@@ -1,3 +1,16 @@
+solidSolvers/solidSolver/solidSolver.C
+solidSolvers/solidSolver/newSolidSolver.C
+solidSolvers/linearGeometrySolid/linearGeometrySolid.C
+solidSolvers/nonLinGeomUpdatedLagrangian/nonLinGeomUpdatedLagrangian.C
+solidSolvers/nonLinGeomTotalLagrangian/nonLinGeomTotalLagrangian.C
+
+fluidSolvers/fluidSolver/fluidSolver.C
+fluidSolvers/fluidSolver/newFluidSolver.C
+fluidSolvers/icoFluid/icoFluid.C
+fluidSolvers/pisoFluid/pisoFluid.C
+fluidSolvers/consistentIcoFluid/consistentIcoFluid.C
+
+
 /*
 fluidSolidInterface/fluidSolidInterface.C
 */
@@ -130,12 +143,6 @@ materialInterfaces = numerics/materialInterfaces
 $(materialInterfaces)/materialInterface/materialInterface.C
 $(materialInterfaces)/TLMaterialInterface/TLMaterialInterface.C
 */
-
-solidSolvers/solidSolver/solidSolver.C
-solidSolvers/solidSolver/newSolidSolver.C
-solidSolvers/linearGeometrySolid/linearGeometrySolid.C
-solidSolvers/nonLinGeomUpdatedLagrangian/nonLinGeomUpdatedLagrangian.C
-solidSolvers/nonLinGeomTotalLagrangian/nonLinGeomTotalLagrangian.C
 
 
 LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
