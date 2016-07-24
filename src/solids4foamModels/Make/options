@@ -1,0 +1,30 @@
+EXE_INC = \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I$(LIB_SRC)/finiteArea/lnInclude \
+    -I$(LIB_SRC)/lagrangian/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/dynamicMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/topoChangerFvMesh/lnInclude \
+    -I$(LIB_SRC)/sampling/lnInclude \
+    -I$(LIB_SRC)/surfMesh/lnInclude \
+    -I$(LIB_SRC)/postProcessing/foamCalcFunctions/lnInclude \
+    -I$(LIB_SRC)/postProcessing/functionObjects/forces/lnInclude \
+    -I$(LIB_SRC)/errorEstimation/lnInclude \
+    -I$(LIB_SRC)/mesh/cfMesh/lnInclude
+
+EXE_LIBS = \
+    -lfiniteVolume \
+    -lmeshTools \
+    -lfiniteArea \
+    -ldynamicFvMesh \
+    -ldynamicMesh \
+    -ltopoChangerFvMesh \
+    -llagrangian \
+    -lsampling \
+    -lsurfMesh \
+    -lfoamCalcFunctions \
+    -lforces \
+    -lerrorEstimation \
+    -lcfMesh

@@ -1,0 +1,130 @@
+# git-ls-files --others --exclude-from=.git/info/exclude
+# Lines that start with '#' are comments.
+
+# ignore eigen and ltensor libraries
+/src/eigen3
+/src/ltensor
+
+# editor and misc backup files - anywhere
+*~
+.*~
+*.bak
+*.bak[0-9][0-9]
+*.orig
+*.orig[0-9][0-9]
+\#*\#
+.DS_Store
+
+# file-browser settings - anywhere
+.directory
+
+# CVS recovered versions - anywhere
+.#*
+
+# objects and archives - anywhere
+*.[oa]
+*.la
+*.so
+*.jar
+*.dylib
+
+# derived files
+lex.yy.c
+
+# Corefiles
+core
+
+# dependency files - anywhere
+*.dep
+
+# lnInclude (symlink) folders - anywhere
+lnInclude
+
+# A hidden file created by the Mac OS X Finder.
+.DS_Store
+
+# build folders - anywhere
+linux*Gcc*/
+linux*Icc*/
+darwin*Gcc*/
+darwin*Intel*/
+linuxming*/
+SiCortex*Gcc*/
+solaris*Gcc*/
+SunOS*Gcc*/
+
+# debian/ derived files
+build-stamp
+debian/files
+debian/openfoam170.debhelper.log
+debian/openfoam170.substvars
+debian/openfoam170/
+debian/stamp-patched
+
+# reinstate wmake/rules that might look like build folders
+!wmake/rules/*/
+
+# doxygen generated documentation
+doc/[Dd]oxygen/html
+doc/[Dd]oxygen/latex
+doc/[Dd]oxygen/man
+
+# generated files in the main directory (e.g. ReleaseNotes-?.?.html)
+/*.html
+
+# patch residue
+*.orig
+*.rej
+
+# pyFoam-stuff
+PlyParser_FoamFileParser_parsetab.py
+
+# python-compile
+*.pyc
+
+# other stuff
+.build
+.hgignore
+.timeStamp
+
+# source packages - anywhere
+*.tar.bz2
+*.tar.gz
+*.tar
+*.tgz
+*.gtgz
+
+# ignore the persistent .build tag in the main directory
+/.build
+
+# ignore .timeStamp in the main directory
+/.timeStamp
+
+# ignore .tags in the main directory
+/.tags
+
+# ignore - changes to the configuration
+etc/cshrc
+etc/bashrc
+etc/settings.csh
+etc/settings.sh
+etc/pref.csh
+etc/pref.sh
+
+# make sure that this settings file is not used
+etc/bashrc.preset
+
+#Test-Harness generated stuff
+
+# The following files are blacklisted because of a DMCA complaint by ANSYS.
+src/lduSolvers/tools/PriorityArray.C
+src/lduSolvers/tools/PriorityArray.H
+src/lduSolvers/amg/amgPolicy/samgPolicy.C
+src/lduSolvers/amg/amgPolicy/samgPolicy.H
+src/lduSolvers/amg/amgPolicy/aamgPolicy.C
+src/lduSolvers/amg/amgPolicy/aamgPolicy.H
+
+# vagrant stuff
+vagrantSandbox/.vagrant/
+
+# end-of-file

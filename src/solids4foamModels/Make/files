@@ -1,0 +1,141 @@
+/*
+fluidSolidInterface/fluidSolidInterface.C
+*/
+
+/*
+functionObjects/forceDisp/forceDisp.C
+functionObjects/hydrostaticPressure/hydrostaticPressure.C
+functionObjects/principalStresses/principalStresses.C
+functionObjects/solidDisp/solidDisp.C
+functionObjects/solidForces/solidForces.C
+functionObjects/solidPointStress/solidPointStress.C
+functionObjects/solidStress/solidStress.C
+functionObjects/solidTractions/solidTractions.C
+functionObjects/stressStrain/stressStrain.C
+functionObjects/stressTriaxiality/stressTriaxiality.C
+*/
+
+fvPatchFields = boundaryConditions/fvPatchFields
+/*
+$(fvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
+$(fvPatchFields)/cohesiveZoneIncrementalModeI/cohesiveZoneIncrementalFvPatchVectorField.C
+$(fvPatchFields)/extrapolated/extrapolatedFvPatchFields.C
+$(fvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
+$(fvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
+$(fvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
+$(fvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
+$(fvPatchFields)/fixedTemperatureGradient/fixedTemperatureGradientFvPatchScalarField.C
+$(fvPatchFields)/solidCohesive/solidCohesiveFvPatchVectorField.C
+$(fvPatchFields)/solidContact/solidContactFvPatchVectorField.C
+$(fvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
+*/
+$(fvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
+/*$(fvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C*/
+$(fvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
+$(fvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
+$(fvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
+$(fvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
+
+/*$(fvPatchFields)/solidTraction/tractionBoundaryGradient/tractionBoundaryGradient.C*/
+
+/*
+contactModels = $(fvPatchFields)/solidContact/contactModels
+normalContactModels = $(contactModels)/normalContactModels
+$(normalContactModels)/normalContactModel/normalContactModel.C
+$(normalContactModels)/normalContactModel/newNormalContactModel.C
+$(normalContactModels)/standardPenalty/standardPenalty.C
+frictionContactModels = $(contactModels)/frictionContactModels
+$(frictionContactModels)/frictionContactModel/frictionContactModel.C
+$(frictionContactModels)/frictionContactModel/newFrictionContactModel.C
+$(frictionContactModels)/frictionless/frictionless.C
+$(frictionContactModels)/standardPenaltyFriction/standardPenaltyFriction.C
+$(frictionContactModels)/frictionLaws/frictionLaw/frictionLaw.C
+$(frictionContactModels)/frictionLaws/frictionLaw/newFrictionLaw.C
+$(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C
+*/
+
+mechanicalModel = materialModels/mechanicalModel
+$(mechanicalModel)/mechanicalModel.C
+
+/*
+cohesiveLaws = $(mechanicalModel)/cohesiveLaws
+$(cohesiveLaws)/cohesiveLaw/cohesiveLaw.C
+$(cohesiveLaws)/cohesiveLaw/newCohesiveLaw.C
+$(cohesiveLaws)/multiMaterialCohesiveLaw/multiMaterialCohesiveLaw.C
+$(cohesiveLaws)/dugdaleCohesiveLaw/dugdaleCohesiveLaw.C
+$(cohesiveLaws)/linearCohesiveLaw/linearCohesiveLaw.C
+
+simpleCohesiveLaws = $(mechanicalModel)/simpleCohesiveLaws
+$(simpleCohesiveLaws)/simpleCohesiveLaw/simpleCohesiveLaw.C
+$(simpleCohesiveLaws)/linear/linearSimpleCohesiveLaw.C
+$(simpleCohesiveLaws)/Dugdale/DugdaleSimpleCohesiveLaw.C
+*/
+
+mechanicalLaws = $(mechanicalModel)/mechanicalLaws
+$(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
+$(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
+/*
+$(mechanicalLaws)/multiMaterial/multiMaterial.C
+$(mechanicalLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C
+$(mechanicalLaws)/PronyViscoelastic/PronyViscoelastic.C
+*/
+$(mechanicalLaws)/linearElastic/linearElastic.C
+$(mechanicalLaws)/neoHookeanElastic/neoHookeanElastic.C
+
+/*$(mechanicalModel)/nonLinearGeometry/nonLinearGeometry.C*/
+
+/*
+thermalModel = materialModels/thermalModel
+$(thermalModel)/thermalModel.C
+thermalLaws = $(thermalModel)/thermalLaws
+$(thermalLaws)/thermalLaw/thermalLaw.C
+$(thermalLaws)/thermalLaw/newThermalLaw.C
+$(thermalLaws)/constantThermal/constantThermal.C
+$(thermalLaws)/multiMaterialThermal/multiMaterialThermal.C
+
+dynamicFvMesh/crackerFvMesh/crackerFvMesh.C
+dynamicFvMesh/crackerFvMesh/faceCracker/faceCracker.C
+dynamicFvMesh/crackerFvMesh/faceCracker/detachFaceCracker.C
+dynamicFvMesh/crackerFvMesh/cohesive/cohesivePolyPatch.C
+
+faceBreakerLaws = dynamicFvMesh/crackerFvMesh/faceBreakerLaws
+$(faceBreakerLaws)/faceBreakerLaw/faceBreakerLaw.C
+$(faceBreakerLaws)/faceBreakerLaw/newFaceBreakerLaw.C
+$(faceBreakerLaws)/effectiveTractionLaw/effectiveTractionLaw.C
+
+pathLimiters = $(faceBreakerLaws)/faceBreakerLaw/crackPathLimiters
+$(pathLimiters)/crackPathLimiter/crackPathLimiter.C
+$(pathLimiters)/crackPathLimiter/newCrackPathLimiter.C
+$(pathLimiters)/boundingBoxLimiter/boundingBoxLimiter.C
+
+dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
+dynamicFvMesh/cellRemovalFvMesh/cellRemovalFvMesh.C
+
+cellRemovalLaws = dynamicFvMesh/cellRemovalFvMesh/cellRemovalLaws
+$(cellRemovalLaws)/cellRemovalLaw/cellRemovalLaw.C
+$(cellRemovalLaws)/cellRemovalLaw/newCellRemovalLaw.C
+$(cellRemovalLaws)/simpleRemovalLaw/simpleRemovalLaw.C
+$(cellRemovalLaws)/sigmaEqLaw/sigmaEqLaw.C
+$(cellRemovalLaws)/boundingBox/boundingBoxRemovalLaw.C
+*/
+
+numerics/newLeastSquaresVolPointInterpolation/newLeastSquaresVolPointInterpolation.C
+/*
+numerics/newSkewCorrectedSnGrad/newSkewCorrectedScalarSnGrad.C
+numerics/newSkewCorrectedSnGrad/newSkewCorrectedVectorSnGrad.C
+numerics/newSkewCorrectedSnGrad/newSkewCorrectedSnGrads.C
+numerics/fvMeshSubset/fvMeshSubset.C
+numerics/logExpVolFields/eig3/eig3.C
+materialInterfaces = numerics/materialInterfaces
+$(materialInterfaces)/materialInterface/materialInterface.C
+$(materialInterfaces)/TLMaterialInterface/TLMaterialInterface.C
+*/
+
+solidSolvers/solidSolver/solidSolver.C
+solidSolvers/solidSolver/newSolidSolver.C
+solidSolvers/linearGeometrySolid/linearGeometrySolid.C
+solidSolvers/nonLinGeomUpdatedLagrangian/nonLinGeomUpdatedLagrangian.C
+solidSolvers/nonLinGeomTotalLagrangian/nonLinGeomTotalLagrangian.C
+
+
+LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
