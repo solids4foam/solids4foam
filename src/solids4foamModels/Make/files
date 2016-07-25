@@ -10,10 +10,16 @@ fluidSolvers/icoFluid/icoFluid.C
 fluidSolvers/pisoFluid/pisoFluid.C
 fluidSolvers/consistentIcoFluid/consistentIcoFluid.C
 
+fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
+fluidSolidInterfaces/fluidSolidInterface/newFluidSolidInterface.C
+fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
+fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInterface.C
+fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
+fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
 
-/*
-fluidSolidInterface/fluidSolidInterface.C
-*/
+fluidFvPatchFields = fluidSolvers/fvPatchFields
+$(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarField.C
 
 /*
 functionObjects/forceDisp/forceDisp.C
@@ -29,11 +35,11 @@ functionObjects/stressTriaxiality/stressTriaxiality.C
 */
 
 fvPatchFields = boundaryConditions/fvPatchFields
+$(fvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 /*
 $(fvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
 $(fvPatchFields)/cohesiveZoneIncrementalModeI/cohesiveZoneIncrementalFvPatchVectorField.C
 $(fvPatchFields)/extrapolated/extrapolatedFvPatchFields.C
-$(fvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(fvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
 $(fvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
 $(fvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C

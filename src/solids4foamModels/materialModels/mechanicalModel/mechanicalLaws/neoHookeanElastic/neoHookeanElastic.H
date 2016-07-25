@@ -28,15 +28,14 @@ Description
     Neo-Hookean elasticity, similar to model proposed in Simo & Hughes (1998)
     in Eqn 9.2.6:
 
-        tau = J*p*I + mu*dev(bEbar)
+        tau = J*p*I + mu*dev(J^(-2.0/3.0)*(F & F.T()))
 
     where
     J        Jacobian of the deformation gradient
     p        hydrostatic pressure
     I        indentity tensor
     mu       shear modulus
-    bEbar    left Cauchy Green strain tensor with the volumetric term removed
-    and bEbar = J^(-2.0/3.0)*(F & F.T())
+    F        deformation gradient
 
     If thermal stresses are active then 3.0*K*alpha*deltaT*I is added.
 
@@ -48,7 +47,7 @@ SourceFiles
     neoHookeanElastic.C
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
@@ -72,15 +71,8 @@ class neoHookeanElastic
 {
     // Private data
 
-        // If the case been restarted
-        const bool restarted_;
-
-        // General properties
-
         // Initial density
         const dimensionedScalar rho_;
-
-        // Elastic properties
 
         // Young's modulus
         const dimensionedScalar E_;
@@ -93,9 +85,6 @@ class neoHookeanElastic
 
         // Bulk modulus
         const dimensionedScalar K_;
-
-        // Elastic left Cauchy-Green sstrain tensor with volumetric term removed
-        volSymmTensorField bEbar_;
 
 
     // Private Member Functions
@@ -135,72 +124,15 @@ public:
         //- Return density
         virtual tmp<volScalarField> rho() const;
 
-        //- Return modulus of elasticity
-        virtual tmp<volScalarField> E() const;
-
-        virtual tmp<volScalarField> E(const volScalarField& epsEq) const
-        {
-            return E();
-        }
-
-        //- Return Poisson's ratio
-        virtual tmp<volScalarField> nu() const;
-
-        //- Return density
-        virtual tmp<volScalarField> rho(scalar t) const
-        {
-            return rho();
-        }
-
-        //- Return modulus of elasticity
-        virtual tmp<volScalarField> E(scalar t) const
-        {
-            return E();
-        }
-
-        //- Return Poisson's ratio
-        virtual tmp<volScalarField> nu(scalar t) const
-        {
-            return nu();
-        }
-
-        //- Return creep compliance
-        virtual tmp<volScalarField> J(scalar t) const
-        {
-            notImplemented(type() + "::J(scalar t)");
-
-            return 1.0/E(t);
-        }
-
-        //- Return plastic modulus
-        virtual tmp<volScalarField> Ep() const;
-
-        virtual tmp<volScalarField> Ep(const volScalarField& sigmaEq) const
-        {
-            return Ep();
-        }
-
-        //- Correct the model
-        // virtual void correct()
-        // {
-        //     notImplemented(type() + "::correct()");
-        // }
+        //- Return the implicit stiffness
+        //  This is the diffusivity for the Laplacian term
+        virtual tmp<volScalarField> impK() const;
 
         //- Update stress based on the mechanical law
         virtual void correct(volSymmTensorField& sigma);
 
-        //- Update stress based on the mechanical law
-        virtual void correct(volSymmTensorField& sigma, const int flag);
-
         //- Update stress based on the mechanical law (surface field)
-        virtual void correct(surfaceSymmTensorField& sigma);
-
-        //- Update the yield stress: called at end of time-step
-        virtual void updateYieldStress()
-        {}
-
-        //- Rate of dissipated energy from plasticity
-        virtual tmp<volScalarField> plasticDissipationRate() const;
+        //virtual void correct(surfaceSymmTensorField& sigma);
 
         //- Set current material index; this is only needed for multiMaterial
         //  analyses

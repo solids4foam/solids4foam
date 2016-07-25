@@ -107,63 +107,9 @@ public:
         //- Return density
         virtual tmp<volScalarField> rho() const;
 
-        //- Return modulus of elasticity
-        virtual tmp<volScalarField> E() const;
-
-        //- Return Poisson's ratio
-        virtual tmp<volScalarField> nu() const;
-
-        //- Return density
-        virtual tmp<volScalarField> rho(scalar t) const
-        {
-            return rho();
-        }
-
-        //- Return modulus of elasticity
-        virtual tmp<volScalarField> E(scalar t) const
-        {
-            return E();
-        }
-
-        virtual tmp<volScalarField> E(const volScalarField& epsEq) const
-        {
-            return E();
-        }
-
-        //- Return Poisson's ratio
-        virtual tmp<volScalarField> nu(scalar t) const
-        {
-            return nu();
-        }
-
-        //- Return creep compliance
-        virtual tmp<volScalarField> J(scalar t) const
-        {
-            notImplemented(type() + "::J(scalar t)");
-
-            return 1.0/E(t);
-        }
-
-        //- Return modulus of plasticity
-        virtual tmp<volScalarField> Ep() const;
-
-        virtual tmp<volScalarField> Ep(const volScalarField& sigmaEq) const
-        {
-            return Ep();
-        }
-
-        //- Return yield stress
-        virtual tmp<volScalarField> sigmaY() const;
-
-        //- Return yield stress given cellID
-        // virtual scalar sigmaY
-        // (
-        //     const scalar epsilonPEq, const label cellID
-        // ) const;
-
-        //- Correct the rheological model
-        // virtual void correct()
-        // {}
+        //- Return the implicit stiffness
+        //  This is the diffusivity for the Laplacian term
+        virtual tmp<volScalarField> impK() const;
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);

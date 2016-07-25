@@ -29,6 +29,7 @@ License
 #include "transformField.H"
 #include "transformGeometricField.H"
 #include "IOdictionary.H"
+#include "linearGeometrySolid.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -66,7 +67,21 @@ Foam::linearElastic::linearElastic
       : nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))
     ),
     mu_(E_/(2.0*(1.0 + nu_)))
-{}
+{
+    // PC: is there are nice way that we can check this, instead of multiple
+    // if-elseif-elseif ...
+    if
+    (
+        mesh.lookupObject<solidSolver>("solidProperties").type()
+     != solidSolvers::linearGeometrySolid::typeName
+    )
+    {
+        WarningIn(type() + "::linearElastic")
+            << "This mechanical law may not be appropriate for the selected "
+            << "mathematical model"
+            << endl;
+    }
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
@@ -103,110 +118,25 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::rho() const
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::linearElastic::E() const
+Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 {
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "E",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            E_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-    tresult().correctBoundaryConditions();
-
-    return tresult;
-}
-
-
-Foam::tmp<Foam::volScalarField> Foam::linearElastic::nu() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "nu",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            nu_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-    tresult().correctBoundaryConditions();
-
-    return tresult;
-}
-
-Foam::tmp<Foam::volScalarField> Foam::linearElastic::Ep() const
-{
-//     notImplemented(type() + "::Ep()");
-
     return tmp<volScalarField>
     (
         new volScalarField
         (
             IOobject
             (
-                "Ep",
+                "impK",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
             mesh(),
-            dimensionedScalar("zeroEp", dimForce/dimArea, 0.0),
-            zeroGradientFvPatchScalarField::typeName
+            2.0*mu_ + lambda_
         )
     );
 }
-
-Foam::tmp<Foam::volScalarField> Foam::linearElastic::sigmaY() const
-{
-//     notImplemented(type() + "::sigmaY()");
-
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "sigmaY",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedScalar("zeroSigmaY", dimForce/dimArea, GREAT),
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-}
-
-// Foam::scalar Foam::linearElastic::sigmaY
-// (
-//     const scalar epsilonPEq, const label cellID
-// ) const
-// {
-//   return GREAT;
-// }
 
 
 void Foam::linearElastic::correct(volSymmTensorField& sigma)
@@ -215,7 +145,7 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
     const volSymmTensorField& epsilon =
         mesh().lookupObject<volSymmTensorField>("epsilon");
 
-    // Hooke's law
+    // Calculate stress based on Hooke's law
     sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
 }
 

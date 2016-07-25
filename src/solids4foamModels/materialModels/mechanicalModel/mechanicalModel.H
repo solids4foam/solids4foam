@@ -45,10 +45,8 @@ Author
 #include "volFields.H"
 #include "tmp.H"
 #include "mechanicalLaw.H"
-//#include "cohesiveLaw.H"
 #include "Switch.H"
 #include "fvc.H"
-#include "IOReferencer.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -69,10 +67,6 @@ class mechanicalModel
 
         //- mechanical law
         autoPtr<mechanicalLaw> mechanicalLawPtr_;
-
-        //- Cohesive dictionary and law
-        // IOdictionary* cohesiveDictPtr_;
-        // autoPtr<cohesiveLaw> cohesiveLawPtr_;
 
         //- Plane stress
         Switch planeStress_;
@@ -110,9 +104,6 @@ public:
 
         // Access
 
-        //- If visco effects are active
-        bool viscoActive() const;
-
         //- Return const reference to mesh
         const fvMesh& mesh() const;
 
@@ -122,13 +113,8 @@ public:
         //- Return mechanical law
         const mechanicalLaw& law() const;
 
-        //- Return cohesive law
-        // const cohesiveLaw& cohLaw() const;
-
         //- Return density
         tmp<volScalarField> rho() const;
-
-        tmp<volScalarField> rho(scalar t) const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
@@ -138,47 +124,8 @@ public:
         //  This is the diffusivity for the Laplacian term
         tmp<surfaceScalarField> impKf() const;
 
-        //- Return first Lame's coefficient
-        tmp<volScalarField> mu() const;
-
-        //- Return first Lame's coefficient
-        tmp<volScalarField> mu(scalar t) const;
-
-        //- Return first Lame's coefficient
-        tmp<volScalarField> mu(const volScalarField& epsilonEq) const;
-
-        //- Return second Lame's coefficient
-        tmp<volScalarField> lambda() const;
-
-        //- Return second Lame's coefficient
-        tmp<volScalarField> lambda(scalar t) const;
-
-        //- Return second Lame's coefficient
-        tmp<volScalarField> lambda(const volScalarField& epsilonEq) const;
-
-        //- Return three times bulk modulus
-        tmp<volScalarField> threeK() const;
-
-        //- Orthotropic tensorial diffusivity. Note this is not the bulk modulus
-        tmp<volDiagTensorField> K() const;
-
-        //- Fourth order elastic stiffness tensor
-        tmp<volSymmTensor4thOrderField> C() const;
-
-        //- Return bulk modulus directly from law
-        tmp<volScalarField> bulkModulus() const;
-
-        //- Return viscosity directly from law
-        tmp<volScalarField> viscosity() const;
-
         //- Update stress based on plasticity stress return vol field
         virtual void correct(volSymmTensorField& sigma);
-
-        //- Update stress based on plasticity stress return vol field
-        virtual void correct(volSymmTensorField& sigma, const int flag);
-
-        //- Update stress based on plasticity stress return surface field
-        virtual void correct(surfaceSymmTensorField& sigma);
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model
@@ -188,7 +135,7 @@ public:
         void updateYieldStress();
 
         //- Rate of dissipated energy from plasticity
-        tmp<volScalarField> plasticDissipationRate() const;
+        //tmp<volScalarField> plasticDissipationRate() const;
 
         //- Read plasticityProperties dictionary
         virtual bool read();

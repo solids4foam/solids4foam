@@ -160,79 +160,17 @@ public:
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
-        virtual tmp<volScalarField> impK() const;
+        virtual tmp<volScalarField> impK() const = 0;
 
         //- Return the implicit stiffness surface field
         //  This is the diffusivity for the Laplacian term
         virtual tmp<surfaceScalarField> impKf() const;
 
-        //- Return modulus of elasticity
-        virtual tmp<volScalarField> E() const = 0;
-
-        //- Return Poisson's ratio
-        virtual tmp<volScalarField> nu() const = 0;
-
-        //- Return density
-        virtual tmp<volScalarField> rho(scalar t) const = 0;
-
-        //- Return modulus of elasticity
-        virtual tmp<volScalarField> E(scalar t) const = 0;
-
-        //- Return modulus of elasticity
-        virtual tmp<volScalarField> E(const volScalarField& epsEq) const = 0;
-
-        //- Return long term non-dimensional relative moduli for viscoelastic
-        virtual tmp<volScalarField> gammaInf() const;
-
-        //- Return non-dimensional relative moduli for viscoelastic
-        virtual PtrList<volScalarField> gamma() const;
-
-        //- Return relaxation time for viscoelastic
-        virtual PtrList<volScalarField> tau() const;
-
-        //- Return Poisson's ratio
-        virtual tmp<volScalarField> nu(scalar t) const = 0;
-
-        //- Return creep compliance
-        virtual tmp<volScalarField> J(scalar t) const = 0;
-
-        //- If effects are active
-        virtual bool viscoActive() const
-        {
-            return false;
-        };
-
-        //- orthotropic tensorial diffusivity
-        virtual tmp<volDiagTensorField> K() const;
-
-        //- fourth order elastic stiffness tensor
-        virtual tmp<volSymmTensor4thOrderField> C() const;
-
-        //- Return bulk modulus
-        virtual tmp<volScalarField> bulkModulus() const;
-
-        //- Return viscosity
-        virtual tmp<volScalarField> viscosity() const;
-
-        //- Correct the mechanical model
-        //virtual void correct() = 0;
-
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma) = 0;
 
         //- Update stress based on plasticity stress return
-        virtual void correct(volSymmTensorField& sigma, const int flag)
-        {
-            notImplemented
-            (
-                "virtual void correct"
-                "(volSymmTensorField& sigma, const int flag)"
-            );
-        }
-
-        //- Update stress based on plasticity stress return
-        virtual void correct(surfaceSymmTensorField& sigma)
-        {}
+        //virtual void correct(surfaceSymmTensorField& sigma) = 0;
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model
@@ -242,16 +180,6 @@ public:
         //- called at end of time-step
         virtual void updateYieldStress()
         {}
-
-        //- Rate of dissipated energy from plasticity
-        virtual tmp<volScalarField> plasticDissipationRate() const
-        {
-            notImplemented("tmp<volScalarField> plasticDissipationRate()");
-
-            // Keep compiler happy
-            tmp<volScalarField>* tmpPtr = NULL;
-            return *tmpPtr;
-        }
 
         // Return reference to current material field
         const volScalarField& curMaterial() const;
