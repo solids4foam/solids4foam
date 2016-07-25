@@ -126,13 +126,6 @@ class nonLinGeomUpdatedLagrangian
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- Global face zones
-        labelList globalFaceZones_;
-
-        //- Global face zones point map from slave processors to the master
-        //  processor
-        IOList<labelList> globalToLocalFaceZonePointMap_;
-
         //- DD equation under-relaxation factor
         const scalar DDEqnRelaxFactor_;
 
@@ -171,13 +164,6 @@ class nonLinGeomUpdatedLagrangian
 
         //- Move the mesh to the deformed configuration
         void moveMesh(const pointField& oldPoints);
-
-        //- Update the points on global face zones when moving the mesh
-        void updateGlobalFaceZoneNewPoints
-        (
-            const pointField& pointDDI,
-            pointField& newPoints
-        );
 
         //- Create global face zone point maps
         void findGlobalFaceZones();

@@ -68,9 +68,6 @@ class solidSolver
         //- Solid properties dictionary
         dictionary solidProperties_;
 
-        //- Mechanical model
-        //mechanicalModel mechanical_;
-
         //- Mechanical properties dictionary
         IOdictionary mechanicalProperties_;
 
@@ -78,18 +75,18 @@ class solidSolver
         autoPtr<mechanicalLaw> mechanicalLawPtr_;
 
         //- Global face zones
-        //mutable labelList* globalFaceZonesPtr_;
+        mutable labelList* globalFaceZonesPtr_;
 
         //- Global to local face zone poin maping
-        //mutable labelListList* globalToLocalFaceZonePointMapPtr_;
+        mutable labelListList* globalToLocalFaceZonePointMapPtr_;
 
     // Private Member Functions
 
         //- Find global face zones
-        //void calcGlobalFaceZones() const;
+        void calcGlobalFaceZones() const;
 
         //- Find global to local point addressing
-        //void calcGlobalToLocalFaceZonePointMap() const;
+        void calcGlobalToLocalFaceZonePointMap() const;
 
         //- Disallow default bitwise copy construct
         solidSolver(const solidSolver&);
@@ -232,12 +229,19 @@ public:
             // currentFaceZonePoints(const label zoneID) const = 0;
 
             //- Get global face zones list
-            // const labelList& globalFaceZones() const;
+            const labelList& globalFaceZones() const;
 
             //- Get global to local face zone point addressing
-            // const labelListList& globalToLocalFaceZonePointMap() const;
+            const labelListList& globalToLocalFaceZonePointMap() const;
 
         // Edit
+
+            //- Update the points on global face zones when moving the mesh
+            void updateGlobalFaceZoneNewPoints
+            (
+                const pointField& pointDDI,
+                pointField& newPoints
+            );
 
             //- Set traction at specified patch
             // virtual void setTraction
@@ -342,8 +346,8 @@ public:
             virtual void end()
             {}
 
-            //- Read flowProperties dictionary
-            // virtual bool read();
+            //- Read solidProperties dictionary
+            virtual bool read();
 };
 
 

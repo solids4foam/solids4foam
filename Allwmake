@@ -1,0 +1,7 @@
+#!/bin/sh
+set -x
+
+
+wmake libso src/solids4foamModels
+
+wmake all applications/solvers

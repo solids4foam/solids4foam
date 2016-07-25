@@ -37,216 +37,327 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-// void Foam::solidSolver::calcGlobalFaceZones() const
-// {
-//     // Find global face zones
-//     if (globalFaceZonesPtr_)
-//     {
-//         FatalErrorIn
-//         (
-//             "void solidSolver::calcGlobalFaceZones() const"
-//         )
-//             << "Global face zones already fonud"
-//                 << abort(FatalError);
-//     }
+void Foam::solidSolver::calcGlobalFaceZones() const
+{
+    // Find global face zones
+    if (globalFaceZonesPtr_)
+    {
+        FatalErrorIn
+        (
+            "void solidSolver::calcGlobalFaceZones() const"
+        )
+            << "Global face zones already found"
+            << abort(FatalError);
+    }
 
-//     SLList<label> globalFaceZonesSet;
+    if (Pstream::parRun())
+    {
+        SLList<label> globalFaceZonesSet;
 
-//     const faceZoneMesh& faceZones = mesh().faceZones();
+        // Previous method
+        // const faceZoneMesh& faceZones = mesh().faceZones();
+        // forAll(faceZones, zoneI)
+        // {
+        //     const faceZone& curFaceZone = faceZones[zoneI];
+        //     forAll(curFaceZone, faceI)
+        //     {
+        //         // If unused face exist
+        //         if (curFaceZone[faceI] >= mesh().nFaces())
+        //         {
+        //             globalFaceZonesSet.insert(zoneI);
+        //             break;
+        //         }
+        //     }
+        // }
 
-//     forAll(faceZones, zoneI)
-//     {
-//         const faceZone& curFaceZone = faceZones[zoneI];
+        // New method: directly lookup globalFaceZones from decomposeParDict
+        IOdictionary decompDict
+        (
+            IOobject
+            (
+                "decomposeParDict",
+                mesh().time().time().system(),
+                mesh().time(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false
+            )
+        );
 
-//         forAll(curFaceZone, faceI)
-//         {
-//             // if unused face exist
-//             if (curFaceZone[faceI] >= mesh().nFaces())
-//             {
-//                 globalFaceZonesSet.insert(zoneI);
-//                 break;
-//             }
-//         }
-//     }
+        if (decompDict.found("globalFaceZones"))
+        {
+            wordList globalFaceZoneNames(decompDict.lookup("globalFaceZones"));
 
-//     globalFaceZonesPtr_ = new labelList(globalFaceZonesSet);
-// }
+            const faceZoneMesh& faceZones = mesh().faceZones();
+
+            forAll(globalFaceZoneNames, nameI)
+            {
+                const label zoneID =
+                    faceZones.findZoneID(globalFaceZoneNames[nameI]);
+
+                if (zoneID == -1)
+                {
+                    FatalErrorIn(type() + "::findGlobalFaceZones")
+                        << "Cannot find globalFaceZone:"
+                        << " " << globalFaceZoneNames[nameI]
+                        << abort(FatalError);
+                }
+
+                globalFaceZonesSet.insert(zoneID);
+            }
+
+            globalFaceZonesPtr_ = new labelList(globalFaceZonesSet);
+        }
+    }
+    else
+    {
+        globalFaceZonesPtr_ = new labelList(0);
+    }
+}
 
 
-// void Foam::solidSolver::calcGlobalToLocalFaceZonePointMap() const
-// {
-//     // Find global face zones
-//     if (globalToLocalFaceZonePointMapPtr_)
-//     {
-//         FatalErrorIn
-//         (
-//             "void solidSolver::calcGlobalToLocalFaceZonePointMap() const"
-//         )
-//             << "Global to local face zones point map already exists"
-//                 << abort(FatalError);
-//     }
+void Foam::solidSolver::calcGlobalToLocalFaceZonePointMap() const
+{
+    // Find global face zones
+    if (globalToLocalFaceZonePointMapPtr_)
+    {
+        FatalErrorIn
+        (
+            "void solidSolver::calcGlobalToLocalFaceZonePointMap() const"
+        )   << "Global to local face zones point map already exists"
+            << abort(FatalError);
+    }
 
-//     globalToLocalFaceZonePointMapPtr_ =
-//         new labelListList(globalFaceZones().size());
+    globalToLocalFaceZonePointMapPtr_ =
+        new labelListList(globalFaceZones().size());
 
-//     labelListList& globalToLocalFaceZonePointMap =
-//         *globalToLocalFaceZonePointMapPtr_;
+    labelListList& globalToLocalFaceZonePointMap =
+        *globalToLocalFaceZonePointMapPtr_;
 
-//     forAll(globalFaceZones(), zoneI)
-//     {
-//         label curZoneID = globalFaceZones()[zoneI];
+    const labelList& globalFaceZones = this->globalFaceZones();
 
-//         labelList curMap(mesh().faceZones()[curZoneID]().nPoints(), -1);
+    forAll(globalFaceZones, zoneI)
+    {
+        const label curZoneID = globalFaceZones[zoneI];
 
-//         vectorField fzGlobalPoints =
-//             mesh().faceZones()[curZoneID]().localPoints();
+        Info<< "Creating faceMap for globalFaceZones "
+            << mesh().faceZones()[curZoneID].name()<< endl;
 
-//         //- set all slave points to zero because only the master order is used
-//         if(!Pstream::master())
-//         {
-//             fzGlobalPoints *= 0.0;
-//         }
+        labelList curMap(mesh().faceZones()[curZoneID]().nPoints(), -1);
 
-//         //- pass points to all procs
-//         reduce(fzGlobalPoints, sumOp<vectorField>());
+        vectorField fzGlobalPoints =
+            mesh().faceZones()[curZoneID]().localPoints();
 
-//         //- now every proc has the master's list of FZ points
-//         //- every proc must now find the mapping from their local FZ points to
-//         //- the global FZ points
+        // Set all slave points to zero because only the master order is used
+        if(!Pstream::master())
+        {
+            fzGlobalPoints = vector::zero;
+        }
 
-//         const vectorField& fzLocalPoints =
-//             mesh().faceZones()[curZoneID]().localPoints();
+        // Pass points to all procs
+        reduce(fzGlobalPoints, sumOp<vectorField>());
 
-//         const edgeList& fzLocalEdges =
-//             mesh().faceZones()[curZoneID]().edges();
+        // Now every proc has the master's list of FZ points
+        // every proc must now find the mapping from their local FZ points to
+        // the global FZ points
 
-//         const labelListList& fzPointEdges =
-//             mesh().faceZones()[curZoneID]().pointEdges();
+        const vectorField& fzLocalPoints =
+            mesh().faceZones()[curZoneID]().localPoints();
 
-//         scalarField minEdgeLength(fzLocalPoints.size(), GREAT);
+        const edgeList& fzLocalEdges =
+            mesh().faceZones()[curZoneID]().edges();
 
-//         forAll(minEdgeLength, pI)
-//         {
-//             const labelList& curPointEdges = fzPointEdges[pI];
+        const labelListList& fzPointEdges =
+            mesh().faceZones()[curZoneID]().pointEdges();
 
-//             forAll(curPointEdges, eI)
-//             {
-//                 scalar Le = fzLocalEdges[curPointEdges[eI]].mag(fzLocalPoints);
-//                 if (Le < minEdgeLength[pI])
-//                 {
-//                     minEdgeLength[pI] = Le;
-//                 }
-//             }
-//         }
+        scalarField minEdgeLength(fzLocalPoints.size(), GREAT);
 
-//         forAll(fzGlobalPoints, globalPointI)
-//         {
-//             boolList visited(fzLocalPoints.size(), false);
+        forAll(minEdgeLength, pI)
+        {
+            const labelList& curPointEdges = fzPointEdges[pI];
 
-//             forAll(fzLocalPoints, procPointI)
-//             {
-//                 if (!visited[procPointI])
-//                 {
-//                     visited[procPointI] = true;
+            forAll(curPointEdges, eI)
+            {
+                const scalar Le =
+                    fzLocalEdges[curPointEdges[eI]].mag(fzLocalPoints);
 
-//                     label nextPoint = procPointI;
+                if (Le < minEdgeLength[pI])
+                {
+                    minEdgeLength[pI] = Le;
+                }
+            }
+        }
 
-//                     scalar curDist =
-//                         mag
-//                         (
-//                             fzLocalPoints[nextPoint]
-//                           - fzGlobalPoints[globalPointI]
-//                         );
+        forAll(fzGlobalPoints, globalPointI)
+        {
+            boolList visited(fzLocalPoints.size(), false);
 
-//                     if (curDist < 1e-4*minEdgeLength[nextPoint])
-//                     {
-//                         curMap[globalPointI] = nextPoint;
-//                         break;
-//                     }
+            forAll(fzLocalPoints, procPointI)
+            {
+                if (!visited[procPointI])
+                {
+                    visited[procPointI] = true;
 
-//                     label found = false;
+                    label nextPoint = procPointI;
 
-//                     while (nextPoint != -1)
-//                     {
-//                         const labelList& nextPointEdges =
-//                             fzPointEdges[nextPoint];
+                    scalar curDist =
+                        mag
+                        (
+                            fzLocalPoints[nextPoint]
+                          - fzGlobalPoints[globalPointI]
+                        );
 
-//                         scalar minDist = GREAT;
-//                         label index = -1;
-//                         forAll(nextPointEdges, edgeI)
-//                         {
-//                             label curNgbPoint =
-//                                 fzLocalEdges[nextPointEdges[edgeI]]
-//                                .otherVertex(nextPoint);
+                    if (curDist < 1e-4*minEdgeLength[nextPoint])
+                    {
+                        curMap[globalPointI] = nextPoint;
+                        break;
+                    }
 
-//                             if (!visited[curNgbPoint])
-//                             {
-//                                 visited[curNgbPoint] = true;
+                    label found = false;
 
-//                                 scalar curDist =
-//                                     mag
-//                                     (
-//                                         fzLocalPoints[curNgbPoint]
-//                                       - fzGlobalPoints[globalPointI]
-//                                     );
+                    while (nextPoint != -1)
+                    {
+                        const labelList& nextPointEdges =
+                            fzPointEdges[nextPoint];
 
-//                                 if (curDist < 1e-4*minEdgeLength[curNgbPoint])
-//                                 {
-//                                     curMap[globalPointI] = curNgbPoint;
-//                                     found = true;
-//                                     break;
-//                                 }
-//                                 else if (curDist < minDist)
-//                                 {
-//                                     minDist = curDist;
-//                                     index = curNgbPoint;
-//                                 }
-//                             }
-//                         }
+                        scalar minDist = GREAT;
+                        label index = -1;
+                        forAll(nextPointEdges, edgeI)
+                        {
+                            label curNgbPoint =
+                                fzLocalEdges[nextPointEdges[edgeI]]
+                               .otherVertex(nextPoint);
 
-//                         nextPoint = index;
-//                     }
+                            if (!visited[curNgbPoint])
+                            {
+                                visited[curNgbPoint] = true;
 
-//                     if (found)
-//                     {
-//                         break;
-//                     }
-//                 }
-//             }
+                                scalar curDist =
+                                    mag
+                                    (
+                                        fzLocalPoints[curNgbPoint]
+                                      - fzGlobalPoints[globalPointI]
+                                    );
 
-// //             forAll(fzLocalPoints, procPointI)
-// //             {
-// //                 scalar curDist =
-// //                     mag
-// //                     (
-// //                         fzLocalPoints[procPointI]
-// //                       - fzGlobalPoints[globalPointI]
-// //                     );
+                                if (curDist < 1e-4*minEdgeLength[curNgbPoint])
+                                {
+                                    curMap[globalPointI] = curNgbPoint;
+                                    found = true;
+                                    break;
+                                }
+                                else if (curDist < minDist)
+                                {
+                                    minDist = curDist;
+                                    index = curNgbPoint;
+                                }
+                            }
+                        }
 
-// //                 if (curDist < 1e-4*minEdgeLength[procPointI])
-// //                 {
-// //                     curMap[globalPointI] = procPointI;
-// //                     break;
-// //                 }
-// //             }
-//         }
+                        nextPoint = index;
+                    }
 
-//         forAll(curMap, globalPointI)
-//         {
-//             if (curMap[globalPointI] == -1)
-//             {
-//                 FatalErrorIn
-//                 (
-//                     "solidSolver::calcGlobalToLocalFaceZonePointMap()"
-//                 )
-//                     << "local to global face zone point map is not correct"
-//                         << abort(FatalError);
-//             }
-//         }
+                    if (found)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
 
-//         globalToLocalFaceZonePointMap[zoneI] = curMap;
-//     }
-// }
+        forAll(curMap, globalPointI)
+        {
+            if (curMap[globalPointI] == -1)
+            {
+                FatalErrorIn
+                (
+                    "solidSolver::calcGlobalToLocalFaceZonePointMap()"
+                )   << "local to global face zone point map is not correct"
+                    << abort(FatalError);
+            }
+        }
+
+        globalToLocalFaceZonePointMap[zoneI] = curMap;
+    }
+}
+
+
+void Foam::solidSolver::updateGlobalFaceZoneNewPoints
+(
+    const pointField& pointDDI,
+    pointField& newPoints
+)
+{
+    const labelList& globalFaceZones = this->globalFaceZones();
+    const labelListList& globalToLocalFaceZonePointMap =
+        this->globalToLocalFaceZonePointMap();
+
+    forAll(globalFaceZones, zoneI)
+    {
+        const label curZoneID = globalFaceZones[zoneI];
+
+        const labelList& curMap = globalToLocalFaceZonePointMap[zoneI];
+
+        const labelList& curZoneMeshPoints =
+            mesh().faceZones()[curZoneID]().meshPoints();
+
+        vectorField curGlobalZonePointDispl
+        (
+            curZoneMeshPoints.size(),
+            vector::zero
+        );
+
+        // Inter-proc points are shared by multiple procs
+        // pointNumProc is the number of procs which a point lies on
+        scalarField pointNumProcs(curZoneMeshPoints.size(), 0);
+
+        forAll(curGlobalZonePointDispl, globalPointI)
+        {
+            label localPoint = curMap[globalPointI];
+
+            if(curZoneMeshPoints[localPoint] < mesh().nPoints())
+            {
+                label procPoint = curZoneMeshPoints[localPoint];
+
+                curGlobalZonePointDispl[globalPointI] = pointDDI[procPoint];
+
+                pointNumProcs[globalPointI] = 1;
+            }
+        }
+
+        if (Pstream::parRun())
+        {
+            reduce(curGlobalZonePointDispl, sumOp<vectorField>());
+            reduce(pointNumProcs, sumOp<scalarField>());
+
+            // Now average the displacement between all procs
+            curGlobalZonePointDispl /= pointNumProcs;
+        }
+
+        // The curZonePointsDisplGlobal now contains the correct face zone
+        // displacement in a global master processor order, now convert them
+        // back into the local proc order
+
+        vectorField curZonePointDispl(curZoneMeshPoints.size(), vector::zero);
+
+        forAll(curGlobalZonePointDispl, globalPointI)
+        {
+            label localPoint = curMap[globalPointI];
+
+            curZonePointDispl[localPoint] =
+                curGlobalZonePointDispl[globalPointI];
+        }
+
+        forAll(curZonePointDispl, pointI)
+        {
+            // Unused points
+            if (curZoneMeshPoints[pointI] >= mesh().nPoints())
+            {
+                newPoints[curZoneMeshPoints[pointI]] +=
+                    curZonePointDispl[pointI];
+            }
+        }
+    }
+}
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -261,7 +372,7 @@ Foam::solidSolver::solidSolver
     (
         IOobject
         (
-            // PC: should this be dict as it is not property related?
+            // PC: maybe this should be a Dict instead of a Properties
             "solidProperties",
             mesh.time().constant(), // PC: system?
             mesh,
@@ -289,9 +400,9 @@ Foam::solidSolver::solidSolver
         (
             "law", mesh, mechanicalProperties_.subDict("mechanical")
         )
-    )
-// globalFaceZonesPtr_(NULL),
-    // globalToLocalFaceZonePointMapPtr_(NULL)
+    ),
+    globalFaceZonesPtr_(NULL),
+    globalToLocalFaceZonePointMapPtr_(NULL)
 {}
 
 
@@ -299,38 +410,35 @@ Foam::solidSolver::solidSolver
 
 Foam::solidSolver::~solidSolver()
 {
-    // deleteDemandDrivenData(globalFaceZonesPtr_);
-    // deleteDemandDrivenData(globalToLocalFaceZonePointMapPtr_);
+    deleteDemandDrivenData(globalFaceZonesPtr_);
+    deleteDemandDrivenData(globalToLocalFaceZonePointMapPtr_);
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-// bool Foam::solidSolver::thermalStress() const
-// {
-//     return mesh().objectRegistry::found("thermalProperties");
-// }
 
-// const Foam::labelList& Foam::solidSolver::globalFaceZones() const
-// {
-//     if (!globalFaceZonesPtr_)
-//     {
-//         calcGlobalFaceZones();
-//     }
+const Foam::labelList& Foam::solidSolver::globalFaceZones() const
+{
+    if (!globalFaceZonesPtr_)
+    {
+        calcGlobalFaceZones();
+    }
 
-//     return *globalFaceZonesPtr_;
-// }
+    return *globalFaceZonesPtr_;
+}
 
-// const Foam::labelListList&
-// Foam::solidSolver::globalToLocalFaceZonePointMap() const
-// {
-//     if (!globalToLocalFaceZonePointMapPtr_)
-//     {
-//         calcGlobalToLocalFaceZonePointMap();
-//     }
 
-//     return *globalToLocalFaceZonePointMapPtr_;
-// }
+const Foam::labelListList&
+Foam::solidSolver::globalToLocalFaceZonePointMap() const
+{
+    if (!globalToLocalFaceZonePointMapPtr_)
+    {
+        calcGlobalToLocalFaceZonePointMap();
+    }
+
+    return *globalToLocalFaceZonePointMapPtr_;
+}
 
 
 void Foam::solidSolver::writeFields(const Time& runTime)
@@ -339,19 +447,19 @@ void Foam::solidSolver::writeFields(const Time& runTime)
 }
 
 
-// bool Foam::solidSolver::read()
-// {
-//     if (regIOobject::read())
-//     {
-//         solidProperties_ = subDict(type() + "Coeffs");
+bool Foam::solidSolver::read()
+{
+    if (regIOobject::read())
+    {
+        solidProperties_ = subDict(type() + "Coeffs");
 
-//         return true;
-//     }
-//     else
-//     {
-//         return false;
-//     }
-// }
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
 
 
 // ************************************************************************* //

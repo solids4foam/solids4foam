@@ -1,0 +1,8 @@
+#!/bin/sh
+set -x
+
+wclean lib src/solids4foamModels
+
+wclean applications/solvers/solidFoam
+wclean applications/solvers/fluidFoam
+wclean applications/solvers/fsiFoam
