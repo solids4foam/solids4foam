@@ -1,3 +1,3 @@
 
 // Create solid model
-autoPtr<solidSolver> solid = solidSolver::New(mesh);
+autoPtr<solidModel> solid = solidModel::New(mesh);

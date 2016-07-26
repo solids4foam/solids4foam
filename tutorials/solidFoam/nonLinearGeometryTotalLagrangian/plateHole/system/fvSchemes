@@ -43,7 +43,6 @@ laplacianSchemes
 snGradSchemes
 {
     default            none;
-    snGrad(D)          skewCorrected 1;
 }
 
 interpolationSchemes

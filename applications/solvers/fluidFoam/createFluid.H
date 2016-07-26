@@ -1,3 +1,3 @@
 
 // Create fluid solver
-autoPtr<fluidSolver> fluid = fluidSolver::New(mesh);
+autoPtr<fluidModel> fluid = fluidModel::New(mesh);

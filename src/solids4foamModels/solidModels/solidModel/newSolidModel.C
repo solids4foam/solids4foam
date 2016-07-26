@@ -51,6 +51,8 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New(fvMesh& mesh)
         solidProperties.lookup("solidModel") >> solidModelTypeName;
     }
 
+    Info<< "Selecting solidModel " << solidModelTypeName << endl;
+
     dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_->find(solidModelTypeName);
 
