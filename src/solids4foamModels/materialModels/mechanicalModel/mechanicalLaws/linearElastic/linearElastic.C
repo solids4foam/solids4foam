@@ -29,7 +29,7 @@ License
 #include "transformField.H"
 #include "transformGeometricField.H"
 #include "IOdictionary.H"
-#include "linearGeometrySolid.H"
+//#include "linGeomSolid.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -70,17 +70,17 @@ Foam::linearElastic::linearElastic
 {
     // PC: is there are nice way that we can check this, instead of multiple
     // if-elseif-elseif ...
-    if
-    (
-        mesh.lookupObject<solidSolver>("solidProperties").type()
-     != solidSolvers::linearGeometrySolid::typeName
-    )
-    {
-        WarningIn(type() + "::linearElastic")
-            << "This mechanical law may not be appropriate for the selected "
-            << "mathematical model"
-            << endl;
-    }
+//     if
+//     (
+//         mesh.lookupObject<solidSolver>("solidProperties").type()
+//      != solidSolvers::linearGeometrySolid::typeName
+//     )
+//     {
+//         WarningIn(type() + "::linearElastic")
+//             << "This mechanical law may not be appropriate for the selected "
+//             << "mathematical model"
+//             << endl;
+//     }
 }
 
 

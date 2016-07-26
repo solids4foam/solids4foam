@@ -1,14 +1,14 @@
-solidSolvers/solidSolver/solidSolver.C
-solidSolvers/solidSolver/newSolidSolver.C
-solidSolvers/linearGeometrySolid/linearGeometrySolid.C
-solidSolvers/nonLinGeomUpdatedLagrangian/nonLinGeomUpdatedLagrangian.C
-solidSolvers/nonLinGeomTotalLagrangian/nonLinGeomTotalLagrangian.C
+solidModels/solidModel/solidModel.C
+solidModels/solidModel/newSolidModel.C
+solidModels/linGeomSolid/linGeomSolid.C
+solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
+solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
 
-fluidSolvers/fluidSolver/fluidSolver.C
-fluidSolvers/fluidSolver/newFluidSolver.C
-fluidSolvers/icoFluid/icoFluid.C
-fluidSolvers/pisoFluid/pisoFluid.C
-fluidSolvers/consistentIcoFluid/consistentIcoFluid.C
+fluidModels/fluidModel/fluidModel.C
+fluidModels/fluidModel/newFluidModel.C
+fluidModels/icoFluid/icoFluid.C
+fluidModels/pisoFluid/pisoFluid.C
+fluidModels/consistentIcoFluid/consistentIcoFluid.C
 
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/fluidSolidInterface/newFluidSolidInterface.C
@@ -17,7 +17,7 @@ fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInt
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
 fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
 
-fluidFvPatchFields = fluidSolvers/fvPatchFields
+fluidFvPatchFields = fluidModels/fvPatchFields
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarField.C
 

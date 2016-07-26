@@ -1,0 +1,305 @@
+/*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           | Copyright held by original author
+     \\/     M anipulation  |
+-------------------------------------------------------------------------------
+License
+    This file is part of OpenFOAM.
+
+    OpenFOAM is free software; you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation; either version 2 of the License, or (at your
+    option) any later version.
+
+    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+    for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with OpenFOAM; if not, write to the Free Software Foundation,
+    Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+
+\*---------------------------------------------------------------------------*/
+
+#include "IQNILSCouplingInterface.H"
+#include "addToRunTimeSelectionTable.H"
+#include "RectangularMatrix.H"
+// #include "volFields.H"
+// #include "fvm.H"
+// #include "fvc.H"
+// #include "fvMatrices.H"
+//#include "adjustPhi.H"
+//#include "findRefCell.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+namespace fluidSolidInterfaces
+{
+
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+defineTypeNameAndDebug(IQNILSCouplingInterface, 0);
+addToRunTimeSelectionTable
+(
+    fluidSolidInterface, IQNILSCouplingInterface, dictionary
+);
+
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+IQNILSCouplingInterface::IQNILSCouplingInterface
+(
+    dynamicFvMesh& fluidMesh,
+    fvMesh& solidMesh
+)
+:
+    fluidSolidInterface(typeName, fluidMesh, solidMesh),
+    relaxationFactor_(readScalar(lookup("relaxationFactor"))),
+    fluidPatchPointsV_(),
+    fluidPatchPointsW_(),
+    fluidPatchPointsT_()
+{}
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void IQNILSCouplingInterface::updateDisplacement()
+{
+    Info<< nl << "Time = " << fluid().runTime().timeName()
+        << ", iteration: " << outerCorr() << endl;
+
+    if (outerCorr() == 1)
+    {
+        // Clean up data from old time steps
+
+        Info<< "Modes before clean-up : " << fluidPatchPointsT_.size();
+
+        while (true)
+        {
+            if (fluidPatchPointsT_.size())
+            {
+                if
+                (
+                    fluid().runTime().timeIndex()-couplingReuse()
+                  > fluidPatchPointsT_[0]
+                )
+                {
+                    for (label i = 0; i < fluidPatchPointsT_.size() - 1; i++)
+                    {
+                        fluidPatchPointsT_[i] = fluidPatchPointsT_[i + 1];
+                        fluidPatchPointsV_[i] = fluidPatchPointsV_[i + 1];
+                        fluidPatchPointsW_[i] = fluidPatchPointsW_[i + 1];
+                    }
+
+                    fluidPatchPointsT_.remove();
+                    fluidPatchPointsV_.remove();
+                    fluidPatchPointsW_.remove();
+                }
+                else
+                {
+                    break;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        Info<< ", modes after clean-up : "
+            << fluidPatchPointsT_.size() << endl;
+    }
+    else if (outerCorr() == 2)
+    {
+        // Set reference in the first coupling iteration
+        solidZonePointsDisplRef() = solidZonePointsDispl();
+        fluidZonePointsDisplRef() = fluidZonePointsDispl();
+    }
+    else
+    {
+        // Reference has been set in the first coupling iteration
+        fluidPatchPointsV_.append
+        (
+            (
+                solidZonePointsDispl()
+              - fluidZonePointsDispl()
+            )
+          - (
+                solidZonePointsDisplRef()
+              - fluidZonePointsDisplRef()
+            )
+        );
+
+        fluidPatchPointsW_.append
+        (
+            solidZonePointsDispl()
+            - solidZonePointsDisplRef()
+        );
+
+        fluidPatchPointsT_.append
+        (
+            fluid().runTime().timeIndex()
+        );
+    }
+
+    if (fluidPatchPointsT_.size() > 1)
+    {
+        // Previoulsy given in the function:
+        // updateDisplacementUsingIQNILS();
+
+        // Consider fluidPatchPointsV as a matrix V
+        // with as columns the items
+        // in the DynamicList and calculate the QR-decomposition of V
+        // with modified Gram-Schmidt
+        label cols = fluidPatchPointsV_.size();
+        RectangularMatrix<scalar> R(cols, cols, 0.0);
+        RectangularMatrix<scalar> C(cols, 1);
+        RectangularMatrix<scalar> Rcolsum(1, cols);
+        DynamicList<vectorField> Q;
+
+        for (label i = 0; i < cols; i++)
+        {
+            Q.append(fluidPatchPointsV_[cols-1-i]);
+        }
+
+        for (label i = 0; i < cols; i++)
+        {
+            // Normalize column i
+            R[i][i] = Foam::sqrt(sum(Q[i] & Q[i]));
+            Q[i] /= R[i][i];
+
+            // Orthogonalize columns to the right of column i
+            for (label j = i+1; j < cols; j++)
+            {
+                R[i][j] = sum(Q[i] & Q[j]);
+                Q[j] -= R[i][j]*Q[i];
+            }
+
+            // Project minus the residual vector on the Q
+            C[i][0] = sum
+                (
+                    Q[i]
+                  & (
+                        fluidZonePointsDispl()
+                      - solidZonePointsDispl()
+                    )
+                );
+        }
+
+        // Solve the upper triangular system
+        for (label j = 0; j < cols; j++)
+        {
+            Rcolsum[0][j] = 0.0;
+            for (label i = 0; i < j+1; i++)
+            {
+                Rcolsum[0][j] += cmptMag(R[i][j]);
+            }
+        }
+        scalar epsilon = 1.0E-10*max(Rcolsum);
+        for (label i = 0; i < cols; i++)
+        {
+            if (cmptMag(R[i][i]) > epsilon)
+            {
+                for (label j = i + 1; j < cols; j++)
+                {
+                    R[i][j] /= R[i][i];
+                }
+                C[i][0] /= R[i][i];
+                R[i][i] = 1.0;
+            }
+        }
+        for (label j = cols-1; j >= 0; j--)
+        {
+            if (cmptMag(R[j][j]) > epsilon)
+            {
+                for (label i = 0; i < j; i++)
+                {
+                    C[i][0] -= C[j][0]*R[i][j];
+                }
+            }
+            else
+            {
+                C[j][0] = 0.0;
+            }
+        }
+
+        fluidZonePointsDisplPrev() = fluidZonePointsDispl();
+
+        fluidZonePointsDispl() = solidZonePointsDispl();
+
+        for (label i = 0; i < cols; i++)
+        {
+            fluidZonePointsDispl() += fluidPatchPointsW_[i]*C[cols-1-i][0];
+        }
+    }
+    else
+    {
+        // Relax the interface displacement
+        Info<< "Current fsi under-relaxation factor: "
+            << relaxationFactor_ << endl;
+
+        fluidZonePointsDisplPrev() = fluidZonePointsDispl();
+
+        fluidZonePointsDispl() += relaxationFactor_*residual();
+    }
+
+
+    // Make sure that displacement on all processors is equal to one
+    // calculated on master processor
+    if (Pstream::parRun())
+    {
+        if (!Pstream::master())
+        {
+            fluidZonePointsDispl() = vector::zero;
+        }
+
+        //- pass to all procs
+        reduce(fluidZonePointsDispl(), sumOp<vectorField>());
+
+        label globalFluidZoneIndex =
+            findIndex(fluid().globalFaceZones(), fluidZoneIndex());
+
+        if (globalFluidZoneIndex == -1)
+        {
+            FatalErrorIn
+            (
+                "fluidSolidInterface::updateDisplacement()"
+            )   << "global zone point map is not availabel"
+                << abort(FatalError);
+        }
+
+        const labelList& map =
+            fluid().globalToLocalFaceZonePointMap()[globalFluidZoneIndex];
+
+        if (!Pstream::master())
+        {
+            vectorField fluidZonePointsDisplGlobal =
+                fluidZonePointsDispl();
+
+            forAll(fluidZonePointsDisplGlobal, globalPointI)
+            {
+                label localPoint = map[globalPointI];
+
+                fluidZonePointsDispl()[localPoint] =
+                    fluidZonePointsDisplGlobal[globalPointI];
+            }
+        }
+    }
+}
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace fluidSolidInterfaces
+
+} // End namespace Foam
+
+// ************************************************************************* //

@@ -27,8 +27,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
-#include "solidSolver.H"
-//#include "tractionBoundaryGradient.H"
+#include "solidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -215,7 +214,7 @@ void solidTractionFvPatchVectorField::updateCoeffs()
     }
 
     gradient() =
-        patch().boundaryMesh().mesh().lookupObject<solidSolver>
+        patch().boundaryMesh().mesh().lookupObject<solidModel>
         (
             "solidProperties"
         ).tractionBoundarySnGrad
