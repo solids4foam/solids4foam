@@ -68,8 +68,11 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
 )
 :
     fluidSolidInterface(typeName, fluidMesh, solidMesh),
-    relaxationFactor_(readScalar(lookup("relaxationFactor"))),
-    couplingReuse_(lookupOrDefault<int>("couplingReuse", 0)),
+    relaxationFactor_
+    (
+        fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
+    ),
+    couplingReuse_(fsiProperties().lookupOrDefault<int>("couplingReuse", 0)),
     fluidPatchPointsV_(),
     fluidPatchPointsW_(),
     fluidPatchPointsT_()

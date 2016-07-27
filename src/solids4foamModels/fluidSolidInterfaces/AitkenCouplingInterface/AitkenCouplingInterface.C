@@ -62,7 +62,10 @@ AitkenCouplingInterface::AitkenCouplingInterface
 )
 :
     fluidSolidInterface(typeName, fluidMesh, solidMesh),
-    relaxationFactor_(readScalar(lookup("relaxationFactor"))),
+    relaxationFactor_
+    (
+        fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
+    ),
     aitkenRelaxationFactor_(relaxationFactor_)
 {}
 

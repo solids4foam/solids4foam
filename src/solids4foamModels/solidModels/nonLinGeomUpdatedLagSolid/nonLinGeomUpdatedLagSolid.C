@@ -451,11 +451,23 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(fvMesh& mesh)
       ? mesh.solutionDict().relaxationFactor("DDEqn")
       : 1.0
     ),
-    solutionTol_(lookupOrDefault<scalar>("solutionTolerance", 1e-06)),
-    alternativeTol_(lookupOrDefault<scalar>("alternativeTolerance", 1e-07)),
-    materialTol_(lookupOrDefault<scalar>("materialTolerance", 1e-05)),
-    infoFrequency_(lookupOrDefault<int>("infoFrequency", 100)),
-    nCorr_(lookupOrDefault<int>("nCorrectors", 1000)),
+    solutionTol_
+    (
+        solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
+    ),
+    alternativeTol_
+    (
+        solidProperties().lookupOrDefault<scalar>("alternativeTolerance", 1e-07)
+    ),
+    materialTol_
+    (
+        solidProperties().lookupOrDefault<scalar>("materialTolerance", 1e-05)
+    ),
+    infoFrequency_
+    (
+        solidProperties().lookupOrDefault<int>("infoFrequency", 100)
+    ),
+    nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
     maxIterReached_(0),
     stabilisePressure_(lookupOrDefault<Switch>("stabilisePressure", false))
 {

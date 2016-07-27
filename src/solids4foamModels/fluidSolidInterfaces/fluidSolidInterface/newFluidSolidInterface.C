@@ -52,8 +52,10 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
             )
         );
 
-        fsiProperties.lookup("fsiSolidInterface") >> fsiTypeName;
+        fsiProperties.lookup("fluidSolidInterface") >> fsiTypeName;
     }
+
+    Info<< "Selecting fluidSolidInterface " << fsiTypeName << endl;
 
     dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_->find(fsiTypeName);

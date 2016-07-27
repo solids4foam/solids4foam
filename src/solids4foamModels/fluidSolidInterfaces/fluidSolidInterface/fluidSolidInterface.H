@@ -111,6 +111,9 @@ class fluidSolidInterface
         //- Fsi coupling on/off
         Switch coupled_;
 
+        //- Optional: enable coupling after specified time
+        const scalar couplingStartTime_;
+
         //- Interface deformation limit
         scalar interfaceDeformationLimit_;
 
@@ -154,6 +157,9 @@ class fluidSolidInterface
         mutable scalarField* minEdgeLengthPtr_;
 
     // Private Member Functions
+
+        //- Update the coupled switch based on the couplingStartTime
+        bool updateCoupled();
 
         //- Calculate current solid zone points
         void calcCurrentSolidZonePoints() const;

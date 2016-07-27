@@ -48,6 +48,23 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
+bool Foam::fluidSolidInterface::updateCoupled()
+{
+    if (couplingStartTime_ > SMALL)
+    {
+        if (runTime().value() > (couplingStartTime_ - SMALL))
+        {
+            // Enable coupling
+            coupled_ = true;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 void Foam::fluidSolidInterface::calcCurrentSolidZonePoints() const
 {
     // Find global face zones
@@ -425,6 +442,10 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrDefault<Switch>("coupled", true)
     ),
+    couplingStartTime_
+    (
+        fsiProperties_.lookupOrDefault<scalar>("couplingStartTime", -1.0)
+    ),
     interfaceDeformationLimit_
     (
         fsiProperties_.lookupOrDefault<scalar>("interfaceDeformationLimit", 0.0)
@@ -446,6 +467,20 @@ Foam::fluidSolidInterface::fluidSolidInterface
     accumulatedFluidInterfaceDisplacementPtr_(NULL),
     minEdgeLengthPtr_(NULL)
 {
+    // Check if couplingStartTime is specified
+    if (couplingStartTime_ > SMALL)
+    {
+        if (coupled_)
+        {
+            WarningIn(type + "::fsiProperties(...)")
+                << "When using the coupilngStartTime option, the coupled "
+                << "option should be set to off: resetting coupled to off"
+                 << endl;
+
+            coupled_ = false;
+        }
+    }
+
     // Solid patch index
 
     const word solidPatchName(fsiProperties_.lookup("solidPatch"));
@@ -555,6 +590,7 @@ Foam::fluidSolidInterface::~fluidSolidInterface()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+
 const Foam::vectorField&
 Foam::fluidSolidInterface::currentSolidZonePoints() const
 {
@@ -641,12 +677,13 @@ void Foam::fluidSolidInterface::initializeFields()
 
     outerCorr_ = 0;
 
-    nOuterCorr_ = fsiProperties_.lookupOrDefault<int>("nOuterCorr", 30);
+    // PC: do we need to re-read these?
+    // nOuterCorr_ = fsiProperties_.lookupOrDefault<int>("nOuterCorr", 30);
 
-    outerCorrTolerance_ =
-        fsiProperties_.lookupOrDefault<scalar>("outerCorrTolerance", 1e-6);
+    // outerCorrTolerance_ =
+    //     fsiProperties_.lookupOrDefault<scalar>("outerCorrTolerance", 1e-6);
 
-    coupled_ = fsiProperties_.lookupOrDefault<Switch>("coupled", true);
+    //coupled_ = fsiProperties_.lookupOrDefault<Switch>("coupled", true);
 }
 
 
@@ -1029,6 +1066,10 @@ void Foam::fluidSolidInterface::updateForce()
             fluidZonePressure
         );
 
+    if (!coupled())
+    {
+        updateCoupled();
+    }
 
     if (coupled())
     {
