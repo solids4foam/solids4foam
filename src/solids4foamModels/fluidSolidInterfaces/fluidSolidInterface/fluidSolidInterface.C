@@ -35,7 +35,7 @@ License
 #include "tetFemMatrices.H"
 #include "fixedValuePointPatchFields.H"
 #include "ZoneIDs.H"
-#include "ggiInterpolation.H"
+#include "newGgiInterpolation.H"
 //#include "RBFMotionSolver.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -140,7 +140,7 @@ void Foam::fluidSolidInterface::calcGgiInterpolator() const
             0,              // Non-overlapping face tolerances
             0,              // HJ, 24/Oct/2008
             true,           // Rescale weighting factors.  Bug fix, MB.
-            ggiInterpolation::AABB
+            newGgiInterpolation::AABB
             // N_SQUARED BB_OCTREE AABB THREE_D_DISTANCE
             // Octree search, MB.
         );

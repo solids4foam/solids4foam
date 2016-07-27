@@ -97,10 +97,10 @@ void Foam::mechanicalModel::correct(Foam::volSymmTensorField& sigma)
 }
 
 
-// void Foam::mechanicalModel::correct(Foam::surfaceSymmTensorField& sigma)
-// {
-//     mechanicalLawPtr_->correct(sigma);
-// }
+void Foam::mechanicalModel::correct(Foam::surfaceSymmTensorField& sigma)
+{
+    mechanicalLawPtr_->correct(sigma);
+}
 
 
 Foam::scalar Foam::mechanicalModel::residual()

@@ -124,8 +124,11 @@ public:
         //  This is the diffusivity for the Laplacian term
         tmp<surfaceScalarField> impKf() const;
 
-        //- Update stress based on plasticity stress return vol field
+        //- Calculate the stress vol field
         virtual void correct(volSymmTensorField& sigma);
+
+        //- Calculate the stress surface field
+        virtual void correct(surfaceSymmTensorField& sigma);
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model

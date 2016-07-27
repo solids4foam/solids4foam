@@ -149,4 +149,16 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
     sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
 }
 
+
+void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
+{
+    // Lookup the strain tensor from the solver
+    const surfaceSymmTensorField& epsilon =
+        mesh().lookupObject<surfaceSymmTensorField>("epsilonf");
+
+    // Calculate stress based on Hooke's law
+    sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
+}
+
+
 // ************************************************************************* //

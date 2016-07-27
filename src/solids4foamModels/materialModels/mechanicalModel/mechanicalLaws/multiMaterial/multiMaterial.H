@@ -104,66 +104,21 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-        //- Return modulus of elasticity
-        virtual tmp<volScalarField> E() const;
-
-        virtual tmp<volScalarField> E(const volScalarField& epsEq) const;
-
-        //- Return Poisson's ratio
-        virtual tmp<volScalarField> nu() const;
-
-        //- Return density
-        virtual tmp<volScalarField> rho(scalar t) const
-        {
-            return rho();
-        }
-
-        //- Return modulus of elasticity
-        virtual tmp<volScalarField> E(scalar t) const
-        {
-            return E();
-        }
-
-        //- Return Poisson's ratio
-        virtual tmp<volScalarField> nu(scalar) const
-        {
-            return nu();
-        }
-
-        //- Return creep compliance
-        virtual tmp<volScalarField> J(scalar t) const
-        {
-            notImplemented(type() + "::J(scalar t)");
-
-            return 1.0/E(t);
-        }
-
-        //- Orthotropic linear elastic properties
-        virtual tmp<volDiagTensorField> K() const;
-        virtual tmp<volSymmTensor4thOrderField> C() const;
-
-        //- Correct the model
-        virtual void correct();
-
-        //- Update stress based on plasticity stress return vol field
+        //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
 
-        //- Update stress based on plasticity stress return
-        virtual void correct(volSymmTensorField& sigma, const int flag);
-
-        //- Update stress based on plasticity stress return surface field
+        //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model
         virtual scalar residual();
 
-        //- Update the yield stress
-        //- called at end of time-step
+        //- Update the yield stress, called at end of time-step
         virtual void updateYieldStress();
 
         //- Rate of dissipated energy from plasticity
-        virtual tmp<volScalarField> plasticDissipationRate() const;
+        //virtual tmp<volScalarField> plasticDissipationRate() const;
 };
 
 

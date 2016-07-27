@@ -34,9 +34,7 @@ License
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
-
 #include "fvcGradf.H"
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -1056,6 +1054,9 @@ bool nonLinGeomUpdatedLagSolid::evolve()
 
     // Total displacement at points
     pointD_ = pointD_.oldTime() + pointDD_;
+
+    // Velocity
+    U_ = fvc::ddt(D_);
 
     return true;
 }

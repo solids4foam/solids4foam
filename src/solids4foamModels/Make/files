@@ -3,6 +3,8 @@ solidModels/solidModel/newSolidModel.C
 solidModels/linGeomSolid/linGeomSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
 solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
+solidModels/unsLinGeomSolid/unsLinGeomSolid.C
+solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/fluidModel/newFluidModel.C
@@ -36,6 +38,12 @@ functionObjects/stressTriaxiality/stressTriaxiality.C
 
 fvPatchFields = boundaryConditions/fvPatchFields
 $(fvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
+$(fvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
+$(fvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
+$(fvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
+$(fvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
+$(fvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
+
 /*
 $(fvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
 $(fvPatchFields)/cohesiveZoneIncrementalModeI/cohesiveZoneIncrementalFvPatchVectorField.C
@@ -47,15 +55,8 @@ $(fvPatchFields)/fixedTemperatureGradient/fixedTemperatureGradientFvPatchScalarF
 $(fvPatchFields)/solidCohesive/solidCohesiveFvPatchVectorField.C
 $(fvPatchFields)/solidContact/solidContactFvPatchVectorField.C
 $(fvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
+$(fvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C
 */
-$(fvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
-/*$(fvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C*/
-$(fvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
-$(fvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
-$(fvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
-$(fvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
-
-/*$(fvPatchFields)/solidTraction/tractionBoundaryGradient/tractionBoundaryGradient.C*/
 
 /*
 contactModels = $(fvPatchFields)/solidContact/contactModels
@@ -101,7 +102,6 @@ $(mechanicalLaws)/PronyViscoelastic/PronyViscoelastic.C
 $(mechanicalLaws)/linearElastic/linearElastic.C
 $(mechanicalLaws)/neoHookeanElastic/neoHookeanElastic.C
 
-/*$(mechanicalModel)/nonLinearGeometry/nonLinearGeometry.C*/
 
 /*
 thermalModel = materialModels/thermalModel
@@ -139,10 +139,10 @@ $(cellRemovalLaws)/boundingBox/boundingBoxRemovalLaw.C
 */
 
 numerics/newLeastSquaresVolPointInterpolation/newLeastSquaresVolPointInterpolation.C
-/*
-numerics/newSkewCorrectedSnGrad/newSkewCorrectedScalarSnGrad.C
-numerics/newSkewCorrectedSnGrad/newSkewCorrectedVectorSnGrad.C
+numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newSkewCorrectedSnGrad/newSkewCorrectedSnGrads.C
+
+/*
 numerics/fvMeshSubset/fvMeshSubset.C
 numerics/logExpVolFields/eig3/eig3.C
 materialInterfaces = numerics/materialInterfaces

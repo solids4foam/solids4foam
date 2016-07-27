@@ -113,6 +113,9 @@ public:
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
+
+        //- Calculate the stress
+        virtual void correct(surfaceSymmTensorField& sigma);
 };
 
 

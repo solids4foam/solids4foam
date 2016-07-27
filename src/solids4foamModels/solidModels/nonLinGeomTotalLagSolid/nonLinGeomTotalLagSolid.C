@@ -31,7 +31,6 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
-
 #include "fvcGradf.H"
 
 
@@ -842,6 +841,9 @@ bool nonLinGeomTotalLagSolid::evolve()
 
     // Interpolate D from cells to points
     volToPoint_.interpolate(D_, pointD_);
+
+    // Velocity
+    U_ = fvc::ddt(D_);
 
     return true;
 }

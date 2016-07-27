@@ -128,11 +128,11 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-        //- Update stress based on the mechanical law
+        //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
 
-        //- Update stress based on the mechanical law (surface field)
-        //virtual void correct(surfaceSymmTensorField& sigma);
+        //- Calculate the stress
+        virtual void correct(surfaceSymmTensorField& sigma);
 
         //- Set current material index; this is only needed for multiMaterial
         //  analyses

@@ -169,8 +169,8 @@ public:
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma) = 0;
 
-        //- Update stress based on plasticity stress return
-        //virtual void correct(surfaceSymmTensorField& sigma) = 0;
+        //- Calculate the stress
+        virtual void correct(surfaceSymmTensorField& sigma);
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model

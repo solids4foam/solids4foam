@@ -172,7 +172,6 @@ Foam::tmp<Foam::volScalarField> Foam::multiMaterial::rho() const
             mesh(),
             dimensionedScalar("zeroRho", dimDensity, 0),
             calculatedFvPatchScalarField::typeName
-            //zeroGradientFvPatchScalarField::typeName
         )
     );
     volScalarField& result = tresult();
@@ -241,208 +240,6 @@ Foam::tmp<Foam::volScalarField> Foam::multiMaterial::impK() const
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::multiMaterial::E() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "E",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedScalar("zeroE", dimForce/dimArea, 0),
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-    volScalarField& result = tresult();
-
-    // Accumulate data for all fields
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    forAll(laws, lawI)
-    {
-        result.internalField() +=
-            indicator(lawI)*laws[lawI].E()().internalField();
-    }
-
-    result.correctBoundaryConditions();
-
-    return tresult;
-}
-
-
-Foam::tmp<Foam::volScalarField>
-Foam::multiMaterial::E(const volScalarField& epsEq) const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "E",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::AUTO_WRITE
-            ),
-            mesh(),
-            dimensionedScalar("zeroE", dimForce/dimArea, 0),
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-    volScalarField& result = tresult();
-
-    // Accumulate data for all fields
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    forAll(laws, lawI)
-    {
-        result.internalField() +=
-            indicator(lawI)*laws[lawI].E(epsEq)().internalField();
-    }
-
-//     forAll(result.boundaryField(),patchI)
-//     {
-//         forAll(laws, lawI)
-//         {
-//             result.boundaryField()[patchI] +=
-//                 indicator(lawI)().boundaryField()[patchI]
-//                 *laws[lawI].E(t)().boundaryField()[patchI];
-//         }
-//     }
-
-    result.correctBoundaryConditions();
-
-    return tresult;
-}
-
-
-Foam::tmp<Foam::volScalarField> Foam::multiMaterial::nu() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "nu",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedScalar("zeroE", dimless, 0),
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-    volScalarField& result = tresult();
-
-    // Accumulate data for all fields
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    forAll(laws, lawI)
-    {
-        result.internalField() +=
-            indicator(lawI)*laws[lawI].nu()().internalField();
-    }
-
-    result.correctBoundaryConditions();
-
-    return tresult;
-}
-
-
-Foam::tmp<Foam::volDiagTensorField> Foam::multiMaterial::K() const
-{
-    tmp<volDiagTensorField> tresult
-    (
-        new volDiagTensorField
-        (
-            IOobject
-            (
-                "K",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedDiagTensor("zeroK", dimForce/dimArea, diagTensor::zero),
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-    volDiagTensorField& result = tresult();
-
-    // Accumulate data for all fields
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    forAll(laws, lawI)
-      {
-    result.internalField() +=
-      indicator(lawI)*laws[lawI].K()().internalField();
-      }
-
-    result.correctBoundaryConditions();
-
-    return tresult;
-}
-
-Foam::tmp<Foam::volSymmTensor4thOrderField> Foam::multiMaterial::C() const
-{
-    tmp<volSymmTensor4thOrderField> tresult
-    (
-        new volSymmTensor4thOrderField
-        (
-            IOobject
-            (
-                "C",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedSymmTensor4thOrder
-            ("zeroC", dimForce/dimArea, symmTensor4thOrder::zero),
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-    volSymmTensor4thOrderField& result = tresult();
-
-    // Accumulate data for all fields
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    forAll(laws, lawI)
-    {
-        result.internalField() +=
-      indicator(lawI)*laws[lawI].C()().internalField();
-    }
-
-    result.correctBoundaryConditions();
-
-    return tresult;
-}
-
-
-void Foam::multiMaterial::correct()
-{
-    PtrList<mechanicalLaw>& laws = *this;
-
-    forAll(laws, lawI)
-    {
-        laws[lawI].correct();
-    }
-}
-
-
 void Foam::multiMaterial::correct(volSymmTensorField& sigma)
 {
     PtrList<mechanicalLaw>& laws = *this;
@@ -450,17 +247,6 @@ void Foam::multiMaterial::correct(volSymmTensorField& sigma)
     forAll(laws, lawI)
     {
         laws[lawI].correct(sigma);
-    }
-}
-
-
-void Foam::multiMaterial::correct(volSymmTensorField& sigma, const int flag)
-{
-    PtrList<mechanicalLaw>& laws = *this;
-
-    forAll(laws, lawI)
-    {
-        laws[lawI].correct(sigma, flag);
     }
 }
 
@@ -502,39 +288,39 @@ void Foam::multiMaterial::updateYieldStress()
 }
 
 
-Foam::tmp<Foam::volScalarField>
-Foam::multiMaterial::plasticDissipationRate() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "PlasticDissipationRate",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedScalar("zeroE", dimForce/(dimArea*dimTime), 0)
-        )
-    );
-    volScalarField& result = tresult();
+// Foam::tmp<Foam::volScalarField>
+// Foam::multiMaterial::plasticDissipationRate() const
+// {
+//     tmp<volScalarField> tresult
+//     (
+//         new volScalarField
+//         (
+//             IOobject
+//             (
+//                 "PlasticDissipationRate",
+//                 mesh().time().timeName(),
+//                 mesh(),
+//                 IOobject::NO_READ,
+//                 IOobject::NO_WRITE
+//             ),
+//             mesh(),
+//             dimensionedScalar("zeroE", dimForce/(dimArea*dimTime), 0)
+//         )
+//     );
+//     volScalarField& result = tresult();
 
-    // Accumulate data for all fields
-    const PtrList<mechanicalLaw>& laws = *this;
+//     // Accumulate data for all fields
+//     const PtrList<mechanicalLaw>& laws = *this;
 
-    forAll(laws, lawI)
-    {
-        result += laws[lawI].curMaterial()*laws[lawI].plasticDissipationRate();
-    }
+//     forAll(laws, lawI)
+//     {
+//         result += laws[lawI].curMaterial()*laws[lawI].plasticDissipationRate();
+//     }
 
-    result.correctBoundaryConditions();
+//     result.correctBoundaryConditions();
 
-    return tresult;
-}
+//     return tresult;
+// }
 
 
 // ************************************************************************* //
