@@ -70,6 +70,9 @@ class IQNILSCouplingInterface
         //- Fixed under-relaxation factor
         const scalar relaxationFactor_;
 
+        //- Coupling reuse
+        label couplingReuse_;
+
         //- Coupling field V
         DynamicList<vectorField> fluidPatchPointsV_;
 
@@ -82,6 +85,8 @@ class IQNILSCouplingInterface
 
     // Private Member Functions
 
+        //- Reuse coupling
+        label couplingReuse() const;
 
         //- Disallow default bitwise copy construct
         IQNILSCouplingInterface(const IQNILSCouplingInterface&);
@@ -93,7 +98,7 @@ class IQNILSCouplingInterface
 public:
 
     //- Runtime type information
-    TypeName("IQNILSCoupling");
+    TypeName("IQNILS");
 
 
     // Constructors
@@ -113,9 +118,6 @@ public:
 
 
     // Member Functions
-
-        // Access
-
 
         // Edit
 

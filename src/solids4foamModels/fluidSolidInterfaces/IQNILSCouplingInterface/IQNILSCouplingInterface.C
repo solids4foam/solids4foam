@@ -53,6 +53,11 @@ addToRunTimeSelectionTable
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
+label IQNILSCouplingInterface::couplingReuse() const
+{
+    return couplingReuse_;
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -64,6 +69,7 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
 :
     fluidSolidInterface(typeName, fluidMesh, solidMesh),
     relaxationFactor_(readScalar(lookup("relaxationFactor"))),
+    couplingReuse_(lookupOrDefault<int>("couplingReuse", 0)),
     fluidPatchPointsV_(),
     fluidPatchPointsW_(),
     fluidPatchPointsT_()

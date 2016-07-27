@@ -62,7 +62,7 @@ fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface
 )
 :
     fluidSolidInterface(typeName, fluidMesh, solidMesh),
-    relaxationFactor_(readScalar(lookup("relaxationFactor")))
+    relaxationFactor_(readScalar(fsiProperties().lookup("relaxationFactor")))
 {}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

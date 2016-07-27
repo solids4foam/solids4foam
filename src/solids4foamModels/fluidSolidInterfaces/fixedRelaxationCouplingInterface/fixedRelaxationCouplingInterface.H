@@ -81,7 +81,7 @@ class fixedRelaxationCouplingInterface
 public:
 
     //- Runtime type information
-    TypeName("fixedRelaxationCoupling");
+    TypeName("fixedRelaxation");
 
 
     // Constructors

@@ -81,7 +81,7 @@ class AitkenCouplingInterface
 public:
 
     //- Runtime type information
-    TypeName("AitkenCoupling");
+    TypeName("Aitken");
 
 
     // Constructors

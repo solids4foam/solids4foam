@@ -1,0 +1,5 @@
+#!/bin/sh
+set -x
+
+# clean all tutorials
+foamCleanTutorials cases

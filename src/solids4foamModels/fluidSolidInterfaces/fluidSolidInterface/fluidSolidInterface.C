@@ -413,13 +413,21 @@ Foam::fluidSolidInterface::fluidSolidInterface
     currentSolidZonePointsPtr_(NULL),
     currentSolidZonePatchPtr_(NULL),
     ggiInterpolatorPtr_(NULL),
-    outerCorrTolerance_(readScalar(lookup("outerCorrTolerance"))),
-    nOuterCorr_(readInt(lookup("nOuterCorr"))),
-    coupled_(lookup("coupled")),
-    couplingReuse_(readInt(lookup("couplingReuse"))),
+    outerCorrTolerance_
+    (
+        fsiProperties_.lookupOrDefault<scalar>("outerCorrTolerance", 1e-06)
+    ),
+    nOuterCorr_
+    (
+        fsiProperties_.lookupOrDefault<int>("nOuterCorr", 30)
+    ),
+    coupled_
+    (
+        fsiProperties_.lookupOrDefault<Switch>("coupled", true)
+    ),
     interfaceDeformationLimit_
     (
-        readScalar(lookup("interfaceDeformationLimit"))
+        fsiProperties_.lookupOrDefault<scalar>("interfaceDeformationLimit", 0.0)
     ),
     fluidZonePointsDispl_(),
     fluidZonePointsDisplRef_(),
@@ -433,14 +441,14 @@ Foam::fluidSolidInterface::fluidSolidInterface
     outerCorr_(0),
     interpolatorUpdateFrequency_
     (
-        readInt(lookup("interpolatorUpdateFrequency"))
+        fsiProperties_.lookupOrDefault<int>("interpolatorUpdateFrequency", 0)
     ),
     accumulatedFluidInterfaceDisplacementPtr_(NULL),
     minEdgeLengthPtr_(NULL)
 {
     // Solid patch index
 
-    const word solidPatchName(lookup("solidPatch"));
+    const word solidPatchName(fsiProperties_.lookup("solidPatch"));
 
     const polyPatchID solidPatch
     (
@@ -460,7 +468,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
 
     // Solid face zone index
 
-    const word solidZoneName(lookup("solidZone"));
+    const word solidZoneName(fsiProperties_.lookup("solidZone"));
 
     const faceZoneID solidZone
     (
@@ -481,7 +489,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
 
     // Fluid patch index
 
-    const word fluidPatchName(lookup("fluidPatch"));
+    const word fluidPatchName(fsiProperties_.lookup("fluidPatch"));
 
     const polyPatchID fluidPatch
     (
@@ -501,7 +509,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
 
     // Fluid face zone index
 
-    const word fluidZoneName(lookup("fluidZone"));
+    const word fluidZoneName(fsiProperties_.lookup("fluidZone"));
 
     const faceZoneID fluidZone
     (
@@ -633,13 +641,12 @@ void Foam::fluidSolidInterface::initializeFields()
 
     outerCorr_ = 0;
 
-    nOuterCorr_ = readInt(lookup("nOuterCorr"));
+    nOuterCorr_ = fsiProperties_.lookupOrDefault<int>("nOuterCorr", 30);
 
-    outerCorrTolerance_ = readScalar(lookup("outerCorrTolerance"));
+    outerCorrTolerance_ =
+        fsiProperties_.lookupOrDefault<scalar>("outerCorrTolerance", 1e-6);
 
-    coupled_ = Switch(lookup("coupled"));
-
-    couplingReuse_ = readInt(lookup("couplingReuse"));
+    coupled_ = fsiProperties_.lookupOrDefault<Switch>("coupled", true);
 }
 
 

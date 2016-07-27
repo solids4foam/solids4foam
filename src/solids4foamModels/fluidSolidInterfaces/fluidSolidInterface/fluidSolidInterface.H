@@ -111,9 +111,6 @@ class fluidSolidInterface
         //- Fsi coupling on/off
         Switch coupled_;
 
-        //- Coupling reuse
-        label couplingReuse_;
-
         //- Interface deformation limit
         scalar interfaceDeformationLimit_;
 
@@ -260,6 +257,12 @@ public:
                 return fluidMesh_.time();
             }
 
+            //- Return sub-dictionary
+            const dictionary& fsiProperties() const
+            {
+                return fsiProperties_;
+            }
+
             //- Return fluid model
             const fluidModel& fluid() const
             {
@@ -340,12 +343,6 @@ public:
             Switch& coupled()
             {
                 return coupled_;
-            }
-
-            //- Is it fluid and solid coupled
-            label couplingReuse() const
-            {
-                return couplingReuse_;
             }
 
             //- Return relaxation factor
