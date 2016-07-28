@@ -16,10 +16,11 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 //solidModel   linearGeometrySolid;
-solidModel     nonLinearGeometryUpdatedLagrangian;
+//solidModel     nonLinearGeometryUpdatedLagrangian;
+solidModel     unsNonLinearGeometryUpdatedLagrangian;
 
 // nonLinearGeometryUpdatedLagrangian: suitable for large strains and rotations
-nonLinearGeometryUpdatedLagrangianCoeffs
+"nonLinearGeometryUpdatedLagrangianCoeffs|unsNonLinearGeometryUpdatedLagrangianCoeffs"
 {
     // Maximum number of momentum correctors
     nCorrectors             1000;

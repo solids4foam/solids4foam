@@ -146,10 +146,10 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     const fvMesh& mesh = this->mesh();
 
     // Lookup the total deformation gradient from the solver
-    const surfaceTensorField& F = mesh.lookupObject<surfaceTensorField>("F");
+    const surfaceTensorField& F = mesh.lookupObject<surfaceTensorField>("Ff");
 
     // Lookup the Jacobian of the deformation gradient from the solver
-    const surfaceScalarField& J = mesh.lookupObject<surfaceScalarField>("J");
+    const surfaceScalarField& J = mesh.lookupObject<surfaceScalarField>("Jf");
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
     surfaceSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(F & F.T());

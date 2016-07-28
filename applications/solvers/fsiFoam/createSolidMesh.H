@@ -1,12 +1,18 @@
-Info << " Reading solid mesh" << endl;
+Info<< "Create solid dynamic mesh for time = "
+    << runTime.timeName() << nl << endl;
 
-fvMesh solidMesh
+autoPtr<dynamicFvMesh> solidMeshPtr
 (
-    IOobject
+    dynamicFvMesh::New
     (
-        "solid",
-        runTime.timeName(),
-        runTime,
-        IOobject::MUST_READ
+            IOobject
+            (
+                "solid",
+                runTime.timeName(),
+                runTime,
+                IOobject::MUST_READ
+            )
     )
 );
+
+dynamicFvMesh& solidMesh = solidMeshPtr();

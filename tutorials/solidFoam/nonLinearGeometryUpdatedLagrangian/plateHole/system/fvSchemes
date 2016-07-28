@@ -37,12 +37,14 @@ divSchemes
 laplacianSchemes
 {
     default            none;
+    laplacian(DD,D)    Gauss linear skewCorrected 1;
     laplacian(DDD,DD)  Gauss linear skewCorrected 1;
 }
 
 snGradSchemes
 {
     default            none;
+    snGrad(D)          skewCorrected 1;
     snGrad(DD)         skewCorrected 1;
 }
 
