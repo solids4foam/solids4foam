@@ -41,7 +41,7 @@ SourceFiles
 #ifndef fluidSolidInterface_H
 #define fluidSolidInterface_H
 
-#include "fvMesh.H"
+#include "dynamicFvMesh.H"
 #include "IOdictionary.H"
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
@@ -75,7 +75,7 @@ class fluidSolidInterface
         autoPtr<fluidModel> fluid_;
 
         //- Solid mesh
-        fvMesh& solidMesh_;
+        dynamicFvMesh& solidMesh_;
 
         //- Solid solver
         autoPtr<solidModel> solid_;
@@ -209,7 +209,7 @@ public:
             fluidSolidInterface,
             dictionary,
             (
-                dynamicFvMesh& fluidMesh, fvMesh& solidMesh
+                dynamicFvMesh& fluidMesh, dynamicFvMesh& solidMesh
             ),
             (fluidMesh, solidMesh)
         );
@@ -222,7 +222,7 @@ public:
         (
             const word& type,
             dynamicFvMesh& fluidMesh,
-            fvMesh& solidMesh
+            dynamicFvMesh& solidMesh
         );
 
 
@@ -232,7 +232,7 @@ public:
         static autoPtr<fluidSolidInterface> New
         (
             dynamicFvMesh& fluidMesh,
-            fvMesh& solidMesh
+            dynamicFvMesh& solidMesh
         );
 
 
@@ -252,7 +252,7 @@ public:
             }
 
             //- Return solid mesh
-            const fvMesh& solidMesh() const
+            const dynamicFvMesh& solidMesh() const
             {
                 return solidMesh_;
             }

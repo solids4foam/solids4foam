@@ -96,7 +96,7 @@ scalar unsNonLinGeomTotalLagSolid::residual() const
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid(fvMesh& mesh)
+unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
 :
     solidModel(typeName, mesh),
     D_

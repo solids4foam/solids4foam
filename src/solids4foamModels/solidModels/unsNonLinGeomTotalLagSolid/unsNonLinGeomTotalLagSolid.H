@@ -191,7 +191,7 @@ public:
     // Constructors
 
         //- Construct from components
-        unsNonLinGeomTotalLagSolid(fvMesh& mesh);
+        unsNonLinGeomTotalLagSolid(dynamicFvMesh& mesh);
 
 
     // Destructor

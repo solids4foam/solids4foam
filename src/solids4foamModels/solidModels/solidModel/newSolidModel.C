@@ -28,7 +28,7 @@ License
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-Foam::autoPtr<Foam::solidModel> Foam::solidModel::New(fvMesh& mesh)
+Foam::autoPtr<Foam::solidModel> Foam::solidModel::New(dynamicFvMesh& mesh)
 {
     word solidModelTypeName;
 
@@ -60,7 +60,7 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New(fvMesh& mesh)
     {
         FatalErrorIn
         (
-            "solidModel::New(fvMesh&)"
+            "solidModel::New(dynamicFvMesh&)"
         )   << "Unknown solidModel type " << solidModelTypeName
             << endl << endl
             << "Valid solidModel types are :" << endl

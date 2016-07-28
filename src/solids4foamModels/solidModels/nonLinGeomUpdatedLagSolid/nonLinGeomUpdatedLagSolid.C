@@ -270,7 +270,7 @@ void nonLinGeomUpdatedLagSolid::moveMesh(const pointField& oldPoints)
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(fvMesh& mesh)
+nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
 :
     solidModel(typeName, mesh),
     DD_

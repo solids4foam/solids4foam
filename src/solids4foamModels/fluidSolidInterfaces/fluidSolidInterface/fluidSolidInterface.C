@@ -404,7 +404,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
 (
     const word& type,
     dynamicFvMesh& fluidMesh,
-    fvMesh& solidMesh
+    dynamicFvMesh& solidMesh
 )
 :
     IOdictionary

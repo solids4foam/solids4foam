@@ -90,7 +90,7 @@ public:
         AitkenCouplingInterface
         (
             dynamicFvMesh& fluidMesh,
-            fvMesh& solidMesh
+            dynamicFvMesh& solidMesh
         );
 
 

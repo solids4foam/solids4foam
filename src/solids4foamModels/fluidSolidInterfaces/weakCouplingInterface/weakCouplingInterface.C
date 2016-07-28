@@ -58,7 +58,7 @@ addToRunTimeSelectionTable
 weakCouplingInterface::weakCouplingInterface
 (
     dynamicFvMesh& fluidMesh,
-    fvMesh& solidMesh
+    dynamicFvMesh& solidMesh
 )
 :
     fluidSolidInterface(typeName, fluidMesh, solidMesh),

@@ -186,7 +186,7 @@ public:
     // Constructors
 
         //- Construct from components
-        nonLinGeomUpdatedLagSolid(fvMesh& mesh);
+        nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh);
 
 
     // Destructor

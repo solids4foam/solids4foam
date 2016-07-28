@@ -365,7 +365,7 @@ void Foam::solidModel::updateGlobalFaceZoneNewPoints
 Foam::solidModel::solidModel
 (
     const word& type,
-    fvMesh& mesh
+    dynamicFvMesh& mesh
 )
 :
     IOdictionary

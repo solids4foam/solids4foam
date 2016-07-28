@@ -143,7 +143,7 @@ bool unsLinGeomSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-unsLinGeomSolid::unsLinGeomSolid(fvMesh& mesh)
+unsLinGeomSolid::unsLinGeomSolid(dynamicFvMesh& mesh)
 :
     solidModel(typeName, mesh),
     D_

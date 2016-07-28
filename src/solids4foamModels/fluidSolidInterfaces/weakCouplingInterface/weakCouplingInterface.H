@@ -94,7 +94,7 @@ public:
         weakCouplingInterface
         (
             dynamicFvMesh& fluidMesh,
-            fvMesh& solidMesh
+            dynamicFvMesh& solidMesh
         );
 
 

@@ -107,7 +107,7 @@ public:
         IQNILSCouplingInterface
         (
             dynamicFvMesh& fluidMesh,
-            fvMesh& solidMesh
+            dynamicFvMesh& solidMesh
         );
 
 

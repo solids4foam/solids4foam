@@ -154,7 +154,7 @@ public:
     // Constructors
 
         //- Construct from components
-        linGeomSolid(fvMesh& mesh);
+        linGeomSolid(dynamicFvMesh& mesh);
 
 
     // Destructor

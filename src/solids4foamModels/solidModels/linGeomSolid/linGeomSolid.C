@@ -150,7 +150,7 @@ bool linGeomSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-linGeomSolid::linGeomSolid(fvMesh& mesh)
+linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
 :
     solidModel(typeName, mesh),
     D_

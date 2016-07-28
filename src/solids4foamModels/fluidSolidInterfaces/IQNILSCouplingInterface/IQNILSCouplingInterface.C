@@ -64,7 +64,7 @@ label IQNILSCouplingInterface::couplingReuse() const
 IQNILSCouplingInterface::IQNILSCouplingInterface
 (
     dynamicFvMesh& fluidMesh,
-    fvMesh& solidMesh
+    dynamicFvMesh& solidMesh
 )
 :
     fluidSolidInterface(typeName, fluidMesh, solidMesh),

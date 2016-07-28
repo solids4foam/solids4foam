@@ -58,7 +58,7 @@ addToRunTimeSelectionTable
 AitkenCouplingInterface::AitkenCouplingInterface
 (
     dynamicFvMesh& fluidMesh,
-    fvMesh& solidMesh
+    dynamicFvMesh& solidMesh
 )
 :
     fluidSolidInterface(typeName, fluidMesh, solidMesh),

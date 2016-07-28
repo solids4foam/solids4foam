@@ -169,7 +169,7 @@ bool nonLinGeomTotalLagSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(fvMesh& mesh)
+nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
 :
     solidModel(typeName, mesh),
     D_

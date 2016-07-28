@@ -41,7 +41,7 @@ SourceFiles
 #ifndef solidModel_H
 #define solidModel_H
 
-#include "fvMesh.H"
+#include "dynamicFvMesh.H"
 #include "IOdictionary.H"
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
@@ -63,7 +63,7 @@ class solidModel
     // Private data
 
         //- Non-const reference to mesh
-        fvMesh& mesh_;
+        dynamicFvMesh& mesh_;
 
         //- Solid properties dictionary
         dictionary solidProperties_;
@@ -125,7 +125,7 @@ public:
             solidModel,
             dictionary,
             (
-                fvMesh& mesh
+                dynamicFvMesh& mesh
             ),
             (mesh)
         );
@@ -137,14 +137,14 @@ public:
         solidModel
         (
             const word& type,
-            fvMesh& mesh
+            dynamicFvMesh& mesh
         );
 
 
     // Selectors
 
         //- Select constructed from mesh
-        static autoPtr<solidModel> New(fvMesh& mesh);
+        static autoPtr<solidModel> New(dynamicFvMesh& mesh);
 
 
     // Destructor
@@ -157,13 +157,13 @@ public:
         // Access
 
             //- Return mesh
-            const fvMesh& mesh() const
+            const dynamicFvMesh& mesh() const
             {
                 return mesh_;
             }
 
             //- Return non-const mesh
-            fvMesh& mesh()
+            dynamicFvMesh& mesh()
             {
                 return mesh_;
             }

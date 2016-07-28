@@ -90,7 +90,7 @@ public:
         fixedRelaxationCouplingInterface
         (
             dynamicFvMesh& fluidMesh,
-            fvMesh& solidMesh
+            dynamicFvMesh& solidMesh
         );
 
 

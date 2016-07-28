@@ -31,7 +31,7 @@ License
 Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
 (
     dynamicFvMesh& fluidMesh,
-    fvMesh& solidMesh
+    dynamicFvMesh& solidMesh
 )
 {
     word fsiTypeName;
@@ -64,7 +64,7 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
     {
         FatalErrorIn
         (
-            "fluidSolidInterface::New(dynamicFvMesh&, fvMesh&)"
+            "fluidSolidInterface::New(dynamicFvMesh&, dynamicFvMesh&)"
         )   << "Unknown fluidSolidInterface type " << fsiTypeName
             << endl << endl
             << "Valid fluidSolidInterface types are :" << endl

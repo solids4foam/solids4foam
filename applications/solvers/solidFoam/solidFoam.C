@@ -44,7 +44,8 @@ int main(int argc, char *argv[])
 {
 #   include "setRootCase.H"
 #   include "createTime.H"
-#   include "createMesh.H"
+#   include "checkDynamicMeshDict.H"
+#   include "createDynamicFvMesh.H"
 #   include "createSolid.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
