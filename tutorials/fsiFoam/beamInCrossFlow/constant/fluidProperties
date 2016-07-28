@@ -10,48 +10,22 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      fluidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
+fluidModel consistentIcoFluid;
+
+icoFluidCoeffs
 {
-    default            Euler;
+    nCorrectors 3;
+    nNonOrthogonalCorrectors 1;
 }
 
-ddtSchemes
+consistentIcoFluidCoeffs
 {
-    default            Euler;
-}
-
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
-
-divSchemes
-{
-    default            Gauss linear;
-}
-
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear skewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear skewCorrected 1;
-}
-
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          skewCorrected 1;
-    snGrad(DD)         skewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
+    nCorrectors 3;
+    nNonOrthogonalCorrectors 1;
 }
 
 // ************************************************************************* //

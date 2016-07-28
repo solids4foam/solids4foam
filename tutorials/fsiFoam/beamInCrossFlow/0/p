@@ -9,49 +9,52 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      fvSchemes;
+    class       volScalarField;
+    object      p;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
 {
-    default            Euler;
+    interface
+    {
+        type extrapolatedPressure;
+        value uniform 0;
+    }
+    outlet
+    {
+         type fixedValue;
+         value uniform 0;
+    }
+    inlet
+    {
+        type extrapolatedPressure;
+        value uniform 0;
+    }
+    bottom
+    {
+        type extrapolatedPressure;
+        value uniform 0;
+    }
+    top
+    {
+        type extrapolatedPressure;
+        value uniform 0;
+    }
+    left
+    {
+        type extrapolatedPressure;
+        value uniform 0;
+    }
+    symmetry
+    {
+        type symmetryPlane;
+    }
 }
 
-ddtSchemes
-{
-    default            Euler;
-}
-
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
-
-divSchemes
-{
-    default            Gauss linear;
-}
-
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear skewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear skewCorrected 1;
-}
-
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          skewCorrected 1;
-    snGrad(DD)         skewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-}
 
 // ************************************************************************* //

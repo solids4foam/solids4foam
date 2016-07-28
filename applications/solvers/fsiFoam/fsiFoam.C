@@ -95,10 +95,10 @@ int main(int argc, char *argv[])
          && (fsi().outerCorr() < fsi().nOuterCorr())
         );
 
-        // PC: is this needed
-        //fsi().solid().updateTotalFields();
-
-        runTime.write();
+        if (runTime.outputTime())
+        {
+            fsi().solid().writeFields(runTime);
+        }
 
         Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
             << "  ClockTime = " << runTime.elapsedClockTime() << " s"

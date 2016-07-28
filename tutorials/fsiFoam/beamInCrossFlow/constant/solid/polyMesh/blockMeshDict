@@ -10,48 +10,56 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      blockMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            Euler;
-}
+convertToMeters 1;
 
-ddtSchemes
-{
-    default            Euler;
-}
+vertices
+(
+//Level 0	
+    (0.45 0 0)
+    (0.55 0 0)
+    (0.55 0 -0.2)
+    (0.45 0 -0.2)
+//Level 1	
+    (0.45 0.2 0)
+    (0.55 0.2 0)
+    (0.55 0.2 -0.2)
+    (0.45 0.2 -0.2)
+);
 
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
+blocks
+(
+    hex (3 2 6 7 0 1 5 4) (4 8 8) simpleGrading (1 1 1)
+);
 
-divSchemes
-{
-    default            Gauss linear;
-}
+edges
+(
+);
 
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear skewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear skewCorrected 1;
-}
+patches
+(
+    wall interface
+    (
+        (3 0 4 7)
+        (2 3 7 6)
+        (1 2 6 5)
+        (4 5 6 7)
+    )
+    symmetryPlane symmetry
+    (
+        (0 1 5 4)
+    )
+    wall bottom
+    (
+        (0 3 2 1)
+    )
+);
 
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          skewCorrected 1;
-    snGrad(DD)         skewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-}
+mergePatchPairs
+(
+);
 
 // ************************************************************************* //

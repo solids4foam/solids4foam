@@ -10,48 +10,20 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            Euler;
-}
+//solidModel    nonLinearGeometryTotalLagrangian;
+solidModel    unsNonLinearGeometryTotalLagrangian;
+//solidModel    nonLinearGeometryUpdatedLagrangian;
+//solidModel    unsNonLinearGeometryUpdatedLagrangian;
 
-ddtSchemes
+unsNonLinearGeometryTotalLagrangianCoeffs
 {
-    default            Euler;
-}
+    nCorrectors            1000;
 
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
-
-divSchemes
-{
-    default            Gauss linear;
-}
-
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear skewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear skewCorrected 1;
-}
-
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          skewCorrected 1;
-    snGrad(DD)         skewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
+    solutionTolerance      1e-7;
 }
 
 // ************************************************************************* //

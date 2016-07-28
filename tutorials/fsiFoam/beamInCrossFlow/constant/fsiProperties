@@ -10,48 +10,32 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      fsiProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            Euler;
-}
+fluidSolidInterface    Aitken;
 
-ddtSchemes
+AitkenCoeffs
 {
-    default            Euler;
-}
+    solidPatch interface;
+    solidZone interface-zone;
 
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
+    fluidPatch interface;
+    fluidZone interface-zone;
 
-divSchemes
-{
-    default            Gauss linear;
-}
+    relaxationFactor 0.4;
 
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear skewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear skewCorrected 1;
-}
+    interfaceDeformationLimit 0;
 
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          skewCorrected 1;
-    snGrad(DD)         skewCorrected 1;
-}
+    outerCorrTolerance 1e-6;
+    nOuterCorr 20;
 
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
+    interpolatorUpdateFrequency 0;
+
+    couplingReuse 0;
+
+    coupled yes;
 }
 
 // ************************************************************************* //

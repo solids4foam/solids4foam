@@ -24,6 +24,7 @@ fluidFvPatchFields = fluidModels/fvPatchFields
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarField.C
 
+functionObjects/setInletVelocity/setInletVelocity.C
 /*
 functionObjects/forceDisp/forceDisp.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C

@@ -50,10 +50,13 @@ namespace Foam
 
 bool Foam::fluidSolidInterface::updateCoupled()
 {
-    if (couplingStartTime_ > SMALL)
+    if (couplingStartTime_ > SMALL && !coupled_)
     {
         if (runTime().value() > (couplingStartTime_ - SMALL))
         {
+            InfoIn("fluidSolidInterface::updateCoupled()")
+                << "Enabling fluid-solid coupling" << endl;
+
             // Enable coupling
             coupled_ = true;
 
@@ -1066,7 +1069,7 @@ void Foam::fluidSolidInterface::updateForce()
             fluidZonePressure
         );
 
-    if (!coupled())
+    if (!coupled_)
     {
         updateCoupled();
     }

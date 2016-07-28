@@ -10,48 +10,42 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            Euler;
-}
+application stressFoam;
 
-ddtSchemes
-{
-    default            Euler;
-}
+startFrom       latestTime;
 
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
+startTime       0;
 
-divSchemes
-{
-    default            Gauss linear;
-}
+stopAt          endTime;
 
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear skewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear skewCorrected 1;
-}
+endTime         3;
 
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          skewCorrected 1;
-    snGrad(DD)         skewCorrected 1;
-}
+deltaT          1e-3;
 
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-}
+writeControl    timeStep;
+
+writeInterval   1;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  no;
+
+maxCo           0.2;
 
 // ************************************************************************* //
