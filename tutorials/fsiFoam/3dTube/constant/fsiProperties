@@ -18,24 +18,26 @@ fluidSolidInterface    IQNILS;
 
 IQNILSCoeffs
 {
-    solidPatch inner-wall;
-    solidZone inner-wall-zone;
+    solidPatch         inner-wall;
+    solidZone          inner-wall-zone;
 
-    fluidPatch wall;
-    fluidZone wall-zone;
+    fluidPatch         wall;
+    fluidZone          wall-zone;
 
-    relaxationFactor 0.05;
+    relaxationFactor   0.05;
 
     interfaceDeformationLimit 0;
 
     outerCorrTolerance 1e-6;
-    nOuterCorr 30;
+
+    nOuterCorr         30;
 
     interpolatorUpdateFrequency 0;
 
-    couplingReuse 1;
+    couplingReuse       1;
 
-    coupled yes;
+    coupled             yes;
+    coupledStartTime    0.1;
 }
 
 // ************************************************************************* //

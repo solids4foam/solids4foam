@@ -3,13 +3,21 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# Make links (serial)
-./makeSerialLinks fluid solid
+runApplication -l log.blockMesh.solid blockMesh -region solid
+runApplication -l log.setSet.solid setSet -region solid -batch setBatch.solid
+runApplication -l log.setsToZones.solid setsToZones -region solid -noFlipMap
 
-# Make links (parallel)
-#./makeLink fluid solid
+runApplication blockMesh
+runApplication setSet -batch setBatch
+runApplication setsToZones -noFlipMap
 
-(cd fluid && ./Allrun)
+# Run serial
+#runApplication fsiFoam
+
+# Run parallel
+runApplication decomposeParFsi
+runApplication -l log.decomposeParFsi.solid decomposeParFsi -region solid
+#runParallel fsiFoam
 
 # ----------------------------------------------------------------- end-of-file
 

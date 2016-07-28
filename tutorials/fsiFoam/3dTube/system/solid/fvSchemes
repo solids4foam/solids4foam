@@ -10,54 +10,48 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      solidProperties;
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel unsTotalLagrangianSolid;
-//solidModel nonLinearGeometryTotalLagrangian;
-solidModel linearGeometry;
-
-linearGeometryCoeffs
+d2dt2Schemes
 {
-    nCorrectors 200;
-    convergenceTolerance 1e-7;
-    relConvergenceTolerance 1e-3;
+    default            steadyState;
 }
 
-nonLinearGeometryTotalLagrangianCoeffs
+ddtSchemes
 {
-    nCorrectors 200;
-    convergenceTolerance 1e-7;
-    relConvergenceTolerance 1e-3;
+    default            steadyState;
 }
 
-unsTotalLagrangianSolidCoeffs
+gradSchemes
 {
-    nCorrectors 200;
-    
-    convergenceTolerance 1e-7;
-    relConvergenceTolerance 1e-3;
-
-    nonLinear no;
-    debug no;
-    moveMesh yes;
+    default            extendedLeastSquares 0;
 }
 
-unsIncrTotalLagrangianSolidCoeffs
+divSchemes
 {
-    nCorrectors 200;
-    
-    convergenceTolerance 1e-7;
-    relConvergenceTolerance 1e-3;
+    default            Gauss linear;
+}
 
-    nonLinear no;
-    debug no;
-    moveMesh yes;
+laplacianSchemes
+{
+    default            none;
+    laplacian(DD,D)    Gauss linear skewCorrected 1;
+    laplacian(DDD,DD)  Gauss linear skewCorrected 1;
+}
 
-    componentReference
-    (
-    );
+snGradSchemes
+{
+    default            none;
+    snGrad(D)          skewCorrected 1;
+    snGrad(DD)         skewCorrected 1;
+}
+
+interpolationSchemes
+{
+    default            none;
+    interpolate(impK)  linear;
 }
 
 // ************************************************************************* //
