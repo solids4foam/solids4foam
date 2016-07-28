@@ -75,8 +75,7 @@ void Foam::solidModel::calcGlobalFaceZones() const
         (
             IOobject
             (
-                "decomposeParDict",
-                mesh().time().time().system(),
+                "../system/solid/decomposeParDict",
                 mesh().time(),
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE,
