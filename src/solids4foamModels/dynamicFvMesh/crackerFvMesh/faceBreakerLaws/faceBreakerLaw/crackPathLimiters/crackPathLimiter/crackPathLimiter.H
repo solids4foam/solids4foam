@@ -26,12 +26,13 @@ Class
 
 Description
     Law that limits where cracks are allowed to propagate.
+
     Returns surfaceScalarField with 1's and 0's;
         1 means face is allowed to break
         0 means face is not allowed to break
 
 Authors
-    Philip Cardif UCD
+    Philip Cardif, UCD. All rights reserved.
 
 SourceFiles
     crackPathLimiter.C
@@ -65,7 +66,7 @@ class crackPathLimiter
         //- Name
         const word name_;
 
-        //- Reference to stress field
+        //- Reference to mesh
         const fvMesh& mesh_;
 
 
@@ -79,12 +80,6 @@ class crackPathLimiter
 
 
 protected:
-
-        //- Return reference to mesh
-        // fvMesh& mesh()
-        // {
-        //     return mesh_;
-        // }
 
         //- Return const reference to mesh
         const fvMesh& mesh() const

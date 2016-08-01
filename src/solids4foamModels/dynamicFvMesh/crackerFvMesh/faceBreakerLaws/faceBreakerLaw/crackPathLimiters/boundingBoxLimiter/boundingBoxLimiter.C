@@ -25,11 +25,6 @@ License
 
 #include "boundingBoxLimiter.H"
 #include "addToRunTimeSelectionTable.H"
-#include "zeroGradientFvPatchFields.H"
-#include "fvc.H"
-#include "directTopoChange.H"
-#include "crackerFvMesh.H"
-#include "solidCohesiveFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -116,7 +111,6 @@ void Foam::boundingBoxLimiter::calcFacesAllowedToBreak() const
     // It is currently not possible to directly visualise surface fields in
     // ParaView, so we create a volume field to show cells adjacent to potential
     // cohesive faces
-
 
     volScalarField crackLimiterBoxes
     (

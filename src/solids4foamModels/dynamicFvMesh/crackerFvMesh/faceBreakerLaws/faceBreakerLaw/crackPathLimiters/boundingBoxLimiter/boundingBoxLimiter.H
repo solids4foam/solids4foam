@@ -26,20 +26,24 @@ Class
 
 Description
     Limit cracks to propagate inside specified bounding boxes.
+
     Usage:
+    verbatim
         crackPathLimiter
         {
             // Cracks may only propagate along faces within these boxes
-            // This allows you to limit the crack paths
+            // This allows the crack path to be limited.
             type            boundingBoxes;
             boundingBoxes
             (
                 (0 -1e-5 0) (0.05 1e-5 1)
+                (0.05 1e-5 0) (0.05 2e-5 1)
             );
         }
+    endverbatim
 
 Author
-    Philip Cardif UCD
+    Philip Cardif, UCD.  All rights reserved.
 
 SourceFiles
     boundingBoxLimiter.C
@@ -51,6 +55,7 @@ SourceFiles
 
 #include "crackPathLimiter.H"
 #include "boundBox.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

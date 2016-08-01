@@ -57,7 +57,6 @@ void Foam::faceCracker::checkDefinition()
     (
         !crackZoneID_.active()
      || !crackPatchID_.active()
-   //|| !openPatchID_.active()
     )
     {
         FatalErrorIn
@@ -67,7 +66,6 @@ void Foam::faceCracker::checkDefinition()
             << "have been found.  Please check your mesh definition.\n"
             << "\tcrackZoneID_.active() is " << crackZoneID_.active() << nl
             << "\tcrackPatchID_.active() is " << crackPatchID_.active() //<< nl
-          //<< "\topenPatchID_.active() is " << openPatchID_.active()
             << abort(FatalError);
     }
 
@@ -76,7 +74,6 @@ void Foam::faceCracker::checkDefinition()
         Pout<< "Face cracker object " << name() << " :" << nl
             << "    faceZoneID:   " << crackZoneID_ << nl
             << "    crackPatchID: " << crackPatchID_ << endl;
-          //<< "    openPatchID: " << openPatchID_ << endl;
     }
 }
 
@@ -90,14 +87,12 @@ Foam::faceCracker::faceCracker
     const label index,
     const polyTopoChanger& mme,
     const word& faceZoneName,
-    const word& crackPatchName //,
-    //const word& openPatchName
+    const word& crackPatchName
 )
 :
     polyMeshModifier(name, index, mme, true),
     crackZoneID_(faceZoneName, mme.mesh().faceZones()),
     crackPatchID_(crackPatchName, mme.mesh().boundaryMesh()),
-    //openPatchID_(openPatchName, mme.mesh().boundaryMesh()),
     coupledFacesToBreak_(),
     trigger_(false)
 {
@@ -125,11 +120,6 @@ Foam::faceCracker::faceCracker
         dict.lookup("crackPatchName"),
         mme.mesh().boundaryMesh()
     ),
-    // openPatchID_
-    // (
-    //     dict.lookup("openPatchName"),
-    //     mme.mesh().boundaryMesh()
-    // ),
     coupledFacesToBreak_(),
     trigger_(false)
 {
@@ -182,38 +172,6 @@ void Foam::faceCracker::setBreak
                 bouFacesInZone.append(facesToBreak[faceI]);
             }
         }
-
-//         // Check faces to open
-//         DynamicList<label> facesNotOnCrack(facesToOpen.size());
-
-//         forAll (facesToOpen, faceI)
-//         {
-//             if
-//             (
-//                 mesh.boundaryMesh().whichPatch(facesToOpen[faceI])
-//              != crackPatchID_.index()
-//             )
-//             {
-//                 facesNotOnCrack.append(facesToOpen[faceI]);
-//             }
-//         }
-
-//         if (bouFacesInZone.size() > 0 || facesNotOnCrack.size() > 0)
-//         {
-//             FatalErrorIn
-//             (
-//                 "void Foam::faceCracker::setBreak\n"
-//                 "(\n"
-//                 "    const labelList& facesToBreak,\n"
-//                 "    const boolList& faceFlip,\n"
-//                 "    const labelList& facesToOpen\n"
-//                 ")"
-//             )   << "Bad crack definition "
-//                 << " for object " << name() << " : " << nl
-//                 << "Boundary faces: " << bouFacesInZone << nl
-//                 << "Crack faces: " << facesNotOnCrack
-//                 << abort(FatalError);
-//         }
     }
 
     // Put the faces into the face zone
@@ -223,7 +181,7 @@ void Foam::faceCracker::setBreak
         faceFlip
     );
 
-    // Grab faces to open
+    // Grab faces to break
     coupledFacesToBreak_ = coupledFacesToBreak;
 
     trigger_ = true;
@@ -283,8 +241,6 @@ void Foam::faceCracker::writeDict(Ostream& os) const
         << token::END_STATEMENT << nl
         << "    crackPatchName " << crackPatchID_.name()
         << token::END_STATEMENT << nl
-        // << "    openPatchName " << openPatchID_.name()
-        // << token::END_STATEMENT << nl
         << "    active " << active()
         << token::END_STATEMENT << nl
         << token::END_BLOCK << endl;

@@ -21,9 +21,12 @@ License
     You should have received a copy of the GNU General Public License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
+Class
+    cohesiveZoneModel
+
 \*---------------------------------------------------------------------------*/
 
-#include "faceBreakerLaw.H"
+#include "cohesiveZoneModel.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 
@@ -34,16 +37,16 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-autoPtr<faceBreakerLaw> faceBreakerLaw::New
+autoPtr<cohesiveZoneModel> cohesiveZoneModel::New
 (
     const word& name,
-    const fvMesh& mesh,
+    const fvPatch& patch,
     const dictionary& dict
 )
 {
     word lawTypeName = dict.lookup("type");
 
-    Info<< "Selecting face breaker law: " << lawTypeName << endl;
+    Info<< "Selecting cohesive zone model: " << lawTypeName << endl;
 
     dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_->find(lawTypeName);
@@ -52,20 +55,20 @@ autoPtr<faceBreakerLaw> faceBreakerLaw::New
     {
         FatalIOErrorIn
         (
-            "faceBreakerLaw::New(\n"
+            "cohesiveZoneModel::New(\n"
             "    const word& name,\n"
-            "    const fvMesh& mesh,\n"
+            "    const fvPatch& patch,\n"
             "    const dictionary& dict\n"
             ")",
             dict
-        )   << "Unknown faceBreakerLaw type "
+        )   << "Unknown cohesiveZoneModel type "
             << lawTypeName << endl << endl
-            << "Valid  faceBreakerLaws are : " << endl
+            << "Valid  cohesiveZoneModels are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
-    return autoPtr<faceBreakerLaw>(cstrIter()(name, mesh, dict));
+    return autoPtr<cohesiveZoneModel>(cstrIter()(name, patch, dict));
 }
 
 

@@ -27,8 +27,9 @@ License
 #include "foamTime.H"
 #include "addToRunTimeSelectionTable.H"
 #include "mapPolyMesh.H"
-#include "materialInterface.H"
-#include "fractureFvMesh.H"
+//#include "materialInterface.H"
+#include "volFields.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -493,11 +494,10 @@ Foam::crackerFvMesh::crackerFvMesh
             )
         ).subDict(typeName + "Coeffs")
     ),
-    writeMesh_(dict_.lookupOrDefault<Switch>("writeMesh", true)),
+    writeMesh_(dict_.lookupOrDefault<Switch>("writeMesh", false)),
     topoChangeMap_(),
     crackPatchID_(word(dict_.lookup("crackPatch")), boundaryMesh()),
-    lawPtr_(NULL), //faceBreakerLaw::New("law", *this, dict_.subDict("law"))),
-    refinerPtr_(NULL),
+    lawPtr_(NULL),
     regionsPtr_(NULL),
     nCellsInRegionPtr_(NULL),
     globalCrackFaceCentresPtr_(NULL),
@@ -505,20 +505,6 @@ Foam::crackerFvMesh::crackerFvMesh
     localCrackStart_(-1),
     globalCrackFaceAddressingPtr_(NULL)
 {
-    // Create refiner if specified
-    if (dict_.found("dynamicRefinement"))
-    {
-        refinerPtr_ =
-            dynamicRefinementLaw::New
-            (
-                "law", *this, dict_.subDict("dynamicRefinement")
-            );
-    }
-    else
-    {
-        Info<< "dynamicRefinement not specified" << endl;
-    }
-
     // Add zones and mesh modifiers
     addZonesAndModifiers();
 }
@@ -553,115 +539,22 @@ void Foam::crackerFvMesh::setBreak
 
 bool Foam::crackerFvMesh::update()
 {
-    // Following lines for temporary testing added by Ripu.
-    // Development on pause until JIP
-    //const vectorField& faceCoordinate = globalCrackFaceCentres();
-    //volScalarField& distance =
-    //    const_cast<volScalarField&>
-    //    (
-    //        this->lookupObject<volScalarField>("distanceFromCrack")
-    //    );
-    //scalarField& distanceI = distance.internalField();
-
-    //forAll(distanceI, cellI)
-    //{
-    //    vector cellCoordinate = this->C()[cellI];
-    //    distanceI[cellI] = GREAT;
-    //    if (faceCoordinate.size())
-    //    {
-    //        forAll(faceCoordinate, faceI)
-    //        {
-    //            scalar tempDistance =
-    //                magSqr(cellCoordinate - faceCoordinate[faceI]);
-    //            if (tempDistance < distanceI[cellI])
-    //            {
-    //                distanceI[cellI] = tempDistance;
-    //            }
-    //        }
-    //    }
-    //    //else
-    //    //{
-    //    //    distanceI[cellI] = magSqr(cellCoordinate - vector(10,0,15));
-    //    //}
-    //    distanceI[cellI] = sqrt(distanceI[cellI]);
-    //}
-    //if (this->time().outputTime())
-    //{
-    //    Info<< "Writing distance field" << endl;
-    //    distance.write();
-    //}
-
-    // Perform mesh refinement if refiner is defined
-    if (refinerPtr_.valid())
-    {
-        refinerPtr_->correct();
-    }
-
     // Clearout the law demand driven data
     faceBreaker().clearOut();
 
     // Get faces to break from the law
     const labelList& facesToBreak = faceBreaker().facesToBreak();
-    const boolList& facesToBreakFlip = faceBreaker().facesToBreakFlip();
+    const boolList facesToBreakFlip = boolList(facesToBreak.size(), false);
     const labelList& coupledFacesToBreak = faceBreaker().coupledFacesToBreak();
 
     // All processors must know if a topological change will occur
     label nFacesToBreak = facesToBreak.size();
     label nCoupledFacesToBreak = coupledFacesToBreak.size();
-    //reduce(topoChange, orOp<bool>());
     reduce(nFacesToBreak, maxOp<label>());
     reduce(nCoupledFacesToBreak, maxOp<label>());
 
     if (nFacesToBreak || nCoupledFacesToBreak)
     {
-        // I don't think that we should print anything out here unless debugging
-        // since the detachFaceCracker already prints the processor number and
-        // the face to break location
-        // If we want it here it would be good to have the second block below
-        // instead of the first block since the second block is less redundant
-        // if (nFacesToBreak)
-        // {
-        //     Info<< "Breaking internal face" << endl;
-
-        //     if (Pstream::parRun() && facesToBreak.size())
-        //     {
-        //         Pout<< "    breaking internal face on processor: "
-        //             << Pstream::myProcNo() << endl;
-        //     }
-        // }
-        // else
-        // {
-        //     Info<< "Breaking coupled face:" << endl;
-
-        //     if (coupledFacesToBreak.size())
-        //     {
-        //         Pout<< "    breaking coupled face on processor: "
-        //             << Pstream::myProcNo() << endl;
-        //     }
-        // }
-
-        // if (nFacesToBreak)
-        // {
-        //     if (facesToBreak.size())
-        //     {
-        //         if (Pstream::parRun())
-        //         {
-        //             Pout<< "Breaking internal face" << endl;
-        //         }
-        //         else
-        //         {
-        //             Info<< "Breaking internal face" << endl;
-        //         }
-        //     }
-        // }
-        // else
-        // {
-        //     if (coupledFacesToBreak.size())
-        //     {
-        //         Pout<< "Breaking coupled face:" << endl;
-        //     }
-        // }
-
         if (debug)
         {
             Pout<< "nFacesToBreak: " << nFacesToBreak << nl
@@ -717,53 +610,25 @@ bool Foam::crackerFvMesh::update()
             faceMap, facesToBreak, coupledFacesToBreak
         );
 
-        // We will now update the displacement field
-        // This should not ne necessary
-        // InfoIn("crackerFvMesh::update()")
-        //     << "Perturbation of U/DU on new faces disabled" << endl;
-        // word dispName = "U";
-        // if (this->thisDb().foundObject<volVectorField>("DU"))
-        // {
-        //     dispName = "DU";
-        // }
-        // perturbFieldOnNewCrackFaces
-        // (
-        //     faceMap, facesToBreak, coupledFacesToBreak, dispName
-        // );
-
-
-        // point fields should be recalculated in the solver
-
+        // Point fields should be recalculated in the solver
 
         // Clearout mechanical properties within interface corrector so they
         // will be regenerated
+        // if (foundObject<materialInterface>("materialInterface"))
+        // {
+        //     materialInterface& interface =
+        //         const_cast<materialInterface&>
+        //         (
+        //             lookupObject<materialInterface>("materialInterface")
+        //         );
 
-        if (foundObject<materialInterface>("materialInterface"))
-        {
-            materialInterface& interface =
-                const_cast<materialInterface&>
-                (
-                    lookupObject<materialInterface>("materialInterface")
-                );
+        //     interface.clearOut();
+        // }
 
-            interface.clearOut();
-        }
-
-
-        // If a fractureFvMesh exists then we will call its updateMaps
-        if (time().foundObject<fractureFvMesh>("fracture"))
-        {
-            fractureFvMesh& fracMesh =
-                const_cast<fractureFvMesh&>
-                (
-                    time().lookupObject<fractureFvMesh>("fracture")
-                );
-
-            fracMesh.updateMaps(topoChangeMap());
-        }
-
-        // Note: the reference for dead cells should be called in the solver
-        // after topological changes
+        // Note: after cracking, dead cell regions (small groups of cells
+        // unconnected to the main mesh may have been created); it may be
+        // required to set a reference to these dead cells in the solver after
+        // or alternatively to delete them.
 
         // We will write the mesh if there is a topological change
         if (writeMesh_)

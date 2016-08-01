@@ -26,8 +26,8 @@ License
 #include "cohesiveZoneInitiation.H"
 #include "addToRunTimeSelectionTable.H"
 #include "crackerFvMesh.H"
-#include "mechanicalModel.H"
 #include "solidCohesiveFvPatchVectorField.H"
+#include "cohesivePolyPatch.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -61,7 +61,7 @@ void Foam::cohesiveZoneInitiation::calcCohesivePatchID() const
 
     forAll (mesh.boundaryMesh(), patchI)
     {
-        if (mesh.boundaryMesh()[patchI].type() == "cohesive")
+        if (mesh.boundaryMesh()[patchI].type() == cohesivePolyPatch::typeName)
         {
             cohesivePatchID = patchI;
             break;
@@ -95,33 +95,35 @@ Foam::cohesiveZoneInitiation::cohesiveZone() const
     // Const reference to the mesh
     const fvMesh& mesh = this->mesh();
 
-    // Lookup displacement field
-    const volVectorField* dispPtr = NULL;
-
-    if (mesh.foundObject<volVectorField>("DU"))
+    // Lookup displacement field (DD or D)
+    if (mesh.foundObject<volVectorField>("DD"))
     {
-        dispPtr = &(mesh.lookupObject<volVectorField>("DU"));
+        return
+            refCast<const solidCohesiveFvPatchVectorField>
+            (
+                mesh.lookupObject<volVectorField>
+                (
+                    "DD"
+                ).boundaryField()[cohesivePatchID()]
+            ).cohesiveZone();
     }
     else
     {
-        dispPtr = &(mesh.lookupObject<volVectorField>("U"));
+        return
+            refCast<const solidCohesiveFvPatchVectorField>
+            (
+                mesh.lookupObject<volVectorField>
+                (
+                    "D"
+                ).boundaryField()[cohesivePatchID()]
+            ).cohesiveZone();
     }
-
-    // Cast cohesive patch to solidCohesive
-    const solidCohesiveFvPatchVectorField& cohesivePatch =
-        refCast<const solidCohesiveFvPatchVectorField>
-        (
-            dispPtr->boundaryField()[cohesivePatchID()]
-        );
-
-    // Return cohesiveZoneModel
-    return cohesivePatch.cohesiveZone();
 }
 
 
 void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
 {
-    if (facesToBreakPtr_ || coupledFacesToBreakPtr_ || facesToBreakFlipPtr_)
+    if (facesToBreakPtr_ || coupledFacesToBreakPtr_)
     {
         FatalErrorIn
         (
@@ -132,11 +134,13 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
     // First, we check if any internal faces need to be broken, then we will
     // check if any coupled (processor boundary) faces need to be broken.
     // If we find more than one face with a traction fraction greater than 1.0,
-    // we will select the face with the highest value
+    // we will select the face with the highest value.
+    // Note: the traction fraction is the traction divided by the strength of
+    // the face, so a value greater than or equal to 1.0 indicates that the face
+    // should break.
 
     int nFacesToBreak = 0;
     int nCoupledFacesToBreak = 0;
-    //bool topoChange = false;
 
     // Cast the mesh to a crackerFvMesh
 
@@ -149,15 +153,13 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
 
     const crackerFvMesh& mesh = refCast<const crackerFvMesh>(this->mesh());
 
-
-    // Clear out demand driven data
-    // clearOut();
-
     // Face unit normals
     const surfaceVectorField n = mesh.Sf()/mesh.magSf();
 
     // Get traction fraction from cohesive zone model
+    cohesiveZone().updateMeshTraction();
     surfaceScalarField tracFrac = cohesiveZone().initiationTractionFraction();
+    const surfaceVectorField& traction = cohesiveZone().meshTraction();
 
     // Apply crack path limiting if specified
     if (pathLimiterPtr_.valid())
@@ -169,7 +171,6 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
     const scalar maxTracFrac = gMax(tracFrac.internalField());
 
     Info<< nl << "Max traction fraction: " << maxTracFrac << endl;
-
 
     label faceToBreakIndex = -1;
     scalar faceToBreakTracFrac = 0.0;
@@ -190,8 +191,9 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
 
         if (faceToBreakIndex != -1)
         {
-            Pout<< "    faceToBreakIndex: " << faceToBreakIndex
+            Pout<< "    faceToBreakIndex: " << faceToBreakIndex << nl
                 << "    faceToBreakLocation: " << mesh.Cf()[faceToBreakIndex]
+                << nl
                 << "    faceToBreakEffTracFrac: " << maxTracFrac
                 << endl;
         }
@@ -218,7 +220,7 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
                 procID = Pstream::myProcNo();
             }
 
-            label minProcID = returnReduce<label>(procID, minOp<label>());
+            const label minProcID = returnReduce<label>(procID, minOp<label>());
 
             if (procID != minProcID)
             {
@@ -338,7 +340,7 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
 
         if (patchID == -1)
         {
-            FatalErrorIn("calcAllFacesToBreak()")
+            FatalErrorIn("cohesiveZoneInitiation::calcAllFacesToBreak()")
                 << "something is wrong: patchID is -1 for coupled face"
                 << abort(FatalError);
         }
@@ -364,7 +366,7 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
         reduce(ngbProc, maxOp<labelList>());
         reduce(index, maxOp<labelList>());
 
-        // going through all the processors to find the processor that has the
+        // Going through all the processors to find the processor that has the
         // coupled part of the coupled face to break in this iteration
         // This is done by comparing the current proc no with the processor no
         // stored in the ngbProc list and then finding the corresponding coupled
@@ -406,15 +408,6 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
             }
         }
     }
-    // if (nCoupledFacesToBreak)
-    // {
-    //    Pout<< "    faceToBreakIndex: " << coupledFaceToBreakIndex
-    //        << "    faceToBreakLocation: " << mesh.Cf()[coupledFaceToBreakIndex]
-    //        << "    faceToBreakEffTracFrac: " << maxCoupledTracFrac
-    //        << endl;
-    //}
-    // thus now nCoupledFacesToBreak will be 1 for both the processors the face
-    // is on
 
     // Note: It is not necessary to scale the tractions as the cohesive boundary
     // condition will do this
@@ -428,14 +421,9 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
 
     // Now we return the faces to break
 
-    const surfaceVectorField& traction =
-        mesh.lookupObject<surfaceVectorField>("traction");
-
     if (nFacesToBreak)
     {
         facesToBreakPtr_ = new labelList(nFacesToBreak, faceToBreakIndex);
-
-        facesToBreakFlipPtr_ = new boolList(nFacesToBreak, false);
 
         coupledFacesToBreakPtr_ = new labelList(0);
 
@@ -462,8 +450,6 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
     else if (nCoupledFacesToBreak)
     {
         facesToBreakPtr_ = new labelList(0);
-
-        facesToBreakFlipPtr_ = new boolList(0);
 
         coupledFacesToBreakPtr_ =
             new labelList(nCoupledFacesToBreak, coupledFaceToBreakIndex);
@@ -500,17 +486,10 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
     else
     {
         facesToBreakPtr_ = new labelList(0);
-
-        facesToBreakFlipPtr_ = new boolList(0);
-
         coupledFacesToBreakPtr_ = new labelList(0);
-
         facesToBreakTractionsPtr_ = new List<vector>(0);
-
         coupledFacesToBreakTractionsPtr_ = new List<vector>(0);
-
         facesToBreakNormalsPtr_ = new List<vector>(0);
-
         coupledFacesToBreakNormalsPtr_ = new List<vector>(0);
     }
 
@@ -534,67 +513,6 @@ void Foam::cohesiveZoneInitiation::calcAllFacesToBreak() const
                 << endl;
         }
     }
-
-    // This following section find the total number of faces that have the
-    // traction within the prescribed tolerance of the globalMaxTrac
-    // The section sets the value of nFacesWithMaxTraction_
-    {
-        const scalar globalMaxTrac = max(maxTracFrac, maxCoupledTracFrac);
-        const scalar tol = tolerance_*globalMaxTrac;
-
-        if (globalMaxTrac > 1.0)
-        {
-            label nInternalFacesWithMaxTraction = 0;
-            forAll(tracFrac, faceI)
-            {
-                if
-                (
-                    (mag(tracFrac[faceI] - globalMaxTrac) < tol)
-                 && (tracFrac[faceI] > 1.0)
-                )
-                {
-                    nInternalFacesWithMaxTraction++;
-                }
-            }
-            nInternalFacesWithMaxTraction =
-                returnReduce(nInternalFacesWithMaxTraction, sumOp<label>());
-
-            label nCoupledFacesWithMaxTraction = 0;
-            if (allowCoupledFaces_ && Pstream::parRun())
-            {
-                forAll(mesh.boundary(), patchI)
-                {
-                    // Find coupled face with the largest traction fraction
-                    if (mesh.boundary()[patchI].coupled())
-                    {
-                        const scalarField& pTracFrac =
-                                tracFrac.boundaryField()[patchI];
-
-                        forAll(pTracFrac, faceI)
-                        {
-                            if
-                            (
-                                (mag(globalMaxTrac - pTracFrac[faceI]) < tol)
-                             && (pTracFrac[faceI] > 1.0)
-                            )
-                            {
-                                nCoupledFacesWithMaxTraction++;
-                            }
-                        }
-                    }
-                }
-            }
-            nCoupledFacesWithMaxTraction =
-                returnReduce(nCoupledFacesWithMaxTraction, sumOp<label>());
-
-            nFacesWithMaxTraction_ =
-                nInternalFacesWithMaxTraction + nCoupledFacesWithMaxTraction/2;
-        }
-        else
-        {
-            nFacesWithMaxTraction_ = 0;
-        }
-    }
 }
 
 
@@ -602,7 +520,6 @@ void Foam::cohesiveZoneInitiation::clearOut()
 {
     deleteDemandDrivenData(cohesivePatchIDPtr_);
     deleteDemandDrivenData(facesToBreakPtr_);
-    deleteDemandDrivenData(facesToBreakFlipPtr_);
     deleteDemandDrivenData(coupledFacesToBreakPtr_);
     deleteDemandDrivenData(facesToBreakTractionsPtr_);
     deleteDemandDrivenData(coupledFacesToBreakTractionsPtr_);
@@ -624,21 +541,18 @@ Foam::cohesiveZoneInitiation::cohesiveZoneInitiation
     cohesivePatchIDPtr_(NULL),
     allowCoupledFaces_(dict.lookupOrDefault<Switch>("allowCoupledFaces", true)),
     facesToBreakPtr_(NULL),
-    facesToBreakFlipPtr_(NULL),
     coupledFacesToBreakPtr_(NULL),
     facesToBreakTractionsPtr_(NULL),
     coupledFacesToBreakTractionsPtr_(NULL),
-    pathLimiterPtr_(NULL),
-    tolerance_(dict.lookupOrDefault<scalar>("tractionFractionTolerance", 1e-6)),
-    nFacesWithMaxTraction_(0)
+    pathLimiterPtr_(NULL)
 {
     if (!allowCoupledFaces_)
     {
-        Warning
+        WarningIn("cohesiveZoneInitiation::cohesiveZoneInitiation(...)")
             << name << ": allowCoupledFaces is false" << endl;
     }
 
-    // Create crackPathLimiter if specified
+    // If specified, create crackPathLimiter
     if (dict.found("crackPathLimiter"))
     {
         pathLimiterPtr_ =
@@ -674,17 +588,6 @@ const Foam::labelList& Foam::cohesiveZoneInitiation::facesToBreak() const
     }
 
     return *facesToBreakPtr_;
-}
-
-
-const Foam::boolList& Foam::cohesiveZoneInitiation::facesToBreakFlip() const
-{
-    if (!facesToBreakFlipPtr_)
-    {
-        calcAllFacesToBreak();
-    }
-
-    return *facesToBreakFlipPtr_;
 }
 
 
@@ -747,13 +650,4 @@ Foam::cohesiveZoneInitiation::coupledFacesToBreakNormals() const
 }
 
 
-Foam::label Foam::cohesiveZoneInitiation::nFacesWithMaxCriteria() const
-{
-    if (!facesToBreakPtr_)
-    {
-        calcAllFacesToBreak();
-    }
-
-    return nFacesWithMaxTraction_;
-}
 // ************************************************************************* //

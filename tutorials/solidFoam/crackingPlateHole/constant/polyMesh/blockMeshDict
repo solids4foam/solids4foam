@@ -75,7 +75,7 @@ patches
         (2 3 14 13)
         (3 6 17 14)
     )
-    symmetryPlane down
+    patch down
     (
         (0 1 12 11)
         (1 2 13 12)

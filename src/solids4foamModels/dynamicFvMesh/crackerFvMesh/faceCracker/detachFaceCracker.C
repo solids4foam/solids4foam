@@ -66,9 +66,6 @@ void Foam::faceCracker::detachInternalFaces
     // 6) Modify the master face to the crack patch, and add a slave face
 
 
-    // Pout<< "DEBUG set to 1" << endl;
-    // debug = 1;
-
     if (debug)
     {
         Pout<< nl << "detachInternalFaces" << nl << endl;
@@ -1061,9 +1058,6 @@ void Foam::faceCracker::detachInternalFaces
 
             // Add the slave face
 
-            // TODO: problem occurred here with one of the point IDs being -1
-            // to be checked: how is this possible?
-
             // Build the face for the slave patch by renumbering
             const face oldFace = faceToBreak.reverseFace();
             face newFace = oldFace;
@@ -1109,7 +1103,7 @@ void Foam::faceCracker::detachInternalFaces
                         -1,                             // master edge
                         faceToBreakID,                  // master face
                         false,                          // flip flux
-                        crackPatchID_.index(),       // patch to add the face to
+                        crackPatchID_.index(),          // new patch index
                         -1,                             // zone for face
                         false                           // zone flip
                     )
@@ -1129,7 +1123,7 @@ void Foam::faceCracker::detachInternalFaces
                         -1,                             // master edge
                         faceToBreakID,                  // master face
                         true,                           // flip flux
-                        crackPatchID_.index(),       // patch to add the face to
+                        crackPatchID_.index(),          // new patch index
                         -1,                             // zone for face
                         false                           // face flip in zone
                     )
@@ -1159,10 +1153,6 @@ void Foam::faceCracker::detachCoupledFaces
     //        Add the points-to-add
     // 5) Modify surrounding faces
     // 6) Move the coupled face to the crack patch
-
-    // WarningIn("void Foam::faceCracker::detachCoupledFaces")
-    //     << "Setting debug to 1.0" << endl;
-    // debug = 1.0;
 
     if (debug)
     {

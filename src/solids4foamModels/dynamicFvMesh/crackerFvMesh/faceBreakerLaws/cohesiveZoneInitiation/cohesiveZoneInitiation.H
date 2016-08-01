@@ -25,21 +25,16 @@ Class
     cohesiveZoneInitiation
 
 Description
-    Failure class that breaks internal mesh faces based on the initiation
-    criteria of the curren cohesive zone model. The cohesive zone model is
-    looked up and its 'initiationTractionFraction' function is called to
-    determine which faces to break.
+    Failure class that selects internal mesh faces to break based on the
+    initiation criteria of the current cohesive zone model.
+    The cohesive zone model is looked up and its 'initiationTractionFraction'
+    function is called to determine which faces to break.
 
-    Only one face is broken per call where the face with the maximum traction
-    fraction is chosen if multiple faces exceed unity.
-
-    After a break, all volFields values on the new faces are updated by
-    averaging from the pervious owner and neighbour cells.
-
-    surfaceFields will also be mapped if there is a corresponding volField.
+    In essense, the current law is a wrapper class that asked the
+    cohesiveZoneModel class what faces it would like to break.
 
 Author
-    Philip Cardif UCD/UT
+    Philip Cardif, UCD/UT. All rights reserved.
 
 SourceFiles
     cohesiveZoneInitiation.C
@@ -68,7 +63,7 @@ class cohesiveZoneInitiation
 {
     // Private data
 
-        // Patch ID of the cohesive patch
+        // Patch index of the cohesive patch
         mutable label* cohesivePatchIDPtr_;
 
         // Allow cracks along coupled faces
@@ -76,9 +71,6 @@ class cohesiveZoneInitiation
 
         // List of internal faces to break
         mutable labelList* facesToBreakPtr_;
-
-        // List of internal faces to normal flips
-        mutable boolList* facesToBreakFlipPtr_;
 
         // List of coupled faces to break
         mutable labelList* coupledFacesToBreakPtr_;
@@ -95,16 +87,8 @@ class cohesiveZoneInitiation
         // List of normals of coupled faces to break
         mutable List<vector>* coupledFacesToBreakNormalsPtr_;
 
-        //- Crack path limiter
+        //- Crack path limiter to limit the cracks to certain regions
         mutable autoPtr<crackPathLimiter> pathLimiterPtr_;
-
-        //- Tolerance to find the number of faces within the maximum effective
-        //  traction fraction
-        const scalar tolerance_;
-
-        //- Number of faces within a close range of the maximum effective
-        //  traction fraction
-        mutable label nFacesWithMaxTraction_;
 
 
     // Private Member Functions
@@ -158,9 +142,6 @@ public:
         // Return list of internal faces to break
         virtual const labelList& facesToBreak() const;
 
-        // Return list of internal faces to break normal flips
-        virtual const boolList& facesToBreakFlip() const;
-
         // Return list of coupled faces to break
         virtual const labelList& coupledFacesToBreak() const;
 
@@ -178,10 +159,6 @@ public:
 
         //- Delete demand driven data
         virtual void clearOut();
-
-        //- Returning the total number of faces that are within a tolerance of
-        //  the global maximum traction fraction
-        virtual label nFacesWithMaxCriteria() const;
 };
 
 

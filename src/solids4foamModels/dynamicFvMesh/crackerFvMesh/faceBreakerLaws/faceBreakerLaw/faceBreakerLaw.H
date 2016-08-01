@@ -25,10 +25,10 @@ Class
     faceBreakerLaw
 
 Description
-    Law that selects which cells should be removed
+    Law that selects which internal faces should be cracked/broken.
 
 Authors
-    Philip Cardif UCD
+    Philip Cardif, UCD. All rights reserved.
 
 SourceFiles
     faceBreakerLaw.C
@@ -42,9 +42,9 @@ SourceFiles
 #include "IOdictionary.H"
 #include "typeInfo.H"
 #include "runTimeSelectionTables.H"
-#include "volFields.H"
 #include "tmp.H"
 #include "autoPtr.H"
+#include "fvMesh.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -62,7 +62,7 @@ class faceBreakerLaw
         //- Name
         const word name_;
 
-        //- Reference to stress field
+        //- Reference to the field
         const fvMesh& mesh_;
 
 
@@ -76,12 +76,6 @@ class faceBreakerLaw
 
 
 protected:
-
-        //- Return reference to mesh
-        // fvMesh& mesh()
-        // {
-        //     return mesh_;
-        // }
 
         //- Return const reference to mesh
         const fvMesh& mesh() const
@@ -150,21 +144,11 @@ public:
         // Return list of internal faces to break
         virtual const labelList& facesToBreak() const = 0;
 
-        // Return list of internal faces to break normal flip
-        virtual const boolList& facesToBreakFlip() const = 0;
-
         // Return list of coupled faces to break
         virtual const labelList& coupledFacesToBreak() const = 0;
 
         //- Delete demand driven data
         virtual void clearOut() = 0;
-
-        //- Return the total number of cracks to break in this iteration that
-        // meet the chosen criteria
-        virtual label nFacesWithMaxCriteria() const
-        {
-            return 1;
-        }
 };
 
 

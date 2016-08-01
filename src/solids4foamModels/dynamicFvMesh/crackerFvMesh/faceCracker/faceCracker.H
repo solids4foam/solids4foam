@@ -25,7 +25,7 @@ Class
     faceCracker
 
 Description
-    Face cracker mesh modifier.  This modifier takes a set of
+    Face cracker mesh modifier. This modifier takes a set of
     internal face labels and converts them into boundary faces.
 
 SourceFiles
@@ -70,10 +70,7 @@ class faceCracker
         //- Crack patch ID.  Holds faces after cracking
         polyPatchID crackPatchID_;
 
-        //- Open patch ID.  Holds faces after cracking
-        //polyPatchID openPatchID_; // no longer used
-
-        //- List of boundary faces to move to open patch
+        //- List of boundary faces to move to the crack patch
         mutable labelList coupledFacesToBreak_;
 
         //- Topology change trigger
@@ -115,8 +112,7 @@ public:
             const label index,
             const polyTopoChanger& mme,
             const word& faceZoneName,
-            const word& crackPatchName //,
-            //const word& openPatchName
+            const word& crackPatchName
         );
 
         //- Construct from dictionary
@@ -142,19 +138,15 @@ public:
             return crackPatchID_;
         }
 
-        //- Set faces to break and open on next update
-        //  break = convert internal face into two boundary faces in
-        //  the crack patch
-        //  open = move crack faces into the open patch
+        //- Set faces to break, where an internal face is converted into two
+        //  boundary faces in the crack patch, or two coupled faces are moved
+        //  to the crack patch
         void setBreak
         (
             const labelList& facesToBreak,
             const boolList& faceFlip,
             const labelList& coupledFacesToBreak
         );
-
-        //- Set cracked faces to open on next update
-        void setOpen();
 
         //- Check for topology change
         virtual bool changeTopology() const;
@@ -167,7 +159,6 @@ public:
 
         //- Force recalculation of locally stored data on topological change
         virtual void updateMesh(const mapPolyMesh&);
-
 
         //- Write
         virtual void write(Ostream&) const;

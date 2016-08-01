@@ -20,52 +20,61 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-    down
+    crack
     {
-        type                     simpleCohesiveZone;
-        simpleCohesiveZoneLaw    Dugdale;
-        DugdaleCoeffs
+        type                       solidCohesive;
+        relaxationFactor           0.01;
+        cohesiveZoneModel
         {
-            GIc                  GIc [ 1 0 -2 0 0 0 0 ] 10;
-            sigmaMax             sigmaMax [ 1 -1 -2 0 0 0 0 ] 1e6;
+            //type        modeI;
+            //type        fixedMixedMode;
+            //sigmaMax    sigmaMax [ 1 -1 -2 0 0 0 0 ] 10e6;
+            //GIc         GIc [ 1 0 -2 0 0 0 0 ] 50;
+
+            type        variableMixedMode;
+            sigmaMax    sigmaMax [ 1 -1 -2 0 0 0 0 ] 10e6;
+            tauMax      tauMax [ 1 -1 -2 0 0 0 0 ] 10e6;
+            GIc         GIc [ 1 0 -2 0 0 0 0 ] 50;
+            GIIc        GIIc [ 1 0 -2 0 0 0 0 ] 50;
         }
-        relaxationFactor         0.1;
+        //contact                    no;
+        //penaltyScale               1;
+        //frictionCoeff              0.1;
         //explicitSeparationDistance no;
-        //breakOnlyOneFace       yes;
-        patchType                symmetryPlane;
-        value                    uniform (0 0 0);
+        value                      uniform ( 0 0 0 );
     }
-    left
+    topLoading
     {
         type            fixedDisplacement;
         displacementSeries
         {
-            fileName    "$FOAM_CASE/constant/timeVsDisp";
+            fileName    "$FOAM_CASE/constant/timeVsTopDisp";
             outOfBounds clamp;
         }
-        pressure        uniform 0;
         value           uniform (0 0 0);
     }
-    right
+    bottomLoading
     {
         type            fixedDisplacement;
+        displacementSeries
+        {
+            fileName    "$FOAM_CASE/constant/timeVsBottomDisp";
+            outOfBounds clamp;
+        }
         value           uniform (0 0 0);
     }
-    up
+    tractionFree
     {
         type            solidTraction;
         traction        uniform ( 0 0 0 );
         pressure        uniform 0;
         value           uniform (0 0 0);
     }
-    hole
+    back
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type            empty;
     }
-    frontAndBack
+    front
     {
         type            empty;
     }

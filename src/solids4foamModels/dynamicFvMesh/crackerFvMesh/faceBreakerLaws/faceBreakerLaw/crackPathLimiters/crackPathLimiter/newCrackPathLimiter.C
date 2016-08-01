@@ -44,12 +44,12 @@ autoPtr<crackPathLimiter> crackPathLimiter::New
     const dictionary& dict
 )
 {
-    word rheoTypeName = dict.lookup("type");
+    word lawTypeName = dict.lookup("type");
 
-    Info<< "Selecting crack path limiter: " << rheoTypeName << endl;
+    Info<< "Selecting crack path limiter: " << lawTypeName << endl;
 
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(rheoTypeName);
+        dictionaryConstructorTablePtr_->find(lawTypeName);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -62,7 +62,7 @@ autoPtr<crackPathLimiter> crackPathLimiter::New
             ")",
             dict
         )   << "Unknown crackPathLimiter type "
-            << rheoTypeName << endl << endl
+            << lawTypeName << endl << endl
             << "Valid  crackPathLimiters are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);

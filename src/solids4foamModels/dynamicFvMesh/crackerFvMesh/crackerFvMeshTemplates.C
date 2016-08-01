@@ -74,7 +74,6 @@ void Foam::crackerFvMesh::updateVolFieldBrokenFaces
     HashTable<const GeometricField<Type, fvPatchField, volMesh>*> fields
     (
         mesh.thisDb().objectRegistry::template lookupClass
-        //<GeometricField<Type, PatchField, GeoMesh> >()
        <GeometricField<Type, fvPatchField, volMesh> >()
     );
 
@@ -108,7 +107,7 @@ void Foam::crackerFvMesh::updateVolFieldBrokenFaces
         // Global crack fields
         Field<Type> gFieldpI = mesh.globalCrackField(fieldpI);
 
-        // Check if there is a surface field by the same name suffixed with 'f'
+        // Check if there is a surface equivalent to the vol field
         bool surfaceFieldExists = false;
         const GeometricField<Type, fvsPatchField, surfaceMesh>*
             surfaceFieldPtr = NULL;

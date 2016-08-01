@@ -23,51 +23,33 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "faceBreakerLaw.H"
-#include "volFields.H"
-#include "surfaceFields.H"
+#include "cohesivePolyPatch.H"
+#include "addToRunTimeSelectionTable.H"
+#include "polyBoundaryMesh.H"
+#include "polyMesh.H"
+//#include "demandDrivenData.H"
+//#include "OFstream.H"
+//#include "patchZones.H"
+//#include "matchPoints.H"
+//#include "SortableList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-autoPtr<faceBreakerLaw> faceBreakerLaw::New
+// Re-ordering no longer performed to allow parallelisation
+bool cohesivePolyPatch::order
 (
-    const word& name,
-    const fvMesh& mesh,
-    const dictionary& dict
-)
+    const primitivePatch& pp,
+    labelList& faceMap,
+    labelList& rotation
+) const
 {
-    word lawTypeName = dict.lookup("type");
-
-    Info<< "Selecting face breaker law: " << lawTypeName << endl;
-
-    dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(lawTypeName);
-
-    if (cstrIter == dictionaryConstructorTablePtr_->end())
-    {
-        FatalIOErrorIn
-        (
-            "faceBreakerLaw::New(\n"
-            "    const word& name,\n"
-            "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
-            ")",
-            dict
-        )   << "Unknown faceBreakerLaw type "
-            << lawTypeName << endl << endl
-            << "Valid  faceBreakerLaws are : " << endl
-            << dictionaryConstructorTablePtr_->toc()
-            << exit(FatalIOError);
-    }
-
-    return autoPtr<faceBreakerLaw>(cstrIter()(name, mesh, dict));
+    return false;
 }
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

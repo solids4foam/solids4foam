@@ -25,15 +25,17 @@ Class
     crackerFvMesh
 
 Description
-    A mesh allowing topological detachment on all internal faces of the mesh.
+    A mesh allowing topological detachment on internal faces of the mesh, based
+    on a run-time selectable faceBreakerLaw.
 
 SourceFiles
     crackerFvMesh.C
+    crackerFvMeshTemplates.C
 
 Author
-    Hrvoje Jasak
-    Zeljko Tukovic
-    Philip Cardiff
+    Hrvoje Jasak, Wikki Ltd. All rights reserved
+    Zeljko Tukovic, FSB Zagreb. All rights reserved.
+    Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
@@ -45,7 +47,6 @@ Author
 #include "mapPolyMesh.H"
 #include "faceCracker.H"
 #include "faceBreakerLaw.H"
-#include "dynamicRefinementLaw.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -62,23 +63,22 @@ class crackerFvMesh
 {
     // Private data
 
-        //- Setup dictionary
+        //- Settings dictionary
         dictionary dict_;
 
-        //- Write mesh when there is a topo change
+        //- Switch to enable/disable writing of the mesh when there is a topo
+        //  change
         const Switch writeMesh_;
 
         //- Last topology mapper
         autoPtr<mapPolyMesh> topoChangeMap_;
 
-        //- Crack patch ID.  Holds faces after cracking
+        //- Crack patch Index
+        //  This patch holds the faces after cracking
         polyPatchID crackPatchID_;
 
         //- Law for governing which faces are broken
         mutable autoPtr<faceBreakerLaw> lawPtr_;
-
-        //- Mesh refiner law
-        autoPtr<dynamicRefinementLaw> refinerPtr_;
 
 
     // Demand-driven data

@@ -443,11 +443,11 @@ label simpleCohesiveZoneFvPatchVectorField::updateCrack()
 
         newTraction[faceID] = initiationTraction_[faceID];
 
-        Pout << "Crack has started at face: " << faceID
-            << ", normal traction: " << curNormalTraction[faceID]
-            << ", tangential traction: "
-            << curTangentialTraction[faceID]
-            << ", initiation traction: "
+        Pout<< "Crack has started at face: " << faceID << nl
+            << "    normal traction: " << curNormalTraction[faceID] << nl
+            << "    tangential traction: "
+            << curTangentialTraction[faceID] << nl
+            << "    initiation traction: "
             << initiationTraction_[faceID]
             << endl;
     }

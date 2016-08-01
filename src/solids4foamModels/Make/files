@@ -45,6 +45,7 @@ $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarFiel
 functionObjects/setInletVelocity/setInletVelocity.C
 
 dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
+dynamicFvMesh/crackerFvMesh/crackerFvMesh.C
 
 dynamicFvMesh/simpleCrackerFvMesh/simpleCohesiveZone/simpleCohesiveZoneFvPatchVectorField.C
 
@@ -52,6 +53,29 @@ simpleCohesiveZones = dynamicFvMesh/simpleCrackerFvMesh/simpleCohesiveZone/simpl
 $(simpleCohesiveZones)/simpleCohesiveZoneLaw/simpleCohesiveZoneLaw.C
 $(simpleCohesiveZones)/Dugdale/DugdaleSimpleCohesiveZoneLaw.C
 $(simpleCohesiveZones)/Linear/linearSimpleCohesiveZoneLaw.C
+
+dynamicFvMesh/crackerFvMesh/cohesivePolyPatch/cohesivePolyPatch.C
+dynamicFvMesh/crackerFvMesh/faceCracker/faceCracker.C
+dynamicFvMesh/crackerFvMesh/faceCracker/detachFaceCracker.C
+
+dynamicFvMesh/crackerFvMesh/solidCohesive/solidCohesiveFvPatchVectorField.C
+
+cohesiveZoneModels = dynamicFvMesh/crackerFvMesh/solidCohesive/cohesiveZoneModels
+$(cohesiveZoneModels)/cohesiveZoneModel/cohesiveZoneModel.C
+$(cohesiveZoneModels)/cohesiveZoneModel/newCohesiveZoneModel.C
+$(cohesiveZoneModels)/modeICohesiveZoneModel/modeICohesiveZoneModel.C
+$(cohesiveZoneModels)/fixedMixedModeCohesiveZoneModel/fixedMixedModeCohesiveZoneModel.C
+$(cohesiveZoneModels)/variableMixedModeCohesiveZoneModel/variableMixedModeCohesiveZoneModel.C
+
+faceBreakerLaws = dynamicFvMesh/crackerFvMesh/faceBreakerLaws
+$(faceBreakerLaws)/faceBreakerLaw/faceBreakerLaw.C
+$(faceBreakerLaws)/faceBreakerLaw/newFaceBreakerLaw.C
+$(faceBreakerLaws)/cohesiveZoneInitiation/cohesiveZoneInitiation.C
+
+crackPathLimiters = $(faceBreakerLaws)/faceBreakerLaw/crackPathLimiters
+$(crackPathLimiters)/crackPathLimiter/crackPathLimiter.C
+$(crackPathLimiters)/crackPathLimiter/newCrackPathLimiter.C
+$(crackPathLimiters)/boundingBoxLimiter/boundingBoxLimiter.C
 
 numerics/newLeastSquaresVolPointInterpolation/newLeastSquaresVolPointInterpolation.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
