@@ -121,9 +121,9 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalModel::impKf() const
 }
 
 
-void Foam::mechanicalModel::updateYieldStress()
+void Foam::mechanicalModel::updateTotalFields()
 {
-    mechanicalLawPtr_->updateYieldStress();
+    mechanicalLawPtr_->updateTotalFields();
 }
 
 

@@ -833,12 +833,6 @@ bool nonLinGeomTotalLagSolid::evolve()
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
-    // PC: rename this function or maybe even remove it
-    // Update yield stress and plasticity total field e.g. epsilonP
-    // Or updateTotalFields: actually, this should be called inside
-    // updateTotalFields() that gets called in solidFoam
-    mechanical().updateYieldStress();
-
     // Interpolate D from cells to points
     volToPoint_.interpolate(D_, pointD_);
 
@@ -895,6 +889,12 @@ tmp<vectorField> nonLinGeomTotalLagSolid::tractionBoundarySnGrad
             )*rImpK
         )
     );
+}
+
+
+void nonLinGeomTotalLagSolid::updateTotalFields()
+{
+    mechanical().updateTotalFields();
 }
 
 

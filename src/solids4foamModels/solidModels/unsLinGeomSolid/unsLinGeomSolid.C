@@ -813,12 +813,6 @@ bool unsLinGeomSolid::evolve()
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
-    // PC: rename this function or maybe even remove it
-    // Update yield stress and plasticity total field e.g. epsilonP
-    // Or updateTotalFields: actually, this should be called inside
-    // updateTotalFields() that gets called in solidFoam
-    mechanical().updateYieldStress();
-
     // Calculate cell strain
     epsilon_ = symm(gradD_);
 
@@ -890,6 +884,12 @@ tmp<vectorField> unsLinGeomSolid::tractionBoundarySnGrad
             )*rImpK
         )
     );
+}
+
+
+void unsLinGeomSolid::updateTotalFields()
+{
+    mechanical().updateTotalFields();
 }
 
 

@@ -59,10 +59,7 @@ Foam::linearElastic::linearElastic
     nu_(dict.lookup("nu")),
     lambda_
     (
-        mesh.lookupObject<IOdictionary>
-        (
-            "mechanicalProperties"
-        ).lookup("planeStress")
+        planeStress()
       ? nu_*E_/((1.0 + nu_)*(1.0 - nu_))
       : nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))
     ),

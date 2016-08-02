@@ -28,9 +28,11 @@ $(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
 $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
 $(mechanicalLaws)/linearElastic/linearElastic.C
 $(mechanicalLaws)/neoHookeanElastic/neoHookeanElastic.C
+$(mechanicalLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
 
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
+$(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
 $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
@@ -76,6 +78,13 @@ crackPathLimiters = $(faceBreakerLaws)/faceBreakerLaw/crackPathLimiters
 $(crackPathLimiters)/crackPathLimiter/crackPathLimiter.C
 $(crackPathLimiters)/crackPathLimiter/newCrackPathLimiter.C
 $(crackPathLimiters)/boundingBoxLimiter/boundingBoxLimiter.C
+
+dynamicFvMesh/cellRemovalFvMesh/cellRemovalFvMesh.C
+
+cellRemovalLaws = dynamicFvMesh/cellRemovalFvMesh/cellRemovalLaws
+$(cellRemovalLaws)/cellRemovalLaw/cellRemovalLaw.C
+$(cellRemovalLaws)/cellRemovalLaw/newCellRemovalLaw.C
+$(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 
 numerics/newLeastSquaresVolPointInterpolation/newLeastSquaresVolPointInterpolation.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
@@ -159,15 +168,6 @@ pathLimiters = $(faceBreakerLaws)/faceBreakerLaw/crackPathLimiters
 $(pathLimiters)/crackPathLimiter/crackPathLimiter.C
 $(pathLimiters)/crackPathLimiter/newCrackPathLimiter.C
 $(pathLimiters)/boundingBoxLimiter/boundingBoxLimiter.C
-
-dynamicFvMesh/cellRemovalFvMesh/cellRemovalFvMesh.C
-
-cellRemovalLaws = dynamicFvMesh/cellRemovalFvMesh/cellRemovalLaws
-$(cellRemovalLaws)/cellRemovalLaw/cellRemovalLaw.C
-$(cellRemovalLaws)/cellRemovalLaw/newCellRemovalLaw.C
-$(cellRemovalLaws)/simpleRemovalLaw/simpleRemovalLaw.C
-$(cellRemovalLaws)/sigmaEqLaw/sigmaEqLaw.C
-$(cellRemovalLaws)/boundingBox/boundingBoxRemovalLaw.C
 
 numerics/fvMeshSubset/fvMeshSubset.C
 numerics/logExpVolFields/eig3/eig3.C

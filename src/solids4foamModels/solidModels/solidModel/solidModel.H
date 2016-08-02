@@ -284,6 +284,9 @@ public:
                 const fvPatch& patch
             ) const = 0;
 
+            //- Update total accumulated fields
+            virtual void updateTotalFields() = 0;
+
             //- Write fields
             virtual void writeFields(const Time& runTime);
 

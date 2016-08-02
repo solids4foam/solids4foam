@@ -778,12 +778,6 @@ bool linGeomSolid::evolve()
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
-    // PC: rename this function or maybe even remove it
-    // Update yield stress and plasticity total field e.g. epsilonP
-    // Or updateTotalFields: actually, this should be called inside
-    // updateTotalFields() that gets called in solidFoam
-    mechanical().updateYieldStress();
-
     // Interpolate cell displacements to vertices
     volToPoint_.interpolate(D_, pointD_);
     pointD_.correctBoundaryConditions();
@@ -853,6 +847,12 @@ tmp<vectorField> linGeomSolid::tractionBoundarySnGrad
             )*rImpK
         )
     );
+}
+
+
+void linGeomSolid::updateTotalFields()
+{
+    mechanical().updateTotalFields();
 }
 
 

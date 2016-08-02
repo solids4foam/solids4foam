@@ -22,19 +22,22 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    mechanicalLaw
+    cellRemovalLaw
 
 Description
-    Material mechanical for solids.
+    Law that selects which cells should be removed
+
+Authors
+    Philip Cardif, UCD. All rights reserved.
 
 SourceFiles
-    mechanicalLaw.C
-    newmechanicalLaw.C
+    cellRemovalLaw.C
+    newCellRemovalLaw.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef mechanicalLaw_H
-#define mechanicalLaw_H
+#ifndef cellRemovalLaw_H
+#define cellRemovalLaw_H
 
 #include "IOdictionary.H"
 #include "typeInfo.H"
@@ -42,7 +45,6 @@ SourceFiles
 #include "volFields.H"
 #include "tmp.H"
 #include "autoPtr.H"
-#include "IOdictionary.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -50,67 +52,47 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class mechanicalLaw Declaration
+                         Class cellRemovalLaw Declaration
 \*---------------------------------------------------------------------------*/
 
-class mechanicalLaw
+class cellRemovalLaw
 {
     // Private data
 
         //- Name
         const word name_;
 
-        //- Const reference to mesh
-        const fvMesh& mesh_;
-
-        //- Const reference to law dictionary
-        const dictionary& dict_;
-
-        // Current materials index field
-        //     1 for the current materials
-        //     0 for other materials
-        mutable volScalarField* curMaterialPtr_;
-
-        // Current material index i.e. is the current material number 0, 1,
-        // 2, etc.
-        mutable label curMatIndex_;
+        //- Reference to stress field
+        fvMesh& mesh_;
 
 
     // Private Member Functions
 
-        // Make current material field
-        void calcCurMaterial() const;
-
         //- Disallow copy construct
-        mechanicalLaw(const mechanicalLaw&);
+        cellRemovalLaw(const cellRemovalLaw&);
 
         //- Disallow default bitwise assignment
-        void operator=(const mechanicalLaw&);
+        void operator=(const cellRemovalLaw&);
 
 
 protected:
 
         //- Return reference to mesh
+        fvMesh& mesh()
+        {
+            return mesh_;
+        }
+
+        //- Return const reference to mesh
         const fvMesh& mesh() const
         {
             return mesh_;
         }
 
-        //- If the case is plane stress
-        bool planeStress() const
-        {
-            return
-                mesh_.lookupObject<IOdictionary>
-                (
-                    "mechanicalProperties"
-                ).lookup("planeStress");
-        }
-
-
 public:
 
     //- Runtime type information
-    TypeName("mechanicalLaw");
+    TypeName("cellRemovalLaw");
 
 
     // Declare run-time constructor selection table
@@ -118,11 +100,11 @@ public:
         declareRunTimeSelectionTable
         (
             autoPtr,
-            mechanicalLaw,
+            cellRemovalLaw,
             dictionary,
             (
                 const word name,
-                const fvMesh& mesh,
+                fvMesh& mesh,
                 const dictionary& dict
             ),
             (name, mesh, dict)
@@ -131,11 +113,11 @@ public:
 
     // Selectors
 
-        //- Return a reference to the selected mechanical model
-        static autoPtr<mechanicalLaw> New
+        //- Return a reference to the selected meshFailure model
+        static autoPtr<cellRemovalLaw> New
         (
             const word& name,
-            const fvMesh& mesh,
+            fvMesh& mesh,
             const dictionary& dict
         );
 
@@ -143,17 +125,17 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        mechanicalLaw
+        cellRemovalLaw
         (
             const word& name,
-            const fvMesh& mesh,
+            fvMesh& mesh,
             const dictionary& dict
         );
 
 
     // Destructor
 
-        virtual ~mechanicalLaw()
+        virtual ~cellRemovalLaw()
         {}
 
 
@@ -165,47 +147,11 @@ public:
             return name_;
         }
 
-        //- Return density
-        virtual tmp<volScalarField> rho() const = 0;
+        // Return list of cell IDs to be removed
+        virtual tmp<labelField> cellsToRemove() = 0;
 
-        //- Return the implicit stiffness
-        //  This is the diffusivity for the Laplacian term
-        virtual tmp<volScalarField> impK() const = 0;
-
-        //- Return the implicit stiffness surface field
-        //  This is the diffusivity for the Laplacian term
-        virtual tmp<surfaceScalarField> impKf() const;
-
-        //- Calculate the stress
-        virtual void correct(volSymmTensorField& sigma) = 0;
-
-        //- Calculate the stress
-        virtual void correct(surfaceSymmTensorField& sigma);
-
-        //- Return material residual i.e. a measured of how convergence of
-        //  the material model
-        virtual scalar residual();
-
-        //- Update total accumulated fields
-        virtual void updateTotalFields()
-        {}
-
-        // Return reference to current material field
-        const volScalarField& curMaterial() const;
-
-        // Return reference to current material field
-        volScalarField& curMaterial();
-
-        // Return reference to current material index
-        label& curMaterialIndex() const
-        {
-            return curMatIndex_;
-        }
-
-        //- Set current material index; this is only needed for multiMaterial
-        //  analyses
-        virtual void setMaterialIndex(label curMaterialIndex)
-        {}
+        // Return list of patch indices for the faces to be removed
+        virtual label exposedFacesPatchID() = 0;
 };
 
 

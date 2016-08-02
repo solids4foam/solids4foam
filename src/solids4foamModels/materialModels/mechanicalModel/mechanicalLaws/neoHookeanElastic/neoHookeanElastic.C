@@ -59,10 +59,7 @@ Foam::neoHookeanElastic::neoHookeanElastic
     mu_(E_/(2.0*(1.0 + nu_))),
     K_
     (
-        mesh.lookupObject<IOdictionary>
-        (
-            "mechanicalProperties"
-        ).lookup("planeStress")
+        planeStress()
       ? (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_
       : (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_
     )

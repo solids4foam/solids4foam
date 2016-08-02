@@ -1091,12 +1091,6 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
     }
     while (!converged(iCorr, solverPerfDD) && ++iCorr < nCorr_);
 
-    // PC: rename this function or maybe even remove it
-    // Update yield stress and plasticity total field e.g. epsilonP
-    // Or updateTotalFields: actually, this should be called inside
-    // updateTotalFields() that gets called in solidFoam
-    mechanical().updateYieldStress();
-
     // Relative deformation gradient
     relF_ = I + gradDD_.T();
 
@@ -1185,6 +1179,12 @@ tmp<vectorField> unsNonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
             )*rImpK
         )
     );
+}
+
+
+void unsNonLinGeomUpdatedLagSolid::updateTotalFields()
+{
+    mechanical().updateTotalFields();
 }
 
 

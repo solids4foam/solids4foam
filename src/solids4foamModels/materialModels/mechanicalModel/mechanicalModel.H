@@ -114,15 +114,15 @@ public:
         const mechanicalLaw& law() const;
 
         //- Return density
-        tmp<volScalarField> rho() const;
+        virtual tmp<volScalarField> rho() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
-        tmp<volScalarField> impK() const;
+        virtual tmp<volScalarField> impK() const;
 
         //- Return the implicit stiffness surface field
         //  This is the diffusivity for the Laplacian term
-        tmp<surfaceScalarField> impKf() const;
+        virtual tmp<surfaceScalarField> impKf() const;
 
         //- Calculate the stress vol field
         virtual void correct(volSymmTensorField& sigma);
@@ -134,8 +134,8 @@ public:
         //  the material model
         virtual scalar residual();
 
-        //- Update yield stress
-        void updateYieldStress();
+        //- Update ttoal accumulated fields
+        virtual void updateTotalFields();
 
         //- Rate of dissipated energy from plasticity
         //tmp<volScalarField> plasticDissipationRate() const;
