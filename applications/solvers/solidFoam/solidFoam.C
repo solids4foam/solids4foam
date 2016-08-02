@@ -63,6 +63,9 @@ int main(int argc, char *argv[])
         }
         while (mesh.update());
 
+        // Update accumulated fields
+        solid->updateTotalFields();
+
         // Write fields
         if (runTime.outputTime())
         {
