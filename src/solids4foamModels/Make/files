@@ -54,7 +54,7 @@ dynamicFvMesh/simpleCrackerFvMesh/simpleCohesiveZone/simpleCohesiveZoneFvPatchVe
 simpleCohesiveZones = dynamicFvMesh/simpleCrackerFvMesh/simpleCohesiveZone/simpleCohesiveZoneLaws
 $(simpleCohesiveZones)/simpleCohesiveZoneLaw/simpleCohesiveZoneLaw.C
 $(simpleCohesiveZones)/Dugdale/DugdaleSimpleCohesiveZoneLaw.C
-$(simpleCohesiveZones)/Linear/linearSimpleCohesiveZoneLaw.C
+$(simpleCohesiveZones)/linear/linearSimpleCohesiveZoneLaw.C
 
 dynamicFvMesh/crackerFvMesh/cohesivePolyPatch/cohesivePolyPatch.C
 dynamicFvMesh/crackerFvMesh/faceCracker/faceCracker.C
