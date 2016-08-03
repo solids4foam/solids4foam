@@ -2,8 +2,7 @@
 # Lines that start with '#' are comments.
 
 # ignore eigen and ltensor libraries
-/src/eigen3
-/src/ltensor
+ThirdParty/eigen3
 
 # editor and misc backup files - anywhere
 *~

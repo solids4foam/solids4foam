@@ -1,0 +1,29 @@
+#!/bin/sh
+set -x
+
+# Eigen library
+# http://eigen.tuxfamily.org/index.php?title=Main_Page
+# To use system version of eigen, set the EIGEN_DIR environmental variable
+# For example, add the following line to your ~.bashrc:
+#     export EIGEN_DIR="/opt/local/include/eigen3"
+# Check if src/eigen3 directory is found
+if [ -d $(pwd)/eigen3 ]
+then
+    echo "eigen3 found."
+else
+    # If EIGEN_DIR is not set then we wil download eigen
+    if [ -z $EIGEN_DIR ]
+    then
+        # Download eigen using wget
+        echo "Downloading eigen3"
+        wget http://bitbucket.org/eigen/eigen/get/3.2.8.tar.gz
+        \tar xvf 3.2.8.tar.gz
+        \rm -f 3.2.8.tar.gz
+        \mv eigen-eigen-07105f7124f9 eigen3
+        (cd eigen3 && wmakeLnInclude .)
+    else
+        #  If EIGEN_DIR is set then then we will create a symbolic link to it
+        echo "EIGEN_DIR is set: creating symbolic link"
+        \ln -s $EIGEN_DIR eigen3;
+    fi
+fi

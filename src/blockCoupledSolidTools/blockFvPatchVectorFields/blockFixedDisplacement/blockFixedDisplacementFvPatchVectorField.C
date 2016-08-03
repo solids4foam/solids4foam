@@ -1,0 +1,345 @@
+/*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           | Copyright held by original author
+     \\/     M anipulation  |
+-------------------------------------------------------------------------------
+License
+    This file is part of OpenFOAM.
+
+    OpenFOAM is free software; you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation; either version 2 of the License, or (at your
+    option) any later version.
+
+    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+    for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with OpenFOAM; if not, write to the Free Software Foundation,
+    Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+
+\*---------------------------------------------------------------------------*/
+
+#include "blockFixedDisplacementFvPatchVectorField.H"
+#include "addToRunTimeSelectionTable.H"
+#include "volFields.H"
+#include "surfaceFields.H"
+#include "fvcMeshPhi.H"
+#include "fixedValuePointPatchFields.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+blockFixedDisplacementFvPatchVectorField::
+blockFixedDisplacementFvPatchVectorField
+(
+    const fvPatch& p,
+    const DimensionedField<vector, volMesh>& iF
+)
+:
+    fixedValueFvPatchVectorField(p, iF),
+    blockFvPatchVectorField(),
+    totalDisp_(vector::zero),
+    dispSeries_()
+{}
+
+
+blockFixedDisplacementFvPatchVectorField::
+blockFixedDisplacementFvPatchVectorField
+(
+    const blockFixedDisplacementFvPatchVectorField& ptf,
+    const fvPatch& p,
+    const DimensionedField<vector, volMesh>& iF,
+    const fvPatchFieldMapper& mapper
+)
+:
+    fixedValueFvPatchVectorField(ptf, p, iF, mapper),
+    blockFvPatchVectorField(),
+    totalDisp_(ptf.totalDisp_),
+    dispSeries_(ptf.dispSeries_)
+{}
+
+
+blockFixedDisplacementFvPatchVectorField::
+blockFixedDisplacementFvPatchVectorField
+(
+    const fvPatch& p,
+    const DimensionedField<vector, volMesh>& iF,
+    const dictionary& dict
+)
+:
+    fixedValueFvPatchVectorField(p, iF, dict),
+    blockFvPatchVectorField(),
+    totalDisp_(vector::zero),
+    dispSeries_()
+{
+    // Check if displacement is time-varying
+    if (dict.found("displacementSeries"))
+    {
+        Info<< "    displacement is time-varying" << endl;
+        dispSeries_ =
+            interpolationTable<vector>(dict.subDict("displacementSeries"));
+
+        fvPatchField<vector>::operator==
+        (
+            dispSeries_(this->db().time().timeOutputValue())
+        );
+    }
+    else
+    {
+        if (dict.found("value"))
+        {
+            vectorField val = vectorField("value", dict, p.size());
+
+            totalDisp_ = gAverage(val);
+        }
+    }
+}
+
+blockFixedDisplacementFvPatchVectorField::
+blockFixedDisplacementFvPatchVectorField
+(
+    const blockFixedDisplacementFvPatchVectorField& ptf
+)
+:
+    fixedValueFvPatchVectorField(ptf),
+    blockFvPatchVectorField(),
+    totalDisp_(ptf.totalDisp_),
+    dispSeries_(ptf.dispSeries_)
+{}
+
+
+blockFixedDisplacementFvPatchVectorField::
+blockFixedDisplacementFvPatchVectorField
+(
+    const blockFixedDisplacementFvPatchVectorField& ptf,
+    const DimensionedField<vector, volMesh>& iF
+)
+:
+    fixedValueFvPatchVectorField(ptf, iF),
+    blockFvPatchVectorField(),
+    totalDisp_(ptf.totalDisp_),
+    dispSeries_(ptf.dispSeries_)
+{}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void blockFixedDisplacementFvPatchVectorField::updateCoeffs()
+{
+    if (this->updated())
+    {
+        return;
+    }
+
+    vectorField disp(patch().size(), totalDisp_);
+    vectorField pointDisp(patch().patch().nPoints(), totalDisp_);
+
+    if (dispSeries_.size())
+    {
+        disp = dispSeries_(this->db().time().timeOutputValue());
+        pointDisp = dispSeries_(this->db().time().timeOutputValue());
+    }
+
+    bool incremental = bool(dimensionedInternalField().name() == "DU");
+
+    if (incremental)
+    {
+        if (patch().boundaryMesh().mesh().foundObject<volVectorField>("U_0"))
+        {
+            const fvPatchField<vector>& Uold =
+              patch().lookupPatchField<volVectorField, vector>("U_0");
+
+            disp -= Uold;
+        }
+        else if (patch().boundaryMesh().mesh().foundObject<volVectorField>("U"))
+        {
+            const fvPatchField<vector>& Uold =
+              patch().lookupPatchField<volVectorField, vector>("U");
+
+            disp -= Uold;
+        }
+    }
+
+    fvPatchField<vector>::operator==
+    (
+        disp
+    );
+
+    // Update pointDU
+
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+
+    if
+    (
+        mesh.objectRegistry::lookupObject<pointVectorField>
+        (
+            "point" + dimensionedInternalField().name()
+        ).boundaryField()[patch().index()].type() == "fixedValue"
+    )
+    {
+        if (incremental)
+        {
+            const pointVectorField& pointU =
+                mesh.objectRegistry::lookupObject
+                <
+                pointVectorField
+                >("pointU");
+
+            const pointVectorField& pointUOld = pointU.oldTime();
+
+            const labelList& meshPoints = patch().patch().meshPoints();
+
+            forAll(meshPoints, pI)
+            {
+                const label pointID = meshPoints[pI];
+
+                pointDisp[pI] -= pointUOld[pointID];
+            }
+        }
+
+        fixedValuePointPatchVectorField& patchPointDU =
+            refCast<fixedValuePointPatchVectorField>
+            (
+                const_cast<pointVectorField&>
+                (
+                    mesh.objectRegistry::lookupObject<pointVectorField>
+                    ("point" + dimensionedInternalField().name())
+                ).boundaryField()[patch().index()]
+            );
+
+        patchPointDU == pointDisp;
+    }
+
+    fixedValueFvPatchVectorField::updateCoeffs();
+}
+
+
+Foam::tmp<Foam::Field<vector> >
+blockFixedDisplacementFvPatchVectorField::snGrad() const
+{
+    // snGrad without non-orthogonal correction
+    // return (*this - patchInternalField())*this->patch().deltaCoeffs();
+
+    // Lookup previous boundary gradient
+    const fvPatchField<tensor>& gradField =
+        patch().lookupPatchField<volTensorField, tensor>
+        (
+            "grad(" + dimensionedInternalField().name() + ")"
+        );
+
+    // Calculate correction vector
+    vectorField n = this->patch().nf();
+    vectorField delta = this->patch().delta();
+    vectorField k = ((I - sqr(n)) & delta);
+
+    return
+    (
+        //*this - patchInternalField()
+        //*this - (patchInternalField() + (k & gradField.patchInternalField()))
+        //*this - (patchInternalField() + (k & gradField))
+        (*this - (k & gradField)) - patchInternalField()
+    )*this->patch().deltaCoeffs();
+}
+
+
+tmp<Field<vector> > blockFixedDisplacementFvPatchVectorField::
+gradientBoundaryCoeffs() const
+{
+    FatalErrorIn("gradientBoundaryCoeffs()")
+        << "This function should not be called!" << nl
+        << "This boundary condition is only for use with the block coupled"
+        << " solid solver"
+        << abort(FatalError);
+
+    // Keep the compiler happy
+    return *this;
+}
+
+
+void blockFixedDisplacementFvPatchVectorField::insertBlockCoeffs
+(
+    const solidPolyMesh& solidMesh,
+    const surfaceScalarField& muf,
+    const surfaceScalarField& lambdaf,
+    const GeometricField<vector, fvPatchField, volMesh>& U,
+    Field<vector>& blockB,
+    BlockLduMatrix<vector>& blockM
+) const
+{
+    // Const reference to polyPatch and the fvMesh
+    const polyPatch& ppatch = patch().patch();
+
+    // Const reference to the patch field
+    const vectorField& pU = *this;
+
+    // Grab block diagonal
+    Field<tensor>& d = blockM.diag().asSquare();
+
+    // Index offset for addressing the diagonal of the boundary faces
+    const label start = ppatch.start();
+
+    // We currently assume that the tangential gradient along fixedValue
+    // boundaries is zero i.e. the values are uniform... do we?
+    // This BC just forces the value so we don't make any simplifying
+    // assumptions.
+    forAll(ppatch, faceI)
+    {
+        // For displacement, the value is fixed so we will set the
+        // diag and source so as to force this fixed value
+
+        // We will set the diag coeff to the scaleFac*I and set the
+        // source to scaleFac*fixedValue, where the scaleFac is used to
+        // set the order of magntitude of the diagonal to be the same as
+        // the internal field
+        // Note: but the matrix preconditioner basically does this for us,
+        // so there is probably no need for us to do it: to be checked!
+
+        // We will use the first cell
+        const scalar scaleFac = (d[0].xx() + d[0].yy() + d[0].zz())/3.0;
+
+        if (mag(scaleFac) < SMALL)
+        {
+            FatalErrorIn("pointGaussLsDivSigmaScheme::insertCoeffBc")
+                << "displacement scaleFac is zero"
+                    << abort(FatalError);
+        }
+
+        //const label varI = offset + faceI;
+        const label varI = solidMesh.findOldVariableID(start + faceI);
+
+        // Diagonal contribution for the boundary face
+        d[varI] += tensor(scaleFac*I);
+
+        // Source contribution
+        blockB[varI] += scaleFac*pU[faceI];
+    } // forAll faces of the patch
+}
+
+void blockFixedDisplacementFvPatchVectorField::write(Ostream& os) const
+{
+    fixedValueFvPatchVectorField::write(os);
+}
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+makePatchTypeField
+(
+    fvPatchVectorField,
+    blockFixedDisplacementFvPatchVectorField
+);
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// ************************************************************************* //
