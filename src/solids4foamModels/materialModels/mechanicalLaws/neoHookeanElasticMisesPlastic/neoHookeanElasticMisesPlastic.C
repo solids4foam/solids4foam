@@ -28,7 +28,6 @@ License
 #include "zeroGradientFvPatchFields.H"
 #include "transformGeometricField.H"
 #include "fvc.H"
-#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

@@ -136,6 +136,18 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 }
 
 
+const Foam::dimensionedScalar& Foam::linearElastic::mu() const
+{
+    return mu_;
+}
+
+
+const Foam::dimensionedScalar& Foam::linearElastic::lambda() const
+{
+    return lambda_;
+}
+
+
 void Foam::linearElastic::correct(volSymmTensorField& sigma)
 {
     // Lookup the strain tensor from the solver

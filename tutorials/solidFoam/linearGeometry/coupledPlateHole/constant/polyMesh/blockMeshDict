@@ -65,7 +65,7 @@ edges
 
 patches
 (
-    symmetryPlane left
+    patch left
     (
         (8 9 20 19)
         (9 10 21 20)
@@ -75,7 +75,7 @@ patches
         (2 3 14 13)
         (3 6 17 14)
     )
-    symmetryPlane down
+    patch down
     (
         (0 1 12 11)
         (1 2 13 12)

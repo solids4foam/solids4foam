@@ -7,6 +7,7 @@ solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/coupledUnsLinGeomSolid/coupledUnsLinGeomSolid.C
+solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/fluidModel/newFluidModel.C
@@ -21,10 +22,7 @@ fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInt
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
 fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
 
-mechanicalModel = materialModels/mechanicalModel
-$(mechanicalModel)/mechanicalModel.C
-
-mechanicalLaws = $(mechanicalModel)/mechanicalLaws
+mechanicalLaws = materialModels/mechanicalLaws
 $(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
 $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
 $(mechanicalLaws)/linearElastic/linearElastic.C
@@ -34,12 +32,27 @@ $(mechanicalLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
+/*$(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C*/
 $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
+
+/*contactModels = $(solidFvPatchFields)/solidContact/contactModels
+normalContactModels = $(contactModels)/normalContactModels
+$(normalContactModels)/normalContactModel/normalContactModel.C
+$(normalContactModels)/normalContactModel/newNormalContactModel.C
+$(normalContactModels)/standardPenalty/standardPenalty.C
+frictionContactModels = $(contactModels)/frictionContactModels
+$(frictionContactModels)/frictionContactModel/frictionContactModel.C
+$(frictionContactModels)/frictionContactModel/newFrictionContactModel.C
+$(frictionContactModels)/frictionless/frictionless.C
+$(frictionContactModels)/standardPenaltyFriction/standardPenaltyFriction.C
+$(frictionContactModels)/frictionLaws/frictionLaw/frictionLaw.C
+$(frictionContactModels)/frictionLaws/frictionLaw/newFrictionLaw.C
+$(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C*/
 
 fluidFvPatchFields = fluidModels/fvPatchFields
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C

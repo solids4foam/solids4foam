@@ -24,7 +24,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "coupledUnsLinGeomSolid.H"
+#include "coupledUnsLinGeomLinearElasticSolid.H"
 #include "volFields.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -33,6 +33,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fvcGradf.H"
 #include "BlockFvmDivSigma.H"
+#include "linearElastic.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -46,104 +47,19 @@ namespace solidModels
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(coupledUnsLinGeomSolid, 0);
-addToRunTimeSelectionTable(solidModel, coupledUnsLinGeomSolid, dictionary);
-
-
-// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
-
-bool coupledUnsLinGeomSolid::converged
+defineTypeNameAndDebug(coupledUnsLinGeomLinearElasticSolid, 0);
+addToRunTimeSelectionTable
 (
-    const int iCorr,
-    const BlockSolverPerformance<vector>& solverPerfD
-)
-{
-    // We will check a number of different residuals for convergence
-    bool converged = false;
-
-    // Calculate displacement residual
-    const scalar residualD =
-        gMax
-        (
-            mag(D_.internalField() - D_.prevIter().internalField())
-           /max
-            (
-                gMax(mag(D_.internalField() - D_.oldTime().internalField())),
-                SMALL
-            )
-        );
-
-    // Calculate material residual
-    const scalar materialResidual = mechanical().residual();
-
-    // If one of the residuals has converged to an order of magnitude
-    // less than the tolerance then consider the solution converged
-    // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol_)
-    {
-        if
-        (
-            mag(solverPerfD.initialResidual()) < solutionTol_
-         && residualD < solutionTol_
-        )
-        {
-            Info<< "    Both residuals have converged" << endl;
-            converged = true;
-        }
-        else if
-        (
-            residualD < alternativeTol_
-        )
-        {
-            Info<< "    The relative residual has converged" << endl;
-            converged = true;
-        }
-        else if
-        (
-            mag(solverPerfD.initialResidual()) < alternativeTol_
-        )
-        {
-            Info<< "    The solver residual has converged" << endl;
-            converged = true;
-        }
-        else
-        {
-            converged = false;
-        }
-    }
-
-    // Print residual information
-    if (iCorr == 0)
-    {
-        Info<< "    Corr, res, relRes, matRes, iters" << endl;
-    }
-    else if (iCorr % infoFrequency_ == 0 || converged)
-    {
-        Info<< "    " << iCorr
-            << ", " << mag(solverPerfD.initialResidual())
-            << ", " << residualD
-            << ", " << materialResidual
-            << ", " << solverPerfD.nIterations() << endl;
-
-        if (converged)
-        {
-            Info<< endl;
-        }
-    }
-    else if (iCorr == nCorr_ - 1)
-    {
-        maxIterReached_++;
-        Warning
-            << "Max iterations reached within momentum loop" << endl;
-    }
-
-    return converged;
-}
+    solidModel, coupledUnsLinGeomLinearElasticSolid, dictionary
+);
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
+coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
+(
+    dynamicFvMesh& mesh
+)
 :
     solidModel(typeName, mesh),
     extendedMesh_(mesh),
@@ -211,37 +127,11 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         mesh,
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
-    epsilonf_
-    (
-        IOobject
-        (
-            "epsilonf",
-            runTime().timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
     sigma_
     (
         IOobject
         (
             "sigma",
-            runTime().timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
-    ),
-    sigmaf_
-    (
-        IOobject
-        (
-            "sigmaf",
             runTime().timeName(),
             mesh,
             IOobject::NO_READ,
@@ -264,25 +154,33 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         mesh,
         dimensionedTensor("0", dimless, tensor::zero)
     ),
-    gradDf_
+    rho_(mechanical().rho()),
+    muf_
     (
         IOobject
         (
-            "grad(" + D_.name() + ")f",
+            "interpolate(mu)",
             runTime().timeName(),
             mesh,
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
         mesh,
-        dimensionedTensor("0", dimless, tensor::zero)
+        dimensionedScalar("0", dimPressure, 0.0)
     ),
-    rho_(mechanical().rho()),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_),
-    muf_("muf", impKf_/3.5), // assuming a Poisson's ratio of 0.3
-    lambdaf_("lambdaf", 1.5*muf_),
+    lambdaf_
+    (
+        IOobject
+        (
+            "interpolate(lambda)",
+            runTime().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar("0", dimPressure, 0.0)
+    ),
     gravity_
     (
         solidProperties().lookupOrDefault<dimensionedVector>
@@ -296,33 +194,35 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         mesh.solutionDict().relax("DEqn")
       ? mesh.solutionDict().relaxationFactor("DEqn")
       : 1.0
-    ),
-    solutionTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
-    ),
-    alternativeTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("alternativeTolerance", 1e-07)
-    ),
-    materialTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("materialTolerance", 1e-05)
-    ),
-    infoFrequency_
-    (
-        solidProperties().lookupOrDefault<int>("infoFrequency", 1)
-    ),
-    nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 100)),
-    maxIterReached_(0)
+    )
 {
     D_.oldTime().oldTime();
+
+    // We will directly read the linearElastic mechanicalLaw
+    if (!isA<linearElastic>(mechanical()))
+    {
+        FatalErrorIn
+        (
+            "coupledUnsLinGeomLinearElasticSolid::"
+            "coupledUnsLinGeomLinearElasticSolid"
+        )   << type() << " can only be used with the linearElastic "
+            << "mechanicalLaw" << nl
+            << "Consider using one of the other linearGeometry solidModels."
+            << abort(FatalError);
+    }
+
+    // Cast the mechanical law to a linearElastic mechanicalLaw
+    const linearElastic& mech = refCast<const linearElastic>(mechanical());
+
+    // Set mu and lambda fields
+    muf_ = mech.mu();
+    lambdaf_ = mech.lambda();
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-// vector coupledUnsLinGeomSolid::pointU(label pointID) const
+// vector coupledUnsLinGeomLinearElasticSolid::pointU(label pointID) const
 // {
 //     pointVectorField pointU
 //     (
@@ -344,7 +244,8 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
 // }
 
 //- Patch point displacement
-tmp<vectorField> coupledUnsLinGeomSolid::patchPointDisplacementIncrement
+tmp<vectorField>
+coupledUnsLinGeomLinearElasticSolid::patchPointDisplacementIncrement
 (
     const label patchID
 ) const
@@ -369,7 +270,8 @@ tmp<vectorField> coupledUnsLinGeomSolid::patchPointDisplacementIncrement
 }
 
 
-tmp<vectorField> coupledUnsLinGeomSolid::faceZonePointDisplacementIncrement
+tmp<vectorField>
+coupledUnsLinGeomLinearElasticSolid::faceZonePointDisplacementIncrement
 (
     const label zoneID
 ) const
@@ -455,7 +357,8 @@ tmp<vectorField> coupledUnsLinGeomSolid::faceZonePointDisplacementIncrement
 }
 
 
-tmp<tensorField> coupledUnsLinGeomSolid::faceZoneSurfaceGradientOfVelocity
+tmp<tensorField>
+coupledUnsLinGeomLinearElasticSolid::faceZoneSurfaceGradientOfVelocity
 (
     const label zoneID,
     const label patchID
@@ -519,7 +422,7 @@ tmp<tensorField> coupledUnsLinGeomSolid::faceZoneSurfaceGradientOfVelocity
 }
 
 
-tmp<vectorField> coupledUnsLinGeomSolid::currentFaceZonePoints
+tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::currentFaceZonePoints
 (
     const label zoneID
 ) const
@@ -608,7 +511,7 @@ tmp<vectorField> coupledUnsLinGeomSolid::currentFaceZonePoints
 }
 
 
-tmp<vectorField> coupledUnsLinGeomSolid::faceZoneNormal
+tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::faceZoneNormal
 (
     const label zoneID,
     const label patchID
@@ -675,7 +578,7 @@ tmp<vectorField> coupledUnsLinGeomSolid::faceZoneNormal
 }
 
 
-void coupledUnsLinGeomSolid::setTraction
+void coupledUnsLinGeomLinearElasticSolid::setTraction
 (
     const label patchID,
     const vectorField& traction
@@ -687,8 +590,10 @@ void coupledUnsLinGeomSolid::setTraction
      != solidTractionFvPatchVectorField::typeName
     )
     {
-        FatalErrorIn("void coupledUnsLinGeomSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
+        FatalErrorIn
+        (
+            "void coupledUnsLinGeomLinearElasticSolid::setTraction(...)"
+        )   << "Bounary condition on " << D_.name()
             <<  " is "
             << D_.boundaryField()[patchID].type()
             << "for patch" << mesh().boundary()[patchID].name()
@@ -707,7 +612,7 @@ void coupledUnsLinGeomSolid::setTraction
 }
 
 
-void coupledUnsLinGeomSolid::setPressure
+void coupledUnsLinGeomLinearElasticSolid::setPressure
 (
     const label patchID,
     const scalarField& pressure
@@ -719,8 +624,10 @@ void coupledUnsLinGeomSolid::setPressure
      != solidTractionFvPatchVectorField::typeName
     )
     {
-        FatalErrorIn("void coupledUnsLinGeomSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
+        FatalErrorIn
+        (
+            "void coupledUnsLinGeomLinearElasticSolid::setTraction(...)"
+        )   << "Bounary condition on " << D_.name()
             <<  " is "
             << D_.boundaryField()[patchID].type()
             << "for patch" << mesh().boundary()[patchID].name()
@@ -739,7 +646,7 @@ void coupledUnsLinGeomSolid::setPressure
 }
 
 
-void coupledUnsLinGeomSolid::setTraction
+void coupledUnsLinGeomLinearElasticSolid::setTraction
 (
     const label patchID,
     const label zoneID,
@@ -764,7 +671,7 @@ void coupledUnsLinGeomSolid::setTraction
 }
 
 
-void coupledUnsLinGeomSolid::setPressure
+void coupledUnsLinGeomLinearElasticSolid::setPressure
 (
     const label patchID,
     const label zoneID,
@@ -789,163 +696,140 @@ void coupledUnsLinGeomSolid::setPressure
 }
 
 
-bool coupledUnsLinGeomSolid::evolve()
+bool coupledUnsLinGeomLinearElasticSolid::evolve()
 {
     Info << "Evolving solid solver" << endl;
 
-    int iCorr = 0;
     BlockSolverPerformance<vector> solverPerfD("undefined", "blockD");
     BlockLduMatrix<vector>::debug = 5;
 
     Info<< "Solving the momentum equation for D" << endl;
 
-    // Momentum equation loop
-    // In this case, a Hookean elastic constutive equation is assumed, and outer
-    // corrections are performed is a different (possibily nonlinear )definition
-    // of stress is used
-    do
+    // Note: there is no momentum loop as everything is linear and we have
+    // hard-coded the linear definition of stress
+
+    // Global coefficients are currently stored in the extendedMesh so we
+    // must clear them out each time before constructing a new equation
+    // Using a global patch may be a nicer solution
+    //extendedMesh_.clearOut();
+    extendedMesh_.clearOutGlobalCoeffs();
+
+    // Store fields for under-relaxation and residual calculation
+    D_.storePrevIter();
+
+    // Create source vector for block matrix
+    vectorField blockB(solutionVec_.size(), vector::zero);
+
+    // Create block system
+    BlockLduMatrix<vector> blockM(extendedMesh_);
+
+    // Grab block diagonal and set it to zero
+    Field<tensor>& d = blockM.diag().asSquare();
+    d = tensor::zero;
+
+    // Grab linear off-diagonal and set it to zero
+    Field<tensor>& l = blockM.lower().asSquare();
+    Field<tensor>& u = blockM.upper().asSquare();
+    u = tensor::zero;
+    l = tensor::zero;
+
+    // Insert coefficients
+
+    // For now we create separate matrices for each term of the three
+    // diffusion terms in the momentum equation and add the contributions
+    // together manually; a BlockFvMatrix class would help make this look
+    // nicer
+
+    // Laplacian
+    // non-orthogonal correction is treated implicitly
+    BlockLduMatrix<vector> blockMatLap =
+        BlockFvm::laplacian(extendedMesh_, muf_, D_, blockB);
+
+    // Laplacian transpose == div(mu*gradU.T())
+    BlockLduMatrix<vector> blockMatLapTran =
+        BlockFvm::laplacianTranspose(extendedMesh_, muf_, D_, blockB);
+
+    // Laplacian trace == div(lambda*I*tr(gradU))
+    BlockLduMatrix<vector> blockMatLapTrac =
+        BlockFvm::laplacianTrace(extendedMesh_, lambdaf_, D_, blockB);
+
+    // Add diagonal contributions
+    d += blockMatLap.diag().asSquare();
+    d += blockMatLapTran.diag().asSquare();
+    d += blockMatLapTrac.diag().asSquare();
+
+    // Add off-diagonal contributions
+    u += blockMatLap.upper().asSquare();
+    u += blockMatLapTran.upper().asSquare();
+    u += blockMatLapTrac.upper().asSquare();
+    l += blockMatLap.lower().asSquare();
+    l += blockMatLapTran.lower().asSquare();
+    l += blockMatLapTrac.lower().asSquare();
+
+    // Add contribution for processor boundaries
+    blockM.interfaces() = blockMatLap.interfaces();
+    forAll(mesh().boundaryMesh(), patchI)
     {
-        // Global coefficients are currently stored in the extendedMesh so we
-        // must clear them out each time before constructing a new equation
-        // Using a global patch may be a nicer solution
-        //extendedMesh_.clearOut();
-        extendedMesh_.clearOutGlobalCoeffs();
-
-        // Store fields for under-relaxation and residual calculation
-        D_.storePrevIter();
-
-        // Create source vector for block matrix
-        vectorField blockB(solutionVec_.size(), vector::zero);
-
-        // Create block system
-        BlockLduMatrix<vector> blockM(extendedMesh_);
-
-        // Grab block diagonal and set it to zero
-        Field<tensor>& d = blockM.diag().asSquare();
-        d = tensor::zero;
-
-        // Grab linear off-diagonal and set it to zero
-        Field<tensor>& l = blockM.lower().asSquare();
-        Field<tensor>& u = blockM.upper().asSquare();
-        u = tensor::zero;
-        l = tensor::zero;
-
-        // Insert coefficients
-
-        // For now we create separate matrices for each term of the three
-        // diffusion terms in the momentum equation and add the contributions
-        // together manually; a BlockFvMatrix class would help make this look
-        // nicer
-
-        // Laplacian
-        // non-orthogonal correction is treated implicitly
-        BlockLduMatrix<vector> blockMatLap =
-            BlockFvm::laplacian(extendedMesh_, muf_, D_, blockB);
-
-        // Laplacian transpose == div(mu*gradU.T())
-        BlockLduMatrix<vector> blockMatLapTran =
-            BlockFvm::laplacianTranspose(extendedMesh_, muf_, D_, blockB);
-
-        // Laplacian trace == div(lambda*I*tr(gradU))
-        BlockLduMatrix<vector> blockMatLapTrac =
-            BlockFvm::laplacianTrace(extendedMesh_, lambdaf_, D_, blockB);
-
-        // Add diagonal contributions
-        d += blockMatLap.diag().asSquare();
-        d += blockMatLapTran.diag().asSquare();
-        d += blockMatLapTrac.diag().asSquare();
-
-        // Add off-diagonal contributions
-        u += blockMatLap.upper().asSquare();
-        u += blockMatLapTran.upper().asSquare();
-        u += blockMatLapTrac.upper().asSquare();
-        l += blockMatLap.lower().asSquare();
-        l += blockMatLapTran.lower().asSquare();
-        l += blockMatLapTrac.lower().asSquare();
-
-        // Add contribution for processor boundaries
-        blockM.interfaces() = blockMatLap.interfaces();
-        forAll(mesh().boundaryMesh(), patchI)
+        const word& patchType = mesh().boundaryMesh()[patchI].type();
+        if (patchType == processorPolyPatch::typeName)
         {
-            const word& patchType = mesh().boundaryMesh()[patchI].type();
-            if (patchType == processorPolyPatch::typeName)
-            {
-                Field<tensor>& coupleUpper =
-                    blockM.coupleUpper()[patchI].asSquare();
+            Field<tensor>& coupleUpper =
+                blockM.coupleUpper()[patchI].asSquare();
 
-                coupleUpper = blockMatLap.coupleUpper()[patchI].asSquare();
-                coupleUpper +=
-                    blockMatLapTran.coupleUpper()[patchI].asSquare();
-                coupleUpper +=
-                    blockMatLapTrac.coupleUpper()[patchI].asSquare();
-            }
+            coupleUpper = blockMatLap.coupleUpper()[patchI].asSquare();
+            coupleUpper +=
+                blockMatLapTran.coupleUpper()[patchI].asSquare();
+            coupleUpper +=
+                blockMatLapTrac.coupleUpper()[patchI].asSquare();
         }
-
-        // We manually add the boundary conditions equations
-        // More thinking is required to get it to fit cleanly with the rest of
-        // the block coupled machinery
-        extendedMesh_.insertBoundaryConditions
-        (
-            blockM, blockB, muf_, lambdaf_, D_
-        );
-
-        // Add terms temporal and gravity terms to the block matrix and source
-        // Alos, we explicitly remove the implicit Hooke's law definition of
-        // stress and explicitly add the definition of stress from the
-        // mechanicalLaw
-        extendedMesh_.addFvMatrix
-        (
-            blockM,
-            blockB,
-            rho_*fvm::d2dt2(D_) - rho_*gravity_
-          + fvc::div
-            (
-                (mesh().Sf() & (2.0*muf_*epsilonf_))
-              + mesh().Sf()*lambdaf_*tr(epsilonf_)
-            )
-          - fvc::div(mesh().Sf() & sigmaf_),
-            true
-        );
-
-        // Block coupled solver call
-        solverPerfD =
-            BlockLduSolver<vector>::New
-            (
-                D_.name(),
-                blockM,
-                mesh().solutionDict().solver("blockD")
-            )->solve(solutionVec_, blockB);
-
-        // Transfer solution vector to D field
-        extendedMesh_.copySolutionVector(solutionVec_, D_);
-
-        // Under-relax the field
-        D_.relax();
-
-        // Update gradient of displacement
-        volToPoint_.interpolate(D_, pointD_);
-        gradD_ = fvc::grad(D_, pointD_);
-        gradDf_ = fvc::fGrad(D_, pointD_);
-
-        // We will call fvc::grad a second time as fixed displacement boundaries
-        // need the patch internal field values to calculate snGrad, which
-        // is then used to set snGrad on the gradD boundary
-        D_.correctBoundaryConditions();
-        gradD_ = fvc::grad(D_, pointD_);
-        gradDf_ = fvc::fGrad(D_, pointD_);
-
-        // Update the strain
-        epsilonf_ = symm(gradDf_);
-
-        // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigmaf_);
     }
-    while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
-    // Calculate cell strain
+    // We manually add the boundary conditions equations
+    // More thinking is required to get it to fit cleanly with the rest of
+    // the block coupled machinery
+    extendedMesh_.insertBoundaryConditions
+    (
+        blockM, blockB, muf_, lambdaf_, D_
+    );
+
+    // Add terms temporal and gravity terms to the block matrix and source
+    extendedMesh_.addFvMatrix
+    (
+        blockM,
+        blockB,
+        rho_*fvm::d2dt2(D_) - rho_*gravity_,
+        true
+    );
+
+    // Block coupled solver call
+    solverPerfD =
+        BlockLduSolver<vector>::New
+        (
+            D_.name(),
+            blockM,
+            mesh().solutionDict().solver("blockD")
+        )->solve(solutionVec_, blockB);
+
+    // Transfer solution vector to D field
+    extendedMesh_.copySolutionVector(solutionVec_, D_);
+
+    // Under-relax the field
+    D_.relax();
+
+    // Update gradient of displacement
+    volToPoint_.interpolate(D_, pointD_);
+    gradD_ = fvc::grad(D_, pointD_);
+
+    // We will call fvc::grad a second time as fixed displacement boundaries
+    // need the patch internal field values to calculate snGrad, which
+    // is then used to set snGrad on the gradD boundary
+    D_.correctBoundaryConditions();
+    gradD_ = fvc::grad(D_, pointD_);
+
+    // Update the strain
     epsilon_ = symm(gradD_);
 
-    // Calculate cell stress
+    // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma_);
 
     // Velocity
@@ -955,7 +839,7 @@ bool coupledUnsLinGeomSolid::evolve()
 }
 
 
-// void coupledUnsLinGeomSolid::predict()
+// void coupledUnsLinGeomLinearElasticSolid::predict()
 // {
 //     Info << "Predicting solid model" << endl;
 
@@ -977,7 +861,7 @@ bool coupledUnsLinGeomSolid::evolve()
 // }
 
 
-tmp<vectorField> coupledUnsLinGeomSolid::tractionBoundarySnGrad
+tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::tractionBoundarySnGrad
 (
     const vectorField& traction,
     const scalarField& pressure,
@@ -988,16 +872,14 @@ tmp<vectorField> coupledUnsLinGeomSolid::tractionBoundarySnGrad
     const label patchID = patch.index();
 
     // Patch mechanical property
-    const scalarField& impK = impK_.boundaryField()[patchID];
-
-    // Patch reciprocal implicit stiffness field
-    const scalarField& rImpK = rImpK_.boundaryField()[patchID];
+    const scalarField& mu = muf_.boundaryField()[patchID];
+    const scalarField& lambda = lambdaf_.boundaryField()[patchID];
 
     // Patch gradient
-    const tensorField& gradD = gradDf_.boundaryField()[patchID];
+    const tensorField& gradD = gradD_.boundaryField()[patchID];
 
     // Patch stress
-    const symmTensorField& sigma = sigmaf_.boundaryField()[patchID];
+    const symmTensorField& sigma = sigma_.boundaryField()[patchID];
 
     // Patch unit normals
     const vectorField n = patch.nf();
@@ -1009,20 +891,20 @@ tmp<vectorField> coupledUnsLinGeomSolid::tractionBoundarySnGrad
         (
             (
                 (traction - n*pressure)
-              - (n & (sigma - impK*gradD))
-            )*rImpK
+              - (n & (sigma - (2.0*mu + lambda)*gradD))
+            )/(2.0*mu + lambda)
         )
     );
 }
 
 
-void coupledUnsLinGeomSolid::updateTotalFields()
+void coupledUnsLinGeomLinearElasticSolid::updateTotalFields()
 {
     mechanical().updateTotalFields();
 }
 
 
-void coupledUnsLinGeomSolid::writeFields(const Time& runTime)
+void coupledUnsLinGeomLinearElasticSolid::writeFields(const Time& runTime)
 {
     // Update equivalent strain
     volScalarField epsilonEq
@@ -1061,20 +943,8 @@ void coupledUnsLinGeomSolid::writeFields(const Time& runTime)
 }
 
 
-void coupledUnsLinGeomSolid::end()
-{
-    if (maxIterReached_ > 0)
-    {
-        WarningIn(type() + "::end()")
-            << "The maximum momentum correctors were reached in "
-            << maxIterReached_ << " time-steps" << nl << endl;
-    }
-    else
-    {
-        Info<< "The momentum equation converged in all time-steps"
-            << nl << endl;
-    }
-}
+void coupledUnsLinGeomLinearElasticSolid::end()
+{}
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

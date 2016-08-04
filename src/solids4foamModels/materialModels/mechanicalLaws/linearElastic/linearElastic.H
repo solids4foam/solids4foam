@@ -22,96 +22,87 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    mechanicalModel
+    linearElastic
 
 Description
-    Class in charge of mechanical properties
+    Hookean linear elastic mechanical law.
 
 SourceFiles
-    mechanicalModel.C
+    linearElastic.C
 
 Author
     Philip Cardiff UCD
-    philip.cardiff@gmail.com
-
 \*---------------------------------------------------------------------------*/
 
-#ifndef mechanicalModel_H
-#define mechanicalModel_H
+#ifndef linearElastic_H
+#define linearElastic_H
 
-#include "IOdictionary.H"
-#include "typeInfo.H"
-#include "runTimeSelectionTables.H"
-#include "volFields.H"
-#include "tmp.H"
 #include "mechanicalLaw.H"
-#include "Switch.H"
-#include "fvc.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+
 /*---------------------------------------------------------------------------*\
-                        Class mechanicalModel Declaration
+                         Class linearElastic Declaration
 \*---------------------------------------------------------------------------*/
 
-class mechanicalModel
+class linearElastic
 :
-  public IOdictionary
+    public mechanicalLaw
 {
     // Private data
 
-        //- Const reference to mesh
-        const fvMesh& mesh_;
+        //- Density
+        dimensionedScalar rho_;
 
-        //- mechanical law
-        autoPtr<mechanicalLaw> mechanicalLawPtr_;
+        //- Modulus of elasticity
+        dimensionedScalar E_;
 
-        //- Plane stress
-        Switch planeStress_;
+        //- Poisson's ratio
+        dimensionedScalar nu_;
 
+        //- First Lame parameter
+        dimensionedScalar lambda_;
 
-private:
+        //- Second Lame parameter (shear modulus)
+        dimensionedScalar mu_;
+
 
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        mechanicalModel(const mechanicalModel&);
+        linearElastic(const linearElastic&);
 
         //- Disallow default bitwise assignment
-        void operator=(const mechanicalModel&);
-
+        void operator=(const linearElastic&);
 
 public:
 
     //- Runtime type information
-    TypeName("mechanicalModel");
+    TypeName("linearElastic");
+
+    // Static data members
 
 
     // Constructors
 
-        //- Construct
-        mechanicalModel(const fvMesh& mesh);
+        //- Construct from dictionary
+        linearElastic
+        (
+            const word& name,
+            const fvMesh& mesh,
+            const dictionary& dict
+        );
 
 
     // Destructor
 
-        virtual ~mechanicalModel();
+        virtual ~linearElastic();
 
 
     // Member Functions
-
-        // Access
-
-        //- Return const reference to mesh
-        const fvMesh& mesh() const;
-
-        //- Return true for plane stress
-        const Switch& planeStress() const;
-
-        //- Return mechanical law
-        const mechanicalLaw& law() const;
 
         //- Return density
         virtual tmp<volScalarField> rho() const;
@@ -120,29 +111,19 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-        //- Return the implicit stiffness surface field
-        //  This is the diffusivity for the Laplacian term
-        virtual tmp<surfaceScalarField> impKf() const;
+        //- Provide access to mu for the coupledUnsNonLinLinearElasticSolid
+        virtual const dimensionedScalar& mu() const;
 
-        //- Calculate the stress vol field
+        //- Provide access to lambda for the coupledUnsNonLinLinearElasticSolid
+        virtual const dimensionedScalar& lambda() const;
+
+        //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
 
-        //- Calculate the stress surface field
+        //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
-
-        //- Return material residual i.e. a measured of how convergence of
-        //  the material model
-        virtual scalar residual();
-
-        //- Update ttoal accumulated fields
-        virtual void updateTotalFields();
-
-        //- Rate of dissipated energy from plasticity
-        //tmp<volScalarField> plasticDissipationRate() const;
-
-        //- Read plasticityProperties dictionary
-        virtual bool read();
 };
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
