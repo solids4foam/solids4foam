@@ -1,6 +1,5 @@
 EXE_INC = \
     -I../../../src/solids4foamModels/lnInclude \
-    -I../../../src/blockCoupledSolidTools/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
     -I$(LIB_SRC)/finiteArea/lnInclude \

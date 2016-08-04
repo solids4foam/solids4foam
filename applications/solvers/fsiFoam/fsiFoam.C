@@ -95,6 +95,8 @@ int main(int argc, char *argv[])
          && (fsi().outerCorr() < fsi().nOuterCorr())
         );
 
+        fsi().solid().updateTotalFields();
+
         if (runTime.outputTime())
         {
             fsi().solid().writeFields(runTime);

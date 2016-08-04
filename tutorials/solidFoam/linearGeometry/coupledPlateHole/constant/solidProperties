@@ -16,7 +16,8 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // linearGeometry: assumes small strains and rotations
-solidModel     coupledUnsLinearGeometry;
+//solidModel     coupledUnsLinearGeometry;
+solidModel     coupledUnsLinearGeometryLinearElastic;
 
 coupledUnsLinearGeometryCoeffs
 {
@@ -36,5 +37,7 @@ coupledUnsLinearGeometryCoeffs
     infoFrequency   1;
 }
 
+coupledUnsLinearGeometryLinearElasticCoeffs
+{}
 
 // ************************************************************************* //
