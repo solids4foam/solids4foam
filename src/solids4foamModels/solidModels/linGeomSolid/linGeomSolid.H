@@ -185,6 +185,12 @@ public:
                 return pMesh_;
             }
 
+            //- Gradient of displacement
+            const volTensorField& gradD() const
+            {
+                return gradD_;
+            }
+
             //- Stress tensor
             const volSymmTensorField& sigma() const
             {
@@ -195,6 +201,18 @@ public:
             const volSymmTensorField& epsilon() const
             {
                 return epsilon_;
+            }
+
+            //- Implicit stiffness
+            const volScalarField& impK() const
+            {
+                return impK_;
+            }
+
+            //- Reciprocal of the implicit stiffness
+            const volScalarField& rImpK() const
+            {
+                return rImpK_;
             }
 
             //- Return point displacement field

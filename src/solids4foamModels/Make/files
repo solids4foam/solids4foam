@@ -8,6 +8,7 @@ solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/coupledUnsLinGeomSolid/coupledUnsLinGeomSolid.C
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
+solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/fluidModel/newFluidModel.C
@@ -26,6 +27,7 @@ mechanicalLaws = materialModels/mechanicalLaws
 $(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
 $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
 $(mechanicalLaws)/linearElastic/linearElastic.C
+$(mechanicalLaws)/thermoLinearElastic/thermoLinearElastic.C
 $(mechanicalLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(mechanicalLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
 
@@ -40,7 +42,8 @@ $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
 
-/*contactModels = $(solidFvPatchFields)/solidContact/contactModels
+/*
+contactModels = $(solidFvPatchFields)/solidContact/contactModels
 normalContactModels = $(contactModels)/normalContactModels
 $(normalContactModels)/normalContactModel/normalContactModel.C
 $(normalContactModels)/normalContactModel/newNormalContactModel.C
@@ -52,7 +55,8 @@ $(frictionContactModels)/frictionless/frictionless.C
 $(frictionContactModels)/standardPenaltyFriction/standardPenaltyFriction.C
 $(frictionContactModels)/frictionLaws/frictionLaw/frictionLaw.C
 $(frictionContactModels)/frictionLaws/frictionLaw/newFrictionLaw.C
-$(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C*/
+$(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C
+*/
 
 fluidFvPatchFields = fluidModels/fvPatchFields
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
@@ -118,47 +122,10 @@ functionObjects/stressTriaxiality/stressTriaxiality.C
 
 $(fvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
 $(fvPatchFields)/cohesiveZoneIncrementalModeI/cohesiveZoneIncrementalFvPatchVectorField.C
-$(fvPatchFields)/extrapolated/extrapolatedFvPatchFields.C
-$(fvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
 $(fvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
 $(fvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
 $(fvPatchFields)/fixedTemperatureGradient/fixedTemperatureGradientFvPatchScalarField.C
-$(fvPatchFields)/solidCohesive/solidCohesiveFvPatchVectorField.C
-$(fvPatchFields)/solidContact/solidContactFvPatchVectorField.C
-$(fvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
 $(fvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C
-
-contactModels = $(fvPatchFields)/solidContact/contactModels
-normalContactModels = $(contactModels)/normalContactModels
-$(normalContactModels)/normalContactModel/normalContactModel.C
-$(normalContactModels)/normalContactModel/newNormalContactModel.C
-$(normalContactModels)/standardPenalty/standardPenalty.C
-frictionContactModels = $(contactModels)/frictionContactModels
-$(frictionContactModels)/frictionContactModel/frictionContactModel.C
-$(frictionContactModels)/frictionContactModel/newFrictionContactModel.C
-$(frictionContactModels)/frictionless/frictionless.C
-$(frictionContactModels)/standardPenaltyFriction/standardPenaltyFriction.C
-$(frictionContactModels)/frictionLaws/frictionLaw/frictionLaw.C
-$(frictionContactModels)/frictionLaws/frictionLaw/newFrictionLaw.C
-$(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C
-
-cohesiveLaws = $(mechanicalModel)/cohesiveLaws
-$(cohesiveLaws)/cohesiveLaw/cohesiveLaw.C
-$(cohesiveLaws)/cohesiveLaw/newCohesiveLaw.C
-$(cohesiveLaws)/multiMaterialCohesiveLaw/multiMaterialCohesiveLaw.C
-$(cohesiveLaws)/dugdaleCohesiveLaw/dugdaleCohesiveLaw.C
-$(cohesiveLaws)/linearCohesiveLaw/linearCohesiveLaw.C
-
-simpleCohesiveLaws = $(mechanicalModel)/simpleCohesiveLaws
-$(simpleCohesiveLaws)/simpleCohesiveLaw/simpleCohesiveLaw.C
-$(simpleCohesiveLaws)/linear/linearSimpleCohesiveLaw.C
-$(simpleCohesiveLaws)/Dugdale/DugdaleSimpleCohesiveLaw.C
-
-
-$(mechanicalLaws)/multiMaterial/multiMaterial.C
-$(mechanicalLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C
-$(mechanicalLaws)/PronyViscoelastic/PronyViscoelastic.C
-
 
 thermalModel = materialModels/thermalModel
 $(thermalModel)/thermalModel.C
@@ -167,21 +134,6 @@ $(thermalLaws)/thermalLaw/thermalLaw.C
 $(thermalLaws)/thermalLaw/newThermalLaw.C
 $(thermalLaws)/constantThermal/constantThermal.C
 $(thermalLaws)/multiMaterialThermal/multiMaterialThermal.C
-
-dynamicFvMesh/crackerFvMesh/crackerFvMesh.C
-dynamicFvMesh/crackerFvMesh/faceCracker/faceCracker.C
-dynamicFvMesh/crackerFvMesh/faceCracker/detachFaceCracker.C
-dynamicFvMesh/crackerFvMesh/cohesive/cohesivePolyPatch.C
-
-faceBreakerLaws = dynamicFvMesh/crackerFvMesh/faceBreakerLaws
-$(faceBreakerLaws)/faceBreakerLaw/faceBreakerLaw.C
-$(faceBreakerLaws)/faceBreakerLaw/newFaceBreakerLaw.C
-$(faceBreakerLaws)/effectiveTractionLaw/effectiveTractionLaw.C
-
-pathLimiters = $(faceBreakerLaws)/faceBreakerLaw/crackPathLimiters
-$(pathLimiters)/crackPathLimiter/crackPathLimiter.C
-$(pathLimiters)/crackPathLimiter/newCrackPathLimiter.C
-$(pathLimiters)/boundingBoxLimiter/boundingBoxLimiter.C
 
 numerics/fvMeshSubset/fvMeshSubset.C
 numerics/logExpVolFields/eig3/eig3.C
