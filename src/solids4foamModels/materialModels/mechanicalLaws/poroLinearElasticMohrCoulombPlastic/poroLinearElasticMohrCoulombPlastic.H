@@ -22,11 +22,12 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    poroLinearElastic
+    poroLinearElasticMohrCoulombPlastic
 
 Description
-    Poro-elastic mechanical law where the total stress is the sum of the solid
-    skeleton (effective) stress, governed by Hooke's law, and the poro-pressure.
+    Poro-elasto-plastic mechanical law where the total stress is the sum
+    of the solid skeleton stress (effective stress), governed by Hooke's
+    law and Mohr-Coulomb plasticity, and the poro-pressure.
 
     More reading at:
 
@@ -40,7 +41,7 @@ Description
     Volume 2, Pages 1301-1306.
 
 SourceFiles
-    poroLinearElastic.C
+    poroLinearElasticMohrCoulombPlastic.C
 
 Author
     Tian Tang, DTU. All rights reserved.
@@ -48,10 +49,10 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef poroLinearElastic_H
-#define poroLinearElastic_H
+#ifndef poroLinearElasticMohrCoulombPlastic_H
+#define poroLinearElasticMohrCoulombPlastic_H
 
-#include "linearElastic.H"
+#include "linearElasticMohrCoulombPlastic.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -59,25 +60,28 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class poroLinearElastic Declaration
+                         Class poroLinearElasticMohrCoulombPlastic Declaration
 \*---------------------------------------------------------------------------*/
 
-class poroLinearElastic
+class poroLinearElasticMohrCoulombPlastic
 :
-    public linearElastic
+    public linearElasticMohrCoulombPlastic
 {
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        poroLinearElastic(const poroLinearElastic&);
+        poroLinearElasticMohrCoulombPlastic
+        (
+            const poroLinearElasticMohrCoulombPlastic&
+        );
 
         //- Disallow default bitwise assignment
-        void operator=(const poroLinearElastic&);
+        void operator=(const poroLinearElasticMohrCoulombPlastic&);
 
 public:
 
     //- Runtime type information
-    TypeName("poroLinearElastic");
+    TypeName("poroLinearElasticMohrCoulombPlastic");
 
     // Static data members
 
@@ -85,7 +89,7 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        poroLinearElastic
+        poroLinearElasticMohrCoulombPlastic
         (
             const word& name,
             const fvMesh& mesh,
@@ -95,7 +99,7 @@ public:
 
     // Destructor
 
-        virtual ~poroLinearElastic();
+        virtual ~poroLinearElasticMohrCoulombPlastic();
 
 
     // Member Functions

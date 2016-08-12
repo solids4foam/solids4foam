@@ -32,6 +32,8 @@ $(mechanicalLaws)/thermoLinearElastic/thermoLinearElastic.C
 $(mechanicalLaws)/poroLinearElastic/poroLinearElastic.C
 $(mechanicalLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(mechanicalLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
+$(mechanicalLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
+$(mechanicalLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
 
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C

@@ -25,10 +25,6 @@ License
 
 #include "poroLinearElastic.H"
 #include "addToRunTimeSelectionTable.H"
-#include "zeroGradientFvPatchFields.H"
-#include "transformField.H"
-#include "transformGeometricField.H"
-#include "IOdictionary.H"
 #include "fvc.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -53,17 +49,7 @@ Foam::poroLinearElastic::poroLinearElastic
     const dictionary& dict
 )
 :
-    mechanicalLaw(name, mesh, dict),
-    rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
-    lambda_
-    (
-        planeStress()
-      ? nu_*E_/((1.0 + nu_)*(1.0 - nu_))
-      : nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))
-    ),
-    mu_(E_/(2.0*(1.0 + nu_)))
+    linearElastic(name, mesh, dict)
 {}
 
 
@@ -73,93 +59,32 @@ Foam::poroLinearElastic::~poroLinearElastic()
 {}
 
 
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::volScalarField> Foam::poroLinearElastic::rho() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-    tresult().correctBoundaryConditions();
-
-    return tresult;
-}
-
-
-Foam::tmp<Foam::volScalarField> Foam::poroLinearElastic::impK() const
-{
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "impK",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            2.0*mu_ + lambda_
-        )
-    );
-}
-
-
-const Foam::dimensionedScalar& Foam::poroLinearElastic::mu() const
-{
-    return mu_;
-}
-
-
-const Foam::dimensionedScalar& Foam::poroLinearElastic::lambda() const
-{
-    return lambda_;
-}
-
-
 void Foam::poroLinearElastic::correct(volSymmTensorField& sigma)
 {
-    // Lookup the strain tensor from the solver
-    const volSymmTensorField& epsilon =
-        mesh().lookupObject<volSymmTensorField>("epsilon");
+    // Calculate effective stress
+    linearElastic::correct(sigma);
 
     // Lookup the pressure field from the solver
     const volScalarField& p = mesh().lookupObject<volScalarField>("p");
 
-    // Calculate stress based on Hooke's law and pore-pressure
-    sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I - p*I;
+    // Calculate the total stress as the sum of the effective stress and the
+    // pore-pressure
+    sigma -= p*symmTensor(I);
 }
 
 
 void Foam::poroLinearElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Lookup the strain tensor from the solver
-    const surfaceSymmTensorField& epsilon =
-        mesh().lookupObject<surfaceSymmTensorField>("epsilonf");
+    // Calculate effective stress
+    linearElastic::correct(sigma);
 
     // Lookup the pressure field from the solver
     const surfaceScalarField& p =
         fvc::interpolate(mesh().lookupObject<volScalarField>("p"));
 
-    // Calculate stress based on Hooke's law and pore-pressure
-    sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I - p*I;
+    // Calculate the total stress as the sum of the effective stress and the
+    // pore-pressure
+    sigma -= p*symmTensor(I);
 }
 
 
