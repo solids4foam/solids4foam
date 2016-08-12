@@ -30,9 +30,13 @@ Description
 
     Neo-Hookean elasticity with Mises/J2 plasticity.
 
-    Reference:
+    More details found in:
+
     Simo & Hughes, Computational Inelasticity, 1998, Springer.
 
+    P. Cardiff, Z. Tukovic, P. De Jaeger, M. Clancy and A. Ivankovic. A
+    Lagrangian cell-centred finite volume method for metal forming simulation,
+    doi=10.1002/nme.5345.
 
 SourceFiles
     neoHookeanElasticMisesPlastic.C

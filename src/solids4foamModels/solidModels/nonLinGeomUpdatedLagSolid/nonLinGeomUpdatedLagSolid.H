@@ -31,6 +31,11 @@ Description
 
     The stress is calculated by the run-time selectable mechanical law.
 
+    More details in:
+    P. Cardiff, Z. Tukovic, P. De Jaeger, M. Clancy and A. Ivankovic. A
+    Lagrangian cell-centred finite volume method for metal forming simulation,
+    doi=10.1002/nme.5345.
+
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
