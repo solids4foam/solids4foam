@@ -26,7 +26,6 @@ License
 
 #include "coulombFriction.H"
 #include "addToRunTimeSelectionTable.H"
-#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

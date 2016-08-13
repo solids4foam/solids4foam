@@ -64,9 +64,6 @@ class solidTractionFvPatchVectorField
 
     // Private Data
 
-        //- Name of the displacement field
-        word fieldName_;
-
         //- Traction
         vectorField traction_;
 
@@ -171,11 +168,6 @@ public:
             virtual scalarField& pressure()
             {
                 return pressure_;
-            }
-
-            virtual word& fieldName()
-            {
-                return fieldName_;
             }
 
 

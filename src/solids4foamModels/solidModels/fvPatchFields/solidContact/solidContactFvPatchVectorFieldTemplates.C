@@ -25,6 +25,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidContactFvPatchVectorField.H"
+#include "PrimitivePatchInterpolationTemplate.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -56,7 +57,7 @@ zoneField
         const label patchStart
             = mesh.boundaryMesh()[patchIndex].start();
 
-        // put local patchField into global zoneField
+        // Put local patchField into global zoneField
         forAll(patchField, i)
         {
             zField[fZone.whichFace(patchStart + i)] = patchField[i];
@@ -123,7 +124,7 @@ zoneFaceToPointInterpolate
 {
     if (zoneID == zoneIndex())
     {
-        PrimitivePatchInterpolation<primitiveFacePatch> zoneInterp(zone());
+        PrimitivePatchInterpolation<standAlonePatch> zoneInterp(zone());
 
         tmp<Field<Type> > tZonePointField
         (
@@ -137,10 +138,10 @@ zoneFaceToPointInterpolate
     }
     else if (zoneID == shadowZoneIndex())
     {
-        PrimitivePatchInterpolation<primitiveFacePatch> zoneInterp
-            (
-                shadowZone()
-            );
+        PrimitivePatchInterpolation<standAlonePatch> zoneInterp
+        (
+            shadowZone()
+        );
 
         tmp<Field<Type> > tZonePointField
         (
@@ -184,7 +185,7 @@ zonePointToFaceInterpolate
 {
     if (zoneID == zoneIndex())
     {
-        PrimitivePatchInterpolation<primitiveFacePatch> zoneInterp(zone());
+        PrimitivePatchInterpolation<standAlonePatch> zoneInterp(zone());
 
         tmp<Field<Type> > tZoneField
         (
@@ -198,10 +199,10 @@ zonePointToFaceInterpolate
     }
     else if (zoneID == shadowZoneIndex())
     {
-        PrimitivePatchInterpolation<primitiveFacePatch> zoneInterp
-            (
-                shadowZone()
-            );
+        PrimitivePatchInterpolation<standAlonePatch> zoneInterp
+        (
+            shadowZone()
+        );
 
         tmp<Field<Type> > tZoneField
         (

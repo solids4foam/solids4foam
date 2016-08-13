@@ -31,6 +31,7 @@ InClass
 #include "volFields.H"
 #include "fvc.H"
 #include "addToRunTimeSelectionTable.H"
+#include "primitivePatchInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -114,8 +115,8 @@ standardPenalty::standardPenalty
     const label slavePatchID,
     const label masterFaceZoneID,
     const label slaveFaceZoneID,
-    const primitiveFacePatch& masterFaceZonePatch,
-    const primitiveFacePatch& slaveFaceZonePatch
+    const standAlonePatch& masterFaceZonePatch,
+    const standAlonePatch& slaveFaceZonePatch
 )
 :
     normalContactModel
@@ -155,7 +156,7 @@ standardPenalty::standardPenalty
             "relaxationFactor", 0.02
         )
     ),
-    totalSlavePointTrac_(slavePointPenetration_.size(), 0.0),
+    totalSlavePointPressure_(slavePointPenetration_.size(), 0.0),
     contactIterNum_(0),
     infoFreq_(normalContactModelDict_.lookupOrDefault<int>("infoFrequency", 1)),
     contactFilePtr_(NULL)
@@ -234,7 +235,7 @@ standardPenalty::standardPenalty(const standardPenalty& nm)
 void standardPenalty::correct
 (
     const vectorField& slavePatchFaceNormals,
-    const extendedGgiZoneInterpolation& zoneToZone
+    const extendedGgiStandAlonePatchInterpolation& zoneToZone
 )
 {
     // Preliminaries
@@ -276,7 +277,7 @@ void standardPenalty::correct
     const scalar minSlavePointPenetration = gMin(globalSlavePointPenetration_);
     const scalar penaltyFac = penaltyFactor();
 
-    forAll(totalSlavePointTrac_, pointI)
+    forAll(totalSlavePointPressure_, pointI)
     {
         // If a point has penetrated (i.e. if the penetration is negative),
         if (slavePointPenetration_[pointI] < 0.0)
@@ -285,12 +286,12 @@ void standardPenalty::correct
             numSlaveContactPoints++;
 
             // The force is linearly proportional the penetration, like a spring
-            totalSlavePointTrac_[pointI] =
+            totalSlavePointPressure_[pointI] =
                 penaltyFac*slavePointPenetration_[pointI];
         }
         else
         {
-            totalSlavePointTrac_[pointI] = 0.0;
+            totalSlavePointPressure_[pointI] = 0.0;
         }
     }
 
@@ -299,8 +300,11 @@ void standardPenalty::correct
 
     // Create local patch interpolation: No need to interpolate using the entire
     // face zone patch
-    WarningIn("standardPenalty::correct(...)")
-        << "Philip: check pointToFace interpolator" << endl;
+    // This is using the original mesh weights; it would be better to use the
+    // deformed patch, and it might help
+    // This could be changed to used the current weights
+    // WarningIn("standardPenalty::correct(...)")
+    //    << "Philip: check pointToFace interpolator" << endl;
     primitivePatchInterpolation localSlaveInterpolator
     (
         mesh.boundaryMesh()[slavePatchIndex]
@@ -309,7 +313,7 @@ void standardPenalty::correct
     vectorField newSlavePressure =
         localSlaveInterpolator.pointToFaceInterpolate<scalar>
         (
-            totalSlavePointTrac_
+            totalSlavePointPressure_
         )*slavePatchFaceNormals;
 
     // Under-relax pressure

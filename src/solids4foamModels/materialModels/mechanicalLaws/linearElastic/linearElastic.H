@@ -31,7 +31,7 @@ SourceFiles
     linearElastic.C
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved
 \*---------------------------------------------------------------------------*/
 
 #ifndef linearElastic_H

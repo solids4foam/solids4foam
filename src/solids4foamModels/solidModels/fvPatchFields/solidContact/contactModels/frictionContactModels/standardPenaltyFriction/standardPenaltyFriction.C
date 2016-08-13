@@ -26,12 +26,6 @@ License
 
 #include "standardPenaltyFriction.H"
 #include "addToRunTimeSelectionTable.H"
-#include "zeroGradientFvPatchFields.H"
-#include "PatchToPatchInterpolationTemplate.H"
-#include "ggiInterpolation.H"
-#include "fvc.H"
-#include "primitivePatchInterpolation.H"
-#include "solidContactFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -258,8 +252,8 @@ void Foam::standardPenaltyFriction::correct
     const vectorField& slavePressure,
     const vectorField& slaveFaceNormals,
     const scalarField& areaInContact,
-    const vectorField& slaveDU,
-    const vectorField& masterDUInterpToSlave
+    const vectorField& slaveDD,
+    const vectorField& masterDDInterpToSlave
 )
 {
     // Preliminaries
@@ -280,9 +274,9 @@ void Foam::standardPenaltyFriction::correct
     {
         if (areaInContact[faceI] > SMALL)
         {
-            // Compute slip as the we need the difference of DU between the
+            // Compute slip as the we need the difference of DD between the
             // master and slave
-            slip_[faceI] = slaveDU[faceI] - masterDUInterpToSlave[faceI];
+            slip_[faceI] = slaveDD[faceI] - masterDDInterpToSlave[faceI];
 
             // The shear traction direction is got by removing the normal
             // component of the DD
@@ -296,8 +290,8 @@ void Foam::standardPenaltyFriction::correct
             maxMagSlip = max(maxMagSlip, magSlip);
 
             const scalar deltaT = mesh.time().deltaTValue();
-            const vector slaveVelocity = slaveDU[faceI]/deltaT;
-            const vector masterVelocity = masterDUInterpToSlave[faceI]/deltaT;
+            const vector slaveVelocity = slaveDD[faceI]/deltaT;
+            const vector masterVelocity = masterDDInterpToSlave[faceI]/deltaT;
 
             // Traction to cause slipping i.e. the maximum shear traction the
             // face can hold for the given pressure, velocities, temperature,

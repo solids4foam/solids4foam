@@ -29,7 +29,7 @@ Description
     Model for the the contact friction.
 
     The actual friction law (e.g. Coulomb) is specified by the frictionLaw
-    in the frictionLaw
+    in the frictionLaw.
 
 SourceFiles
     frictionContactModel.C
@@ -69,18 +69,22 @@ class frictionContactModel
         //- Reference to primitivePatch
         const fvPatch& patch_;
 
-        //- Master and slave patch IDs
+        //- Master patch index
         const label masterPatchID_;
+
+        //- Slave patch index
         const label slavePatchID_;
 
-        //- Master and slave face zone ID
+        //- Master face zone index
         const label masterFaceZoneID_;
+
+        //- Slave face zone index
         const label slaveFaceZoneID_;
 
-        // for visualistion of sticking and slipping faces
+        // For visualistion of sticking and slipping faces
         // face not in contact is set to 0.0
-        // slipping face is set to 1.0
-        // sticking face is set to 2.0
+        //     slipping face is set to 1.0
+        //     sticking face is set to 2.0
         scalarField stickSlipFaces_;
 
 
@@ -202,8 +206,8 @@ public:
         //- Return slave friction traction
         virtual const vectorField& slaveTraction() const = 0;
 
-        //- Return slave friction traction for master. This has the same size as
-        // the slave patch
+        //- Return slave friction traction for master.
+        //  This has the same size as the slave patch
         virtual const vectorField& slaveTractionForMaster() const
         {
             return slaveTraction();
@@ -244,7 +248,8 @@ public:
         virtual const vectorField& slip() const = 0;
 
         //- Write model dictionary
-        virtual void writeDict(Ostream& os) const {};
+        virtual void writeDict(Ostream& os) const
+        {};
 };
 
 

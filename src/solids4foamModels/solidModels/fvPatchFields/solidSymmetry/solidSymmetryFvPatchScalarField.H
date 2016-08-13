@@ -31,7 +31,7 @@ SourceFiles
     solidSymmetryFvPatchScalarField.C
 
 Author
-    Philip Cardiff UCD based on symmetryDisplacement
+    Philip Cardiff, UCD. All rights reserved based on symmetryDisplacement
 
 \*---------------------------------------------------------------------------*/
 

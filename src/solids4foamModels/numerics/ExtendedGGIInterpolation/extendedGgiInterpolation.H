@@ -57,6 +57,12 @@ namespace Foam
         PrimitivePatch<face, List, const pointField&>,
         PrimitivePatch<face, List, const pointField&>
     >   extendedGgiZoneInterpolation;
+
+    typedef ExtendedGGIInterpolation
+    <
+        PrimitivePatch<face, List, pointField>,
+        PrimitivePatch<face, List, pointField>
+    >   extendedGgiStandAlonePatchInterpolation;
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

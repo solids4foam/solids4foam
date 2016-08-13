@@ -34,7 +34,7 @@ SourceFiles
     coulombFriction.C
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved
 
 \*---------------------------------------------------------------------------*/
 

@@ -26,14 +26,14 @@ Class
     normalContactModel
 
 Description
-    model for the behaviour of the normal contact
+    Model for the behaviour of the normal contact
 
 SourceFiles
     normalContactModel.C
     newNormalContactModel.C
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved
 
 \*---------------------------------------------------------------------------*/
 
@@ -46,16 +46,15 @@ Author
 #include "volFields.H"
 #include "tmp.H"
 #include "autoPtr.H"
-#include "patchToPatchInterpolation.H"
-#include "primitivePatchInterpolation.H"
 #include "extendedGgiInterpolation.H"
+#include "standAlonePatch.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
-
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------* \
                          Class normalContactModel Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -69,19 +68,20 @@ class normalContactModel
         //- Reference to primitivePatch
         const fvPatch& patch_;
 
-        //- Master and slave patch IDs
+        //- Master patch index
         const label masterPatchID_;
+
+        //- Slave patch index
         const label slavePatchID_;
 
-        //- Master and slave face zone ID
+        //- Master face zone index
         const label masterFaceZoneID_;
+
+        //- Slave face zone index
         const label slaveFaceZoneID_;
 
-        //- contact point gap
+        //- Contact point gap
         scalarField slaveContactPointGap_;
-
-        //- Use interpolated master face normals
-        //const Switch useMasterNormals_;
 
     // Private Member Functions
 
@@ -122,8 +122,8 @@ public:
                 const label slavePatchID,
                 const label masterFaceZoneID,
                 const label slaveFaceZoneID,
-                const primitiveFacePatch& masterFaceZonePatch,
-                const primitiveFacePatch& slaveFaceZonePatch
+                const standAlonePatch& masterFaceZonePatch,
+                const standAlonePatch& slaveFaceZonePatch
             ),
             (
                 name,
@@ -151,8 +151,8 @@ public:
             const label slavePatchID,
             const label masterFaceZoneID,
             const label slaveFaceZoneID,
-            const primitiveFacePatch& masterFaceZonePatch,
-            const primitiveFacePatch& slaveFaceZonePatch
+            const standAlonePatch& masterFaceZonePatch,
+            const standAlonePatch& slaveFaceZonePatch
         );
 
 
@@ -168,8 +168,8 @@ public:
             const label slavePatchID,
             const label masterFaceZoneID,
             const label slaveFaceZoneID,
-            const primitiveFacePatch& masterFaceZonePatch,
-            const primitiveFacePatch& slaveFaceZonePatch
+            const standAlonePatch& masterFaceZonePatch,
+            const standAlonePatch& slaveFaceZonePatch
         );
 
         //- Construct as copy
@@ -203,17 +203,11 @@ public:
         virtual void correct
         (
             const vectorField& slavePatchFaceNormals,
-            const extendedGgiZoneInterpolation& zoneToZone
+            const extendedGgiStandAlonePatchInterpolation& zoneToZone
         ) = 0;
-
-        //- Return slave displacement
-        // virtual const vectorField& slaveDisp() const = 0;
 
         //- Return slave pressure
         virtual const vectorField& slavePressure() const = 0;
-
-        //- Return slave valueFraction
-        //virtual const symmTensorField& slaveValueFrac() const = 0;
 
         //- Return master patch ID
         virtual label masterPatchID() const
@@ -244,12 +238,6 @@ public:
         {
             return slaveContactPointGap_;
         }
-
-        //- Return contact residual
-        // virtual scalar residual()
-        // {
-        //     return 1.0;
-        // };
 
         //- Return area in contact of slave patch
         virtual const scalarField& areaInContact() const = 0;

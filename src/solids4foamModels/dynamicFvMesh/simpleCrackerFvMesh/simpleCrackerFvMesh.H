@@ -34,7 +34,7 @@ SourceFiles
     simpleCrackerFvMesh.C
 
 Author
-    Philip Cardiff UCD, UT. All rights reserved.
+    Philip Cardiff, UCD. All rights reserved, UT. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 

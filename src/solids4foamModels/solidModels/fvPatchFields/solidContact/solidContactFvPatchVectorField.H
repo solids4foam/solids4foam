@@ -28,12 +28,16 @@ Class
 Description
     Contact boundary conditions for finite volume solidMechanics solvers.
 
-    There is a master and a slave patch. The master creates the contactModel
-    and the slave gets the pointer to it.
-
     The treatment of the normal contact and tangential contact can be specified
     individually at run-time using the normalContactModel and
     frictionContactModel.
+
+    The buondary condition makes a copy of the master and slave face zones and
+    keeps them in the deformed configuration; this allows the calculation of
+    contact distances and interpolation between the zones.
+    Note: we use const_cast to move the standAlonePatch zone points.
+
+    The distance calculations and interpolations are performed by the GGI class.
 
     More details in:
 
@@ -44,6 +48,10 @@ Description
     P. Cardiff, Z. Tukovic, P. De Jaeger, M. Clancy and A. Ivankovic. A
     Lagrangian cell-centred finite volume method for metal forming simulation,
     doi=10.1002/nme.5345.
+
+    P. Cardiff, Development of the Finite Volume Method for Hip Joint Stress
+    Analysis, PhD thesis, University College Dublin, 2012.
+
 
 SourceFiles
     solidContactFvPatchVectorField.C
@@ -60,12 +68,10 @@ Author
 #include "solidTractionFvPatchVectorField.H"
 #include "normalContactModel.H"
 #include "frictionContactModel.H"
-#include "primitivePatchInterpolation.H"
-#include "patchToPatchInterpolation.H"
 #include "extendedGgiInterpolation.H"
-#include "ExtendedGGIInterpolationTemplate.H"
 #include "Switch.H"
 #include "boundBox.H"
+#include "standAlonePatch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -82,11 +88,11 @@ class solidContactFvPatchVectorField
 {
     // Private data
 
-        //- Name of the displacement field
-        const word fieldName_;
-
-        //- is this patch the master
+        //- Is this patch the master
         const Switch master_;
+
+        //- Write the deformed contact zones to VTK surface files
+        const Switch writeZoneVTK_;
 
         //- Shadow patch name
         word shadowPatchName_;
@@ -112,33 +118,14 @@ class solidContactFvPatchVectorField
         //- Friction contact model pointer
         mutable frictionContactModel* frictionModelPtr_;
 
-        // Mesh.allPoints() where the contact zone points are kept in the
-        // deformed configuration
-        // PC: should no longer be needed as our zones will store their own
-        // points
-        //mutable vectorField* allPointsDeformedPtr_;
-
-        // Zone points at end of previous time step for incremental solver,
-        // zone points from initial configuration for total displacement solver
-        // NOT needed as the mesh already has these!
-        //mutable vectorField* oldZonePointsPtr_;
-
-        // Shadow zone points at end of previous time step for incremental
-        // solver,
-        // shadow zone points from initial configuration for total displacement
-        // solver
-        // NOT needed as the mesh already has these!
-        //mutable vectorField* oldShadowZonePointsPtr_;
-
         // Master face zone kept in deformed configuration
-        mutable primitiveFacePatch* zonePtr_;
+        mutable standAlonePatch* zonePtr_;
 
         // Slave face zone kept in deformed configuration
-        mutable primitiveFacePatch* shadowZonePtr_;
+        mutable standAlonePatch* shadowZonePtr_;
 
         //- Zone-to-zone interpolation
-        //PrimitivePatch<face, List, const pointField&>
-        mutable extendedGgiZoneInterpolation* zoneToZonePtr_;
+        mutable extendedGgiStandAlonePatchInterpolation* zoneToZonePtr_;
 
         //- GGI quick reject algorithm
         extendedGgiInterpolation::quickReject quickReject_;
@@ -150,87 +137,72 @@ class solidContactFvPatchVectorField
         //- Current time index
         label curTimeIndex_;
 
-        //- Global face zones in the mesh
-        mutable labelList* globalFaceZonesPtr_;
-
-        // Point map from global to local for global face zones
-        mutable IOList<labelList>* globalToLocalFaceZonePointMapPtr_;
-
 
     // Private Member Functions
 
-            //- Move the master and slave zones to the deformed configuration
-            void moveZonesToDeformedConfiguration();
+        //- Move the master and slave zones to the deformed configuration
+        void moveZonesToDeformedConfiguration();
 
-            //- Calculate the zone index
-            void calcZoneIndex() const;
+        //- Calculate the zone index
+        void calcZoneIndex() const;
 
-            //- Calculate the shadow zone index
-            void calcShadowZoneIndex() const;
+        //- Calculate the shadow zone index
+        void calcShadowZoneIndex() const;
 
-            //- Create the normal contact model
-            void calcNormalModel() const;
+        //- Create the normal contact model
+        void calcNormalModel() const;
 
-            //- Create the friction contact model
-            void calcFrictionModel() const;
+        //- Create the friction contact model
+        void calcFrictionModel() const;
 
-            //- Calculate zone
-            void calcZone() const;
+        //- Create the zone
+        void calcZone() const;
 
-            //- Calculate shadow zone
-            void calcShadowZone() const;
+        //- Create the shadow zone
+        void calcShadowZone() const;
 
-            //- Calculate interpolation
-            void calcZoneToZone() const;
+        //- Create the zone-to-zone interpolator
+        void calcZoneToZone() const;
 
-            //- Calculate slaveFaceNormals
-    //void calcSlaveFaceNormals() const;
+        // Return the Ccntact dictionary
+        const dictionary& dict() const
+        {
+            return dict_;
+        };
 
-            //- Calculate global face zones
-            void calcGlobalFaceZones() const;
+        //- Get zone field from patch field
+        template<class Type>
+        tmp<Field<Type> > zoneField
+        (
+            const label zoneIndex,
+            const label patchIndex,
+            const Field<Type>& patchField
+        ) const;
 
-            //- Calculate global to local face zone point map
-            void calcGlobalToLocalFaceZonePointMap() const;
+        //- Get patch field from zone field
+        template<class Type>
+        tmp<Field<Type> > patchField
+        (
+            const label patchIndex,
+            const label zoneIndex,
+            const Field<Type>& zoneField
+        ) const;
 
-            // Contact dictionary
-            const dictionary& dict() const
-            {
-                return dict_;
-            };
+        //- Interpolate zone face values to points
+        template<class Type>
+        tmp<Field<Type> > zoneFaceToPointInterpolate
+        (
+            const label zoneIndex,
+            const Field<Type>& zoneField
+        ) const;
 
-            //- Get zone field from patch field
-            template<class Type>
-            tmp<Field<Type> > zoneField
-            (
-                const label zoneIndex,
-                const label patchIndex,
-                const Field<Type>& patchField
-            ) const;
-
-            //- Get patch field from zone field
-            template<class Type>
-            tmp<Field<Type> > patchField
-            (
-                const label patchIndex,
-                const label zoneIndex,
-                const Field<Type>& zoneField
-            ) const;
-
-            //- Interpolate zone face values to points
-            template<class Type>
-            tmp<Field<Type> > zoneFaceToPointInterpolate
-            (
-                const label zoneIndex,
-                const Field<Type>& zoneField
-            ) const;
-
-            //- Interpolate zone point values to faces
-            template<class Type>
-            tmp<Field<Type> > zonePointToFaceInterpolate
-            (
-                const label zoneIndex,
-                const Field<Type>& zonePointField
-            ) const;
+        //- Interpolate zone point values to faces
+        template<class Type>
+        tmp<Field<Type> > zonePointToFaceInterpolate
+        (
+            const label zoneIndex,
+            const Field<Type>& zonePointField
+        ) const;
 
 public:
 
@@ -345,32 +317,22 @@ public:
             const frictionContactModel& frictionModel() const;
 
             //- Return const reference to deformed master zone
-            const primitiveFacePatch& zone() const;
+            const standAlonePatch& zone() const;
 
             //- Return reference to deformed master zone
-            primitiveFacePatch& zone();
+            standAlonePatch& zone();
 
             //- Return const reference to deformed master zone
-            const primitiveFacePatch& shadowZone() const;
+            const standAlonePatch& shadowZone() const;
 
             //- Return reference to deformed master zone
-            primitiveFacePatch& shadowZone();
+            standAlonePatch& shadowZone();
 
             //- Return const reference to patch-to-patch interpolation
-            const extendedGgiZoneInterpolation& zoneToZone() const;
+            const extendedGgiStandAlonePatchInterpolation& zoneToZone() const;
 
             //- Return reference to patch-to-patch interpolation
-            extendedGgiZoneInterpolation& zoneToZone();
-
-            //- Return reference to slave face normals
-            //vectorField& slaveFaceNormals();
-
-            //- Return const reference to global face zones
-            const labelList& globalFaceZones() const;
-
-            //- Return const reference to global face zone point map
-            const IOList<labelList>& globalToLocalFaceZonePointMap() const;
-
+            extendedGgiStandAlonePatchInterpolation& zoneToZone();
 
         // Mapping functions
 

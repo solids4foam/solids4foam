@@ -31,8 +31,8 @@ Description
     Using a fixed penalty factor, force is applied to the contact faces based on
     the gap.
 
-    The penalty method is effectively like attaching stiff springs to any face
-    that comes into contact.
+    The penalty method is effectively like attaching springs to any face that
+    comes into contact.
 
 SourceFiles
     standardPenalty.C
@@ -49,8 +49,6 @@ Author
 #include "typeInfo.H"
 #include "runTimeSelectionTables.H"
 #include "autoPtr.H"
-#include "patchToPatchInterpolation.H"
-#include "primitivePatchInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -97,8 +95,8 @@ class standardPenalty
         //- Under-relaxation factor
         const scalar relaxFac_;
 
-        //- Current slave point tractions
-        scalarField totalSlavePointTrac_;
+        //- Current slave point contact pressure
+        scalarField totalSlavePointPressure_;
 
         //- Contact iteration number
         label contactIterNum_;
@@ -141,8 +139,8 @@ public:
             const label slavePatchID,
             const label masterFaceZoneID,
             const label slaveFaceZoneID,
-            const primitiveFacePatch& masterFaceZonePatch,
-            const primitiveFacePatch& slaveFaceZonePatch
+            const standAlonePatch& masterFaceZonePatch,
+            const standAlonePatch& slaveFaceZonePatch
         );
 
         //- Construct as copy
@@ -168,7 +166,7 @@ public:
         virtual void correct
         (
             const vectorField& slavePatchFaceNormals,
-            const extendedGgiZoneInterpolation& zoneToZone
+            const extendedGgiStandAlonePatchInterpolation& zoneToZone
         );
 
         //- Return slave pressure
@@ -182,9 +180,6 @@ public:
         {
             return slavePressure_;
         }
-
-        //- Reset slavePressure and clear from dict
-        //virtual void resetSlavePressure();
 
         //- Penalty factor
         virtual scalar penaltyFactor() const;

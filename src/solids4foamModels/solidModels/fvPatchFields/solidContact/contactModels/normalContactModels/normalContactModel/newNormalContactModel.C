@@ -22,7 +22,7 @@ License
     along with OpenFOAM; if not, write to the Free Software Foundation,
     Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
-Class
+InClass
     normalContactModel
 
 \*---------------------------------------------------------------------------*/
@@ -47,8 +47,8 @@ autoPtr<normalContactModel> normalContactModel::New
     const label slavePatchID,
     const label masterFaceZoneID,
     const label slaveFaceZoneID,
-    const primitiveFacePatch& masterFaceZonePatch,
-    const primitiveFacePatch& slaveFaceZonePatch
+    const standAlonePatch& masterFaceZonePatch,
+    const standAlonePatch& slaveFaceZonePatch
 )
 {
     Info<< "    Normal contact model: " << name << endl;
@@ -68,8 +68,8 @@ autoPtr<normalContactModel> normalContactModel::New
             "    const label slavePatchID,\n"
             "    const label masterFaceZoneID,\n"
             "    const label slaveFaceZoneID,\n"
-            "    const primitiveFacePatch& masterFaceZonePatch,\n"
-            "    const primitiveFacePatch& slaveFaceZonePatch\n"
+            "    const standAlonePatch& masterFaceZonePatch,\n"
+            "    const standAlonePatch& slaveFaceZonePatch\n"
             ")",
             dict
         )   << "Unknown normalContactModel type "

@@ -32,7 +32,7 @@ SourceFiles
     solidWedgeFvPatchVectorField.C
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved
 
 \*---------------------------------------------------------------------------*/
 

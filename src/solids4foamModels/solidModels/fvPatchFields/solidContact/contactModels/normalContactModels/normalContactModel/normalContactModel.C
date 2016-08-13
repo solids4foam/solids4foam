@@ -22,7 +22,7 @@ License
     along with OpenFOAM; if not, write to the Free Software Foundation,
     Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
-Class
+InClass
     normalContactModel
 
 \*---------------------------------------------------------------------------*/
@@ -52,8 +52,8 @@ normalContactModel::normalContactModel
     const label slavePatchID,
     const label masterFaceZoneID,
     const label slaveFaceZoneID,
-    const primitiveFacePatch& masterFaceZonePatch,
-    const primitiveFacePatch& slaveFaceZonePatch
+    const standAlonePatch& masterFaceZonePatch,
+    const standAlonePatch& slaveFaceZonePatch
 )
 :
     name_(name),

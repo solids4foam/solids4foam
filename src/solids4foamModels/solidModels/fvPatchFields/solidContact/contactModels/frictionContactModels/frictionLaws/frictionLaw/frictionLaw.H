@@ -26,7 +26,7 @@ Class
     frictionLaw
 
 Description
-    friction law e.g. Coulomb, Orowan, Shaw, etc.
+    Friction law e.g. Coulomb, Orowan, Shaw, etc.
     Given the pressure (or other variable for more complex laws),
     the friction law returns the shear traction.
 
@@ -35,7 +35,7 @@ SourceFiles
     newFrictionLaw.C
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved
 
 \*---------------------------------------------------------------------------*/
 
@@ -64,10 +64,10 @@ class frictionLaw
 {
     // Private data
 
-        // Reference to the frictionContactModel
+        //- Reference to the frictionContactModel
         const frictionContactModel& frictionModel_;
 
-        // Friction law dict
+        //- Friction law dictionary
         dictionary frictionLawDict_;
 
     // Private Member Functions
