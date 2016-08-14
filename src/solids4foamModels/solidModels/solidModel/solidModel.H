@@ -45,7 +45,7 @@ SourceFiles
 #include "IOdictionary.H"
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
-#include "mechanicalLaw.H"
+#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -68,11 +68,8 @@ class solidModel
         //- Solid properties dictionary
         dictionary solidProperties_;
 
-        //- Mechanical properties dictionary
-        IOdictionary mechanicalProperties_;
-
-        //- Mechanical law
-        autoPtr<mechanicalLaw> mechanicalLawPtr_;
+        //- Mechanical model
+        mechanicalModel mechanical_;
 
         //- Global face zones
         mutable labelList* globalFaceZonesPtr_;
@@ -105,10 +102,10 @@ protected:
             return solidProperties_;
         }
 
-        //- Return solid properties dictionary
-        mechanicalLaw& mechanical()
+        //- Return mechanical model
+        mechanicalModel& mechanical()
         {
-            return mechanicalLawPtr_();
+            return mechanical_;
         }
 
 public:
@@ -181,9 +178,9 @@ public:
             }
 
             //- Return mechanical model
-            const mechanicalLaw& mechanical() const
+            const mechanicalModel& mechanical() const
             {
-                return mechanicalLawPtr_();
+                return mechanical_;
             }
 
             //- Return point displacement field

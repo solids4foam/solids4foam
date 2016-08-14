@@ -29,7 +29,6 @@ License
 #include "transformField.H"
 #include "transformGeometricField.H"
 #include "IOdictionary.H"
-//#include "linGeomSolid.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -65,19 +64,8 @@ Foam::linearElastic::linearElastic
     ),
     mu_(E_/(2.0*(1.0 + nu_)))
 {
-    // PC: is there are nice way that we can check this, instead of multiple
-    // if-elseif-elseif ...
-//     if
-//     (
-//         mesh.lookupObject<solidSolver>("solidProperties").type()
-//      != solidSolvers::linearGeometrySolid::typeName
-//     )
-//     {
-//         WarningIn(type() + "::linearElastic")
-//             << "This mechanical law may not be appropriate for the selected "
-//             << "mathematical model"
-//             << endl;
-//     }
+    // PC: some mechanical laws are only appropriate for some solidModels
+    // what is a nice way to check this?
 }
 
 

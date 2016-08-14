@@ -22,14 +22,14 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    mechanicalLaw
+    Foam::mechanicalLaw
 
 Description
-    Material mechanical for solids.
+    Mechanical constitutive law for the solidModels.
 
 SourceFiles
     mechanicalLaw.C
-    newmechanicalLaw.C
+    newMechanicalLaw.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -66,20 +66,7 @@ class mechanicalLaw
         //- Const reference to law dictionary
         const dictionary& dict_;
 
-        // Current materials index field
-        //     1 for the current materials
-        //     0 for other materials
-        mutable volScalarField* curMaterialPtr_;
-
-        // Current material index i.e. is the current material number 0, 1,
-        // 2, etc.
-        mutable label curMatIndex_;
-
-
     // Private Member Functions
-
-        // Make current material field
-        void calcCurMaterial() const;
 
         //- Disallow copy construct
         mechanicalLaw(const mechanicalLaw&);
@@ -97,14 +84,7 @@ protected:
         }
 
         //- If the case is plane stress
-        bool planeStress() const
-        {
-            return
-                mesh_.lookupObject<IOdictionary>
-                (
-                    "mechanicalProperties"
-                ).lookup("planeStress");
-        }
+        bool planeStress() const;
 
 
 public:
@@ -188,23 +168,6 @@ public:
 
         //- Update total accumulated fields
         virtual void updateTotalFields()
-        {}
-
-        // Return reference to current material field
-        const volScalarField& curMaterial() const;
-
-        // Return reference to current material field
-        volScalarField& curMaterial();
-
-        // Return reference to current material index
-        label& curMaterialIndex() const
-        {
-            return curMatIndex_;
-        }
-
-        //- Set current material index; this is only needed for multiMaterial
-        //  analyses
-        virtual void setMaterialIndex(label curMaterialIndex)
         {}
 };
 

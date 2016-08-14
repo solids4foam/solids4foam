@@ -60,64 +60,6 @@ namespace Foam
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 
-void Foam::neoHookeanElasticMisesPlastic::calcCurMaterialf() const
-{
-    if (curMaterialfPtr_)
-    {
-        FatalErrorIn
-        (
-            "void Foam::neoHookeanElasticMisesPlastic::calcCurMaterialf() const"
-        )   << "pointer already set" << abort(FatalError);
-    }
-
-    curMaterialfPtr_ =
-        new surfaceScalarField
-        (
-            IOobject
-            (
-                "curMaterialf",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::READ_IF_PRESENT,
-                IOobject::AUTO_WRITE
-            ),
-            mesh(),
-            dimensionedScalar("zero", dimless, 0.0)
-        );
-
-    const volScalarField& curMat = curMaterial();
-    const scalarField& curMatI = curMat.internalField();
-    scalarField& curMatfI = curMaterialfPtr_->internalField();
-    const unallocLabelList& own = mesh().owner();
-
-    forAll(curMatfI, faceI)
-    {
-        // Set to owner: OK except for interfaces
-        curMatfI[faceI] = curMatI[own[faceI]];
-    }
-
-    forAll(curMat.boundaryField(), patchI)
-    {
-        curMaterialfPtr_->boundaryField()[patchI] =
-            curMat.boundaryField()[patchI];
-    }
-
-    curMaterialfPtr_->correctBoundaryConditions();
-}
-
-
-const Foam::surfaceScalarField&
-Foam::neoHookeanElasticMisesPlastic::curMaterialf() const
-{
-    if (!curMaterialfPtr_)
-    {
-        calcCurMaterialf();
-    }
-
-    return *curMaterialfPtr_;
-}
-
-
 Foam::scalar Foam::neoHookeanElasticMisesPlastic::curYieldStress
 (
     const scalar curEpsilonPEq,    // Current equivalent plastic strain
@@ -531,7 +473,6 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
         mesh,
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
-    curMaterialfPtr_(NULL),
     nonLinearPlasticity_(stressPlasticStrainSeries_.size() > 2),
     Hp_(0.0),
     maxDeltaErr_
@@ -822,21 +763,6 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& tau)
 
     // Update bEbar
     bEbar_ = (s/mu_) + Ibar*I;
-
-
-    // Multi-material:
-    //volSymmTensorField newTau("newTau", 0.5*K_*(pow(J, 2) - 1)*I + s);
-
-    // Assign Kirchhoff stress
-    // For now, to deal with multi-materials, we will multiply by curMaterial
-    // index field so only cells in the current material are calculated:
-    // we should be able to do this in a better way
-
-    //tau = curMaterial()*newTau + (1.0 - curMaterial())*tau;
-
-    // Update bEbar
-    //const volSymmTensorField newBEbar = (s/mu_) + Ibar*I;
-    //bEbar_ = curMaterial()*newBEbar + (1.0 - curMaterial())*bEbar_;
 }
 
 
@@ -1046,21 +972,6 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& tau)
 
     // Update bEbar
     bEbarf_ = (s/mu_) + Ibar*I;
-
-
-    // Multi-material:
-    // surfaceSymmTensorField newTau("newTau", 0.5*K_*(pow(J, 2) - 1)*I + s);
-
-    // Assign Kirchhoff stress
-    // For now, to deal with multi-materials, we will multiply by curMaterial
-    // index field so only cells in the current material are calculated:
-    // we should be able to do this in a better way
-
-    // tau = curMaterialf()*newTau + (1.0 - curMaterialf())*tau;
-
-    // Update bEbar
-    //const surfaceSymmTensorField newBEbar = (s/mu_) + Ibar*I;
-    //bEbarf_ = curMaterialf()*newBEbar + (1.0 - curMaterialf())*bEbarf_;
 }
 
 
@@ -1169,13 +1080,6 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
 //         )
 //     );
 // }
-
-
-void Foam::neoHookeanElasticMisesPlastic::setMaterialIndex(label curMatIndex)
-{
-    // Set current material index
-    curMaterialIndex() = curMatIndex;
-}
 
 
 // ************************************************************************* //

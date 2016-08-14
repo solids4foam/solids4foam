@@ -156,7 +156,7 @@ class neoHookeanElasticMisesPlastic
         surfaceSymmTensorField plasticNf_;
 
         //- Current material surface field
-        mutable surfaceScalarField* curMaterialfPtr_;
+        //mutable surfaceScalarField* curMaterialfPtr_;
 
         //- An iterative procedure is used when the yield stress is a nonlinear
         //  function of plastic strain
@@ -191,10 +191,10 @@ class neoHookeanElasticMisesPlastic
         void operator=(const neoHookeanElasticMisesPlastic&);
 
         // Calculate curMaterialf field
-        void calcCurMaterialf() const;
+        //void calcCurMaterialf() const;
 
         // Return curMaterialf field
-        const surfaceScalarField& curMaterialf() const;
+        //const surfaceScalarField& curMaterialf() const;
 
         // Return the current Kirchhoff yield stress
         scalar curYieldStress
@@ -274,7 +274,7 @@ public:
 
         //- Set current material index; this is only needed for multiMaterial
         //  analyses
-        virtual void setMaterialIndex(label curMaterialIndex);
+        //virtual void setMaterialIndex(label curMaterialIndex);
 };
 
 

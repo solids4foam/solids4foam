@@ -373,33 +373,15 @@ Foam::solidModel::solidModel
         (
             // PC: maybe this should be a Dict instead of a Properties
             "solidProperties",
-            mesh.time().constant(), // PC: system may ne more appropriate?
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-            //IOobject::AUTO_WRITE // must be AUTO_WRITE : PC: why?
-        )
-    ),
-    mesh_(mesh),
-    solidProperties_(subDict(type + "Coeffs")),
-    mechanicalProperties_
-    (
-        IOobject
-        (
-            "mechanicalProperties",
             mesh.time().constant(),
             mesh,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
     ),
-    mechanicalLawPtr_
-    (
-        mechanicalLaw::New
-        (
-            "law", mesh, mechanicalProperties_.subDict("mechanical")
-        )
-    ),
+    mesh_(mesh),
+    solidProperties_(subDict(type + "Coeffs")),
+    mechanical_(mesh),
     globalFaceZonesPtr_(NULL),
     globalToLocalFaceZonePointMapPtr_(NULL)
 {}

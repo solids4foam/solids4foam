@@ -22,18 +22,37 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    multiMaterial
+    neoHookeanElastic
 
 Description
-    Zoned multi-material mechanical controlled by an indicator field.
+    Neo-Hookean elasticity, similar to model proposed in Simo & Hughes (1998)
+    in Eqn 9.2.6:
+
+        tau = J*p*I + mu*dev(J^(-2.0/3.0)*(F & F.T()))
+
+    where
+    J        Jacobian of the deformation gradient
+    p        hydrostatic pressure
+    I        indentity tensor
+    mu       shear modulus
+    F        deformation gradient
+
+    If thermal stresses are active then 3.0*K*alpha*deltaT*I is added.
+
+    Reference
+    Simo & Hughes, Computational Inelasticity, 1998, Springer.
+
 
 SourceFiles
-    multiMaterial.C
+    neoHookeanElastic.C
+
+Author
+    Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef multiMaterial_H
-#define multiMaterial_H
+#ifndef neoHookeanElastic_H
+#define neoHookeanElastic_H
 
 #include "mechanicalLaw.H"
 
@@ -43,38 +62,43 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class multiMaterial Declaration
+                         Class linearElastic Declaration
 \*---------------------------------------------------------------------------*/
 
-class multiMaterial
+class neoHookeanElastic
 :
-    public mechanicalLaw,
-    public PtrList<mechanicalLaw>
+    public mechanicalLaw
 {
     // Private data
 
-        //- Material indicator field
-        volScalarField materials_;
+        // Initial density
+        const dimensionedScalar rho_;
+
+        // Young's modulus
+        const dimensionedScalar E_;
+
+        // Poisson's ratio
+        const dimensionedScalar nu_;
+
+        // Shear modulus
+        const dimensionedScalar mu_;
+
+        // Bulk modulus
+        const dimensionedScalar K_;
+
 
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        multiMaterial(const multiMaterial&);
+        neoHookeanElastic(const neoHookeanElastic&);
 
         //- Disallow default bitwise assignment
-        void operator=(const multiMaterial&);
-
-
-        //- Calculate indicator field given index
-        tmp<scalarField> indicator(const label index) const;
-
-        //- Calculate indicator field given index
-        scalar indicator(const label index, const label cellID) const;
+        void operator=(const neoHookeanElastic&);
 
 public:
 
     //- Runtime type information
-    TypeName("multiMaterial");
+    TypeName("neoHookeanElastic");
 
     // Static data members
 
@@ -82,7 +106,7 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        multiMaterial
+        neoHookeanElastic
         (
             const word& name,
             const fvMesh& mesh,
@@ -92,7 +116,7 @@ public:
 
     // Destructor
 
-        virtual ~multiMaterial();
+        virtual ~neoHookeanElastic();
 
 
     // Member Functions
@@ -110,15 +134,9 @@ public:
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
 
-        //- Return material residual i.e. a measured of how convergence of
-        //  the material model
-        virtual scalar residual();
-
-        //- Update the yield stress, called at end of time-step
-        virtual void updateYieldStress();
-
-        //- Rate of dissipated energy from plasticity
-        //virtual tmp<volScalarField> plasticDissipationRate() const;
+        //- Set current material index; this is only needed for multiMaterial
+        //  analyses
+        //virtual void setMaterialIndex(label curMaterialIndex);
 };
 
 

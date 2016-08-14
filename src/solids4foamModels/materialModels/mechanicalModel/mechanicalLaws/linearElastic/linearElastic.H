@@ -22,37 +22,21 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    neoHookeanElastic
+    linearElastic
 
 Description
-    Neo-Hookean elasticity, similar to model proposed in Simo & Hughes (1998)
-    in Eqn 9.2.6:
-
-        tau = J*p*I + mu*dev(J^(-2.0/3.0)*(F & F.T()))
-
-    where
-    J        Jacobian of the deformation gradient
-    p        hydrostatic pressure
-    I        indentity tensor
-    mu       shear modulus
-    F        deformation gradient
-
-    If thermal stresses are active then 3.0*K*alpha*deltaT*I is added.
-
-    Reference
-    Simo & Hughes, Computational Inelasticity, 1998, Springer.
-
+    Hookean linear elastic mechanical law.
 
 SourceFiles
-    neoHookeanElastic.C
+    linearElastic.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff, UCD. All rights reserved
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef neoHookeanElastic_H
-#define neoHookeanElastic_H
+#ifndef linearElastic_H
+#define linearElastic_H
 
 #include "mechanicalLaw.H"
 
@@ -65,40 +49,40 @@ namespace Foam
                          Class linearElastic Declaration
 \*---------------------------------------------------------------------------*/
 
-class neoHookeanElastic
+class linearElastic
 :
     public mechanicalLaw
 {
     // Private data
 
-        // Initial density
-        const dimensionedScalar rho_;
+        //- Density
+        dimensionedScalar rho_;
 
-        // Young's modulus
-        const dimensionedScalar E_;
+        //- Modulus of elasticity
+        dimensionedScalar E_;
 
-        // Poisson's ratio
-        const dimensionedScalar nu_;
+        //- Poisson's ratio
+        dimensionedScalar nu_;
 
-        // Shear modulus
-        const dimensionedScalar mu_;
+        //- First Lame parameter
+        dimensionedScalar lambda_;
 
-        // Bulk modulus
-        const dimensionedScalar K_;
+        //- Second Lame parameter (shear modulus)
+        dimensionedScalar mu_;
 
 
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        neoHookeanElastic(const neoHookeanElastic&);
+        linearElastic(const linearElastic&);
 
         //- Disallow default bitwise assignment
-        void operator=(const neoHookeanElastic&);
+        void operator=(const linearElastic&);
 
 public:
 
     //- Runtime type information
-    TypeName("neoHookeanElastic");
+    TypeName("linearElastic");
 
     // Static data members
 
@@ -106,7 +90,7 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        neoHookeanElastic
+        linearElastic
         (
             const word& name,
             const fvMesh& mesh,
@@ -116,7 +100,7 @@ public:
 
     // Destructor
 
-        virtual ~neoHookeanElastic();
+        virtual ~linearElastic();
 
 
     // Member Functions
@@ -128,15 +112,17 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+        //- Provide access to mu for the coupledUnsNonLinLinearElasticSolid
+        virtual const dimensionedScalar& mu() const;
+
+        //- Provide access to lambda for the coupledUnsNonLinLinearElasticSolid
+        virtual const dimensionedScalar& lambda() const;
+
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
 
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
-
-        //- Set current material index; this is only needed for multiMaterial
-        //  analyses
-        virtual void setMaterialIndex(label curMaterialIndex);
 };
 
 

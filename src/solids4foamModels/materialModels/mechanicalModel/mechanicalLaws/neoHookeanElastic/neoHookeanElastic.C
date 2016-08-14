@@ -159,14 +159,14 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 }
 
 
-void Foam::neoHookeanElastic::setMaterialIndex(label curMatIndex)
-{
-    // Set current material index
-    curMaterialIndex() = curMatIndex;
+// void Foam::neoHookeanElastic::setMaterialIndex(label curMatIndex)
+// {
+//     // Set current material index
+//     curMaterialIndex() = curMatIndex;
 
-    // Rename fields to avoid conflicts with other mechanical laws
-    curMaterial().rename(curMaterial().name() + '_' + Foam::name(curMatIndex));
-}
+//     // Rename fields to avoid conflicts with other mechanical laws
+//   curMaterial().rename(curMaterial().name() + '_' + Foam::name(curMatIndex));
+// }
 
 
 // ************************************************************************* //
