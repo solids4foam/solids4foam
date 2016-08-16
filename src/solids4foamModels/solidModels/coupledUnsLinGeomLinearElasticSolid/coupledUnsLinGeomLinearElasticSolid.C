@@ -199,7 +199,18 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
     D_.oldTime().oldTime();
 
     // We will directly read the linearElastic mechanicalLaw
-    if (!isA<linearElastic>(mechanical()))
+    const PtrList<mechanicalLaw>& mechLaws = mechanical();
+    if (mechLaws.size() != 1)
+    {
+        FatalErrorIn
+        (
+            "coupledUnsLinGeomLinearElasticSolid::"
+            "coupledUnsLinGeomLinearElasticSolid"
+        )   << type() << " can currently only be used with a single material"
+            << "\nConsider using one of the other solidModels."
+            << abort(FatalError);
+    }
+    else if (!isA<linearElastic>(mechLaws[0]))
     {
         FatalErrorIn
         (
@@ -212,7 +223,7 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
     }
 
     // Cast the mechanical law to a linearElastic mechanicalLaw
-    const linearElastic& mech = refCast<const linearElastic>(mechanical());
+    const linearElastic& mech = refCast<const linearElastic>(mechLaws[0]);
 
     // Set mu and lambda fields
     muf_ = mech.mu();

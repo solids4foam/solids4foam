@@ -1,0 +1,55 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      setFieldsDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+defaultFieldValues
+(
+    volVectorFieldValue DD (0 0 0)
+    volVectorFieldValue DD_0 (0 0 0)
+    volVectorFieldValue DD_0_0 (0 0 0)
+    volVectorFieldValue DD_0_0_0 (0 0 0)
+    volVectorFieldValue D (0 0 0)
+    volVectorFieldValue D_0 (0 0 0)
+    volVectorFieldValue D_0_0 (0 0 0)
+    volVectorFieldValue D_0_0_0 (0 0 0)
+);
+
+regions
+(
+    boxToCell
+    {
+        box (0 0 -8.72654e-05) (0.0324 0.00999962 8.72654e-05);
+
+        // Set old displacement increments to give a velocity of 227 m/s
+        // DD = velocity*timeStep
+        // D_0 = -velocity*timeStep
+        // D_0_0 = -velocity*2.0*timeStep
+        // D_0_0_0 = -velocity*3.0*timeStep
+        fieldValues
+        (
+            volVectorFieldValue DD (0.00001816 0 0)
+            volVectorFieldValue DD_0 (0.00001816 0 0)
+            volVectorFieldValue DD_0_0 (0.00001816 0 0)
+            volVectorFieldValue DD_0_0_0 (0.00001816 0 0)
+            //volVectorFieldValue D (0 0 0)
+            volVectorFieldValue D_0 (-0.00001816 0 0)
+            volVectorFieldValue D_0_0 (-0.00003632 0 0)
+            volVectorFieldValue D_0_0_0 (-0.00005448 0 0)
+        );
+    }
+);
+
+// ************************************************************************* //

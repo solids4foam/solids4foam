@@ -66,6 +66,9 @@ class mechanicalLaw
         //- Const reference to law dictionary
         const dictionary& dict_;
 
+        //- Name of the baseMesh region
+        word baseMeshRegionName_;
+
     // Private Member Functions
 
         //- Disallow copy construct
@@ -77,7 +80,7 @@ class mechanicalLaw
 
 protected:
 
-        //- Return reference to mesh
+        //- Return const reference to mesh
         const fvMesh& mesh() const
         {
             return mesh_;
@@ -86,6 +89,11 @@ protected:
         //- If the case is plane stress
         bool planeStress() const;
 
+        //- Return the bse mesh region name
+        const word& baseMeshRegionName() const
+        {
+            return baseMeshRegionName_;
+        }
 
 public:
 

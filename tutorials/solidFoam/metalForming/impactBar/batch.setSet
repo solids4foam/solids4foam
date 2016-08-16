@@ -1,0 +1,3 @@
+faceSet billetContactFaceZone new patchToFace billetContact
+faceSet dieContactFaceZone new patchToFace dieContact
+quit

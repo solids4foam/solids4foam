@@ -40,6 +40,25 @@ InClass
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 
+bool Foam::solidContactFvPatchVectorField::movingMesh() const
+{
+    // If the deformation gradient "F" and the displacement increment DD" are
+    // found then we can assume it is a moving mesh (updated Lagrangian) case
+    if
+    (
+        db().foundObject<volVectorField>("DD")
+     && db().foundObject<volTensorField>("F")
+    )
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+
 void Foam::solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()
 {
     // Only the master moves the zones
@@ -58,68 +77,78 @@ void Foam::solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()
     // We need to take care in parallel, and also realise that the solidModel
     // might have a moving or stationary mesh
 
-    // If the displacement increment field (DD) exists then we will assume that
-    // the solidModel is using an incremental approach
-    // TODO: we can add a function to solidModel called incremental() and
-    // movingMesh()
-    if (db().foundObject<volVectorField>("DD"))
+    // Assemble the zone face displacement field to move the zones
+    vectorField zoneD(zone().size(), vector::zero);
+    vectorField shadowZoneD(shadowZone().size(), vector::zero);
+
+    // For a non-moving mesh, we will move the zones by the total
+    // displacement, whereas for a moving mesh (updated Lagrangian), we will
+    // move the zones by the displacement increment
+
+    if (movingMesh())
     {
-        // Linear geometry incremental models
-        FatalErrorIn
-        (
-            "solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()"
-        ) << "wip: on my to-do list" << abort(FatalError);
-    }
-    else if (db().foundObject<volVectorField>("F"))
-    {
-        // Nonlinear geometry models
-        FatalErrorIn
-        (
-            "solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()"
-        ) << "wip: on my to-do list" << abort(FatalError);
+        // Updated Lagrangian, so we will move the zones by the displacement
+        // increment
+
+        // Lookup the current total displacement field
+        const volVectorField& DD = db().lookupObject<volVectorField>("DD");
+
+        // Take a reference to the patch face displacement increment field
+        const vectorField& patchDD =
+            DD.boundaryField()[patch().index()];
+        const vectorField& shadowPatchDD =
+            DD.boundaryField()[shadowPatchIndex()];
+
+        zoneD =
+            zoneField(zoneIndex(), patch().index(), patchDD);
+        shadowZoneD =
+            zoneField(shadowZoneIndex(), shadowPatchIndex(), shadowPatchDD);
     }
     else
     {
+        // Non-moving mesh: we will move the zones by the total displacement
+
         // Lookup the current total displacement field
         const volVectorField& D = db().lookupObject<volVectorField>("D");
 
         // Take a reference to the patch face total displacement field
-        const vectorField& patchD = D.boundaryField()[patch().index()];
-        const vectorField& shadowPatchD = D.boundaryField()[shadowPatchIndex()];
+        const vectorField& patchD =
+            D.boundaryField()[patch().index()];
+        const vectorField& shadowPatchD =
+            D.boundaryField()[shadowPatchIndex()];
 
-        // Assemble the zone face total displacement field
-        const vectorField zoneD =
+        zoneD =
             zoneField(zoneIndex(), patch().index(), patchD);
-        const vectorField shadowZoneD =
+        shadowZoneD =
             zoneField(shadowZoneIndex(), shadowPatchIndex(), shadowPatchD);
-
-        // Interpolate the zone face field to the zone points
-        const pointField zonePointD =
-            zoneFaceToPointInterpolate(zoneIndex(), zoneD);
-        const pointField shadowZonePointD =
-            zoneFaceToPointInterpolate(shadowZoneIndex(), shadowZoneD);
-
-        // The zone deformed points are the initial position plus the
-        // displacement
-        const pointField zoneNewPoints =
-            mesh.faceZones()[zoneIndex()]().localPoints()
-          + zonePointD;
-        const pointField shadowZoneNewPoints =
-            mesh.faceZones()[shadowZoneIndex()]().localPoints()
-          + shadowZonePointD;
-
-        // Move the zones
-
-        // Remove zones weights
-        zone().movePoints(zoneNewPoints);
-        shadowZone().movePoints(shadowZoneNewPoints);
-
-        // We need to use const_cast to move the standAlonePatch points as the
-        // movePoints function only clears weights
-        // Also, be careful to move the points are opposed to the localPoints
-        const_cast<pointField&>(zone().points()) = zoneNewPoints;
-        const_cast<pointField&>(shadowZone().points()) = shadowZoneNewPoints;
     }
+
+    // Interpolate the zone face field to the zone points
+    const pointField zonePointD =
+        zoneFaceToPointInterpolate(zoneIndex(), zoneD);
+    const pointField shadowZonePointD =
+        zoneFaceToPointInterpolate(shadowZoneIndex(), shadowZoneD);
+
+    // The zone deformed points are the initial position plus the
+    // displacement
+    const pointField zoneNewPoints =
+        mesh.faceZones()[zoneIndex()]().localPoints()
+        + zonePointD;
+    const pointField shadowZoneNewPoints =
+        mesh.faceZones()[shadowZoneIndex()]().localPoints()
+        + shadowZonePointD;
+
+    // Move the zones
+
+    // Remove zones weights
+    zone().movePoints(zoneNewPoints);
+    shadowZone().movePoints(shadowZoneNewPoints);
+
+    // We need to use const_cast to move the standAlonePatch points as the
+    // movePoints function only clears weights
+    // Also, be careful to move the points are opposed to the localPoints
+    const_cast<pointField&>(zone().points()) = zoneNewPoints;
+    const_cast<pointField&>(shadowZone().points()) = shadowZoneNewPoints;
 }
 
 
@@ -1084,7 +1113,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
     {
         // Calculate the slave patch face unit normals as they are units by both
         // the normal and friction models
-        const vectorField slavePatchFaceNormals =
+        const vectorField shadowPatchFaceNormals =
             patchField
             (
                 shadowPatchIndex(),
@@ -1095,54 +1124,66 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
         // Calculate normal contact forces
         normalModel().correct
         (
-            slavePatchFaceNormals,
+            shadowPatchFaceNormals,
             zoneToZone()
         );
 
         // Interpolate the master displacement increment to the slave patch as
         // it required by the friction model
-        // Can I tidy this up? Maybe a function to pass this straight to the
-        // friction model
-        // Maybe just pass the slip!?
-        if (db().foundObject<volVectorField>("DD"))
+
+        vectorField patchDD(patch().size(), vector::zero);
+        vectorField shadowPatchDD(patch().size(), vector::zero);
+
+        if (movingMesh())
         {
-            FatalErrorIn("solidContact::updateCoeffs()")
-                << "wip: DD not ready yet!" << abort(FatalError);
+            // Updated Lagrangian, we will directly lookup the displacement
+            // increment
+
+            const volVectorField& DD = db().lookupObject<volVectorField>("DD");
+
+            patchDD = DD.boundaryField()[patch().index()];
+            shadowPatchDD = DD.boundaryField()[shadowPatchIndex()];
         }
-        const volVectorField& D = db().lookupObject<volVectorField>("D");
-        const vectorField masterPatchDD =
-            D.boundaryField()[patch().index()]
-          - D.oldTime().boundaryField()[patch().index()];
-        const vectorField slavePatchDD =
-            D.boundaryField()[shadowPatchIndex()]
-          - D.oldTime().boundaryField()[shadowPatchIndex()];
+        else
+        {
+            // We will lookup the total displacement and old total displacement
+
+            const volVectorField& D = db().lookupObject<volVectorField>("D");
+
+            patchDD =
+                D.boundaryField()[patch().index()]
+              - D.oldTime().boundaryField()[patch().index()];
+            shadowPatchDD =
+                D.boundaryField()[shadowPatchIndex()]
+              - D.oldTime().boundaryField()[shadowPatchIndex()];
+        }
 
         // Master zone DD
-        const vectorField masterZoneDD =
+        const vectorField zoneDD =
             zoneField
             (
                 zoneIndex(),
                 patch().index(),
-                masterPatchDD
+                patchDD
             );
 
         // Master patch DD interpolated to the slave patch
-        const vectorField masterPatchDDInterpToSlavePatch =
+        const vectorField patchDDInterpToShadowPatch =
             patchField
             (
                 shadowPatchIndex(),
                 shadowZoneIndex(),
-                zoneToZone().masterToSlave(masterZoneDD)()
+                zoneToZone().masterToSlave(zoneDD)()
             );
 
         // Calculate friction contact forces
         frictionModel().correct
         (
             normalModel().slavePressure(),
-            slavePatchFaceNormals,
+            shadowPatchFaceNormals,
             normalModel().areaInContact(),
-            slavePatchDD,
-            masterPatchDDInterpToSlavePatch
+            shadowPatchDD,
+            patchDDInterpToShadowPatch
         );
 
         if (rigidMaster_)

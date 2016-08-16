@@ -31,6 +31,7 @@ License
 #include "IOdictionary.H"
 #include "fvc.H"
 #include "mathematicalConstants.H"
+#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -634,8 +635,14 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
     sigmaEff_.storePrevIter();
 
     // Lookup the strain tensor from the solver
-    const volSymmTensorField& epsilon =
-        mesh().lookupObject<volSymmTensorField>("epsilon");
+    const volSymmTensorField epsilon =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<symmTensor>("epsilon", mesh());
 
     // Calculate the strain increment
     const volSymmTensorField DEpsilon = epsilon - epsilon.oldTime();
@@ -702,8 +709,14 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     sigmaEfff_.storePrevIter();
 
     // Lookup the strain tensor from the solver
-    const surfaceSymmTensorField& epsilon =
-        mesh().lookupObject<surfaceSymmTensorField>("epsilonf");
+    const surfaceSymmTensorField epsilon =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshSurfaceField<symmTensor>("epsilonf", mesh());
 
     // Calculate the strain increment
     const surfaceSymmTensorField DEpsilon = epsilon - epsilon.oldTime();

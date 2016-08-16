@@ -1,0 +1,98 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      DD;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    loading
+    {
+        type           fixedDisplacement;
+        displacementSeries
+        {
+            fileName       "$FOAM_CASE/constant/timeVsDisp";
+            outOfBounds    clamp;
+        }
+        value          uniform ( 0 0 0 );
+    }
+
+    billetContact
+    {
+        type            solidContact;
+        master          no;
+        shadowPatch     dieContact;
+        value           uniform (0 0 0);
+    }
+
+    dieContact
+    {
+        type            solidContact;
+        master          yes;
+        rigidMaster     yes;
+        shadowPatch     billetContact;
+        //useMasterNormals yes;
+        //quickReject     distance3D;
+        normalContactModel standardPenalty;
+        standardPenaltyNormalModelDict
+        {
+            penaltyScale             1;
+            relaxationFactor         0.02;
+        }
+        frictionContactModel standardPenalty;
+        standardPenaltyFrictionModelDict
+        {
+            relaxationFactor 0.02;
+            penaltyScale 2.3;
+            frictionLaw     coulomb;
+            frictionLawDict
+            {
+                frictionCoeff   0.5;
+            }
+        }
+        value           uniform (0 0 0);
+    }
+
+    symmPlane
+    {
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
+    }
+
+    back
+    {
+        type            solidWedge;
+        patchType       wedge;
+        value           uniform (0 0 0);
+    }
+
+    front
+    {
+        type            solidWedge;
+        patchType       wedge;
+        value           uniform (0 0 0);
+    }
+
+    axis
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

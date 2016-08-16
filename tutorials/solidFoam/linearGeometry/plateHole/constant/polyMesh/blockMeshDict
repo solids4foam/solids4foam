@@ -44,11 +44,11 @@ vertices
 
 blocks
 (
-    hex (5 4 9 10 16 15 20 21) (10 10 1) simpleGrading (1 1 1)
-    hex (0 1 4 5 11 12 15 16) (10 10 1) simpleGrading (1 1 1)
-    hex (1 2 3 4 12 13 14 15) (20 10 1) simpleGrading (1 1 1)
-    hex (4 3 6 7 15 14 17 18) (20 20 1) simpleGrading (1 1 1)
-    hex (9 4 7 8 20 15 18 19) (10 20 1) simpleGrading (1 1 1)
+    hex (5 4 9 10 16 15 20 21) aluminium (10 10 1) simpleGrading (1 1 1)
+    hex (0 1 4 5 11 12 15 16) aluminium (10 10 1) simpleGrading (1 1 1)
+    hex (1 2 3 4 12 13 14 15) steel (20 10 1) simpleGrading (1 1 1)
+    hex (4 3 6 7 15 14 17 18) steel (20 20 1) simpleGrading (1 1 1)
+    hex (9 4 7 8 20 15 18 19) steel (10 20 1) simpleGrading (1 1 1)
 );
 
 edges

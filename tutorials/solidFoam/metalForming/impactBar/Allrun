@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Create the mesh
+m4 constant/polyMesh/blockMeshDict.cylinder.m4 > constant/polyMesh/blockMeshDict
+runApplication blockMesh
+
+# Set the initial conditions
+runApplication setFields
+
+# Create the zones
+runApplication setSet -batch batch.setSet
+runApplication setsToZones -noFlipMap
+
+# RUn the solver
+runApplication solidFoam
+#runApplication decomposePar
+#runParallel solidFoam 8
+#runApplication reconstructPar

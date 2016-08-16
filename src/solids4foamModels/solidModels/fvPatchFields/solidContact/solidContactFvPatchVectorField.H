@@ -140,6 +140,9 @@ class solidContactFvPatchVectorField
 
     // Private Member Functions
 
+        //- Is a moving mesh (e.g. updated Lagrangian) approach be used
+        bool movingMesh() const;
+
         //- Move the master and slave zones to the deformed configuration
         void moveZonesToDeformedConfiguration();
 

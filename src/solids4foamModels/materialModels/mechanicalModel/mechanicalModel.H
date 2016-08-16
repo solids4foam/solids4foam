@@ -178,6 +178,24 @@ public:
 
             //- Update total accumulated fields
             void updateTotalFields();
+
+            //- Lookup a field from the base mesh and interpolate it the subMesh
+            template<class Type>
+            tmp< GeometricField<Type, fvPatchField, volMesh> >
+            lookupBaseMeshVolField
+            (
+                const word& fieldName,
+                const fvMesh& subMesh
+            ) const;
+
+            //- Lookup a field from the base mesh and interpolate it the subMesh
+            template<class Type>
+            tmp< GeometricField<Type, fvsPatchField, surfaceMesh> >
+            lookupBaseMeshSurfaceField
+            (
+                const word& fieldName,
+                const fvMesh& subMesh
+            ) const;
 };
 
 

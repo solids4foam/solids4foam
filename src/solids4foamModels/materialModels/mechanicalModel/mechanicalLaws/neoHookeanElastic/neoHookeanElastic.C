@@ -29,6 +29,7 @@ License
 #include "transformGeometricField.H"
 #include "fvc.H"
 #include "IOdictionary.H"
+#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -119,13 +120,25 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 
 void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 {
-    const fvMesh& mesh = this->mesh();
-
     // Lookup the total deformation gradient from the solver
-    const volTensorField& F = mesh.lookupObject<volTensorField>("F");
+    const volTensorField F =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<tensor>("F", mesh());
 
     // Lookup the Jacobian of the deformation gradient from the solver
-    const volScalarField& J = mesh.lookupObject<volScalarField>("J");
+    const volScalarField J =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("J", mesh());
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
     volSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(F & F.T());
@@ -140,13 +153,25 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 
 void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 {
-    const fvMesh& mesh = this->mesh();
-
     // Lookup the total deformation gradient from the solver
-    const surfaceTensorField& F = mesh.lookupObject<surfaceTensorField>("Ff");
+    const surfaceTensorField F =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshSurfaceField<tensor>("Ff", mesh());
 
     // Lookup the Jacobian of the deformation gradient from the solver
-    const surfaceScalarField& J = mesh.lookupObject<surfaceScalarField>("Jf");
+    const surfaceScalarField J =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshSurfaceField<scalar>("Jf", mesh());
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
     surfaceSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(F & F.T());

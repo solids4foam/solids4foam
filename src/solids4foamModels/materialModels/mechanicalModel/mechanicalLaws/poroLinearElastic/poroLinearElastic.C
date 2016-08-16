@@ -26,6 +26,7 @@ License
 #include "poroLinearElastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
+#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -65,7 +66,14 @@ void Foam::poroLinearElastic::correct(volSymmTensorField& sigma)
     linearElastic::correct(sigma);
 
     // Lookup the pressure field from the solver
-    const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+    const volScalarField p =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("p", mesh());
 
     // Calculate the total stress as the sum of the effective stress and the
     // pore-pressure
@@ -79,12 +87,20 @@ void Foam::poroLinearElastic::correct(surfaceSymmTensorField& sigma)
     linearElastic::correct(sigma);
 
     // Lookup the pressure field from the solver
-    const surfaceScalarField& p =
-        fvc::interpolate(mesh().lookupObject<volScalarField>("p"));
+    const volScalarField p =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("p", mesh());
+
+    const surfaceScalarField pf = fvc::interpolate(p);
 
     // Calculate the total stress as the sum of the effective stress and the
     // pore-pressure
-    sigma -= p*symmTensor(I);
+    sigma -= pf*symmTensor(I);
 }
 
 

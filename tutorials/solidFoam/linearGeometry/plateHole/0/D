@@ -29,7 +29,6 @@ boundaryField
     right
     {
         type            solidTraction;
-        //traction        uniform ( 1e+05 0 0 );
         tractionSeries
         {
             fileName    "$FOAM_CASE/constant/timeVsTraction";

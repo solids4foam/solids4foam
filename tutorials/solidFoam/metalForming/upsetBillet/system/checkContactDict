@@ -1,0 +1,31 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    note        "";
+    location    "system";
+    object      checkContactDict;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+masterZoneName            dieContactFaceZone;
+slaveZoneName             billetContactFaceZone;
+
+//quickReject               nSquared;
+//quickReject               distance3D;
+//quickReject               AABB;
+quickReject               bbOctree;
+
+slaveCellZoneName         billet;
+slaveTranslation          (-0.009 0 0);
+
+// ************************************************************************* //

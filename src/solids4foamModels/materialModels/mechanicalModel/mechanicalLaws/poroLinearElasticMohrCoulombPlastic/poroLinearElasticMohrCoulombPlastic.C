@@ -26,6 +26,7 @@ License
 #include "poroLinearElasticMohrCoulombPlastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
+#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -72,21 +73,15 @@ void Foam::poroLinearElasticMohrCoulombPlastic::correct
     linearElasticMohrCoulombPlastic::correct(sigma);
 
     // Lookup the pore-pressure from the solver
-
-    if (!mesh().foundObject<volScalarField>("p"))
-    {
-        FatalErrorIn
+    const volScalarField p =
+        mesh().db().lookupObject<fvMesh>
         (
-            "void Foam::poroLinearElasticMohrCoulombPlastic::correct"
-            "("
-            "    volSymmTensorField& sigma"
-            ")"
-        )   << "The pore-pressure field 'p' is not found!" << nl
-            << "    Make sure you are using a pore-pressure based solidModel."
-            << abort(FatalError);
-    }
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("p", mesh());
 
-    const volScalarField& p = mesh().lookupObject<volScalarField>("p");
 
     // The total stress is equal to the sum of the efffective stress and
     // pore-pressure components
@@ -102,27 +97,21 @@ void Foam::poroLinearElasticMohrCoulombPlastic::correct
     // Call Mohr-Coulomb law to calculate the effective stress
     linearElasticMohrCoulombPlastic::correct(sigma);
 
-    // Lookup the pore-pressure from the solver
-
-    if (!mesh().foundObject<volScalarField>("p"))
-    {
-        FatalErrorIn
+    // Lookup the pressure field from the solver
+    const volScalarField p =
+        mesh().db().lookupObject<fvMesh>
         (
-            "void Foam::poroLinearElasticMohrCoulombPlastic::correct"
-            "("
-            "    volSymmTensorField& sigma"
-            ")"
-        )   << "The pore-pressure field 'p' is not found!" << nl
-            << "    Make sure you are using a pore-pressure based solidModel."
-            << abort(FatalError);
-    }
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("p", mesh());
 
-    const surfaceScalarField& p =
-        fvc::interpolate(mesh().lookupObject<volScalarField>("p"));
+    const surfaceScalarField pf = fvc::interpolate(p);
 
     // The total stress is equal to the sum of the efffective stress and
     // pore-pressure components
-    sigma -= p*symmTensor(I);
+    sigma -= pf*symmTensor(I);
 }
 
 

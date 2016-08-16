@@ -1,0 +1,122 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant/polyMesh";
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Model Description
+// Axisymmetric cylinder mesh with compression die
+
+// Setup m4 stuff
+
+
+
+// define geometry in mm
+
+ // full cylinder height/length
+ // cylinder radius
+ // angle of wedge in degrees
+ // die thickness
+ // die width
+
+// calculated quantities
+
+
+
+
+// define mesh density
+ // number of cells in axial direction
+ // number of cells in radial direction
+ // rigid wall
+
+// start of blockMeshDict
+
+convertToMeters 0.001;
+
+vertices
+(
+    //- dimension in mm
+    (0 0 0)
+    (32.4 0 0)
+    (32.4 3.19987815380535 -0.0279249135947984)
+    (0 3.19987815380535 -0.0279249135947984)
+    (32.4 3.19987815380535 0.0279249135947984)
+    (0 3.19987815380535 0.0279249135947984)
+
+    (32.4 0 0)
+    (33.4 0 0)
+    (33.4 9.99961923064171 -0.0872653549837451)
+    (32.4 9.99961923064171 -0.0872653549837451)
+    (33.4 9.99961923064171 0.0872653549837451)
+    (32.4 9.99961923064171 0.0872653549837451)
+);
+
+blocks
+(
+    hex (0 1 2 3 0 1 4 5) billet (60 6 1) simpleGrading (1 1 1)
+    hex (6 7 8 9 6 7 10 11) die (1 5 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+patches
+(
+    patch left
+    (
+        (0 5 3 0)
+    )
+
+    patch dieContact
+    (
+        (6 11 9 6)
+        (8 9 11 10)
+    )
+
+    patch billetContact
+    (
+        (1 4 2 1)
+        (2 3 5 4)
+    )
+
+    patch loading
+    (
+        (7 10 8 7)
+    )
+
+    wedge back
+    (
+        (3 2 1 0)
+        (9 8 7 6)
+    )
+
+    wedge front
+    (
+        (0 1 4 5)
+        (6 7 10 11)
+    )
+
+    empty axis
+    (
+        (0 1 1 0)
+        (6 7 7 6)
+    )
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

@@ -30,6 +30,7 @@ License
 #include "transformGeometricField.H"
 #include "IOdictionary.H"
 #include "fvc.H"
+#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -139,14 +140,34 @@ const Foam::dimensionedScalar& Foam::thermoLinearElastic::lambda() const
 void Foam::thermoLinearElastic::correct(volSymmTensorField& sigma)
 {
     // Lookup the strain tensor from the solver
-    const volSymmTensorField& epsilon =
-        mesh().lookupObject<volSymmTensorField>("epsilon");
+    const volSymmTensorField epsilon =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<symmTensor>("epsilon", mesh());
 
     // Lookup the temperature field from the solver
-    const volScalarField& T = mesh().lookupObject<volScalarField>("T");
+    const volScalarField T =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("T", mesh());
 
     // Lookup the stress-free reference temperature field from the solver
-    const volScalarField& T0 = mesh().lookupObject<volScalarField>("T0");
+    const volScalarField T0 =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("T0", mesh());
 
     // Calculate stress based on Hooke's law
     sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I - 3.0*K_*alpha_*(T - T0)*I;
@@ -156,19 +177,42 @@ void Foam::thermoLinearElastic::correct(volSymmTensorField& sigma)
 void Foam::thermoLinearElastic::correct(surfaceSymmTensorField& sigma)
 {
     // Lookup the strain tensor from the solver
-    const surfaceSymmTensorField& epsilon =
-        mesh().lookupObject<surfaceSymmTensorField>("epsilonf");
+    const surfaceSymmTensorField epsilon =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshSurfaceField<symmTensor>("epsilonf", mesh());
 
     // Lookup the temperature field from the solver
-    const surfaceScalarField& T =
-        fvc::interpolate(mesh().lookupObject<volScalarField>("T"));
+    const volScalarField T =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("T", mesh());
+
+    const surfaceScalarField& Tf = fvc::interpolate(T);
 
     // Lookup the stress-free reference temperature field from the solver
-    const surfaceScalarField& T0 =
-        fvc::interpolate(mesh().lookupObject<volScalarField>("T0"));
+    const volScalarField T0 =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("T0", mesh());
+
+    const surfaceScalarField& T0f = fvc::interpolate(T0);
 
     // Calculate stress based on Hooke's law
-    sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I - 3.0*K_*alpha_*(T - T0)*I;
+    sigma =
+        2.0*mu_*epsilon + lambda_*tr(epsilon)*I - 3.0*K_*alpha_*(Tf - T0f)*I;
 }
 
 

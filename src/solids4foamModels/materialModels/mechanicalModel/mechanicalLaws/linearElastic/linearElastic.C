@@ -30,6 +30,8 @@ License
 #include "transformGeometricField.H"
 #include "IOdictionary.H"
 
+#include "mechanicalModel.H"
+
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
@@ -139,8 +141,14 @@ const Foam::dimensionedScalar& Foam::linearElastic::lambda() const
 void Foam::linearElastic::correct(volSymmTensorField& sigma)
 {
     // Lookup the strain tensor from the solver
-    const volSymmTensorField& epsilon =
-        mesh().lookupObject<volSymmTensorField>("epsilon");
+    const volSymmTensorField epsilon =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<symmTensor>("epsilon", mesh());
 
     // Calculate stress based on Hooke's law
     sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
@@ -150,8 +158,14 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
 void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
 {
     // Lookup the strain tensor from the solver
-    const surfaceSymmTensorField& epsilon =
-        mesh().lookupObject<surfaceSymmTensorField>("epsilonf");
+    const surfaceSymmTensorField epsilon =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshSurfaceField<symmTensor>("epsilonf", mesh());
 
     // Calculate stress based on Hooke's law
     sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;

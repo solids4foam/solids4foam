@@ -28,6 +28,7 @@ License
 #include "zeroGradientFvPatchFields.H"
 #include "transformGeometricField.H"
 #include "fvc.H"
+#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -564,15 +565,37 @@ Foam::neoHookeanElasticMisesPlastic::impK() const
 
 void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& tau)
 {
-    const fvMesh& mesh = this->mesh();
-
     // Compute elastic predictor
 
-    // Lookup relative deformation gradient
-    const volTensorField& relF = mesh.lookupObject<volTensorField>("relF");
+    // Lookup the total deformation gradient from the solver
+    const volTensorField relF =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<tensor>("relF", mesh());
 
-    // Lookup relative Jacobian
-    const volScalarField& relJ = mesh.lookupObject<volScalarField>("relJ");
+    // Lookup the Jacobian of the deformation gradient from the solver
+    const volScalarField relJ =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("relJ", mesh());
+
+    // Lookup the Jacobian of the deformation gradient
+    const volScalarField J =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshVolField<scalar>("J", mesh());
 
     // Calculate the relative deformation gradient with the volumetric term
     // removed
@@ -580,9 +603,6 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& tau)
 
     // Update bE trial
     bEbarTrial_ = transform(relFbar, bEbar_.oldTime());
-
-    // Lookup the Jacobian of the deformation gradient
-    const volScalarField& J = mesh.lookupObject<volScalarField>("J");
 
     // Calculate trial deviatoric stress
     volSymmTensorField sTrial = mu_*dev(bEbarTrial_);
@@ -768,17 +788,37 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& tau)
 
 void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& tau)
 {
-    const fvMesh& mesh = this->mesh();
-
     // Compute elastic predictor
 
-    // Lookup relative deformation gradient
-    const surfaceTensorField& relF =
-        mesh.lookupObject<surfaceTensorField>("relFf");
+    // Lookup the total deformation gradient from the solver
+    const surfaceTensorField relF =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshSurfaceField<tensor>("relFf", mesh());
 
-    // Lookup relative Jacobian
-    const surfaceScalarField& relJ =
-        mesh.lookupObject<surfaceScalarField>("relJf");
+    // Lookup the Jacobian of the deformation gradient from the solver
+    const surfaceScalarField relJ =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshSurfaceField<scalar>("relJf", mesh());
+
+    // Lookup the Jacobian of the deformation gradient
+    const surfaceScalarField J =
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).lookupBaseMeshSurfaceField<scalar>("Jf", mesh());
 
     // Calculate the relative deformation gradient with the volumetric term
     // removed
@@ -786,9 +826,6 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& tau)
 
     // Update bE trial
     bEbarTrialf_ = transform(relFbar, bEbarf_.oldTime());
-
-    // Lookup the Jacobian of the deformation gradient
-    const surfaceScalarField& J = mesh.lookupObject<surfaceScalarField>("Jf");
 
     // Calculate trial deviatoric stress
     surfaceSymmTensorField sTrial = mu_*dev(bEbarTrialf_);
@@ -978,7 +1015,13 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& tau)
 Foam::scalar Foam::neoHookeanElasticMisesPlastic::residual()
 {
     // Calculate residual based on change in plastic strain increment
-    if (mesh().foundObject<surfaceTensorField>("Ff"))
+    if
+    (
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).foundObject<surfaceTensorField>("Ff")
+    )
     {
         return
             gMax
