@@ -467,8 +467,8 @@ void pointGaussLsDivSigmaScheme::insertCoeffsTang
                                 // Remove coeff in fixed direction
                                 coeff = (coeff & (I - sePointFixedDir));
 
-                                // Add explicitly to the source: todo below
-                                //blockB += coeff & pointFixedComp(sePointID);
+                                // Add explicitly to the source
+                                blockB += coeff & pointFixedComp[sePointID];
                             }
 
                             // Add coeff contribution to cellI from
@@ -603,8 +603,8 @@ void pointGaussLsDivSigmaScheme::insertCoeffsTang
                                 // Remove coeff in fixed direction
                                 coeff = (coeff & (I - sePointFixedDir));
 
-                                // Add explicitly to the source: todo below
-                                //blockB += coeff & pointFixedComp(sePointID);
+                                // Add explicitly to the source
+                                blockB += coeff & pointFixedComp[sePointID];
                             }
 
                             // Add coeff contribution to the upper of cellI from
@@ -732,6 +732,16 @@ void pointGaussLsDivSigmaScheme::insertCoeffsTang
                                 coeff += transform(T, coeff);
                             }
 
+                            // Check if the point has a fixed component
+                            if (pointHasFixedComp)
+                            {
+                                // Remove coeff in fixed direction
+                                coeff = (coeff & (I - sePointFixedDir));
+
+                                // Add explicitly to the source
+                                blockB += coeff & pointFixedComp[sePointID];
+                            }
+
                             // Add coeff contribution to globalCoeff
                             pointProcFacesCoeffs[cellI][sePointID][i] += coeff;
 
@@ -801,6 +811,16 @@ void pointGaussLsDivSigmaScheme::insertCoeffsTang
                                         mirrorPlaneTrans[sePointID].second();
 
                                     coeff += transform(T, coeff);
+                                }
+
+                                // Check if the point has a fixed component
+                                if (pointHasFixedComp)
+                                {
+                                    // Remove coeff in fixed direction
+                                    coeff = (coeff & (I - sePointFixedDir));
+
+                                    // Add explicitly to the source
+                                    blockB += coeff & pointFixedComp[sePointID];
                                 }
 
                                 // Add coeff contribution to globalCoeff
@@ -876,6 +896,16 @@ void pointGaussLsDivSigmaScheme::insertCoeffsTang
                                     coeff += transform(T, coeff);
                                 }
 
+                                // Check if the point has a fixed component
+                                if (pointHasFixedComp)
+                                {
+                                    // Remove coeff in fixed direction
+                                    coeff = (coeff & (I - sePointFixedDir));
+
+                                    // Add explicitly to the source
+                                    blockB += coeff & pointFixedComp[sePointID];
+                                }
+
                                 // Add coeff contribution to globalCoeff
                                 gPtNgbProcCellCoeffs[cellI][sePointID][i] +=
                                     coeff;
@@ -943,6 +973,16 @@ void pointGaussLsDivSigmaScheme::insertCoeffsTang
                                         mirrorPlaneTrans[sePointID].second();
 
                                     coeff += transform(T, coeff);
+                                }
+
+                                // Check if the point has a fixed component
+                                if (pointHasFixedComp)
+                                {
+                                    // Remove coeff in fixed direction
+                                    coeff = (coeff & (I - sePointFixedDir));
+
+                                    // Add explicitly to the source
+                                    blockB += coeff & pointFixedComp[sePointID];
                                 }
 
                                 // Add coeff contribution to globalCoeff
@@ -1015,6 +1055,16 @@ void pointGaussLsDivSigmaScheme::insertCoeffsTang
                                         mirrorPlaneTrans[sePointID].second();
 
                                     coeff += transform(T, coeff);
+                                }
+
+                                // Check if the point has a fixed component
+                                if (pointHasFixedComp)
+                                {
+                                    // Remove coeff in fixed direction
+                                    coeff = (coeff & (I - sePointFixedDir));
+
+                                    // Add explicitly to the source
+                                    blockB += coeff & pointFixedComp[sePointID];
                                 }
 
                                 // Add coeff contribution to globalCoeff

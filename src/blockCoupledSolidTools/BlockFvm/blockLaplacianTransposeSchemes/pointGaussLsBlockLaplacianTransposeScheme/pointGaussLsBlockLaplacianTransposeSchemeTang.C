@@ -456,8 +456,8 @@ void pointGaussLsBlockLaplacianTransposeScheme::insertCoeffsTang
                                 // Remove coeff in fixed direction
                                 coeff = (coeff & (I - sePointFixedDir));
 
-                                // Add explicitly to the source: todo below
-                                //blockB += coeff & pointFixedComp(sePointID);
+                                // Add explicitly to the source
+                                blockB += coeff & pointFixedComp[sePointID];
                             }
 
                             // Add coeff contribution to cellI from
@@ -591,8 +591,8 @@ void pointGaussLsBlockLaplacianTransposeScheme::insertCoeffsTang
                                 // Remove coeff in fixed direction
                                 coeff = (coeff & (I - sePointFixedDir));
 
-                                // Add explicitly to the source: todo below
-                                //blockB += coeff & pointFixedComp(sePointID);
+                                // Add explicitly to the source
+                                blockB += coeff & pointFixedComp[sePointID];
                             }
 
                             // Add coeff contribution to the upper of cellI from
@@ -717,6 +717,16 @@ void pointGaussLsBlockLaplacianTransposeScheme::insertCoeffsTang
                                 coeff += transform(T, coeff);
                             }
 
+                            // Check if the point has a fixed component
+                            if (pointHasFixedComp)
+                            {
+                                // Remove coeff in fixed direction
+                                coeff = (coeff & (I - sePointFixedDir));
+
+                                // Add explicitly to the source
+                                blockB += coeff & pointFixedComp[sePointID];
+                            }
+
                             // Add coeff contribution to globalCoeff
                             pointProcFacesCoeffs[cellI][sePointID][i] += coeff;
 
@@ -777,13 +787,23 @@ void pointGaussLsBlockLaplacianTransposeScheme::insertCoeffsTang
                                 if
                                 (
                                     mag(mirrorPlaneTrans[sePointID].first())
-                                    > SMALL
+                                  > SMALL
                                 )
                                 {
                                     const tensor& T =
                                         mirrorPlaneTrans[sePointID].second();
 
                                     coeff += transform(T, coeff);
+                                }
+
+                                // Check if the point has a fixed component
+                                if (pointHasFixedComp)
+                                {
+                                    // Remove coeff in fixed direction
+                                    coeff = (coeff & (I - sePointFixedDir));
+
+                                    // Add explicitly to the source
+                                    blockB += coeff & pointFixedComp[sePointID];
                                 }
 
                                 // Add coeff contribution to globalCoeff
@@ -848,13 +868,23 @@ void pointGaussLsBlockLaplacianTransposeScheme::insertCoeffsTang
                                 if
                                 (
                                     mag(mirrorPlaneTrans[sePointID].first())
-                                    > SMALL
+                                  > SMALL
                                 )
                                 {
                                     const tensor& T =
                                         mirrorPlaneTrans[sePointID].second();
 
                                     coeff += transform(T, coeff);
+                                }
+
+                                // Check if the point has a fixed component
+                                if (pointHasFixedComp)
+                                {
+                                    // Remove coeff in fixed direction
+                                    coeff = (coeff & (I - sePointFixedDir));
+
+                                    // Add explicitly to the source
+                                    blockB += coeff & pointFixedComp[sePointID];
                                 }
 
                                 // Add coeff contribution to globalCoeff
@@ -922,6 +952,16 @@ void pointGaussLsBlockLaplacianTransposeScheme::insertCoeffsTang
                                         mirrorPlaneTrans[sePointID].second();
 
                                     coeff += transform(T, coeff);
+                                }
+
+                                // Check if the point has a fixed component
+                                if (pointHasFixedComp)
+                                {
+                                    // Remove coeff in fixed direction
+                                    coeff = (coeff & (I - sePointFixedDir));
+
+                                    // Add explicitly to the source
+                                    blockB += coeff & pointFixedComp[sePointID];
                                 }
 
                                 // Add coeff contribution to globalCoeff
@@ -992,6 +1032,16 @@ void pointGaussLsBlockLaplacianTransposeScheme::insertCoeffsTang
                                         mirrorPlaneTrans[sePointID].second();
 
                                     coeff += transform(T, coeff);
+                                }
+
+                                // Check if the point has a fixed component
+                                if (pointHasFixedComp)
+                                {
+                                    // Remove coeff in fixed direction
+                                    coeff = (coeff & (I - sePointFixedDir));
+
+                                    // Add explicitly to the source
+                                    blockB += coeff & pointFixedComp[sePointID];
                                 }
 
                                 // Add coeff contribution to globalCoeff
