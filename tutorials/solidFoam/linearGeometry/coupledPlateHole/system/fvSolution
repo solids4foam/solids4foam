@@ -19,11 +19,12 @@ solvers
 {
     blockD
     {
+        //solver          EigenSparseLU;
         solver          BiCGStab;
         preconditioner  Cholesky;
         tolerance       1e-07;
         relTol          0;
-        minIter         1;
+        minIter         2;
         maxIter         1000;
     }
 

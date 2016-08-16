@@ -71,11 +71,24 @@ void Foam::solidModel::calcGlobalFaceZones() const
         // }
 
         // New method: directly lookup globalFaceZones from decomposeParDict
+
+
+        // For FSI cases, we need to look in a different location for the dict
+
+        word decompDictName = "system/decomposeParDict";
+
+        if (isDir(mesh().rootPath()/mesh().caseName()/"../system/solid"))
+        {
+            decompDictName = "../system/solid/decomposeParDict";
+        }
+
+        Info<< "Reading decomposeParDict " << decompDictName << endl;
+
         IOdictionary decompDict
         (
             IOobject
             (
-                "../system/solid/decomposeParDict",
+                decompDictName,
                 mesh().time(),
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE,
