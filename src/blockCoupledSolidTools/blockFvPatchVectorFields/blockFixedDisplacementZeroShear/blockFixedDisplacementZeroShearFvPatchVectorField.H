@@ -73,7 +73,7 @@ class blockFixedDisplacementZeroShearFvPatchVectorField
     // Private Data
 
         //- Displacement time series
-        interpolationTable<vector> timeSeries_;
+        interpolationTable<vector> dispSeries_;
 
 public:
 

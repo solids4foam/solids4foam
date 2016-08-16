@@ -149,52 +149,41 @@ void blockFixedDisplacementFvPatchVectorField::updateCoeffs()
         pointDisp = dispSeries_(this->db().time().timeOutputValue());
     }
 
-    bool incremental = bool(dimensionedInternalField().name() == "DU");
-
-    if (incremental)
+    if (dimensionedInternalField().name() == "DD")
     {
-        if (patch().boundaryMesh().mesh().foundObject<volVectorField>("U_0"))
-        {
-            const fvPatchField<vector>& Uold =
-              patch().lookupPatchField<volVectorField, vector>("U_0");
+        // Incremental approach, so we wil set the increment of displacement
+        // Lookup the old displacement field and subtract it from the total
+        // displacement
+        const volVectorField& Dold =
+            db().lookupObject<volVectorField>("D").oldTime();
 
-            disp -= Uold;
-        }
-        else if (patch().boundaryMesh().mesh().foundObject<volVectorField>("U"))
-        {
-            const fvPatchField<vector>& Uold =
-              patch().lookupPatchField<volVectorField, vector>("U");
-
-            disp -= Uold;
-        }
+        disp -= Dold.boundaryField()[patch().index()];
     }
 
-    fvPatchField<vector>::operator==
-    (
-        disp
-    );
+    fvPatchField<vector>::operator==(disp);
 
-    // Update pointDU
+
+    // Update point displacement field
 
     const fvMesh& mesh = patch().boundaryMesh().mesh();
 
     if
     (
-        mesh.objectRegistry::lookupObject<pointVectorField>
+        mesh.lookupObject<pointVectorField>
         (
             "point" + dimensionedInternalField().name()
         ).boundaryField()[patch().index()].type() == "fixedValue"
     )
     {
-        if (incremental)
+        if (dimensionedInternalField().name() == "DD")
         {
-            const pointVectorField& pointU =
+            const pointVectorField& pointD =
                 mesh.objectRegistry::lookupObject
                 <
                 pointVectorField
-                >("pointU");
+                >("pointD");
 
-            const pointVectorField& pointUOld = pointU.oldTime();
+            const pointVectorField& pointDOld = pointD.oldTime();
 
             const labelList& meshPoints = patch().patch().meshPoints();
 
@@ -202,11 +191,11 @@ void blockFixedDisplacementFvPatchVectorField::updateCoeffs()
             {
                 const label pointID = meshPoints[pI];
 
-                pointDisp[pI] -= pointUOld[pointID];
+                pointDisp[pI] -= pointDOld[pointID];
             }
         }
 
-        fixedValuePointPatchVectorField& patchPointDU =
+        fixedValuePointPatchVectorField& patchPointDD =
             refCast<fixedValuePointPatchVectorField>
             (
                 const_cast<pointVectorField&>
@@ -216,7 +205,7 @@ void blockFixedDisplacementFvPatchVectorField::updateCoeffs()
                 ).boundaryField()[patch().index()]
             );
 
-        patchPointDU == pointDisp;
+        patchPointDD == pointDisp;
     }
 
     fixedValueFvPatchVectorField::updateCoeffs();
@@ -278,6 +267,10 @@ void blockFixedDisplacementFvPatchVectorField::insertBlockCoeffs
     // Const reference to polyPatch and the fvMesh
     const polyPatch& ppatch = patch().patch();
 
+    // Update the displacement
+    // We shouldn't have to use const_cast ...
+    const_cast<blockFixedDisplacementFvPatchVectorField&>(*this).updateCoeffs();
+
     // Const reference to the patch field
     const vectorField& pU = *this;
 
@@ -296,36 +289,50 @@ void blockFixedDisplacementFvPatchVectorField::insertBlockCoeffs
         // For displacement, the value is fixed so we will set the
         // diag and source so as to force this fixed value
 
-        // We will set the diag coeff to the scaleFac*I and set the
-        // source to scaleFac*fixedValue, where the scaleFac is used to
-        // set the order of magntitude of the diagonal to be the same as
-        // the internal field
-        // Note: but the matrix preconditioner basically does this for us,
-        // so there is probably no need for us to do it: to be checked!
+        // The preconditioner will take care of scaling this coefficients;
+        // however, scaling the coefficients here does affect the number of
+        // iterations
 
-        // We will use the first cell
-        const scalar scaleFac = (d[0].xx() + d[0].yy() + d[0].zz())/3.0;
+        //const scalar scaleFac = (d[0].xx() + d[0].yy() + d[0].zz())/3.0;
+        // if (mag(scaleFac) < SMALL)
+        // {
+        //     FatalErrorIn
+        //     (
+        //         "void blockFixedDisplacementFvPatchVectorField::"
+        //         "insertBlockCoeffs\n"
+        //         "(\n"
+        //         "    const solidPolyMesh& solidMesh,\n"
+        //         "    const surfaceScalarField& muf,\n"
+        //         "    const surfaceScalarField& lambdaf,\n"
+        //         "    const GeometricField<vector, fvPatchField, volMesh>&,\n"
+        //         "    Field<vector>& blockB,\n"
+        //         "    BlockLduMatrix<vector>& blockM\n"
+        //         ") const"
+        //     )   << "displacement scaleFac is zero" << abort(FatalError);
+        // }
 
-        if (mag(scaleFac) < SMALL)
-        {
-            FatalErrorIn("pointGaussLsDivSigmaScheme::insertCoeffBc")
-                << "displacement scaleFac is zero"
-                    << abort(FatalError);
-        }
-
-        //const label varI = offset + faceI;
         const label varI = solidMesh.findOldVariableID(start + faceI);
 
         // Diagonal contribution for the boundary face
-        d[varI] += tensor(scaleFac*I);
+        //d[varI] += tensor(scaleFac*I);
+        d[varI] += tensor(I);
 
         // Source contribution
-        blockB[varI] += scaleFac*pU[faceI];
-    } // forAll faces of the patch
+        //blockB[varI] += scaleFac*pU[faceI];
+        blockB[varI] += pU[faceI];
+    }
 }
 
 void blockFixedDisplacementFvPatchVectorField::write(Ostream& os) const
 {
+    if (dispSeries_.size())
+    {
+        os.writeKeyword("displacementSeries") << nl;
+        os << token::BEGIN_BLOCK << nl;
+        dispSeries_.write(os);
+        os << token::END_BLOCK << nl;
+    }
+
     fixedValueFvPatchVectorField::write(os);
 }
 

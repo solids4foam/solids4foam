@@ -327,20 +327,9 @@ public:
             //- Return the variable ID (index in variable list) given the faceID
             //  Returns -1 for internal faces and boundary faces which are empty
             //  or processor boundaries
-            //  Note: initially the varibales are ordered as the cells followed
-            //  by boundary faces: findOldVariableID returns the index into this
-            //  initial ordering. This list is then renumbered (band
-            //  compression): the findNewVariableID function returns the index
-            //  into the renumbered list
+            //  Note: the varibales are ordered as the cells followed by
+            //  boundary faces
             label findOldVariableID(const label bFaceID) const;
-
-            //- Returns the variable ID given the cellID or boundary face ID
-            //  Returns -1 for invalid IDs
-            //  See note in above findOldVariableID
-            label findNewVariableID(const label cellOrBFaceID) const;
-
-            //- Return map from old variable IDs to new variable IDs
-            const labelList& oldToNewAddressing() const;
 
             //- Add the given fvVectorMatrix to the given block matrix and block
             //  source

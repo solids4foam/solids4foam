@@ -35,6 +35,8 @@ License
 #include "BlockFvmDivSigma.H"
 #include "linearElastic.H"
 
+#include "blockFixedDisplacementZeroShearFvPatchVectorField.H"
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -829,6 +831,36 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
 
     // Update gradient of displacement
     volToPoint_.interpolate(D_, pointD_);
+
+    // Enforce zero normal displacement on symmetry
+    // Todo: we should create a blockSymmetry boundary condition
+    pointField& pointDI = pointD_.internalField();
+    forAll(mesh().boundaryMesh(), patchI)
+    {
+        if
+        (
+            D_.boundaryField()[patchI].type()
+         == blockFixedDisplacementZeroShearFvPatchVectorField::typeName
+        )
+        {
+            WarningIn("coupledUnsLinGeomLinearElasticSolid::evolve()")
+                << "Setting the normal displacement on patch "
+                << mesh().boundaryMesh()[patchI].name() << " to zero" << endl;
+
+            const labelList& meshPoints =
+                mesh().boundaryMesh()[patchI].meshPoints();
+            const vectorField& pointNormals =
+                mesh().boundaryMesh()[patchI].pointNormals();
+
+            // Remove normal component
+            forAll(meshPoints, pI)
+            {
+                const label pointID = meshPoints[pI];
+                pointDI[pointID] =
+                    ((I - sqr(pointNormals[pI])) & pointDI[pointID]);
+            }
+        }
+    }
     gradD_ = fvc::grad(D_, pointD_);
 
     // We will call fvc::grad a second time as fixed displacement boundaries

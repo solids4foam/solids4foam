@@ -46,7 +46,7 @@ blockFixedDisplacementZeroShearFvPatchVectorField
 :
     fixedValueFvPatchVectorField(p, iF),
     blockFvPatchVectorField(),
-    timeSeries_()
+    dispSeries_()
 {}
 
 
@@ -61,7 +61,7 @@ blockFixedDisplacementZeroShearFvPatchVectorField
 :
     fixedValueFvPatchVectorField(ptf, p, iF, mapper),
     blockFvPatchVectorField(),
-    timeSeries_(ptf.timeSeries_)
+    dispSeries_(ptf.dispSeries_)
 {}
 
 
@@ -75,7 +75,7 @@ blockFixedDisplacementZeroShearFvPatchVectorField
 :
     fixedValueFvPatchVectorField(p, iF, dict),
     blockFvPatchVectorField(),
-    timeSeries_()
+    dispSeries_()
 {
     fvPatchVectorField::operator=(patchInternalField());
 
@@ -88,7 +88,7 @@ blockFixedDisplacementZeroShearFvPatchVectorField
     if (dict.found("displacementSeries"))
     {
         Info<< "    displacement is time-varying" << endl;
-        timeSeries_ =
+        dispSeries_ =
             interpolationTable<vector>(dict.subDict("displacementSeries"));
     }
 }
@@ -102,7 +102,7 @@ blockFixedDisplacementZeroShearFvPatchVectorField
 :
     fixedValueFvPatchVectorField(ptf),
     blockFvPatchVectorField(),
-    timeSeries_(ptf.timeSeries_)
+    dispSeries_(ptf.dispSeries_)
 {}
 
 
@@ -115,7 +115,7 @@ blockFixedDisplacementZeroShearFvPatchVectorField
 :
     fixedValueFvPatchVectorField(ptf, iF),
     blockFvPatchVectorField(),
-    timeSeries_(ptf.timeSeries_)
+    dispSeries_(ptf.dispSeries_)
 {}
 
 
@@ -171,9 +171,9 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
 {
     // Update displacement if time-varying
     vectorField disp = *this;
-    if (timeSeries_.size())
+    if (dispSeries_.size())
     {
-        disp = timeSeries_(this->db().time().timeOutputValue());
+        disp = dispSeries_(this->db().time().timeOutputValue());
     }
 
     // Const reference to polyPatch and the fvMesh
@@ -479,8 +479,8 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                         // Remove coeff in fixed direction
                         coeff = (coeff & (I - sePointFixedDir));
 
-                        // Add explicitly to the source: todo below
-                        //blockB += coeff & pointFixedComp(sePointID);
+                        // Add explicitly to the source
+                        blockB += coeff & pointFixedComp[sePointID];
                     }
 
                     // Add coeff contribution to cellI from
@@ -586,8 +586,8 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                         // Remove coeff in fixed direction
                         coeff = (coeff & (I - sePointFixedDir));
 
-                        // Add explicitly to the source: todo below
-                        //blockB += coeff & pointFixedComp(sePointID);
+                        // Add explicitly to the source
+                        blockB += coeff & pointFixedComp[sePointID];
                     }
 
                     // Add coeff contribution to the upper of cellI from
@@ -742,8 +742,8 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                         // Remove coeff in fixed direction
                         coeff = (coeff & (I - sePointFixedDir));
 
-                        // Add explicitly to the source: todo below
-                        //blockB += coeff & pointFixedComp(sePointID);
+                        // Add explicitly to the source
+                        blockB += coeff & pointFixedComp[sePointID];
                     }
 
                     // Add coeff contribution to globalCoeff
@@ -819,8 +819,8 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                             // Remove coeff in fixed direction
                             coeff = (coeff & (I - sePointFixedDir));
 
-                            // Add explicitly to the source: todo below
-                            //blockB += coeff & pointFixedComp(sePointID);
+                            // Add explicitly to the source
+                            blockB += coeff & pointFixedComp[sePointID];
                         }
 
                         // Add coeff contribution to globalCoeff
@@ -898,8 +898,8 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                             // Remove coeff in fixed direction
                             coeff = (coeff & (I - sePointFixedDir));
 
-                            // Add explicitly to the source: todo below
-                            //blockB += coeff & pointFixedComp(sePointID);
+                            // Add explicitly to the source
+                            blockB += coeff & pointFixedComp[sePointID];
                         }
 
                         // Add coeff contribution to globalCoeff
@@ -980,8 +980,8 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                             // Remove coeff in fixed direction
                             coeff = (coeff & (I - sePointFixedDir));
 
-                            // Add explicitly to the source: todo below
-                            //blockB += coeff & pointFixedComp(sePointID);
+                            // Add explicitly to the source
+                            blockB += coeff & pointFixedComp[sePointID];
                         }
 
                         // Add coeff contribution to globalCoeff
@@ -1058,8 +1058,8 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                             // Remove coeff in fixed direction
                             coeff = (coeff & (I - sePointFixedDir));
 
-                            // Add explicitly to the source: todo below
-                            //blockB += coeff & pointFixedComp(sePointID);
+                            // Add explicitly to the source
+                            blockB += coeff & pointFixedComp[sePointID];
                         }
 
                         // Add coeff contribution to globalCoeff
@@ -1077,32 +1077,40 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
         // force normal
 
         // We will use the first cell
-        const scalar scaleFac = (d[0].xx() + d[0].yy() + d[0].zz())/3.0;
-
-        if (mag(scaleFac) < SMALL)
-        {
-            FatalErrorIn("pointGaussLsDivSigmaScheme::insertCoeffBc")
-                << "blockFixedDisplacementZeroShear scaleFac is zero"
-                    << abort(FatalError);
-        }
+        //const scalar scaleFac = (d[0].xx() + d[0].yy() + d[0].zz())/3.0;
+        // if (mag(scaleFac) < SMALL)
+        // {
+        //     FatalErrorIn("pointGaussLsDivSigmaScheme::insertCoeffBc")
+        //         << "blockFixedDisplacementZeroShear scaleFac is zero"
+        //         << abort(FatalError);
+        // }
 
         // Diagonal contribution for the boundary face
         // d[varI] += tensor(scaleFac*I);
 
-        d[varI] = scaleFac*sqr(faceN) + (d[varI] & (I - sqr(faceN)));
+        //d[varI] = scaleFac*sqr(faceN) + (d[varI] & (I - sqr(faceN)));
+        d[varI] = sqr(faceN) + (d[varI] & (I - sqr(faceN)));
         //d[varI] = scaleFac*sqr(faceN) + ((I - sqr(faceN)) & d[varI]);
 
         // Source contribution
         // This is the only difference with a symmetry plane: we force a
         // non-zero normal dislacement
-        blockB[varI] += scaleFac*(sqr(faceN) & disp[faceI]);
-    } // forAll faces of the patch
+        //blockB[varI] += scaleFac*(sqr(faceN) & disp[faceI]);
+        blockB[varI] += (sqr(faceN) & disp[faceI]);
+    }
 }
 
 
 void blockFixedDisplacementZeroShearFvPatchVectorField::write(Ostream& os) const
 {
-    timeSeries_.write(os);
+    if (dispSeries_.size())
+    {
+        os.writeKeyword("displacementSeries") << nl;
+        os << token::BEGIN_BLOCK << nl;
+        dispSeries_.write(os);
+        os << token::END_BLOCK << nl;
+    }
+
     fixedValueFvPatchVectorField::write(os);
 }
 

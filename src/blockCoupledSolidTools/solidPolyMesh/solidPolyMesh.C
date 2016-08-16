@@ -1572,8 +1572,8 @@ label solidPolyMesh::findFaceFaceImplicitBond
     const label secondOffset = mesh.nCells() - nIntFaces - secondPreEmptyFaces;
     const label firstID = firstFaceID + firstOffset;
     const label secondID = secondFaceID + secondOffset;
-    const label firstBFaceID = firstFaceID - nIntFaces;
-    const label secondBFaceID = secondFaceID - nIntFaces;
+    const label firstBFaceID = firstFaceID - nIntFaces - firstPreEmptyFaces;
+    const label secondBFaceID = secondFaceID - nIntFaces - secondPreEmptyFaces;
 
     // We will loop through all boundary implicit bonds of curFace until we
     // find the edge which connects the curFace and otherFace

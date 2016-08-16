@@ -626,8 +626,8 @@ void blockSolidTractionFvPatchVectorField::insertBlockCoeffs
                         // Remove coeff in fixed direction
                         coeff = (coeff & (I - sePointFixedDir));
 
-                        // Add explicitly to the source: todo below
-                        //blockB += coeff & pointFixedComp(sePointID);
+                        // Add explicitly to the source
+                        blockB += coeff & pointFixedComp[sePointID];
                     }
 
                     // Add coeff contribution to cellI from
@@ -734,8 +734,8 @@ void blockSolidTractionFvPatchVectorField::insertBlockCoeffs
                         // Remove coeff in fixed direction
                         coeff = (coeff & (I - sePointFixedDir));
 
-                        // Add explicitly to the source: todo below
-                        //blockB += coeff & pointFixedComp(sePointID);
+                        // Add explicitly to the source
+                        blockB += coeff & pointFixedComp[sePointID];
                     }
 
                     // Add coeff contribution to the upper of cellI from
@@ -887,6 +887,16 @@ void blockSolidTractionFvPatchVectorField::insertBlockCoeffs
                         coeff += transform(sePointMirr.second(), coeff);
                     }
 
+                    // Check if the point has a fixed component
+                    if (pointHasFixedComp)
+                    {
+                        // Remove coeff in fixed direction
+                        coeff = (coeff & (I - sePointFixedDir));
+
+                        // Add explicitly to the source
+                        blockB += coeff & pointFixedComp[sePointID];
+                    }
+
                     // Add coeff contribution to globalCoeff
                     pointProcFacesCoeffs[varI][sePointID][i] -= coeff;
 
@@ -950,6 +960,16 @@ void blockSolidTractionFvPatchVectorField::insertBlockCoeffs
                         {
                             coeff +=
                                 transform(sePointMirr.second(), coeff);
+                        }
+
+                        // Check if the point has a fixed component
+                        if (pointHasFixedComp)
+                        {
+                            // Remove coeff in fixed direction
+                            coeff = (coeff & (I - sePointFixedDir));
+
+                            // Add explicitly to the source
+                            blockB += coeff & pointFixedComp[sePointID];
                         }
 
                         // Add coeff contribution to globalCoeff
@@ -1017,6 +1037,16 @@ void blockSolidTractionFvPatchVectorField::insertBlockCoeffs
                         {
                             coeff +=
                                 transform(sePointMirr.second(), coeff);
+                        }
+
+                        // Check if the point has a fixed component
+                        if (pointHasFixedComp)
+                        {
+                            // Remove coeff in fixed direction
+                            coeff = (coeff & (I - sePointFixedDir));
+
+                            // Add explicitly to the source
+                            blockB += coeff & pointFixedComp[sePointID];
                         }
 
                         // Add coeff contribution to globalCoeff
@@ -1089,6 +1119,16 @@ void blockSolidTractionFvPatchVectorField::insertBlockCoeffs
                                 transform(sePointMirr.second(), coeff);
                         }
 
+                        // Check if the point has a fixed component
+                        if (pointHasFixedComp)
+                        {
+                            // Remove coeff in fixed direction
+                            coeff = (coeff & (I - sePointFixedDir));
+
+                            // Add explicitly to the source
+                            blockB += coeff & pointFixedComp[sePointID];
+                        }
+
                         // Add coeff contribution to globalCoeff
                         pointProcCellsCoeffs[varI][sePointID][i] -=
                             coeff;
@@ -1155,6 +1195,16 @@ void blockSolidTractionFvPatchVectorField::insertBlockCoeffs
                                 transform(sePointMirr.second(), coeff);
                         }
 
+                        // Check if the point has a fixed component
+                        if (pointHasFixedComp)
+                        {
+                            // Remove coeff in fixed direction
+                            coeff = (coeff & (I - sePointFixedDir));
+
+                            // Add explicitly to the source
+                            blockB += coeff & pointFixedComp[sePointID];
+                        }
+
                         // Add coeff contribution to globalCoeff
                         pointProcBndFacesCoeffs[varI][sePointID][i] -=
                             coeff;
@@ -1170,9 +1220,31 @@ void blockSolidTractionFvPatchVectorField::insertBlockCoeffs
 
 void blockSolidTractionFvPatchVectorField::write(Ostream& os) const
 {
-    traction_.writeEntry("traction", os);
-    pressure_.writeEntry("pressure", os);
     fixedValueFvPatchVectorField::write(os);
+
+    if (tractionSeries_.size())
+    {
+        os.writeKeyword("tractionSeries") << nl;
+        os << token::BEGIN_BLOCK << nl;
+        tractionSeries_.write(os);
+        os << token::END_BLOCK << nl;
+    }
+    else
+    {
+        traction_.writeEntry("traction", os);
+    }
+
+    if (pressureSeries_.size())
+    {
+        os.writeKeyword("pressureSeries") << nl;
+        os << token::BEGIN_BLOCK << nl;
+        pressureSeries_.write(os);
+        os << token::END_BLOCK << nl;
+    }
+    else
+    {
+        pressure_.writeEntry("pressure", os);
+    }
 }
 
 
