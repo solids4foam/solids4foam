@@ -183,18 +183,6 @@ public:
                 return mechanical_;
             }
 
-            //- Return point displacement field
-            //virtual const pointVectorField& pointD() const = 0;
-
-            //- Return point velocity field
-            // virtual vector pointU(label pointID) const = 0;
-
-            //- Patch point displacement increment
-            virtual tmp<vectorField> patchPointDisplacementIncrement
-            (
-               const label patchID
-            ) const = 0;
-
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (

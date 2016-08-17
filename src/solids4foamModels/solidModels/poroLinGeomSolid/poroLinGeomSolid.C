@@ -323,32 +323,6 @@ poroLinGeomSolid::poroLinGeomSolid(dynamicFvMesh& mesh)
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-//- Patch point displacement
-tmp<vectorField> poroLinGeomSolid::patchPointDisplacementIncrement
-(
-    const label patchID
-) const
-{
-    tmp<vectorField> tPointDisplacement
-    (
-        new vectorField
-        (
-            mesh().boundaryMesh()[patchID].localPoints().size(),
-            vector::zero
-        )
-    );
-
-    tPointDisplacement() =
-        vectorField
-        (
-            pointD_.internalField() - pointD_.oldTime().internalField(),
-            mesh().boundaryMesh()[patchID].meshPoints()
-        );
-
-    return tPointDisplacement;
-}
-
-
 tmp<vectorField> poroLinGeomSolid::faceZonePointDisplacementIncrement
 (
     const label zoneID

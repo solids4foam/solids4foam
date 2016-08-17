@@ -250,15 +250,6 @@ public:
                 return volToPoint_;
             }
 
-            //- Return point displacement field
-            //virtual vector pointU(label pointID) const;
-
-            //- Patch point displacement increment
-            virtual tmp<vectorField> patchPointDisplacementIncrement
-            (
-                const label patchID
-            ) const;
-
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (

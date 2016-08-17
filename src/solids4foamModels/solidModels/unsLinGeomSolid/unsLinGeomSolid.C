@@ -299,52 +299,6 @@ unsLinGeomSolid::unsLinGeomSolid(dynamicFvMesh& mesh)
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-// vector unsLinGeomSolid::pointU(label pointID) const
-// {
-//     pointVectorField pointU
-//     (
-//         IOobject
-//         (
-//             "pointU",
-//             runTime().timeName(),
-//             mesh(),
-//             IOobject::NO_READ,
-//             IOobject::NO_WRITE
-//         ),
-//         pMesh_,
-//         dimensionedVector("0", dimVelocity, vector::zero)
-//     );
-
-//     volToPoint_.interpolate(U_, pointU);
-
-//     return pointU.internalField()[pointID];
-// }
-
-//- Patch point displacement
-tmp<vectorField> unsLinGeomSolid::patchPointDisplacementIncrement
-(
-    const label patchID
-) const
-{
-    tmp<vectorField> tPointDisplacement
-    (
-        new vectorField
-        (
-            mesh().boundaryMesh()[patchID].localPoints().size(),
-            vector::zero
-        )
-    );
-
-    tPointDisplacement() =
-        vectorField
-        (
-            pointD_.internalField() - pointD_.oldTime().internalField(),
-            mesh().boundaryMesh()[patchID].meshPoints()
-        );
-
-    return tPointDisplacement;
-}
-
 
 tmp<vectorField> unsLinGeomSolid::faceZonePointDisplacementIncrement
 (

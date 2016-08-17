@@ -252,7 +252,7 @@ Foam::solidForces::solidForces
                 (
                     new OFstream
                     (
-                        historyDir/"solidForces"+historyPatchName + ".dat"
+                        historyDir/"solidForces" + historyPatchName + ".dat"
                     )
                 );
 

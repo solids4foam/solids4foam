@@ -239,7 +239,14 @@ Foam::solidForcesDisplacements::solidForcesDisplacements
             mkDir(historyDir);
 
             // Open new file at start up
-            historyFilePtr_.reset(new OFstream(historyDir/"history.dat"));
+            historyFilePtr_.reset
+            (
+                new OFstream
+                (
+                    historyDir/"solidForcesDisplacements"
+                  + historyPatchName + ".dat"
+                )
+            );
 
             // Add headers to output data
             if (historyFilePtr_.valid())
