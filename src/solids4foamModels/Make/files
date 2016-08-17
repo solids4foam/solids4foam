@@ -66,6 +66,10 @@ $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocit
 $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarField.C
 
 functionObjects/setInletVelocity/setInletVelocity.C
+functionObjects/solidForces/solidForces.C
+functionObjects/solidForcesDisplacements/solidForcesDisplacements.C
+functionObjects/solidDisplacements/solidDisplacements.C
+functionObjects/hydrostaticPressure/hydrostaticPressure.C
 
 dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
 dynamicFvMesh/crackerFvMesh/crackerFvMesh.C
@@ -112,11 +116,7 @@ numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newSkewCorrectedSnGrad/newSkewCorrectedSnGrads.C
 
 /*
-functionObjects/forceDisp/forceDisp.C
-functionObjects/hydrostaticPressure/hydrostaticPressure.C
 functionObjects/principalStresses/principalStresses.C
-functionObjects/solidDisp/solidDisp.C
-functionObjects/solidForces/solidForces.C
 functionObjects/solidPointStress/solidPointStress.C
 functionObjects/solidStress/solidStress.C
 functionObjects/solidTractions/solidTractions.C
