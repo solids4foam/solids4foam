@@ -203,6 +203,10 @@ public:
             const vectorField& masterDUInterpToSlave
         ) = 0;
 
+        //- It is the start of a new time step
+        virtual void newTimeStep() const
+        {}
+
         //- Return slave friction traction
         virtual const vectorField& slaveTraction() const = 0;
 

@@ -206,6 +206,10 @@ public:
             const extendedGgiStandAlonePatchInterpolation& zoneToZone
         ) = 0;
 
+        //- It is the start of a new time step
+        virtual void newTimeStep() const
+        {}
+
         //- Return slave pressure
         virtual const vectorField& slavePressure() const = 0;
 

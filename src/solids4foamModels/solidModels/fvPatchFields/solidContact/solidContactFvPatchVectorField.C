@@ -1092,14 +1092,10 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
         // Update old quantities at the start of a new time-step
         curTimeIndex_ = this->db().time().timeIndex();
 
-        // Update penalty factor
-        // PC: we should define a "newTimeStep" function and then the contact
-        // law can do whatever it likes
         // Let the contact models know that it is a new time-step, in case they
         // need to update anything
-        // TO BE DEFINED in normal and friction model
-        //normalModel().newTimeStep();
-        //frictionModel().newTimeStep();
+        normalModel().newTimeStep();
+        frictionModel().newTimeStep();
     }
 
     // Move the master and slave zone to the deformed configuration
@@ -1132,7 +1128,11 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
         // it required by the friction model
 
         vectorField patchDD(patch().size(), vector::zero);
-        vectorField shadowPatchDD(patch().size(), vector::zero);
+        vectorField shadowPatchDD
+        (
+            patch().boundaryMesh()[shadowPatchIndex()].size(),
+            vector::zero
+        );
 
         if (movingMesh())
         {

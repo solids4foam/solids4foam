@@ -722,7 +722,7 @@ bool linGeomSolid::evolve()
         D_.relax();
 
         // Update gradient of displacement
-        gradD_ = fvc::grad(D_);
+        mechanical().grad(gradD_, D_);
 
         // Update the strain
         epsilon_ = symm(gradD_);

@@ -176,6 +176,12 @@ public:
             //- Calculate the stress surfaceField
             void correct(surfaceSymmTensorField& sigma);
 
+            //- Update the gradient of displacement
+            void grad
+            (
+                volTensorField& gradD, const volVectorField& D
+            ) const;
+
             //- Update total accumulated fields
             void updateTotalFields();
 

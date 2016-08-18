@@ -26,6 +26,9 @@ License
 #include "mechanicalModel.H"
 #include "ZoneID.H"
 
+// WIP
+#include "fvc.H"
+#include "gaussGrad.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -545,6 +548,12 @@ void Foam::mechanicalModel::correct(surfaceSymmTensorField& sigma)
     }
     else
     {
+        // Reset sigma before performing the accumulatation as interface values
+        // will be added for each material
+        // This is not necessary for volFields as they store no value on the
+        // interface
+        sigma = dimensionedSymmTensor("zero", dimPressure, symmTensor::zero);
+
         // Accumulate data for all fields
         forAll(laws, lawI)
         {
@@ -556,6 +565,76 @@ void Foam::mechanicalModel::correct(surfaceSymmTensorField& sigma)
                 lawI, subMeshSigmaf()[lawI], sigma
             );
         }
+    }
+}
+
+
+void Foam::mechanicalModel::grad
+(
+    volTensorField& gradD,
+    const volVectorField& D
+) const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        gradD = fvc::grad(D);
+    }
+    else
+    {
+        // Accumulate data for all fields
+        forAll(laws, lawI)
+        {
+            // Map the base displacement field to the subMesh
+            volVectorField subMeshD = subMeshes()[lawI].interpolate(D);
+
+            // Calculate gradient on subMesh
+            volTensorField subMeshGradD = fvc::grad(subMeshD);
+
+            // Iteratively extrapolate D to the interface patch
+            int i = 0;
+            do
+            {
+                forAll(subMeshD.boundaryField(), patchI)
+                {
+                    if (subMeshes()[lawI].patchMap()[patchI] == -1)
+                    {
+                        subMeshD.boundaryField()[patchI] =
+                            subMeshD.boundaryField()
+                            [
+                                patchI
+                            ].patchInternalField()
+                          + (
+                                subMeshGradD.boundaryField()
+                                [
+                                    patchI
+                                ].patchInternalField()
+                              & subMeshes()[lawI].subMesh().boundary()
+                                [
+                                    patchI
+                                ].delta()
+                              );
+                    }
+                }
+
+                // Re-calculate gradient
+                subMeshGradD = fvc::grad(subMeshD);
+
+            } while (++i < 2);
+
+            // Map subMesh gradD to the base gradient field
+            mapSubMeshVolField<tensor>
+            (
+                lawI, subMeshGradD, gradD
+            );
+        }
+
+        // Correct boundary snGrad
+        fv::gaussGrad<vector>
+        (
+            mesh()
+        ).correctBoundaryConditions(D, gradD);
     }
 }
 

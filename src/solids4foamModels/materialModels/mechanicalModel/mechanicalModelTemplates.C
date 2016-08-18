@@ -78,36 +78,6 @@ void Foam::mechanicalModel::mapSubMeshVolField
                 }
             }
         }
-        else // interface faces shared by two materials
-        {
-            forAll(subMeshFieldP, faceI)
-            {
-                const label globalGlobalMeshFace = faceMap[start + faceI];
-
-                if (globalGlobalMeshFace < mesh().nInternalFaces())
-                {
-                    // Face value will be the average from both sides
-                    baseMeshField[globalGlobalMeshFace] +=
-                        0.5*subMeshFieldP[faceI];
-                }
-                else
-                {
-                    FatalErrorIn
-                    (
-                        "template<class Type>\n"
-                        "void Foam::mechanicalModel::mapSubMeshField<Type> "
-                        "subMeshes\n"
-                        "(\n"
-                        "    const label meshI,\n"
-                        "    const GeometricField<Type, fvPatchField, volMesh>&"
-                        " subMeshField,\n"
-                        "    GeometricField<Type, fvPatchField, volMesh>& "
-                        "baseMeshField\n"
-                        ") const\n"
-                    )   << "What do we do with this face?" << abort(FatalError);
-                }
-            }
-        }
     }
 
     baseMeshField.correctBoundaryConditions();
