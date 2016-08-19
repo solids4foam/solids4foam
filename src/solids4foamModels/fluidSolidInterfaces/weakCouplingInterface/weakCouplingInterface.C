@@ -25,13 +25,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "weakCouplingInterface.H"
-// #include "volFields.H"
-// #include "fvm.H"
-// #include "fvc.H"
-// #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
-//#include "adjustPhi.H"
-//#include "findRefCell.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -64,7 +58,11 @@ weakCouplingInterface::weakCouplingInterface
     fluidSolidInterface(typeName, fluidMesh, solidMesh),
     solidZoneTraction_(),
     solidZoneTractionPrev_(),
-    predictedSolidZoneTraction_()
+    predictedSolidZoneTraction_(),
+    relaxationFactor_
+    (
+        fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
+    )
 {
     // Initialize zone traction fields
     solidZoneTraction_ =
@@ -84,6 +82,26 @@ weakCouplingInterface::weakCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+void weakCouplingInterface::evolve()
+{
+    initializeFields();
+
+    updateInterpolator();
+
+    solid().evolve();
+
+    updateWeakDisplacement();
+
+    moveFluidMesh();
+
+    fluid().evolve();
+
+    updateWeakTraction();
+
+    solid().updateTotalFields();
+}
+
+
 void weakCouplingInterface::initializeFields()
 {
     predictedSolidZoneTraction_ =
@@ -97,7 +115,7 @@ void weakCouplingInterface::initializeFields()
 }
 
 
-void weakCouplingInterface::updateDisplacement()
+void weakCouplingInterface::updateWeakDisplacement()
 {
     vectorField solidZonePointsDisplAtSolid =
         solid().faceZonePointDisplacementIncrement(solidZoneIndex());
@@ -120,12 +138,12 @@ void weakCouplingInterface::updateDisplacement()
     // calculated on master processor
     if (Pstream::parRun())
     {
-        if (!Pstream::master())
+        if(!Pstream::master())
         {
             fluidZonePointsDispl() *= 0.0;
         }
 
-        // Pass to all procs
+        //- pass to all procs
         reduce(fluidZonePointsDispl(), sumOp<vectorField>());
 
         label globalFluidZoneIndex =
@@ -135,7 +153,7 @@ void weakCouplingInterface::updateDisplacement()
         {
             FatalErrorIn
             (
-                type() + "::updateDisplacement()"
+                "void weakCouplingInterface::updateWeakDisplacement()"
             )   << "global zone point map is not available"
                 << abort(FatalError);
         }
@@ -160,109 +178,88 @@ void weakCouplingInterface::updateDisplacement()
 }
 
 
-void weakCouplingInterface::updateForce()
+void weakCouplingInterface::updateWeakTraction()
 {
-    if (coupled())
+    Info<< "Update weak traction on solid patch" << endl;
+
+    solidZoneTractionPrev_ = solidZoneTraction_;
+
+    // Calc fluid traction
+
+    const vectorField& p =
+        fluidMesh().faceZones()[fluidZoneIndex()]().localPoints();
+    const faceList& f =
+        fluidMesh().faceZones()[fluidZoneIndex()]().localFaces();
+
+    vectorField n(f.size(), vector::zero);
+    forAll(n, faceI)
     {
-        Info<< "Setting weak traction on solid patch" << endl;
+        n[faceI] = f[faceI].normal(p);
+        n[faceI] /= mag(n[faceI]);
+    }
 
-        predictedSolidZoneTraction_ =
-            2*solidZoneTraction_ - solidZoneTractionPrev_;
-
-        solid().setTraction
+    vectorField fluidZoneTraction =
+        fluid().faceZoneViscousForce
         (
-            solidPatchIndex(),
-            solidZoneIndex(),
-            predictedSolidZoneTraction_
+            fluidZoneIndex(),
+            fluidPatchIndex()
+        )
+      - fluid().faceZonePressureForce(fluidZoneIndex(), fluidPatchIndex())*n;
+
+    vectorField fluidZoneTractionAtSolid =
+        ggiInterpolator().masterToSlave
+        (
+            -fluidZoneTraction
         );
+
+    solidZoneTraction_ =
+        relaxationFactor_*fluidZoneTractionAtSolid
+      + (1.0 - relaxationFactor_)*predictedSolidZoneTraction_;
+
+
+    // Total force at the fluid side of the interface
+    {
+        const vectorField& p =
+            fluidMesh().faceZones()[fluidZoneIndex()]().localPoints();
+
+        const faceList& f =
+            fluidMesh().faceZones()[fluidZoneIndex()]().localFaces();
+
+        vectorField S(f.size(), vector::zero);
+
+        forAll(S, faceI)
+        {
+            S[faceI] = f[faceI].normal(p);
+        }
+
+        vector totalTractionForce = sum(fluidZoneTraction*mag(S));
+
+        Info<< "Total force (fluid) = "
+            << totalTractionForce << endl;
+    }
+
+    // Total force at the solid side of the interface
+    {
+        const vectorField& p =
+            solidMesh().faceZones()[solidZoneIndex()]().localPoints();
+
+        const faceList& f =
+            solidMesh().faceZones()[solidZoneIndex()]().localFaces();
+
+        vectorField S(f.size(), vector::zero);
+
+        forAll(S, faceI)
+        {
+            S[faceI] = f[faceI].normal(p);
+        }
+
+        vector totalTractionForce =
+            sum(fluidZoneTractionAtSolid*mag(S));
+
+        Info<< "Total force (solid) = "
+            << totalTractionForce << endl;
     }
 }
-
-
-// void weakCouplingInterface::updateWeakTraction()
-// {
-//     Info<< "Update weak traction on solid patch" << endl;
-
-//     solidZoneTractionPrev_ = solidZoneTraction_;
-
-//     // Calc fluid traction
-
-//     const vectorField& p =
-//         fluidMesh().faceZones()[fluidZoneIndex_]().localPoints();
-//     const faceList& f =
-//         fluidMesh().faceZones()[fluidZoneIndex_]().localFaces();
-
-//     vectorField n(f.size(), vector::zero);
-//     forAll(n, faceI)
-//     {
-//         n[faceI] = f[faceI].normal(p);
-//         n[faceI] /= mag(n[faceI]);
-//     }
-
-//     vectorField fluidZoneTraction =
-//         fluid().faceZoneViscousForce
-//         (
-//             fluidZoneIndex(),
-//             fluidPatchIndex()
-//         )
-//       - fluid().faceZonePressureForce(fluidZoneIndex(), fluidPatchIndex())*n;
-
-//     vectorField fluidZoneTractionAtSolid =
-//         ggiInterpolator().masterToSlave
-//         (
-//             -fluidZoneTraction
-//         );
-
-//     scalar beta_ = relaxationFactor_;
-
-//     solidZoneTraction_ =
-//         beta_*fluidZoneTractionAtSolid
-//       + (1.0-beta_)*predictedSolidZoneTraction_;
-
-
-//     // Total force at the fluid side of the interface
-//     {
-//         const vectorField& p =
-//             fluidMesh().faceZones()[fluidZoneIndex_]().localPoints();
-
-//         const faceList& f =
-//             fluidMesh().faceZones()[fluidZoneIndex_]().localFaces();
-
-//         vectorField S(f.size(), vector::zero);
-
-//         forAll(S, faceI)
-//         {
-//             S[faceI] = f[faceI].normal(p);
-//         }
-
-//         vector totalTractionForce = sum(fluidZoneTraction*mag(S));
-
-//         Info<< "Total force (fluid) = "
-//             << totalTractionForce << endl;
-//     }
-
-//     // Total force at the solid side of the interface
-//     {
-//         const vectorField& p =
-//             solidMesh().faceZones()[solidZoneIndex_]().localPoints();
-
-//         const faceList& f =
-//             solidMesh().faceZones()[solidZoneIndex_]().localFaces();
-
-//         vectorField S(f.size(), vector::zero);
-
-//         forAll(S, faceI)
-//         {
-//             S[faceI] = f[faceI].normal(p);
-//         }
-
-//         vector totalTractionForce =
-//             sum(fluidZoneTractionAtSolid*mag(S));
-
-//         Info<< "Total force (solid) = "
-//             << totalTractionForce << endl;
-//     }
-// }
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

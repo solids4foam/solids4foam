@@ -27,12 +27,6 @@ License
 #include "IQNILSCouplingInterface.H"
 #include "addToRunTimeSelectionTable.H"
 #include "RectangularMatrix.H"
-// #include "volFields.H"
-// #include "fvm.H"
-// #include "fvc.H"
-// #include "fvMatrices.H"
-//#include "adjustPhi.H"
-//#include "findRefCell.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -79,6 +73,42 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
 {}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void IQNILSCouplingInterface::evolve()
+{
+    initializeFields();
+
+    updateInterpolator();
+
+    scalar residualNorm = 0;
+
+    do
+    {
+        outerCorr()++;
+
+        // Transfer the displacement from the solid to the fluid
+        updateDisplacement();
+
+        // Move the fluid mesh
+        moveFluidMesh();
+
+        // Solve fluid
+        fluid().evolve();
+
+        // Transfer the force from the fluid to the solid
+        updateForce();
+
+        // Solve solid
+        solid().evolve();
+
+        // Calculate the FSI residual
+        residualNorm = updateResidual();
+    }
+    while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
+
+    solid().updateTotalFields();
+}
+
 
 void IQNILSCouplingInterface::updateDisplacement()
 {

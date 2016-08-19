@@ -419,17 +419,17 @@ public:
 
         // Edit
 
+            //- Evolve the interface
+            virtual void evolve() = 0;
+
             //- Initialize fields
             virtual void initializeFields();
 
             //- Update interpolator
-            void updateInterpolator();
-
-            //- Calculate interface displacement
-            virtual void updateDisplacement() = 0;
+            virtual void updateInterpolator();
 
             //- Move fluid mesh
-            void moveFluidMesh();
+            virtual void moveFluidMesh();
 
             //- Update interface force
             virtual void updateForce();

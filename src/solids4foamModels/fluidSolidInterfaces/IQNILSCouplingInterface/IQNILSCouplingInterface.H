@@ -46,8 +46,6 @@ SourceFiles
 #define IQNILSCouplingInterface_H
 
 #include "fluidSolidInterface.H"
-//#include "volFields.H"
-//#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -120,6 +118,9 @@ public:
     // Member Functions
 
         // Edit
+
+            //- Evolve the interface
+            virtual void evolve();
 
             //- Calculate interface displacement
             virtual void updateDisplacement();

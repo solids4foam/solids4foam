@@ -41,8 +41,6 @@ SourceFiles
 #define fixedRelaxationCouplingInterface_H
 
 #include "fluidSolidInterface.H"
-//#include "volFields.H"
-//#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -102,10 +100,10 @@ public:
 
     // Member Functions
 
-        // Access
-
-
         // Edit
+
+            //- Evolve the interface
+            virtual void evolve();
 
             //- Calculate interface displacement
             virtual void updateDisplacement();

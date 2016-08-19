@@ -61,41 +61,8 @@ int main(int argc, char *argv[])
     {
         Info<< "Time = " << runTime.timeName() << nl << endl;
 
-        fsi().initializeFields();
-
-        fsi().updateInterpolator();
-
-        scalar residualNorm = 0;
-
-        do
-        {
-            fsi().outerCorr()++;
-
-            // Transfer the displacement from the solid to the fluid
-            fsi().updateDisplacement();
-
-            // Move the fluid mesh
-            fsi().moveFluidMesh();
-
-            // Solve fluid
-            fsi().fluid().evolve();
-
-            // Transfer the force from the fluid to the solid
-            fsi().updateForce();
-
-            // Solve solid
-            fsi().solid().evolve();
-
-            // Calculate the FSI residual
-            residualNorm = fsi().updateResidual();
-        }
-        while
-        (
-            (residualNorm > fsi().outerCorrTolerance())
-         && (fsi().outerCorr() < fsi().nOuterCorr())
-        );
-
-        fsi().solid().updateTotalFields();
+        // Evolve the fluid-solid interface
+        fsi().evolve();
 
         if (runTime.outputTime())
         {
