@@ -690,7 +690,7 @@ void linGeomSolid::setPressure
 
 bool linGeomSolid::evolve()
 {
-    Info << "Evolving solid solver" << endl;
+    Info<< "Evolving solid solver" << endl;
 
     int iCorr = 0;
     lduMatrix::solverPerformance solverPerfD;
@@ -709,8 +709,12 @@ bool linGeomSolid::evolve()
         (
             rho_*fvm::d2dt2(D_)
          == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
-          + fvc::div(sigma_ - impK_*gradD_, "div(sigma)")
+          - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
+          + fvc::div(sigma_, "div(sigma)")
         );
+
+        // Add Rhie-Chow corrections to quell oscillations
+        DEqn -= mechanical().RhieChowCorrection(D_, gradD_);
 
         // Under-relaxation the linear system
         DEqn.relax(DEqnRelaxFactor_);

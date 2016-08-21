@@ -85,6 +85,22 @@ class mechanicalModel
         //- Stress surfaceField for each mechanical law
         mutable PtrList<surfaceSymmTensorField> subMeshSigmaf_;
 
+        //- Displacement volField for each mechanical law
+        mutable PtrList<volVectorField> subMeshD_;
+
+        //- Index of the subMesh on the other side of a bi-material interface
+        mutable PtrList<labelList> interfaceShadowSubMeshID_;
+
+        //- Index of the subMesh on the other side of a bi-material interface
+        mutable PtrList<labelList> interfaceShadowPatchID_;
+
+        //- Index of the subMesh on the other side of a bi-material interface
+        mutable PtrList<labelList> interfaceShadowFaceID_;
+
+        //- The implicit stiffness surface field for Rhie-Chow correction
+        mutable surfaceScalarField* impKfcorrPtr_;
+
+
     // Private Member Functions
 
         //- Make material sub-meshes
@@ -102,11 +118,45 @@ class mechanicalModel
         //- Return the subMesh sigma volFields
         PtrList<volSymmTensorField>& subMeshSigma();
 
+        //- Return the subMesh sigma volFields
+        const PtrList<volSymmTensorField>& subMeshSigma() const;
+
         //- Calculate the subMesh sigmaf fields
         void calcSubMeshSigmaf() const;
 
         //- Return the subMesh sigma surfaceFields
         PtrList<surfaceSymmTensorField>& subMeshSigmaf();
+
+        //- Return the subMesh sigma surfaceFields
+        const PtrList<surfaceSymmTensorField>& subMeshSigmaf() const;
+
+        //- Calculate the subMesh D fields
+        void calcSubMeshD() const;
+
+        //- Return the subMesh D volFields
+        PtrList<volVectorField>& subMeshD();
+
+        //- Return the subMesh D volFields
+        const PtrList<volVectorField>& subMeshD() const;
+
+        //- Calculate the interface shadow subMesh indices
+        void calcInterfaceShadowIDs() const;
+
+        //- Return the interface shadow subMesh indices
+        const PtrList<labelList>& interfaceShadowSubMeshID() const;
+
+        //- Return the interface shadow patch indices
+        const PtrList<labelList>& interfaceShadowPatchID() const;
+
+        //- Return the interface shadow face indices
+        const PtrList<labelList>& interfaceShadowFaceID() const;
+
+        //- Calculate the impKf field for Rhie-Chow correction
+        //  This field is zero on bi-material interfaces
+        void calcImpKfcorr() const;
+
+        //- Return the implicit stiffness surface field for Rhie-Chow correction
+        const surfaceScalarField& impKfcorr() const;
 
         //- Map a volField from the subMesh to the base mesh
         template<class Type>
@@ -180,6 +230,13 @@ public:
             void grad
             (
                 volTensorField& gradD, const volVectorField& D
+            );
+
+            //- Return explicit Rhie-Chow correction field to quell oscillations
+            tmp<volVectorField> RhieChowCorrection
+            (
+                const volVectorField& D,
+                const volTensorField& gradD
             ) const;
 
             //- Update total accumulated fields

@@ -25,8 +25,6 @@ License
 
 #include "mechanicalModel.H"
 #include "ZoneID.H"
-
-// WIP
 #include "fvc.H"
 #include "gaussGrad.H"
 
@@ -239,6 +237,18 @@ Foam::PtrList<Foam::volSymmTensorField>& Foam::mechanicalModel::subMeshSigma()
 }
 
 
+const Foam::PtrList<Foam::volSymmTensorField>&
+Foam::mechanicalModel::subMeshSigma() const
+{
+    if (subMeshSigma_.empty())
+    {
+        calcSubMeshSigma();
+    }
+
+    return subMeshSigma_;
+}
+
+
 void Foam::mechanicalModel::calcSubMeshSigmaf() const
 {
     if (!subMeshSigmaf_.empty())
@@ -301,6 +311,305 @@ Foam::mechanicalModel::subMeshSigmaf()
 }
 
 
+const Foam::PtrList<Foam::surfaceSymmTensorField>&
+Foam::mechanicalModel::subMeshSigmaf() const
+{
+    if (subMeshSigmaf_.empty())
+    {
+        calcSubMeshSigmaf();
+    }
+
+    return subMeshSigmaf_;
+}
+
+
+void Foam::mechanicalModel::calcSubMeshD() const
+{
+    if (!subMeshD_.empty())
+    {
+        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshD() const")
+            << "pointer list already set" << abort(FatalError);
+    }
+
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        // Sub-meshes should not be defined if there is only one material
+        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshD() const")
+            << "There should be no need for subMeshes when there is only one "
+            << "material" << abort(FatalError);
+    }
+
+    subMeshD_.setSize(laws.size());
+
+    const PtrList<fvMeshSubset>& subMeshes = this->subMeshes();
+
+    forAll(laws, lawI)
+    {
+        subMeshD_.set
+        (
+            lawI,
+            new volVectorField
+            (
+                IOobject
+                (
+                    "D",
+                    subMeshes[lawI].subMesh().time().timeName(),
+                    subMeshes[lawI].subMesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                subMeshes[lawI].subMesh(),
+                dimensionedVector("zero", dimLength, vector::zero)
+            )
+        );
+    }
+}
+
+
+Foam::PtrList<Foam::volVectorField>& Foam::mechanicalModel::subMeshD()
+{
+    if (subMeshD_.empty())
+    {
+        calcSubMeshD();
+    }
+
+    return subMeshD_;
+}
+
+
+const Foam::PtrList<Foam::volVectorField>&
+Foam::mechanicalModel::subMeshD() const
+{
+    if (subMeshD_.empty())
+    {
+        calcSubMeshD();
+    }
+
+    return subMeshD_;
+}
+
+
+void Foam::mechanicalModel::calcInterfaceShadowIDs() const
+{
+    if (!interfaceShadowSubMeshID_.empty())
+    {
+        FatalErrorIn
+        (
+            "void Foam::mechanicalModel::calcInterfaceShadowIDs() const"
+        )   << "pointer already set" << abort(FatalError);
+    }
+
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    interfaceShadowSubMeshID_.setSize(laws.size());
+    interfaceShadowPatchID_.setSize(laws.size());
+    interfaceShadowFaceID_.setSize(laws.size());
+
+    // Reverse maps for the interface faces
+    labelList baseMeshShadSubMeshID = labelList(mesh().nInternalFaces(), -1);
+    labelList baseMeshShadPatchID = labelList(mesh().nInternalFaces(), -1);
+    labelList baseMeshShadFaceID = labelList(mesh().nInternalFaces(), -1);
+
+    forAll(laws, lawI)
+    {
+        const fvMesh& subMesh = subMeshes()[lawI].subMesh();
+
+        const labelList& patchMap = subMeshes()[lawI].patchMap();
+        const labelList& faceMap = subMeshes()[lawI].faceMap();
+
+        bool uniquePatchFound = false;
+
+        forAll(subMesh.boundaryMesh(), patchI)
+        {
+            if (patchMap[patchI] == -1)
+            {
+                if (uniquePatchFound)
+                {
+                    FatalErrorIn
+                    (
+                        "void Foam::mechanicalModel::"
+                        "calcInterfaceShadowIDs() const"
+                    )   << "There are more than one interface patches!"
+                        << abort(FatalError);
+                }
+
+                uniquePatchFound = true;
+
+                interfaceShadowSubMeshID_.set
+                (
+                    lawI,
+                    new labelList(subMesh.boundaryMesh()[patchI].size(), -1)
+                );
+
+                interfaceShadowPatchID_.set
+                (
+                    lawI,
+                    new labelList(subMesh.boundaryMesh()[patchI].size(), -1)
+                );
+
+                interfaceShadowFaceID_.set
+                (
+                    lawI,
+                    new labelList(subMesh.boundaryMesh()[patchI].size(), -1)
+                );
+
+                labelList& shadSubMeshID = interfaceShadowSubMeshID_[lawI];
+                labelList& shadPatchID = interfaceShadowPatchID_[lawI];
+                labelList& shadFaceID = interfaceShadowFaceID_[lawI];
+
+                const label start = subMesh.boundaryMesh()[patchI].start();
+
+                forAll(shadSubMeshID, faceI)
+                {
+                    const label baseMeshFaceID = faceMap[start + faceI];
+
+                    // Check if the face has been set in the baseMesh lists
+                    if (baseMeshShadSubMeshID[baseMeshFaceID] == -1)
+                    {
+                        // Store the local IDs in the baseMesh lists
+                        baseMeshShadSubMeshID[baseMeshFaceID] = lawI;
+                        baseMeshShadPatchID[baseMeshFaceID] = patchI;
+                        baseMeshShadFaceID[baseMeshFaceID] = faceI;
+                    }
+                    else
+                    {
+                        // Store the shadow values in the local lists
+                        shadSubMeshID[faceI] =
+                            baseMeshShadSubMeshID[baseMeshFaceID];
+                        shadPatchID[faceI] =
+                            baseMeshShadPatchID[baseMeshFaceID];
+                        shadFaceID[faceI] =
+                            baseMeshShadFaceID[baseMeshFaceID];
+
+                        // Update the shadow lists with the local values
+                        const label shadSubMeshID =
+                            baseMeshShadSubMeshID[baseMeshFaceID];
+                        //const label shadPatchID =
+                        //    baseMeshShadPatchID[baseMeshFaceID];
+                        const label shadFaceID =
+                            baseMeshShadFaceID[baseMeshFaceID];
+
+                        interfaceShadowSubMeshID_[shadSubMeshID][shadFaceID] =
+                            lawI;
+                        interfaceShadowPatchID_[shadSubMeshID][shadFaceID] =
+                            patchI;
+                        interfaceShadowFaceID_[shadSubMeshID][shadFaceID] =
+                            faceI;
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+const Foam::PtrList<Foam::labelList>&
+Foam::mechanicalModel::interfaceShadowSubMeshID() const
+{
+    if (interfaceShadowSubMeshID_.empty())
+    {
+        calcInterfaceShadowIDs();
+    }
+
+    return interfaceShadowSubMeshID_;
+}
+
+
+const Foam::PtrList<Foam::labelList>&
+Foam::mechanicalModel::interfaceShadowPatchID() const
+{
+    if (interfaceShadowPatchID_.empty())
+    {
+        calcInterfaceShadowIDs();
+    }
+
+    return interfaceShadowPatchID_;
+}
+
+
+const Foam::PtrList<Foam::labelList>&
+Foam::mechanicalModel::interfaceShadowFaceID() const
+{
+    if (interfaceShadowFaceID_.empty())
+    {
+        calcInterfaceShadowIDs();
+    }
+
+    return interfaceShadowFaceID_;
+}
+
+
+void Foam::mechanicalModel::calcImpKfcorr() const
+{
+    if (impKfcorrPtr_)
+    {
+        FatalErrorIn
+        (
+            "const Foam::volScalarField& "
+            "Foam::mechanicalModel::calcImpKfcorr() const"
+        )   << "pointer already set" << abort(FatalError);
+    }
+
+    impKfcorrPtr_ =
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "impKfcorr",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            impKf()
+        );
+
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() > 1)
+    {
+        // To disable Rhie-Chow correction on bi-material interface, we will set
+        // newImpKf to zero on bi-material interface faces
+
+        scalarField& impKfcorrI = impKfcorrPtr_->internalField();
+
+        forAll(laws, lawI)
+        {
+            const fvMesh& subMesh = subMeshes()[lawI].subMesh();
+            const labelList& patchMap = subMeshes()[lawI].patchMap();
+            const labelList& faceMap = subMeshes()[lawI].faceMap();
+
+            forAll(subMesh.boundaryMesh(), patchI)
+            {
+                if (patchMap[patchI] == -1)
+                {
+                    const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
+                    const label start = ppatch.start();
+
+                    forAll(ppatch, faceI)
+                    {
+                        impKfcorrI[faceMap[start + faceI]] = 0.0;
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+const Foam::surfaceScalarField& Foam::mechanicalModel::impKfcorr() const
+{
+    if (!impKfcorrPtr_)
+    {
+        calcImpKfcorr();
+    }
+
+    return *impKfcorrPtr_;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::mechanicalModel::mechanicalModel(const fvMesh& mesh)
@@ -322,7 +631,12 @@ Foam::mechanicalModel::mechanicalModel(const fvMesh& mesh)
     cellZoneNames_(),
     subMeshes_(),
     subMeshSigma_(),
-    subMeshSigmaf_()
+    subMeshSigmaf_(),
+    subMeshD_(),
+    interfaceShadowSubMeshID_(),
+    interfaceShadowPatchID_(),
+    interfaceShadowFaceID_(),
+    impKfcorrPtr_()
 {
     Info<< "Creating the mechanicalModel" << endl;
 
@@ -573,7 +887,7 @@ void Foam::mechanicalModel::grad
 (
     volTensorField& gradD,
     const volVectorField& D
-) const
+)
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
@@ -586,42 +900,192 @@ void Foam::mechanicalModel::grad
         // Accumulate data for all fields
         forAll(laws, lawI)
         {
-            // Map the base displacement field to the subMesh
-            volVectorField subMeshD = subMeshes()[lawI].interpolate(D);
+            volVectorField& subMeshD = this->subMeshD()[lawI];
 
-            // Calculate gradient on subMesh
-            volTensorField subMeshGradD = fvc::grad(subMeshD);
+            const fvMesh& subMesh = subMeshes()[lawI].subMesh();
+            const labelList& faceMap = subMeshes()[lawI].faceMap();
+            const labelList& patchMap = subMeshes()[lawI].patchMap();
+            const labelList& cellMap = subMeshes()[lawI].cellMap();
 
-            // Iteratively extrapolate D to the interface patch
-            int i = 0;
-            do
+            // Store interface field as it is overwritten with the interpolated
+            // value by the interpolate function
+            vectorField Dinterface(0);
+            forAll(subMeshD.boundaryField(), patchI)
             {
-                forAll(subMeshD.boundaryField(), patchI)
+                if (patchMap[patchI] == -1)
                 {
-                    if (subMeshes()[lawI].patchMap()[patchI] == -1)
+                    Dinterface = subMeshD.boundaryField()[patchI];
+                }
+            }
+
+            // Map the base displacement field to the subMesh; this overwrites
+            // the interface with the interpolated values
+            subMeshD = subMeshes()[lawI].interpolate(D);
+
+            // Overwrite the interface values with the previous interface values
+            forAll(subMeshD.boundaryField(), patchI)
+            {
+                if (patchMap[patchI] == -1)
+                {
+                    subMeshD.boundaryField()[patchI] = Dinterface;
+                }
+            }
+
+            // Calculate the new correction to the interface valaues
+            forAll(subMeshD.boundaryField(), patchI)
+            {
+                if (patchMap[patchI] == -1)
+                {
+                    // Interface displacement
+                    vectorField& Dinterface = subMeshD.boundaryField()[patchI];
+
+                    const label start = subMesh.boundaryMesh()[patchI].start();
+
+                    // Base mesh owner cells
+                    const unallocLabelList& baseOwn = mesh().owner();
+
+                    // Base mesh neighbour cells
+                    const unallocLabelList& baseNei = mesh().neighbour();
+
+                    // Base mesh face interpolation weights
+                    const scalarField& baseWeightsI =
+                        mesh().weights().internalField();
+
+                    // Base mesh cell centres
+                    const vectorField& baseCI = mesh().C().internalField();
+
+                    // Base mesh face area vectors
+                    const vectorField& baseSf = mesh().Sf().internalField();
+
+                    // Base mesh face area vector magnitudes
+                    const scalarField& baseMagSf =
+                        mesh().magSf().internalField();
+
+                    // Implicit stiffness field
+                    const scalarField& KI =
+                        mesh().lookupObject<volScalarField>
+                        (
+                            "impK"
+                        ).internalField();
+
+                    // Interface face centres
+                    const vectorField& Cf = subMesh.boundary()[patchI].Cf();
+
+                    // Stress in the current subMesh at the interface
+                    const symmTensorField& sigmaPatch =
+                        subMeshSigma()[lawI].boundaryField()[patchI];
+
+                    const labelList& faceCells =
+                        subMesh.boundaryMesh()[patchI].faceCells();
+
+                    // The stress fields in all the subMeshes
+                    const PtrList<volSymmTensorField>& subMeshSigma =
+                        this->subMeshSigma();
+
+                    const labelList& interfaceShadowSubMeshID =
+                        this->interfaceShadowSubMeshID()[lawI];
+                    const labelList& interfaceShadowPatchID =
+                        this->interfaceShadowPatchID()[lawI];
+                    const labelList& interfaceShadowFaceID =
+                        this->interfaceShadowFaceID()[lawI];
+
+                    // Calculate the interface displacements
+                    forAll(Dinterface, faceI)
                     {
-                        subMeshD.boundaryField()[patchI] =
-                            subMeshD.boundaryField()
-                            [
-                                patchI
-                            ].patchInternalField()
-                          + (
-                                subMeshGradD.boundaryField()
+                        // Base mesh face index
+                        const label baseFaceID = faceMap[start + faceI];
+
+                        // Base mesh owner cell index
+                        const label baseOwnID = baseOwn[baseFaceID];
+
+                        // Base mesh neighbour cell index
+                        const label baseNeiID = baseNei[baseFaceID];
+
+                        // Base mesh face interpolation weight
+                        const scalar baseW = baseWeightsI[baseFaceID];
+
+                        // Interface unit normal (on base mesh); this may be in
+                        // the opposite direction to the subMesh normal
+                        const vector n =
+                            baseSf[baseFaceID]/baseMagSf[baseFaceID];
+
+                        // Normal distance from the interface to the cell-centre
+                        // on side-a
+                        const scalar da =
+                            mag(n & (Cf[faceI] - baseCI[baseOwnID]));
+
+                        // Normal distance from the interface to the cell-centre
+                        // on side-b
+                        const scalar db =
+                            mag(n & (baseCI[baseNeiID] - Cf[faceI]));
+
+                        // Calculate implicit stiffness for the interface; this
+                        // value only affects the convergence and not the result
+                        // For now, we ill linearly interpolate the value
+                        // Weighted-harmonic interpolation may be a better
+                        // candidate
+                        const scalar K =
+                            baseW*KI[baseOwnID] + (1.0 - baseW)*KI[baseNeiID];
+
+                        // Lookup stress for side-a and side-b
+                        symmTensor sigmaa = symmTensor::zero;
+                        symmTensor sigmab = symmTensor::zero;
+
+                        // ID of the subMesh on the other side of
+                        // interface
+                        const label shadowSubMeshID =
+                            interfaceShadowSubMeshID[faceI];
+
+                        // ID of the subMesh patch on the other side of
+                        // interface
+                        const label shadowPatchID =
+                            interfaceShadowPatchID[faceI];
+
+                        // ID of the subMesh patch face on the other side of
+                        // interface
+                        const label shadowFaceID =
+                            interfaceShadowFaceID[faceI];
+
+                        if (baseOwnID == cellMap[faceCells[faceI]])
+                        {
+                            // Stress calculated at the side-a (owner) of the
+                            // interface
+                            sigmaa = sigmaPatch[faceI];
+
+                            // Stress calculated at the side-b (neighbour) of
+                            // the interface
+                            sigmab =
+                                subMeshSigma
                                 [
-                                    patchI
-                                ].patchInternalField()
-                              & subMeshes()[lawI].subMesh().boundary()
+                                    shadowSubMeshID
+                                ].boundaryField()[shadowPatchID][shadowFaceID];
+                        }
+                        else
+                        {
+                            // Stress calculated at the side-b (neighbour) of
+                            // the interface
+                            sigmaa =
+                                subMeshSigma
                                 [
-                                    patchI
-                                ].delta()
-                              );
+                                    shadowSubMeshID
+                                ].boundaryField()[shadowPatchID][shadowFaceID];
+
+                            // Stress calculated at the side-b (neighbour) of
+                            // the interface
+                            sigmab = sigmaPatch[faceI];
+                        }
+
+                        // Add correction to the interface displacement
+                        // This correction goes to zero on convergence
+                        Dinterface[faceI] +=
+                            ((da*db)/(da + db))*(n & (sigmab - sigmaa)/K);
                     }
                 }
+            }
 
-                // Re-calculate gradient
-                subMeshGradD = fvc::grad(subMeshD);
-
-            } while (++i < 2);
+            // Calculate gradient on subMesh
+            // This will use the values at the interface
+            volTensorField subMeshGradD = fvc::grad(subMeshD);
 
             // Map subMesh gradD to the base gradient field
             mapSubMeshVolField<tensor>
@@ -636,6 +1100,20 @@ void Foam::mechanicalModel::grad
             mesh()
         ).correctBoundaryConditions(D, gradD);
     }
+}
+
+
+Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
+(
+    const volVectorField& D,
+    const volTensorField& gradD
+) const
+{
+    return
+    (
+        fvc::laplacian(impKfcorr(), D, "laplacian(DD,D)")
+      - fvc::div(impKfcorr()*mesh().Sf() & fvc::interpolate(gradD))
+    );
 }
 
 

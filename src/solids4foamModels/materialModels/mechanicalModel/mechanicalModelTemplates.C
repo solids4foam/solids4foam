@@ -278,7 +278,7 @@ Foam::mechanicalModel::lookupBaseMeshVolField
                     << "mesh" << abort(FatalError);
         }
 
-        // Return the baseField intrpolated to the subMesh
+        // Return the baseField interpolated to the subMesh
         return subMeshes()[curSubMeshID].interpolate(baseField);
     }
 }
@@ -340,7 +340,7 @@ Foam::mechanicalModel::lookupBaseMeshSurfaceField
                     << "mesh" << abort(FatalError);
         }
 
-        // Return the baseField intrpolated to the subMesh
+        // Return the baseField interpolated to the subMesh
         return subMeshes()[curSubMeshID].interpolate(baseField);
     }
 }

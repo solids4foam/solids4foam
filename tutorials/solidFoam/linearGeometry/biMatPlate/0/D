@@ -20,50 +20,37 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
+    top
+    {
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform -1e+06;
+        value           uniform (0 0 0);
+    }
     left
     {
-        type            blockFixedDisplacementZeroShear;
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform 0;
         value           uniform (0 0 0);
     }
     right
     {
-        type            blockFixedDisplacement;
-        displacementSeries
-        {
-            fileName    "$FOAM_CASE/constant/timeVsDisp";
-            outOfBounds clamp;
-        }
-        value           uniform (0 0 0);
-
-//         type            blockSolidTraction;
-//         tractionSeries
-//         {
-//             fileName    "$FOAM_CASE/constant/timeVsTraction";
-//             outOfBounds clamp;
-//         }
-//         pressure        uniform 0;
-//         value           uniform (0 0 0);
-    }
-    down
-    {
-        type            blockFixedDisplacementZeroShear;
-        value           uniform (0 0 0);
-    }
-    up
-    {
-        type            blockSolidTraction;
-        traction        uniform ( 0 0 0 );
+        type            solidTraction;
+        traction        uniform (0 0 0);
         pressure        uniform 0;
         value           uniform (0 0 0);
     }
-    hole
+    bottom
     {
-        type            blockSolidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
+        type            fixedDisplacement;
         value           uniform (0 0 0);
     }
-    frontAndBack
+    front
+    {
+        type            empty;
+    }
+    back
     {
         type            empty;
     }

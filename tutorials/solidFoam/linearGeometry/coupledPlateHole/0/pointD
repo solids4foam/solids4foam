@@ -9,50 +9,42 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      fvSchemes;
+    class       pointVectorField;
+    object      pointD;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            steadyState;
-}
+dimensions      [0 1 0 0 0 0 0];
 
-ddtSchemes
-{
-    default            steadyState;
-}
+internalField   uniform (0 0 0);
 
-gradSchemes
+boundaryField
 {
-    default            extendedLeastSquares 0;
-}
-
-divSchemes
-{
-    default            Gauss linear;
-}
-
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
-}
-
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          newSkewCorrected 1;
-    snGrad(DD)         newSkewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-    interpolate(grad(D)) linear;
+    left
+    {
+        type            calculated;
+    }
+    right
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    down
+    {
+        type            calculated;
+    }
+    up
+    {
+        type            calculated;
+    }
+    hole
+    {
+        type            calculated;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
 }
 
 // ************************************************************************* //
