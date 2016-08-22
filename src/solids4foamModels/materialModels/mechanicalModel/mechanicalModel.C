@@ -888,14 +888,10 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                     sigmab = sigmaPatch[faceI];
                 }
 
-                // Under-relaxation for the correction
-                //const scalar rf = 0.1;
-
                 // Add correction to the interface displacement
                 // This correction goes to zero on convergence
                 Dinterface[faceI] +=
                     ((da*db)/(da + db))*(n & (sigmab - sigmaa)/K);
-                    //rf*((da*db)/(da + db))*(n & (sigmab - sigmaa)/K);
             }
         }
     }
