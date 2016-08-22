@@ -81,7 +81,7 @@ void Foam::mechanicalModel::makeSubMeshes() const
         subMeshes_.set
         (
             matI,
-            new fvMeshSubset
+            new newFvMeshSubset
             (
                 IOobject
                 (
@@ -99,7 +99,7 @@ void Foam::mechanicalModel::makeSubMeshes() const
     }
 }
 
-const Foam::PtrList<Foam::fvMeshSubset>&
+const Foam::PtrList<Foam::newFvMeshSubset>&
 Foam::mechanicalModel::subMeshes() const
 {
     if (subMeshes_.empty())
@@ -196,7 +196,7 @@ void Foam::mechanicalModel::calcSubMeshSigma() const
 
     subMeshSigma_.setSize(laws.size());
 
-    const PtrList<fvMeshSubset>& subMeshes = this->subMeshes();
+    const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
     forAll(laws, lawI)
     {
@@ -269,7 +269,7 @@ void Foam::mechanicalModel::calcSubMeshSigmaf() const
 
     subMeshSigmaf_.setSize(laws.size());
 
-    const PtrList<fvMeshSubset>& subMeshes = this->subMeshes();
+    const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
     forAll(laws, lawI)
     {
@@ -335,7 +335,6 @@ void Foam::mechanicalModel::calcSubMeshD() const
 
     if (laws.size() == 1)
     {
-        // Sub-meshes should not be defined if there is only one material
         FatalErrorIn("void Foam::mechanicalModel::calcSubMeshD() const")
             << "There should be no need for subMeshes when there is only one "
             << "material" << abort(FatalError);
@@ -343,7 +342,7 @@ void Foam::mechanicalModel::calcSubMeshD() const
 
     subMeshD_.setSize(laws.size());
 
-    const PtrList<fvMeshSubset>& subMeshes = this->subMeshes();
+    const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
     forAll(laws, lawI)
     {
@@ -391,9 +390,82 @@ Foam::mechanicalModel::subMeshD() const
 }
 
 
+void Foam::mechanicalModel::calcSubMeshGradD() const
+{
+    if (!subMeshGradD_.empty())
+    {
+        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshGradD() const")
+            << "pointer list already set" << abort(FatalError);
+    }
+
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshGradD() const")
+            << "There should be no need for subMeshes when there is only one "
+            << "material" << abort(FatalError);
+    }
+
+    subMeshGradD_.setSize(laws.size());
+
+    const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
+
+    forAll(laws, lawI)
+    {
+        subMeshGradD_.set
+        (
+            lawI,
+            new volTensorField
+            (
+                IOobject
+                (
+                    "grad(D)",
+                    subMeshes[lawI].subMesh().time().timeName(),
+                    subMeshes[lawI].subMesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                subMeshes[lawI].subMesh(),
+                dimensionedTensor("zero", dimless, tensor::zero)
+            )
+        );
+    }
+}
+
+
+Foam::PtrList<Foam::volTensorField>& Foam::mechanicalModel::subMeshGradD()
+{
+    if (subMeshGradD_.empty())
+    {
+        calcSubMeshGradD();
+    }
+
+    return subMeshGradD_;
+}
+
+
+const Foam::PtrList<Foam::volTensorField>&
+Foam::mechanicalModel::subMeshGradD() const
+{
+    if (subMeshGradD_.empty())
+    {
+        calcSubMeshGradD();
+    }
+
+    return subMeshGradD_;
+}
+
+
 void Foam::mechanicalModel::calcInterfaceShadowIDs() const
 {
-    if (!interfaceShadowSubMeshID_.empty())
+    if
+    (
+        !interfaceShadowSubMeshID_.empty()
+     || !interfaceShadowPatchID_.empty()
+     || !interfaceShadowFaceID_.empty()
+     || interfaceFoundPtr_
+    )
     {
         FatalErrorIn
         (
@@ -406,6 +478,8 @@ void Foam::mechanicalModel::calcInterfaceShadowIDs() const
     interfaceShadowSubMeshID_.setSize(laws.size());
     interfaceShadowPatchID_.setSize(laws.size());
     interfaceShadowFaceID_.setSize(laws.size());
+    interfaceFoundPtr_ = new bool(false);
+    bool& interfaceFound = *interfaceFoundPtr_;
 
     // Reverse maps for the interface faces
     labelList baseMeshShadSubMeshID = labelList(mesh().nInternalFaces(), -1);
@@ -436,6 +510,8 @@ void Foam::mechanicalModel::calcInterfaceShadowIDs() const
                 }
 
                 uniquePatchFound = true;
+
+                interfaceFound = true;
 
                 interfaceShadowSubMeshID_.set
                 (
@@ -541,6 +617,17 @@ Foam::mechanicalModel::interfaceShadowFaceID() const
 }
 
 
+bool Foam::mechanicalModel::interfaceFound() const
+{
+    if (!interfaceFoundPtr_)
+    {
+        calcInterfaceShadowIDs();
+    }
+
+    return *interfaceFoundPtr_;
+}
+
+
 void Foam::mechanicalModel::calcImpKfcorr() const
 {
     if (impKfcorrPtr_)
@@ -609,6 +696,272 @@ const Foam::surfaceScalarField& Foam::mechanicalModel::impKfcorr() const
     return *impKfcorrPtr_;
 }
 
+void Foam::mechanicalModel::interpolateDtoSubMeshD
+(
+    const label lawI,
+    const volVectorField& D
+)
+{
+    const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
+
+    volVectorField& subMeshD = this->subMeshD()[lawI];
+
+    if (!interfaceFound())
+    {
+        // No need for any corrections if there are no bi-material interfaces
+        subMeshD = subMeshes[lawI].interpolate(D);
+
+        return;
+    }
+
+    const fvMesh& subMesh = subMeshes[lawI].subMesh();
+
+    const labelList& faceMap = subMeshes[lawI].faceMap();
+    const labelList& patchMap = subMeshes[lawI].patchMap();
+    const labelList& cellMap = subMeshes[lawI].cellMap();
+
+    // Store interface field as it is overwritten with the interpolated
+    // value by the interpolate function
+    vectorField Dinterface(0);
+    forAll(subMeshD.boundaryField(), patchI)
+    {
+        if (patchMap[patchI] == -1)
+        {
+            Dinterface = subMeshD.boundaryField()[patchI];
+        }
+    }
+
+    // Map the base displacement field to the subMesh; this overwrites
+    // the interface with the interpolated values
+    subMeshD = subMeshes[lawI].interpolate(D);
+
+    // Overwrite the interface values with the previous interface values
+    forAll(subMeshD.boundaryField(), patchI)
+    {
+        if (patchMap[patchI] == -1)
+        {
+            subMeshD.boundaryField()[patchI] = Dinterface;
+        }
+    }
+
+    // Calculate the new correction to the interface valaues
+    forAll(subMeshD.boundaryField(), patchI)
+    {
+        if (patchMap[patchI] == -1)
+        {
+            // Interface displacement
+            vectorField& Dinterface = subMeshD.boundaryField()[patchI];
+
+            const label start = subMesh.boundaryMesh()[patchI].start();
+
+            // Base mesh owner cells
+            const unallocLabelList& baseOwn = mesh().owner();
+
+            // Base mesh neighbour cells
+            const unallocLabelList& baseNei = mesh().neighbour();
+
+            // Base mesh face interpolation weights
+            const scalarField& baseWeightsI =
+                mesh().weights().internalField();
+
+            // Base mesh cell centres
+            const vectorField& baseCI = mesh().C().internalField();
+
+            // Base mesh face area vectors
+            const vectorField& baseSf = mesh().Sf().internalField();
+
+            // Base mesh face area vector magnitudes
+            const scalarField& baseMagSf =
+                mesh().magSf().internalField();
+
+            // Implicit stiffness field
+            const scalarField& KI =
+                mesh().lookupObject<volScalarField>
+                (
+                    "impK"
+                ).internalField();
+
+            // Interface face centres
+            const vectorField& Cf = subMesh.boundary()[patchI].Cf();
+
+            // Stress in the current subMesh at the interface
+            const symmTensorField& sigmaPatch =
+                subMeshSigma()[lawI].boundaryField()[patchI];
+
+            const labelList& faceCells =
+                subMesh.boundaryMesh()[patchI].faceCells();
+
+            // The stress fields in all the subMeshes
+            const PtrList<volSymmTensorField>& subMeshSigma =
+                this->subMeshSigma();
+
+            const labelList& interfaceShadowSubMeshID =
+                this->interfaceShadowSubMeshID()[lawI];
+            const labelList& interfaceShadowPatchID =
+                this->interfaceShadowPatchID()[lawI];
+            const labelList& interfaceShadowFaceID =
+                this->interfaceShadowFaceID()[lawI];
+
+            // Calculate the interface displacements
+            forAll(Dinterface, faceI)
+            {
+                // Base mesh face index
+                const label baseFaceID = faceMap[start + faceI];
+
+                // Base mesh owner cell index
+                const label baseOwnID = baseOwn[baseFaceID];
+
+                // Base mesh neighbour cell index
+                const label baseNeiID = baseNei[baseFaceID];
+
+                // Base mesh face interpolation weight
+                const scalar baseW = baseWeightsI[baseFaceID];
+
+                // Interface unit normal (on base mesh); this may be in
+                // the opposite direction to the subMesh normal
+                const vector n =
+                    baseSf[baseFaceID]/baseMagSf[baseFaceID];
+
+                // Normal distance from the interface to the cell-centre
+                // on side-a
+                const scalar da =
+                    mag(n & (Cf[faceI] - baseCI[baseOwnID]));
+
+                // Normal distance from the interface to the cell-centre
+                // on side-b
+                const scalar db =
+                    mag(n & (baseCI[baseNeiID] - Cf[faceI]));
+
+                // Calculate implicit stiffness for the interface; this
+                // value only affects the convergence and not the result
+                // For now, we will linearly interpolate the value
+                // Weighted-harmonic interpolation may be a better
+                // candidate
+                const scalar K =
+                    baseW*KI[baseOwnID] + (1.0 - baseW)*KI[baseNeiID];
+
+                // Lookup stress for side-a and side-b
+                symmTensor sigmaa = symmTensor::zero;
+                symmTensor sigmab = symmTensor::zero;
+
+                // ID of the subMesh on the other side of
+                // interface
+                const label shadowSubMeshID =
+                    interfaceShadowSubMeshID[faceI];
+
+                // ID of the subMesh patch on the other side of
+                // interface
+                const label shadowPatchID =
+                    interfaceShadowPatchID[faceI];
+
+                // ID of the subMesh patch face on the other side of
+                // interface
+                const label shadowFaceID =
+                    interfaceShadowFaceID[faceI];
+
+                if (baseOwnID == cellMap[faceCells[faceI]])
+                {
+                    // Stress calculated at the side-a (owner) of the
+                    // interface
+                    sigmaa = sigmaPatch[faceI];
+
+                    // Stress calculated at the side-b (neighbour) of
+                    // the interface
+                    sigmab =
+                        subMeshSigma
+                        [
+                            shadowSubMeshID
+                        ].boundaryField()[shadowPatchID][shadowFaceID];
+                }
+                else
+                {
+                    // Stress calculated at the side-b (neighbour) of
+                    // the interface
+                    sigmaa =
+                        subMeshSigma
+                        [
+                            shadowSubMeshID
+                        ].boundaryField()[shadowPatchID][shadowFaceID];
+
+                    // Stress calculated at the side-b (neighbour) of
+                    // the interface
+                    sigmab = sigmaPatch[faceI];
+                }
+
+                // Under-relaxation for the correction
+                //const scalar rf = 0.1;
+
+                // Add correction to the interface displacement
+                // This correction goes to zero on convergence
+                Dinterface[faceI] +=
+                    ((da*db)/(da + db))*(n & (sigmab - sigmaa)/K);
+                    //rf*((da*db)/(da + db))*(n & (sigmab - sigmaa)/K);
+            }
+        }
+    }
+
+}
+
+
+void Foam::mechanicalModel::correctInterfaceSnGrad(const label lawI)
+{
+    if (!interfaceFound())
+    {
+        // No need for any corrections if there are no bi-material interfaces
+        return;
+    }
+
+    const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
+
+    const volVectorField& subMeshD = this->subMeshD()[lawI];
+    volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
+    const fvMesh& subMesh = subMeshes[lawI].subMesh();
+    const labelList& patchMap = subMeshes[lawI].patchMap();
+
+    forAll(subMeshGradD.boundaryField(), patchI)
+    {
+        if (patchMap[patchI] == -1)
+        {
+            tensorField& patchGradD = subMeshGradD.boundaryField()[patchI];
+            const tensorField patchGradDif =
+                subMeshGradD.boundaryField()[patchI].patchInternalField();
+
+            const vectorField& patchD = subMeshD.boundaryField()[patchI];
+            const vectorField patchDif =
+                subMeshD.boundaryField()[patchI].patchInternalField();
+
+            const vectorField n = subMesh.boundary()[patchI].nf();
+            const vectorField delta = subMesh.boundary()[patchI].delta();
+            const vectorField k = delta - n*(n & delta);
+            const scalarField& deltaCoeffs =
+                subMesh.boundary()[patchI].deltaCoeffs();
+
+            const vectorField correctedSnGrad =
+                (patchD - (patchDif + (k & patchGradDif)))*deltaCoeffs;
+
+            patchGradD += n*(correctedSnGrad - (n & patchGradD));
+        }
+    }
+}
+
+
+void Foam::mechanicalModel::clearOut() const
+{
+    subMeshSigma_.clear();
+    subMeshSigmaf_.clear();
+    subMeshD_.clear();
+    subMeshGradD_.clear();
+    interfaceShadowSubMeshID_.clear();
+    interfaceShadowPatchID_.clear();
+    interfaceShadowFaceID_.clear();
+    deleteDemandDrivenData(interfaceFoundPtr_);
+    deleteDemandDrivenData(impKfcorrPtr_);
+
+    // Make sure to clear the subMeshes after (not before) clearing the subMesh
+    // fields
+    subMeshes_.clear();
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -633,10 +986,12 @@ Foam::mechanicalModel::mechanicalModel(const fvMesh& mesh)
     subMeshSigma_(),
     subMeshSigmaf_(),
     subMeshD_(),
+    subMeshGradD_(),
     interfaceShadowSubMeshID_(),
     interfaceShadowPatchID_(),
     interfaceShadowFaceID_(),
-    impKfcorrPtr_()
+    interfaceFoundPtr_(NULL),
+    impKfcorrPtr_(NULL)
 {
     Info<< "Creating the mechanicalModel" << endl;
 
@@ -690,7 +1045,9 @@ Foam::mechanicalModel::mechanicalModel(const fvMesh& mesh)
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::mechanicalModel::~mechanicalModel()
-{}
+{
+    clearOut();
+}
 
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
@@ -900,194 +1257,20 @@ void Foam::mechanicalModel::grad
         // Accumulate data for all fields
         forAll(laws, lawI)
         {
-            volVectorField& subMeshD = this->subMeshD()[lawI];
-
-            const fvMesh& subMesh = subMeshes()[lawI].subMesh();
-            const labelList& faceMap = subMeshes()[lawI].faceMap();
-            const labelList& patchMap = subMeshes()[lawI].patchMap();
-            const labelList& cellMap = subMeshes()[lawI].cellMap();
-
-            // Store interface field as it is overwritten with the interpolated
-            // value by the interpolate function
-            vectorField Dinterface(0);
-            forAll(subMeshD.boundaryField(), patchI)
-            {
-                if (patchMap[patchI] == -1)
-                {
-                    Dinterface = subMeshD.boundaryField()[patchI];
-                }
-            }
-
-            // Map the base displacement field to the subMesh; this overwrites
-            // the interface with the interpolated values
-            subMeshD = subMeshes()[lawI].interpolate(D);
-
-            // Overwrite the interface values with the previous interface values
-            forAll(subMeshD.boundaryField(), patchI)
-            {
-                if (patchMap[patchI] == -1)
-                {
-                    subMeshD.boundaryField()[patchI] = Dinterface;
-                }
-            }
-
-            // Calculate the new correction to the interface valaues
-            forAll(subMeshD.boundaryField(), patchI)
-            {
-                if (patchMap[patchI] == -1)
-                {
-                    // Interface displacement
-                    vectorField& Dinterface = subMeshD.boundaryField()[patchI];
-
-                    const label start = subMesh.boundaryMesh()[patchI].start();
-
-                    // Base mesh owner cells
-                    const unallocLabelList& baseOwn = mesh().owner();
-
-                    // Base mesh neighbour cells
-                    const unallocLabelList& baseNei = mesh().neighbour();
-
-                    // Base mesh face interpolation weights
-                    const scalarField& baseWeightsI =
-                        mesh().weights().internalField();
-
-                    // Base mesh cell centres
-                    const vectorField& baseCI = mesh().C().internalField();
-
-                    // Base mesh face area vectors
-                    const vectorField& baseSf = mesh().Sf().internalField();
-
-                    // Base mesh face area vector magnitudes
-                    const scalarField& baseMagSf =
-                        mesh().magSf().internalField();
-
-                    // Implicit stiffness field
-                    const scalarField& KI =
-                        mesh().lookupObject<volScalarField>
-                        (
-                            "impK"
-                        ).internalField();
-
-                    // Interface face centres
-                    const vectorField& Cf = subMesh.boundary()[patchI].Cf();
-
-                    // Stress in the current subMesh at the interface
-                    const symmTensorField& sigmaPatch =
-                        subMeshSigma()[lawI].boundaryField()[patchI];
-
-                    const labelList& faceCells =
-                        subMesh.boundaryMesh()[patchI].faceCells();
-
-                    // The stress fields in all the subMeshes
-                    const PtrList<volSymmTensorField>& subMeshSigma =
-                        this->subMeshSigma();
-
-                    const labelList& interfaceShadowSubMeshID =
-                        this->interfaceShadowSubMeshID()[lawI];
-                    const labelList& interfaceShadowPatchID =
-                        this->interfaceShadowPatchID()[lawI];
-                    const labelList& interfaceShadowFaceID =
-                        this->interfaceShadowFaceID()[lawI];
-
-                    // Calculate the interface displacements
-                    forAll(Dinterface, faceI)
-                    {
-                        // Base mesh face index
-                        const label baseFaceID = faceMap[start + faceI];
-
-                        // Base mesh owner cell index
-                        const label baseOwnID = baseOwn[baseFaceID];
-
-                        // Base mesh neighbour cell index
-                        const label baseNeiID = baseNei[baseFaceID];
-
-                        // Base mesh face interpolation weight
-                        const scalar baseW = baseWeightsI[baseFaceID];
-
-                        // Interface unit normal (on base mesh); this may be in
-                        // the opposite direction to the subMesh normal
-                        const vector n =
-                            baseSf[baseFaceID]/baseMagSf[baseFaceID];
-
-                        // Normal distance from the interface to the cell-centre
-                        // on side-a
-                        const scalar da =
-                            mag(n & (Cf[faceI] - baseCI[baseOwnID]));
-
-                        // Normal distance from the interface to the cell-centre
-                        // on side-b
-                        const scalar db =
-                            mag(n & (baseCI[baseNeiID] - Cf[faceI]));
-
-                        // Calculate implicit stiffness for the interface; this
-                        // value only affects the convergence and not the result
-                        // For now, we ill linearly interpolate the value
-                        // Weighted-harmonic interpolation may be a better
-                        // candidate
-                        const scalar K =
-                            baseW*KI[baseOwnID] + (1.0 - baseW)*KI[baseNeiID];
-
-                        // Lookup stress for side-a and side-b
-                        symmTensor sigmaa = symmTensor::zero;
-                        symmTensor sigmab = symmTensor::zero;
-
-                        // ID of the subMesh on the other side of
-                        // interface
-                        const label shadowSubMeshID =
-                            interfaceShadowSubMeshID[faceI];
-
-                        // ID of the subMesh patch on the other side of
-                        // interface
-                        const label shadowPatchID =
-                            interfaceShadowPatchID[faceI];
-
-                        // ID of the subMesh patch face on the other side of
-                        // interface
-                        const label shadowFaceID =
-                            interfaceShadowFaceID[faceI];
-
-                        if (baseOwnID == cellMap[faceCells[faceI]])
-                        {
-                            // Stress calculated at the side-a (owner) of the
-                            // interface
-                            sigmaa = sigmaPatch[faceI];
-
-                            // Stress calculated at the side-b (neighbour) of
-                            // the interface
-                            sigmab =
-                                subMeshSigma
-                                [
-                                    shadowSubMeshID
-                                ].boundaryField()[shadowPatchID][shadowFaceID];
-                        }
-                        else
-                        {
-                            // Stress calculated at the side-b (neighbour) of
-                            // the interface
-                            sigmaa =
-                                subMeshSigma
-                                [
-                                    shadowSubMeshID
-                                ].boundaryField()[shadowPatchID][shadowFaceID];
-
-                            // Stress calculated at the side-b (neighbour) of
-                            // the interface
-                            sigmab = sigmaPatch[faceI];
-                        }
-
-                        // Add correction to the interface displacement
-                        // This correction goes to zero on convergence
-                        Dinterface[faceI] +=
-                            ((da*db)/(da + db))*(n & (sigmab - sigmaa)/K);
-                    }
-                }
-            }
+            // Interpolate the base D to the subMesh D
+            // If necessary, corrections are applied on bi-material interfaces
+            interpolateDtoSubMeshD(lawI, D);
 
             // Calculate gradient on subMesh
             // This will use the values at the interface
-            volTensorField subMeshGradD = fvc::grad(subMeshD);
+            volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
+            subMeshGradD = fvc::grad(subMeshD()[lawI]);
 
-            // Map subMesh gradD to the base gradient field
+            // Correct snGrad on the interface patch of subMeshGradD because the
+            // default calculated boundaries disable non-orthogonal correction
+            correctInterfaceSnGrad(lawI);
+
+            // Map subMesh gradD to the base gradD
             mapSubMeshVolField<tensor>
             (
                 lawI, subMeshGradD, gradD

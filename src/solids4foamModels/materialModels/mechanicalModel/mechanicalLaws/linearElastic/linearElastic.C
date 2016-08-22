@@ -31,9 +31,6 @@ License
 #include "IOdictionary.H"
 #include "mechanicalModel.H"
 
-// WIP
-#include "fvc.H"
-
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
@@ -142,28 +139,14 @@ const Foam::dimensionedScalar& Foam::linearElastic::lambda() const
 
 void Foam::linearElastic::correct(volSymmTensorField& sigma)
 {
-    // Lookup the strain tensor from the solver
-    // const volSymmTensorField epsilon =
-    //     mesh().db().lookupObject<fvMesh>
-    //     (
-    //         baseMeshRegionName()
-    //     ).lookupObject<mechanicalModel>
-    //     (
-    //         "mechanicalProperties"
-    //     ).lookupBaseMeshVolField<symmTensor>("epsilon", mesh());
-
-    // WIP
-    // What is a nice way to do this?
-    // We cannot use lookupBaseMeshField because it linearly interpolates fields
-    // to bi-material interfaces, which is bad.
-    // This method is OK but we need to re-evaluate gradD; in the case of finite
-    // strain approaches, we would have to re-evaluate F, relF, etc.
-    // Hmnn...
-    const volVectorField& D = mesh().lookupObject<volVectorField>("D");
-    const volSymmTensorField epsilon = symm(fvc::grad(D));
+    // Lookup gradient of displacement
+    // Note: for multi-material cases, gradD is corrected on bi-material
+    // interfaces
+    const volTensorField& gradD =
+        mesh().lookupObject<volTensorField>("grad(D)");
 
     // Calculate stress based on Hooke's law
-    sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
+    sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
 }
 
 

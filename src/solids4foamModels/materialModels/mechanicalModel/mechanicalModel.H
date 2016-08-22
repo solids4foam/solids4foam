@@ -49,7 +49,7 @@ Author
 #include "Switch.H"
 #include "volFields.H"
 #include "surfaceFields.H"
-#include "fvMeshSubset.H"
+#include "newFvMeshSubset.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -77,7 +77,7 @@ class mechanicalModel
 
         //- Sub-mesh for each material
         //  Not used if there is only one material
-        mutable PtrList<fvMeshSubset> subMeshes_;
+        mutable PtrList<newFvMeshSubset> subMeshes_;
 
         //- Stress volField for each mechanical law
         mutable PtrList<volSymmTensorField> subMeshSigma_;
@@ -88,6 +88,9 @@ class mechanicalModel
         //- Displacement volField for each mechanical law
         mutable PtrList<volVectorField> subMeshD_;
 
+        //- Displacement gradient volField for each mechanical law
+        mutable PtrList<volTensorField> subMeshGradD_;
+
         //- Index of the subMesh on the other side of a bi-material interface
         mutable PtrList<labelList> interfaceShadowSubMeshID_;
 
@@ -96,6 +99,9 @@ class mechanicalModel
 
         //- Index of the subMesh on the other side of a bi-material interface
         mutable PtrList<labelList> interfaceShadowFaceID_;
+
+        //- Are there any faces on a bi-material interface
+        mutable bool* interfaceFoundPtr_;
 
         //- The implicit stiffness surface field for Rhie-Chow correction
         mutable surfaceScalarField* impKfcorrPtr_;
@@ -107,7 +113,7 @@ class mechanicalModel
         void makeSubMeshes() const;
 
         //- Return a const reference to the subMeshes
-        const PtrList<fvMeshSubset>& subMeshes() const;
+        const PtrList<newFvMeshSubset>& subMeshes() const;
 
         //- Check the cell zones are defined for each material
         void checkCellZones() const;
@@ -139,6 +145,15 @@ class mechanicalModel
         //- Return the subMesh D volFields
         const PtrList<volVectorField>& subMeshD() const;
 
+        //- Calculate the subMesh gradD fields
+        void calcSubMeshGradD() const;
+
+        //- Return the subMesh gradD volFields
+        PtrList<volTensorField>& subMeshGradD();
+
+        //- Return the subMesh gradD volFields
+        const PtrList<volTensorField>& subMeshGradD() const;
+
         //- Calculate the interface shadow subMesh indices
         void calcInterfaceShadowIDs() const;
 
@@ -151,9 +166,23 @@ class mechanicalModel
         //- Return the interface shadow face indices
         const PtrList<labelList>& interfaceShadowFaceID() const;
 
+        //- Return the interface found
+        bool interfaceFound() const;
+
         //- Calculate the impKf field for Rhie-Chow correction
         //  This field is zero on bi-material interfaces
         void calcImpKfcorr() const;
+
+        //- Interpolate the base D to the subMesh D, where we apply corrections
+        //  on bi-material interfaces
+        void interpolateDtoSubMeshD
+        (
+            const label lawI,
+            const volVectorField& D
+        );
+
+        //- Correct SnGrad on subMesh bi-material interface patch
+        void correctInterfaceSnGrad(const label lawI);
 
         //- Return the implicit stiffness surface field for Rhie-Chow correction
         const surfaceScalarField& impKfcorr() const;
@@ -176,6 +205,9 @@ class mechanicalModel
                 subMeshField,
             GeometricField<Type, fvsPatchField, surfaceMesh>& baseMeshField
         ) const;
+
+        //- Clear out demand driven data
+        void clearOut() const;
 
         //- Disallow default bitwise copy construct
         mechanicalModel(const mechanicalModel&);

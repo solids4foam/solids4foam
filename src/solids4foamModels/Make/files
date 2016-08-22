@@ -41,6 +41,7 @@ $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
+$(solidFvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
@@ -70,6 +71,9 @@ functionObjects/solidForces/solidForces.C
 functionObjects/solidForcesDisplacements/solidForcesDisplacements.C
 functionObjects/solidDisplacements/solidDisplacements.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
+functionObjects/principalStresses/principalStresses.C
+functionObjects/stressTriaxiality/stressTriaxiality.C
+functionObjects/solidTractions/solidTractions.C
 
 dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
 dynamicFvMesh/crackerFvMesh/crackerFvMesh.C
@@ -114,21 +118,18 @@ $(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 numerics/newLeastSquaresVolPointInterpolation/newLeastSquaresVolPointInterpolation.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newSkewCorrectedSnGrad/newSkewCorrectedSnGrads.C
+numerics/newFvMeshSubset/newFvMeshSubset.C
+numerics/logExpVolFields/eig3/eig3.C
+numerics/logExpVolFields/eig3Field.C
+numerics/logExpVolFields/expVolFields.C
+numerics/logExpVolFields/logVolFields.C
 
 /*
-functionObjects/principalStresses/principalStresses.C
-functionObjects/solidPointStress/solidPointStress.C
-functionObjects/solidStress/solidStress.C
-functionObjects/solidTractions/solidTractions.C
-functionObjects/stressStrain/stressStrain.C
-functionObjects/stressTriaxiality/stressTriaxiality.C
-
 $(fvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
 $(fvPatchFields)/cohesiveZoneIncrementalModeI/cohesiveZoneIncrementalFvPatchVectorField.C
 $(fvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
 $(fvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
 $(fvPatchFields)/fixedTemperatureGradient/fixedTemperatureGradientFvPatchScalarField.C
-$(fvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C
 
 thermalModel = materialModels/thermalModel
 $(thermalModel)/thermalModel.C
@@ -136,13 +137,6 @@ thermalLaws = $(thermalModel)/thermalLaws
 $(thermalLaws)/thermalLaw/thermalLaw.C
 $(thermalLaws)/thermalLaw/newThermalLaw.C
 $(thermalLaws)/constantThermal/constantThermal.C
-$(thermalLaws)/multiMaterialThermal/multiMaterialThermal.C
-
-numerics/fvMeshSubset/fvMeshSubset.C
-numerics/logExpVolFields/eig3/eig3.C
-materialInterfaces = numerics/materialInterfaces
-$(materialInterfaces)/materialInterface/materialInterface.C
-$(materialInterfaces)/TLMaterialInterface/TLMaterialInterface.C
 */
 
 

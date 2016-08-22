@@ -22,7 +22,7 @@ solidModel     linearGeometry;
 "linearGeometryCoeffs|unsLinearGeometryCoeffs"
 {
     // Maximum number of momentum correctors
-    nCorrectors     1000;
+    nCorrectors     10000;
 
     // Solution tolerance for displacement
     solutionTolerance 1e-06;
