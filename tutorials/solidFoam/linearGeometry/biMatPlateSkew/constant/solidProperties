@@ -10,24 +10,31 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    "system";
-    object      fvSolution;
+    location    "constant";
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solvers
-{
-    D
-    {
-        solver          PCG;
-        preconditioner  FDIC;
-        tolerance       1e-09;
-        relTol          0.1;
-    }
-}
+// linearGeometry: assumes small strains and rotations
+solidModel     linearGeometry;
+//solidModel     unsLinearGeometry;
 
-relaxationFactors
+"linearGeometryCoeffs|unsLinearGeometryCoeffs"
 {
+    // Maximum number of momentum correctors
+    //nCorrectors     10000;
+
+    // Solution tolerance for displacement
+    //solutionTolerance 1e-06;
+
+    // Alternative solution tolerance for displacement
+    //alternativeTolerance 1e-07;
+
+    // Material law solution tolerance
+    //materialTolerance 1e-05;
+
+    // Write frequency for the residuals
+    //infoFrequency   100;
 }
 
 

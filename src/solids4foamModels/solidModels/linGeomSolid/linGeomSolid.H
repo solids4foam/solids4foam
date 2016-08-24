@@ -46,7 +46,6 @@ SourceFiles
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
-#include "newLeastSquaresVolPointInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -80,14 +79,8 @@ class linGeomSolid
         //- Point displacement field
         pointVectorField pointD_;
 
-        //- Strain field
-        volSymmTensorField epsilon_;
-
         //- Stress field
         volSymmTensorField sigma_;
-
-        //- Cell-to-point interpolation
-        newLeastSquaresVolPointInterpolation volToPoint_;
 
         //- Cell displacement gradient
         volTensorField gradD_;
@@ -197,12 +190,6 @@ public:
                 return sigma_;
             }
 
-            //- Strain tensor
-            const volSymmTensorField& epsilon() const
-            {
-                return epsilon_;
-            }
-
             //- Implicit stiffness
             const volScalarField& impK() const
             {
@@ -219,12 +206,6 @@ public:
             virtual const pointVectorField& pointD() const
             {
                 return pointD_;
-            }
-
-            //- Return multi-material interface pointer
-            const newLeastSquaresVolPointInterpolation& volToPoint() const
-            {
-                return volToPoint_;
             }
 
             //- Face zone point displacement increment

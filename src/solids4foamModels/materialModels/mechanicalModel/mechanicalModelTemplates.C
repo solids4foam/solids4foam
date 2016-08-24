@@ -25,56 +25,63 @@ License
 
 #include "mechanicalModel.H"
 #include "processorFvsPatchField.H"
-
+#include "processorPointPatchFields.H"
+#include "componentMixedPointPatchFields.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 template<class Type>
-void Foam::mechanicalModel::mapSubMeshVolField
+void Foam::mechanicalModel::mapSubMeshVolFields
 (
-    const label meshI,
-    const GeometricField<Type, fvPatchField, volMesh>& subMeshField,
+    const PtrList<GeometricField<Type, fvPatchField, volMesh> >& subMeshFields,
     GeometricField<Type, fvPatchField, volMesh>& baseMeshField
 ) const
 {
-    // Map iternal field from sub-mesh to global mesh
+    // Map internal field from sub-meshes to base mesh
 
-    const labelList& cellMap = subMeshes()[meshI].cellMap();
-
-    forAll(subMeshField, cellI)
+    forAll(subMeshes(), meshI)
     {
-        baseMeshField[cellMap[cellI]] = subMeshField[cellI];
-    }
+        const labelList& cellMap = subMeshes()[meshI].cellMap();
 
-    // Map boundary field
+        const GeometricField<Type, fvPatchField, volMesh>& subMeshField =
+            subMeshFields[meshI];
 
-    const labelList& patchMap = subMeshes()[meshI].patchMap();
-    const labelList& faceMap = subMeshes()[meshI].faceMap();
-
-    forAll(subMeshField.boundaryField(), patchI)
-    {
-        const fvPatchField<Type>& subMeshFieldP =
-            subMeshField.boundaryField()[patchI];
-
-        const label start = subMeshFieldP.patch().patch().start();
-
-        if (patchMap[patchI] != -1)
+        forAll(subMeshField, cellI)
         {
-            fvPatchField<Type>& baseMeshFieldP =
-                baseMeshField.boundaryField()[patchMap[patchI]];
+            baseMeshField[cellMap[cellI]] = subMeshField[cellI];
+        }
 
-            if (!baseMeshFieldP.coupled())
+        // Map boundary field
+
+        const labelList& patchMap = subMeshes()[meshI].patchMap();
+        const labelList& faceMap = subMeshes()[meshI].faceMap();
+
+        forAll(subMeshField.boundaryField(), patchI)
+        {
+            const fvPatchField<Type>& subMeshFieldP =
+                subMeshField.boundaryField()[patchI];
+
+            const label start = subMeshFieldP.patch().patch().start();
+
+            if (patchMap[patchI] != -1)
             {
-                forAll(subMeshFieldP, faceI)
+                fvPatchField<Type>& baseMeshFieldP =
+                    baseMeshField.boundaryField()[patchMap[patchI]];
+
+                if (!baseMeshFieldP.coupled())
                 {
-                    const label globalGlobalMeshFace = faceMap[start + faceI];
+                    forAll(subMeshFieldP, faceI)
+                    {
+                        const label globalGlobalMeshFace =
+                            faceMap[start + faceI];
 
-                    const label curGlobalMeshPatchFace =
-                        globalGlobalMeshFace
-                      - mesh().boundaryMesh()[patchMap[patchI]].start();
+                        const label curGlobalMeshPatchFace =
+                            globalGlobalMeshFace
+                            - mesh().boundaryMesh()[patchMap[patchI]].start();
 
-                    baseMeshFieldP[curGlobalMeshPatchFace] =
-                        subMeshFieldP[faceI];
+                        baseMeshFieldP[curGlobalMeshPatchFace] =
+                            subMeshFieldP[faceI];
+                    }
                 }
             }
         }
@@ -85,77 +92,91 @@ void Foam::mechanicalModel::mapSubMeshVolField
 
 
 template<class Type>
-void Foam::mechanicalModel::mapSubMeshSurfaceField
+void Foam::mechanicalModel::mapSubMeshSurfaceFields
 (
-    const label meshI,
-    const GeometricField<Type, fvsPatchField, surfaceMesh>& subMeshField,
+    const PtrList<GeometricField<Type, fvsPatchField, surfaceMesh> >&
+        subMeshFields,
     GeometricField<Type, fvsPatchField, surfaceMesh>& baseMeshField
 ) const
 {
-    // Map iternal field from sub-mesh to global mesh
+    // Map internal fields from sub-mesh to base mesh
 
-    const labelList& faceMap = subMeshes()[meshI].faceMap();
+    // Reset field to zero as we will average later
+    baseMeshField =
+        dimensioned<Type>
+        (
+            "zero", baseMeshField.dimensions(), pTraits<Type>::zero
+        );
 
-    forAll(subMeshField, faceI)
+    forAll(subMeshes(), meshI)
     {
-        baseMeshField[faceMap[faceI]] = subMeshField[faceI];
-    }
+        const labelList& faceMap = subMeshes()[meshI].faceMap();
 
-    // Map boundary field
+        const GeometricField<Type, fvsPatchField, surfaceMesh>& subMeshField =
+            subMeshFields[meshI];
 
-    const labelList& patchMap = subMeshes()[meshI].patchMap();
-
-    forAll(subMeshField.boundaryField(), patchI)
-    {
-        const fvsPatchField<Type>& subMeshFieldP =
-            subMeshField.boundaryField()[patchI];
-
-        const label start = subMeshFieldP.patch().patch().start();
-
-        if (patchMap[patchI] != -1)
+        forAll(subMeshField, faceI)
         {
-            fvsPatchField<Type>& baseMeshFieldP =
-                baseMeshField.boundaryField()[patchMap[patchI]];
-
-            // Note: unlike volFields, we do map on the coupled patches for
-            // surface fields
-            forAll(subMeshFieldP, faceI)
-            {
-                const label globalGlobalMeshFace = faceMap[start + faceI];
-
-                const label curGlobalMeshPatchFace =
-                    globalGlobalMeshFace
-                  - mesh().boundaryMesh()[patchMap[patchI]].start();
-
-                baseMeshFieldP[curGlobalMeshPatchFace] = subMeshFieldP[faceI];
-            }
+            baseMeshField[faceMap[faceI]] = subMeshField[faceI];
         }
-        else // interface faces shared by two materials
+
+        // Map boundary field
+
+        const labelList& patchMap = subMeshes()[meshI].patchMap();
+
+        forAll(subMeshField.boundaryField(), patchI)
         {
-            forAll(subMeshFieldP, faceI)
+            const fvsPatchField<Type>& subMeshFieldP =
+                subMeshField.boundaryField()[patchI];
+
+            const label start = subMeshFieldP.patch().patch().start();
+
+            if (patchMap[patchI] != -1)
             {
-                const label globalGlobalMeshFace = faceMap[start + faceI];
+                fvsPatchField<Type>& baseMeshFieldP =
+                    baseMeshField.boundaryField()[patchMap[patchI]];
 
-                if (globalGlobalMeshFace < mesh().nInternalFaces())
+                // Note: unlike volFields, we do map on the coupled patches for
+                // surface fields
+                forAll(subMeshFieldP, faceI)
                 {
-                    // Face value will be the average from both sides
-                    baseMeshField[globalGlobalMeshFace] +=
-                        0.5*subMeshFieldP[faceI];
-                }
-                else
-                {
-                    const label curPatch =
-                        mesh().boundaryMesh().whichPatch
-                        (
-                            globalGlobalMeshFace
-                        );
+                    const label globalGlobalMeshFace = faceMap[start + faceI];
 
-                    const label curPatchFace =
+                    const label curGlobalMeshPatchFace =
                         globalGlobalMeshFace
-                      - mesh().boundaryMesh()[curPatch].start();
+                        - mesh().boundaryMesh()[patchMap[patchI]].start();
 
-                    baseMeshField.boundaryField()[curPatch][curPatchFace] =
+                    baseMeshFieldP[curGlobalMeshPatchFace] =
                         subMeshFieldP[faceI];
+                }
+            }
+            else // interface faces shared by two materials
+            {
+                forAll(subMeshFieldP, faceI)
+                {
+                    const label globalGlobalMeshFace = faceMap[start + faceI];
+
+                    if (globalGlobalMeshFace < mesh().nInternalFaces())
+                    {
+                        // Face value will be the average from both sides
+                        baseMeshField[globalGlobalMeshFace] +=
+                            0.5*subMeshFieldP[faceI];
+                    }
+                    else
+                    {
+                        const label curPatch =
+                            mesh().boundaryMesh().whichPatch
+                            (
+                                globalGlobalMeshFace
+                            );
+
+                        const label curPatchFace =
+                            globalGlobalMeshFace
+                            - mesh().boundaryMesh()[curPatch].start();
+
+                        baseMeshField.boundaryField()[curPatch][curPatchFace] =
+                            subMeshFieldP[faceI];
+                    }
                 }
             }
         }
@@ -215,6 +236,258 @@ void Foam::mechanicalModel::mapSubMeshSurfaceField
             Field<Type>& patchField = baseMeshFieldP;
 
             patchField = 0.5*(patchField + ngbPatchField);
+        }
+    }
+}
+
+
+template<class Type>
+void Foam::mechanicalModel::mapSubMeshPointFields
+(
+    const PtrList<GeometricField<Type, pointPatchField, pointMesh> >&
+        subMeshFields,
+    GeometricField<Type, pointPatchField, pointMesh>& baseMeshField
+) const
+{
+    // Map internal field from sub-mesh to base mesh
+
+    vectorField& baseMeshFieldI = baseMeshField.internalField();
+
+    // Reset the baseMeshField to zero as we take global averages later
+    baseMeshFieldI = vector::zero;
+
+    // Number of material adjacent to each point
+    const labelList& noMat = pointNumOfMaterials();
+
+    // Global point addressing
+    const labelList& spLabels =
+        mesh().globalData().sharedPointLabels();
+    const labelList& spAddressing =
+        mesh().globalData().sharedPointAddr();
+
+    // Global point data
+    List< List< Map<vector> > > glData(Pstream::nProcs());
+    forAll(glData, procI)
+    {
+        glData[procI] =
+            List< Map<vector> >
+            (
+                mesh().globalData().nGlobalPoints(),
+                Map<vector>()
+            );
+    }
+
+    forAll(subMeshes(), meshI)
+    {
+        const labelList& pointMap = subMeshes()[meshI].pointMap();
+        const vectorField& subMeshPointDI =
+            subMeshFields[meshI].internalField();
+
+        forAll(pointMap, pointI)
+        {
+            const label curMeshPoint = pointMap[pointI];
+            const bool sharedPoint(findIndex(spLabels, curMeshPoint) != -1);
+
+            if (sharedPoint)
+            {
+                const label k = findIndex(spLabels, curMeshPoint);
+                const label curSpIndex = spAddressing[k];
+                glData[Pstream::myProcNo()][curSpIndex].insert
+                    (
+                        meshI,
+                        subMeshPointDI[pointI]
+                    );
+            }
+            else
+            {
+                baseMeshFieldI[curMeshPoint] +=
+                    subMeshPointDI[pointI]/noMat[curMeshPoint];
+            }
+        }
+    }
+
+    Pstream::gatherList(glData);
+    Pstream::scatterList(glData);
+
+    const int nGlobalPoints = mesh().globalData().nGlobalPoints();
+
+    if (nGlobalPoints)
+    {
+        const int nSubMeshes = subMeshes().size();
+
+        for (label k = 0; k < nGlobalPoints; k++)
+        {
+            // Current shared point index
+            const label curSpIndex = findIndex(spAddressing, k);
+
+            if (curSpIndex != -1)
+            {
+                List<label> matN(subMeshes().size(), 0);
+                List<vector> matAvg(subMeshes().size(), vector::zero);
+
+                forAll(glData, procI)
+                {
+                    const Map<vector>& curProcGlData = glData[procI][k];
+
+                    for (label i = 0; i < nSubMeshes; i++)
+                    {
+                        if (curProcGlData.found(i))
+                        {
+                            matAvg[i] += curProcGlData[i];
+                            matN[i]++;
+                        }
+                    }
+                }
+
+                label nMat = 0;
+                vector avg = vector::zero;
+
+                forAll(matAvg, matI)
+                {
+                    if (matN[matI])
+                    {
+                        matAvg[matI] /= matN[matI];
+                        avg += matAvg[matI];
+                        nMat++;
+                    }
+                }
+                avg /= nMat;
+
+                baseMeshFieldI[spLabels[curSpIndex]] = avg;
+            }
+        }
+    }
+
+
+    const int nIsolatedInterfacePoints =
+        returnReduce(isolatedInterfacePoints().size(), sumOp<int>());
+
+    if (nIsolatedInterfacePoints)
+    {
+        // Correct isolated points
+        forAll(baseMeshField.boundaryField(), patchI)
+        {
+            if
+            (
+                baseMeshField.boundaryField()[patchI].type()
+             == processorPointPatchVectorField::typeName
+            )
+            {
+                if (Pstream::parRun())
+                {
+                    const processorPointPatchVectorField& procPatchDispl =
+                        refCast<processorPointPatchVectorField>
+                        (
+                            baseMeshField.boundaryField()[patchI]
+                        );
+
+                    const processorPolyPatch& procPatch =
+                        refCast<const processorPolyPatch>
+                        (
+                            mesh().boundaryMesh()[patchI]
+                        );
+
+                    vectorField pif =
+                        procPatchDispl.patchInternalField
+                        (
+                            baseMeshField.internalField()
+                        );
+
+                    OPstream::write
+                    (
+                        Pstream::blocking,
+                        procPatch.neighbProcNo(),
+                        reinterpret_cast<const char*>(pif.begin()),
+                        pif.byteSize()
+                    );
+                }
+            }
+        }
+
+        forAll(baseMeshField.boundaryField(), patchI)
+        {
+            if
+            (
+                baseMeshField.boundaryField()[patchI].type()
+             == processorPointPatchVectorField::typeName
+            )
+            {
+                if (Pstream::parRun())
+                {
+                    const processorPointPatchVectorField& procPatchDispl =
+                        refCast<processorPointPatchVectorField>
+                        (
+                            baseMeshField.boundaryField()[patchI]
+                        );
+
+                    const processorPolyPatch& procPatch =
+                        refCast<const processorPolyPatch>
+                        (
+                            mesh().boundaryMesh()[patchI]
+                        );
+
+                    tmp<vectorField> tNgbProcPatchDispl
+                    (
+                        new vectorField(procPatchDispl.size(), vector::zero)
+                    );
+                    vectorField& ngbProcPatchDispl = tNgbProcPatchDispl();
+
+                    IPstream::read
+                    (
+                        Pstream::blocking,
+                        procPatch.neighbProcNo(),
+                        reinterpret_cast<char*>(ngbProcPatchDispl.begin()),
+                        ngbProcPatchDispl.byteSize()
+                    );
+
+                    const labelList& isoInterfacePoints =
+                        isolatedInterfacePoints();
+                    const labelListList& pointFaces = mesh().pointFaces();
+
+                    forAll(isoInterfacePoints, pI)
+                    {
+                        const label curPoint = isoInterfacePoints[pI];
+
+                        const labelList& curPointFaces = pointFaces[curPoint];
+
+                        forAll(curPointFaces, fI)
+                        {
+                            const label faceID = curPointFaces[fI];
+                            const label patchID =
+                                mesh().boundaryMesh().whichPatch(faceID);
+
+                            if (patchID == patchI)
+                            {
+                                const label curPatchPoint =
+                                    mesh().boundaryMesh()
+                                    [
+                                        patchI
+                                    ].meshPointMap()[curPoint];
+
+                                baseMeshFieldI[curPoint] =
+                                    ngbProcPatchDispl[curPatchPoint];
+
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    baseMeshField.correctBoundaryConditions();
+
+    // Re-evaluate componentMixed patches
+    forAll(baseMeshField.boundaryField(), patchI)
+    {
+        if
+        (
+            baseMeshField.boundaryField()[patchI].type()
+         == componentMixedPointPatchVectorField::typeName
+        )
+        {
+            baseMeshField.boundaryField()[patchI].evaluate();
         }
     }
 }

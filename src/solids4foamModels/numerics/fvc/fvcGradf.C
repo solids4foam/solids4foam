@@ -49,8 +49,8 @@ tmp
 <
     GeometricField
     <
-        typename outerProduct<vector, Type>::type, 
-        fvsPatchField, 
+        typename outerProduct<vector, Type>::type,
+        fvsPatchField,
         surfaceMesh
     >
 > fGrad
@@ -120,10 +120,10 @@ tmp
             Le *= curFace.edgeDirection(curEdge);
 
             // Edge-centre field value
-            Type fe = 
+            Type fe =
                 0.5
                *(
-                   pfI[curEdge.start()] 
+                   pfI[curEdge.start()]
                  + pfI[curEdge.end()]
                 );
 
@@ -135,7 +135,7 @@ tmp
             Re -= nI[faceI]*(nI[faceI]&Re);
             faceArea += (Le&Re);
         }
-        
+
         faceArea /= 2.0;
 
         gradI[faceI] /= mag; // faceArea; // mag
@@ -175,10 +175,10 @@ tmp
                 Le *= curFace.edgeDirection(curEdge);
 
                 // Edge-centre field value
-                Type fe = 
+                Type fe =
                     0.5
                    *(
-                       pfI[curEdge.start()] 
+                       pfI[curEdge.start()]
                      + pfI[curEdge.end()]
                     );
 
@@ -192,7 +192,7 @@ tmp
             }
 
             faceArea /= 2.0;
-        
+
             patchGrad[faceI] /= mag; //faceArea; //mag
         }
     }
@@ -206,9 +206,9 @@ tmp
 
             if (!ggiPatch.master())
             {
-                Field<GradType>& slaveGrad = 
+                Field<GradType>& slaveGrad =
                     tGrad().boundaryField()[patchI];
-                const Field<GradType>& masterGrad = 
+                const Field<GradType>& masterGrad =
                     tGrad().boundaryField()[ggiPatch.shadowIndex()];
 
                 slaveGrad = ggiPatch.interpolate(masterGrad);
@@ -216,7 +216,7 @@ tmp
         }
     }
 
-//     const GeometricField<GradType, fvPatchField, volMesh>& gradU = 
+//     const GeometricField<GradType, fvPatchField, volMesh>& gradU =
 //         mesh.lookupObject<GeometricField<GradType, fvPatchField, volMesh> >
 //         (
 //             "grad(" + vf.name() + ")"
@@ -236,8 +236,8 @@ tmp
 <
     GeometricField
     <
-        typename outerProduct<vector, Type>::type, 
-        fvsPatchField, 
+        typename outerProduct<vector, Type>::type,
+        fvsPatchField,
         surfaceMesh
     >
 > fsGrad
@@ -307,10 +307,10 @@ tmp
             Le *= curFace.edgeDirection(curEdge);
 
             // Edge-centre field value
-            Type fe = 
+            Type fe =
                 0.5
                *(
-                   pfI[curEdge.start()] 
+                   pfI[curEdge.start()]
                  + pfI[curEdge.end()]
                 );
 
@@ -322,7 +322,7 @@ tmp
             Re -= nI[faceI]*(nI[faceI]&Re);
             faceArea += (Le&Re);
         }
-        
+
         faceArea /= 2.0;
 
         gradI[faceI] /= mag; // faceArea; // mag
@@ -362,10 +362,10 @@ tmp
                 Le *= curFace.edgeDirection(curEdge);
 
                 // Edge-centre field value
-                Type fe = 
+                Type fe =
                     0.5
                    *(
-                       pfI[curEdge.start()] 
+                       pfI[curEdge.start()]
                      + pfI[curEdge.end()]
                     );
 
@@ -379,7 +379,7 @@ tmp
             }
 
             faceArea /= 2.0;
-        
+
             patchGrad[faceI] /= mag; //faceArea; //mag
         }
     }
@@ -388,14 +388,14 @@ tmp
     {
         if (mesh.boundary()[patchI].type() == ggiFvPatch::typeName)
         {
-            const ggiFvPatch& ggiPatch = 
+            const ggiFvPatch& ggiPatch =
                 refCast<const ggiFvPatch>(mesh.boundary()[patchI]);
 
             if (!ggiPatch.master())
             {
-                Field<GradType>& slaveGrad = 
+                Field<GradType>& slaveGrad =
                     tGrad().boundaryField()[patchI];
-                const Field<GradType>& masterGrad = 
+                const Field<GradType>& masterGrad =
                     tGrad().boundaryField()[ggiPatch.shadowIndex()];
 
                 slaveGrad = ggiPatch.interpolate(masterGrad);
@@ -457,7 +457,7 @@ tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
             Le *= curFace.edgeDirection(curEdge);
 
             // Edge-centre displacement
-            Type fe = 
+            Type fe =
                 0.5
                *(
                    ppf[curEdge.start()]
@@ -474,7 +474,7 @@ tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
         }
 
         faceArea /= 2.0;
-        
+
         grad[faceI] /= mag; //faceArea;
     }
 
@@ -487,8 +487,8 @@ tmp
 <
     GeometricField
     <
-        typename outerProduct<vector, Type>::type, 
-        fvPatchField, 
+        typename outerProduct<vector, Type>::type,
+        fvPatchField,
         volMesh
     >
 > grad
@@ -543,7 +543,7 @@ tmp
         // If the face is a triangle, do a direct calculation
         if (curFace.size() == 3)
         {
-            GradType SF = 
+            GradType SF =
                 curFace.normal(points)*curFace.average(points, pfI);
 
             iGrad[owner[faceI]] += SF;
@@ -586,14 +586,14 @@ tmp
                     (
                         (points[curFace[pI]] - centrePoint)
                       ^ (
-                            points[curFace[(pI + 1) % nPoints]] 
+                            points[curFace[(pI + 1) % nPoints]]
                           - centrePoint
                         )
                     );
                 St /= 2.0;
 
                 // Calculate triangle centre
-                vector Ct = 
+                vector Ct =
                     (
                         centrePoint
                       + points[curFace[pI]]
@@ -617,7 +617,7 @@ tmp
 
         forAll(mesh.boundaryMesh()[patchI], faceI)
         {
-            label globalFaceID = 
+            label globalFaceID =
                 mesh.boundaryMesh()[patchI].start() + faceI;
 
             const face& curFace = faces[globalFaceID];
@@ -663,14 +663,14 @@ tmp
                         (
                             (points[curFace[pI]] - centrePoint)
                           ^ (
-                                points[curFace[(pI + 1) % nPoints]] 
+                                points[curFace[(pI + 1) % nPoints]]
                               - centrePoint
                             )
                         );
                     St /= 2.0;
 
                     // Calculate triangle centre
-                    vector Ct = 
+                    vector Ct =
                         (
                             centrePoint
                           + points[curFace[pI]]
@@ -695,7 +695,7 @@ tmp
     // Calculate boundary gradient
     forAll(mesh.boundary(), patchI)
     {
-        if 
+        if
         (
             mesh.boundary()[patchI].size()
          && !vf.boundaryField()[patchI].coupled()
@@ -703,7 +703,7 @@ tmp
         {
             Field<Type> ppf = pf.boundaryField()[patchI].patchInternalField();
 
-            tGrad().boundaryField()[patchI] = 
+            tGrad().boundaryField()[patchI] =
                 fGrad(mesh.boundaryMesh()[patchI], ppf);
         }
     }

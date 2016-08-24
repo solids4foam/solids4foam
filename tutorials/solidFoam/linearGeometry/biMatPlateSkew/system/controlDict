@@ -10,49 +10,38 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            steadyState;
-}
+application     solidFoam;
 
-ddtSchemes
-{
-    default            steadyState;
-}
+startFrom       startTime;
 
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
+startTime       0;
 
-divSchemes
-{
-    default            Gauss linear;
-}
+stopAt          endTime;
 
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
-}
+endTime         10;
 
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          newSkewCorrected 1;
-    snGrad(DD)         newSkewCorrected 1;
-}
+deltaT          10;
 
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-    interpolate(grad(D)) linear;
-}
+writeControl    timeStep;
+
+writeInterval   1;
+
+cycleWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
 
 // ************************************************************************* //

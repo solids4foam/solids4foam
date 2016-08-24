@@ -10,49 +10,28 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      mechanicalProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            steadyState;
-}
+planeStress     yes;
 
-ddtSchemes
-{
-    default            steadyState;
-}
-
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
-
-divSchemes
-{
-    default            Gauss linear;
-}
-
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
-}
-
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          newSkewCorrected 1;
-    snGrad(DD)         newSkewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-    interpolate(grad(D)) linear;
-}
+mechanical
+(
+    steel
+    {
+        type            linearElastic;
+        rho             rho [1 -3 0 0 0 0 0] 7854;
+        E               E [1 -1 -2 0 0 0 0] 200e+9;
+        nu              nu [0 0 0 0 0 0 0] 0.3;
+    }
+    epoxy
+    {
+        type            linearElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+        E               E [1 -1 -2 0 0 0 0] 3e+9;
+        nu              nu [0 0 0 0 0 0 0] 0.4;
+    }
+);
 
 // ************************************************************************* //

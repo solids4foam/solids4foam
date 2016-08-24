@@ -120,31 +120,21 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 
 void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 {
-    // Lookup the total deformation gradient from the solver
-    const volTensorField F =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<tensor>("F", mesh());
+    // Lookup gradient of displacement
+    const volTensorField& gradD =
+        mesh().lookupObject<volTensorField>("grad(D)");
 
-    // Lookup the Jacobian of the deformation gradient from the solver
-    const volScalarField J =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<scalar>("J", mesh());
+    // Calculate deformation gradient
+    const volTensorField F = I + gradD.T();
 
-    // Calculate left Cauchy Green strain tensor with volumetric term removed
-    volSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(F & F.T());
+    // Calculate the Jacobian of the deformation gradient
+    const volScalarField J = det(F);
 
-    // Calculate deviatoric stress
-    volSymmTensorField s = mu_*dev(bEbar);
+    // Calculate the volume preserving left Cauchy Green strain
+    const volSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(F & F.T());
+
+    // Calculate the deviatoric stress
+    const volSymmTensorField s = mu_*dev(bEbar);
 
     // Calculate the Cauchy stress
     sigma = (1.0/J)*0.5*K_*(pow(J, 2) - 1)*I + s;

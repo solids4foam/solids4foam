@@ -28,8 +28,12 @@ Description
     The mechanical model class takes care of reading the mechanical properties
     and creating mechanical laws.
 
-    To consider: cellZones would be more natural than a material indicator field
-    but we would have to make sure no cell is in more than one cellZone.
+    If there are multiple mechanical laws then cellZones are read, and
+    corrections are applied at bi-material interfaces to ensure continuity of
+    stress.
+
+    Multiple mechanical laws are treated by defining a separate sub-mesh for
+    each mechanical law region (cellZone).
 
 SourceFiles
     mechanicalModel.C
@@ -50,6 +54,7 @@ Author
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "newFvMeshSubset.H"
+#include "newLeastSquaresVolPointInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -72,12 +77,19 @@ class mechanicalModel
         //- Is the current case plane stress or plain strain/3-D
         const Switch planeStress_;
 
-        //- Name of the cellZones for each material
+        //- Name of the cellZone for each material
         mutable wordList cellZoneNames_;
 
         //- Sub-mesh for each material
         //  Not used if there is only one material
         mutable PtrList<newFvMeshSubset> subMeshes_;
+
+        //- Volume field to point field interpolator for the base mesh
+        mutable newLeastSquaresVolPointInterpolation* volToPointPtr_;
+
+        //- Volume field to point field interpolator for each mechanical law
+        mutable PtrList<newLeastSquaresVolPointInterpolation>
+            subMeshVolToPoint_;
 
         //- Stress volField for each mechanical law
         mutable PtrList<volSymmTensorField> subMeshSigma_;
@@ -91,6 +103,16 @@ class mechanicalModel
         //- Displacement gradient volField for each mechanical law
         mutable PtrList<volTensorField> subMeshGradD_;
 
+        //- Displacement gradient surfaceField for each mechanical law
+        mutable PtrList<surfaceTensorField> subMeshGradDf_;
+
+        //- Displacement pointField for each mechanical law
+        mutable PtrList<pointVectorField> subMeshPointD_;
+
+        //- List of faces in the base mesh that are on a bi-material interface
+        //  ie. they are shared by two materials
+        mutable labelList* interfaceBaseFacesPtr_;
+
         //- Index of the subMesh on the other side of a bi-material interface
         mutable PtrList<labelList> interfaceShadowSubMeshID_;
 
@@ -100,11 +122,14 @@ class mechanicalModel
         //- Index of the subMesh on the other side of a bi-material interface
         mutable PtrList<labelList> interfaceShadowFaceID_;
 
-        //- Are there any faces on a bi-material interface
-        mutable bool* interfaceFoundPtr_;
-
         //- The implicit stiffness surface field for Rhie-Chow correction
         mutable surfaceScalarField* impKfcorrPtr_;
+
+        //- Number of materials adjacent to each point in the base mesh
+        mutable labelList* pointNumOfMaterialsPtr_;
+
+        //- Isolated interface points
+        mutable labelList* isolatedInterfacePointsPtr_;
 
 
     // Private Member Functions
@@ -114,6 +139,16 @@ class mechanicalModel
 
         //- Return a const reference to the subMeshes
         const PtrList<newFvMeshSubset>& subMeshes() const;
+
+        //- Make base mesh vol-to-point interpolator
+        void makeVolToPoint() const;
+
+        //- Make subMesh vol-to-point interpolators
+        void makeSubMeshVolToPoint() const;
+
+        //- Return a const reference to the vol-to-point interpolators
+        const PtrList<newLeastSquaresVolPointInterpolation>&
+            subMeshVolToPoint() const;
 
         //- Check the cell zones are defined for each material
         void checkCellZones() const;
@@ -154,6 +189,30 @@ class mechanicalModel
         //- Return the subMesh gradD volFields
         const PtrList<volTensorField>& subMeshGradD() const;
 
+        //- Calculate the subMesh gradDf fields
+        void calcSubMeshGradDf() const;
+
+        //- Return the subMesh gradDf volFields
+        PtrList<surfaceTensorField>& subMeshGradDf();
+
+        //- Return the subMesh gradDf volFields
+        const PtrList<surfaceTensorField>& subMeshGradDf() const;
+
+        //- Calculate the subMesh pointD fields
+        void calcSubMeshPointD() const;
+
+        //- Return the subMesh pointD volFields
+        PtrList<pointVectorField>& subMeshPointD();
+
+        //- Return the subMesh pointD volFields
+        const PtrList<pointVectorField>& subMeshPointD() const;
+
+        //- Make the interface base faces
+        void makeInterfaceBaseFaces() const;
+
+        //- Return the interface base faces
+        const labelList& interfaceBaseFaces() const;
+
         //- Calculate the interface shadow subMesh indices
         void calcInterfaceShadowIDs() const;
 
@@ -166,44 +225,65 @@ class mechanicalModel
         //- Return the interface shadow face indices
         const PtrList<labelList>& interfaceShadowFaceID() const;
 
-        //- Return the interface found
-        bool interfaceFound() const;
-
         //- Calculate the impKf field for Rhie-Chow correction
         //  This field is zero on bi-material interfaces
         void calcImpKfcorr() const;
+
+        //- Make materials number for points
+        void makePointNumOfMaterials() const;
+
+        //- Return material number for points
+        const labelList& pointNumOfMaterials() const;
+
+        //- Make isolated interface points
+        void makeIsolatedInterfacePoints() const;
+
+        //- Return isolated interface points
+        const labelList& isolatedInterfacePoints() const;
 
         //- Interpolate the base D to the subMesh D, where we apply corrections
         //  on bi-material interfaces
         void interpolateDtoSubMeshD
         (
-            const label lawI,
-            const volVectorField& D
+            const volVectorField& D,
+            const bool useVolFieldSigma
         );
 
-        //- Correct SnGrad on subMesh bi-material interface patch
-        void correctInterfaceSnGrad(const label lawI);
+        //- Correct snGrad on bi-material interface patch for subMeshGradD field
+        void correctInterfaceSnGrad();
+
+        //- Correct snGrad on bi-material interface patch for subMeshGradDf
+        //  field
+        void correctInterfaceSnGradf();
 
         //- Return the implicit stiffness surface field for Rhie-Chow correction
         const surfaceScalarField& impKfcorr() const;
 
         //- Map a volField from the subMesh to the base mesh
         template<class Type>
-        void mapSubMeshVolField
+        void mapSubMeshVolFields
         (
-            const label meshI,
-            const GeometricField<Type, fvPatchField, volMesh>& subMeshField,
+            const PtrList<GeometricField<Type, fvPatchField, volMesh> >&
+                subMeshFields,
             GeometricField<Type, fvPatchField, volMesh>& baseMeshField
         ) const;
 
         //- Map a surfaceField from the subMesh to the base mesh
         template<class Type>
-        void mapSubMeshSurfaceField
+        void mapSubMeshSurfaceFields
         (
-            const label meshI,
-            const GeometricField<Type, fvsPatchField, surfaceMesh>&
-                subMeshField,
+            const PtrList<GeometricField<Type, fvsPatchField, surfaceMesh> >&
+                subMeshFields,
             GeometricField<Type, fvsPatchField, surfaceMesh>& baseMeshField
+        ) const;
+
+        //- Map pointFields from the subMesh to the base mesh
+        template<class Type>
+        void mapSubMeshPointFields
+        (
+            const PtrList<GeometricField<Type, pointPatchField, pointMesh> >&
+                subMshFields,
+            GeometricField<Type, pointPatchField, pointMesh>& baseMeshField
         ) const;
 
         //- Clear out demand driven data
@@ -235,6 +315,10 @@ public:
             //- Return const access to the mesh
             const fvMesh& mesh() const;
 
+            //- Return a const reference to the vol-to-point base mesh
+            //  interpolator
+            const newLeastSquaresVolPointInterpolation& volToPoint() const;
+
             //- Return initial density
             tmp<volScalarField> rho() const;
 
@@ -258,10 +342,35 @@ public:
             //- Calculate the stress surfaceField
             void correct(surfaceSymmTensorField& sigma);
 
-            //- Update the gradient of displacement
+            //- Update the gradient of displacement vol field
             void grad
             (
-                volTensorField& gradD, const volVectorField& D
+                const volVectorField& D,
+                volTensorField& gradD
+            );
+
+            //- Update the gradient of displacement vol field using pointD
+            void grad
+            (
+                const volVectorField& D,
+                const pointVectorField& pointD,
+                volTensorField& gradD
+            );
+
+            //- Update the gradient of displacement surface field using pointD
+            void grad
+            (
+                const volVectorField& D,
+                const pointVectorField& pointD,
+                surfaceTensorField& gradDf
+            );
+
+            //- Interpolate D to pointD
+            void interpolate
+            (
+                const volVectorField& D,
+                pointVectorField& pointD,
+                const bool useVolFieldSigma = true
             );
 
             //- Return explicit Rhie-Chow correction field to quell oscillations

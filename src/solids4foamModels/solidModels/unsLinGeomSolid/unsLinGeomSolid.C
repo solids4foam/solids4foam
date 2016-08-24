@@ -185,32 +185,6 @@ unsLinGeomSolid::unsLinGeomSolid(dynamicFvMesh& mesh)
         pMesh_,
         dimensionedVector("0", dimLength, vector::zero)
     ),
-    epsilon_
-    (
-        IOobject
-        (
-            "epsilon",
-            runTime().timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
-    epsilonf_
-    (
-        IOobject
-        (
-            "epsilonf",
-            runTime().timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
     sigma_
     (
         IOobject
@@ -237,7 +211,6 @@ unsLinGeomSolid::unsLinGeomSolid(dynamicFvMesh& mesh)
         mesh,
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    volToPoint_(mesh),
     gradD_
     (
         IOobject
@@ -403,7 +376,11 @@ tmp<tensorField> unsLinGeomSolid::faceZoneSurfaceGradientOfVelocity
     tensorField& velocityGradient = tVelocityGradient();
 
     vectorField pPointU =
-        volToPoint_.interpolate(mesh().boundaryMesh()[patchID], U_);
+        mechanical().volToPoint().interpolate
+        (
+            mesh().boundaryMesh()[patchID],
+            U_
+        );
 
     const faceList& localFaces =
         mesh().boundaryMesh()[patchID].localFaces();
@@ -754,21 +731,17 @@ bool unsLinGeomSolid::evolve()
         // Under-relax the field
         D_.relax();
 
-        // Update gradient of displacement
-        volToPoint_.interpolate(D_, pointD_);
-        gradD_ = fvc::grad(D_, pointD_);
-        gradDf_ = fvc::fGrad(D_, pointD_);
+        // Interpolate D to pointD
+        mechanical().interpolate(D_, pointD_, false);
 
-        // Update the strain
-        epsilonf_ = symm(gradDf_);
+        // Update gradient of displacement
+        mechanical().grad(D_, pointD_, gradD_);
+        mechanical().grad(D_, pointD_, gradDf_);
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigmaf_);
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
-
-    // Calculate cell strain
-    epsilon_ = symm(gradD_);
 
     // Calculate cell stress
     mechanical().correct(sigma_);
@@ -793,7 +766,7 @@ bool unsLinGeomSolid::evolve()
 //     }
 //     else
 //     {
-//         volToPoint_.interpolate(D_, pointD_);
+//         mechanical().volToPoint().interpolate(D_, pointD_);
 //         gradD_ = fvc::grad(D_, pointD_);
 //         gradDf_ = fvc::fGrad(D_, pointD_);
 //     }
@@ -849,6 +822,20 @@ void unsLinGeomSolid::updateTotalFields()
 
 void unsLinGeomSolid::writeFields(const Time& runTime)
 {
+    // Calculate cell strain
+    volSymmTensorField epsilon
+    (
+        IOobject
+        (
+            "epsilon",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        symm(gradD_)
+    );
+
     // Update equivalent strain
     volScalarField epsilonEq
     (
@@ -860,7 +847,7 @@ void unsLinGeomSolid::writeFields(const Time& runTime)
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        sqrt((2.0/3.0)*magSqr(dev(epsilon_)))
+        sqrt((2.0/3.0)*magSqr(dev(epsilon)))
     );
 
     Info<< "Max epsilonEq = " << max(epsilonEq).value()

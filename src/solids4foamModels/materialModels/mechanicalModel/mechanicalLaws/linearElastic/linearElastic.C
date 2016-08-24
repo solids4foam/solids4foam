@@ -152,18 +152,14 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
 
 void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Lookup the strain tensor from the solver
-    const surfaceSymmTensorField epsilon =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshSurfaceField<symmTensor>("epsilonf", mesh());
+    // Lookup gradient of displacement
+    // Note: for multi-material cases, gradD is corrected on bi-material
+    // interfaces
+    const surfaceTensorField& gradD =
+        mesh().lookupObject<surfaceTensorField>("grad(D)f");
 
     // Calculate stress based on Hooke's law
-    sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
+    sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
 }
 
 

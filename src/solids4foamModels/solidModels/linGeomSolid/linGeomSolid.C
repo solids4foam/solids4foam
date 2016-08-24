@@ -31,14 +31,7 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
-
 #include "fvcGradf.H"
-//#include "skewCorrectionVectors.H"
-//#include "multiMaterial.H"
-//#include "twoDPointCorrector.H"
-//#include "thermalModel.H"
-//#include "findRefCellVector.H"
-//#include "componentReferenceList.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -192,19 +185,6 @@ linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
         pMesh_,
         dimensionedVector("0", dimLength, vector::zero)
     ),
-    epsilon_
-    (
-        IOobject
-        (
-            "epsilon",
-            runTime().timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
     sigma_
     (
         IOobject
@@ -218,7 +198,6 @@ linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
         mesh,
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    volToPoint_(mesh),
     gradD_
     (
         IOobject
@@ -371,7 +350,11 @@ tmp<tensorField> linGeomSolid::faceZoneSurfaceGradientOfVelocity
     tensorField& velocityGradient = tVelocityGradient();
 
     vectorField pPointU =
-        volToPoint_.interpolate(mesh().boundaryMesh()[patchID], U_);
+        mechanical().volToPoint().interpolate
+        (
+            mesh().boundaryMesh()[patchID],
+            U_
+        );
 
     const faceList& localFaces =
         mesh().boundaryMesh()[patchID].localFaces();
@@ -726,10 +709,7 @@ bool linGeomSolid::evolve()
         D_.relax();
 
         // Update gradient of displacement
-        mechanical().grad(gradD_, D_);
-
-        // Update the strain
-        epsilon_ = symm(gradD_);
+        mechanical().grad(D_, gradD_);
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma_);
@@ -737,8 +717,7 @@ bool linGeomSolid::evolve()
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
     // Interpolate cell displacements to vertices
-    volToPoint_.interpolate(D_, pointD_);
-    pointD_.correctBoundaryConditions();
+    mechanical().interpolate(D_, pointD_);
 
     // Velocity
     U_ = fvc::ddt(D_);
@@ -816,7 +795,21 @@ void linGeomSolid::updateTotalFields()
 
 void linGeomSolid::writeFields(const Time& runTime)
 {
-    // Update equivalent strain
+    // Calculate strain
+    volSymmTensorField epsilon
+    (
+        IOobject
+        (
+            "epsilon",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        symm(gradD_)
+    );
+
+    // Calculaute equivalent strain
     volScalarField epsilonEq
     (
         IOobject
@@ -827,13 +820,13 @@ void linGeomSolid::writeFields(const Time& runTime)
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        sqrt((2.0/3.0)*magSqr(dev(epsilon_)))
+        sqrt((2.0/3.0)*magSqr(dev(epsilon)))
     );
 
     Info<< "Max epsilonEq = " << max(epsilonEq).value()
         << endl;
 
-    // Update equivalent (von Mises) stress
+    // Calculaute equivalent (von Mises) stress
     volScalarField sigmaEq
     (
         IOobject
