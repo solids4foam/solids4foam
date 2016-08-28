@@ -38,7 +38,7 @@ Author
 #ifndef thermoLinearElastic_H
 #define thermoLinearElastic_H
 
-#include "mechanicalLaw.H"
+#include "linearElastic.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -51,12 +51,9 @@ namespace Foam
 
 class thermoLinearElastic
 :
-    public mechanicalLaw
+    public linearElastic
 {
     // Private data
-
-        //- Density
-        dimensionedScalar rho_;
 
         //- Modulus of elasticity
         dimensionedScalar E_;
@@ -110,19 +107,6 @@ public:
 
 
     // Member Functions
-
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
-
-        //- Return the implicit stiffness
-        //  This is the diffusivity for the Laplacian term
-        virtual tmp<volScalarField> impK() const;
-
-        //- Provide access to mu for the coupledUnsNonLinLinearElasticSolid
-        virtual const dimensionedScalar& mu() const;
-
-        //- Provide access to lambda for the coupledUnsNonLinLinearElasticSolid
-        virtual const dimensionedScalar& lambda() const;
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);

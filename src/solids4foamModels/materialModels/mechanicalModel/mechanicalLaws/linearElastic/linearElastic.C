@@ -25,11 +25,6 @@ License
 
 #include "linearElastic.H"
 #include "addToRunTimeSelectionTable.H"
-#include "zeroGradientFvPatchFields.H"
-#include "transformField.H"
-#include "transformGeometricField.H"
-#include "IOdictionary.H"
-#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -57,16 +52,48 @@ Foam::linearElastic::linearElastic
     rho_(dict.lookup("rho")),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
-    lambda_
-    (
-        planeStress()
-      ? nu_*E_/((1.0 + nu_)*(1.0 - nu_))
-      : nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))
-    ),
-    mu_(E_/(2.0*(1.0 + nu_)))
+    lambda_("lambda", dimPressure, 0.0),
+    mu_(E_/(2.0*(1.0 + nu_))),
+    k_("k", dimPressure, 0.0)
 {
-    // PC: some mechanical laws are only appropriate for some solidModels
-    // what is a nice way to check this?
+    // Check for physical Poisson's ratio
+    if (nu_.value() < -1.0 || nu_.value() > 0.5)
+    {
+        FatalErrorIn
+        (
+            "Foam::linearElastic::linearElastic\n"
+            "(\n"
+            "    const word& name,\n"
+            "    const fvMesh& mesh,\n"
+            "    const dictionary& dict\n"
+            ")"
+        )   << "Unphysical Poisson's ratio: nu should be >= -1.0 and <= 0.5"
+            << abort(FatalError);
+    }
+
+    // Check for incompressibility
+    if (nu_.value() == 0.5)
+    {
+        Info<< "Material is incompressible: make sure to use a hybrid"
+            << " approach solid model" << endl;
+
+        // Set lambda and k to GREAT
+        lambda_.value() = GREAT;
+        k_.value() = GREAT;
+    }
+    else
+    {
+        if (planeStress())
+        {
+            lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - nu_));
+        }
+        else
+        {
+            lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_));
+        }
+
+        k_ = lambda_ + (2.0/3.0)*mu_;
+    }
 }
 
 
@@ -106,20 +133,64 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::rho() const
 
 Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 {
+    if (nu_.value() == 0.5)
+    {
+        return tmp<volScalarField>
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "impK",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                2.0*mu_
+            )
+        );
+    }
+    else
+    {
+        return tmp<volScalarField>
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "impK",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                2.0*mu_ + lambda_
+            )
+        );
+    }
+
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::linearElastic::K() const
+{
     return tmp<volScalarField>
     (
         new volScalarField
         (
             IOobject
             (
-                "impK",
+                "K",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
             mesh(),
-            2.0*mu_ + lambda_
+            k_
         )
     );
 }
@@ -139,27 +210,60 @@ const Foam::dimensionedScalar& Foam::linearElastic::lambda() const
 
 void Foam::linearElastic::correct(volSymmTensorField& sigma)
 {
-    // Lookup gradient of displacement
-    // Note: for multi-material cases, gradD is corrected on bi-material
-    // interfaces
-    const volTensorField& gradD =
-        mesh().lookupObject<volTensorField>("grad(D)");
+    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    {
+        // Lookup gradient of displacement increment
+        const volTensorField& gradDD =
+            mesh().lookupObject<volTensorField>("grad(DD)");
 
-    // Calculate stress based on Hooke's law
-    sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
+        // Calculate stress based on incremental form of Hooke's law
+        sigma = sigma.oldTime() + mu_*twoSymm(gradDD) + lambda_*tr(gradDD)*I;
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const volTensorField& gradD =
+            mesh().lookupObject<volTensorField>("grad(D)");
+
+        // Check if a hybrid approach is being used where pressure is being
+        // solved for
+        if (mesh().foundObject<volScalarField>("p"))
+        {
+            const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+
+            // Calculate stress using Hooke's law in uncoupled deviatoric
+            // volumetric form
+            sigma = mu_*dev(twoSymm(gradD)) - p*I;
+        }
+        else
+        {
+            // Calculate stress based on Hooke's law
+            sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
+        }
+    }
 }
 
 
 void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Lookup gradient of displacement
-    // Note: for multi-material cases, gradD is corrected on bi-material
-    // interfaces
-    const surfaceTensorField& gradD =
-        mesh().lookupObject<surfaceTensorField>("grad(D)f");
+    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    {
+        // Lookup gradient of displacement increment
+        const surfaceTensorField& gradDD =
+            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
-    // Calculate stress based on Hooke's law
-    sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
+        // Calculate stress based on incremental form of Hooke's law
+        sigma = sigma.oldTime() + mu_*twoSymm(gradDD) + lambda_*tr(gradDD)*I;
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const surfaceTensorField& gradD =
+            mesh().lookupObject<surfaceTensorField>("grad(D)f");
+
+        // Calculate stress based on Hooke's law
+        sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
+    }
 }
 
 

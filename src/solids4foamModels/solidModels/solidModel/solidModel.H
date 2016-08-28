@@ -244,7 +244,7 @@ public:
                 const label patchID,
                 const label zoneID,
                 const vectorField& faceZoneTraction
-            ) = 0;
+            );
 
             //- Set traction at specified patch
             virtual void setPressure
@@ -252,7 +252,7 @@ public:
                 const label patchID,
                 const label zoneID,
                 const scalarField& faceZonePressure
-            ) = 0;
+            );
 
             //- Evolve the solid model
             virtual bool evolve() = 0;

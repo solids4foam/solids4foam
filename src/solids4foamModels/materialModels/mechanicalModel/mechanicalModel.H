@@ -100,11 +100,20 @@ class mechanicalModel
         //- Displacement volField for each mechanical law
         mutable PtrList<volVectorField> subMeshD_;
 
+        //- Displacement increment volField for each mechanical law
+        mutable PtrList<volVectorField> subMeshDD_;
+
         //- Displacement gradient volField for each mechanical law
         mutable PtrList<volTensorField> subMeshGradD_;
 
         //- Displacement gradient surfaceField for each mechanical law
         mutable PtrList<surfaceTensorField> subMeshGradDf_;
+
+        //- Displacement gradient increment volField for each mechanical law
+        mutable PtrList<volTensorField> subMeshGradDD_;
+
+        //- Displacement gradient increment surfaceField for each mechanical law
+        mutable PtrList<surfaceTensorField> subMeshGradDDf_;
 
         //- Displacement pointField for each mechanical law
         mutable PtrList<pointVectorField> subMeshPointD_;
@@ -180,6 +189,15 @@ class mechanicalModel
         //- Return the subMesh D volFields
         const PtrList<volVectorField>& subMeshD() const;
 
+        //- Calculate the subMesh DD fields
+        void calcSubMeshDD() const;
+
+        //- Return the subMesh DD volFields
+        PtrList<volVectorField>& subMeshDD();
+
+        //- Return the subMesh DD volFields
+        const PtrList<volVectorField>& subMeshDD() const;
+
         //- Calculate the subMesh gradD fields
         void calcSubMeshGradD() const;
 
@@ -197,6 +215,24 @@ class mechanicalModel
 
         //- Return the subMesh gradDf volFields
         const PtrList<surfaceTensorField>& subMeshGradDf() const;
+
+        //- Calculate the subMesh gradDD fields
+        void calcSubMeshGradDD() const;
+
+        //- Return the subMesh gradDD volFields
+        PtrList<volTensorField>& subMeshGradDD();
+
+        //- Return the subMesh gradDD volFields
+        const PtrList<volTensorField>& subMeshGradDD() const;
+
+        //- Calculate the subMesh gradDDf fields
+        void calcSubMeshGradDDf() const;
+
+        //- Return the subMesh gradDDf volFields
+        PtrList<surfaceTensorField>& subMeshGradDDf();
+
+        //- Return the subMesh gradDDf volFields
+        const PtrList<surfaceTensorField>& subMeshGradDDf() const;
 
         //- Calculate the subMesh pointD fields
         void calcSubMeshPointD() const;
@@ -250,11 +286,20 @@ class mechanicalModel
         );
 
         //- Correct snGrad on bi-material interface patch for subMeshGradD field
-        void correctInterfaceSnGrad();
+        void correctInterfaceSnGrad
+        (
+            PtrList<volVectorField>& subMeshDList,
+            PtrList<volTensorField>& subMeshGradDList
+        );
 
         //- Correct snGrad on bi-material interface patch for subMeshGradDf
         //  field
-        void correctInterfaceSnGradf();
+        void correctInterfaceSnGradf
+        (
+            PtrList<volVectorField>& subMeshDList,
+            PtrList<surfaceTensorField>& subMeshGradDfList,
+            PtrList<volTensorField>& subMeshGradDList
+        );
 
         //- Return the implicit stiffness surface field for Rhie-Chow correction
         const surfaceScalarField& impKfcorr() const;
@@ -329,6 +374,9 @@ public:
             //- Return the implicit stiffness surface field
             //  This is the diffusivity for the Laplacian term
             tmp<surfaceScalarField> impKf() const;
+
+            //- Return bulk modulus
+            tmp<volScalarField> K() const;
 
             //- Return material residual i.e. a measured of how convergence of
             //  the material model

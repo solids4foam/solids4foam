@@ -28,11 +28,10 @@ boundaryField
     }
     right
     {
-        type            solidTraction;
-        //traction        uniform ( 1e+05 0 0 );
-        tractionSeries
+        type            fixedDisplacementZeroShear;
+        displacementSeries
         {
-            fileName    "$FOAM_CASE/constant/timeVsTraction";
+            fileName    "$FOAM_CASE/constant/timeVsDisp";
             outOfBounds clamp;
         }
         pressure        uniform 0;

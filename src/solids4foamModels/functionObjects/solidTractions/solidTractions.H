@@ -66,13 +66,6 @@ class solidTractions
         //- Reference to main object registry
         const Time& time_;
 
-        //- Name of stress field
-        const word stressName_;
-
-        //- If solver is nonLinear total Lagrangian, then we need to read in the
-        // deformation gradient
-        bool nonLinearTL_;
-
     // Private Member Functions
 
         //- Write data

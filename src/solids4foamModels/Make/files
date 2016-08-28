@@ -1,6 +1,7 @@
 solidModels/solidModel/solidModel.C
 solidModels/solidModel/newSolidModel.C
 solidModels/linGeomSolid/linGeomSolid.C
+solidModels/hybridLinGeomSolid/hybridLinGeomSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
 solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
@@ -29,12 +30,15 @@ mechanicalLaws = materialModels/mechanicalModel/mechanicalLaws
 $(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
 $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
 $(mechanicalLaws)/linearElastic/linearElastic.C
-$(mechanicalLaws)/thermoLinearElastic/thermoLinearElastic.C
+$(mechanicalLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
+$(mechanicalLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C
 $(mechanicalLaws)/poroLinearElastic/poroLinearElastic.C
+$(mechanicalLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
 $(mechanicalLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(mechanicalLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
-$(mechanicalLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
-$(mechanicalLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
+$(mechanicalLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
+$(mechanicalLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
+$(mechanicalLaws)/thermoLinearElastic/thermoLinearElastic.C
 
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C

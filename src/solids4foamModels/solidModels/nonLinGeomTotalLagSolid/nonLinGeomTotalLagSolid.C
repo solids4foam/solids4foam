@@ -144,29 +144,6 @@ bool nonLinGeomTotalLagSolid::converged
 }
 
 
-// void nonLinGeomTotalLagSolid::checkJacobian(const volScalarField& J)
-// {
-//     const scalarField& JI = J.internalField();
-
-//     if (gMax(JI) < 0.01)
-//     {
-//         forAll(JI, cellI)
-//         {
-//             if (JI[cellI] < SMALL)
-//             {
-//                 Pout<< "Cell " << cellI
-//                     << " with centre " << mesh.C()[cellI]
-//                     << " has a become inverted!" << endl;
-//             }
-//         }
-
-//         FatalErrorIn(type() + "::evolve()")
-//             << "Cells have become inverted! see details above."
-//             << abort(FatalError);
-//     }
-// }
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
@@ -224,7 +201,6 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
         mesh,
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    volToPoint_(mesh),
     gradD_
     (
         IOobject
@@ -261,7 +237,7 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        hinv(F_)
+        inv(F_)
     ),
     J_
     (
@@ -414,7 +390,11 @@ tmp<tensorField> nonLinGeomTotalLagSolid::faceZoneSurfaceGradientOfVelocity
     tensorField& velocityGradient = tVelocityGradient();
 
     vectorField pPointU =
-        volToPoint_.interpolate(mesh().boundaryMesh()[patchID], U_);
+        mechanical().volToPoint().interpolate
+        (
+            mesh().boundaryMesh()[patchID],
+            U_
+        );
 
     const faceList& localFaces =
         mesh().boundaryMesh()[patchID].localFaces();
@@ -662,7 +642,7 @@ void nonLinGeomTotalLagSolid::setPressure
      != solidTractionFvPatchVectorField::typeName
     )
     {
-        FatalErrorIn("void nonLinGeomTotalLagSolid::setTraction(...)")
+        FatalErrorIn("void nonLinGeomTotalLagSolid::setPressure(...)")
             << "Bounary condition on " << D_.name()
             <<  " is "
             << D_.boundaryField()[patchID].type()
@@ -679,56 +659,6 @@ void nonLinGeomTotalLagSolid::setPressure
         );
 
     patchU.pressure() = pressure;
-}
-
-
-void nonLinGeomTotalLagSolid::setTraction
-(
-    const label patchID,
-    const label zoneID,
-    const vectorField& faceZoneTraction
-)
-{
-  vectorField patchTraction(mesh().boundary()[patchID].size(), vector::zero);
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(patchTraction, i)
-    {
-        patchTraction[i] =
-            faceZoneTraction
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ];
-    }
-
-    setTraction(patchID, patchTraction);
-}
-
-
-void nonLinGeomTotalLagSolid::setPressure
-(
-    const label patchID,
-    const label zoneID,
-    const scalarField& faceZonePressure
-)
-{
-    scalarField patchPressure(mesh().boundary()[patchID].size(), 0.0);
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(patchPressure, i)
-    {
-        patchPressure[i] =
-            faceZonePressure
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ];
-    }
-
-    setPressure(patchID, patchPressure);
 }
 
 
@@ -753,12 +683,12 @@ bool nonLinGeomTotalLagSolid::evolve()
         (
             rho_*fvm::d2dt2(D_)
          == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
-          + fvc::div
-            (
-                (J_*sigma_ & Finv_.T()) - impK_*gradD_,
-                "div(sigma)"
-            )
+          - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
+          + fvc::div((J_*sigma_ & Finv_.T()), "div(sigma)")
         );
+
+        // Add Rhie-Chow corrections to quell oscillations
+        DEqn -= mechanical().RhieChowCorrection(D_, gradD_);
 
         // Under-relax the linear system
         DEqn.relax(DEqnRelaxFactor_);
@@ -769,14 +699,14 @@ bool nonLinGeomTotalLagSolid::evolve()
         // Under-relax the D field
         D_.relax();
 
-        // Update gradient of displacement increment
-        gradD_ = fvc::grad(D_);
+        // Update gradient of displacement
+        mechanical().grad(D_, gradD_);
 
         // Total deformation gradient
         F_ = I + gradD_.T();
 
         // Inverse of the deformation gradient
-        Finv_ = hinv(F_);
+        Finv_ = inv(F_);
 
         // Jacobian of the deformation gradient
         J_ = det(F_);
@@ -786,8 +716,8 @@ bool nonLinGeomTotalLagSolid::evolve()
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
-    // Interpolate D from cells to points
-    volToPoint_.interpolate(D_, pointD_);
+    // Interpolate cell displacements to vertices
+    mechanical().interpolate(D_, pointD_);
 
     // Velocity
     U_ = fvc::ddt(D_);
@@ -806,7 +736,7 @@ tmp<vectorField> nonLinGeomTotalLagSolid::tractionBoundarySnGrad
     // Patch index
     const label patchID = patch.index();
 
-    // Patch mechanical property
+    // Patch implicit stiffness field
     const scalarField& impK = impK_.boundaryField()[patchID];
 
     // Patch reciprocal implicit stiffness field
@@ -815,20 +745,18 @@ tmp<vectorField> nonLinGeomTotalLagSolid::tractionBoundarySnGrad
     // Patch gradient
     const tensorField& gradD = gradD_.boundaryField()[patchID];
 
-    // Patch stress
+    // Patch Cauchy stress
     const symmTensorField& sigma = sigma_.boundaryField()[patchID];
 
     // Patch total deformation gradient inverse
     const tensorField& Finv = Finv_.boundaryField()[patchID];
 
-    // Patch total Jacobian
-    const scalarField& J = J_.boundaryField()[patchID];
-
     // Patch unit normals (initial configuration)
     const vectorField n = patch.nf();
 
     // Patch unit normals (deformed configuration)
-    const vectorField nCurrent = J*Finv.T() & n;
+    vectorField nCurrent = Finv.T() & n;
+    nCurrent /= mag(nCurrent);
 
     // Return patch snGrad
     return tmp<vectorField>
@@ -836,9 +764,9 @@ tmp<vectorField> nonLinGeomTotalLagSolid::tractionBoundarySnGrad
         new vectorField
         (
             (
-                (traction - n*pressure)
+                (traction - nCurrent*pressure)
               - (nCurrent & sigma)
-              + (n & (impK*gradD))
+              + impK*(n & gradD)
             )*rImpK
         )
     );

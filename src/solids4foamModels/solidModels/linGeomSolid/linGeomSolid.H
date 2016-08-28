@@ -252,22 +252,6 @@ public:
                 const scalarField& pressure
             );
 
-            //- Set traction at specified patch
-            virtual void setTraction
-            (
-                const label patchID,
-                const label zoneID,
-                const vectorField& zoneTraction
-            );
-
-            //- Set pressure at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const label zoneID,
-                const scalarField& zonePressure
-            );
-
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 

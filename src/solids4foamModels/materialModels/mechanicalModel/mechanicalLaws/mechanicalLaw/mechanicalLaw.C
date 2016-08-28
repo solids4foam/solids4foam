@@ -49,10 +49,13 @@ bool Foam::mechanicalLaw::planeStress() const
     if (mesh_.foundObject<IOdictionary>("mechanicalProperties"))
     {
         return
-            mesh_.lookupObject<IOdictionary>
+            Switch
             (
-                "mechanicalProperties"
-            ).lookup("planeStress");
+                mesh_.lookupObject<IOdictionary>
+                (
+                    "mechanicalProperties"
+                ).lookup("planeStress")
+            );
     }
     else
     {
@@ -72,7 +75,7 @@ bool Foam::mechanicalLaw::planeStress() const
             )
         );
 
-        return mechProp.lookup("planeStress");
+        return Switch(mechProp.lookup("planeStress"));
     }
 }
 

@@ -133,10 +133,10 @@ void Foam::solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()
     // displacement
     const pointField zoneNewPoints =
         mesh.faceZones()[zoneIndex()]().localPoints()
-        + zonePointD;
+      + zonePointD;
     const pointField shadowZoneNewPoints =
         mesh.faceZones()[shadowZoneIndex()]().localPoints()
-        + shadowZonePointD;
+      + shadowZonePointD;
 
     // Move the zones
 

@@ -462,6 +462,73 @@ Foam::mechanicalModel::subMeshD() const
 }
 
 
+void Foam::mechanicalModel::calcSubMeshDD() const
+{
+    if (!subMeshDD_.empty())
+    {
+        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshDD() const")
+            << "pointer list already set" << abort(FatalError);
+    }
+
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshDD() const")
+            << "There should be no need for subMeshes when there is only one "
+            << "material" << abort(FatalError);
+    }
+
+    subMeshDD_.setSize(laws.size());
+
+    const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
+
+    forAll(laws, lawI)
+    {
+        subMeshDD_.set
+        (
+            lawI,
+            new volVectorField
+            (
+                IOobject
+                (
+                    "DD",
+                    subMeshes[lawI].subMesh().time().timeName(),
+                    subMeshes[lawI].subMesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                subMeshes[lawI].subMesh(),
+                dimensionedVector("zero", dimLength, vector::zero)
+            )
+        );
+    }
+}
+
+
+Foam::PtrList<Foam::volVectorField>& Foam::mechanicalModel::subMeshDD()
+{
+    if (subMeshDD_.empty())
+    {
+        calcSubMeshDD();
+    }
+
+    return subMeshDD_;
+}
+
+
+const Foam::PtrList<Foam::volVectorField>&
+Foam::mechanicalModel::subMeshDD() const
+{
+    if (subMeshDD_.empty())
+    {
+        calcSubMeshDD();
+    }
+
+    return subMeshDD_;
+}
+
+
 void Foam::mechanicalModel::calcSubMeshGradD() const
 {
     if (!subMeshGradD_.empty())
@@ -593,6 +660,142 @@ Foam::mechanicalModel::subMeshGradDf() const
     }
 
     return subMeshGradDf_;
+}
+
+
+
+
+void Foam::mechanicalModel::calcSubMeshGradDD() const
+{
+    if (!subMeshGradDD_.empty())
+    {
+        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshGradDD() const")
+            << "pointer list already set" << abort(FatalError);
+    }
+
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshGradDD() const")
+            << "There should be no need for subMeshes when there is only one "
+            << "material" << abort(FatalError);
+    }
+
+    subMeshGradDD_.setSize(laws.size());
+
+    const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
+
+    forAll(laws, lawI)
+    {
+        subMeshGradDD_.set
+        (
+            lawI,
+            new volTensorField
+            (
+                IOobject
+                (
+                    "grad(DD)",
+                    subMeshes[lawI].subMesh().time().timeName(),
+                    subMeshes[lawI].subMesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                subMeshes[lawI].subMesh(),
+                dimensionedTensor("zero", dimless, tensor::zero)
+            )
+        );
+    }
+}
+
+
+Foam::PtrList<Foam::volTensorField>& Foam::mechanicalModel::subMeshGradDD()
+{
+    if (subMeshGradDD_.empty())
+    {
+        calcSubMeshGradDD();
+    }
+
+    return subMeshGradDD_;
+}
+
+
+const Foam::PtrList<Foam::volTensorField>&
+Foam::mechanicalModel::subMeshGradDD() const
+{
+    if (subMeshGradDD_.empty())
+    {
+        calcSubMeshGradDD();
+    }
+
+    return subMeshGradDD_;
+}
+
+
+void Foam::mechanicalModel::calcSubMeshGradDDf() const
+{
+    if (!subMeshGradDDf_.empty())
+    {
+        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshGradDDf() const")
+            << "pointer list already set" << abort(FatalError);
+    }
+
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshGradDDf() const")
+            << "There should be no need for subMeshes when there is only one "
+            << "material" << abort(FatalError);
+    }
+
+    subMeshGradDDf_.setSize(laws.size());
+
+    const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
+
+    forAll(laws, lawI)
+    {
+        subMeshGradDDf_.set
+        (
+            lawI,
+            new surfaceTensorField
+            (
+                IOobject
+                (
+                    "grad(DD)f",
+                    subMeshes[lawI].subMesh().time().timeName(),
+                    subMeshes[lawI].subMesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                subMeshes[lawI].subMesh(),
+                dimensionedTensor("zero", dimless, tensor::zero)
+            )
+        );
+    }
+}
+
+
+Foam::PtrList<Foam::surfaceTensorField>& Foam::mechanicalModel::subMeshGradDDf()
+{
+    if (subMeshGradDDf_.empty())
+    {
+        calcSubMeshGradDDf();
+    }
+
+    return subMeshGradDDf_;
+}
+
+
+const Foam::PtrList<Foam::surfaceTensorField>&
+Foam::mechanicalModel::subMeshGradDDf() const
+{
+    if (subMeshGradDDf_.empty())
+    {
+        calcSubMeshGradDDf();
+    }
+
+    return subMeshGradDDf_;
 }
 
 
@@ -1252,8 +1455,14 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
         // No need for any corrections if there are no bi-material interfaces
         forAll(subMeshes, lawI)
         {
-            volVectorField& subMeshD = this->subMeshD()[lawI];
-            subMeshD = subMeshes[lawI].interpolate(D);
+            if (D.name() == "D")
+            {
+                subMeshD()[lawI] = subMeshes[lawI].interpolate(D);
+            }
+            else
+            {
+                subMeshDD()[lawI] = subMeshes[lawI].interpolate(D);
+            }
         }
 
         return;
@@ -1261,7 +1470,16 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
 
     forAll(subMeshes, lawI)
     {
-        volVectorField& subMeshD = this->subMeshD()[lawI];
+        volVectorField* subMeshDPtr = NULL;
+        if (D.name() == "D")
+        {
+            subMeshDPtr = &(this->subMeshD()[lawI]);
+        }
+        else
+        {
+            subMeshDPtr = &(this->subMeshDD()[lawI]);
+        }
+        volVectorField& subMeshD = *subMeshDPtr;
 
         const fvMesh& subMesh = subMeshes[lawI].subMesh();
 
@@ -1290,6 +1508,35 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
             if (patchMap[patchI] == -1)
             {
                 subMeshD.boundaryField()[patchI] = Dinterface;
+            }
+        }
+
+        // Check if a large strain procedure is being used, if so we must
+        // calculate the deformed normals
+        // If the deformation gradient field 'F' is found, we will assume it is
+        // a large/finite strain procedure
+        // For finite strain procedures, we will look up the deformation
+        // gradient: relative deformation gradient for updated Lagrangian
+        // approaches and the total deformation gradient for total
+        // approaches
+        const bool useDeformedNormals = mesh().foundObject<volTensorField>("F");
+        const volTensorField* FinvPtr = NULL;
+        const volScalarField* JPtr = NULL;
+        if (useDeformedNormals)
+        {
+            if (mesh().foundObject<volTensorField>("relF"))
+            {
+                // Updated Lagrangian approach: use the inverse of the relative
+                // deformation gradient
+                FinvPtr = &(mesh().lookupObject<volTensorField>("relFinv"));
+                JPtr = &(mesh().lookupObject<volScalarField>("relJ"));
+            }
+            else
+            {
+                // Total Lagrangian approach: use the inverse of the total
+                // deformation gradient
+                FinvPtr = &(mesh().lookupObject<volTensorField>("Finv"));
+                JPtr = &(mesh().lookupObject<volScalarField>("J"));
             }
         }
 
@@ -1374,8 +1621,28 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
 
                     // Interface unit normal (on base mesh); this may be in
                     // the opposite direction to the subMesh normal
-                    const vector n =
-                        baseSf[baseFaceID]/baseMagSf[baseFaceID];
+                    vector n = baseSf[baseFaceID]/baseMagSf[baseFaceID];
+                    if (useDeformedNormals)
+                    {
+                        // Interpolate Finv and J to the face
+                        const tensorField& FinvI = FinvPtr->internalField();
+                        const tensor Finv =
+                            baseW*FinvI[baseOwn[baseFaceID]]
+                          + (1.0 - baseW)*FinvI[baseOwn[baseFaceID]];
+
+                        const scalarField& JI = JPtr->internalField();
+                        const scalar J =
+                            baseW*JI[baseOwn[baseFaceID]]
+                          + (1.0 - baseW)*JI[baseOwn[baseFaceID]];
+
+                        // Nanson's formula
+                        // Note: for updated Lagrangian approach, F is the
+                        // relative deformation gradient, whereas for total
+                        // Lagrangian approaches, it is the total deformation
+                        // gradient
+                        n = J*Finv.T() & n;
+                        n /= mag(n);
+                    }
 
                     // Normal distance from the interface to the cell-centre
                     // on side-a
@@ -1476,7 +1743,11 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
 }
 
 
-void Foam::mechanicalModel::correctInterfaceSnGrad()
+void Foam::mechanicalModel::correctInterfaceSnGrad
+(
+    PtrList<volVectorField>& subMeshDList,
+    PtrList<volTensorField>& subMeshGradDList
+)
 {
     if (interfaceBaseFaces().size() == 0)
     {
@@ -1488,8 +1759,8 @@ void Foam::mechanicalModel::correctInterfaceSnGrad()
 
     forAll(subMeshes, lawI)
     {
-        const volVectorField& subMeshD = this->subMeshD()[lawI];
-        volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
+        const volVectorField& subMeshD = subMeshDList[lawI];
+        volTensorField& subMeshGradD = subMeshGradDList[lawI];
         const fvMesh& subMesh = subMeshes[lawI].subMesh();
         const labelList& patchMap = subMeshes[lawI].patchMap();
 
@@ -1521,7 +1792,12 @@ void Foam::mechanicalModel::correctInterfaceSnGrad()
 }
 
 
-void Foam::mechanicalModel::correctInterfaceSnGradf()
+void Foam::mechanicalModel::correctInterfaceSnGradf
+(
+    PtrList<volVectorField>& subMeshDList,
+    PtrList<surfaceTensorField>& subMeshGradDfList,
+    PtrList<volTensorField>& subMeshGradDList
+)
 {
     if (interfaceBaseFaces().size() == 0)
     {
@@ -1533,9 +1809,9 @@ void Foam::mechanicalModel::correctInterfaceSnGradf()
 
     forAll(subMeshes, lawI)
     {
-        const volVectorField& subMeshD = this->subMeshD()[lawI];
-        surfaceTensorField& subMeshGradDf = this->subMeshGradDf()[lawI];
-        const volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
+        const volVectorField& subMeshD = subMeshDList[lawI];
+        surfaceTensorField& subMeshGradDf = subMeshGradDfList[lawI];
+        const volTensorField& subMeshGradD = subMeshGradDList[lawI];
         const fvMesh& subMesh = subMeshes[lawI].subMesh();
         const labelList& patchMap = subMeshes[lawI].patchMap();
 
@@ -1575,9 +1851,13 @@ void Foam::mechanicalModel::clearOut() const
     subMeshSigma_.clear();
     subMeshSigmaf_.clear();
     subMeshD_.clear();
+    subMeshDD_.clear();
     subMeshGradD_.clear();
     subMeshGradDf_.clear();
+    subMeshGradDD_.clear();
+    subMeshGradDDf_.clear();
     subMeshPointD_.clear();
+    deleteDemandDrivenData(interfaceBaseFacesPtr_);
     interfaceShadowSubMeshID_.clear();
     interfaceShadowPatchID_.clear();
     interfaceShadowFaceID_.clear();
@@ -1611,13 +1891,18 @@ Foam::mechanicalModel::mechanicalModel(const fvMesh& mesh)
     planeStress_(lookup("planeStress")),
     cellZoneNames_(),
     subMeshes_(),
+    volToPointPtr_(),
     subMeshVolToPoint_(),
     subMeshSigma_(),
     subMeshSigmaf_(),
     subMeshD_(),
+    subMeshDD_(),
     subMeshGradD_(),
     subMeshGradDf_(),
+    subMeshGradDD_(),
+    subMeshGradDDf_(),
     subMeshPointD_(),
+    interfaceBaseFacesPtr_(NULL),
     interfaceShadowSubMeshID_(),
     interfaceShadowPatchID_(),
     interfaceShadowFaceID_(),
@@ -1861,6 +2146,59 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalModel::impKf() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::K() const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        return laws[0].K();
+    }
+    else
+    {
+        // Accumulate data for all fields
+        tmp<volScalarField> tresult
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "K",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimForce/dimArea, 0),
+                calculatedFvPatchScalarField::typeName
+            )
+        );
+        volScalarField& result = tresult();
+
+        // Accumulated subMesh fields and then map to the base mesh
+        PtrList<volScalarField> Ks(laws.size());
+
+        forAll(laws, lawI)
+        {
+            Ks.set
+            (
+                lawI,
+                new volScalarField(laws[lawI].K())
+            );
+        }
+
+        // Map subMesh fields to the base mesh
+        mapSubMeshVolFields<scalar>(Ks, result);
+
+        // Clear subMesh fields
+        Ks.clear();
+
+        return tresult;
+    }
+}
+
+
 void Foam::mechanicalModel::correct(volSymmTensorField& sigma)
 {
     PtrList<mechanicalLaw>& laws = *this;
@@ -1940,19 +2278,41 @@ void Foam::mechanicalModel::grad
         {
             // Calculate gradient on subMesh
             // This will use the values at the interface
-            volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
-            subMeshGradD = fvc::grad(subMeshD()[lawI]);
+            if (D.name() == "D")
+            {
+                volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
+                subMeshGradD = fvc::grad(subMeshD()[lawI]);
+            }
+            else
+            {
+                volTensorField& subMeshGradDD = this->subMeshGradDD()[lawI];
+                subMeshGradDD = fvc::grad(subMeshDD()[lawI]);
+            }
         }
 
-        // Correct snGrad on the interface patch of subMeshGradD because the
-        // default calculated boundaries disable non-orthogonal correction
-        correctInterfaceSnGrad();
-
         // Map subMesh gradD to the base gradD
-        mapSubMeshVolFields<tensor>
-        (
-            subMeshGradD(), gradD
-        );
+        if (D.name() == "D")
+        {
+            // Correct snGrad on the interface patch of subMeshGradD because the
+            // default calculated boundaries disable non-orthogonal correction
+            correctInterfaceSnGrad(subMeshD(), subMeshGradD());
+
+            mapSubMeshVolFields<tensor>
+            (
+                subMeshGradD(), gradD
+            );
+        }
+        else
+        {
+            // Correct snGrad on the interface patch of subMeshGradD because the
+            // default calculated boundaries disable non-orthogonal correction
+            correctInterfaceSnGrad(subMeshDD(), subMeshGradDD());
+
+            mapSubMeshVolFields<tensor>
+            (
+                subMeshGradDD(), gradD
+            );
+        }
 
         // Correct boundary snGrad
         fv::gaussGrad<vector>
@@ -1981,22 +2341,47 @@ void Foam::mechanicalModel::grad
         // Accumulate data for all fields
         forAll(laws, lawI)
         {
-            // Calculate gradient on subMesh
-            volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
-            subMeshGradD =
-                fvc::grad(subMeshD()[lawI], subMeshPointD()[lawI]);
+            // Map subMesh gradD to the base gradD
+            if (D.name() == "D")
+            {
+                volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
+                subMeshGradD =
+                    fvc::grad(subMeshD()[lawI], subMeshPointD()[lawI]);
+            }
+            else
+            {
+                volTensorField& subMeshGradDD = this->subMeshGradDD()[lawI];
+                subMeshGradDD =
+                    fvc::grad(subMeshDD()[lawI], subMeshPointD()[lawI]);
+            }
         }
 
-        // Correct snGrad on the interface patch of subMeshGradDf because
-        // the default calculated boundaries disable non-orthogonal
-        // correction
-        correctInterfaceSnGrad();
+        if (D.name() == "D")
+        {
+            // Correct snGrad on the interface patch of subMeshGradDf because
+            // the default calculated boundaries disable non-orthogonal
+            // correction
+            correctInterfaceSnGrad(subMeshD(), subMeshGradD());
 
-        // Map subMesh gradD fields to the base gradD field
-        mapSubMeshVolFields<tensor>
-        (
-            this->subMeshGradD(), gradD
-        );
+            // Map subMesh gradD fields to the base gradD field
+            mapSubMeshVolFields<tensor>
+            (
+                this->subMeshGradD(), gradD
+            );
+        }
+        else
+        {
+            // Correct snGrad on the interface patch of subMeshGradDf because
+            // the default calculated boundaries disable non-orthogonal
+            // correction
+            correctInterfaceSnGrad(subMeshDD(), subMeshGradDD());
+
+            // Map subMesh gradD fields to the base gradD field
+            mapSubMeshVolFields<tensor>
+            (
+                this->subMeshGradDD(), gradD
+            );
+        }
 
         // Correct boundary snGrad
         fv::gaussGrad<vector>
@@ -2025,22 +2410,53 @@ void Foam::mechanicalModel::grad
         // Accumulate data for all fields
         forAll(laws, lawI)
         {
-            // Calculate gradient on subMesh
-            surfaceTensorField& subMeshGradDf = this->subMeshGradDf()[lawI];
-            subMeshGradDf =
-                fvc::fGrad(subMeshD()[lawI], subMeshPointD()[lawI]);
+            if (D.name() == "D")
+            {
+                surfaceTensorField& subMeshGradDf = this->subMeshGradDf()[lawI];
+                subMeshGradDf =
+                    fvc::fGrad(subMeshD()[lawI], subMeshPointD()[lawI]);
+            }
+            else
+            {
+                surfaceTensorField& subMeshGradDDf =
+                    this->subMeshGradDDf()[lawI];
+                subMeshGradDDf =
+                    fvc::fGrad(subMeshDD()[lawI], subMeshPointD()[lawI]);
+            }
         }
 
-        // Correct snGrad on the interface patch of subMeshGradDf because
-        // the default calculated boundaries disable non-orthogonal
-        // correction
-        correctInterfaceSnGradf();
+        if (D.name() == "D")
+        {
+            // Correct snGrad on the interface patch of subMeshGradDf because
+            // the default calculated boundaries disable non-orthogonal
+            // correction
+            correctInterfaceSnGradf
+            (
+                subMeshD(), subMeshGradDf(), subMeshGradD()
+            );
 
-        // Map subMesh gradDf fields to the base gradDf field
-        mapSubMeshSurfaceFields<tensor>
-        (
-            subMeshGradDf(), gradDf
-        );
+            // Map subMesh gradDf fields to the base gradDf field
+            mapSubMeshSurfaceFields<tensor>
+            (
+                subMeshGradDf(), gradDf
+            );
+        }
+        else
+        {
+            // Correct snGrad on the interface patch of subMeshGradDf because
+            // the default calculated boundaries disable non-orthogonal
+            // correction
+            correctInterfaceSnGradf
+            (
+                subMeshDD(), subMeshGradDDf(), subMeshGradDD()
+            );
+
+            // Map subMesh gradDf fields to the base gradDf field
+            mapSubMeshSurfaceFields<tensor>
+            (
+                subMeshGradDDf(), gradDf
+            );
+        }
 
         // Replace normal component
         // If we don't do this then we don't get convergence in many cases
@@ -2072,12 +2488,24 @@ void Foam::mechanicalModel::interpolate
         // Accumulate data for all fields
         forAll(laws, lawI)
         {
-            // Interpolate the subMeshD to the subMeshPointD
-            subMeshVolToPoint()[lawI].interpolate
-            (
-                subMeshD()[lawI],
-                subMeshPointD()[lawI]
-            );
+            if (D.name() == "D")
+            {
+                // Interpolate the subMeshD to the subMeshPointD
+                subMeshVolToPoint()[lawI].interpolate
+                (
+                    subMeshD()[lawI],
+                    subMeshPointD()[lawI]
+                );
+            }
+            else
+            {
+                // Interpolate the subMeshD to the subMeshPointD
+                subMeshVolToPoint()[lawI].interpolate
+                (
+                    subMeshDD()[lawI],
+                    subMeshPointD()[lawI]
+                );
+            }
         }
 
         // Map subMesh pointD fields back to the base pointD field

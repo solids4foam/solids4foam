@@ -27,7 +27,7 @@ License
 #include "solidTractions.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
-#include "pointFields.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -48,66 +48,141 @@ namespace Foam
 
 bool Foam::solidTractions::writeData()
 {
-    const fvMesh& mesh =
-        time_.lookupObject<fvMesh>("region0");
-
-    if (mesh.foundObject<volSymmTensorField>(stressName_))
+    if (time_.outputTime())
     {
-        const volSymmTensorField& sigma =
-            mesh.lookupObject<volSymmTensorField>(stressName_);
+        Info<< name_ << " functionObject: writing traction field" << nl << endl;
 
-        volVectorField traction
-        (
-            IOobject
-            (
-                "traction",
-                mesh.time().timeName(),
-                mesh,
-                IOobject::NO_READ,
-                IOobject::AUTO_WRITE
-            ),
-            mesh,
-            dimensionedVector("zero", dimForce/dimArea, vector::zero)
-        );
-
-        const surfaceVectorField n = mesh.Sf()/mesh.magSf();
-
-        if (nonLinearTL_)
+        // Lookup the solid mesh
+        const fvMesh* meshPtr = NULL;
+        if (time_.foundObject<fvMesh>("solid"))
         {
-            const volTensorField Finv =
-                hinv(mesh.lookupObject<volTensorField>("F"));
-
-            forAll(traction.boundaryField(), patchi)
-            {
-                if (!traction.boundaryField()[patchi].coupled())
-                {
-                    traction.boundaryField()[patchi] =
-                        (
-                            Finv.boundaryField()[patchi].T()
-                            & n.boundaryField()[patchi]
-                        ) & sigma.boundaryField()[patchi];
-                }
-            }
+            meshPtr = &(time_.lookupObject<fvMesh>("solid"));
         }
         else
         {
-            forAll(traction.boundaryField(), patchi)
+            meshPtr = &(time_.lookupObject<fvMesh>("region0"));
+        }
+        const fvMesh& mesh = *meshPtr;
+
+        if
+        (
+            mesh.foundObject<volVectorField>("DD")
+         && mesh.foundObject<volTensorField>("relF")
+        )
+        {
+            // Updated Lagrangian
+            // The mesh has been moved to the deformed configuration
+
+            // Lookup the Cauchy stress
+            const volSymmTensorField& sigma =
+                mesh.lookupObject<volSymmTensorField>("sigmaCauchy");
+
+            // Create the traction
+            volVectorField traction
+            (
+                IOobject
+                (
+                    "traction",
+                    mesh.time().timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh,
+                dimensionedVector("zero", dimPressure, vector::zero)
+            );
+
+            forAll(traction.boundaryField(), patchI)
             {
-                if (!traction.boundaryField()[patchi].coupled())
+                if (!traction.boundaryField()[patchI].coupled())
                 {
-                    traction.boundaryField()[patchi] =
-                        n.boundaryField()[patchi]
-                        & sigma.boundaryField()[patchi];
+                    traction.boundaryField()[patchI] =
+                        mesh.boundary()[patchI].nf()
+                      & sigma.boundaryField()[patchI];
                 }
             }
-        }
 
-        traction.write();
-    }
-    else
-    {
-        InfoIn(this->name() + " function object constructor")
-            << stressName_ << " not found" << endl;
+            traction.write();
+        }
+        else if (mesh.foundObject<volTensorField>("F"))
+        {
+            // Total Lagrangian
+            // The mesh is in its initial configuration
+
+            // Lookup the Cauchy stress
+            const volSymmTensorField& sigma =
+                mesh.lookupObject<volSymmTensorField>("sigmaCauchy");
+
+            // Lookup the inverse deformation gradient
+            const volTensorField& Finv =
+                mesh.lookupObject<volTensorField>("Finv");
+
+            // Create the traction
+            volVectorField traction
+            (
+                IOobject
+                (
+                    "traction",
+                    mesh.time().timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh,
+                dimensionedVector("zero", dimPressure, vector::zero)
+            );
+
+            forAll(traction.boundaryField(), patchI)
+            {
+                if (!traction.boundaryField()[patchI].coupled())
+                {
+                    vectorField nCurrent =
+                        Finv.boundaryField()[patchI].T()
+                      & mesh.boundary()[patchI].nf();
+                    nCurrent /= mag(nCurrent);
+
+                    traction.boundaryField()[patchI] =
+                      nCurrent & sigma.boundaryField()[patchI];
+                }
+            }
+
+            traction.write();
+        }
+        else
+        {
+            // Small strain approach
+
+            // Lookup the stress
+            const volSymmTensorField& sigma =
+                mesh.lookupObject<volSymmTensorField>("sigma");
+
+            // Create the traction
+            volVectorField traction
+            (
+                IOobject
+                (
+                    "traction",
+                    mesh.time().timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh,
+                dimensionedVector("zero", dimPressure, vector::zero)
+            );
+
+            forAll(traction.boundaryField(), patchI)
+            {
+                if (!traction.boundaryField()[patchI].coupled())
+                {
+                    traction.boundaryField()[patchI] =
+                        mesh.boundary()[patchI].nf()
+                      & sigma.boundaryField()[patchI];
+                }
+            }
+
+            traction.write();
+        }
     }
 
     return true;
@@ -124,19 +199,7 @@ Foam::solidTractions::solidTractions
 :
     functionObject(name),
     name_(name),
-    time_(t),
-    stressName_
-    (
-        dict.found("stressName")
-        ? word(dict.lookup("stressName"))
-        : word("sigma")
-    ),
-    nonLinearTL_
-    (
-        dict.found("nonLinearTL")
-        ? bool(dict.lookup("nonLinearTL"))
-        : bool(false)
-    )
+    time_(t)
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 }

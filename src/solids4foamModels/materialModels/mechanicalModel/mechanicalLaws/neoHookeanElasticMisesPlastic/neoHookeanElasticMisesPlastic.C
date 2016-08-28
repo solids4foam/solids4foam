@@ -25,10 +25,7 @@ License
 
 #include "neoHookeanElasticMisesPlastic.H"
 #include "addToRunTimeSelectionTable.H"
-#include "zeroGradientFvPatchFields.H"
 #include "transformGeometricField.H"
-#include "fvc.H"
-#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -59,6 +56,150 @@ namespace Foam
 
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+
+void Foam::neoHookeanElasticMisesPlastic::makeRelF()
+{
+    if (relFPtr_)
+    {
+        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeRelF()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    relFPtr_ =
+        new volTensorField
+        (
+            IOobject
+            (
+                "relF",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, I)
+        );
+}
+
+
+Foam::volTensorField& Foam::neoHookeanElasticMisesPlastic::relF()
+{
+    if (!relFPtr_)
+    {
+        makeRelF();
+    }
+
+    return *relFPtr_;
+}
+
+
+void Foam::neoHookeanElasticMisesPlastic::makeRelFf()
+{
+    if (relFfPtr_)
+    {
+        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeRelFf()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    relFfPtr_ =
+        new surfaceTensorField
+        (
+            IOobject
+            (
+                "relFf",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, I)
+        );
+}
+
+
+Foam::surfaceTensorField& Foam::neoHookeanElasticMisesPlastic::relFf()
+{
+    if (!relFfPtr_)
+    {
+        makeRelFf();
+    }
+
+    return *relFfPtr_;
+}
+
+
+void Foam::neoHookeanElasticMisesPlastic::makeJ()
+{
+    if (JPtr_)
+    {
+        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeJ()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    JPtr_ =
+        new volScalarField
+        (
+            IOobject
+            (
+                "J",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("one", dimless, 1.0)
+        );
+}
+
+
+Foam::volScalarField& Foam::neoHookeanElasticMisesPlastic::J()
+{
+    if (!JPtr_)
+    {
+        makeJ();
+    }
+
+    return *JPtr_;
+}
+
+
+void Foam::neoHookeanElasticMisesPlastic::makeJf()
+{
+    if (JfPtr_)
+    {
+        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeJf()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    JfPtr_ =
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "Jf",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("one", dimless, 1.0)
+        );
+}
+
+
+Foam::surfaceScalarField& Foam::neoHookeanElasticMisesPlastic::Jf()
+{
+    if (!JfPtr_)
+    {
+        makeJf();
+    }
+
+    return *JfPtr_;
+}
 
 
 Foam::scalar Foam::neoHookeanElasticMisesPlastic::curYieldStress
@@ -194,6 +335,10 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
       ? (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_
       : (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_
     ),
+    relFPtr_(NULL),
+    relFfPtr_(NULL),
+    JPtr_(NULL),
+    JfPtr_(NULL),
     stressPlasticStrainSeries_(dict),
     sigmaY_
     (
@@ -563,43 +708,39 @@ Foam::neoHookeanElasticMisesPlastic::impK() const
 }
 
 
-void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& tau)
+void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 {
-    // Compute elastic predictor
+    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    {
+        // Lookup gradient of displacement increment
+        const volTensorField& gradDD =
+            mesh().lookupObject<volTensorField>("grad(DD)");
 
-    // Lookup the total deformation gradient from the solver
-    const volTensorField relF =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<tensor>("relF", mesh());
+        // Update the relative deformation gradient
+        relF() = I + gradDD.T();
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const volTensorField& gradD =
+            mesh().lookupObject<volTensorField>("grad(D)");
+
+        // Calculate the gradient of the displacement increment
+        const volTensorField gradDD = gradD - gradD.oldTime();
+
+        // Update the relative deformation gradient
+        relF() = I + gradDD.T();
+    }
 
     // Lookup the Jacobian of the deformation gradient from the solver
-    const volScalarField relJ =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<scalar>("relJ", mesh());
+    const volScalarField relJ = det(relF());
 
-    // Lookup the Jacobian of the deformation gradient
-    const volScalarField J =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<scalar>("J", mesh());
+    // Update the Jacobian of the total deformation gradient
+    J() = relJ*J().oldTime();
 
     // Calculate the relative deformation gradient with the volumetric term
     // removed
-    volTensorField relFbar = pow(relJ, -1.0/3.0)*relF;
+    volTensorField relFbar = pow(relJ, -1.0/3.0)*relF();
 
     // Update bE trial
     bEbarTrial_ = transform(relFbar, bEbar_.oldTime());
@@ -623,7 +764,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& tau)
 
     // Trial yield function
     // sigmaY is the Cauchy yield stress so we scale it by J
-    const volScalarField fTrial = mag(sTrial) - sqrtTwoOverThree_*J*sigmaY_;
+    const volScalarField fTrial = mag(sTrial) - sqrtTwoOverThree_*J()*sigmaY_;
 
     // Magnitude of hardening slope
     const scalar magHp = mag(Hp_);
@@ -635,7 +776,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& tau)
     scalarField& DSigmaYI = DSigmaY_.internalField();
     scalarField& DLambdaI = DLambda_.internalField();
     const scalarField& muBarI = muBar.internalField();
-    const scalarField& JI = J.internalField();
+    const scalarField& JI = J().internalField();
     const scalarField& sigmaYI = sigmaY_.internalField();
     const scalarField& epsilonPEqOldI = epsilonPEq_.oldTime().internalField();
 
@@ -705,7 +846,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& tau)
             scalarField& DSigmaYP = DSigmaY_.boundaryField()[patchI];
             scalarField& DLambdaP = DLambda_.boundaryField()[patchI];
             const scalarField& muBarP = muBar.boundaryField()[patchI];
-            const scalarField& JP = J.boundaryField()[patchI];
+            const scalarField& JP = J().boundaryField()[patchI];
             const scalarField& sigmaYP = sigmaY_.boundaryField()[patchI];
             const scalarField& epsilonPEqOldP =
                 epsilonPEq_.oldTime().boundaryField()[patchI];
@@ -778,51 +919,51 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& tau)
     // Calculate deviatoric stress
     const volSymmTensorField s = sTrial - 2*mu_*DEpsilonP_;
 
-    // Calculate new Kirchhoff stress
-    tau = 0.5*K_*(pow(J, 2) - 1)*I + s;
-
     // Update bEbar
     bEbar_ = (s/mu_) + Ibar*I;
+
+    // Calculate Kirchhoff stress
+    const volSymmTensorField tau = 0.5*K_*(pow(J(), 2) - 1)*I + s;
+
+    // Update the Cauchy stress
+    sigma = tau/J();
+
 }
 
 
-void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& tau)
+void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Compute elastic predictor
+    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    {
+        // Lookup gradient of displacement increment
+        const surfaceTensorField& gradDD =
+            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
-    // Lookup the total deformation gradient from the solver
-    const surfaceTensorField relF =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshSurfaceField<tensor>("relFf", mesh());
+        // Update the relative deformation gradient
+        relFf() = I + gradDD.T();
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const surfaceTensorField& gradD =
+            mesh().lookupObject<surfaceTensorField>("grad(D)f");
+
+        // Calculate the gradient of the displacement increment
+        const surfaceTensorField gradDD = gradD - gradD.oldTime();
+
+        // Update the relative deformation gradient
+        relFf() = I + gradDD.T();
+    }
 
     // Lookup the Jacobian of the deformation gradient from the solver
-    const surfaceScalarField relJ =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshSurfaceField<scalar>("relJf", mesh());
+    const surfaceScalarField relJ = det(relFf());
 
-    // Lookup the Jacobian of the deformation gradient
-    const surfaceScalarField J =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshSurfaceField<scalar>("Jf", mesh());
+    // Update the Jacobian of the total deformation gradient
+    Jf() = relJ*Jf().oldTime();
 
     // Calculate the relative deformation gradient with the volumetric term
     // removed
-    surfaceTensorField relFbar = pow(relJ, -1.0/3.0)*relF;
+    surfaceTensorField relFbar = pow(relJ, -1.0/3.0)*relFf();
 
     // Update bE trial
     bEbarTrialf_ = transform(relFbar, bEbarf_.oldTime());
@@ -847,7 +988,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& tau)
     // Trial yield function
     // sigmaY is the Cauchy yield stress so we scale it by J
     const surfaceScalarField fTrial =
-        mag(sTrial) - sqrtTwoOverThree_*J*sigmaYf_;
+        mag(sTrial) - sqrtTwoOverThree_*Jf()*sigmaYf_;
 
     // Magnitude of hardening slope
     const scalar magHp = mag(Hp_);
@@ -859,7 +1000,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& tau)
     scalarField& DSigmaYI = DSigmaYf_.internalField();
     scalarField& DLambdaI = DLambdaf_.internalField();
     const scalarField& muBarI = muBar.internalField();
-    const scalarField& JI = J.internalField();
+    const scalarField& JI = Jf().internalField();
     const scalarField& sigmaYI = sigmaYf_.internalField();
     const scalarField& epsilonPEqOldI = epsilonPEqf_.oldTime().internalField();
 
@@ -931,7 +1072,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& tau)
             scalarField& DSigmaYP = DSigmaYf_.boundaryField()[patchI];
             scalarField& DLambdaP = DLambdaf_.boundaryField()[patchI];
             const scalarField& muBarP = muBar.boundaryField()[patchI];
-            const scalarField& JP = J.boundaryField()[patchI];
+            const scalarField& JP = Jf().boundaryField()[patchI];
             const scalarField& sigmaYP = sigmaYf_.boundaryField()[patchI];
             const scalarField& epsilonPEqOldP =
                 epsilonPEq_.oldTime().boundaryField()[patchI];
@@ -1004,11 +1145,14 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& tau)
     // Calculate deviatoric stress
     const surfaceSymmTensorField s = sTrial - 2*mu_*DEpsilonPf_;
 
-    // Calculate new Kirchhoff stress
-    tau = 0.5*K_*(pow(J, 2) - 1)*I + s;
-
     // Update bEbar
     bEbarf_ = (s/mu_) + Ibar*I;
+
+    // Calculate Kirchhoff stress
+    const surfaceSymmTensorField tau = 0.5*K_*(pow(Jf(), 2) - 1)*I + s;
+
+    // Update the Cauchy stress
+    sigma = tau/Jf();
 }
 
 
@@ -1101,28 +1245,6 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
     Info<< "    " << numCellsYielding << " cells are actively yielding"
         << nl << endl;
 }
-
-
-// Foam::tmp<Foam::volScalarField>
-// Foam::neoHookeanElasticMisesPlastic::plasticDissipationRate() const
-// {
-//     const volSymmTensorField& sigmaCauchy =
-//         mesh().lookupObject<volSymmTensorField>("sigmaCauchy");
-
-//     // We assume 90% conversion
-//     return tmp<volScalarField>
-//     (
-//         new volScalarField
-//         (
-//             "plasticDissipationRate",
-//             max
-//             (
-//                 dimensionedScalar("zero", dimForce/(dimArea*dimTime), 0.0),
-//                 0.9*(sigmaCauchy && DEpsilonP_)/mesh().time().deltaT()
-//             )
-//         )
-//     );
-// }
 
 
 // ************************************************************************* //

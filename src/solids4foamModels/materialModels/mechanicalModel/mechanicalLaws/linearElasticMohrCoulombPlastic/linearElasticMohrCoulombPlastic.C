@@ -25,13 +25,7 @@ License
 
 #include "linearElasticMohrCoulombPlastic.H"
 #include "addToRunTimeSelectionTable.H"
-#include "zeroGradientFvPatchFields.H"
-#include "transformField.H"
-#include "transformGeometricField.H"
-#include "IOdictionary.H"
-#include "fvc.H"
 #include "mathematicalConstants.H"
-#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -634,18 +628,40 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
     sigma.storePrevIter();
     sigmaEff_.storePrevIter();
 
-    // Lookup the strain tensor from the solver
-    const volSymmTensorField epsilon =
-        mesh().db().lookupObject<fvMesh>
+    // Calculate the increment of total strain
+    volSymmTensorField DEpsilon
+    (
+        IOobject
         (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<symmTensor>("epsilon", mesh());
+            "DEpsilon",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
+    );
 
-    // Calculate the strain increment
-    const volSymmTensorField DEpsilon = epsilon - epsilon.oldTime();
+    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    {
+        // Lookup gradient of displacement increment
+        const volTensorField& gradDD =
+            mesh().lookupObject<volTensorField>("grad(DD)");
+
+        DEpsilon = symm(gradDD);
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const volTensorField& gradD =
+            mesh().lookupObject<volTensorField>("grad(D)");
+
+        // Calculate gradient of displacement increment
+        const volTensorField gradDD = gradD - gradD.oldTime();
+
+        DEpsilon = symm(gradDD);
+    }
 
     // Calculate trial elastic stress assuming Hooke's elastic law
     const volSymmTensorField DSigmaTrial =
@@ -687,7 +703,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
     // Under-relax the stress
     sigma.relax();
 
-    // Update the stress tensor
+    // Update the effective stress tensor
     // Note: if a poro-elasto-plastic law is used then the pore-pressure term
     // will be added after this
     sigmaEff_ = 1.0*sigma;
@@ -708,18 +724,40 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     sigma.storePrevIter();
     sigmaEfff_.storePrevIter();
 
-    // Lookup the strain tensor from the solver
-    const surfaceSymmTensorField epsilon =
-        mesh().db().lookupObject<fvMesh>
+    // Calculate the increment of total strain
+    surfaceSymmTensorField DEpsilon
+    (
+        IOobject
         (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshSurfaceField<symmTensor>("epsilonf", mesh());
+            "DEpsilon",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
+    );
 
-    // Calculate the strain increment
-    const surfaceSymmTensorField DEpsilon = epsilon - epsilon.oldTime();
+    if (mesh().foundObject<surfaceTensorField>("grad(DD)"))
+    {
+        // Lookup gradient of displacement increment
+        const surfaceTensorField& gradDD =
+            mesh().lookupObject<surfaceTensorField>("grad(DD)");
+
+        DEpsilon = symm(gradDD);
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const surfaceTensorField& gradD =
+            mesh().lookupObject<surfaceTensorField>("grad(D)");
+
+        // Calculate gradient of displacement increment
+        const surfaceTensorField gradDD = gradD - gradD.oldTime();
+
+        DEpsilon = symm(gradDD);
+    }
 
     // Calculate trial elastic stress assuming Hooke's elastic law
     const surfaceSymmTensorField DSigmaTrial =
@@ -751,7 +789,8 @@ void Foam::linearElasticMohrCoulombPlastic::correct
         symmTensorField& sigmaP = sigma.boundaryField()[patchI];
         scalarField& activeYieldP = activeYield_.boundaryField()[patchI];
 
-        if (!sigma.boundaryField()[patchI].coupled())
+        // We calculate on surfaceField coupled boundaries
+        //if (!sigma.boundaryField()[patchI].coupled())
         {
             forAll(sigmaP, faceI)
             {
@@ -767,7 +806,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     // Under-relax the stress
     sigma.relax();
 
-    // Update the stress tensor
+    // Update the effective stress tensor
     // Note: if a poro-elasto-plastic law is used then the pore-pressure term
     // will be added after this
     sigmaEfff_ = 1.0*sigma;

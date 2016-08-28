@@ -25,12 +25,8 @@ License
 
 #include "thermoLinearElastic.H"
 #include "addToRunTimeSelectionTable.H"
-#include "zeroGradientFvPatchFields.H"
-#include "transformField.H"
-#include "transformGeometricField.H"
-#include "IOdictionary.H"
-#include "fvc.H"
 #include "mechanicalModel.H"
+#include "fvc.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -54,8 +50,7 @@ Foam::thermoLinearElastic::thermoLinearElastic
     const dictionary& dict
 )
 :
-    mechanicalLaw(name, mesh, dict),
-    rho_(dict.lookup("rho")),
+    linearElastic(name, mesh, dict),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
     lambda_
@@ -78,76 +73,11 @@ Foam::thermoLinearElastic::~thermoLinearElastic()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volScalarField> Foam::thermoLinearElastic::rho() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-    tresult().correctBoundaryConditions();
-
-    return tresult;
-}
-
-
-Foam::tmp<Foam::volScalarField> Foam::thermoLinearElastic::impK() const
-{
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "impK",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            2.0*mu_ + lambda_
-        )
-    );
-}
-
-
-const Foam::dimensionedScalar& Foam::thermoLinearElastic::mu() const
-{
-    return mu_;
-}
-
-
-const Foam::dimensionedScalar& Foam::thermoLinearElastic::lambda() const
-{
-    return lambda_;
-}
-
 
 void Foam::thermoLinearElastic::correct(volSymmTensorField& sigma)
 {
-    // Lookup the strain tensor from the solver
-    const volSymmTensorField epsilon =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<symmTensor>("epsilon", mesh());
+    // Calculate linear elastic stress
+    linearElastic::correct(sigma);
 
     // Lookup the temperature field from the solver
     const volScalarField T =
@@ -169,22 +99,15 @@ void Foam::thermoLinearElastic::correct(volSymmTensorField& sigma)
             "mechanicalProperties"
         ).lookupBaseMeshVolField<scalar>("T0", mesh());
 
-    // Calculate stress based on Hooke's law
-    sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I - 3.0*K_*alpha_*(T - T0)*I;
+    // Add thermal stress component
+    sigma -= 3.0*K_*alpha_*(T - T0)*symmTensor(I);
 }
 
 
 void Foam::thermoLinearElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Lookup the strain tensor from the solver
-    const surfaceSymmTensorField epsilon =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshSurfaceField<symmTensor>("epsilonf", mesh());
+    // Calculate linear elastic stress
+    linearElastic::correct(sigma);
 
     // Lookup the temperature field from the solver
     const volScalarField T =
@@ -210,9 +133,8 @@ void Foam::thermoLinearElastic::correct(surfaceSymmTensorField& sigma)
 
     const surfaceScalarField& T0f = fvc::interpolate(T0);
 
-    // Calculate stress based on Hooke's law
-    sigma =
-        2.0*mu_*epsilon + lambda_*tr(epsilon)*I - 3.0*K_*alpha_*(Tf - T0f)*I;
+    // Add thermal stress component
+    sigma -= 3.0*K_*alpha_*(Tf - T0f)*symmTensor(I);
 }
 
 
