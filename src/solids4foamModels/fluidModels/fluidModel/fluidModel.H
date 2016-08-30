@@ -145,7 +145,7 @@ public:
 
         // Access
 
-            //- Return mesh
+            //- Return const reference to the mesh
             const fvMesh& mesh() const
             {
                 return mesh_;

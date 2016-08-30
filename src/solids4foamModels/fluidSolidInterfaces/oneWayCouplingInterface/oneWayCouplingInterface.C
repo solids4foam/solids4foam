@@ -24,8 +24,9 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "weakCouplingInterface.H"
+#include "oneWayCouplingInterface.H"
 #include "addToRunTimeSelectionTable.H"
+#include "oneWayFsiFluid.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -37,10 +38,10 @@ namespace fluidSolidInterfaces
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(weakCouplingInterface, 0);
+defineTypeNameAndDebug(oneWayCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
-    fluidSolidInterface, weakCouplingInterface, dictionary
+    fluidSolidInterface, oneWayCouplingInterface, dictionary
 );
 
 
@@ -49,20 +50,14 @@ addToRunTimeSelectionTable
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-weakCouplingInterface::weakCouplingInterface
+oneWayCouplingInterface::oneWayCouplingInterface
 (
     dynamicFvMesh& fluidMesh,
     dynamicFvMesh& solidMesh
 )
 :
     fluidSolidInterface(typeName, fluidMesh, solidMesh),
-    solidZoneTraction_(),
-    solidZoneTractionPrev_(),
-    predictedSolidZoneTraction_(),
-    relaxationFactor_
-    (
-        fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
-    )
+    solidZoneTraction_()
 {
     // Initialize zone traction fields
     solidZoneTraction_ =
@@ -72,119 +67,44 @@ weakCouplingInterface::weakCouplingInterface
             vector::zero
         );
 
-    solidZoneTractionPrev_ =
-        vectorField
+    if (!isA<fluidModels::oneWayFsiFluid>(fluid()))
+    {
+        FatalErrorIn
         (
-            solidMesh.faceZones()[solidZoneIndex()]().size(),
-            vector::zero
-        );
+            "oneWayCouplingInterface::oneWayCouplingInterface\n"
+            "(\n"
+            "    dynamicFvMesh& fluidMesh,\n"
+            "    dynamicFvMesh& solidMesh\n"
+            ")\n"
+        )   << "The " << type() << " FSI coupling can only be used with the "
+            << fluidModels::oneWayFsiFluid::typeName << " fluidModel"
+            << abort(FatalError);
+    }
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void weakCouplingInterface::evolve()
+void oneWayCouplingInterface::evolve()
 {
-    initializeFields();
+    fluidSolidInterface::initializeFields();
 
     updateInterpolator();
 
-    solid().evolve();
-
-    updateWeakDisplacement();
-
-    moveFluidMesh();
-
     fluid().evolve();
 
-    updateWeakTraction();
+    updateTraction();
+
+    solid().evolve();
 
     solid().updateTotalFields();
 }
 
 
-void weakCouplingInterface::initializeFields()
+void oneWayCouplingInterface::updateTraction()
 {
-    predictedSolidZoneTraction_ =
-        vectorField
-        (
-            solidMesh().faceZones()[solidZoneIndex()]().size(),
-            vector::zero
-        );
+    Info<< "Update traction on solid patch" << endl;
 
-    fluidSolidInterface::initializeFields();
-}
-
-
-void weakCouplingInterface::updateWeakDisplacement()
-{
-    vectorField solidZonePointsDisplAtSolid =
-        solid().faceZonePointDisplacementIncrement(solidZoneIndex());
-
-    solidZonePointsDispl() =
-        ggiInterpolator().slaveToMasterPointInterpolate
-        (
-            solidZonePointsDisplAtSolid
-        );
-
-    residualPrev() = residual();
-
-    residual() = solidZonePointsDispl() - fluidZonePointsDispl();
-
-    fluidZonePointsDisplPrev() = fluidZonePointsDispl();
-
-    fluidZonePointsDispl() += residual();
-
-    // Make sure that displacement on all processors is equal to one
-    // calculated on master processor
-    if (Pstream::parRun())
-    {
-        if(!Pstream::master())
-        {
-            fluidZonePointsDispl() *= 0.0;
-        }
-
-        //- pass to all procs
-        reduce(fluidZonePointsDispl(), sumOp<vectorField>());
-
-        label globalFluidZoneIndex =
-            findIndex(fluid().globalFaceZones(), fluidZoneIndex());
-
-        if (globalFluidZoneIndex == -1)
-        {
-            FatalErrorIn
-            (
-                "void weakCouplingInterface::updateWeakDisplacement()"
-            )   << "global zone point map is not available"
-                << abort(FatalError);
-        }
-
-        const labelList& map =
-            fluid().globalToLocalFaceZonePointMap()[globalFluidZoneIndex];
-
-        if (!Pstream::master())
-        {
-            vectorField fluidZonePointsDisplGlobal =
-                fluidZonePointsDispl();
-
-            forAll(fluidZonePointsDisplGlobal, globalPointI)
-            {
-                label localPoint = map[globalPointI];
-
-                fluidZonePointsDispl()[localPoint] =
-                    fluidZonePointsDisplGlobal[globalPointI];
-            }
-        }
-    }
-}
-
-
-void weakCouplingInterface::updateWeakTraction()
-{
-    Info<< "Update weak traction on solid patch" << endl;
-
-    solidZoneTractionPrev_ = solidZoneTraction_;
-
-    // Calc fluid traction
+    // Calculate fluid traction
 
     const vectorField& p =
         fluidMesh().faceZones()[fluidZoneIndex()]().localPoints();
@@ -212,9 +132,7 @@ void weakCouplingInterface::updateWeakTraction()
             -fluidZoneTraction
         );
 
-    solidZoneTraction_ =
-        relaxationFactor_*fluidZoneTractionAtSolid
-      + (1.0 - relaxationFactor_)*predictedSolidZoneTraction_;
+    solidZoneTraction_ = fluidZoneTractionAtSolid;
 
     if (coupled())
     {

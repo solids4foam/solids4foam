@@ -17,6 +17,7 @@ fluidModels/fluidModel/newFluidModel.C
 fluidModels/icoFluid/icoFluid.C
 fluidModels/pisoFluid/pisoFluid.C
 fluidModels/consistentIcoFluid/consistentIcoFluid.C
+fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/fluidSolidInterface/newFluidSolidInterface.C
@@ -24,6 +25,7 @@ fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
 fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
 fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
+fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 
 materialModels/mechanicalModel/mechanicalModel.C
 mechanicalLaws = materialModels/mechanicalModel/mechanicalLaws

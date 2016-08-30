@@ -23,23 +23,23 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    weakCouplingInterface
+    oneWayCouplingInterface
 
 Description
-    Weak Dirichlet-Neumann coupling, where no outer FSI correctors are
-    performed each time-step.
+    Pseduo coupling scheme class that reads the fluid velocity and pressure
+    fields from a pre-run fluid case; this then allows a one-way fluid-solid
+    interaction simulation.
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
     Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
-    weakCouplingInterface.C
+    oneWayCouplingInterface.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef weakCouplingInterface_H
-#define weakCouplingInterface_H
+#ifndef oneWayCouplingInterface_H
+#define oneWayCouplingInterface_H
 
 #include "fluidSolidInterface.H"
 
@@ -52,10 +52,10 @@ namespace fluidSolidInterfaces
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class weakCouplingInterface Declaration
+                        Class oneWayCouplingInterface Declaration
 \*---------------------------------------------------------------------------*/
 
-class weakCouplingInterface
+class oneWayCouplingInterface
 :
     public fluidSolidInterface
 {
@@ -64,35 +64,26 @@ class weakCouplingInterface
         //- Solid zone traction (pressure + vicous)
         vectorField solidZoneTraction_;
 
-        //- Solid zone traction (pressure + vicous)
-        vectorField solidZoneTractionPrev_;
-
-        //- Solid zone traction (pressure + vicous)
-        vectorField predictedSolidZoneTraction_;
-
-        //- Fixed under-relaxation factor
-        const scalar relaxationFactor_;
-
 
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        weakCouplingInterface(const weakCouplingInterface&);
+        oneWayCouplingInterface(const oneWayCouplingInterface&);
 
         //- Disallow default bitwise assignment
-        void operator=(const weakCouplingInterface&);
+        void operator=(const oneWayCouplingInterface&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("weakCoupling");
+    TypeName("oneWayCoupling");
 
 
     // Constructors
 
         //- Construct from components
-        weakCouplingInterface
+        oneWayCouplingInterface
         (
             dynamicFvMesh& fluidMesh,
             dynamicFvMesh& solidMesh
@@ -101,7 +92,7 @@ public:
 
     // Destructor
 
-        virtual ~weakCouplingInterface()
+        virtual ~oneWayCouplingInterface()
         {}
 
 
@@ -112,14 +103,8 @@ public:
             //- Evolve the interface
             virtual void evolve();
 
-            //- Initialize fields
-            virtual void initializeFields();
-
-            //- Calculate interface displacement
-            virtual void updateWeakDisplacement();
-
             //- Update interface traction
-            virtual void updateWeakTraction();
+            virtual void updateTraction();
 };
 
 

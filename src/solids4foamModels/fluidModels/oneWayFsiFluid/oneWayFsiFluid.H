@@ -23,111 +23,141 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    weakCouplingInterface
+    oneWayFsiFluid
 
 Description
-    Weak Dirichlet-Neumann coupling, where no outer FSI correctors are
-    performed each time-step.
+    Pseduo fluid model class that reads the fluid velocity and pressure fields
+    from a pre-run fluid case; this then allows a one-way fluid-solid
+    interaction simulation.
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
     Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
-    weakCouplingInterface.C
+    oneWayFsiFluid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef weakCouplingInterface_H
-#define weakCouplingInterface_H
+#ifndef oneWayFsiFluid_H
+#define oneWayFsiFluid_H
 
-#include "fluidSolidInterface.H"
+#include "fluidModel.H"
+#include "volFields.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
-
-namespace fluidSolidInterfaces
+namespace fluidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class weakCouplingInterface Declaration
+                        Class oneWayFsiFluid Declaration
 \*---------------------------------------------------------------------------*/
 
-class weakCouplingInterface
+class oneWayFsiFluid
 :
-    public fluidSolidInterface
+    public fluidModel
 {
     // Private data
 
-        //- Solid zone traction (pressure + vicous)
-        vectorField solidZoneTraction_;
+        //- Velocity field
+        volVectorField U_;
 
-        //- Solid zone traction (pressure + vicous)
-        vectorField solidZoneTractionPrev_;
+        //- Pressure field
+        volScalarField p_;
 
-        //- Solid zone traction (pressure + vicous)
-        vectorField predictedSolidZoneTraction_;
+        // Transport properties dictionary
+        IOdictionary transportProperties_;
 
-        //- Fixed under-relaxation factor
-        const scalar relaxationFactor_;
+        //- Kinematic viscosity
+        dimensionedScalar nu_;
+
+        //- Density
+        dimensionedScalar rho_;
 
 
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        weakCouplingInterface(const weakCouplingInterface&);
+        oneWayFsiFluid(const oneWayFsiFluid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const weakCouplingInterface&);
+        void operator=(const oneWayFsiFluid&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("weakCoupling");
+    TypeName("oneWayFsiFluid");
 
 
     // Constructors
 
         //- Construct from components
-        weakCouplingInterface
-        (
-            dynamicFvMesh& fluidMesh,
-            dynamicFvMesh& solidMesh
-        );
+        oneWayFsiFluid(const fvMesh& mesh);
 
 
     // Destructor
 
-        virtual ~weakCouplingInterface()
+        virtual ~oneWayFsiFluid()
         {}
 
 
     // Member Functions
 
+        // Access
+
+            //- Return velocity field
+            virtual const volVectorField& U() const;
+
+            //- Return pressure field
+            virtual const volScalarField& p() const;
+
+            //- Patch viscous force (N/m2)
+            virtual tmp<vectorField> patchViscousForce
+            (
+                const label patchID
+            ) const;
+
+            //- Patch pressure force (N/m2)
+            virtual tmp<scalarField> patchPressureForce
+            (
+                const label patchID
+            ) const;
+
+            //- Patch viscous force (N/m2)
+            virtual tmp<vectorField> faceZoneViscousForce
+            (
+                const label zoneID,
+                const label patchID
+            ) const;
+
+            //- Patch pressure force (N/m2)
+            virtual tmp<scalarField> faceZonePressureForce
+            (
+                const label zoneID,
+                const label patchID
+            ) const;
+
+            //- Face zone effective dynamic viscosity
+            virtual tmp<scalarField> faceZoneMuEff
+            (
+                const label zoneID,
+                const label patchID
+            ) const;
+
         // Edit
 
-            //- Evolve the interface
+            //- Evolve the fluid model
             virtual void evolve();
-
-            //- Initialize fields
-            virtual void initializeFields();
-
-            //- Calculate interface displacement
-            virtual void updateWeakDisplacement();
-
-            //- Update interface traction
-            virtual void updateWeakTraction();
 };
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-} // End namespace fluidSolidInterfaces
-
-
+} // End namespace fluidModels
 } // End namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
