@@ -33,8 +33,8 @@ Description
     the unknowns; consequently, the current approach can be employed to simulate
     incompressible materials.
 
-    The mathematical model is solved in a segregated manner using the transient
-    SIMPLE algorithm.
+    The mathematical model can be solved using a coupled or segregated
+    (transient SIMPLE) methodoloy, controlled by the 'coupled' switch.
 
     The stress is calculated by the run-time selectable mechanical law.
 
@@ -53,6 +53,7 @@ SourceFiles
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
+#include "fvBlockMatrix.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -82,6 +83,10 @@ class hybridLinGeomSolid
 
         //- Velocity field
         volVectorField U_;
+
+        //- Field to hold p-D solution vector if a coupled solution
+        //  methodology is employed
+        volVector4Field* pDPtr_;
 
         //- Point mesh
         pointMesh pMesh_;
@@ -141,6 +146,9 @@ class hybridLinGeomSolid
         //- Maximum number of momentum correctors
         const int nCorr_;
 
+        //- Coupled or segregated solution methodology
+        const Switch coupled_;
+
         //- Number of times the maximum number of correctors was reached in the
         //  momentum equation
         int maxIterReached_;
@@ -154,6 +162,12 @@ class hybridLinGeomSolid
             const lduMatrix::solverPerformance& solverPerfD,
             const lduMatrix::solverPerformance& solverPerfp
         );
+
+        //- Make p-D field
+        void makePD();
+
+        //- Return p-D field
+        volVector4Field& pD();
 
         //- Disallow default bitwise copy construct
         hybridLinGeomSolid(const hybridLinGeomSolid&);
