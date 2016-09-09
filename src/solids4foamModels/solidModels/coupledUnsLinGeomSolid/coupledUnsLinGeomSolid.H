@@ -57,6 +57,7 @@ SourceFiles
 #include "newLeastSquaresVolPointInterpolation.H"
 #include "solidPolyMesh.H"
 #include "BlockSolverPerformance.H"
+#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -146,9 +147,6 @@ class coupledUnsLinGeomSolid
         //- Hooke's law first Lame parameter
         const surfaceScalarField lambdaf_;
 
-        //- Gravity
-        const dimensionedVector gravity_;
-
         //- D equation under-relaxation factor
         const scalar DEqnRelaxFactor_;
 
@@ -166,6 +164,9 @@ class coupledUnsLinGeomSolid
 
         //- Maximum number of momentum correctors
         const int nCorr_;
+
+        //- Gravitational acceleration
+        const uniformDimensionedVectorField g_;
 
         //- Number of times the maximum number of correctors was reached in the
         //  momentum equation

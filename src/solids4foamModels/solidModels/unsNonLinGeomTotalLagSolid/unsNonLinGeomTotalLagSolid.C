@@ -292,6 +292,17 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
         solidProperties().lookupOrDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
+    g_
+    (
+        IOobject
+        (
+            "g",
+            runTime().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
     nonLinear_(solidProperties().lookupOrDefault<Switch>("nonLinear", true)),
     enforceLinear_(false),
     debug_(solidProperties().lookupOrDefault<Switch>("debug", false)),
@@ -301,14 +312,6 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
         (
             "K",
             dimensionedScalar("K", dimless/dimTime, 0)
-        )
-    ),
-    g_
-    (
-        solidProperties().lookupOrDefault<dimensionedVector>
-        (
-            "g",
-            dimensionedVector("g", dimVelocity/dimTime, vector::zero)
         )
     ),
     maxIterReached_(0)

@@ -51,6 +51,7 @@ SourceFiles
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "newLeastSquaresVolPointInterpolation.H"
+#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -151,6 +152,9 @@ class unsNonLinGeomTotalLagSolid
         //- Maximum number of momentum correctors
         const int nCorr_;
 
+        //- Gravitational acceleration
+        const uniformDimensionedVectorField g_;
+
         //- Switch to enable/disable nonlinear geometry
         const Switch nonLinear_;
 
@@ -162,9 +166,6 @@ class unsNonLinGeomTotalLagSolid
 
         //- Viscosity/damping coefficient
         const dimensionedScalar K_;
-
-        //- Gravity
-        const dimensionedVector g_;
 
         //- Number of times the maximum number of correctors was reached in the
         //  momentum equation

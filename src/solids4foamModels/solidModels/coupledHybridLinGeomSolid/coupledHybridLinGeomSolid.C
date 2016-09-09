@@ -317,7 +317,17 @@ coupledHybridLinGeomSolid::coupledHybridLinGeomSolid(dynamicFvMesh& mesh)
         solidProperties().lookupOrDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
-    coupled_(solidProperties().lookupOrDefault<Switch>("coupled", true)),
+    g_
+    (
+        IOobject
+        (
+            "g",
+            runTime().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
@@ -733,6 +743,7 @@ bool coupledHybridLinGeomSolid::evolve()
           - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
           + fvc::div(sigma_, "div(sigma)")
           + gradp_
+          + rho_*g_
         );
 
         // Add Rhie-Chow corrections to quell oscillations

@@ -66,6 +66,7 @@ SourceFiles
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "newLeastSquaresVolPointInterpolation.H"
+#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -173,6 +174,9 @@ class poroLinGeomSolid
 
         //- Maximum number of momentum-pressure correctors
         const int nCorr_;
+
+        //- Gravitational acceleration
+        const uniformDimensionedVectorField g_;
 
         //- Number of times the maximum number of correctors was reached in the
         //  momentum-pressure corrector loop

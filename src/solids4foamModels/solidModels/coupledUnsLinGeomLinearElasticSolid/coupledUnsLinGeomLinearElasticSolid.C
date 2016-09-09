@@ -183,12 +183,15 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         mesh,
         dimensionedScalar("0", dimPressure, 0.0)
     ),
-    gravity_
+    g_
     (
-        solidProperties().lookupOrDefault<dimensionedVector>
+        IOobject
         (
-            "gravity",
-            dimensionedVector("gravity", dimVelocity/dimTime, vector::zero)
+            "g",
+            runTime().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
         )
     ),
     DEqnRelaxFactor_
@@ -763,7 +766,7 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     (
         blockM,
         blockB,
-        rho_*fvm::d2dt2(D_) - rho_*gravity_,
+        rho_*fvm::d2dt2(D_) - rho_*g_,
         true
     );
 

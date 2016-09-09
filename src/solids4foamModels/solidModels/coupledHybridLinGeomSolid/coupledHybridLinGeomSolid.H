@@ -54,6 +54,7 @@ SourceFiles
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "fvBlockMatrix.H"
+#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -148,8 +149,8 @@ class coupledHybridLinGeomSolid
         //- Maximum number of momentum correctors
         const int nCorr_;
 
-        //- Coupled or segregated solution methodology
-        const Switch coupled_;
+        //- Gravitational acceleration
+        const uniformDimensionedVectorField g_;
 
         //- Number of times the maximum number of correctors was reached in the
         //  momentum equation

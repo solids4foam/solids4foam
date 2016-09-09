@@ -283,14 +283,6 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
     rImpK_(1.0/impK_),
     muf_("muf", impKf_/3.5), // assuming a Poisson's ratio of 0.3
     lambdaf_("lambdaf", 1.5*muf_),
-    gravity_
-    (
-        solidProperties().lookupOrDefault<dimensionedVector>
-        (
-            "gravity",
-            dimensionedVector("gravity", dimVelocity/dimTime, vector::zero)
-        )
-    ),
     DEqnRelaxFactor_
     (
         mesh.solutionDict().relax("DEqn")
@@ -314,6 +306,17 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         solidProperties().lookupOrDefault<int>("infoFrequency", 1)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 100)),
+    g_
+    (
+        IOobject
+        (
+            "g",
+            runTime().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
@@ -851,7 +854,7 @@ bool coupledUnsLinGeomSolid::evolve()
         (
             blockM,
             blockB,
-            rho_*fvm::d2dt2(D_) - rho_*gravity_
+            rho_*fvm::d2dt2(D_) - rho_*g_
           + fvc::div
             (
                 (mesh().Sf() & (2.0*muf_*epsilonf_))

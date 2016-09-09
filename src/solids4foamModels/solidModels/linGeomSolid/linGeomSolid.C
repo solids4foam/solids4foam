@@ -238,6 +238,17 @@ linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
         solidProperties().lookupOrDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
+    g_
+    (
+        IOobject
+        (
+            "g",
+            runTime().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
@@ -644,6 +655,7 @@ bool linGeomSolid::evolve()
          == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
           - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
           + fvc::div(sigma_, "div(sigma)")
+          + rho_*g_
         );
 
         // Add Rhie-Chow corrections to quell oscillations

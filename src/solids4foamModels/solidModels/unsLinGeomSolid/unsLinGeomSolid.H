@@ -50,6 +50,7 @@ SourceFiles
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
+#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -128,6 +129,9 @@ class unsLinGeomSolid
 
         //- Maximum number of momentum correctors
         const int nCorr_;
+
+        //- Gravitational acceleration
+        const uniformDimensionedVectorField g_;
 
         //- Number of times the maximum number of correctors was reached in the
         //  momentum equation

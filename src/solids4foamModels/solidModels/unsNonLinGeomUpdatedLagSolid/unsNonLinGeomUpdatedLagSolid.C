@@ -553,6 +553,17 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         solidProperties().lookupOrDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
+    g_
+    (
+        IOobject
+        (
+            "g",
+            runTime().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
     maxIterReached_(0),
     stabilisePressure_(lookupOrDefault<Switch>("stabilisePressure", false))
 {
@@ -1009,6 +1020,7 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
          == fvm::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           + fvc::div((relJf_*relFinvf_.T() & mesh().Sf()) & sigmaf_)
+          + rho_*g_
         );
 
         // Under-relax the linear system

@@ -313,6 +313,17 @@ poroLinGeomSolid::poroLinGeomSolid(dynamicFvMesh& mesh)
         solidProperties().lookupOrDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
+    g_
+    (
+        IOobject
+        (
+            "g",
+            runTime().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
@@ -795,6 +806,7 @@ bool poroLinGeomSolid::evolve()
             rho_*fvm::d2dt2(D_)
          == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
           + fvc::div(sigma_ - impK_*gradD_, "div(sigma)")
+          + rho_*g_
         );
 
         // Under-relaxation the linear system

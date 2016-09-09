@@ -56,6 +56,7 @@ SourceFiles
 #include "newLeastSquaresVolPointInterpolation.H"
 #include "solidPolyMesh.H"
 #include "BlockSolverPerformance.H"
+#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -119,8 +120,8 @@ class coupledUnsLinGeomLinearElasticSolid
         //- Hooke's law first Lame parameter
         surfaceScalarField lambdaf_;
 
-        //- Gravity
-        const dimensionedVector gravity_;
+        //- Gravitational acceleration
+        const uniformDimensionedVectorField g_;
 
         //- D equation under-relaxation factor
         const scalar DEqnRelaxFactor_;

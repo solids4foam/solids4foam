@@ -506,6 +506,17 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         solidProperties().lookupOrDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
+    g_
+    (
+        IOobject
+        (
+            "g",
+            runTime().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
     maxIterReached_(0),
     stabilisePressure_
     (
@@ -922,6 +933,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
          == fvm::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           + fvc::div((relJ_*sigma_ & relFinv_.T()), "div(sigma)")
+          + rho_*g_
         );
 
         // Add Rhie-Chow corrections to quell oscillations

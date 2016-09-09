@@ -264,6 +264,17 @@ unsLinGeomSolid::unsLinGeomSolid(dynamicFvMesh& mesh)
         solidProperties().lookupOrDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
+    g_
+    (
+        IOobject
+        (
+            "g",
+            runTime().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
@@ -720,6 +731,7 @@ bool unsLinGeomSolid::evolve()
          == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
           - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
           + fvc::div(mesh().Sf() & sigmaf_)
+          + rho_*g_
         );
 
         // Under-relaxation the linear system
