@@ -23,7 +23,7 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    hybridLinGeomSolid
+    coupledHybridLinGeomSolid
 
 Description
     Mathematical model where linear geometry is assumed i.e. small strains and
@@ -33,8 +33,8 @@ Description
     the unknowns; consequently, the current approach can be employed to simulate
     incompressible materials.
 
-    The mathematical model can be solved using a coupled or segregated
-    (transient SIMPLE) methodoloy, controlled by the 'coupled' switch.
+    The mathematical model is solved using a block coupled methodoloy, where
+    displacement and pressure are solved simultaneously.
 
     The stress is calculated by the run-time selectable mechanical law.
 
@@ -42,12 +42,12 @@ Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
-    hybridLinGeomSolid.C
+    coupledHybridLinGeomSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef hybridLinGeomSolid_H
-#define hybridLinGeomSolid_H
+#ifndef coupledHybridLinGeomSolid_H
+#define coupledHybridLinGeomSolid_H
 
 #include "solidModel.H"
 #include "volFields.H"
@@ -66,10 +66,10 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class hybridLinGeomSolid Declaration
+                        Class coupledHybridLinGeomSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class hybridLinGeomSolid
+class coupledHybridLinGeomSolid
 :
     public solidModel
 {
@@ -84,9 +84,8 @@ class hybridLinGeomSolid
         //- Velocity field
         volVectorField U_;
 
-        //- Field to hold p-D solution vector if a coupled solution
-        //  methodology is employed
-        volVector4Field* pDPtr_;
+        //- Field to hold p-D solution vector
+        volVector4Field pD_;
 
         //- Point mesh
         pointMesh pMesh_;
@@ -124,6 +123,9 @@ class hybridLinGeomSolid
 
         //- D equation under-relaxation factor
         const scalar DEqnRelaxFactor_;
+
+        //- p equation under-relaxation factor
+        const scalar pEqnRelaxFactor_;
 
         //- Solution standard tolerance for D
         const scalar solutionTol_;
@@ -163,33 +165,27 @@ class hybridLinGeomSolid
             const lduMatrix::solverPerformance& solverPerfp
         );
 
-        //- Make p-D field
-        void makePD();
-
-        //- Return p-D field
-        volVector4Field& pD();
-
         //- Disallow default bitwise copy construct
-        hybridLinGeomSolid(const hybridLinGeomSolid&);
+        coupledHybridLinGeomSolid(const coupledHybridLinGeomSolid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const hybridLinGeomSolid&);
+        void operator=(const coupledHybridLinGeomSolid&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("hybridLinearGeometry");
+    TypeName("coupledHybridLinearGeometry");
 
     // Constructors
 
         //- Construct from components
-        hybridLinGeomSolid(dynamicFvMesh& mesh);
+        coupledHybridLinGeomSolid(dynamicFvMesh& mesh);
 
 
     // Destructor
 
-        virtual ~hybridLinGeomSolid()
+        virtual ~coupledHybridLinGeomSolid()
         {}
 
 

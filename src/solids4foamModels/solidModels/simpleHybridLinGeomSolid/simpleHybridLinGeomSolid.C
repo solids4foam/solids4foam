@@ -24,7 +24,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "hybridLinGeomSolid.H"
+#include "simpleHybridLinGeomSolid.H"
 #include "volFields.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -46,13 +46,13 @@ namespace solidModels
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(hybridLinGeomSolid, 0);
-addToRunTimeSelectionTable(solidModel, hybridLinGeomSolid, dictionary);
+defineTypeNameAndDebug(simpleHybridLinGeomSolid, 0);
+addToRunTimeSelectionTable(solidModel, simpleHybridLinGeomSolid, dictionary);
 
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
-bool hybridLinGeomSolid::converged
+bool simpleHybridLinGeomSolid::converged
 (
     const int iCorr,
     const lduMatrix::solverPerformance& solverPerfD,
@@ -132,38 +132,19 @@ bool hybridLinGeomSolid::converged
     // Print residual information
     if (iCorr == 0)
     {
-        if (coupled_)
-        {
-            Info<< "    Corr, resPD, relResD, relResP, matRes, itersPD" << endl;
-        }
-        else
-        {
-            Info<< "    Corr, resD, relResD, resP, relResP, matRes, "
-                << "itersD, itersP" << endl;
-        }
+        Info<< "    Corr, resD, relResD, resP, relResP, matRes, "
+            << "itersD, itersP" << endl;
     }
     else if (iCorr % infoFrequency_ == 0 || converged)
     {
-        if (coupled_)
-        {
-            Info<< "    " << iCorr
-                << ", " << solverPerfD.initialResidual()
-                << ", " << residualD
-                << ", " << residualp
-                << ", " << materialResidual
-                << ", " << solverPerfD.nIterations() << endl;
-        }
-        else
-        {
-            Info<< "    " << iCorr
-                << ", " << solverPerfD.initialResidual()
-                << ", " << residualD
-                << ", " << solverPerfp.initialResidual()
-                << ", " << residualp
-                << ", " << materialResidual
-                << ", " << solverPerfD.nIterations()
-                << ", " << solverPerfp.nIterations() << endl;
-        }
+        Info<< "    " << iCorr
+            << ", " << solverPerfD.initialResidual()
+            << ", " << residualD
+            << ", " << solverPerfp.initialResidual()
+            << ", " << residualp
+            << ", " << materialResidual
+            << ", " << solverPerfD.nIterations()
+            << ", " << solverPerfp.nIterations() << endl;
 
         if (converged)
         {
@@ -181,45 +162,9 @@ bool hybridLinGeomSolid::converged
 }
 
 
-void hybridLinGeomSolid::makePD()
-{
-    if (pDPtr_)
-    {
-        FatalErrorIn("void hybridLinGeomSolid::makePD()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    pDPtr_ =
-        new volVector4Field
-        (
-            IOobject
-            (
-                "pD",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedVector4("zero", dimless, vector4::zero)
-        );
-}
-
-
-volVector4Field& hybridLinGeomSolid::pD()
-{
-    if (!pDPtr_)
-    {
-        makePD();
-    }
-
-    return *pDPtr_;
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-hybridLinGeomSolid::hybridLinGeomSolid(dynamicFvMesh& mesh)
+simpleHybridLinGeomSolid::simpleHybridLinGeomSolid(dynamicFvMesh& mesh)
 :
     solidModel(typeName, mesh),
     D_
@@ -261,7 +206,6 @@ hybridLinGeomSolid::hybridLinGeomSolid(dynamicFvMesh& mesh)
         mesh,
         dimensionedVector("0", dimLength/dimTime, vector::zero)
     ),
-    pDPtr_(NULL),
     pMesh_(mesh),
     pointD_
     (
@@ -326,6 +270,12 @@ hybridLinGeomSolid::hybridLinGeomSolid(dynamicFvMesh& mesh)
       ? mesh.solutionDict().relaxationFactor("DEqn")
       : 1.0
     ),
+    pEqnRelaxFactor_
+    (
+        mesh.solutionDict().relax("pEqn")
+      ? mesh.solutionDict().relaxationFactor("pEqn")
+      : 1.0
+    ),
     solutionTol_
     (
         solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
@@ -357,7 +307,6 @@ hybridLinGeomSolid::hybridLinGeomSolid(dynamicFvMesh& mesh)
         solidProperties().lookupOrDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
-    coupled_(solidProperties().lookupOrDefault<Switch>("coupled", true)),
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
@@ -367,7 +316,7 @@ hybridLinGeomSolid::hybridLinGeomSolid(dynamicFvMesh& mesh)
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-tmp<vectorField> hybridLinGeomSolid::faceZonePointDisplacementIncrement
+tmp<vectorField> simpleHybridLinGeomSolid::faceZonePointDisplacementIncrement
 (
     const label zoneID
 ) const
@@ -453,7 +402,7 @@ tmp<vectorField> hybridLinGeomSolid::faceZonePointDisplacementIncrement
 }
 
 
-tmp<tensorField> hybridLinGeomSolid::faceZoneSurfaceGradientOfVelocity
+tmp<tensorField> simpleHybridLinGeomSolid::faceZoneSurfaceGradientOfVelocity
 (
     const label zoneID,
     const label patchID
@@ -521,7 +470,7 @@ tmp<tensorField> hybridLinGeomSolid::faceZoneSurfaceGradientOfVelocity
 }
 
 
-tmp<vectorField> hybridLinGeomSolid::currentFaceZonePoints
+tmp<vectorField> simpleHybridLinGeomSolid::currentFaceZonePoints
 (
     const label zoneID
 ) const
@@ -610,7 +559,7 @@ tmp<vectorField> hybridLinGeomSolid::currentFaceZonePoints
 }
 
 
-tmp<vectorField> hybridLinGeomSolid::faceZoneNormal
+tmp<vectorField> simpleHybridLinGeomSolid::faceZoneNormal
 (
     const label zoneID,
     const label patchID
@@ -677,7 +626,7 @@ tmp<vectorField> hybridLinGeomSolid::faceZoneNormal
 }
 
 
-void hybridLinGeomSolid::setTraction
+void simpleHybridLinGeomSolid::setTraction
 (
     const label patchID,
     const vectorField& traction
@@ -689,7 +638,7 @@ void hybridLinGeomSolid::setTraction
      != solidTractionFvPatchVectorField::typeName
     )
     {
-        FatalErrorIn("void hybridLinGeomSolid::setTraction(...)")
+        FatalErrorIn("void simpleHybridLinGeomSolid::setTraction(...)")
             << "Bounary condition on " << D_.name()
             <<  " is "
             << D_.boundaryField()[patchID].type()
@@ -709,7 +658,7 @@ void hybridLinGeomSolid::setTraction
 }
 
 
-void hybridLinGeomSolid::setPressure
+void simpleHybridLinGeomSolid::setPressure
 (
     const label patchID,
     const scalarField& pressure
@@ -721,7 +670,7 @@ void hybridLinGeomSolid::setPressure
      != solidTractionFvPatchVectorField::typeName
     )
     {
-        FatalErrorIn("void hybridLinGeomSolid::setTraction(...)")
+        FatalErrorIn("void simpleHybridLinGeomSolid::setTraction(...)")
             << "Bounary condition on " << D_.name()
             <<  " is "
             << D_.boundaryField()[patchID].type()
@@ -741,7 +690,7 @@ void hybridLinGeomSolid::setPressure
 }
 
 
-bool hybridLinGeomSolid::evolve()
+bool simpleHybridLinGeomSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
 
@@ -749,9 +698,9 @@ bool hybridLinGeomSolid::evolve()
     lduMatrix::solverPerformance solverPerfD;
     lduMatrix::solverPerformance solverPerfp;
     lduMatrix::debug = 0;
-    BlockLduMatrix<vector4>::debug = 0;
 
-    Info<< "Solving the momentum equation for D and p" << endl;
+    Info<< "Solving the momentum equation for D and p using a transient "
+        << "SIMPLE approach" << endl;
 
     // Momentum equation loop
     do
@@ -760,150 +709,64 @@ bool hybridLinGeomSolid::evolve()
         D_.storePrevIter();
         p_.storePrevIter();
 
-        if (coupled_)
-        {
-            // Initialize the pD block system
-            fvBlockMatrix<vector4> pDEqn(pD());
+        // Transient SIMPLE segregated solution methodlogy
 
-            // Assemble and insert momentum equation with pressure
-            // term removed i.e. we add it back on
-            tmp<fvVectorMatrix> DEqn
+        // Linear momentum equation total displacement form with pressure
+        // term removed i.e. we add it back on
+        tmp<fvVectorMatrix> HDEqn
+        (
+            rho_*fvm::d2dt2(D_)
+         == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
+          - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
+          + fvc::div(sigma_, "div(sigma)")
+          + gradp_
+        );
+
+        // Add Rhie-Chow corrections to quell oscillations
+        HDEqn() -= mechanical().RhieChowCorrection(D_, gradD_);
+
+        // Under-relaxation the linear system
+        HDEqn().relax(DEqnRelaxFactor_);
+
+        // Solve the linear system
+        solverPerfD =
+            solve
             (
-                rho_*fvm::d2dt2(D_)
-              - fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
-              - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
-              + fvc::div(sigma_, "div(sigma)")
-              + gradp_
+                HDEqn()
+                ==
+                -gradp_
             );
 
-            // Add Rhie-Chow corrections to quell oscillations
-            DEqn() -= mechanical().RhieChowCorrection(D_, gradD_);
+        // Under-relax the field
+        D_.relax();
 
-            DEqn().relax(DEqnRelaxFactor_);
+        // Update gradient of displacement
+        mechanical().grad(D_, gradD_);
 
-            pDEqn.insertEquation(0, DEqn());
+        // Update p boundaries in case they depend on D
+        p_.boundaryField().updateCoeffs();
 
-            // Assemble and insert pressure equation
+        // Prepare clean 1/Ap without contribution from under-relaxation
+        const volScalarField rDA("(1|A(D))", 1/HDEqn().A());
 
-            // Pressure parts of the continuity equation
-            const surfaceScalarField rUAf
-            (
-                "rUAf",
-                fvc::interpolate(1.0/(DEqn()).A())
-            );
+        // Clear equation to reduce memory overhead
+        HDEqn.clear();
 
-            DEqn.clear();
+        // Pressure equation with Rhie-Chow corrections to avoid
+        // oscillations
+        fvScalarMatrix pEqn
+        (
+            fvm::laplacian(rDA, p_, "laplacian(Dp,p)")
+          - fvc::div(rDA*gradp_, "skewCorrectedDiv(D)")
+         == fvc::div(D_, "skewCorrectedDiv(D)")
+          + fvm::Sp(rK_, p_)
+        );
 
-            // Pressure equation where we allow for explicit skewness correction
-            // and Rhie-Chow corrections are also employed
-            fvScalarMatrix pEqn
-            (
-                fvm::Sp(rK_, p_)
-              - fvm::laplacian(rUAf, p_)
-              + fvc::div(rUAf*(fvc::interpolate(fvc::grad(p_)) & mesh().Sf()))
-              + fvc::div(D_, "skewCorrectedDiv(D)")
-              - fvc::div(D_)
-            );
+        // Under-relax the equation
+        pEqn.relax(pEqnRelaxFactor_);
 
-            pDEqn.insertEquation(3, pEqn);
-
-            // Assemble and insert coupling terms
-
-            // Calculate grad p coupling matrix
-            BlockLduSystem<vector, vector> pInD(fvm::grad(p_));
-
-            // Calculate div(D) coupling
-            BlockLduSystem<vector, scalar> DInp(fvm::UDiv(D_));
-
-            // Last argument in insertBlockCoupling says if the column direction
-            // should be incremented. This is needed for arbitrary positioning
-            // of D and p in the system
-            pDEqn.insertBlockCoupling(0, 3, pInD, true);
-            pDEqn.insertBlockCoupling(3, 0, DInp, false);
-
-            // Solve the block matrix
-            BlockSolverPerformance<vector4> blockSolverPerf = pDEqn.solve();
-
-            // Store the residuals and iterations
-            solverPerfD.initialResidual() =
-                cmptMax(blockSolverPerf.initialResidual());
-            solverPerfD.nIterations() = blockSolverPerf.nIterations();
-
-            // Retrieve solution
-            pDEqn.retrieveSolution(0, D_.internalField());
-            pDEqn.retrieveSolution(3, p_.internalField());
-
-            D_.correctBoundaryConditions();
-            p_.correctBoundaryConditions();
-
-            // Under-relax the field
-            D_.relax();
-
-            // Update gradient of displacement
-            mechanical().grad(D_, gradD_);
-        }
-        else
-        {
-            // Transient SIMPLE segregated solution methodlogy
-
-            // Linear momentum equation total displacement form with pressure
-            // term removed i.e. we add it back on
-            tmp<fvVectorMatrix> HDEqn
-            (
-                rho_*fvm::d2dt2(D_)
-             == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
-              - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
-              + fvc::div(sigma_, "div(sigma)")
-              + gradp_
-            );
-
-            // Add Rhie-Chow corrections to quell oscillations
-            HDEqn() -= mechanical().RhieChowCorrection(D_, gradD_);
-
-            // Under-relaxation the linear system
-            HDEqn().relax(DEqnRelaxFactor_);
-
-            // Solve the linear system
-            solverPerfD =
-                solve
-                (
-                    HDEqn()
-                    ==
-                    -gradp_
-                );
-
-            // Under-relax the field
-            D_.relax();
-
-            // Update gradient of displacement
-            mechanical().grad(D_, gradD_);
-
-            // Update p boundaries in case they depend on D
-            p_.boundaryField().updateCoeffs();
-
-            // Prepare clean 1/Ap without contribution from under-relaxation
-            const volScalarField rDA
-            (
-                "(1|A(D))",
-                1/HDEqn().A()
-            );
-
-            // Clear equation to reduce memory overhead
-            HDEqn.clear();
-
-            // Pressure equation with Rhie-Chow corrections to avoid
-            // oscillations
-            fvScalarMatrix pEqn
-            (
-                fvm::laplacian(rDA, p_, "laplacian(Dp,p)")
-              - fvc::div(rDA*gradp_, "div(D)")
-             == fvc::div(D_, "div(D)")
-              + fvm::Sp(rK_, p_)
-            );
-
-            // Solve the linear system
-            solverPerfp = pEqn.solve();
-        }
+        // Solve the linear system
+        solverPerfp = pEqn.solve();
 
         // Explicitly relax pressure for momentum corrector
         p_.relax();
@@ -926,7 +789,7 @@ bool hybridLinGeomSolid::evolve()
 }
 
 
-// void hybridLinGeomSolid::predict()
+// void simpleHybridLinGeomSolid::predict()
 // {
 //     Info << "Predicting solid model" << endl;
 
@@ -948,7 +811,7 @@ bool hybridLinGeomSolid::evolve()
 // }
 
 
-tmp<vectorField> hybridLinGeomSolid::tractionBoundarySnGrad
+tmp<vectorField> simpleHybridLinGeomSolid::tractionBoundarySnGrad
 (
     const vectorField& traction,
     const scalarField& pressure,
@@ -987,13 +850,13 @@ tmp<vectorField> hybridLinGeomSolid::tractionBoundarySnGrad
 }
 
 
-void hybridLinGeomSolid::updateTotalFields()
+void simpleHybridLinGeomSolid::updateTotalFields()
 {
     mechanical().updateTotalFields();
 }
 
 
-void hybridLinGeomSolid::writeFields(const Time& runTime)
+void simpleHybridLinGeomSolid::writeFields(const Time& runTime)
 {
     // Calculate strain
     volSymmTensorField epsilon
@@ -1046,7 +909,7 @@ void hybridLinGeomSolid::writeFields(const Time& runTime)
 }
 
 
-void hybridLinGeomSolid::end()
+void simpleHybridLinGeomSolid::end()
 {
     if (maxIterReached_ > 0)
     {

@@ -28,9 +28,11 @@ boundaryField
     }
     right
     {
-        type            fixedValue;
-        //value           $internalField;
+        //type            fixedValue;
+        type            extrapolated;
         value           uniform 0;
+        //value           $internalField;
+        //value           uniform 0;
     }
     down
     {

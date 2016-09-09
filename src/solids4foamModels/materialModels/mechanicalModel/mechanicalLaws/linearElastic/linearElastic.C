@@ -133,7 +133,7 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::rho() const
 
 Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 {
-    if (nu_.value() == 0.5)
+    if (nu_.value() == 0.5 || mesh().foundObject<volScalarField>("p"))
     {
         return tmp<volScalarField>
         (
@@ -225,8 +225,8 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
         const volTensorField& gradD =
             mesh().lookupObject<volTensorField>("grad(D)");
 
-        // Check if a hybrid approach is being used where pressure is being
-        // solved for
+        // Check if a hybrid approach is being used
+        // Currently, this will only work when there is no material interface
         if (mesh().foundObject<volScalarField>("p"))
         {
             const volScalarField& p = mesh().lookupObject<volScalarField>("p");

@@ -1,7 +1,8 @@
 solidModels/solidModel/solidModel.C
 solidModels/solidModel/newSolidModel.C
 solidModels/linGeomSolid/linGeomSolid.C
-solidModels/hybridLinGeomSolid/hybridLinGeomSolid.C
+solidModels/coupledHybridLinGeomSolid/coupledHybridLinGeomSolid.C
+solidModels/simpleHybridLinGeomSolid/simpleHybridLinGeomSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
 solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
@@ -53,6 +54,7 @@ $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
+$(solidFvPatchFields)/extrapolated/extrapolatedFvPatchFields.C
 
 pointPatchFields = solidModels/pointPatchFields
 $(pointPatchFields)/componentMixed/componentMixedPointPatchFields.C

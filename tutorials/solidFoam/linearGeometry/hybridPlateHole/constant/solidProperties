@@ -16,11 +16,30 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // linearGeometry: assumes small strains and rotations
-solidModel     linearGeometry;
+//solidModel     linearGeometry;
 //solidModel     unsLinearGeometry;
-//solidModel     hybridLinearGeometry;
+solidModel     coupledHybridLinearGeometry;
+//solidModel     simpleHybridLinearGeometry;
 
-"linearGeometryCoeffs|unsLinearGeometryCoeffs|hybridLinearGeometryCoeffs"
+"coupledHybridLinearGeometryCoeffs|simpleHybridLinearGeometryCoeffs"
+{
+    // Maximum number of momentum correctors
+    //nCorrectors     1000;
+
+    // Solution tolerance for displacement
+    //solutionTolerance 1e-06;
+
+    // Alternative solution tolerance for displacement
+    //alternativeTolerance 1e-07;
+
+    // Material law solution tolerance
+    //materialTolerance 1e-05;
+
+    // Write frequency for the residuals
+    infoFrequency   100;
+}
+
+"linearGeometryCoeffs|unsLinearGeometryCoeffs"
 {
     // Maximum number of momentum correctors
     //nCorrectors     1000;
