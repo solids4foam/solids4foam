@@ -744,10 +744,8 @@ bool coupledHybridLinGeomSolid::evolve()
           + fvc::div(sigma_, "div(sigma)")
           + gradp_
           + rho_*g_
+          + mechanical().RhieChowCorrection(D_, gradD_)
         );
-
-        // Add Rhie-Chow corrections to quell oscillations
-        DEqn() -= mechanical().RhieChowCorrection(D_, gradD_);
 
         // Under-relax the equation
         DEqn().relax(DEqnRelaxFactor_);

@@ -697,10 +697,8 @@ bool nonLinGeomTotalLagSolid::evolve()
           - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
           + fvc::div((J_*sigma_ & Finv_.T()), "div(sigma)")
           + rho_*g_
+          + mechanical().RhieChowCorrection(D_, gradD_)
         );
-
-        // Add Rhie-Chow corrections to quell oscillations
-        DEqn -= mechanical().RhieChowCorrection(D_, gradD_);
 
         // Under-relax the linear system
         DEqn.relax(DEqnRelaxFactor_);

@@ -656,10 +656,8 @@ bool linGeomSolid::evolve()
           - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
           + fvc::div(sigma_, "div(sigma)")
           + rho_*g_
+          + mechanical().RhieChowCorrection(D_, gradD_)
         );
-
-        // Add Rhie-Chow corrections to quell oscillations
-        DEqn -= mechanical().RhieChowCorrection(D_, gradD_);
 
         // Under-relaxation the linear system
         DEqn.relax(DEqnRelaxFactor_);

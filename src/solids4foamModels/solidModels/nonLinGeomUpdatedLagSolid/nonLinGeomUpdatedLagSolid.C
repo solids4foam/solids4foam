@@ -929,15 +929,13 @@ bool nonLinGeomUpdatedLagSolid::evolve()
         fvVectorMatrix DDEqn
         (
             fvm::d2dt2(rho_, DD_)
-          + fvc::d2dt2(rho_.oldTime(), DD_.oldTime())
+          + fvc::d2dt2(rho_.oldTime(), D_.oldTime())
          == fvm::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           + fvc::div((relJ_*sigma_ & relFinv_.T()), "div(sigma)")
           + rho_*g_
+          + mechanical().RhieChowCorrection(DD_, gradDD_)
         );
-
-        // Add Rhie-Chow corrections to quell oscillations
-        DDEqn -= mechanical().RhieChowCorrection(DD_, gradDD_);
 
         // Under-relax the linear system
         DDEqn.relax(DDEqnRelaxFactor_);

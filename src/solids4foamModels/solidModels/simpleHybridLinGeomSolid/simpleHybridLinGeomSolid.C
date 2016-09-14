@@ -732,10 +732,8 @@ bool simpleHybridLinGeomSolid::evolve()
           + fvc::div(sigma_, "div(sigma)")
           + gradp_
           + rho_*g_
+          + mechanical().RhieChowCorrection(D_, gradD_)
         );
-
-        // Add Rhie-Chow corrections to quell oscillations
-        HDEqn() -= mechanical().RhieChowCorrection(D_, gradD_);
 
         // Under-relaxation the linear system
         HDEqn().relax(DEqnRelaxFactor_);
