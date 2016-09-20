@@ -42,6 +42,7 @@ $(mechanicalLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
 $(mechanicalLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 $(mechanicalLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
 $(mechanicalLaws)/thermoLinearElastic/thermoLinearElastic.C
+$(mechanicalLaws)/linearElasticFromFile/linearElasticFromFile.C
 
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
