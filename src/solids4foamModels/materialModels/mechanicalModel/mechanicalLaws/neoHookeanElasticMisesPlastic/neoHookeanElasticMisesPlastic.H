@@ -226,14 +226,14 @@ class neoHookeanElasticMisesPlastic
         //- Return a reference to the Jf field
         surfaceScalarField& Jf();
 
-        // Return the current Kirchhoff yield stress
+        //- Return the current Kirchhoff yield stress
         scalar curYieldStress
         (
             const scalar curEpsilonPEq,    // Current equivalent plastic strain
             const scalar J                 // Current Jacobian
         ) const;
 
-        // Evaulate current value of the yield function
+        //- Evaulate current value of the yield function
         scalar yieldFunction
         (
             const scalar epsilonPEqOld,    // Old equivalent plastic strain
@@ -243,8 +243,8 @@ class neoHookeanElasticMisesPlastic
             const scalar J                 // Current Jacobian
         ) const;
 
-        // Iteratively calculate plastic multiplier increment (DLambda)
-        // and current yield stress using Newton's method
+        //- Iteratively calculate plastic multiplier increment (DLambda)
+        //  and current yield stress using Newton's method
         void newtonLoop
         (
             scalar& DLambda,               // Plastic multiplier
@@ -255,6 +255,13 @@ class neoHookeanElasticMisesPlastic
             const scalar J,                // Current Jacobian
             const scalar maxMagDEpsilon    // Max strain increment magnitude
         ) const;
+
+        //- Update bEbar after the deviatoric stress has been calculated
+        void updateBEbar
+        (
+            volSymmTensorField& bEbar,
+            const volSymmTensorField& bEbarTrial
+        );
 
 public:
 

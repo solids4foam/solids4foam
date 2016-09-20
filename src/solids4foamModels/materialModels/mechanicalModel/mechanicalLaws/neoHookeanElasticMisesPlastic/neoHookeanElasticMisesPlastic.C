@@ -314,6 +314,125 @@ void Foam::neoHookeanElasticMisesPlastic::newtonLoop
 }
 
 
+void Foam::neoHookeanElasticMisesPlastic::updateBEbar
+(
+    volSymmTensorField& bEbar,
+    const volSymmTensorField& devBEbarTrial
+)
+{
+    // From Simo & Hughes 1998:
+    // but this incorrectly results in det(bEbar) =! 1
+    //bEbar = (s/mu) + Ibar*I;
+
+    // A method of calculating Ibar o denforce det(bEbar) == 1 is proposed
+    // by solving a cubic equation.
+    // Rubin and Attia, CALCULATION OF HYPERELASTIC RESPONSE OF FINITELY
+    // DEFORMED ELASTIC-VISCOPLASTIC MATERIALS, INTERNATIONAL JOURNAL FOR
+    // NUMERICAL METHODS IN ENGINEERING, VOL. 39,309-320(1996)
+    // and
+    // M. Hollenstein M. Jabareen M. B. Rubin, Modeling a smooth elastic-
+    // inelastic transition with a strongly objective numerical integrator
+    // needing no iteration, Comput Mech (2013) 52:649–667
+    // DOI 10.1007/s00466-013-0838-7
+
+    // Note: In Hollenstrain et al. (2013), they suggest that Eqn 49(a) in the
+    // original Rubin and Attia paper should be used.
+
+    // Method implemented below is translated from the SmoothMultiPhase fortran
+    // subroutine of Rubin
+
+    // Calculate deviatoric component of trial bEbar
+    //const volSymmTensorField devBEbarTrial = dev(bEbarTrial);
+
+    // Take reference to internal fields for efficiency
+    symmTensorField& bEbarI = bEbar.internalField();
+    const symmTensorField& devBEbarTrialI = devBEbarTrial.internalField();
+
+    // Calculate internal field
+    forAll(bEbarI, cellI)
+    {
+        const scalar detdevBepr = det(devBEbarTrialI[cellI]);
+        const scalar dotprod = devBEbarTrialI[cellI] && devBEbarTrialI[cellI];
+        const scalar fac1 = 2.0*dotprod/3.0;
+
+        scalar alpha1 = 0.0;
+
+        if (fac1 == 0.0) // maybe check abs is less than SMALL
+        {
+            alpha1 = 3.0;
+        }
+        else
+        {
+            const scalar fac2 = (4.0*(1.0 - detdevBepr))/(pow(fac1, 1.5));
+
+            if (fac2 >= 1.0)
+            {
+                alpha1 = 3.0*Foam::sqrt(fac1)*Foam::cosh(Foam::acosh(fac2)/3.0);
+            }
+            else
+            {
+                alpha1 = 3.0*Foam::sqrt(fac1)*Foam::cos(Foam::acos(fac2)/3.0);
+            }
+        }
+
+        bEbarI[cellI] = devBEbarTrialI[cellI] + (alpha1/3.0)*I;
+    }
+
+    // Calculate boundary field
+    forAll(bEbar.boundaryField(), patchI)
+    {
+        if
+        (
+            !bEbar.boundaryField()[patchI].coupled()
+         && bEbar.boundaryField()[patchI].type() != "empty"
+        )
+        {
+            // Take reference to patch fields for efficiency
+            symmTensorField& bEbarP = bEbar.boundaryField()[patchI];
+            const symmTensorField& devBEbarTrialP =
+                devBEbarTrial.boundaryField()[patchI];
+
+            forAll(bEbarP, faceI)
+            {
+                const scalar detdevBepr = det(devBEbarTrialP[faceI]);
+                const scalar dotprod =
+                    devBEbarTrialP[faceI] && devBEbarTrialP[faceI];
+                const scalar fac1 = 2.0*dotprod/3.0;
+
+                scalar alpha1 = 0.0;
+
+                if (fac1 == 0.0) // maybe check abs is less than SMALL
+                {
+                    alpha1 = 3.0;
+                }
+                else
+                {
+                    const scalar fac2 =
+                        (4.0*(1.0 - detdevBepr))/(pow(fac1, 1.5));
+
+                    if (fac2 >= 1.0)
+                    {
+                        alpha1 =
+                            3.0*Foam::sqrt(fac1)
+                           *Foam::cosh(Foam::acosh(fac2)/3.0);
+                    }
+                    else
+                    {
+                        alpha1 =
+                            3.0*Foam::sqrt(fac1)
+                           *Foam::cos(Foam::acos(fac2)/3.0);
+                    }
+                }
+
+                bEbarP[faceI] = devBEbarTrialP[faceI] + (alpha1/3.0)*I;
+            }
+        }
+    }
+
+    bEbar.correctBoundaryConditions();
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -920,14 +1039,23 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     const volSymmTensorField s = sTrial - 2*mu_*DEpsilonP_;
 
     // Update bEbar
-    bEbar_ = (s/mu_) + Ibar*I;
+    const bool updateBEbarConsistent_ = false;
+    if (updateBEbarConsistent_)
+    {
+        const volSymmTensorField devBEbar = (s/mu_);
+        //updateBEbar(bEbar_, bEbarTrial_);
+        updateBEbar(bEbar_, devBEbar);
+    }
+    else
+    {
+        bEbar_ = (s/mu_) + Ibar*I;
+    }
 
     // Calculate Kirchhoff stress
     const volSymmTensorField tau = 0.5*K_*(pow(J(), 2) - 1)*I + s;
 
     // Update the Cauchy stress
     sigma = tau/J();
-
 }
 
 
@@ -1244,6 +1372,27 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
 
     Info<< "    " << numCellsYielding << " cells are actively yielding"
         << nl << endl;
+
+    // if (mesh().time().outputTime())
+    // {
+    //     Info<< "Writing det(bEbar)" << endl;
+
+    //     volScalarField detBEbarMinus1
+    //     (
+    //         "detBEbarMinus1",
+    //         det(bEbar_) - 1.0
+    //     );
+
+    //     detBEbarMinus1.write();
+
+    //     volScalarField trBEbarOver3Minus1
+    //     (
+    //         "trBEbarOver3Minus1",
+    //         (tr(bEbar_)/3.0) - 1.0
+    //     );
+
+    //     trBEbarOver3Minus1.write();
+    // }
 }
 
 
