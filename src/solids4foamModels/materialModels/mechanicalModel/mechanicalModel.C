@@ -120,6 +120,17 @@ Foam::mechanicalModel::subMeshes() const
 }
 
 
+Foam::PtrList<Foam::newFvMeshSubset>& Foam::mechanicalModel::subMeshes()
+{
+    if (subMeshes_.empty())
+    {
+        makeSubMeshes();
+    }
+
+    return subMeshes_;
+}
+
+
 void Foam::mechanicalModel::makeVolToPoint() const
 {
     if (volToPointPtr_)
@@ -1954,6 +1965,14 @@ Foam::mechanicalModel::mechanicalModel(const fvMesh& mesh)
                     lawEntries[lawI].dict()
                 )
             );
+
+            if (lookupOrDefault<Switch>("writeSubMeshes",  false))
+            {
+                Info<< "Writing subMeshes "
+                    << subMeshes()[lawI].subMesh().name() << endl;
+                subMeshes()[lawI].subMesh().setInstance("constant");
+                subMeshes()[lawI].subMesh().write();
+            }
         }
     }
 }

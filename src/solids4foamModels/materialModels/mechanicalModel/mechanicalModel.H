@@ -149,6 +149,9 @@ class mechanicalModel
         //- Return a const reference to the subMeshes
         const PtrList<newFvMeshSubset>& subMeshes() const;
 
+        //- Return a const reference to the subMeshes
+        PtrList<newFvMeshSubset>& subMeshes();
+
         //- Make base mesh vol-to-point interpolator
         void makeVolToPoint() const;
 

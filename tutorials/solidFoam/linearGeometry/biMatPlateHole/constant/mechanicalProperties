@@ -15,6 +15,7 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 planeStress     yes;
+//writeSubMeshes  yes;
 
 mechanical
 (
