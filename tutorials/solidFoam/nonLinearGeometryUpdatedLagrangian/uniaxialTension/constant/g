@@ -3,40 +3,19 @@
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
 |  \\    /   O peration     | Version:     3.2                                |
 |   \\  /    A nd           | Web:         http://www.foam-extend.org         |
-|    \\/     M anipulation  | For copyright notice see file Copyright         |
+|    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
+    class       uniformDimensionedVectorField;
     location    "constant";
-    object      solidProperties;
+    object      g;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     nonLinearGeometryUpdatedLagrangian;
-
-nonLinearGeometryUpdatedLagrangianCoeffs
-{
-    // Maximum number of momentum correctors
-    nCorrectors     1000;
-
-    // Solution tolerance for displacement
-    solutionTolerance 1e-06;
-
-    // Alternative solution tolerance for displacement
-    alternativeTolerance 1e-07;
-
-    // Material law solution tolerance
-    materialTolerance 1e-05;
-
-    // Write frequency for the residuals
-    infoFrequency   100;
-
-    // Stabilise hydrostatic pressure
-    //stabilisePressure no;
-}
-
+dimensions      [0 1 -2 0 0 0 0];
+value           ( 0 0 0 );
 
 // ************************************************************************* //

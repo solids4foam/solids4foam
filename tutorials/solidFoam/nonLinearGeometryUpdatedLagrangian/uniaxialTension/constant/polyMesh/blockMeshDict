@@ -10,48 +10,69 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    "system";
-    object      controlDict;
+    location    "constant/polyMesh";
+    object      blockMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     elasticPlasticNonLinDLThermalSolidFoam;
+convertToMeters 1;
 
-startFrom       startTime;
+vertices
+(
+ (0 0 0)
+ (0.5 0 0)
+ (0.5 0.5 0)
+ (0 0.5 0)
+ (0 0 0.5)
+ (0.5 0 0.5)
+ (0.5 0.5 0.5)
+ (0 0.5 0.5)
+);
 
-startTime       0;
+blocks
+(
+ hex (0 1 2 3 4 5 6 7) (3 3 3) simpleGrading (1 1 1)
+);
 
-stopAt          endTime;
+edges
+(
+);
 
-endTime         1;
+patches
+(
+ patch top
+ (
+  (2 3 7 6)
+  )
 
-deltaT          0.01; //0.001;
+ symmetryPlane left
+ (
+  (3 0 4 7)
+  )
 
-writeControl    timeStep;
+ patch right
+ (
+  (1 2 6 5)
+  )
 
-writeInterval   1; //250;
+ symmetryPlane bottom
+ (
+  (0 1 5 4)
+  )
 
-cycleWrite      0;
+ patch front
+ (
+  (7 6 5 4)
+  )
 
-writeFormat     ascii;
+ symmetryPlane back
+ (
+  (0 1 2 3)
+  )
+ );
 
-writePrecision  6;
-
-writeCompression uncompressed;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable no;
-
-functions
-{
-    forceDisp
-    {
-        type          solidForcesDisplacements;
-        historyPatch  pipeContact;
-    }
-}
+mergePatchPairs
+(
+);
 
 // ************************************************************************* //

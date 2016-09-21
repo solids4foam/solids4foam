@@ -15,7 +15,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     elasticPlasticNonLinDLThermalSolidFoam;
+application     solidFoam;
 
 startFrom       startTime;
 
@@ -23,13 +23,13 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         1;
+endTime         0.1;
 
-deltaT          0.01; //0.001;
+deltaT          0.001;
 
 writeControl    timeStep;
 
-writeInterval   1; //250;
+writeInterval   1;
 
 cycleWrite      0;
 
@@ -37,7 +37,7 @@ writeFormat     ascii;
 
 writePrecision  6;
 
-writeCompression uncompressed;
+writeCompression compressed;
 
 timeFormat      general;
 
@@ -47,10 +47,10 @@ runTimeModifiable no;
 
 functions
 {
-    forceDisp
+    force
     {
-        type          solidForcesDisplacements;
-        historyPatch  pipeContact;
+        type           solidForces;
+        historyPatch   top;
     }
 }
 
