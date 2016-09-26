@@ -42,6 +42,8 @@ SourceFiles
 #define weakCouplingInterface_H
 
 #include "fluidSolidInterface.H"
+//#include "volFields.H"
+//#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -135,3 +137,4 @@ public:
 #endif
 
 // ************************************************************************* //
+

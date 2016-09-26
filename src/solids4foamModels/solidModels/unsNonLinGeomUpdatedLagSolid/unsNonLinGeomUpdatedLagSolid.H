@@ -50,8 +50,8 @@ SourceFiles
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
-#include "newLeastSquaresVolPointInterpolation.H"
-#include "uniformDimensionedFields.H"
+//#include "newLeastSquaresVolPointInterpolation.H"
+#include "volPointInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -98,7 +98,8 @@ class unsNonLinGeomUpdatedLagSolid
         surfaceSymmTensorField sigmaf_;
 
         //- Cell-to-point interpolation for interpolating DD to pointDD
-        newLeastSquaresVolPointInterpolation volToPoint_;
+//        newLeastSquaresVolPointInterpolation volToPoint_;
+        volPointInterpolation volToPoint_;
 
         //- Cell displacement increment gradient
         volTensorField gradDD_;
@@ -173,9 +174,6 @@ class unsNonLinGeomUpdatedLagSolid
         //- Maximum number of momentum correctors
         const int nCorr_;
 
-        //- Gravitational acceleration
-        const uniformDimensionedVectorField g_;
-
         //- Number of times the maximum number of correctors was reached in the
         //  momentum equation
         int maxIterReached_;
@@ -191,7 +189,8 @@ class unsNonLinGeomUpdatedLagSolid
         bool converged
         (
             const int iCorr,
-            const lduMatrix::solverPerformance& solverPerfD
+//            const lduMatrix::solverPerformance& solverPerfD
+            const solverPerformance& solverPerfD
         );
 
         //- Move the mesh to the deformed configuration
@@ -265,10 +264,20 @@ public:
             }
 
             //- Return multi-material interface pointer
-            const newLeastSquaresVolPointInterpolation& volToPoint() const
+//            const newLeastSquaresVolPointInterpolation& volToPoint() const
+            const volPointInterpolation& volToPoint() const
             {
                 return volToPoint_;
             }
+
+            //- Return point displacement field
+            virtual vector pointU(label pointID) const;
+
+            //- Patch point displacement increment
+            virtual tmp<vectorField> patchPointDisplacementIncrement
+            (
+                const label patchID
+            ) const;
 
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
@@ -329,6 +338,20 @@ public:
                 const label zoneID,
                 const scalarField& zonePressure
             );
+
+            //- Predict traction at specified zone
+             virtual tmp<vectorField> predictTraction
+             (
+                 const label patchID,
+                 const label zoneID
+             );
+
+            //- Predict pressure at specified zone
+             virtual tmp<scalarField> predictPressure
+             (
+                 const label patchID,
+                 const label zoneID
+             );
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();

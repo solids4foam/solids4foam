@@ -31,8 +31,7 @@ SourceFiles
     linearElastic.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved
-
+    Philip Cardiff UCD
 \*---------------------------------------------------------------------------*/
 
 #ifndef linearElastic_H
@@ -69,9 +68,6 @@ class linearElastic
 
         //- Second Lame parameter (shear modulus)
         dimensionedScalar mu_;
-
-        //- Bulk modulus
-        dimensionedScalar k_;
 
 
     // Private Member Functions
@@ -114,15 +110,6 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
-
-        //- Return the bulk modulus
-        virtual tmp<volScalarField> K() const;
-
-        //- Provide access to mu for the coupledUnsNonLinLinearElasticSolid
-        virtual const dimensionedScalar& mu() const;
-
-        //- Provide access to lambda for the coupledUnsNonLinLinearElasticSolid
-        virtual const dimensionedScalar& lambda() const;
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);

@@ -30,8 +30,15 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
-#include "solidTractionFvPatchVectorField.H"
 #include "fvcGradf.H"
+#include "solidTractionFvPatchVectorField.H"
+
+//#include "skewCorrectionVectors.H"
+//#include "multiMaterial.H"
+//#include "twoDPointCorrector.H"
+//#include "thermalModel.H"
+//#include "findRefCellVector.H"
+//#include "componentReferenceList.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -55,7 +62,8 @@ addToRunTimeSelectionTable(solidModel, linGeomSolid, dictionary);
 bool linGeomSolid::converged
 (
     const int iCorr,
-    const lduMatrix::solverPerformance& solverPerfD
+    //const lduMatrix::solverPerformance& solverPerfD
+    const solverPerformance& solverPerfD
 )
 {
     // We will check a number of different residuals for convergence
@@ -185,6 +193,19 @@ linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
         pMesh_,
         dimensionedVector("0", dimLength, vector::zero)
     ),
+    epsilon_
+    (
+        IOobject
+        (
+            "epsilon",
+            runTime().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
+    ),
     sigma_
     (
         IOobject
@@ -198,6 +219,7 @@ linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
         mesh,
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
+    volToPoint_(mesh),
     gradD_
     (
         IOobject
@@ -217,38 +239,15 @@ linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
     rImpK_(1.0/impK_),
     DEqnRelaxFactor_
     (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
-      : 1.0
+        mesh.relaxEquation("DEqn")
+      ? mesh.equationRelaxationFactor("DEqn")
+      : -1.0
     ),
-    solutionTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
-    ),
-    alternativeTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("alternativeTolerance", 1e-07)
-    ),
-    materialTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("materialTolerance", 1e-05)
-    ),
-    infoFrequency_
-    (
-        solidProperties().lookupOrDefault<int>("infoFrequency", 100)
-    ),
-    nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
-    g_
-    (
-        IOobject
-        (
-            "g",
-            runTime().constant(),
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        )
-    ),
+    solutionTol_(lookupOrDefault<scalar>("solutionTolerance", 1e-06)),
+    alternativeTol_(lookupOrDefault<scalar>("alternativeTolerance", 1e-07)),
+    materialTol_(lookupOrDefault<scalar>("materialTolerance", 1e-05)),
+    infoFrequency_(lookupOrDefault<int>("infoFrequency", 100)),
+    nCorr_(lookupOrDefault<int>("nCorrectors", 1000)),
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
@@ -257,388 +256,611 @@ linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-
-tmp<vectorField> linGeomSolid::faceZonePointDisplacementIncrement
-(
-    const label zoneID
-) const
-{
-    tmp<vectorField> tPointDisplacement
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().localPoints().size(),
-            vector::zero
-        )
-    );
-    vectorField& pointDisplacement = tPointDisplacement();
-
-    const vectorField& pointDI = pointD_.internalField();
-    const vectorField& oldPointDI = pointD_.oldTime().internalField();
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const labelList& curPointMap =
-            globalToLocalFaceZonePointMap()[globalZoneIndex];
-
-        const labelList& zoneMeshPoints =
-            mesh().faceZones()[zoneID]().meshPoints();
-
-        vectorField zonePointsDisplGlobal
-        (
-            zoneMeshPoints.size(),
-            vector::zero
-        );
-
-        //- Inter-proc points are shared by multiple procs
-        //  pointNumProc is the number of procs which a point lies on
-        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
-
-        forAll(zonePointsDisplGlobal, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
-            {
-                label procPoint = zoneMeshPoints[localPoint];
-
-                zonePointsDisplGlobal[globalPointI] =
-                    pointDI[procPoint] - oldPointDI[procPoint];
-
-                pointNumProcs[globalPointI] = 1;
-            }
-        }
-
-        if (Pstream::parRun())
-        {
-            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
-            reduce(pointNumProcs, sumOp<scalarField>());
-
-            //- now average the displacement between all procs
-            zonePointsDisplGlobal /= pointNumProcs;
-        }
-
-        forAll(pointDisplacement, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            pointDisplacement[localPoint] =
-                zonePointsDisplGlobal[globalPointI];
-        }
-    }
-    else
-    {
-        tPointDisplacement() =
-            vectorField
-            (
-                pointDI - oldPointDI,
-                mesh().faceZones()[zoneID]().meshPoints()
-            );
-    }
-
-    return tPointDisplacement;
-}
-
-
-tmp<tensorField> linGeomSolid::faceZoneSurfaceGradientOfVelocity
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<tensorField> tVelocityGradient
-    (
-        new tensorField
-        (
-            mesh().faceZones()[zoneID]().size(),
-            tensor::zero
-        )
-    );
-    tensorField& velocityGradient = tVelocityGradient();
-
-    vectorField pPointU =
-        mechanical().volToPoint().interpolate
-        (
-            mesh().boundaryMesh()[patchID],
-            U_
-        );
-
-    const faceList& localFaces =
-        mesh().boundaryMesh()[patchID].localFaces();
-
-    vectorField localPoints =
-        mesh().boundaryMesh()[patchID].localPoints();
-    localPoints += pointD_.boundaryField()[patchID].patchInternalField();
-
-    PrimitivePatch<face, List, const pointField&> patch
-    (
-        localFaces,
-        localPoints
-    );
-
-    tensorField patchGradU = fvc::fGrad(patch, pPointU);
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const label patchStart =
-            mesh().boundaryMesh()[patchID].start();
-
-        forAll(patchGradU, i)
-        {
-            velocityGradient
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchGradU[i];
-        }
-
-        // Parallel data exchange: collect field on all processors
-        reduce(velocityGradient, sumOp<tensorField>());
-    }
-    else
-    {
-        velocityGradient = patchGradU;
-    }
-
-    return tVelocityGradient;
-}
-
-
-tmp<vectorField> linGeomSolid::currentFaceZonePoints
-(
-    const label zoneID
-) const
-{
-    vectorField pointDisplacement
-    (
-        mesh().faceZones()[zoneID]().localPoints().size(),
-        vector::zero
-    );
-
-    const vectorField& pointDI = pointD_.internalField();
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-        const labelList& curPointMap =
-            globalToLocalFaceZonePointMap()[globalZoneIndex];
-
-        const labelList& zoneMeshPoints =
-            mesh().faceZones()[zoneID]().meshPoints();
-
-        vectorField zonePointsDisplGlobal
-        (
-            zoneMeshPoints.size(),
-            vector::zero
-        );
-
-        //- Inter-proc points are shared by multiple procs
-        //  pointNumProc is the number of procs which a point lies on
-        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
-
-        forAll(zonePointsDisplGlobal, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
-            {
-                label procPoint = zoneMeshPoints[localPoint];
-
-                zonePointsDisplGlobal[globalPointI] =
-                    pointDI[procPoint];
-
-                pointNumProcs[globalPointI] = 1;
-            }
-        }
-
-        if (Pstream::parRun())
-        {
-            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
-            reduce(pointNumProcs, sumOp<scalarField>());
-
-            //- now average the displacement between all procs
-            zonePointsDisplGlobal /= pointNumProcs;
-        }
-
-        forAll(pointDisplacement, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            pointDisplacement[localPoint] =
-                zonePointsDisplGlobal[globalPointI];
-        }
-    }
-    else
-    {
-        pointDisplacement =
-            vectorField
-            (
-                pointDI,
-                mesh().faceZones()[zoneID]().meshPoints()
-            );
-    }
-
-    tmp<vectorField> tCurrentPoints
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().localPoints()
-          + pointDisplacement
-        )
-    );
-
-    return tCurrentPoints;
-}
-
-
-tmp<vectorField> linGeomSolid::faceZoneNormal
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<vectorField> tNormals
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().size(),
-            vector::zero
-        )
-    );
-    vectorField& normals = tNormals();
-
-    const faceList& localFaces =
-        mesh().boundaryMesh()[patchID].localFaces();
-
-    vectorField localPoints =
-        mesh().boundaryMesh()[patchID].localPoints();
-    localPoints += pointD_.boundaryField()[patchID].patchInternalField();
-
-    PrimitivePatch<face, List, const pointField&> patch
-    (
-        localFaces,
-        localPoints
-    );
-
-    vectorField patchNormals(patch.size(), vector::zero);
-
-    forAll(patchNormals, faceI)
-    {
-        patchNormals[faceI] =
-            localFaces[faceI].normal(localPoints);
-    }
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const label patchStart =
-            mesh().boundaryMesh()[patchID].start();
-
-        forAll(patchNormals, i)
-        {
-            normals
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchNormals[i];
-        }
-
-        // Parallel data exchange: collect field on all processors
-        reduce(normals, sumOp<vectorField>());
-    }
-    else
-    {
-        normals = patchNormals;
-    }
-
-    return tNormals;
-}
-
-
-void linGeomSolid::setTraction
-(
-    const label patchID,
-    const vectorField& traction
-)
-{
-    if
-    (
-        D_.boundaryField()[patchID].type()
-     != solidTractionFvPatchVectorField::typeName
-    )
-    {
-        FatalErrorIn("void linGeomSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
-            <<  " is "
-            << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
-            << ", instead "
-            << solidTractionFvPatchVectorField::typeName
-            << abort(FatalError);
-    }
-
-    solidTractionFvPatchVectorField& patchU =
-        refCast<solidTractionFvPatchVectorField>
-        (
-            D_.boundaryField()[patchID]
-        );
-
-    patchU.traction() = traction;
-}
-
-
-void linGeomSolid::setPressure
-(
-    const label patchID,
-    const scalarField& pressure
-)
-{
-    if
-    (
-        D_.boundaryField()[patchID].type()
-     != solidTractionFvPatchVectorField::typeName
-    )
-    {
-        FatalErrorIn("void linGeomSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
-            <<  " is "
-            << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
-            << ", instead "
-            << solidTractionFvPatchVectorField::typeName
-            << abort(FatalError);
-    }
-
-    solidTractionFvPatchVectorField& patchU =
-        refCast<solidTractionFvPatchVectorField>
-        (
-            D_.boundaryField()[patchID]
-        );
-
-    patchU.pressure() = pressure;
-}
+ vector linGeomSolid::pointU(label pointID) const
+ {
+     pointVectorField pointU
+     (
+         IOobject
+         (
+             "pointU",
+             runTime().timeName(),
+             mesh(),
+             IOobject::NO_READ,
+             IOobject::NO_WRITE
+         ),
+         pMesh_,
+         dimensionedVector("0", dimVelocity, vector::zero)
+     );
+
+     volToPoint_.interpolate(U_, pointU);
+
+     return pointU.internalField()[pointID];
+ }
+
+// //- Patch point displacement
+ tmp<vectorField> linGeomSolid::patchPointDisplacementIncrement
+ (
+     const label patchID
+ ) const
+ {
+     tmp<vectorField> tPointDisplacement
+     (
+         new vectorField
+         (
+             mesh().boundaryMesh()[patchID].localPoints().size(),
+             vector::zero
+         )
+     );
+
+     tPointDisplacement() =
+         vectorField
+         (
+             pointD_.internalField() - pointD_.oldTime().internalField(),
+             mesh().boundaryMesh()[patchID].meshPoints()
+         );
+
+     return tPointDisplacement;
+ }
+
+//- Face zone point displacement
+ tmp<vectorField> linGeomSolid::faceZonePointDisplacementIncrement
+ (
+     const label zoneID
+ ) const
+ {
+     tmp<vectorField> tPointDisplacement
+     (
+         new vectorField
+         (
+             mesh().faceZones()[zoneID]().localPoints().size(),
+             vector::zero
+         )
+     );
+     vectorField& pointDisplacement = tPointDisplacement();
+
+     const vectorField& pointDI = pointD_.internalField();
+     const vectorField& oldPointDI = pointD_.oldTime().internalField();
+
+     label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+     if (globalZoneIndex != -1)
+     {
+         // global face zone
+
+         const labelList& curPointMap =
+             globalToLocalFaceZonePointMap()[globalZoneIndex];
+
+         const labelList& zoneMeshPoints =
+             mesh().faceZones()[zoneID]().meshPoints();
+
+         vectorField zonePointsDisplGlobal
+         (
+             zoneMeshPoints.size(),
+             vector::zero
+         );
+
+         //- Inter-proc points are shared by multiple procs
+         //  pointNumProc is the number of procs which a point lies on
+         scalarField pointNumProcs(zoneMeshPoints.size(), 0);
+
+         forAll(zonePointsDisplGlobal, globalPointI)
+         {
+             label localPoint = curPointMap[globalPointI];
+
+             if(zoneMeshPoints[localPoint] < mesh().nPoints())
+             {
+                 label procPoint = zoneMeshPoints[localPoint];
+
+                 zonePointsDisplGlobal[globalPointI] =
+                     pointDI[procPoint] - oldPointDI[procPoint];
+
+                 pointNumProcs[globalPointI] = 1;
+             }
+         }
+
+         if (Pstream::parRun())
+         {
+             reduce(zonePointsDisplGlobal, sumOp<vectorField>());
+             reduce(pointNumProcs, sumOp<scalarField>());
+
+             //- now average the displacement between all procs
+             zonePointsDisplGlobal /= pointNumProcs;
+         }
+
+         forAll(pointDisplacement, globalPointI)
+         {
+             label localPoint = curPointMap[globalPointI];
+
+             pointDisplacement[localPoint] =
+                 zonePointsDisplGlobal[globalPointI];
+         }
+     }
+     else
+     {
+         tPointDisplacement() =
+             vectorField
+             (
+                 pointDI - oldPointDI,
+                 mesh().faceZones()[zoneID]().meshPoints()
+             );
+     }
+
+     return tPointDisplacement;
+ }
+
+
+//- Face zone point displacement
+ tmp<tensorField> linGeomSolid::faceZoneSurfaceGradientOfVelocity
+ (
+     const label zoneID,
+     const label patchID
+ ) const
+ {
+     tmp<tensorField> tVelocityGradient
+     (
+         new tensorField
+         (
+             mesh().faceZones()[zoneID]().size(),
+             tensor::zero
+         )
+     );
+     tensorField& velocityGradient = tVelocityGradient();
+
+     pointVectorField pPointU
+     (
+         IOobject
+         (
+             "pPointU",
+             runTime().timeName(),
+             mesh(),
+             IOobject::NO_READ,
+             IOobject::NO_WRITE
+         ),
+         pMesh_,
+         dimensionedVector("0", dimVelocity, vector::zero)
+     );
+
+    volToPoint_.interpolate(U_, pPointU);
+
+//     vectorField pPointU =
+//         volToPoint_.interpolate(mesh().boundaryMesh()[patchID], U_);
+
+     const faceList& localFaces =
+         mesh().boundaryMesh()[patchID].localFaces();
+
+     vectorField localPoints =
+         mesh().boundaryMesh()[patchID].localPoints();
+     localPoints += pointD_.boundaryField()[patchID].patchInternalField();
+
+     PrimitivePatch<face, List, const pointField&> patch
+     (
+         localFaces,
+         localPoints
+     );
+
+     tensorField patchGradU = fvc::fGrad(patch, pPointU);
+
+     label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+     if (globalZoneIndex != -1)
+     {
+         // global face zone
+
+         const label patchStart =
+             mesh().boundaryMesh()[patchID].start();
+
+         forAll(patchGradU, i)
+         {
+             velocityGradient
+             [
+                 mesh().faceZones()[zoneID].whichFace(patchStart + i)
+             ] =
+                 patchGradU[i];
+         }
+
+         // Parallel data exchange: collect field on all processors
+         reduce(velocityGradient, sumOp<tensorField>());
+     }
+     else
+     {
+         velocityGradient = patchGradU;
+     }
+
+     return tVelocityGradient;
+ }
+
+
+ tmp<vectorField>
+ linGeomSolid::currentFaceZonePoints(const label zoneID) const
+ {
+     vectorField pointDisplacement
+     (
+         mesh().faceZones()[zoneID]().localPoints().size(),
+         vector::zero
+     );
+
+     const vectorField& pointDI = pointD_.internalField();
+
+     label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+     if (globalZoneIndex != -1)
+     {
+         // global face zone
+         const labelList& curPointMap =
+             globalToLocalFaceZonePointMap()[globalZoneIndex];
+
+         const labelList& zoneMeshPoints =
+             mesh().faceZones()[zoneID]().meshPoints();
+
+         vectorField zonePointsDisplGlobal
+         (
+             zoneMeshPoints.size(),
+             vector::zero
+         );
+
+         //- Inter-proc points are shared by multiple procs
+         //  pointNumProc is the number of procs which a point lies on
+         scalarField pointNumProcs(zoneMeshPoints.size(), 0);
+
+         forAll(zonePointsDisplGlobal, globalPointI)
+         {
+             label localPoint = curPointMap[globalPointI];
+
+             if(zoneMeshPoints[localPoint] < mesh().nPoints())
+             {
+                 label procPoint = zoneMeshPoints[localPoint];
+
+                 zonePointsDisplGlobal[globalPointI] =
+                     pointDI[procPoint];
+
+                 pointNumProcs[globalPointI] = 1;
+             }
+         }
+
+         if (Pstream::parRun())
+         {
+             reduce(zonePointsDisplGlobal, sumOp<vectorField>());
+             reduce(pointNumProcs, sumOp<scalarField>());
+
+             //- now average the displacement between all procs
+             zonePointsDisplGlobal /= pointNumProcs;
+         }
+
+         forAll(pointDisplacement, globalPointI)
+         {
+             label localPoint = curPointMap[globalPointI];
+
+             pointDisplacement[localPoint] =
+                 zonePointsDisplGlobal[globalPointI];
+         }
+     }
+     else
+     {
+         pointDisplacement =
+             vectorField
+             (
+                 pointDI,
+                 mesh().faceZones()[zoneID]().meshPoints()
+             );
+     }
+
+     tmp<vectorField> tCurrentPoints
+     (
+         new vectorField
+         (
+             mesh().faceZones()[zoneID]().localPoints()
+           + pointDisplacement
+         )
+     );
+
+     return tCurrentPoints;
+ }
+
+
+//- Face zone point displacement
+ tmp<vectorField> linGeomSolid::faceZoneNormal
+ (
+     const label zoneID,
+     const label patchID
+ ) const
+ {
+     tmp<vectorField> tNormals
+     (
+         new vectorField
+         (
+             mesh().faceZones()[zoneID]().size(),
+             vector::zero
+         )
+     );
+     vectorField& normals = tNormals();
+
+     const faceList& localFaces =
+         mesh().boundaryMesh()[patchID].localFaces();
+
+     vectorField localPoints =
+         mesh().boundaryMesh()[patchID].localPoints();
+     localPoints += pointD_.boundaryField()[patchID].patchInternalField();
+
+     PrimitivePatch<face, List, const pointField&> patch
+     (
+         localFaces,
+         localPoints
+     );
+
+     vectorField patchNormals(patch.size(), vector::zero);
+
+     forAll(patchNormals, faceI)
+     {
+         patchNormals[faceI] =
+             localFaces[faceI].normal(localPoints);
+     }
+
+     label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+     if (globalZoneIndex != -1)
+     {
+         // global face zone
+
+         const label patchStart =
+             mesh().boundaryMesh()[patchID].start();
+
+         forAll(patchNormals, i)
+         {
+             normals
+             [
+                 mesh().faceZones()[zoneID].whichFace(patchStart + i)
+             ] =
+                 patchNormals[i];
+         }
+
+         // Parallel data exchange: collect field on all processors
+         reduce(normals, sumOp<vectorField>());
+     }
+     else
+     {
+         normals = patchNormals;
+     }
+
+     return tNormals;
+ }
+
+
+ void linGeomSolid::setTraction
+ (
+     const label patchID,
+     const vectorField& traction
+ )
+ {
+     if
+     (
+         D_.boundaryField()[patchID].type()
+      != solidTractionFvPatchVectorField::typeName
+     )
+     {
+         FatalErrorIn("void linGeomSolid::setTraction(...)")
+             << "Bounary condition on " << D_.name()
+             <<  " is "
+             << D_.boundaryField()[patchID].type()
+             << "for patch" << mesh().boundary()[patchID].name()
+             << ", instead "
+             << solidTractionFvPatchVectorField::typeName
+             << abort(FatalError);
+     }
+
+     solidTractionFvPatchVectorField& patchU =
+         refCast<solidTractionFvPatchVectorField>
+         (
+             D_.boundaryField()[patchID]
+         );
+
+     patchU.traction() = traction;
+ }
+
+ void linGeomSolid::setPressure
+ (
+     const label patchID,
+     const scalarField& pressure
+ )
+ {
+     if
+     (
+         D_.boundaryField()[patchID].type()
+      != solidTractionFvPatchVectorField::typeName
+     )
+     {
+         FatalErrorIn("void linGeomSolid::setTraction(...)")
+             << "Bounary condition on " << D_.name()
+             <<  " is "
+             << D_.boundaryField()[patchID].type()
+             << "for patch" << mesh().boundary()[patchID].name()
+             << ", instead "
+             << solidTractionFvPatchVectorField::typeName
+             << abort(FatalError);
+     }
+
+     solidTractionFvPatchVectorField& patchU =
+         refCast<solidTractionFvPatchVectorField>
+         (
+             D_.boundaryField()[patchID]
+         );
+
+     patchU.pressure() = pressure;
+ }
+
+ void linGeomSolid::setTraction
+ (
+     const label patchID,
+     const label zoneID,
+     const vectorField& faceZoneTraction
+ )
+ {
+     vectorField patchTraction(mesh().boundary()[patchID].size(), vector::zero);
+
+     const label patchStart =
+         mesh().boundaryMesh()[patchID].start();
+
+     forAll(patchTraction, i)
+     {
+         patchTraction[i] =
+             faceZoneTraction
+             [
+                 mesh().faceZones()[zoneID].whichFace(patchStart + i)
+             ];
+     }
+
+     setTraction(patchID, patchTraction);
+ }
+
+ void linGeomSolid::setPressure
+ (
+     const label patchID,
+     const label zoneID,
+     const scalarField& faceZonePressure
+ )
+ {
+     scalarField patchPressure(mesh().boundary()[patchID].size(), 0.0);
+
+     const label patchStart =
+         mesh().boundaryMesh()[patchID].start();
+
+     forAll(patchPressure, i)
+     {
+         patchPressure[i] =
+             faceZonePressure
+             [
+                 mesh().faceZones()[zoneID].whichFace(patchStart + i)
+             ];
+     }
+
+     setPressure(patchID, patchPressure);
+ }
+
+
+ tmp<vectorField> linGeomSolid::predictTraction
+ (
+     const label patchID,
+     const label zoneID
+ )
+ {
+     // Predict traction on patch
+     if
+     (
+         D_.boundaryField()[patchID].type()
+      != solidTractionFvPatchVectorField::typeName
+     )
+     {
+         FatalErrorIn("void linGeomSolid::setTraction(...)")
+             << "Bounary condition on " << D_.name()
+                 <<  " is "
+                 << D_.boundaryField()[patchID].type()
+                 << "for patch" << mesh().boundary()[patchID].name()
+                 << ", instead "
+                 << solidTractionFvPatchVectorField::typeName
+                 << abort(FatalError);
+     }
+
+     solidTractionFvPatchVectorField& patchUo =
+         refCast<solidTractionFvPatchVectorField>
+         (
+             D_.oldTime().boundaryField()[patchID]
+         );
+
+     solidTractionFvPatchVectorField& patchUoo =
+         refCast<solidTractionFvPatchVectorField>
+         (
+             D_.oldTime().oldTime().boundaryField()[patchID]
+         );
+
+
+     vectorField ptF = 2*patchUo.traction() - patchUoo.traction();
+
+     tmp<vectorField> ttF
+     (
+         new vectorField(mesh().faceZones()[zoneID].size(), vector::zero)
+     );
+     vectorField& tF = ttF();
+
+     const label patchStart =
+         mesh().boundaryMesh()[patchID].start();
+
+     forAll(ptF, i)
+     {
+         tF[mesh().faceZones()[zoneID].whichFace(patchStart + i)] = ptF[i];
+     }
+
+     // Parallel data exchange: collect pressure field on all processors
+     reduce(tF, sumOp<vectorField>());
+
+     return ttF;
+ }
+
+
+ tmp<scalarField> linGeomSolid::predictPressure
+ (
+     const label patchID,
+     const label zoneID
+ )
+ {
+//      Predict pressure field on patch
+     if
+     (
+         D_.boundaryField()[patchID].type()
+      != solidTractionFvPatchVectorField::typeName
+     )
+     {
+         FatalErrorIn("void linGeomSolid::setTraction(...)")
+             << "Bounary condition on " << D_.name()
+                 <<  " is "
+                 << D_.boundaryField()[patchID].type()
+                 << "for patch" << mesh().boundary()[patchID].name()
+                 << ", instead "
+                 << solidTractionFvPatchVectorField::typeName
+                 << abort(FatalError);
+     }
+
+     solidTractionFvPatchVectorField& patchUo =
+         refCast<solidTractionFvPatchVectorField>
+         (
+             D_.oldTime().boundaryField()[patchID]
+         );
+
+     solidTractionFvPatchVectorField& patchUoo =
+         refCast<solidTractionFvPatchVectorField>
+         (
+             D_.oldTime().oldTime().boundaryField()[patchID]
+         );
+
+
+     scalarField pPF = 2*patchUo.pressure() - patchUoo.pressure();
+
+     tmp<scalarField> tpF
+     (
+         new scalarField(mesh().faceZones()[zoneID].size(), 0)
+     );
+     scalarField& pF = tpF();
+
+     const label patchStart =
+         mesh().boundaryMesh()[patchID].start();
+
+     forAll(pPF, i)
+     {
+         pF[mesh().faceZones()[zoneID].whichFace(patchStart + i)] = pPF[i];
+     }
+
+     // Parallel data exchange: collect pressure field on all processors
+     reduce(pF, sumOp<scalarField>());
+
+     return tpF;
+ }
 
 
 bool linGeomSolid::evolve()
 {
-    Info<< "Evolving solid solver" << endl;
+    Info << "Evolving solid solver" << endl;
 
     int iCorr = 0;
-    lduMatrix::solverPerformance solverPerfD;
-    lduMatrix::debug = 0;
+    solverPerformance solverPerfD;
+    solverPerformance::debug = 0;
 
     Info<< "Solving the momentum equation for D" << endl;
 
@@ -653,10 +875,7 @@ bool linGeomSolid::evolve()
         (
             rho_*fvm::d2dt2(D_)
          == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
-          - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
-          + fvc::div(sigma_, "div(sigma)")
-          + rho_*g_
-          + mechanical().RhieChowCorrection(D_, gradD_)
+          + fvc::div(sigma_ - impK_*gradD_, "div(sigma)")
         );
 
         // Under-relaxation the linear system
@@ -669,18 +888,21 @@ bool linGeomSolid::evolve()
         D_.relax();
 
         // Update gradient of displacement
-        mechanical().grad(D_, gradD_);
+        gradD_ = fvc::grad(D_);
+
+        // Update the strain
+        epsilon_ = symm(gradD_);
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma_);
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
-    // Interpolate cell displacements to vertices
-    mechanical().interpolate(D_, pointD_);
-
-    // Velocity
-    U_ = fvc::ddt(D_);
+    // PC: rename this function or maybe even remove it
+    // Update yield stress and plasticity total field e.g. epsilonP
+    // Or updateTotalFields: actually, this should be called inside
+    // updateTotalFields() that gets called in solidFoam
+    mechanical().updateYieldStress();
 
     return true;
 }
@@ -746,30 +968,14 @@ tmp<vectorField> linGeomSolid::tractionBoundarySnGrad
     );
 }
 
-
 void linGeomSolid::updateTotalFields()
 {
     mechanical().updateTotalFields();
 }
 
-
 void linGeomSolid::writeFields(const Time& runTime)
 {
-    // Calculate strain
-    volSymmTensorField epsilon
-    (
-        IOobject
-        (
-            "epsilon",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        symm(gradD_)
-    );
-
-    // Calculaute equivalent strain
+    // Update equivalent strain
     volScalarField epsilonEq
     (
         IOobject
@@ -780,13 +986,13 @@ void linGeomSolid::writeFields(const Time& runTime)
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        sqrt((2.0/3.0)*magSqr(dev(epsilon)))
+        sqrt((2.0/3.0)*magSqr(dev(epsilon_)))
     );
 
     Info<< "Max epsilonEq = " << max(epsilonEq).value()
         << endl;
 
-    // Calculaute equivalent (von Mises) stress
+    // Update equivalent (von Mises) stress
     volScalarField sigmaEq
     (
         IOobject

@@ -32,7 +32,7 @@ SourceFiles
     solidWedgeFvPatchScalarField.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved
+    Philip Cardiff UCD
 
 \*---------------------------------------------------------------------------*/
 

@@ -179,15 +179,24 @@ void fixedDisplacementZeroShearFvPatchVectorField::updateCoeffs()
         disp = dispSeries_(this->db().time().timeOutputValue());
     }
 
-    if (dimensionedInternalField().name() == "DD")
-    {
-        // Incremental approach, so we wil set the increment of displacement
-        // Lookup the old displacement field and subtract it from the total
-        // displacement
-        const volVectorField& Dold =
-            db().lookupObject<volVectorField>("D").oldTime();
+    bool incremental = bool(dimensionedInternalField().name() == "DD");
 
-        disp -= Dold.boundaryField()[patch().index()];
+    if (incremental)
+    {
+        if (patch().boundaryMesh().mesh().foundObject<volVectorField>("D_0"))
+        {
+            const fvPatchField<vector>& Uold =
+              patch().lookupPatchField<volVectorField, vector>("D_0");
+
+            disp -= Uold;
+        }
+        else if (patch().boundaryMesh().mesh().foundObject<volVectorField>("D"))
+        {
+            const fvPatchField<vector>& Uold =
+              patch().lookupPatchField<volVectorField, vector>("D");
+
+            disp -= Uold;
+        }
     }
 
     // Set displacement

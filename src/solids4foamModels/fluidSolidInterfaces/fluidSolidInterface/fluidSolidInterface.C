@@ -29,14 +29,17 @@ License
 #include "polyPatchID.H"
 #include "primitivePatchInterpolation.H"
 #include "twoDPointCorrector.H"
-#include "tetPointFields.H"
-#include "fixedValueTetPolyPatchFields.H"
-#include "tetPolyPatchInterpolation.H"
-#include "tetFemMatrices.H"
+//#include "tetPointFields.H"
+//#include "fixedValueTetPolyPatchFields.H"
+//#include "tetPolyPatchInterpolation.H"
+//#include "tetFemMatrices.H"
 #include "fixedValuePointPatchFields.H"
 #include "ZoneIDs.H"
-#include "newGgiInterpolation.H"
+//#include "newGgiInterpolation.H"
 //#include "RBFMotionSolver.H"
+#include "SubField.H"
+#include "Time.H"
+#include "addToRunTimeSelectionTable.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -95,58 +98,135 @@ void Foam::fluidSolidInterface::calcCurrentSolidZonePatch() const
         (
             "void fluidSolidInterface::"
             "calcCurrentSolidZonePatch() const"
-        )   << "Current solid zone patch alarady exists"
+        )   << "Current solid zone patch already exists"
             << abort(FatalError);
     }
 
     currentSolidZonePatchPtr_ =
-        new PrimitivePatch<face, List, const pointField&>
+//        new PrimitivePatch<face, List, const pointField&>
+        new PrimitivePatch<face, SubList, const pointField&>//SubList is required for AMI!!!
         (
-            solidMesh().faceZones()[solidZoneIndex_]().localFaces(),
+//            solidMesh().faceZones()[solidZoneIndex_]().localFaces(),
+	    SubList<face>
+            (
+                solidMesh().faceZones()[solidZoneIndex_]().localFaces(),
+                solidMesh().faceZones()[solidZoneIndex_]().size()
+            ),
             currentSolidZonePoints()
         );
 }
 
-
-void Foam::fluidSolidInterface::calcGgiInterpolator() const
+void Foam::fluidSolidInterface::calcCurrentFluidZonePoints() const
 {
-    // Create extended ggi interpolation
-    if (ggiInterpolatorPtr_)
+    // Find global face zones
+    if (currentFluidZonePointsPtr_)
     {
         FatalErrorIn
         (
             "void fluidSolidInterface::"
-            "calcGgiInterpolator() const"
-        )   << "Ggi interpolator already exists"
+            "calcCurrentFluidZonePoints() const"
+        )   << "Current fluid zone points alarady exist"
             << abort(FatalError);
     }
+
+    currentFluidZonePointsPtr_ =
+        new vectorField(fluid().currentFaceZonePoints(fluidZoneIndex()));
+}
+
+void Foam::fluidSolidInterface::calcCurrentFluidZonePatch() const
+{
+    // Find global face zones
+    if (currentFluidZonePatchPtr_)
+    {
+        FatalErrorIn
+        (
+            "void fluidSolidInterface::"
+            "calcCurrentFluidZonePatch() const"
+        )   << "Current fluid zone patch already exists"
+            << abort(FatalError);
+    }
+
+    currentFluidZonePatchPtr_ =
+        new PrimitivePatch<face, SubList, const pointField&>//SubList is required for AMI!!!
+        (
+	    SubList<face>
+            (
+                fluidMesh().faceZones()[solidZoneIndex_]().localFaces(),
+                fluidMesh().faceZones()[solidZoneIndex_]().size()
+            ),
+            currentFluidZonePoints()
+        );
+}
+
+
+
+void Foam::fluidSolidInterface::calcAMIInterpolator() const
+{
+    // Create extended ggi interpolation
+////    if (ggiInterpolatorPtr_)
+////    {
+////        FatalErrorIn
+////        (
+////            "void fluidSolidInterface::"
+////            "calcGgiInterpolator() const"
+////        )   << "Ggi interpolator already exists"
+////            << abort(FatalError);
+////    }
+
+    // Create AMI interpolation
+////    if (AMIPtr_)//Do we need this?
+////    {
+////        FatalErrorIn
+////        (
+////            "void fluidSolidInterface::"
+////            "calcAMIInterpolator() const"
+////        )   << "AMI interpolator already exists"
+////            << abort(FatalError);
+////    }
 
     // Create copy of solid face zone primitive patch in current configuration
 
     deleteDemandDrivenData(currentSolidZonePatchPtr_);
     deleteDemandDrivenData(currentSolidZonePointsPtr_);
 
-    //currentSolidZonePatch().movePoints(currentSolidZonePoints());
+    //currentSolidZonePatch().movePoints(currentSolidZonePoints());//Do we need this?
 
-    Info<< "Create extended GGI zone-to-zone interpolator" << endl;
+    Info<< "Create AMI" << endl;
+    const bool flip = false;//good question
+
+	    AMIPtr_.set
+            (
+                new AMIPatchToPatchInterpolation
+                (
+                    currentFluidZonePatch(),//fluidMesh().faceZones()[fluidZoneIndex_](),//p,
+                    currentSolidZonePatch(),//solidMesh().boundaryMesh(),//nbrP,
+                    faceAreaIntersect::tmMesh,
+                    true,
+                    AMIPatchToPatchInterpolation::imFaceAreaWeight,
+                    -1,
+                    flip
+                )
+            );
+    Info<< "AMI Created" << endl;
 
     currentSolidZonePatch(),
+    currentFluidZonePatch(),
 
-    ggiInterpolatorPtr_ =
-        new extendedGgiZoneInterpolation
-        (
-            fluidMesh().faceZones()[fluidZoneIndex_](),
-            currentSolidZonePatch(),
-            tensorField(0),
-            tensorField(0),
-            vectorField(0), // Slave-to-master separation. Bug fix
-            0,              // Non-overlapping face tolerances
-            0,              // HJ, 24/Oct/2008
-            true,           // Rescale weighting factors.  Bug fix, MB.
-            newGgiInterpolation::AABB
+////    ggiInterpolatorPtr_ =
+////        new extendedGgiZoneInterpolation
+////        (
+////            fluidMesh().faceZones()[fluidZoneIndex_](),
+////            currentSolidZonePatch(),
+////            tensorField(0),
+////            tensorField(0),
+////            vectorField(0), // Slave-to-master separation. Bug fix
+////            0,              // Non-overlapping face tolerances
+////            0,              // HJ, 24/Oct/2008
+////            true,           // Rescale weighting factors.  Bug fix, MB.
+////            newGgiInterpolation::AABB
             // N_SQUARED BB_OCTREE AABB THREE_D_DISTANCE
             // Octree search, MB.
-        );
+////        );
 
 
     Info<< "Checking fluid-to-solid face interpolator" << endl;
@@ -182,11 +262,13 @@ void Foam::fluidSolidInterface::calcGgiInterpolator() const
         // Parallel data exchange: collect faceCentres field on all processors
         reduce(fluidZoneFaceCentres, sumOp<vectorField>());
 
-        vectorField solidZoneFaceCentres =
-            ggiInterpolatorPtr_->masterToSlave
-            (
-                fluidZoneFaceCentres
-            );
+        vectorField solidZoneFaceCentres = AMI().interpolateToSource(fluidZoneFaceCentres);
+
+////        vectorField solidZoneFaceCentres =
+////            ggiInterpolatorPtr_->masterToSlave
+////            (
+////                fluidZoneFaceCentres
+////            );
 
         vectorField solidPatchFaceCentres
         (
@@ -199,7 +281,7 @@ void Foam::fluidSolidInterface::calcGgiInterpolator() const
 
         forAll(solidPatchFaceCentres, i)
         {
-            solidPatchFaceCentres[i] =
+           solidPatchFaceCentres[i] =
                 solidZoneFaceCentres
                 [
                     solidMesh().faceZones()[solidZoneIndex_]
@@ -220,16 +302,19 @@ void Foam::fluidSolidInterface::calcGgiInterpolator() const
             << endl;
     }
 
-    Info<< "Checking solid-to-fluid point interpolator (GGI)" << endl;
+    Info<< "Checking solid-to-fluid point interpolator (AMI)" << endl;
     {
         vectorField solidZonePoints_ =
             solidMesh().faceZones()[solidZoneIndex_]().localPoints();
 
-        vectorField solidZonePoints =
-            ggiInterpolatorPtr_->slaveToMasterPointInterpolate
-            (
-                solidZonePoints_
-            );
+//////        vectorField solidZonePoints = AMI().interpolateToSource(solidZonePoints_);
+        vectorField solidZonePoints = solidZonePoints_;//Is this enough??? Otherwise we'll need an AMI for point interpolation!
+
+////        vectorField solidZonePoints =
+////            ggiInterpolatorPtr_->slaveToMasterPointInterpolate
+////            (
+////                solidZonePoints_
+////            );
 
         vectorField fluidZonePoints =
             fluidMesh().faceZones()[fluidZoneIndex_]().localPoints();
@@ -243,15 +328,15 @@ void Foam::fluidSolidInterface::calcGgiInterpolator() const
             )
         );
 
-        Info<< "Solid-to-fluid point interpolation error (GGI): " << maxDist
+        Info<< "Solid-to-fluid point interpolation error (AMI): " << maxDist
             << endl;
     }
 
-    Info<< "Number of uncovered master faces: "
-        << ggiInterpolatorPtr_->uncoveredMasterFaces().size() << endl;
+////    Info<< "Number of uncovered master faces: "
+////        << ggiInterpolatorPtr_->uncoveredMasterFaces().size() << endl;
 
-    Info<< "Number of uncovered slave faces: "
-        << ggiInterpolatorPtr_ ->uncoveredSlaveFaces().size() << endl;
+////    Info<< "Number of uncovered slave faces: "
+////        << ggiInterpolatorPtr_ ->uncoveredSlaveFaces().size() << endl;
 }
 
 
@@ -432,7 +517,10 @@ Foam::fluidSolidInterface::fluidSolidInterface
     fluidZoneIndex_(-1),
     currentSolidZonePointsPtr_(NULL),
     currentSolidZonePatchPtr_(NULL),
-    ggiInterpolatorPtr_(NULL),
+    currentFluidZonePointsPtr_(NULL),
+    currentFluidZonePatchPtr_(NULL),
+    AMIPtr_(NULL),
+////    ggiInterpolatorPtr_(NULL),
     outerCorrTolerance_
     (
         fsiProperties_.lookupOrDefault<scalar>("outerCorrTolerance", 1e-06)
@@ -585,7 +673,11 @@ Foam::fluidSolidInterface::~fluidSolidInterface()
 {
     deleteDemandDrivenData(currentSolidZonePointsPtr_);
     deleteDemandDrivenData(currentSolidZonePatchPtr_);
-    deleteDemandDrivenData(ggiInterpolatorPtr_);
+    deleteDemandDrivenData(currentFluidZonePointsPtr_);
+    deleteDemandDrivenData(currentFluidZonePatchPtr_);
+    AMIPtr_.clear();
+////    deleteDemandDrivenData(AMIPtr_);
+////    deleteDemandDrivenData(ggiInterpolatorPtr_);
     deleteDemandDrivenData(accumulatedFluidInterfaceDisplacementPtr_);
     deleteDemandDrivenData(minEdgeLengthPtr_);
 }
@@ -606,7 +698,8 @@ Foam::fluidSolidInterface::currentSolidZonePoints() const
 }
 
 
-const Foam::PrimitivePatch<Foam::face, Foam::List, const Foam::pointField&>&
+//const Foam::PrimitivePatch<Foam::face, Foam::List, const Foam::pointField&>&
+const Foam::PrimitivePatch<Foam::face, Foam::SubList, const Foam::pointField&>&
 Foam::fluidSolidInterface::currentSolidZonePatch() const
 {
     if (!currentSolidZonePatchPtr_)
@@ -617,17 +710,65 @@ Foam::fluidSolidInterface::currentSolidZonePatch() const
     return *currentSolidZonePatchPtr_;
 }
 
-
-const Foam::extendedGgiZoneInterpolation&
-Foam::fluidSolidInterface::ggiInterpolator() const
+const Foam::vectorField&
+Foam::fluidSolidInterface::currentFluidZonePoints() const
 {
-    if (!ggiInterpolatorPtr_)
+    if (!currentFluidZonePointsPtr_)
     {
-        calcGgiInterpolator();
+        calcCurrentFluidZonePoints();
     }
 
-    return *ggiInterpolatorPtr_;
+    return *currentFluidZonePointsPtr_;
 }
+
+const Foam::PrimitivePatch<Foam::face, Foam::SubList, const Foam::pointField&>&
+Foam::fluidSolidInterface::currentFluidZonePatch() const
+{
+    if (!currentFluidZonePatchPtr_)
+    {
+        calcCurrentFluidZonePatch();
+    }
+
+    return *currentFluidZonePatchPtr_;
+}
+
+
+const Foam::AMIPatchToPatchInterpolation& Foam::fluidSolidInterface::AMI() const
+{
+/*    if (!owner())//might be important to insert this! - example in src/meshTools/regionCoupled/patches/regionCoupledPolyPatch/regionCoupledBase.C/.H
+    {
+        FatalErrorIn
+        (
+            "const AMIPatchToPatchInterpolation& cyclicAMIPolyPatch::AMI()"
+        )
+            << "AMI interpolator only available to owner patch"
+            << abort(FatalError);
+    }
+
+    if (!AMIPtr_.valid())
+    {
+        resetAMI();
+    }
+*/
+
+    if (!AMIPtr_.valid())
+    {
+        calcAMIInterpolator();
+    }
+
+    return AMIPtr_;
+}
+
+////const Foam::extendedGgiZoneInterpolation&
+////Foam::fluidSolidInterface::ggiInterpolator() const
+////{
+////    if (!ggiInterpolatorPtr_)
+////    {
+////        calcGgiInterpolator();
+////    }
+
+////    return *ggiInterpolatorPtr_;
+////}
 
 
 void Foam::fluidSolidInterface::initializeFields()
@@ -680,6 +821,8 @@ void Foam::fluidSolidInterface::initializeFields()
 
     outerCorr_ = 0;
 
+Info  << "Initialization finished..." << endl;
+
     // PC: do we need to re-read these?
     // nOuterCorr_ = fsiProperties_.lookupOrDefault<int>("nOuterCorr", 30);
 
@@ -696,16 +839,20 @@ void Foam::fluidSolidInterface::updateInterpolator()
     {
         if (((runTime().timeIndex() - 1) % interpolatorUpdateFrequency_) == 0)
         {
-            deleteDemandDrivenData(ggiInterpolatorPtr_);
-            ggiInterpolator();
+	    AMIPtr_.clear();
+	    AMI();
+	    Info << "AMI was updated... (1)" << endl;
+////            ggiInterpolator();
         }
     }
     else
     {
         if ((runTime().timeIndex() - 1) == 0)
         {
-            deleteDemandDrivenData(ggiInterpolatorPtr_);
-            ggiInterpolator();
+    	    AMIPtr_.clear();
+	    AMI();
+	    Info << "AMI was updated... (2)" << endl;
+//            ggiInterpolator();
         }
     }
 }
@@ -780,7 +927,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     if (delta < interfaceDeformationLimit())
     {
         // Move only interface points
-        pointField newPoints = fluidMesh().allPoints();
+        pointField newPoints = fluidMesh().points();
 
         const labelList& meshPoints =
             fluidMesh().boundaryMesh()[fluidPatchIndex()].meshPoints();
@@ -806,7 +953,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     else
     {
         // Move whole fluid mesh
-        pointField newPoints = fluidMesh().allPoints();
+        pointField newPoints = fluidMesh().points();
 
         const labelList& meshPoints =
             fluidMesh().boundaryMesh()[fluidPatchIndex()].meshPoints();
@@ -828,11 +975,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
           - fluidPatchPointsDisplPrev;
 
         // Check mesh motion solver type
-        bool feMotionSolver =
-            fluidMesh().objectRegistry::foundObject<tetPointVectorField>
-            (
-                "motionU"
-            );
+////        bool feMotionSolver =
+////            fluidMesh().objectRegistry::foundObject<tetPointVectorField>
+////            (
+////                "motionU"
+////            );
 
         bool fvMotionSolver =
             fluidMesh().objectRegistry::foundObject<pointVectorField>
@@ -885,38 +1032,42 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 //             ms.setMotion(motion);
 //         }
 //         else if (feMotionSolver)
-        if (feMotionSolver)
+////        if (feMotionSolver)
+////        {
+////            tetPointVectorField& motionU =
+////                const_cast<tetPointVectorField&>
+////                (
+////                    fluidMesh().objectRegistry::
+////                    lookupObject<tetPointVectorField>
+////                    (
+////                        "motionU"
+////                    )
+////                );
+
+////            fixedValueTetPolyPatchVectorField& motionUFluidPatch =
+////                refCast<fixedValueTetPolyPatchVectorField>
+////                (
+////                    motionU.boundaryField()[fluidPatchIndex()]
+////                );
+////
+////            tetPolyPatchInterpolation tppi
+////            (
+////                refCast<const faceTetPolyPatch>(motionUFluidPatch.patch())
+////            );
+
+////            motionUFluidPatch ==
+////                tppi.pointToPointInterpolate
+////                (
+////                    accumulatedFluidInterfaceDisplacement()
+////                   /fluid().runTime().deltaT().value()
+////                );
+////        }
+////        else if (fvMotionSolver)
+	if (fvMotionSolver)
         {
-            tetPointVectorField& motionU =
-                const_cast<tetPointVectorField&>
-                (
-                    fluidMesh().objectRegistry::
-                    lookupObject<tetPointVectorField>
-                    (
-                        "motionU"
-                    )
-                );
 
-            fixedValueTetPolyPatchVectorField& motionUFluidPatch =
-                refCast<fixedValueTetPolyPatchVectorField>
-                (
-                    motionU.boundaryField()[fluidPatchIndex()]
-                );
+	    Info << "Using fvMotionSolver for movment of fluid mesh..." << endl;
 
-            tetPolyPatchInterpolation tppi
-            (
-                refCast<const faceTetPolyPatch>(motionUFluidPatch.patch())
-            );
-
-            motionUFluidPatch ==
-                tppi.pointToPointInterpolate
-                (
-                    accumulatedFluidInterfaceDisplacement()
-                   /fluid().runTime().deltaT().value()
-                );
-        }
-        else if (fvMotionSolver)
-        {
             pointVectorField& motionU =
                 const_cast<pointVectorField&>
                 (
@@ -957,7 +1108,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
     // Move unused fluid mesh points
     {
-        vectorField newPoints = fluidMesh().allPoints();
+        vectorField newPoints = fluidMesh().points();
 
         const labelList& fluidZoneMeshPoints =
             fluidMesh().faceZones()[fluidZoneIndex()]().meshPoints();
@@ -1013,24 +1164,33 @@ void Foam::fluidSolidInterface::updateForce()
     const vectorField fluidZoneTotalTraction =
         fluidZoneTraction - fluidZonePressure*n;
 
+    vectorField solidZoneTraction = AMI().interpolateToTarget(-fluidZoneTraction);
 
-    vectorField solidZoneTraction =
-        ggiInterpolator().masterToSlave
-        (
-           -fluidZoneTraction
-        );
+////    vectorField solidZoneTraction =
+////        ggiInterpolator().masterToSlave
+////        (
+////           -fluidZoneTraction
+////        );
 
-    const vectorField solidZoneTotalTraction =
-        ggiInterpolator().masterToSlave
-        (
-            -fluidZoneTotalTraction
-        );
+    vectorField solidZoneTotalTraction = AMI().interpolateToTarget(-fluidZoneTotalTraction);
 
-    const scalarField solidZoneMuEff =
-        ggiInterpolator().masterToSlave
-        (
-            fluid().faceZoneMuEff(fluidZoneIndex(), fluidPatchIndex())
-        );
+////    const vectorField solidZoneTotalTraction =
+////        ggiInterpolator().masterToSlave
+////        (
+////            -fluidZoneTotalTraction
+////        );
+
+    const scalarField solidZoneMuEff = 
+			AMI().interpolateToTarget
+			(
+		     	    fluid().faceZoneMuEff(fluidZoneIndex(), fluidPatchIndex())
+			);
+
+////    const scalarField solidZoneMuEff =
+////        ggiInterpolator().masterToSlave
+////        (
+////            fluid().faceZoneMuEff(fluidZoneIndex(), fluidPatchIndex())
+////        );
 
     const tensorField solidZoneSurfaceGradientOfVelocity =
         solid().faceZoneSurfaceGradientOfVelocity
@@ -1062,12 +1222,13 @@ void Foam::fluidSolidInterface::updateForce()
           + (solidZoneSurfaceGradientOfVelocity&solidZoneNormal)
         );
 
+    solidZonePressure_ = AMI().interpolateToTarget(fluidZonePressure);
 
-    solidZonePressure_ =
-        ggiInterpolator().masterToSlave
-        (
-            fluidZonePressure
-        );
+////    solidZonePressure_ =
+////        ggiInterpolator().masterToSlave
+////        (
+////            fluidZonePressure
+////        );
 
     if (!coupled_)
     {
@@ -1133,11 +1294,13 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
     vectorField solidZonePointsDisplAtSolid =
         solid().faceZonePointDisplacementIncrement(solidZoneIndex());
 
-    solidZonePointsDispl() =
-        ggiInterpolator().slaveToMasterPointInterpolate
-        (
-            solidZonePointsDisplAtSolid
-        );
+    solidZonePointsDispl() = AMI().interpolateToSource(solidZonePointsDisplAtSolid);
+
+////    solidZonePointsDispl() =
+////        ggiInterpolator().slaveToMasterPointInterpolate
+////        (
+////            solidZonePointsDisplAtSolid
+////        );
 
     residualPrev() = residual();
 
@@ -1159,3 +1322,4 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
 
 // ************************************************************************* //
+

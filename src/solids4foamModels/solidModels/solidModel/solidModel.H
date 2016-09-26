@@ -34,7 +34,7 @@ Author
 
 SourceFiles
     solidModel.C
-    newSolidModel.C
+    newSsolidModel.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -45,7 +45,7 @@ SourceFiles
 #include "IOdictionary.H"
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
-#include "mechanicalModel.H"
+#include "mechanicalLaw.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -68,13 +68,16 @@ class solidModel
         //- Solid properties dictionary
         dictionary solidProperties_;
 
-        //- Mechanical model
-        mechanicalModel mechanical_;
+        //- Mechanical properties dictionary
+        IOdictionary mechanicalProperties_;
+
+        //- Mechanical law
+        autoPtr<mechanicalLaw> mechanicalLawPtr_;
 
         //- Global face zones
         mutable labelList* globalFaceZonesPtr_;
 
-        //- Global to local face zone point mapping
+        //- Global to local face zone poin maping
         mutable labelListList* globalToLocalFaceZonePointMapPtr_;
 
     // Private Member Functions
@@ -102,10 +105,10 @@ protected:
             return solidProperties_;
         }
 
-        //- Return mechanical model
-        mechanicalModel& mechanical()
+        //- Return solid properties dictionary
+        mechanicalLaw& mechanical()
         {
-            return mechanical_;
+            return mechanicalLawPtr_();
         }
 
 public:
@@ -178,36 +181,52 @@ public:
             }
 
             //- Return mechanical model
-            const mechanicalModel& mechanical() const
+            const mechanicalLaw& mechanical() const
             {
-                return mechanical_;
+                return mechanicalLawPtr_();
             }
+
+            //- Thermal stress
+            //bool thermalStress() const;
+
+            //- Thermal stress
+            //virtual const constitutiveModel& rheology() const = 0;
+
+            //- Return point displacement field
+            virtual const pointVectorField& pointD() const = 0;
+
+            //- Return point velocity field
+            virtual vector pointU(label pointID) const = 0;
+
+            //- Patch point displacement increment
+            virtual tmp<vectorField> patchPointDisplacementIncrement
+            (
+                const label patchID
+            ) const = 0;
 
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (
                  const label zoneID
-            ) const = 0;
+             ) const = 0;
 
             //- Face zone velocity gradient
-            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
-            (
-                const label zoneID,
-                const label patchID
-            ) const = 0;
+             virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
+             (
+                 const label zoneID,
+                 const label patchID
+             ) const = 0;
 
             //- Face zone current normal
-            virtual tmp<vectorField> faceZoneNormal
-            (
-                const label zoneID,
-                const label patchID
-            ) const = 0;
+             virtual tmp<vectorField> faceZoneNormal
+             (
+                 const label zoneID,
+                 const label patchID
+             ) const = 0;
 
             //- Face zone primitive patch in current configuration
-            virtual tmp<vectorField> currentFaceZonePoints
-            (
-                const label zoneID
-            ) const = 0;
+             virtual tmp<vectorField>
+             currentFaceZonePoints(const label zoneID) const = 0;
 
             //- Get global face zones list
             const labelList& globalFaceZones() const;
@@ -225,37 +244,88 @@ public:
             );
 
             //- Set traction at specified patch
-            virtual void setTraction
-            (
-                const label patchID,
-                const vectorField& traction
-            ) = 0;
+             virtual void setTraction
+             (
+                 const label patchID,
+                 const vectorField& traction
+             ) = 0;
+
+            // //- Set traction at specified patch
+             virtual void setPressure
+             (
+                 const label patchID,
+                 const scalarField& pressure
+             ) = 0;
 
             //- Set traction at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const scalarField& pressure
-            ) = 0;
+             virtual void setTraction
+             (
+                 const label patchID,
+                 const label zoneID,
+                 const vectorField& faceZoneTraction
+             ) = 0;
 
             //- Set traction at specified patch
-            virtual void setTraction
-            (
-                const label patchID,
-                const label zoneID,
-                const vectorField& faceZoneTraction
-            );
+             virtual void setPressure
+             (
+                 const label patchID,
+                 const label zoneID,
+                 const scalarField& faceZonePressure
+             ) = 0;
 
-            //- Set traction at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const label zoneID,
-                const scalarField& faceZonePressure
-            );
+            //- Predict traction at specified zone
+             virtual tmp<vectorField> predictTraction
+             (
+                 const label patchID,
+                 const label zoneID
+             ) = 0;
+
+            //- Predict pressure at specified zone
+             virtual tmp<scalarField> predictPressure
+             (
+                 const label patchID,
+                 const label zoneID
+             ) = 0;
 
             //- Evolve the solid model
             virtual bool evolve() = 0;
+
+            //- Predict the solid model
+            // virtual void predict() = 0;
+
+            //- Smooth solution
+            // virtual scalar smooth
+            // (
+            //     const volVectorField& source,
+            //     label nCorrectors = 0
+            // ) = 0;
+
+            // //- Smooth solution
+            // virtual scalar smooth
+            // (
+            //     const volVectorField& source,
+            //     const volVectorField& refSolution,
+            //     label nCorrectors = 0
+            // ) = 0;
+
+            //- Return reference to current solution
+            // virtual const volVectorField& solution() const = 0;
+
+            //- Return reference to current solution field
+            // virtual volVectorField& solution() = 0;
+
+            //- Initialise solution
+            // virtual void initialise
+            // (
+            //     const volVectorField& sol,
+            //     bool consistenBoundaryField = false
+            // ) = 0;
+
+            //- Return current residual
+            // virtual tmp<volVectorField> residual
+            // (
+            //     const volVectorField& source
+            // ) = 0;
 
             //- Traction boundary surface normal gradient
             //  Given the user-specified boundary patch traction, this function

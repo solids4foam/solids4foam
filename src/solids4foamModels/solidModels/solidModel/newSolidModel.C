@@ -25,6 +25,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidModel.H"
+#include "Time.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -51,8 +52,6 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New(dynamicFvMesh& mesh)
         solidProperties.lookup("solidModel") >> solidModelTypeName;
     }
 
-    Info<< "Selecting solidModel " << solidModelTypeName << endl;
-
     dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_->find(solidModelTypeName);
 
@@ -60,7 +59,7 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New(dynamicFvMesh& mesh)
     {
         FatalErrorIn
         (
-            "solidModel::New(dynamicFvMesh&)"
+            "solidModel::New(dynamicFvMesh& mesh)"
         )   << "Unknown solidModel type " << solidModelTypeName
             << endl << endl
             << "Valid solidModel types are :" << endl

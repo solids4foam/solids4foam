@@ -78,27 +78,52 @@ weakCouplingInterface::weakCouplingInterface
             solidMesh.faceZones()[solidZoneIndex()]().size(),
             vector::zero
         );
+
+Info << "Initializing the fileds..." << endl;
+
+    initializeFields();
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 void weakCouplingInterface::evolve()
 {
-    initializeFields();
+
+
+
+Info << "Updating interpolator..." << endl;
+
 
     updateInterpolator();
 
+Info << "Evolving the solid field..." << endl;
+
+
     solid().evolve();
+
+Info << "Updating weak displacment..." << endl;
+
 
     updateWeakDisplacement();
 
+Info << "Moving the fluid mesh..." << endl;
+
+
     moveFluidMesh();
+
+
+Info << "Evolving the fluid..." << endl;
 
     fluid().evolve();
 
-    updateWeakTraction();
+Info << "Updating weak traction..." << endl;
 
-    solid().updateTotalFields();
+    updateWeakTraction();
+    updateForce();//Do we need this? - only this transfers traction to solid region, function above doesn't!
+
+Info << "Updating total fields..." << endl;
+
+    solid().updateTotalFields();// not sure, what this does...
 }
 
 
@@ -120,11 +145,14 @@ void weakCouplingInterface::updateWeakDisplacement()
     vectorField solidZonePointsDisplAtSolid =
         solid().faceZonePointDisplacementIncrement(solidZoneIndex());
 
-    solidZonePointsDispl() =
-        ggiInterpolator().slaveToMasterPointInterpolate
-        (
-            solidZonePointsDisplAtSolid
-        );
+	// Is this valid? Or do we really have to interpolate? For that we have to find an AMI, which is able to interpolate between points. Current AMI only interpolated between vectorFields.
+        solidZonePointsDispl() = solidZonePointsDisplAtSolid;//AMI().interpolateToSource(solidZonePointsDisplAtSolid);
+
+////    solidZonePointsDispl() =
+////        ggiInterpolator().slaveToMasterPointInterpolate
+////        (
+////            solidZonePointsDisplAtSolid
+////        );
 
     residualPrev() = residual();
 
@@ -147,7 +175,7 @@ void weakCouplingInterface::updateWeakDisplacement()
         reduce(fluidZonePointsDispl(), sumOp<vectorField>());
 
         label globalFluidZoneIndex =
-            findIndex(fluid().globalFaceZones(), fluidZoneIndex());
+	            findIndex(fluid().globalFaceZones(), fluidZoneIndex());
 
         if (globalFluidZoneIndex == -1)
         {
@@ -206,25 +234,17 @@ void weakCouplingInterface::updateWeakTraction()
         )
       - fluid().faceZonePressureForce(fluidZoneIndex(), fluidPatchIndex())*n;
 
-    vectorField fluidZoneTractionAtSolid =
-        ggiInterpolator().masterToSlave
-        (
-            -fluidZoneTraction
-        );
+        vectorField fluidZoneTractionAtSolid = AMI().interpolateToSource(-fluidZoneTraction);
+
+////    vectorField fluidZoneTractionAtSolid =
+////        ggiInterpolator().masterToSlave
+////        (
+////            -fluidZoneTraction
+////        );
 
     solidZoneTraction_ =
         relaxationFactor_*fluidZoneTractionAtSolid
       + (1.0 - relaxationFactor_)*predictedSolidZoneTraction_;
-
-    if (coupled())
-    {
-        solid().setTraction
-        (
-            solidPatchIndex(),
-            solidZoneIndex(),
-            solidZoneTraction_
-        );
-    }
 
     // Total force at the fluid side of the interface
     {
@@ -278,3 +298,4 @@ void weakCouplingInterface::updateWeakTraction()
 } // End namespace Foam
 
 // ************************************************************************* //
+

@@ -60,7 +60,8 @@ addToRunTimeSelectionTable
 bool unsNonLinGeomUpdatedLagSolid::converged
 (
     const int iCorr,
-    const lduMatrix::solverPerformance& solverPerfDD
+//    const lduMatrix::solverPerformance& solverPerfDD
+    const solverPerformance& solverPerfDD
 )
 {
     // We will check a number of different residuals for convergence
@@ -261,7 +262,9 @@ void unsNonLinGeomUpdatedLagSolid::moveMesh(const pointField& oldPoints)
     mesh().movePoints(newPoints);
     mesh().V00();
     mesh().moving(false);
-    mesh().changing(false);
+//    mesh().changing(false);
+    mesh().changing();
+
 
     // meshPhi does not need to be written
     mesh().setPhi().writeOpt() = IOobject::NO_WRITE;
@@ -488,7 +491,8 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        hinv(relF_)
+//        hinv(relF_)
+        inv(relF_)
     ),
     relFinvf_
     (
@@ -500,7 +504,8 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        hinv(relFf_)
+//        hinv(relFf_)
+        inv(relFf_)
     ),
     relJ_
     (
@@ -532,9 +537,12 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
     rImpK_(1.0/impK_),
     DDEqnRelaxFactor_
     (
-        mesh.solutionDict().relax("DDEqn")
-      ? mesh.solutionDict().relaxationFactor("DDEqn")
+        mesh.relaxEquation("DEqn")
+      ? mesh.equationRelaxationFactor("DEqn")
       : 1.0
+//        mesh.solutionDict().relax("DDEqn")
+//      ? mesh.solutionDict().relaxationFactor("DDEqn")
+//      : 1.0
     ),
     solutionTol_
     (
@@ -553,17 +561,6 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         solidProperties().lookupOrDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
-    g_
-    (
-        IOobject
-        (
-            "g",
-            runTime().constant(),
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        )
-    ),
     maxIterReached_(0),
     stabilisePressure_(lookupOrDefault<Switch>("stabilisePressure", false))
 {
@@ -575,8 +572,54 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-tmp<vectorField>
-unsNonLinGeomUpdatedLagSolid::faceZonePointDisplacementIncrement
+ vector unsNonLinGeomUpdatedLagSolid::pointU(label pointID) const
+ {
+     pointVectorField pointU
+     (
+         IOobject
+         (
+             "pointU",
+             runTime().timeName(),
+             mesh(),
+             IOobject::NO_READ,
+             IOobject::NO_WRITE
+         ),
+         pMesh_,
+         dimensionedVector("0", dimVelocity, vector::zero)
+     );
+
+     volToPoint_.interpolate(U_, pointU);
+
+     return pointU.internalField()[pointID];
+ }
+
+//- Patch point displacement
+tmp<vectorField> unsNonLinGeomUpdatedLagSolid::patchPointDisplacementIncrement
+(
+    const label patchID
+) const
+{
+    tmp<vectorField> tPointDisplacement
+    (
+        new vectorField
+        (
+            mesh().boundaryMesh()[patchID].localPoints().size(),
+            vector::zero
+        )
+    );
+
+    tPointDisplacement() =
+        vectorField
+        (
+            pointD_.internalField() - pointD_.oldTime().internalField(),
+            mesh().boundaryMesh()[patchID].meshPoints()
+        );
+
+    return tPointDisplacement;
+}
+
+
+tmp<vectorField> unsNonLinGeomUpdatedLagSolid::faceZonePointDisplacementIncrement
 (
     const label zoneID
 ) const
@@ -678,8 +721,24 @@ tmp<tensorField> unsNonLinGeomUpdatedLagSolid::faceZoneSurfaceGradientOfVelocity
     );
     tensorField& velocityGradient = tVelocityGradient();
 
-    vectorField pPointU =
-        volToPoint_.interpolate(mesh().boundaryMesh()[patchID], U_);
+     pointVectorField pPointU
+     (
+         IOobject
+         (
+             "pPointU",
+             runTime().timeName(),
+             mesh(),
+             IOobject::NO_READ,
+             IOobject::NO_WRITE
+         ),
+         pMesh_,
+         dimensionedVector("0", dimVelocity, vector::zero)
+     );
+
+    volToPoint_.interpolate(U_, pPointU);
+
+//    vectorField pPointU =
+//        volToPoint_.interpolate(mesh().boundaryMesh()[patchID], U_);
 
     const faceList& localFaces =
         mesh().boundaryMesh()[patchID].localFaces();
@@ -992,17 +1051,56 @@ void unsNonLinGeomUpdatedLagSolid::setPressure
     setPressure(patchID, patchPressure);
 }
 
+tmp<vectorField> unsNonLinGeomUpdatedLagSolid::predictTraction
+ (
+     const label patchID,
+     const label zoneID
+ )
+ {
+     // Predict traction on patch
+     //	dummy implementation!
+
+     tmp<vectorField> ttF
+     (
+         new vectorField(mesh().faceZones()[zoneID].size(), vector::zero)
+     );
+
+
+     return ttF;
+ }
+
+ tmp<scalarField> unsNonLinGeomUpdatedLagSolid::predictPressure
+ (
+     const label patchID,
+     const label zoneID
+ )
+ {
+//      Predict pressure field on patch
+//	dummy implementation!
+
+     tmp<scalarField> tpF
+     (
+         new scalarField(mesh().faceZones()[zoneID].size(), 0)
+     );
+
+
+     return tpF;
+ }
 
 bool unsNonLinGeomUpdatedLagSolid::evolve()
 {
     Info << "Evolving solid solver" << endl;
 
     int iCorr = 0;
-    lduMatrix::solverPerformance solverPerfDD;
-    lduMatrix::debug = 0;
+//    lduMatrix::solverPerformance solverPerfDD;
+    solverPerformance solverPerfDD;
+//    lduMatrix::debug = 0;
+    solverPerformance::debug = 0;
 
     // Store old points for moving the mesh
-    const vectorField oldPoints = mesh().allPoints();
+//    const vectorField oldPoints = mesh().allPoints();
+    const vectorField oldPoints = mesh().points();
+
 
     Info<< "Solving the momentum equation for DD" << endl;
 
@@ -1020,20 +1118,20 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
          == fvm::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           + fvc::div((relJf_*relFinvf_.T() & mesh().Sf()) & sigmaf_)
-          + rho_*g_
         );
 
         // Under-relax the linear system
         DDEqn.relax(DDEqnRelaxFactor_);
 
         // Solve the linear system
-        solverPerfDD = DDEqn.solve();
+//        solverPerfDD = DDEqn.solve();
+        DDEqn.solve();
 
         // Under-relax the DD field
         DD_.relax();
 
         // Update the cell and face displacement increment gradients
-        volToPoint_.interpolate(DD_, pointDD_);
+//        volToPoint_.interpolate(DD_, pointDD_);
         gradDD_ = fvc::grad(DD_, pointDD_);
         gradDDf_ = fvc::fGrad(DD_, pointDD_);
 
@@ -1041,7 +1139,8 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
         relFf_ = I + gradDDf_.T();
 
         // Inverse relative deformation gradient
-        relFinvf_ = hinv(relFf_);
+//        relFinvf_ = hinv(relFf_);
+        relFinvf_ = inv(relFf_);
 
         // Total deformation gradient
         Ff_ = relFf_ & Ff_.oldTime();
@@ -1057,11 +1156,18 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
     }
     while (!converged(iCorr, solverPerfDD) && ++iCorr < nCorr_);
 
+    // PC: rename this function or maybe even remove it
+    // Update yield stress and plasticity total field e.g. epsilonP
+    // Or updateTotalFields: actually, this should be called inside
+    // updateTotalFields() that gets called in solidFoam
+    mechanical().updateYieldStress();
+
     // Relative deformation gradient
     relF_ = I + gradDD_.T();
 
     // Inverse relative deformation gradient
-    relFinv_ = hinv(relF_);
+//    relFinv_ = hinv(relF_);
+    relFinv_ = inv(relF_);
 
     // Total deformation gradient
     F_ = relF_ & F_.oldTime();
@@ -1147,12 +1253,10 @@ tmp<vectorField> unsNonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
     );
 }
 
-
 void unsNonLinGeomUpdatedLagSolid::updateTotalFields()
 {
     mechanical().updateTotalFields();
 }
-
 
 void unsNonLinGeomUpdatedLagSolid::writeFields(const Time& runTime)
 {

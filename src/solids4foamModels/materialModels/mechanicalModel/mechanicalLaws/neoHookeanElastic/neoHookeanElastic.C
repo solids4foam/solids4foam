@@ -25,6 +25,10 @@ License
 
 #include "neoHookeanElastic.H"
 #include "addToRunTimeSelectionTable.H"
+#include "zeroGradientFvPatchFields.H"
+#include "transformGeometricField.H"
+#include "fvc.H"
+#include "IOdictionary.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -35,80 +39,6 @@ namespace Foam
     (
         mechanicalLaw, neoHookeanElastic, dictionary
     );
-}
-
-
-// * * * * * * * * * * *  Private Member Funtcions * * * * * * * * * * * * * //
-
-void Foam::neoHookeanElastic::makeF()
-{
-    if (FPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElastic::makeF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "F",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElastic::F()
-{
-    if (!FPtr_)
-    {
-        makeF();
-    }
-
-    return *FPtr_;
-}
-
-
-void Foam::neoHookeanElastic::makeFf()
-{
-    if (FfPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElastic::makeFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "Ff",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::surfaceTensorField& Foam::neoHookeanElastic::Ff()
-{
-    if (!FfPtr_)
-    {
-        makeFf();
-    }
-
-    return *FfPtr_;
 }
 
 
@@ -129,12 +59,13 @@ Foam::neoHookeanElastic::neoHookeanElastic
     mu_(E_/(2.0*(1.0 + nu_))),
     K_
     (
-        planeStress()
+        mesh.lookupObject<IOdictionary>
+        (
+            "mechanicalProperties"
+        ).lookup("planeStress")
       ? (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_
       : (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_
-    ),
-    FPtr_(NULL),
-    FfPtr_(NULL)
+    )
 {}
 
 
@@ -191,71 +122,51 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 
 void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 {
-    if (mesh().foundObject<volTensorField>("grad(DD)"))
-    {
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
+    const fvMesh& mesh = this->mesh();
 
-        // Update the total deformation gradient
-        F() = (I + gradDD.T()) & F().oldTime();
-    }
-    else
-    {
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
+    // Lookup the total deformation gradient from the solver
+    const volTensorField& F = mesh.lookupObject<volTensorField>("F");
 
-        // Update the total deformation gradient
-        F() = I + gradD.T();
-    }
+    // Lookup the Jacobian of the deformation gradient from the solver
+    const volScalarField& J = mesh.lookupObject<volScalarField>("J");
 
-    // Calculate the Jacobian of the deformation gradient
-    const volScalarField J = det(F());
+    // Calculate left Cauchy Green strain tensor with volumetric term removed
+    volSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(F & F.T());
 
-    // Calculate the volume preserving left Cauchy Green strain
-    const volSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(F() & F().T());
-
-    // Calculate the deviatoric stress
-    const volSymmTensorField s = mu_*dev(bEbar);
+    // Calculate deviatoric stress
+    volSymmTensorField s = mu_*dev(bEbar);
 
     // Calculate the Cauchy stress
     sigma = (1.0/J)*0.5*K_*(pow(J, 2) - 1)*I + s;
 }
 
-
 void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 {
-    if (mesh().foundObject<volTensorField>("grad(DD)f"))
-    {
-        // Lookup gradient of displacement increment
-        const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
+    const fvMesh& mesh = this->mesh();
 
-        // Update the total deformation gradient
-        Ff() = (I + gradDD.T()) & Ff().oldTime();
-    }
-    else
-    {
-        // Lookup gradient of displacement
-        const surfaceTensorField& gradD =
-            mesh().lookupObject<surfaceTensorField>("grad(D)f");
+    // Lookup the total deformation gradient from the solver
+    const surfaceTensorField& F = mesh.lookupObject<surfaceTensorField>("F");
 
-        // Update the total deformation gradient
-        Ff() = I + gradD.T();
-    }
-
-    // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J = det(Ff());
+    // Lookup the Jacobian of the deformation gradient from the solver
+    const surfaceScalarField& J = mesh.lookupObject<surfaceScalarField>("J");
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
-    const surfaceSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(Ff() & Ff().T());
+    surfaceSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(F & F.T());
 
     // Calculate deviatoric stress
-    const surfaceSymmTensorField s = mu_*dev(bEbar);
+    surfaceSymmTensorField s = mu_*dev(bEbar);
 
     // Calculate the Cauchy stress
     sigma = (1.0/J)*0.5*K_*(pow(J, 2) - 1)*I + s;
+}
+
+void Foam::neoHookeanElastic::setMaterialIndex(label curMatIndex)
+{
+    // Set current material index
+    curMaterialIndex() = curMatIndex;
+
+    // Rename fields to avoid conflicts with other mechanical laws
+    curMaterial().rename(curMaterial().name() + '_' + Foam::name(curMatIndex));
 }
 
 

@@ -31,11 +31,6 @@ Description
 
     The stress is calculated by the run-time selectable mechanical law.
 
-    More details in:
-    P. Cardiff, Z. Tukovic, P. De Jaeger, M. Clancy and A. Ivankovic. A
-    Lagrangian cell-centred finite volume method for metal forming simulation,
-    doi=10.1002/nme.5345.
-
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
@@ -51,7 +46,7 @@ SourceFiles
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
-#include "uniformDimensionedFields.H"
+#include "volPointInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -87,6 +82,9 @@ class nonLinGeomTotalLagSolid
 
         //- Cauchy (true) stress field
         volSymmTensorField sigma_;
+
+        //- Cell-to-point interpolation
+        volPointInterpolation volToPoint_;
 
         //- Cell displacement gradient
         volTensorField gradD_;
@@ -134,9 +132,6 @@ class nonLinGeomTotalLagSolid
         //- Maximum number of momentum correctors
         const int nCorr_;
 
-        //- Gravitational acceleration
-        const uniformDimensionedVectorField g_;
-
         //- Number of times the maximum number of correctors was reached in the
         //  momentum equation
         int maxIterReached_;
@@ -148,7 +143,8 @@ class nonLinGeomTotalLagSolid
         bool converged
         (
             const int iCorr,
-            const lduMatrix::solverPerformance& solverPerfD
+//            const lduMatrix::solverPerformance& solverPerfD
+            const solverPerformance& solverPerfD
         );
 
         //- Disallow default bitwise copy construct
@@ -192,10 +188,10 @@ public:
             }
 
             //- Return point mesh
-            const pointMesh& pMesh() const
-            {
-                return pMesh_;
-            }
+            // const pointMesh& pMesh() const
+            // {
+            //     return pMesh_;
+            // }
 
             //- Stress tensor
             const volSymmTensorField& sigma() const
@@ -210,54 +206,100 @@ public:
             // }
 
             //- Return point displacement field
-            virtual const pointVectorField& pointD() const
-            {
-                return pointD_;
-            }
+             virtual const pointVectorField& pointD() const
+             {
+                 return pointD_;
+             }
+
+            //- Return multi-material interface pointer
+//             const leastSquaresVolPointInterpolation& volToPoint() const
+            const volPointInterpolation& volToPoint() const
+             {
+                 return volToPoint_;
+             }
+
+            //- Return point displacement field
+             virtual vector pointU(label pointID) const;
+
+            //- Patch point displacement increment
+             virtual tmp<vectorField> patchPointDisplacementIncrement
+             (
+                 const label patchID
+             ) const;
 
             //- Face zone point displacement increment
-            virtual tmp<vectorField> faceZonePointDisplacementIncrement
-            (
-                const label zoneID
-            ) const;
+             virtual tmp<vectorField> faceZonePointDisplacementIncrement
+             (
+                 const label zoneID
+             ) const;
 
             //- Face zone velocity surface (tangential) gradient
-            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
+             virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
+             (
+                 const label zoneID,
+                 const label patchID
+             ) const;
 
             //- Face zone current normal
-            virtual tmp<vectorField> faceZoneNormal
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
+             virtual tmp<vectorField> faceZoneNormal
+             (
+                 const label zoneID,
+                 const label patchID
+             ) const;
 
             //- Face zone primitive patch in current configuration
-            virtual tmp<vectorField> currentFaceZonePoints
-            (
-                const label zoneID
-            ) const;
+             virtual tmp<vectorField> currentFaceZonePoints
+             (
+                 const label zoneID
+             ) const;
 
         // Edit
 
             //- Set traction on the specified patch
             //  This function enables the FSI procedure to pass a traction from
             //  fluid to the solid
-            virtual void setTraction
-            (
-                const label patchID,
-                const vectorField& traction
-            );
+             virtual void setTraction
+             (
+                 const label patchID,
+                 const vectorField& traction
+             );
+
+            // //- Set pressure at specified patch
+             virtual void setPressure
+             (
+                 const label patchID,
+                 const scalarField& pressure
+             );
+
+            //- Set traction at specified patch
+             virtual void setTraction
+             (
+                 const label patchID,
+                 const label zoneID,
+                 const vectorField& zoneTraction
+             );
 
             //- Set pressure at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const scalarField& pressure
-            );
+             virtual void setPressure
+             (
+                 const label patchID,
+                 const label zoneID,
+                 const scalarField& zonePressure
+             );
+
+            //- Predict traction at specified zone
+             virtual tmp<vectorField> predictTraction
+             (
+                 const label patchID,
+                 const label zoneID
+             );
+
+            //- Predict pressure at specified zone
+             virtual tmp<scalarField> predictPressure
+             (
+                 const label patchID,
+                 const label zoneID
+             );
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
