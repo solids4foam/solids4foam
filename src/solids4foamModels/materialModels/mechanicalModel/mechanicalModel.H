@@ -118,6 +118,9 @@ class mechanicalModel
         //- Displacement pointField for each mechanical law
         mutable PtrList<pointVectorField> subMeshPointD_;
 
+        //- Are there any bi-material interface faces
+        mutable bool* biMaterialInterfaceActivePtr_;
+
         //- List of faces in the base mesh that are on a bi-material interface
         //  ie. they are shared by two materials
         mutable labelList* interfaceBaseFacesPtr_;
@@ -253,6 +256,8 @@ class mechanicalModel
         const labelList& interfaceBaseFaces() const;
 
         //- Calculate the interface shadow subMesh indices
+        //  These are the maps to find which subMesh has the shadow face at a
+        //  bi-material interface
         void calcInterfaceShadowIDs() const;
 
         //- Return the interface shadow subMesh indices
@@ -333,6 +338,12 @@ class mechanicalModel
                 subMshFields,
             GeometricField<Type, pointPatchField, pointMesh>& baseMeshField
         ) const;
+
+        //- Are there any bi-material interface faces
+        bool biMaterialInterfaceActive() const;
+
+        //- Calculate biMaterialInterfaceActive
+        void calcBiMaterialInterfaceActive() const;
 
         //- Clear out demand driven data
         void clearOut() const;
