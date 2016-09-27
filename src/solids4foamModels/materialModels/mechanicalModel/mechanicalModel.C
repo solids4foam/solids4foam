@@ -1034,7 +1034,6 @@ Foam::mechanicalModel::interfaceShadowFaceID() const
 
 void Foam::mechanicalModel::calcImpKfcorr() const
 {
-    Pout<< "calcImpKfcorr()" << endl;
     if (impKfcorrPtr_)
     {
         FatalErrorIn
@@ -1078,12 +1077,9 @@ void Foam::mechanicalModel::calcImpKfcorr() const
             {
                 if (patchMap[patchI] == -1)
                 {
-                    Pout<< "Patch " << subMesh.boundaryMesh()[patchI].name()
-                        << endl;
                     const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
                     const label start = ppatch.start();
 
-                    Pout<< "impKfcorrI.size() " << impKfcorrI.size() << endl;
                     forAll(ppatch, faceI)
                     {
                         const label baseFaceID = faceMap[start + faceI];
@@ -1111,7 +1107,7 @@ void Foam::mechanicalModel::calcImpKfcorr() const
             }
         }
 
-        impKfcorr.correctBoundaryConditions();
+        impKfcorrPtr_->correctBoundaryConditions();
     }
 }
 
@@ -2568,20 +2564,6 @@ Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
     const volTensorField& gradD
 ) const
 {
-    Pout<< "line " << __LINE__ << endl;
-    impKfcorr();
-    Pout<< "line " << __LINE__ << endl;
-    impKfcorr()*D;
-    Pout<< "line " << __LINE__ << endl;
-    fvc::laplacian(impKfcorr(), D, "laplacian(DD,D)");
-    Pout<< "line " << __LINE__ << endl;
-    impKfcorr()*mesh().Sf();
-    Pout<< "line " << __LINE__ << endl;
-    impKfcorr()*mesh().Sf() & fvc::interpolate(gradD);
-    Pout<< "line " << __LINE__ << endl;
-    fvc::div(impKfcorr()*mesh().Sf() & fvc::interpolate(gradD));
-    Pout<< "line " << __LINE__ << endl;
-
     return
     (
         fvc::laplacian(impKfcorr(), D, "laplacian(DD,D)")

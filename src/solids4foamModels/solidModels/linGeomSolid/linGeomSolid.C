@@ -648,20 +648,6 @@ bool linGeomSolid::evolve()
         // Store fields for under-relaxation and residual calculation
         D_.storePrevIter();
 
-        Pout<< "line " << __LINE__ << endl;
-        rho_*fvm::d2dt2(D_);
-        Pout<< "line " << __LINE__ << endl;
-        fvm::laplacian(impKf_, D_, "laplacian(DD,D)");
-        Pout<< "line " << __LINE__ << endl;
-        fvc::laplacian(impKf_, D_, "laplacian(DD,D)");
-        Pout<< "line " << __LINE__ << endl;
-        fvc::div(sigma_, "div(sigma)");
-        Pout<< "line " << __LINE__ << endl;
-        rho_*g_;
-        Pout<< "line " << __LINE__ << endl;
-        mechanical().RhieChowCorrection(D_, gradD_);
-        Pout<< "line " << __LINE__ << endl;
-
         // Linear momentum equation total displacement form
         fvVectorMatrix DEqn
         (
@@ -672,27 +658,21 @@ bool linGeomSolid::evolve()
           + rho_*g_
           + mechanical().RhieChowCorrection(D_, gradD_)
         );
-        Pout<< "line " << __LINE__ << endl;
 
         // Under-relaxation the linear system
         DEqn.relax(DEqnRelaxFactor_);
 
-        Pout<< "line " << __LINE__ << endl;
         // Solve the linear system
         solverPerfD = DEqn.solve();
 
-        Pout<< "line " << __LINE__ << endl;
         // Under-relax the field
         D_.relax();
 
-        Pout<< "line " << __LINE__ << endl;
         // Update gradient of displacement
         mechanical().grad(D_, gradD_);
 
-        Pout<< "line " << __LINE__ << endl;
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma_);
-        Pout<< "line " << __LINE__ << endl;
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
