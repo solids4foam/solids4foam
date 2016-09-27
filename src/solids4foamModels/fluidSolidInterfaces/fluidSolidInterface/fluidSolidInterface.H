@@ -47,11 +47,8 @@ SourceFiles
 #include "runTimeSelectionTables.H"
 #include "fluidModel.H"
 #include "solidModel.H"
-//#include "extendedGgiInterpolation.H"
-#include "coupledPolyPatch.H"
-#include "AMIPatchToPatchInterpolation.H"
-#include "polyBoundaryMesh.H"
-#include "coupleGroupIdentifier.H"
+#include "dynamicFvMesh.H"
+#include "extendedGgiInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -99,24 +96,11 @@ class fluidSolidInterface
         mutable vectorField* currentSolidZonePointsPtr_;
 
         //- Solid face zone primitive patch in current configuration
-//        mutable PrimitivePatch<face, List, const pointField&>*
-        mutable PrimitivePatch<face, SubList, const pointField&>*
+        mutable PrimitivePatch<face, List, const pointField&>*
             currentSolidZonePatchPtr_;
 
-        //- Fluid face zone current points
-        mutable vectorField* currentFluidZonePointsPtr_;
-
-        //- Fluid face zone primitive patch in current configuration
-        mutable PrimitivePatch<face, SubList, const pointField&>*
-            currentFluidZonePatchPtr_;
-
-////        const polyPatch& patchAMI1_;
-
-        //- AMI zone-to-zone interpolation
-////        mutable extendedGgiZoneInterpolation* ggiInterpolatorPtr_;AMIInterpolation
-            mutable autoPtr<AMIPatchToPatchInterpolation> AMIPtr_;
-////            mutable AMIPatchToPatchInterpolation* AMIPtr_;
-
+        //- Ggi zone-to-zone interpolation
+        mutable extendedGgiZoneInterpolation* ggiInterpolatorPtr_;
 
         //- Outer correction loop stoping tolerance
         scalar outerCorrTolerance_;
@@ -183,14 +167,8 @@ class fluidSolidInterface
         //- Calculate current solid zone primitive patch
         void calcCurrentSolidZonePatch() const;
 
-        //- Calculate current solid zone points
-        void calcCurrentFluidZonePoints() const;
-
-        //- Calculate current solid zone primitive patch
-        void calcCurrentFluidZonePatch() const;
-
-        //- Calculate fluid to solid AMI interpolator
-        void calcAMIInterpolator() const;
+        //- Calculate fluid to solid ggi interpolator
+        void calcGgiInterpolator() const;
 
         //- Accumulated fluid interface displacement
         void calcAccumulatedFluidInterfaceDisplacement() const;
@@ -343,23 +321,11 @@ public:
             const vectorField& currentSolidZonePoints() const;
 
             //- Return current solid zone patch
-//            const PrimitivePatch<face, List, const pointField&>&
-            const PrimitivePatch<face, SubList, const pointField&>&
+            const PrimitivePatch<face, List, const pointField&>&
             currentSolidZonePatch() const;
 
-            //- Return current fluid zone points
-            const vectorField& currentFluidZonePoints() const;
-
-            //- Return current fluid zone patch
-//            const PrimitivePatch<face, List, const pointField&>&
-            const PrimitivePatch<face, SubList, const pointField&>&
-            currentFluidZonePatch() const;
-
             //- Return fluid to solid interpolator
-////            const extendedGgiZoneInterpolation& ggiInterpolator() const;
-
-            //- Return a reference to the AMI interpolator
-            const AMIPatchToPatchInterpolation& AMI() const;
+            const extendedGgiZoneInterpolation& ggiInterpolator() const;
 
             //- Return outer corrector loop tolerance
             scalar outerCorrTolerance() const
@@ -482,4 +448,3 @@ public:
 #endif
 
 // ************************************************************************* //
-

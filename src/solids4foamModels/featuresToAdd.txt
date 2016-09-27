@@ -1,0 +1,13 @@
+contact: done
+multi-material: done
+mechanical laws
+    st venant kirchhoff: done
+    orthotropic elastic: done
+    viscoelasticity:
+    hybrid pressure small strain solver
+        solidModels: done
+        mechanicalLaws: OK
+gravity: done
+functionObjects: done
+blockCoupled: symmetry and fixedValue in constructor
+tutorials: tidy

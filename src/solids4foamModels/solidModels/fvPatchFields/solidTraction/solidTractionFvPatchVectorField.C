@@ -28,7 +28,6 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "solidModel.H"
-//#include "tractionBoundaryGradient.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -45,7 +44,6 @@ solidTractionFvPatchVectorField
 )
 :
     fixedGradientFvPatchVectorField(p, iF),
-    fieldName_("undefined"),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
@@ -65,18 +63,11 @@ solidTractionFvPatchVectorField
 )
 :
     fixedGradientFvPatchVectorField(p, iF),
-    fieldName_(dimensionedInternalField().name()),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
     pressureSeries_()
 {
-    fvPatchVectorField::operator=(patchInternalField());
-    gradient() = vector::zero;
-
-    Info<< "Patch " << patch().name()
-        << "    Traction boundary field: " << fieldName_ << endl;
-
     if (dict.found("gradient"))
     {
         gradient() = vectorField("gradient", dict, p.size());
@@ -90,11 +81,15 @@ solidTractionFvPatchVectorField
     {
         Field<vector>::operator=(vectorField("value", dict, p.size()));
     }
+    else
+    {
+        fvPatchVectorField::operator=(patchInternalField());
+    }
 
     // Check if traction is time-varying
     if (dict.found("tractionSeries"))
     {
-        Info<< "    traction is time-varying" << endl;
+        Info<< "traction is time-varying" << endl;
         tractionSeries_ =
             interpolationTable<vector>(dict.subDict("tractionSeries"));
     }
@@ -106,7 +101,7 @@ solidTractionFvPatchVectorField
     // Check if pressure is time-varying
     if (dict.found("pressureSeries"))
     {
-        Info<< "    pressure is time-varying" << endl;
+        Info<< "pressure is time-varying" << endl;
         pressureSeries_ =
             interpolationTable<scalar>(dict.subDict("pressureSeries"));
     }
@@ -127,7 +122,6 @@ solidTractionFvPatchVectorField
 )
 :
     fixedGradientFvPatchVectorField(stpvf, p, iF, mapper),
-    fieldName_(stpvf.fieldName_),
     traction_(stpvf.traction_, mapper),
     pressure_(stpvf.pressure_, mapper),
     tractionSeries_(stpvf.tractionSeries_),
@@ -142,7 +136,6 @@ solidTractionFvPatchVectorField
 )
 :
     fixedGradientFvPatchVectorField(stpvf),
-    fieldName_(stpvf.fieldName_),
     traction_(stpvf.traction_),
     pressure_(stpvf.pressure_),
     tractionSeries_(stpvf.tractionSeries_),
@@ -158,7 +151,6 @@ solidTractionFvPatchVectorField
 )
 :
     fixedGradientFvPatchVectorField(stpvf, iF),
-    fieldName_(stpvf.fieldName_),
     traction_(stpvf.traction_),
     pressure_(stpvf.pressure_),
     tractionSeries_(stpvf.tractionSeries_),
@@ -239,7 +231,7 @@ void solidTractionFvPatchVectorField::evaluate(const Pstream::commsTypes)
     const fvPatchField<tensor>& gradField =
         patch().lookupPatchField<volTensorField, tensor>
         (
-            "grad(" + fieldName_ + ")"
+            "grad(" + dimensionedInternalField().name() + ")"
         );
 
     vectorField n = patch().nf();

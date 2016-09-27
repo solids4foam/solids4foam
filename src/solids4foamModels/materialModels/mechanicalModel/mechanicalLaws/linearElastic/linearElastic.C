@@ -25,12 +25,6 @@ License
 
 #include "linearElastic.H"
 #include "addToRunTimeSelectionTable.H"
-#include "zeroGradientFvPatchFields.H"
-#include "transformField.H"
-#include "transformGeometricField.H"
-#include "IOdictionary.H"
-#include "volFields.H"
-#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -58,17 +52,49 @@ Foam::linearElastic::linearElastic
     rho_(dict.lookup("rho")),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
-    lambda_
-    (
-        mesh.lookupObject<IOdictionary>
+    lambda_("lambda", dimPressure, 0.0),
+    mu_(E_/(2.0*(1.0 + nu_))),
+    k_("k", dimPressure, 0.0)
+{
+    // Check for physical Poisson's ratio
+    if (nu_.value() < -1.0 || nu_.value() > 0.5)
+    {
+        FatalErrorIn
         (
-            "mechanicalProperties"
-        ).lookup("planeStress")
-      ? nu_*E_/((1.0 + nu_)*(1.0 - nu_))
-      : nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))
-    ),
-    mu_(E_/(2.0*(1.0 + nu_)))
-{}
+            "Foam::linearElastic::linearElastic\n"
+            "(\n"
+            "    const word& name,\n"
+            "    const fvMesh& mesh,\n"
+            "    const dictionary& dict\n"
+            ")"
+        )   << "Unphysical Poisson's ratio: nu should be >= -1.0 and <= 0.5"
+            << abort(FatalError);
+    }
+
+    // Check for incompressibility
+    if (nu_.value() == 0.5)
+    {
+        Info<< "Material is incompressible: make sure to use a hybrid"
+            << " approach solid model" << endl;
+
+        // Set lambda and k to GREAT
+        lambda_.value() = GREAT;
+        k_.value() = GREAT;
+    }
+    else
+    {
+        if (planeStress())
+        {
+            lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - nu_));
+        }
+        else
+        {
+            lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_));
+        }
+
+        k_ = lambda_ + (2.0/3.0)*mu_;
+    }
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
@@ -107,44 +133,138 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::rho() const
 
 Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 {
+    if (nu_.value() == 0.5 || mesh().foundObject<volScalarField>("p"))
+    {
+        return tmp<volScalarField>
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "impK",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                2.0*mu_
+            )
+        );
+    }
+    else
+    {
+        return tmp<volScalarField>
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "impK",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                2.0*mu_ + lambda_
+            )
+        );
+    }
+
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::linearElastic::K() const
+{
     return tmp<volScalarField>
     (
         new volScalarField
         (
             IOobject
             (
-                "impK",
+                "K",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
             mesh(),
-            2.0*mu_ + lambda_
+            k_
         )
     );
 }
 
 
+const Foam::dimensionedScalar& Foam::linearElastic::mu() const
+{
+    return mu_;
+}
+
+
+const Foam::dimensionedScalar& Foam::linearElastic::lambda() const
+{
+    return lambda_;
+}
+
+
 void Foam::linearElastic::correct(volSymmTensorField& sigma)
 {
-    // Lookup the strain tensor from the solver
-    const volSymmTensorField& epsilon =
-        mesh().lookupObject<volSymmTensorField>("epsilon");
+    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    {
+        // Lookup gradient of displacement increment
+        const volTensorField& gradDD =
+            mesh().lookupObject<volTensorField>("grad(DD)");
 
-    // Calculate stress based on Hooke's law
-    sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
+        // Calculate stress based on incremental form of Hooke's law
+        sigma = sigma.oldTime() + mu_*twoSymm(gradDD) + lambda_*tr(gradDD)*I;
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const volTensorField& gradD =
+            mesh().lookupObject<volTensorField>("grad(D)");
+
+        // Check if a hybrid approach is being used
+        // Currently, this will only work when there is no material interface
+        if (mesh().foundObject<volScalarField>("p"))
+        {
+            const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+
+            // Calculate stress using Hooke's law in uncoupled deviatoric
+            // volumetric form
+            sigma = mu_*dev(twoSymm(gradD)) - p*I;
+        }
+        else
+        {
+            // Calculate stress based on Hooke's law
+            sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
+        }
+    }
 }
 
 
 void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Lookup the strain tensor from the solver
-    const surfaceSymmTensorField& epsilon =
-        mesh().lookupObject<surfaceSymmTensorField>("epsilonf");
+    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    {
+        // Lookup gradient of displacement increment
+        const surfaceTensorField& gradDD =
+            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
-    // Calculate stress based on Hooke's law
-    sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
+        // Calculate stress based on incremental form of Hooke's law
+        sigma = sigma.oldTime() + mu_*twoSymm(gradDD) + lambda_*tr(gradDD)*I;
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const surfaceTensorField& gradD =
+            mesh().lookupObject<surfaceTensorField>("grad(D)f");
+
+        // Calculate stress based on Hooke's law
+        sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
+    }
 }
+
 
 // ************************************************************************* //

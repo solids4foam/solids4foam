@@ -156,30 +156,18 @@ void fixedDisplacementFvPatchVectorField::updateCoeffs()
         disp = dispSeries_(this->db().time().timeOutputValue());
     }
 
-    bool incremental = bool(dimensionedInternalField().name() == "DU");
-
-    if (incremental)
+    if (dimensionedInternalField().name() == "DD")
     {
-        if (patch().boundaryMesh().mesh().foundObject<volVectorField>("U_0"))
-        {
-            const fvPatchField<vector>& Uold =
-              patch().lookupPatchField<volVectorField, vector>("U_0");
+        // Incremental approach, so we wil set the increment of displacement
+        // Lookup the old displacement field and subtract it from the total
+        // displacement
+        const volVectorField& Dold =
+            db().lookupObject<volVectorField>("D").oldTime();
 
-            disp -= Uold;
-        }
-        else if (patch().boundaryMesh().mesh().foundObject<volVectorField>("U"))
-        {
-            const fvPatchField<vector>& Uold =
-              patch().lookupPatchField<volVectorField, vector>("U");
-
-            disp -= Uold;
-        }
+        disp -= Dold.boundaryField()[patch().index()];
     }
 
-    fvPatchField<vector>::operator==
-    (
-        disp
-    );
+    fvPatchField<vector>::operator==(disp);
 
     fixedValueFvPatchVectorField::updateCoeffs();
 }

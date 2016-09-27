@@ -174,6 +174,10 @@ class neoHookeanElasticMisesPlastic
         //  function of plastic strain
         const bool nonLinearPlasticity_;
 
+        //- Update bEbar consistently with the assumption that det(bEbar) == 1
+        //  defaults to off
+        const Switch updateBEbarConsistent_;
+
         //- Linear plastic modulus. It is only used if plasticity is linear,
         //  defined by two points on the stress-plastic strain curve
         scalar Hp_;

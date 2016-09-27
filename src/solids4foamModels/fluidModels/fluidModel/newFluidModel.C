@@ -25,7 +25,6 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "fluidModel.H"
-#include "Time.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -51,6 +50,8 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New(const fvMesh& mesh)
 
         fluidProperties.lookup("fluidModel") >> fluidModelTypeName;
     }
+
+    Info<< "Selecting fluidModel " << fluidModelTypeName << endl;
 
     dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_->find(fluidModelTypeName);

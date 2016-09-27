@@ -35,7 +35,7 @@ SourceFiles
     fixedDisplacementFvPatchVectorField.C
 
 Author
-    Philip Cardiff UCD/UT
+    Philip Cardiff, UCD/UT. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 

@@ -119,7 +119,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
 
             forAll(pc, cI)
             {
-                interpNgbProcCellData[cI] = 
+                interpNgbProcCellData[cI] =
                     procCellVfI
                     [
                         pc[cI].first()
@@ -140,7 +140,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
 
             forAll(pf, fI)
             {
-                interpNgbProcBndFaceData[fI] = 
+                interpNgbProcBndFaceData[fI] =
                     procBndFaceVf
                     [
                         pf[fI].first()
@@ -179,7 +179,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
         for (label i=0; i<interpBndFaces.size(); i++)
         {
             label faceID = interpBndFaces[i];
-            label patchID = 
+            label patchID =
                 mesh().boundaryMesh().whichPatch(faceID);
 
             label start = mesh().boundaryMesh()[patchID].start();
@@ -193,13 +193,13 @@ void newLeastSquaresVolPointInterpolation::interpolate
         for (label i=0; i<interpCyclicFaces.size(); i++)
         {
             label faceID = interpCyclicFaces[i];
-            label patchID = 
+            label patchID =
                 mesh().boundaryMesh().whichPatch(faceID);
 
             label start = mesh().boundaryMesh()[patchID].start();
             label localFaceID = faceID - start;
 
-            const unallocLabelList& faceCells = 
+            const unallocLabelList& faceCells =
                 mesh().boundary()[patchID].faceCells();
 
             label sizeby2 = faceCells.size()/2;
@@ -221,7 +221,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
         for (label i=0; i<interpProcFaces.size(); i++)
         {
             label faceID = interpProcFaces[i];
-            label patchID = 
+            label patchID =
                 mesh().boundaryMesh().whichPatch(faceID);
 
             label start = mesh().boundaryMesh()[patchID].start();
@@ -358,7 +358,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
     (
         new Field<Type>
         (
-            patch.nPoints(), 
+            patch.nPoints(),
             pTraits<Type>::zero
         )
     );
@@ -428,7 +428,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 
             forAll(pc, cI)
             {
-                interpNgbProcCellData[cI] = 
+                interpNgbProcCellData[cI] =
                     procCellVfI
                     [
                         pc[cI].first()
@@ -449,7 +449,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 
             forAll(pf, fI)
             {
-                interpNgbProcBndFaceData[fI] = 
+                interpNgbProcBndFaceData[fI] =
                     procBndFaceVf
                     [
                         pf[fI].first()
@@ -488,7 +488,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
         for (label i=0; i<interpBndFaces.size(); i++)
         {
             label faceID = interpBndFaces[i];
-            label patchID = 
+            label patchID =
                 mesh().boundaryMesh().whichPatch(faceID);
 
             label start = mesh().boundaryMesh()[patchID].start();
@@ -502,13 +502,13 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
         for (label i=0; i<interpCyclicFaces.size(); i++)
         {
             label faceID = interpCyclicFaces[i];
-            label patchID = 
+            label patchID =
                 mesh().boundaryMesh().whichPatch(faceID);
 
             label start = mesh().boundaryMesh()[patchID].start();
             label localFaceID = faceID - start;
 
-            const unallocLabelList& faceCells = 
+            const unallocLabelList& faceCells =
                 mesh().boundary()[patchID].faceCells();
 
             label sizeby2 = faceCells.size()/2;
@@ -530,7 +530,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
         for (label i=0; i<interpProcFaces.size(); i++)
         {
             label faceID = interpProcFaces[i];
-            label patchID = 
+            label patchID =
                 mesh().boundaryMesh().whichPatch(faceID);
 
             label start = mesh().boundaryMesh()[patchID].start();
@@ -636,7 +636,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 //     (
 //         new Field<Type>
 //         (
-//             patch.nPoints(), 
+//             patch.nPoints(),
 //             pTraits<Type>::zero
 //         )
 //     );
@@ -698,7 +698,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 
 //             forAll(pc, cI)
 //             {
-//                 interpNgbProcCellData[cI] = 
+//                 interpNgbProcCellData[cI] =
 //                     procCellVfI
 //                     [
 //                         pc[cI].first()
@@ -735,7 +735,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 //         for (label i=0; i<interpBndFaces.size(); i++)
 //         {
 //             label faceID = interpBndFaces[i];
-//             label patchID = 
+//             label patchID =
 //                 mesh().boundaryMesh().whichPatch(faceID);
 
 //             label start = mesh().boundaryMesh()[patchID].start();
@@ -749,7 +749,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 //         for (label i=0; i<interpProcFaces.size(); i++)
 //         {
 //             label faceID = interpProcFaces[i];
-//             label patchID = 
+//             label patchID =
 //                 mesh().boundaryMesh().whichPatch(faceID);
 
 //             label start = mesh().boundaryMesh()[patchID].start();
@@ -904,7 +904,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 
             forAll(pc, cI)
             {
-                interpNgbProcCellData[cI] = 
+                interpNgbProcCellData[cI] =
                     procCellVfI
                     [
                         pc[cI].first()
@@ -925,7 +925,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 
             forAll(pf, fI)
             {
-                interpNgbProcBndFaceData[fI] = 
+                interpNgbProcBndFaceData[fI] =
                     procBndFaceVf
                     [
                         pf[fI].first()
@@ -964,7 +964,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
         for (label i=0; i<interpBndFaces.size(); i++)
         {
             label faceID = interpBndFaces[i];
-            label patchID = 
+            label patchID =
                 mesh().boundaryMesh().whichPatch(faceID);
 
             label start = mesh().boundaryMesh()[patchID].start();
@@ -978,13 +978,13 @@ Type newLeastSquaresVolPointInterpolation::interpolate
         for (label i=0; i<interpCyclicFaces.size(); i++)
         {
             label faceID = interpCyclicFaces[i];
-            label patchID = 
+            label patchID =
                 mesh().boundaryMesh().whichPatch(faceID);
 
             label start = mesh().boundaryMesh()[patchID].start();
             label localFaceID = faceID - start;
 
-            const unallocLabelList& faceCells = 
+            const unallocLabelList& faceCells =
                 mesh().boundary()[patchID].faceCells();
 
             label sizeby2 = faceCells.size()/2;
@@ -1006,7 +1006,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
         for (label i=0; i<interpProcFaces.size(); i++)
         {
             label faceID = interpProcFaces[i];
-            label patchID = 
+            label patchID =
                 mesh().boundaryMesh().whichPatch(faceID);
 
             label start = mesh().boundaryMesh()[patchID].start();
@@ -1163,7 +1163,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 
 //             forAll(pc, cI)
 //             {
-//                 interpNgbProcCellData[cI] = 
+//                 interpNgbProcCellData[cI] =
 //                     procCellVfI
 //                     [
 //                         pc[cI].first()
@@ -1200,7 +1200,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //         for (label i=0; i<interpBndFaces.size(); i++)
 //         {
 //             label faceID = interpBndFaces[i];
-//             label patchID = 
+//             label patchID =
 //                 mesh().boundaryMesh().whichPatch(faceID);
 
 //             label start = mesh().boundaryMesh()[patchID].start();
@@ -1214,7 +1214,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //         for (label i=0; i<interpProcFaces.size(); i++)
 //         {
 //             label faceID = interpProcFaces[i];
-//             label patchID = 
+//             label patchID =
 //                 mesh().boundaryMesh().whichPatch(faceID);
 
 //             label start = mesh().boundaryMesh()[patchID].start();
@@ -1335,7 +1335,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //                     label curPoint = bndPoints[pointI];
 //                     label curMeshPoint = mshPoints[curPoint];
 
-//                     const labelList& curPointBndFaces = 
+//                     const labelList& curPointBndFaces =
 //                         ptBndFaces[curMeshPoint];
 
 //                     Field<Type> curPointFaceData(curPointBndFaces.size());
@@ -1343,7 +1343,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //                     forAll(curPointFaceData, faceI)
 //                     {
 //                         label faceID = curPointBndFaces[faceI];
-//                         label patchID = 
+//                         label patchID =
 //                             mesh().boundaryMesh().whichPatch(faceID);
 
 //                         label start = mesh().boundaryMesh()[patchID].start();
@@ -1355,7 +1355,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 
 //                     bndPointsFaceData.set
 //                     (
-//                         pointI, 
+//                         pointI,
 //                         new Field<Type>(curPointFaceData)
 //                     );
 //                 }
@@ -1390,7 +1390,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //                     fromNeighbProc >> ngbBndPoints >> ngbBndPointsFaceData;
 //                 }
 
-//                 const labelList& glPoints = 
+//                 const labelList& glPoints =
 //                     mesh().globalData().sharedPointLabels();
 
 //                 forAll(bndPoints, pointI)
@@ -1405,12 +1405,12 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //                     {
 //                         label curNgbPoint = procPatch.neighbPoints()[curPoint];
 
-//                         label curNgbBndPoint = 
+//                         label curNgbBndPoint =
 //                             findIndex(ngbBndPoints, curNgbPoint);
 
 //                         fieldData.insert
 //                         (
-//                             curMeshPoint, 
+//                             curMeshPoint,
 //                             ngbBndPointsFaceData[curNgbBndPoint]
 //                         );
 //                     }
@@ -1421,10 +1421,10 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //         // Global boundary points
 //         if (mesh().globalData().nGlobalPoints())
 //         {
-//             const labelList& spLabels = 
+//             const labelList& spLabels =
 //                 mesh().globalData().sharedPointLabels();
 
-//             const labelList& spAddressing = 
+//             const labelList& spAddressing =
 //                 mesh().globalData().sharedPointAddr();
 
 //             for (label k=0; k<mesh().globalData().nGlobalPoints(); k++)
@@ -1445,7 +1445,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //                     forAll (curBndFaces, faceI)
 //                     {
 //                         label faceID = curBndFaces[faceI];
-//                         label patchID = 
+//                         label patchID =
 //                             mesh().boundaryMesh().whichPatch(faceID);
 
 //                         label start = mesh().boundaryMesh()[patchID].start();
@@ -1462,7 +1462,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 
 //                 Pstream::gatherList(procBndFaceData);
 //                 Pstream::scatterList(procBndFaceData);
-                
+
 //                 if (curSpIndex != -1)
 //                 {
 //                     label curMeshPoint = spLabels[curSpIndex];
@@ -1493,7 +1493,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 
 //                     fieldData.insert
 //                     (
-//                         curMeshPoint, 
+//                         curMeshPoint,
 //                         allFaceData
 //                     );
 //                 }
@@ -1529,10 +1529,10 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceFieldData
         // Global points
         if (mesh().globalData().nGlobalPoints())
         {
-            const labelList& spLabels = 
+            const labelList& spLabels =
                 mesh().globalData().sharedPointLabels();
 
-            const labelList& spAddressing = 
+            const labelList& spAddressing =
                 mesh().globalData().sharedPointAddr();
 
             for (label k=0; k<mesh().globalData().nGlobalPoints(); k++)
@@ -1547,18 +1547,18 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceFieldData
 
                     const labelList& curBndFaces = ptBndFaces[curMeshPoint];
 
-                    procBndFaceData[Pstream::myProcNo()] = 
+                    procBndFaceData[Pstream::myProcNo()] =
                         List<Type>(curBndFaces.size());
 
                     forAll (curBndFaces, faceI)
                     {
                         label faceID = curBndFaces[faceI];
-                        label patchID = 
+                        label patchID =
                             mesh().boundaryMesh().whichPatch(faceID);
                         label start = mesh().boundaryMesh()[patchID].start();
                         label localFaceID = faceID - start;
 
-                        procBndFaceData[Pstream::myProcNo()][faceI] = 
+                        procBndFaceData[Pstream::myProcNo()][faceI] =
                             vf.boundaryField()[patchID][localFaceID];
                     }
                 }
@@ -1569,7 +1569,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceFieldData
 
                 Pstream::gatherList(procBndFaceData);
                 Pstream::scatterList(procBndFaceData);
-                
+
                 if (curSpIndex != -1)
                 {
                     label curMeshPoint = spLabels[curSpIndex];
@@ -1585,7 +1585,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceFieldData
 
                     Field<Type> allBndFaceData
                     (
-                        nAllBndFaces, 
+                        nAllBndFaces,
                         pTraits<Type>::zero
                     );
 
@@ -1604,7 +1604,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceFieldData
 
                     fieldData.insert
                     (
-                        curMeshPoint, 
+                        curMeshPoint,
                         allBndFaceData
                     );
                 }
@@ -1638,10 +1638,10 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
         // Global points
         if (mesh().globalData().nGlobalPoints())
         {
-            const labelList& spLabels = 
+            const labelList& spLabels =
                 mesh().globalData().sharedPointLabels();
 
-            const labelList& spAddressing = 
+            const labelList& spAddressing =
                 mesh().globalData().sharedPointAddr();
 
             for (label k=0; k<mesh().globalData().nGlobalPoints(); k++)
@@ -1656,12 +1656,12 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
 
                     const labelList& curCells = ptCells[curMeshPoint];
 
-                    procCellData[Pstream::myProcNo()] = 
+                    procCellData[Pstream::myProcNo()] =
                         List<Type>(curCells.size());
 
                     forAll (curCells, cellI)
                     {
-                        procCellData[Pstream::myProcNo()][cellI] = 
+                        procCellData[Pstream::myProcNo()][cellI] =
                             vfI[curCells[cellI]];
                     }
                 }
@@ -1672,7 +1672,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
 
                 Pstream::gatherList(procCellData);
                 Pstream::scatterList(procCellData);
-                
+
                 if (curSpIndex != -1)
                 {
                     label curMeshPoint = spLabels[curSpIndex];
@@ -1703,7 +1703,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
 
                     fieldData.insert
                     (
-                        curMeshPoint, 
+                        curMeshPoint,
                         allCellData
                     );
                 }
@@ -1848,7 +1848,7 @@ newLeastSquaresVolPointInterpolation::procBndFacesFieldData
                     forAll(curPsi, faceI)
                     {
                         label faceID = curBndFaces[faceI];
-                        label patchID = 
+                        label patchID =
                             mesh().boundaryMesh().whichPatch(faceID);
                         label start = mesh().boundaryMesh()[patchID].start();
                         label localFaceID = faceID - start;

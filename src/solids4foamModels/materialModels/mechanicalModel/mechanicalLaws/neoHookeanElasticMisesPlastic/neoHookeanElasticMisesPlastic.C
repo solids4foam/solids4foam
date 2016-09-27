@@ -739,6 +739,14 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     nonLinearPlasticity_(stressPlasticStrainSeries_.size() > 2),
+    updateBEbarConsistent_
+    (
+        dict.lookupOrDefault<Switch>
+        (
+            "updateBEbarConsistent",
+            Switch(false)
+        )
+    ),
     Hp_(0.0),
     maxDeltaErr_
     (
@@ -770,6 +778,11 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
                   - stressPlasticStrainSeries_[0].first()
                 );
         }
+    }
+
+    if (updateBEbarConsistent_)
+    {
+        Info<< "updateBEbarConsistent is active" << endl;
     }
 }
 
@@ -1039,11 +1052,9 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     const volSymmTensorField s = sTrial - 2*mu_*DEpsilonP_;
 
     // Update bEbar
-    const bool updateBEbarConsistent_ = false;
     if (updateBEbarConsistent_)
     {
         const volSymmTensorField devBEbar = (s/mu_);
-        //updateBEbar(bEbar_, bEbarTrial_);
         updateBEbar(bEbar_, devBEbar);
     }
     else
