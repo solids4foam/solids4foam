@@ -1783,27 +1783,32 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                         {
                             // Interpolate Finv and J to the face
                             // to-do
-                            FatalError
-                                << "bi-material correction for finite strain "
-                                << "not implemented yet" << abort(FatalError);
-                            // const tensorField& FinvI =
-                            //     FinvPtr->internalField();
-                            // const tensor Finv =
-                            //     baseW*FinvI[baseOwn[baseFaceID]]
-                            //     + (1.0 - baseW)*FinvI[baseOwn[baseFaceID]];
+                            const tensorField& FinvI =
+                                FinvPtr->internalField();
+                            const tensor Finv =
+                                baseW*FinvI[baseOwnID]
+                              + (1.0 - baseW)
+                               *FinvPtr->boundaryField()
+                                [
+                                    basePatchID
+                                ][baseLocalFaceID];
 
-                            // const scalarField& JI = JPtr->internalField();
-                            // const scalar J =
-                            //     baseW*JI[baseOwn[baseFaceID]]
-                            //     + (1.0 - baseW)*JI[baseOwn[baseFaceID]];
+                            const scalarField& JI = JPtr->internalField();
+                            const scalar J =
+                                baseW*JI[baseOwnID]
+                              + (1.0 - baseW)
+                               *JPtr->boundaryField()
+                                [
+                                    basePatchID
+                                ][baseLocalFaceID];
 
                             // Nanson's formula
                             // Note: for updated Lagrangian approach, F is the
                             // relative deformation gradient, whereas for total
                             // Lagrangian approaches, it is the total
                             // deformation gradient
-                            // n = J*Finv.T() & n;
-                            // n /= mag(n);
+                            n = J*Finv.T() & n;
+                            n /= mag(n);
                         }
 
                         // Normal distance from the interface to the cell-centre
@@ -1836,8 +1841,6 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                         // For now, we will linearly interpolate the value
                         // Weighted-harmonic interpolation may be a better
                         // candidate
-                        // const scalar Kav =
-                        //    baseW*KI[baseOwnID] + (1.0 - baseW)*KI[baseNeiID];
                         const scalar Kav =
                             baseW*KI[baseOwnID]
                          + (1.0 - baseW)

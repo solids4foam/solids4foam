@@ -120,6 +120,10 @@ void Foam::solidModel::calcGlobalFaceZones() const
 
             globalFaceZonesPtr_ = new labelList(globalFaceZonesSet);
         }
+        else
+        {
+            globalFaceZonesPtr_ = new labelList(0);
+        }
     }
     else
     {
