@@ -134,6 +134,10 @@ class mechanicalModel
         //- Index of the subMesh on the other side of a bi-material interface
         mutable PtrList<labelList> interfaceShadowFaceID_;
 
+        //- Stress calculated at shadow side of the interface for processor
+        //  faces
+        mutable PtrList<symmTensorField> interfaceShadowSigma_;
+
         //- The implicit stiffness surface field for Rhie-Chow correction
         mutable surfaceScalarField* impKfcorrPtr_;
 
@@ -338,6 +342,17 @@ class mechanicalModel
                 subMshFields,
             GeometricField<Type, pointPatchField, pointMesh>& baseMeshField
         ) const;
+
+        //- Return interfaceShadowSigma
+        const PtrList<symmTensorField>& interfaceShadowSigma() const;
+
+        //- Make interfaceShadowSigma
+        void makeInterfaceShadowSigma() const;
+
+        //- Assemble and update the stress calculated from the other side of the
+        //  interface i.e. calculated in the subMeshes on the other side of the
+        //  interface
+        void updateInterfaceShadowSigma(const bool useVolFieldSigma);
 
         //- Are there any bi-material interface faces
         bool biMaterialInterfaceActive() const;
