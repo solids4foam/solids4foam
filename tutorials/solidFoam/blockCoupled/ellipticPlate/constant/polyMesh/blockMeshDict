@@ -1,0 +1,107 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant/polyMesh";
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+convertToMeters 1;
+
+vertices
+(
+    (0 1 0)
+    (2 0 0)
+    (3.25 0 0)
+    (0 2.75 0)
+    (0 1 0.6)
+    (2 0 0.6)
+    (3.25 0 0.6)
+    (0 2.75 0.6)
+);
+
+blocks
+(
+    // Same mesh densities as in Demirdzic 1997
+
+    // mesh 1
+    //hex (0 1 2 3 4 5 6 7) (6 4 3) simpleGrading (1 1 1)
+    // hex (0 1 2 3 4 5 6 7) (6 4 4)
+    //     edgeGrading (0.9 0.34 0.34 0.9 2.4 2.4 2.4 2.4 1 1 1 1)
+
+    // mesh 2
+    //hex (0 1 2 3 4 5 6 7) (12 8 6) simpleGrading (1 1 1)
+    // hex (0 1 2 3 4 5 6 7) (12 8 6)
+    //     edgeGrading (0.9 0.34 0.34 0.9 2.4 2.4 2.4 2.4 1 1 1 1)
+
+    // mesh 3
+    //hex (0 1 2 3 4 5 6 7) (24 16 12) simpleGrading (4 2 1) // mesh 3
+    hex (0 1 2 3 4 5 6 7) (24 16 12)
+        edgeGrading (0.9 0.34 0.34 0.9 2.4 2.4 2.4 2.4 1 1 1 1)
+
+    //hex (0 1 2 3 4 5 6 7) (48 32 24) simpleGrading (1 1 1) // mesh 4
+    //hex (0 1 2 3 4 5 6 7) (96 64 48) simpleGrading (1 1 1) // mesh 5
+
+    //hex (0 1 2 3 4 5 6 7) (6 5 3) simpleGrading (1 1 1)
+);
+
+edges
+(
+    // ellipse is defined by two points, its centre and its eccentricity
+
+    ellipse 0 1 (0 0 0) 0.866025404
+
+    ellipse 4 5 (0 0 0.6) 0.866025404
+
+    ellipse 2 3 (0 0 0) 0.5329387102
+
+    ellipse 6 7 (0 0 0.6) 0.5329387102
+);
+
+patches
+(
+    patch outside
+    (
+        (2 3 7 6)
+    )
+
+    symmetryPlane symmx
+    (
+        (3 0 4 7)
+    )
+
+    symmetryPlane symmy
+    (
+        (1 2 6 5)
+    )
+
+    patch inside
+    (
+        (0 1 5 4)
+    )
+
+    patch top
+    (
+        (7 6 5 4)
+    )
+
+    patch bottom
+    (
+        (0 1 2 3)
+    )
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //
