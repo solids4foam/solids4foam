@@ -77,7 +77,14 @@ void Foam::solidModel::calcGlobalFaceZones() const
 
         word decompDictName = "system/decomposeParDict";
 
-        if (isDir(mesh().rootPath()/mesh().caseName()/"../system/solid"))
+        if
+        (
+            isDir
+            (
+                mesh().time().rootPath()/mesh().time().caseName()
+                /"../system/solid"
+            )
+        )
         {
             decompDictName = "../system/solid/decomposeParDict";
         }
