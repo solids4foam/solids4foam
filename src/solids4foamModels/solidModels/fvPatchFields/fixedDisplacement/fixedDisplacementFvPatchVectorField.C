@@ -29,11 +29,86 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "fvcMeshPhi.H"
+#include "pointMesh.H"
+#include "pointFields.H"
+#include "fixedValuePointPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+
+// * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * * //
+
+void fixedDisplacementFvPatchVectorField::makeInterp() const
+{
+    if (interpPtr_)
+    {
+        FatalErrorIn
+        (
+            "void fixedDisplacementFvPatchVectorField::makeInterp() const"
+        ) << "pointer already set" << abort(FatalError);
+    }
+
+    interpPtr_ = new primitivePatchInterpolation(patch().patch());
+}
+
+
+primitivePatchInterpolation& fixedDisplacementFvPatchVectorField::interp()
+{
+    if (!interpPtr_)
+    {
+        makeInterp();
+    }
+
+    return *interpPtr_;
+}
+
+
+void fixedDisplacementFvPatchVectorField::setPointDisplacement
+(
+    const vectorField& faceDisp
+)
+{
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+
+    if
+    (
+        mesh.foundObject<pointVectorField>
+        (
+            "point" + dimensionedInternalField().name()
+        )
+    )
+    {
+        const pointVectorField& pointD =
+            mesh.lookupObject<pointVectorField>
+            (
+                "point" + dimensionedInternalField().name()
+            );
+
+        // Check if the boundary is fixedValue
+        if
+        (
+            pointD.boundaryField()[patch().index()].type()
+         == fixedValuePointPatchVectorField::typeName
+        )
+        {
+            // Use const_cast to set boundary condition
+            fixedValuePointPatchVectorField& patchPointD =
+                refCast<fixedValuePointPatchVectorField>
+                (
+                    const_cast<pointVectorField&>
+                    (
+                        pointD
+                    ).boundaryField()[patch().index()]
+                );
+
+            // Interpolate face values to the points
+            patchPointD == interp().faceToPointInterpolate(faceDisp);
+        }
+    }
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -45,7 +120,8 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 :
     fixedValueFvPatchVectorField(p, iF),
     totalDisp_(p.size(), vector::zero),
-    dispSeries_()
+    dispSeries_(),
+    interpPtr_(NULL)
 {}
 
 
@@ -59,7 +135,8 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 :
     fixedValueFvPatchVectorField(ptf, p, iF, mapper),
     totalDisp_(ptf.totalDisp_, mapper),
-    dispSeries_(ptf.dispSeries_)
+    dispSeries_(ptf.dispSeries_),
+    interpPtr_(NULL)
 {}
 
 
@@ -72,7 +149,8 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 :
     fixedValueFvPatchVectorField(p, iF, dict),
     totalDisp_("value", dict, p.size()),
-    dispSeries_()
+    dispSeries_(),
+    interpPtr_(NULL)
 {
     // Check if displacement is time-varying
     if (dict.found("displacementSeries"))
@@ -96,7 +174,8 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 :
     fixedValueFvPatchVectorField(pivpvf),
     totalDisp_(pivpvf.totalDisp_),
-    dispSeries_(pivpvf.dispSeries_)
+    dispSeries_(pivpvf.dispSeries_),
+    interpPtr_(NULL)
 {}
 
 
@@ -108,7 +187,8 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 :
     fixedValueFvPatchVectorField(pivpvf, iF),
     totalDisp_(pivpvf.totalDisp_),
-    dispSeries_(pivpvf.dispSeries_)
+    dispSeries_(pivpvf.dispSeries_),
+    interpPtr_(NULL)
 {}
 
 
@@ -170,6 +250,10 @@ void fixedDisplacementFvPatchVectorField::updateCoeffs()
     fvPatchField<vector>::operator==(disp);
 
     fixedValueFvPatchVectorField::updateCoeffs();
+
+    // If the corresponding point displacement field has a fixedValue type
+    // boundary condition, then we wil update it
+    setPointDisplacement(disp);
 }
 
 

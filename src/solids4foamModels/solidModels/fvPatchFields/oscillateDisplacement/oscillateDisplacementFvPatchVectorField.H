@@ -23,29 +23,24 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    Foam::fixedDisplacementFvPatchVectorField
+    Foam::oscillateDisplacementFvPatchVectorField
 
 Description
-    Fixed displacement boundary condition with boundary non-orthogonal
-    correction for solid solvers.
-    Essentially fixedValue with non-orthogonal correction.
-    Optionally time-varying.
+    Sinusoidal oscillating displacement condition, specified by amplitude
+    and frequency.
 
 SourceFiles
-    fixedDisplacementFvPatchVectorField.C
+    oscillateDisplacementFvPatchVectorField.C
 
 Author
-    Philip Cardiff, UCD/UT. All rights reserved.
+    Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef fixedDisplacementFvPatchVectorField_H
-#define fixedDisplacementFvPatchVectorField_H
+#ifndef oscillateDisplacementFvPatchVectorField_H
+#define oscillateDisplacementFvPatchVectorField_H
 
-#include "fvPatchFields.H"
-#include "fixedValueFvPatchFields.H"
-#include "interpolationTable.H"
-#include "primitivePatchInterpolation.H"
+#include "fixedDisplacementFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -53,72 +48,59 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                 Class fixedDisplacementFvPatch Declaration
+                 Class oscillateDisplacementFvPatch Declaration
 \*---------------------------------------------------------------------------*/
 
-class fixedDisplacementFvPatchVectorField
+class oscillateDisplacementFvPatchVectorField
 :
-    public fixedValueFvPatchVectorField
+    public fixedDisplacementFvPatchVectorField
 {
     // Private Data
 
-        //- Constant total displacement field
-        vectorField totalDisp_;
+        //- Amplitude of the displacement sine curve
+        const vector amplitude_;
 
-        //- Displacement time series
-        interpolationTable<vector> dispSeries_;
+        //- Frequency (in Hz) of the displacement sine curve
+        const scalar frequency_;
 
-        //- Patch interpolator to interpolate face values to the points
-        mutable primitivePatchInterpolation* interpPtr_;
-
-    // Private Functions
-
-        //- Make the patch interpolator
-        void makeInterp() const;
-
-        //- Return the patch interpolator
-        primitivePatchInterpolation& interp();
-
-        //- Set the point displacement field boundary condition
-        void setPointDisplacement(const vectorField& faceDisp);
 
 public:
 
     //- Runtime type information
-    TypeName("fixedDisplacement");
+    TypeName("oscillateDisplacement");
 
 
     // Constructors
 
         //- Construct from patch and internal field
-        fixedDisplacementFvPatchVectorField
+        oscillateDisplacementFvPatchVectorField
         (
             const fvPatch&,
             const DimensionedField<vector, volMesh>&
         );
 
         //- Construct from patch, internal field and dictionary
-        fixedDisplacementFvPatchVectorField
+        oscillateDisplacementFvPatchVectorField
         (
             const fvPatch&,
             const DimensionedField<vector, volMesh>&,
             const dictionary&
         );
 
-        //- Construct by mapping given fixedDisplacementFvPatchVectorField
+        //- Construct by mapping given oscillateDisplacementFvPatchVectorField
         //  onto a new patch
-        fixedDisplacementFvPatchVectorField
+        oscillateDisplacementFvPatchVectorField
         (
-            const fixedDisplacementFvPatchVectorField&,
+            const oscillateDisplacementFvPatchVectorField&,
             const fvPatch&,
             const DimensionedField<vector, volMesh>&,
             const fvPatchFieldMapper&
         );
 
         //- Construct as copy
-        fixedDisplacementFvPatchVectorField
+        oscillateDisplacementFvPatchVectorField
         (
-            const fixedDisplacementFvPatchVectorField&
+            const oscillateDisplacementFvPatchVectorField&
         );
 
         //- Construct and return a clone
@@ -126,14 +108,14 @@ public:
         {
             return tmp<fvPatchVectorField>
             (
-                new fixedDisplacementFvPatchVectorField(*this)
+                new oscillateDisplacementFvPatchVectorField(*this)
             );
         }
 
         //- Construct as copy setting internal field reference
-        fixedDisplacementFvPatchVectorField
+        oscillateDisplacementFvPatchVectorField
         (
-            const fixedDisplacementFvPatchVectorField&,
+            const oscillateDisplacementFvPatchVectorField&,
             const DimensionedField<vector, volMesh>&
         );
 
@@ -145,7 +127,7 @@ public:
         {
             return tmp<fvPatchVectorField>
             (
-                new fixedDisplacementFvPatchVectorField(*this, iF)
+                new oscillateDisplacementFvPatchVectorField(*this, iF)
             );
         }
 
@@ -153,42 +135,11 @@ public:
 
     // Member functions
 
-        // Access functions
-
-        //- Update the coefficients associated with the patch field
-            virtual vectorField& totalDisp()
-            {
-                return totalDisp_;
-            }
 
         // Evaluation functions
 
             //- Update the coefficients associated with the patch field
             virtual void updateCoeffs();
-
-            //- Return patch-normal gradient
-            //- with non-orthogonal correction regardless of whether snGrad
-            //- is corrected or not
-            virtual tmp<Field<vector> > snGrad() const;
-
-            //- Return the matrix source coefficients corresponding to the
-            //  evaluation of the gradient of this patchField
-            virtual tmp<Field<vector> > gradientBoundaryCoeffs() const;
-
-        // Mapping functions
-
-            //- Map (and resize as needed) from self given a mapping object
-            virtual void autoMap
-            (
-                const fvPatchFieldMapper&
-            );
-
-            //- Reverse map the given fvPatchField onto this fvPatchField
-            virtual void rmap
-            (
-                const fvPatchField<vector>&,
-                const labelList&
-            );
 
         //- Write
         virtual void write(Ostream&) const;
