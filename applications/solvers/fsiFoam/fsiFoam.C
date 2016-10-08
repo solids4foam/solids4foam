@@ -33,6 +33,7 @@ Description
 Author
     Zeljko Tukovic, FSB Zagreb.  All rights reserved.
     Philip Cardiff, UCD.  All rights reserved.
+    József Nagy
 
 \*---------------------------------------------------------------------------*/
 
@@ -57,8 +58,14 @@ int main(int argc, char *argv[])
 
     Info<< "\nStarting time loop\n" << endl;
 
-    for (runTime++; !runTime.end(); runTime++)
+    while (runTime.run())
     {
+        #include "readTimeControls.H"
+        #include "CourantNo.H"
+        #include "setDeltaT.H"
+
+        runTime++;
+
         Info<< "Time = " << runTime.timeName() << nl << endl;
 
         // Evolve the fluid-solid interface

@@ -115,6 +115,19 @@ public:
             //- Return pressure field
             virtual const volScalarField& p() const;
 
+            //- Return const reference to phi
+            virtual const surfaceScalarField& phi() const
+            {
+                notImplemented
+                (
+                    type() + "virtual const surfaceScalarField& phi() const"
+                );
+
+                // Keep compiler happy
+                surfaceScalarField* ptr = NULL;
+                return *ptr;
+            };
+
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce
             (

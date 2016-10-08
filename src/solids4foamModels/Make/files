@@ -17,7 +17,6 @@ fluidModels/fluidModel/fluidModel.C
 fluidModels/fluidModel/newFluidModel.C
 fluidModels/icoFluid/icoFluid.C
 fluidModels/pisoFluid/pisoFluid.C
-fluidModels/consistentIcoFluid/consistentIcoFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
