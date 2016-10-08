@@ -569,6 +569,8 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
 {
     DD_.oldTime().oldTime();
     D_.oldTime();
+    pointDD_.oldTime();
+    pointD_.oldTime();
 }
 
 
@@ -890,14 +892,14 @@ void unsNonLinGeomUpdatedLagSolid::setTraction
 {
     if
     (
-        D_.boundaryField()[patchID].type()
+        DD_.boundaryField()[patchID].type()
      != solidTractionFvPatchVectorField::typeName
     )
     {
         FatalErrorIn("void unsNonLinGeomUpdatedLagSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
+            << "Boundary condition on " << DD_.name()
             <<  " is "
-            << D_.boundaryField()[patchID].type()
+            << DD_.boundaryField()[patchID].type()
             << "for patch" << mesh().boundary()[patchID].name()
             << ", instead "
             << solidTractionFvPatchVectorField::typeName
@@ -907,7 +909,7 @@ void unsNonLinGeomUpdatedLagSolid::setTraction
     solidTractionFvPatchVectorField& patchU =
         refCast<solidTractionFvPatchVectorField>
         (
-            D_.boundaryField()[patchID]
+            DD_.boundaryField()[patchID]
         );
 
     patchU.traction() = traction;
@@ -921,15 +923,15 @@ void unsNonLinGeomUpdatedLagSolid::setPressure
 {
     if
     (
-        D_.boundaryField()[patchID].type()
+        DD_.boundaryField()[patchID].type()
      != solidTractionFvPatchVectorField::typeName
     )
     {
         FatalErrorIn("void unsNonLinGeomUpdatedLagSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
+            << "Boundary condition on " << DD_.name()
             <<  " is "
-            << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
+            << DD_.boundaryField()[patchID].type()
+            << " for patch" << mesh().boundary()[patchID].name()
             << ", instead "
             << solidTractionFvPatchVectorField::typeName
             << abort(FatalError);
@@ -938,7 +940,7 @@ void unsNonLinGeomUpdatedLagSolid::setPressure
     solidTractionFvPatchVectorField& patchU =
         refCast<solidTractionFvPatchVectorField>
         (
-            D_.boundaryField()[patchID]
+            DD_.boundaryField()[patchID]
         );
 
     patchU.pressure() = pressure;

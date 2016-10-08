@@ -9,30 +9,36 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      solidProperties;
+    class       volVectorField;
+    object      DD;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel    linearGeometry;
-//solidModel    unsLinearGeometry;
-//solidModel    nonLinearGeometryTotalLagrangian;
-//solidModel    unsNonLinearGeometryTotalLagrangian;
-solidModel    nonLinearGeometryUpdatedLagrangian;
+dimensions      [0 1 0 0 0 0 0];
 
-"linearGeometryCoeffs|unsLinearGeometryCoeffs"
-{}
+internalField   uniform (0 0 0);
 
-nonLinearGeometryTotalLagrangianCoeffs
-{}
+boundaryField
+{
+    interface
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    bottom
+    {
+       type            fixedDisplacement;
+       value           uniform (0 0 0);
+    }
+    symmetry
+    {
+       type            solidSymmetry;
+       patchType       symmetryPlane;
+       value           uniform (0 0 0);
+    }
+}
 
-nonLinearGeometryUpdatedLagrangianCoeffs
-{}
-
-unsNonLinearGeometryTotalLagrangianCoeffs
-{}
-
-unsNonLinearGeometryUpdatedLagrangianCoeffs
-{}
 
 // ************************************************************************* //

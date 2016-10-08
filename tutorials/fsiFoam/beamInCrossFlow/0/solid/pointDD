@@ -9,30 +9,33 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      solidProperties;
+    class       pointVectorField;
+    object      pointDD;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel    linearGeometry;
-//solidModel    unsLinearGeometry;
-//solidModel    nonLinearGeometryTotalLagrangian;
-//solidModel    unsNonLinearGeometryTotalLagrangian;
-solidModel    nonLinearGeometryUpdatedLagrangian;
+dimensions      [0 1 0 0 0 0 0];
 
-"linearGeometryCoeffs|unsLinearGeometryCoeffs"
-{}
+internalField   uniform (0 0 0);
 
-nonLinearGeometryTotalLagrangianCoeffs
-{}
+boundaryField
+{
+    interface
+    {
+        type           calculated;
+        value          uniform (0 0 0);
+    }
+    bottom
+    {
+       type            fixedValue;
+       value           uniform (0 0 0);
+    }
+    symmetry
+    {
+       type            symmetryPlane;
+       value           uniform (0 0 0);
+    }
+}
 
-nonLinearGeometryUpdatedLagrangianCoeffs
-{}
-
-unsNonLinearGeometryTotalLagrangianCoeffs
-{}
-
-unsNonLinearGeometryUpdatedLagrangianCoeffs
-{}
 
 // ************************************************************************* //

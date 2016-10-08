@@ -15,9 +15,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application fsiFoam;
+application     fsiFoam;
 
-startFrom       latestTime;
+startFrom       startTime;
 
 startTime       0;
 
@@ -51,26 +51,9 @@ maxCo           0.2;
 
 functions
 (
-//    beamReport
-//    {
-//        type pointHistory;
-//        functionObjectLibs
-//        (
-//          "libpointHistory.so"
-//        );
-
-//        refHistoryPoint (0.45 0.15 -0.15);
-
-//        region solid;
-//    }
-
    setInletVelocity
    {
        type setInletVelocity;
-       functionObjectLibs
-       (
-         "libsetInletVelocity.so"
-       );
    }
 
    forces

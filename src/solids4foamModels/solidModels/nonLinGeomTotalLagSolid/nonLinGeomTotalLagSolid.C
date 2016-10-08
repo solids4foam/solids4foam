@@ -292,6 +292,7 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
+    pointD_.oldTime();
 }
 
 
@@ -608,7 +609,6 @@ tmp<vectorField> nonLinGeomTotalLagSolid::faceZoneNormal
 }
 
 
-
 void nonLinGeomTotalLagSolid::setTraction
 (
     const label patchID,
@@ -622,10 +622,10 @@ void nonLinGeomTotalLagSolid::setTraction
     )
     {
         FatalErrorIn("void nonLinGeomTotalLagSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
+            << "Boundary condition on " << D_.name()
             <<  " is "
             << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
+            << " for patch" << mesh().boundary()[patchID].name()
             << ", instead "
             << solidTractionFvPatchVectorField::typeName
             << abort(FatalError);
@@ -654,10 +654,10 @@ void nonLinGeomTotalLagSolid::setPressure
     )
     {
         FatalErrorIn("void nonLinGeomTotalLagSolid::setPressure(...)")
-            << "Bounary condition on " << D_.name()
+            << "Boundary condition on " << D_.name()
             <<  " is "
             << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
+            << " for patch" << mesh().boundary()[patchID].name()
             << ", instead "
             << solidTractionFvPatchVectorField::typeName
             << abort(FatalError);

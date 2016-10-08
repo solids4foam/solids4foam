@@ -202,6 +202,7 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
     )
 {
     D_.oldTime().oldTime();
+    pointD_.oldTime();
 
     // We will directly read the linearElastic mechanicalLaw
     const PtrList<mechanicalLaw>& mechLaws = mechanical();

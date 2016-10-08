@@ -1062,7 +1062,6 @@ void Foam::fluidSolidInterface::updateForce()
           + (solidZoneSurfaceGradientOfVelocity&solidZoneNormal)
         );
 
-
     solidZonePressure_ =
         ggiInterpolator().masterToSlave
         (

@@ -164,6 +164,7 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
         mesh,
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
+    volToPoint_(mesh),
     gradD_
     (
         IOobject
@@ -316,6 +317,7 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
+    pointD_.oldTime();
 }
 
 
@@ -425,7 +427,7 @@ tmp<tensorField> unsNonLinGeomTotalLagSolid::faceZoneSurfaceGradientOfVelocity
     tensorField& velocityGradient = tVelocityGradient();
 
     vectorField pPointU =
-        mechanical().volToPoint().interpolate(mesh().boundaryMesh()[patchID], U_);
+        volToPoint_.interpolate(mesh().boundaryMesh()[patchID], U_);
 
     const faceList& localFaces =
         mesh().boundaryMesh()[patchID].localFaces();
@@ -642,10 +644,10 @@ void unsNonLinGeomTotalLagSolid::setTraction
     )
     {
         FatalErrorIn("void unsNonLinGeomTotalLagSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
+            << "Boundary condition on " << D_.name()
             <<  " is "
             << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
+            << " for patch" << mesh().boundary()[patchID].name()
             << ", instead "
             << solidTractionFvPatchVectorField::typeName
             << abort(FatalError);
@@ -708,7 +710,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
 
     do
     {
-        if (iCorr % infoFrequency_ == 0)
+        if (lduMatrix::debug)
         {
             Info<< "Time: " << runTime().timeName()
                 << ", outer iteration: " << iCorr << endl;
@@ -745,6 +747,12 @@ bool unsNonLinGeomTotalLagSolid::evolve()
               - fvc::div(mesh().Sf() & sigmaf_);
         }
 
+        // PC: what is the nicest way to do this: maybe GGI type BC?
+        // if (interface().valid())
+        // {
+        //     interface()->correct(DEqn);
+        // }
+
         // Under-relax the linear system
         DEqn.relax(DEqnRelaxFactor_);
 
@@ -759,12 +767,10 @@ bool unsNonLinGeomTotalLagSolid::evolve()
             initialResidual = solverPerf.initialResidual();
         }
 
-        // Interpolate D to pointD
-        mechanical().interpolate(D_, pointD_, false);
-
-        // Update gradient of displacement
-        mechanical().grad(D_, pointD_, gradD_);
-        mechanical().grad(D_, pointD_, gradDf_);
+        // Update the cell and face displacement gradients
+        volToPoint_.interpolate(D_, pointD_);
+        gradD_ = fvc::grad(D_, pointD_);
+        gradDf_ = fvc::fGrad(D_, pointD_);
 
         // Total deformation gradient
         Ff_ = I + gradDf_.T();
@@ -777,6 +783,19 @@ bool unsNonLinGeomTotalLagSolid::evolve()
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigmaf_);
+
+        // PC: see question above
+        // if (interface().valid())
+        // {
+        //     interface()->updateDisplacement(pointD_);
+        //     interface()->updateDisplacementGradient(gradD_, gradDf_);
+        // }
+        // else
+        // {
+        //     volToPoint_.interpolate(D_, pointD_);
+        //     gradD_ = fvc::grad(D_, pointD_);
+        //     gradDf_ = fvc::fGrad(D_, pointD_);
+        // }
 
         if (nonLinear_ && !enforceLinear_)
         {
@@ -812,7 +831,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
             curConvergenceTolerance = solutionTol_;
         }
 
-        if (iCorr % infoFrequency_ == 0)
+        if (lduMatrix::debug)
         {
             Info<< "Relative residual = " << res << endl;
         }
