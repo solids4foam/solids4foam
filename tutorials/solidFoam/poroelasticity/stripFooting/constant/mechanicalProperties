@@ -17,14 +17,17 @@ FoamFile
 planeStress     no;
 
 mechanical
-{
-    type            poroLinearElasticMohrCoulombPlastic;
-    rho             rho [1 -3 0 0 0 0 0] 7854;
-    E               E [ 1 -1 -2 0 0 0 0 ] 20e6;
-    nu              nu [0 0 0 0 0 0 0] 0.3;
-    frictionAngle   frictionAngle [0 0 0 0 0 0 0] 30;
-    dilationAngle   dilationAngle [0 0 0 0 0 0 0] 0;
-    cohesion        cohesion [1 -1 -2 0 0 0 0] 1e5;
-}
+(
+    soil
+    {
+        type            poroLinearElasticMohrCoulombPlastic;
+        rho             rho [1 -3 0 0 0 0 0] 7854;
+        E               E [ 1 -1 -2 0 0 0 0 ] 20e6;
+        nu              nu [0 0 0 0 0 0 0] 0.3;
+        frictionAngle   frictionAngle [0 0 0 0 0 0 0] 30;
+        dilationAngle   dilationAngle [0 0 0 0 0 0 0] 0;
+        cohesion        cohesion [1 -1 -2 0 0 0 0] 1e5;
+    }
+);
 
 // ************************************************************************* //

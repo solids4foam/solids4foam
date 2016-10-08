@@ -1,30 +1,21 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
-|    \\/     M anipulation  |                                                 |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    location    "constant";
+    object      dynamicMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress     no;
+dynamicFvMesh   staticFvMesh;
 
-mechanical
-(
-    steel
-    {
-        type            poroLinearElastic;
-        rho             rho [1 -3 0 0 0 0 0] 7854;
-        E               E [1 -1 -2 0 0 0 0] 2e+11;
-        nu              nu [0 0 0 0 0 0 0] 0.3;
-    }
-);
 
 // ************************************************************************* //
