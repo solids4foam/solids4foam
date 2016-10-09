@@ -173,10 +173,6 @@ class nonLinGeomUpdatedLagSolid
         //- Move the mesh to the deformed configuration
         void moveMesh(const pointField& oldPoints);
 
-        //- Move the mesh to the deformed configuration consistent with the
-        //  deformation gradient field
-        void moveMeshConsistent(const pointField& oldPoints);
-
         //- Create global face zone point maps
         void findGlobalFaceZones();
 

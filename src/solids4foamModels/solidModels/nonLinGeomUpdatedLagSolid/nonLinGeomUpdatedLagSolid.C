@@ -248,56 +248,6 @@ void nonLinGeomUpdatedLagSolid::moveMesh(const pointField& oldPoints)
 }
 
 
-void nonLinGeomUpdatedLagSolid::moveMeshConsistent(const pointField& oldPoints)
-{
-    Info<< "Moving the mesh to the deformed configuration consistent with F"
-        << nl << endl;
-
-    // Take a copy of the geometry
-    const surfaceVectorField Sf = mesh().Sf();
-    const surfaceScalarField magSf = mesh().magSf();
-    const surfaceVectorField Cf = mesh().Cf();
-    const volVectorField C = mesh().C();
-    const scalarField V = mesh().V().field();
-    //const pointField allPoints = mesh().allPoints();
-    const pointField points = mesh().points();
-
-    // Move the mesh
-    moveMesh(oldPoints);
-
-    // Overwrite new geometry with deformed geometry consistent with the
-    // relative deformation gradient
-    //relF_
-
-    const_cast<scalarField&>(mesh().V().field()) = relJ_.internalField()*V;
-    const_cast<volVectorField&>(mesh().C()) = relF_ & C;
-
-    // Interpolate refF to the faces
-    const surfaceTensorField relFf = fvc::interpolate(relF_);
-    const_cast<surfaceVectorField&>(mesh().Sf()) = relFf & Sf;
-    const_cast<surfaceScalarField&>(mesh().magSf()) = det(relFf)*magSf;
-    const_cast<surfaceVectorField&>(mesh().Cf()) = relFf & Cf;
-
-    // Interpolate refF to the points
-    pointTensorField pointRelF
-    (
-        IOobject
-        (
-            "pointRelF",
-            runTime().timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        pMesh_,
-        dimensionedTensor("zero", dimless, tensor::zero)
-    );
-    mechanical().volToPoint().interpolate(relF_, pointRelF);
-    const_cast<pointField&>(mesh().points()) = pointRelF & points;
-    //const_cast<pointField&>(mesh().allPoints()) = pointRelF & allPoints;
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
@@ -578,7 +528,7 @@ tmp<vectorField> nonLinGeomUpdatedLagSolid::faceZonePointDisplacementIncrement
         {
             label localPoint = curPointMap[globalPointI];
 
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
             {
                 label procPoint = zoneMeshPoints[localPoint];
 
@@ -724,7 +674,7 @@ tmp<vectorField> nonLinGeomUpdatedLagSolid::currentFaceZonePoints
         {
             label localPoint = curPointMap[globalPointI];
 
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
             {
                 label procPoint = zoneMeshPoints[localPoint];
 
@@ -1095,7 +1045,6 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
     // Move the mesh to the deformed configuration
     const vectorField oldPoints = mesh().allPoints();
     moveMesh(oldPoints);
-    //moveMeshConsistent(oldPoints);
 
     mechanical().updateTotalFields();
 }

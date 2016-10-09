@@ -26,7 +26,7 @@ ddtSchemes
 
 gradSchemes
 {
-    default            extendedLeastSquares 0;
+    default            pointCellsLeastSquares;
 }
 
 divSchemes
@@ -52,8 +52,6 @@ interpolationSchemes
 {
     default            none;
     interpolate(impK)  linear;
-    interpolate(grad(D)) linear;
-    interpolate(grad(DD)) linear;
 }
 
 // ************************************************************************* //

@@ -35,8 +35,8 @@ relaxationFactors
 
     // Under-relaxating the DD field by 0.1-0.9 can improve convergence in some
     // cases
-    D      0.9;
-    DD      0.9;
+    //D      0.7;
+    //DD      0.7;
 }
 
 // ************************************************************************* //
