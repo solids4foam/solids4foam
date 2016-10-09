@@ -14,16 +14,25 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+//solidModel    linearGeometry;
+//solidModel    unsLinearGeometry;
 //solidModel    nonLinearGeometryTotalLagrangian;
-solidModel    unsNonLinearGeometryTotalLagrangian;
-//solidModel    nonLinearGeometryUpdatedLagrangian;
-//solidModel    unsNonLinearGeometryUpdatedLagrangian;
+solidModel    nonLinearGeometryUpdatedLagrangian;
+//solidModel    unsNonLinearGeometryTotalLagrangian;
+
+"linearGeometryCoeffs|unsLinearGeometryCoeffs"
+{}
+
+nonLinearGeometryTotalLagrangianCoeffs
+{}
+
+nonLinearGeometryUpdatedLagrangianCoeffs
+{}
 
 unsNonLinearGeometryTotalLagrangianCoeffs
-{
-    nCorrectors            1000;
+{}
 
-    solutionTolerance      1e-7;
-}
+unsNonLinearGeometryUpdatedLagrangianCoeffs
+{}
 
 // ************************************************************************* //

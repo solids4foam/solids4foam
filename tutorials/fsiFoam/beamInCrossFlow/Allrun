@@ -3,21 +3,13 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+runApplication -l log.blockMesh.solid blockMesh -region solid
+runApplication -l log.setSet.solid setSet -region solid -batch setBatch.solid
+runApplication -l log.setsToZones.solid setsToZones -region solid -noFlipMap
+
 runApplication blockMesh
 runApplication setSet -batch setBatch
 runApplication setsToZones -noFlipMap
-
-# Note: runApplication in Openfoam does not have a '-l' option, like in
-# foam-extend
-# Also there is some issue with setsToZones where it requires the default region
-# to have a mesh even if we are operating on a sub-region, hence we create
-# the solid mesh second
-echo "Running blockMesh on region solid"
-blockMesh -region solid >& log.blockMesh.solid
-echo "Running setSet on region solid"
-setSet -region solid -batch setBatch.solid >& log.setSet.solid
-echo "Running setsToZones on region solid"
-setsToZones -region solid -noFlipMap >& log.setsToZones.solid
 
 # Serial
 runApplication fsiFoam

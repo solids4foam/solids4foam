@@ -16,13 +16,8 @@ FoamFile
 
 dynamicFvMesh dynamicMotionSolverFvMesh;
 
-motionSolverLibs ( "libfvMotionSolvers.so" );
-
 solver velocityLaplacian;
 
-velocityLaplacianCoeffs
-{
-    diffusivity quadratic inverseDistance (interface);
-}
+diffusivity quadratic inverseDistance (interface);
 
 // ************************************************************************* //
