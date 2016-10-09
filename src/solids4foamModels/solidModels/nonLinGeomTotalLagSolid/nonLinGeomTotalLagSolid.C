@@ -298,7 +298,6 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-
 tmp<vectorField> nonLinGeomTotalLagSolid::faceZonePointDisplacementIncrement
 (
     const label zoneID
@@ -343,7 +342,7 @@ tmp<vectorField> nonLinGeomTotalLagSolid::faceZonePointDisplacementIncrement
         {
             label localPoint = curPointMap[globalPointI];
 
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
             {
                 label procPoint = zoneMeshPoints[localPoint];
 
@@ -491,7 +490,7 @@ tmp<vectorField> nonLinGeomTotalLagSolid::currentFaceZonePoints
         {
             label localPoint = curPointMap[globalPointI];
 
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
             {
                 label procPoint = zoneMeshPoints[localPoint];
 
@@ -593,8 +592,7 @@ tmp<vectorField> nonLinGeomTotalLagSolid::faceZoneNormal
             normals
             [
                 mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchNormals[i];
+            ] = patchNormals[i];
         }
 
         // Parallel data exchange: collect field on all processors
@@ -675,7 +673,7 @@ void nonLinGeomTotalLagSolid::setPressure
 
 bool nonLinGeomTotalLagSolid::evolve()
 {
-    Info << "Evolving solid solver" << endl;
+    Info<< "Evolving solid solver" << endl;
 
     int iCorr = 0;
     lduMatrix::solverPerformance solverPerfD;
@@ -808,7 +806,7 @@ void nonLinGeomTotalLagSolid::writeFields(const Time& runTime)
     // Info<< "Max epsilonEq = " << max(epsilonEq).value()
     //     << endl;
 
-    // Update equivalent (von Mises) stress
+    // Calculate equivalent (von Mises) stress
     volScalarField sigmaEq
     (
         IOobject

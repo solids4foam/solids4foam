@@ -855,7 +855,7 @@ void nonLinGeomUpdatedLagSolid::setTraction
     {
         FatalErrorIn("void nonLinGeomUpdatedLagSolid::setTraction(...)")
             << "Boundary condition on " << DD_.name()
-            <<  " is "
+            << " is "
             << DD_.boundaryField()[patchID].type()
             << " for patch" << mesh().boundary()[patchID].name()
             << ", instead "
@@ -863,14 +863,15 @@ void nonLinGeomUpdatedLagSolid::setTraction
             << abort(FatalError);
     }
 
-    solidTractionFvPatchVectorField& patchU =
+    solidTractionFvPatchVectorField& patchDD =
         refCast<solidTractionFvPatchVectorField>
         (
             DD_.boundaryField()[patchID]
         );
 
-    patchU.traction() = traction;
+    patchDD.traction() = traction;
 }
+
 
 void nonLinGeomUpdatedLagSolid::setPressure
 (
@@ -886,7 +887,7 @@ void nonLinGeomUpdatedLagSolid::setPressure
     {
         FatalErrorIn("void nonLinGeomUpdatedLagSolid::setTraction(...)")
             << "Boundary condition on " << DD_.name()
-            <<  " is "
+            << " is "
             << DD_.boundaryField()[patchID].type()
             << " for patch" << mesh().boundary()[patchID].name()
             << ", instead "
@@ -894,19 +895,19 @@ void nonLinGeomUpdatedLagSolid::setPressure
             << abort(FatalError);
     }
 
-    solidTractionFvPatchVectorField& patchU =
+    solidTractionFvPatchVectorField& patchDD =
         refCast<solidTractionFvPatchVectorField>
         (
             DD_.boundaryField()[patchID]
         );
 
-    patchU.pressure() = pressure;
+    patchDD.pressure() = pressure;
 }
 
 
 bool nonLinGeomUpdatedLagSolid::evolve()
 {
-    Info << "Evolving solid solver" << endl;
+    Info<< "Evolving solid solver" << endl;
 
     int iCorr = 0;
     lduMatrix::solverPerformance solverPerfDD;
@@ -983,8 +984,17 @@ bool nonLinGeomUpdatedLagSolid::evolve()
     }
     while (!converged(iCorr, solverPerfDD) && ++iCorr < nCorr_);
 
+    // Update gradient of total displacement
+    gradD_ = fvc::grad(D_.oldTime() + DD_);
+
+    // Total displacement
+    D_ = D_.oldTime() + DD_;
+
     // Update pointDD as it used by FSI procedure
     mechanical().interpolate(DD_, pointDD_);
+
+    // Total displacement at points
+    pointD_ = pointD_.oldTime() + pointDD_;
 
     // Velocity
     U_ = fvc::ddt(D_);
@@ -1062,7 +1072,6 @@ tmp<vectorField> nonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
     // // Patch unit normals (deformed configuration)
     // const vectorField& nCurrent = deformedPatch.faceNormals();
 
-
     // Return patch snGrad
     return tmp<vectorField>
     (
@@ -1080,12 +1089,6 @@ tmp<vectorField> nonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
 
 void nonLinGeomUpdatedLagSolid::updateTotalFields()
 {
-    // Update gradient of total displacement
-    gradD_ = fvc::grad(D_.oldTime() + DD_);
-
-    // Total displacement
-    D_ = D_.oldTime() + DD_;
-
     // Density
     rho_ = rho_.oldTime()/relJ_;
 
@@ -1094,33 +1097,13 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
     moveMesh(oldPoints);
     //moveMeshConsistent(oldPoints);
 
-    // Total displacement at points
-    pointD_ = pointD_.oldTime() + pointDD_;
-
     mechanical().updateTotalFields();
 }
 
 
 void nonLinGeomUpdatedLagSolid::writeFields(const Time& runTime)
 {
-    // Update equivalent strain
-    // volScalarField epsilonEq
-    // (
-    //     IOobject
-    //     (
-    //         "epsilonEq",
-    //         runTime.timeName(),
-    //         mesh(),
-    //         IOobject::NO_READ,
-    //         IOobject::AUTO_WRITE
-    //     ),
-    //     sqrt((2.0/3.0)*magSqr(dev(epsilon_)))
-    // );
-
-    // Info<< "Max epsilonEq = " << max(epsilonEq).value()
-    //     << endl;
-
-    // Update equivalent (von Mises) stress
+    // Calculate equivalent (von Mises) stress
     volScalarField sigmaEq
     (
         IOobject

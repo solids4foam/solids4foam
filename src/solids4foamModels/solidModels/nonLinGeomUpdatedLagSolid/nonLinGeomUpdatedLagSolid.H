@@ -232,12 +232,6 @@ public:
                 return sigma_;
             }
 
-            //- Strain tensor
-            // const volSymmTensorField& epsilon() const
-            // {
-            //     return epsilon_;
-            // }
-
             //- Return point displacement field
             virtual const pointVectorField& pointD() const
             {
