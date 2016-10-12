@@ -307,7 +307,7 @@ void pisoFluid::evolve()
     fvVectorMatrix HUEqn
     (
         fvm::div(phi_, U_)
-      + turbulence_->divDevReff(U_)
+      + turbulence_->divDevReff()
     );
 
     // Time derivative matrix

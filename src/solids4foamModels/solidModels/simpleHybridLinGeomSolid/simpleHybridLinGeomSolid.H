@@ -119,12 +119,6 @@ class simpleHybridLinGeomSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- D equation under-relaxation factor
-        const scalar DEqnRelaxFactor_;
-
-        //- p equation under-relaxation factor
-        const scalar pEqnRelaxFactor_;
-
         //- Solution standard tolerance for D
         const scalar solutionTol_;
 
@@ -159,8 +153,8 @@ class simpleHybridLinGeomSolid
         bool converged
         (
             const int iCorr,
-            const lduMatrix::solverPerformance& solverPerfD,
-            const lduMatrix::solverPerformance& solverPerfp
+            const lduSolverPerformance& solverPerfD,
+            const lduSolverPerformance& solverPerfp
         );
 
         //- Disallow default bitwise copy construct

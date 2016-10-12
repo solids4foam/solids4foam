@@ -154,12 +154,6 @@ class poroLinGeomSolid
         //- Reciprocal of the effective bulk modulus of water and air mixture
         dimensionedScalar rKprime_;
 
-        //- D equation under-relaxation factor
-        const scalar DEqnRelaxFactor_;
-
-        //- p equation under-relaxation factor
-        const scalar pEqnRelaxFactor_;
-
         //- Solution standard tolerance
         const scalar solutionTol_;
 
@@ -188,8 +182,8 @@ class poroLinGeomSolid
         bool converged
         (
             const int iCorr,
-            const lduMatrix::solverPerformance& solverPerfD,
-            const lduMatrix::solverPerformance& solverPerfp
+            const lduSolverPerformance& solverPerfD,
+            const lduSolverPerformance& solverPerfp
         );
 
         //- Disallow default bitwise copy construct

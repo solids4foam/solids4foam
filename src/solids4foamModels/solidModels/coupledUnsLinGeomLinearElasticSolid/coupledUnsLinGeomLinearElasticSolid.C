@@ -193,12 +193,6 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
-    ),
-    DEqnRelaxFactor_
-    (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
-      : 1.0
     )
 {
     D_.oldTime().oldTime();

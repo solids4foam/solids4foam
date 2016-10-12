@@ -27,22 +27,22 @@ boundaryField
     }
     right
     {
-        type            blockFixedDisplacement;
-        displacementSeries
-        {
-            fileName    "$FOAM_CASE/constant/timeVsDisp";
-            outOfBounds clamp;
-        }
-        value           uniform (0 0 0);
-
-//         type            blockSolidTraction;
-//         tractionSeries
+//         type            blockFixedDisplacement;
+//         displacementSeries
 //         {
-//             fileName    "$FOAM_CASE/constant/timeVsTraction";
+//             fileName    "$FOAM_CASE/constant/timeVsDisp";
 //             outOfBounds clamp;
 //         }
-//         pressure        uniform 0;
 //         value           uniform (0 0 0);
+
+        type            blockSolidTraction;
+        tractionSeries
+        {
+            fileName    "$FOAM_CASE/constant/timeVsTraction";
+            outOfBounds clamp;
+        }
+        pressure        uniform 0;
+        value           uniform (0 0 0);
     }
     down
     {

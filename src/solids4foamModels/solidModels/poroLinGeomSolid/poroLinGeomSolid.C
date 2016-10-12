@@ -55,8 +55,8 @@ addToRunTimeSelectionTable(solidModel, poroLinGeomSolid, dictionary);
 bool poroLinGeomSolid::converged
 (
     const int iCorr,
-    const lduMatrix::solverPerformance& solverPerfD,
-    const lduMatrix::solverPerformance& solverPerfp
+    const lduSolverPerformance& solverPerfD,
+    const lduSolverPerformance& solverPerfp
 )
 {
     // We will check a number of different residuals for convergence
@@ -283,18 +283,6 @@ poroLinGeomSolid::poroLinGeomSolid(dynamicFvMesh& mesh)
         (saturation_/KWater_)
       + (1.0 - saturation_)
         /dimensionedScalar("atmosphericPressure", dimPressure, 1e+05)
-    ),
-    DEqnRelaxFactor_
-    (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
-      : 1.0
-    ),
-    pEqnRelaxFactor_
-    (
-        mesh.solutionDict().relax("pEqn")
-      ? mesh.solutionDict().relaxationFactor("pEqn")
-      : 1.0
     ),
     solutionTol_
     (
@@ -760,9 +748,9 @@ bool poroLinGeomSolid::evolve()
     Info << "Evolving poro solid solver" << endl;
 
     int iCorr = 0;
-    lduMatrix::solverPerformance solverPerfp;
-    lduMatrix::solverPerformance solverPerfD;
-    lduMatrix::debug = 0;
+    lduSolverPerformance solverPerfp;
+    lduSolverPerformance solverPerfD;
+    blockLduMatrix::debug = 0;
 
     Info<< "Solving the pressure equation for p and momentum equation for D"
         << endl;
@@ -784,7 +772,7 @@ bool poroLinGeomSolid::evolve()
         );
 
         // Under-relaxation the linear system
-        pEqn.relax(pEqnRelaxFactor_);
+        pEqn.relax();
 
         // Solve the linear system
         solverPerfp = pEqn.solve();
@@ -811,7 +799,7 @@ bool poroLinGeomSolid::evolve()
         );
 
         // Under-relaxation the linear system
-        DEqn.relax(DEqnRelaxFactor_);
+        DEqn.relax();
 
         // Solve the linear system
         solverPerfD = DEqn.solve();

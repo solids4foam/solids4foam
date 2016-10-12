@@ -283,12 +283,6 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
     rImpK_(1.0/impK_),
     muf_("muf", impKf_/3.5), // assuming a Poisson's ratio of 0.3
     lambdaf_("lambdaf", 1.5*muf_),
-    DEqnRelaxFactor_
-    (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
-      : 1.0
-    ),
     solutionTol_
     (
         solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)

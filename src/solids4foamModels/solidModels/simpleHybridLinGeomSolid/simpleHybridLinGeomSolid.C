@@ -55,8 +55,8 @@ addToRunTimeSelectionTable(solidModel, simpleHybridLinGeomSolid, dictionary);
 bool simpleHybridLinGeomSolid::converged
 (
     const int iCorr,
-    const lduMatrix::solverPerformance& solverPerfD,
-    const lduMatrix::solverPerformance& solverPerfp
+    const lduSolverPerformance& solverPerfD,
+    const lduSolverPerformance& solverPerfp
 )
 {
     // We will check a number of different residuals for convergence
@@ -264,18 +264,6 @@ simpleHybridLinGeomSolid::simpleHybridLinGeomSolid(dynamicFvMesh& mesh)
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    DEqnRelaxFactor_
-    (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
-      : 1.0
-    ),
-    pEqnRelaxFactor_
-    (
-        mesh.solutionDict().relax("pEqn")
-      ? mesh.solutionDict().relaxationFactor("pEqn")
-      : 1.0
-    ),
     solutionTol_
     (
         solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
@@ -707,9 +695,9 @@ bool simpleHybridLinGeomSolid::evolve()
     Info<< "Evolving solid solver" << endl;
 
     int iCorr = 0;
-    lduMatrix::solverPerformance solverPerfD;
-    lduMatrix::solverPerformance solverPerfp;
-    lduMatrix::debug = 0;
+    lduSolverPerformance solverPerfD;
+    lduSolverPerformance solverPerfp;
+    blockLduMatrix::debug = 0;
 
     Info<< "Solving the momentum equation for D and p using a transient "
         << "SIMPLE approach" << endl;
@@ -737,7 +725,7 @@ bool simpleHybridLinGeomSolid::evolve()
         );
 
         // Under-relaxation the linear system
-        HDEqn().relax(DEqnRelaxFactor_);
+        HDEqn().relax();
 
         // Solve the linear system
         solverPerfD =
@@ -774,7 +762,7 @@ bool simpleHybridLinGeomSolid::evolve()
         );
 
         // Under-relax the equation
-        pEqn.relax(pEqnRelaxFactor_);
+        pEqn.relax();
 
         // Solve the linear system
         solverPerfp = pEqn.solve();

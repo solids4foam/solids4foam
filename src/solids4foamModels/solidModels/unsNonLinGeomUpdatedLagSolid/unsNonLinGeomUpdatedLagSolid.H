@@ -151,9 +151,6 @@ class unsNonLinGeomUpdatedLagSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- DD equation under-relaxation factor
-        const scalar DDEqnRelaxFactor_;
-
         //- Solution standard tolerance
         const scalar solutionTol_;
 
@@ -187,7 +184,7 @@ class unsNonLinGeomUpdatedLagSolid
         bool converged
         (
             const int iCorr,
-            const lduMatrix::solverPerformance& solverPerfD
+            const lduSolverPerformance& solverPerfD
         );
 
         //- Move the mesh to the deformed configuration

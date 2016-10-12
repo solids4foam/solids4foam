@@ -79,9 +79,6 @@ class thermalLinGeomSolid
         //- Thermal conductivity
         volScalarField k_;
 
-        //- T equation under-relaxation factor
-        const scalar TEqnRelaxFactor_;
-
         //- Solution tolerance for outer non-orthogonality correctors
         const scalar solutionTol_;
 
@@ -103,7 +100,7 @@ class thermalLinGeomSolid
         bool converged
         (
             const int iCorr,
-            const lduMatrix::solverPerformance& solverPerfD
+            const lduSolverPerformance& solverPerfD
         );
 
         //- Disallow default bitwise copy construct

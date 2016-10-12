@@ -55,7 +55,7 @@ addToRunTimeSelectionTable(solidModel, thermalLinGeomSolid, dictionary);
 bool thermalLinGeomSolid::converged
 (
     const int iCorr,
-    const lduMatrix::solverPerformance& solverPerfT
+    const lduSolverPerformance& solverPerfT
 )
 {
     // We will check a number of different residuals for convergence
@@ -204,12 +204,6 @@ thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
         ),
         mesh
     ),
-    TEqnRelaxFactor_
-    (
-        mesh.solutionDict().relax("TEqn")
-      ? mesh.solutionDict().relaxationFactor("TEqn")
-      : 1.0
-    ),
     solutionTol_
     (
         solidProperties().lookupOrDefault<scalar>("solutionToleranceT", 1e-06)
@@ -240,8 +234,8 @@ bool thermalLinGeomSolid::evolve()
     Info << "Evolving thermal solid solver" << endl;
 
     int iCorr = 0;
-    lduMatrix::solverPerformance solverPerfT;
-    lduMatrix::debug = 0;
+    lduSolverPerformance solverPerfT;
+    blockLduMatrix::debug = 0;
 
     Info<< "Solving the energy equation for T" << endl;
 
@@ -259,7 +253,7 @@ bool thermalLinGeomSolid::evolve()
         );
 
         // Under-relaxation the linear system
-        TEqn.relax(TEqnRelaxFactor_);
+        TEqn.relax();
 
         // Solve the linear system
         solverPerfT = TEqn.solve();

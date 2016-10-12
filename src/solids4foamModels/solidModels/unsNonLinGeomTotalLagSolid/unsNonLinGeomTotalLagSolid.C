@@ -245,12 +245,6 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    DEqnRelaxFactor_
-    (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
-      : 1.0
-    ),
     solutionTol_
     (
         solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
@@ -678,11 +672,11 @@ bool unsNonLinGeomTotalLagSolid::evolve()
 
     int iCorr = 0;
     scalar initialResidual = 0;
-    lduMatrix::solverPerformance solverPerf;
+    lduSolverPerformance solverPerf;
     scalar res = 1.0;
     scalar maxRes = 0;
     scalar curConvergenceTolerance = solutionTol_;
-    lduMatrix::debug = 0;
+    blockLduMatrix::debug = 0;
 
     do
     {
@@ -724,7 +718,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         }
 
         // Under-relax the linear system
-        DEqn.relax(DEqnRelaxFactor_);
+        DEqn.relax();
 
         // Solve the system
         solverPerf = DEqn.solve();

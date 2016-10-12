@@ -147,9 +147,6 @@ class coupledUnsLinGeomSolid
         //- Hooke's law first Lame parameter
         const surfaceScalarField lambdaf_;
 
-        //- D equation under-relaxation factor
-        const scalar DEqnRelaxFactor_;
-
         //- Solution standard tolerance
         const scalar solutionTol_;
 

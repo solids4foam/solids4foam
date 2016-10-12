@@ -61,7 +61,7 @@ addToRunTimeSelectionTable
 bool nonLinGeomUpdatedLagSolid::converged
 (
     const int iCorr,
-    const lduMatrix::solverPerformance& solverPerfDD
+    const lduSolverPerformance& solverPerfDD
 )
 {
     // We will check a number of different residuals for convergence
@@ -433,12 +433,6 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    DDEqnRelaxFactor_
-    (
-        mesh.solutionDict().relax("DDEqn")
-      ? mesh.solutionDict().relaxationFactor("DDEqn")
-      : 1.0
-    ),
     solutionTol_
     (
         solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
@@ -860,8 +854,8 @@ bool nonLinGeomUpdatedLagSolid::evolve()
     Info<< "Evolving solid solver" << endl;
 
     int iCorr = 0;
-    lduMatrix::solverPerformance solverPerfDD;
-    lduMatrix::debug = 0;
+    lduSolverPerformance solverPerfDD;
+    blockLduMatrix::debug = 0;
 
     Info<< "Solving the momentum equation for DD" << endl;
 
@@ -884,7 +878,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
         );
 
         // Under-relax the linear system
-        DDEqn.relax(DDEqnRelaxFactor_);
+        DDEqn.relax();
 
         // Solve the linear system
         solverPerfDD = DDEqn.solve();

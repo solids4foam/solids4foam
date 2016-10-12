@@ -123,9 +123,6 @@ class coupledUnsLinGeomLinearElasticSolid
         //- Gravitational acceleration
         const uniformDimensionedVectorField g_;
 
-        //- D equation under-relaxation factor
-        const scalar DEqnRelaxFactor_;
-
 
     // Private Member Functions
 

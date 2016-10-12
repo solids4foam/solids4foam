@@ -30,11 +30,17 @@ relaxationFactors
 {
     // Under-relaxating the D equation by 0.99-0.9999 can improve convergence in
     // some cases, in particular when there are solidContact boundaries
-    //DEqn    0.999;
+    equations
+    {
+        //DEqn    0.999;
+    }
 
     // Under-relaxating the D field by 0.1-0.9 can improve convergence in some
     // cases
-    D       0.7;
+    fields
+    {
+        D       0.7;
+    }
 }
 
 // ************************************************************************* //
