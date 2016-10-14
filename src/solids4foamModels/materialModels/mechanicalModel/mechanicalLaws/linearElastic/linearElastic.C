@@ -25,6 +25,7 @@ License
 
 #include "linearElastic.H"
 #include "addToRunTimeSelectionTable.H"
+#include "fvc.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -35,6 +36,36 @@ namespace Foam
     (
         mechanicalLaw, linearElastic, dictionary
     );
+}
+
+
+// * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
+
+void Foam::linearElastic::makeSigma0f() const
+{
+    if (sigma0fPtr_)
+    {
+        FatalErrorIn("void Foam::linearElastic::makeSigma0f() const")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    sigma0fPtr_ =
+        new surfaceSymmTensorField
+        (
+            "sigma0f",
+            fvc::interpolate(sigma0_)
+        );
+}
+
+
+const Foam::surfaceSymmTensorField& Foam::linearElastic::sigma0f() const
+{
+    if (!sigma0fPtr_)
+    {
+        makeSigma0f();
+    }
+
+    return *sigma0fPtr_;
 }
 
 
@@ -54,7 +85,25 @@ Foam::linearElastic::linearElastic
     nu_(dict.lookup("nu")),
     lambda_("lambda", dimPressure, 0.0),
     mu_(E_/(2.0*(1.0 + nu_))),
-    k_("k", dimPressure, 0.0)
+    k_("k", dimPressure, 0.0),
+    sigma0_
+    (
+        IOobject
+        (
+            "sigma0",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dict.lookupOrDefault<dimensionedSymmTensor>
+        (
+            "sigma0",
+            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+        )
+    ),
+    sigma0fPtr_(NULL)
 {
     // Check for physical Poisson's ratio
     if (nu_.value() < -1.0 || nu_.value() > 0.5)
@@ -94,13 +143,20 @@ Foam::linearElastic::linearElastic
 
         k_ = lambda_ + (2.0/3.0)*mu_;
     }
+
+    if (gMax(mag(sigma0_)()) > SMALL)
+    {
+        Info<< "Reading sigma0 initial/residual stress field" << endl;
+    }
 }
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::linearElastic::~linearElastic()
-{}
+{
+    deleteDemandDrivenData(sigma0fPtr_);
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -217,7 +273,9 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
             mesh().lookupObject<volTensorField>("grad(DD)");
 
         // Calculate stress based on incremental form of Hooke's law
-        sigma = sigma.oldTime() + mu_*twoSymm(gradDD) + lambda_*tr(gradDD)*I;
+        sigma =
+            sigma.oldTime() + mu_*twoSymm(gradDD) + lambda_*tr(gradDD)*I
+          + sigma0_;
     }
     else
     {
@@ -233,12 +291,12 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
 
             // Calculate stress using Hooke's law in uncoupled deviatoric
             // volumetric form
-            sigma = mu_*dev(twoSymm(gradD)) - p*I;
+            sigma = mu_*dev(twoSymm(gradD)) - p*I + sigma0_;
         }
         else
         {
             // Calculate stress based on Hooke's law
-            sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
+            sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I + sigma0_;
         }
     }
 }
@@ -253,7 +311,9 @@ void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
             mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
         // Calculate stress based on incremental form of Hooke's law
-        sigma = sigma.oldTime() + mu_*twoSymm(gradDD) + lambda_*tr(gradDD)*I;
+        sigma =
+            sigma.oldTime() + mu_*twoSymm(gradDD) + lambda_*tr(gradDD)*I
+          + sigma0f();
     }
     else
     {
@@ -262,7 +322,7 @@ void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
             mesh().lookupObject<surfaceTensorField>("grad(D)f");
 
         // Calculate stress based on Hooke's law
-        sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
+        sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I + sigma0f();
     }
 }
 
