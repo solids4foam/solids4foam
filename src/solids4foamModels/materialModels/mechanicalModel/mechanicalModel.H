@@ -97,25 +97,20 @@ class mechanicalModel
         //- Stress surfaceField for each mechanical law
         mutable PtrList<surfaceSymmTensorField> subMeshSigmaf_;
 
-        //- Displacement volField for each mechanical law
+        //- Displacement (or displacement increment) volField for each
+        //  mechanical
         mutable PtrList<volVectorField> subMeshD_;
 
-        //- Displacement increment volField for each mechanical law
-        mutable PtrList<volVectorField> subMeshDD_;
-
-        //- Displacement gradient volField for each mechanical law
+        //- Displacement  (or displacement increment) gradient volField for each
+        //  mechanical law
         mutable PtrList<volTensorField> subMeshGradD_;
 
-        //- Displacement gradient surfaceField for each mechanical law
+        //- Displacement  (or displacement increment) gradient surfaceField for
+        //  each mechanical law
         mutable PtrList<surfaceTensorField> subMeshGradDf_;
 
-        //- Displacement gradient increment volField for each mechanical law
-        mutable PtrList<volTensorField> subMeshGradDD_;
-
-        //- Displacement gradient increment surfaceField for each mechanical law
-        mutable PtrList<surfaceTensorField> subMeshGradDDf_;
-
-        //- Displacement pointField for each mechanical law
+        //- Displacement (or displacement increment) pointField for each
+        //  mechanical law
         mutable PtrList<pointVectorField> subMeshPointD_;
 
         //- Are there any bi-material interface faces
@@ -199,15 +194,6 @@ class mechanicalModel
         //- Return the subMesh D volFields
         const PtrList<volVectorField>& subMeshD() const;
 
-        //- Calculate the subMesh DD fields
-        void calcSubMeshDD() const;
-
-        //- Return the subMesh DD volFields
-        PtrList<volVectorField>& subMeshDD();
-
-        //- Return the subMesh DD volFields
-        const PtrList<volVectorField>& subMeshDD() const;
-
         //- Calculate the subMesh gradD fields
         void calcSubMeshGradD() const;
 
@@ -225,24 +211,6 @@ class mechanicalModel
 
         //- Return the subMesh gradDf volFields
         const PtrList<surfaceTensorField>& subMeshGradDf() const;
-
-        //- Calculate the subMesh gradDD fields
-        void calcSubMeshGradDD() const;
-
-        //- Return the subMesh gradDD volFields
-        PtrList<volTensorField>& subMeshGradDD();
-
-        //- Return the subMesh gradDD volFields
-        const PtrList<volTensorField>& subMeshGradDD() const;
-
-        //- Calculate the subMesh gradDDf fields
-        void calcSubMeshGradDDf() const;
-
-        //- Return the subMesh gradDDf volFields
-        PtrList<surfaceTensorField>& subMeshGradDDf();
-
-        //- Return the subMesh gradDDf volFields
-        const PtrList<surfaceTensorField>& subMeshGradDDf() const;
 
         //- Calculate the subMesh pointD fields
         void calcSubMeshPointD() const;
@@ -297,16 +265,17 @@ class mechanicalModel
             const bool useVolFieldSigma
         );
 
-        //- Correct snGrad on bi-material interface patch for subMeshGradD field
-        void correctInterfaceSnGrad
+        //- Correct snGrad on subMeshGradD fields because the default calculated
+        //  patches do not account for non-orthogonality
+        void correctBoundarySnGrad
         (
             PtrList<volVectorField>& subMeshDList,
             PtrList<volTensorField>& subMeshGradDList
         );
 
-        //- Correct snGrad on bi-material interface patch for subMeshGradDf
-        //  field
-        void correctInterfaceSnGradf
+        //- Correct snGrad on subMeshGradD fields because the default calculated
+        //  patches do not account for non-orthogonality
+        void correctBoundarySnGradf
         (
             PtrList<volVectorField>& subMeshDList,
             PtrList<surfaceTensorField>& subMeshGradDfList,
@@ -459,6 +428,12 @@ public:
 
             //- Update total accumulated fields
             void updateTotalFields();
+
+            //- Return the desired new time-step size
+            scalar newDeltaT();
+
+            //- Move subMeshes
+            void moveSubMeshes();
 
             //- Lookup a field from the base mesh and interpolate it the subMesh
             template<class Type>

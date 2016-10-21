@@ -82,17 +82,21 @@ class neoHookeanElasticMisesPlastic
         //- Bulk modulus
         const dimensionedScalar K_;
 
-        // Relative deformation gradient volField
+        //- Relative deformation gradient volField
         volTensorField* relFPtr_;
 
-        // Relative deformation gradient surfaceField
+        //- Relative deformation gradient surfaceField
         surfaceTensorField* relFfPtr_;
 
-        // Jacobian of the toal deformation gradient volField
+        //- Jacobian of the toal deformation gradient volField
         volScalarField* JPtr_;
 
-        // Jacobian of the toal deformation gradient surfaceField
+        //- Jacobian of the toal deformation gradient surfaceField
         surfaceScalarField* JfPtr_;
+
+        //- Total deformation gradient volField
+        //  Used in the calculation of the adaptive time-step
+        volTensorField* FPtr_;
 
         //- Table of post-yield stress versus plastic strain
         //  For large strain total Lagrangian models, it expects
@@ -167,9 +171,6 @@ class neoHookeanElasticMisesPlastic
         //- plasticN surface field
         surfaceSymmTensorField plasticNf_;
 
-        //- Current material surface field
-        //mutable surfaceScalarField* curMaterialfPtr_;
-
         //- An iterative procedure is used when the yield stress is a nonlinear
         //  function of plastic strain
         const bool nonLinearPlasticity_;
@@ -229,6 +230,12 @@ class neoHookeanElasticMisesPlastic
 
         //- Return a reference to the Jf field
         surfaceScalarField& Jf();
+
+        //- Make the F field
+        void makeF();
+
+        //- Return a reference to the F field
+        volTensorField& F();
 
         //- Return the current Kirchhoff yield stress
         scalar curYieldStress
@@ -312,6 +319,9 @@ public:
 
         //- Update the yield stress: called at end of time-step
         virtual void updateTotalFields();
+
+        //- Return the desired new time-step
+        virtual scalar newDeltaT();
 };
 
 

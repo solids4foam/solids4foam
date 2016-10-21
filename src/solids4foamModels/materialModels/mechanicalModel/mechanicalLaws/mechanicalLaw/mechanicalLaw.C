@@ -147,4 +147,11 @@ Foam::scalar Foam::mechanicalLaw::residual()
 }
 
 
+Foam::scalar Foam::mechanicalLaw::newDeltaT()
+{
+    // Default to a large number
+    return mesh_.time().endTime().value();
+}
+
+
 // ************************************************************************* //

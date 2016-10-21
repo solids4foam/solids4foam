@@ -167,9 +167,6 @@ class nonLinGeomUpdatedLagSolid
             const lduSolverPerformance& solverPerfD
         );
 
-        //- Move the mesh to the deformed configuration
-        void moveMesh(const pointField& oldPoints);
-
         //- Create global face zone point maps
         void findGlobalFaceZones();
 

@@ -14,6 +14,7 @@ License
     option) any later version.
 
     OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
     FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
     for more details.
@@ -22,60 +23,47 @@ License
     along with OpenFOAM; if not, write to the Free Software Foundation,
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-Application
-    fluidFoam
+File
+    readSolidTimeControls
 
 Description
-    Finite volume fluid flow solver with run-time selectable fluid model.
+    Read the time controls for adaptive time-stepping.
 
 Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
     Philip Cardiff, UCD. All rights reserved.
-    József Nagy
 
 \*---------------------------------------------------------------------------*/
 
-#include "fvCFD.H"
-#include "dynamicFvMesh.H"
-#include "fluidModel.H"
+// Adjustable time-step
+const Switch adjustTimeStep
+(
+    runTime.controlDict().lookupOrDefault<Switch>("adjustTimeStep", false)
+);
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// Maximum allowed time-step
+const scalar maxDeltaT
+(
+    runTime.controlDict().lookupOrDefault<scalar>("maxDeltaT", GREAT)
+);
 
-int main(int argc, char *argv[])
+// Minimum allowed time-step
+const scalar minDeltaT
+(
+    runTime.controlDict().lookupOrDefault<scalar>("minDeltaT", 0.0)
+);
+
+// Increase the time-step at most every increaseTimeStepFreq time-steps
+int increaseTimeStep = 0;
+const int increaseTimeStepFreq = 4;
+(
+    runTime.controlDict().lookupOrDefault<int>("increaseTimeStepFreq", 4)
+);
+
+if (adjustTimeStep)
 {
-#   include "setRootCase.H"
-#   include "createTime.H"
-#   include "createDynamicFvMesh.H"
-#   include "createFluid.H"
-#   include "createTimeControls.H"
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-    Info<< "\nStarting time loop\n" << endl;
-
-    while (runTime.run())
-    {
-#        include "readTimeControls.H"
-#        include "CourantNo.H"
-#        include "setDeltaT.H"
-
-        runTime++;
-
-        Info<< "Time = " << runTime.timeName() << nl << endl;
-
-        fluid->evolve();
-
-        runTime.write();
-
-        Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
-            << "  ClockTime = " << runTime.elapsedClockTime() << " s"
-            << nl << endl;
-    }
-
-    Info<< "End\n" << endl;
-
-    return(0);
+    Info<< nl << "Adjustable time-step" << nl
+        << "    Max deltaT " << maxDeltaT << nl
+        << "    Min deltaT " << minDeltaT << nl << endl;
 }
-
 
 // ************************************************************************* //
