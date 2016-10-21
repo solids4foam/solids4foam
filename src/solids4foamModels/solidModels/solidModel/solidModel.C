@@ -26,6 +26,8 @@ License
 
 #include "solidModel.H"
 #include "volFields.H"
+#include "symmetryPolyPatch.H"
+#include "twoDPointCorrector.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
