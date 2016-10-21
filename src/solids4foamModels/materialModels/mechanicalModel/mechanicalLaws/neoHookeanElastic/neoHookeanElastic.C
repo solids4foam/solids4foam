@@ -202,8 +202,6 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
     }
     else
     {
-        FatalError
-            << "OH dear: " << abort(FatalError);
         // Lookup gradient of displacement
         const volTensorField& gradD =
             mesh().lookupObject<volTensorField>("grad(D)");
