@@ -46,6 +46,7 @@ $(mechanicalLaws)/linearElasticFromFile/linearElasticFromFile.C
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
+$(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
 $(solidFvPatchFields)/oscillateDisplacement/oscillateDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C

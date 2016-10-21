@@ -77,7 +77,7 @@ void Foam::mechanicalModel::mapSubMeshVolFields
 
                         const label curGlobalMeshPatchFace =
                             globalGlobalMeshFace
-                            - mesh().boundaryMesh()[patchMap[patchI]].start();
+                          - mesh().boundaryMesh()[patchMap[patchI]].start();
 
                         baseMeshFieldP[curGlobalMeshPatchFace] =
                             subMeshFieldP[faceI];

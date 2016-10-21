@@ -189,6 +189,9 @@ public:
         //- Update total accumulated fields
         virtual void updateTotalFields()
         {}
+
+        //- Return the desired new time-step
+        virtual scalar newDeltaT();
 };
 
 

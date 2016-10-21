@@ -49,6 +49,7 @@ int main(int argc, char *argv[])
 #   include "createTime.H"
 #   include "createDynamicFvMesh.H"
 #   include "createSolidMesh.H"
+#   include "createTimeControls.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -60,9 +61,9 @@ int main(int argc, char *argv[])
 
     while (runTime.run())
     {
-        #include "readTimeControls.H"
-        #include "CourantNo.H"
-        #include "setDeltaT.H"
+#        include "readTimeControls.H"
+#        include "CourantNo.H"
+#        include "setDeltaT.H"
 
         runTime++;
 
