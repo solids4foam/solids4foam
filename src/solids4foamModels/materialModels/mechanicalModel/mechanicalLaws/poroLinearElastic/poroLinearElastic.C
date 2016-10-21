@@ -40,6 +40,36 @@ namespace Foam
 }
 
 
+// * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
+
+void Foam::poroLinearElastic::makeP0f() const
+{
+    if (p0fPtr_)
+    {
+        FatalErrorIn("void Foam::poroLinearElastic::makeP0f() const")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    p0fPtr_ =
+        new surfaceScalarField
+        (
+            "p0f",
+            fvc::interpolate(p0_)
+        );
+}
+
+
+const Foam::surfaceScalarField& Foam::poroLinearElastic::p0f() const
+{
+    if (!p0fPtr_)
+    {
+        makeP0f();
+    }
+
+    return *p0fPtr_;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -50,14 +80,39 @@ Foam::poroLinearElastic::poroLinearElastic
     const dictionary& dict
 )
 :
-    linearElastic(name, mesh, dict)
-{}
+    linearElastic(name, mesh, dict),
+    p0_
+    (
+        IOobject
+        (
+            "p0",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dict.lookupOrDefault<dimensionedScalar>
+        (
+            "p0",
+            dimensionedScalar("zero", dimPressure, 0.0)
+        )
+    ),
+    p0fPtr_(NULL)
+{
+    if (gMax(mag(p0_)()) > SMALL)
+    {
+        Info<< "Reading p0 initial/residual pore-pressure field" << endl;
+    }
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::poroLinearElastic::~poroLinearElastic()
-{}
+{
+    deleteDemandDrivenData(p0fPtr_);
+}
 
 
 void Foam::poroLinearElastic::correct(volSymmTensorField& sigma)
@@ -77,7 +132,7 @@ void Foam::poroLinearElastic::correct(volSymmTensorField& sigma)
 
     // Calculate the total stress as the sum of the effective stress and the
     // pore-pressure
-    sigma -= p*symmTensor(I);
+    sigma -= (p + p0_)*symmTensor(I);
 }
 
 
@@ -100,7 +155,7 @@ void Foam::poroLinearElastic::correct(surfaceSymmTensorField& sigma)
 
     // Calculate the total stress as the sum of the effective stress and the
     // pore-pressure
-    sigma -= pf*symmTensor(I);
+    sigma -= (pf + p0f())*symmTensor(I);
 }
 
 
