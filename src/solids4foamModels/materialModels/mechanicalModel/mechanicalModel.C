@@ -1700,7 +1700,6 @@ void Foam::mechanicalModel::correctBoundarySnGrad
         const volVectorField& subMeshD = subMeshDList[lawI];
         volTensorField& subMeshGradD = subMeshGradDList[lawI];
         const fvMesh& subMesh = subMeshes[lawI].subMesh();
-        const labelList& patchMap = subMeshes[lawI].patchMap();
 
         forAll(subMeshGradD.boundaryField(), patchI)
         {
@@ -1742,7 +1741,6 @@ void Foam::mechanicalModel::correctBoundarySnGradf
         surfaceTensorField& subMeshGradDf = subMeshGradDfList[lawI];
         const volTensorField& subMeshGradD = subMeshGradDList[lawI];
         const fvMesh& subMesh = subMeshes[lawI].subMesh();
-        const labelList& patchMap = subMeshes[lawI].patchMap();
 
         forAll(subMeshGradDf.boundaryField(), patchI)
         {

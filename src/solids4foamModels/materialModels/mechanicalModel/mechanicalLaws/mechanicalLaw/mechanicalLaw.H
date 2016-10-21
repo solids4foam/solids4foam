@@ -86,6 +86,12 @@ protected:
             return mesh_;
         }
 
+        //- Return const reference to dict
+        const dictionary& dict() const
+        {
+            return dict_;
+        }
+
         //- If the case is plane stress
         bool planeStress() const;
 
