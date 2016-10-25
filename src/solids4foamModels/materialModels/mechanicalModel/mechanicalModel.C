@@ -2748,33 +2748,43 @@ Foam::scalar Foam::mechanicalModel::newDeltaT()
 
 void Foam::mechanicalModel::moveSubMeshes()
 {
-    forAll(subMeshes(), lawI)
+    PtrList<mechanicalLaw>& laws = *this;
+
+    // Sub-meshes only exist when there is more than one material law
+    if (laws.size() > 1)
     {
-        Info<< "    Moving subMesh " << subMeshes()[lawI].subMesh().name()
-            << endl;
-
-        twoDPointCorrector twoDCorrector(subMeshes()[lawI].subMesh());
-        pointField newPoints =
-            subMeshes()[lawI].subMesh().points() + subMeshPointD()[lawI];
-        twoDCorrector.correctPoints(newPoints);
-
-        subMeshes()[lawI].subMesh().movePoints(newPoints);
-        subMeshes()[lawI].subMesh().V00();
-        subMeshes()[lawI].subMesh().moving(false);
-        subMeshes()[lawI].subMesh().changing(false);
-        subMeshes()[lawI].subMesh().setPhi().writeOpt() = IOobject::NO_WRITE;
-
-        if
-        (
-            mesh().time().outputTime()
-         && lookupOrDefault<Switch>("writeSubMeshes",  false)
-        )
+        forAll(subMeshes(), lawI)
         {
-            Info<< "    Writing subMesh "
-                << subMeshes()[lawI].subMesh().name() << endl;
-            subMeshes()[lawI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
-            subMeshes()[lawI].subMesh().setInstance(mesh().time().timeName());
-            subMeshes()[lawI].subMesh().write();
+            Info<< "    Moving subMesh " << subMeshes()[lawI].subMesh().name()
+                << endl;
+
+            twoDPointCorrector twoDCorrector(subMeshes()[lawI].subMesh());
+            pointField newPoints =
+                subMeshes()[lawI].subMesh().points() + subMeshPointD()[lawI];
+            twoDCorrector.correctPoints(newPoints);
+
+            subMeshes()[lawI].subMesh().movePoints(newPoints);
+            subMeshes()[lawI].subMesh().V00();
+            subMeshes()[lawI].subMesh().moving(false);
+            subMeshes()[lawI].subMesh().changing(false);
+            subMeshes()[lawI].subMesh().setPhi().writeOpt() =
+                IOobject::NO_WRITE;
+
+            if
+            (
+                mesh().time().outputTime()
+             && lookupOrDefault<Switch>("writeSubMeshes",  false)
+            )
+            {
+                Info<< "    Writing subMesh "
+                    << subMeshes()[lawI].subMesh().name() << endl;
+                subMeshes()[lawI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
+                subMeshes()[lawI].subMesh().setInstance
+                (
+                    mesh().time().timeName()
+                );
+                subMeshes()[lawI].subMesh().write();
+            }
         }
     }
 }

@@ -612,7 +612,7 @@ void Foam::solidModel::moveMesh
     mesh().changing(false);
     mesh().setPhi().writeOpt() = IOobject::NO_WRITE;
 
-    // Tell the mechanical model to move the subMeshes
+    // Tell the mechanical model to move the subMeshes, if they exist
     mechanical().moveSubMeshes();
 }
 

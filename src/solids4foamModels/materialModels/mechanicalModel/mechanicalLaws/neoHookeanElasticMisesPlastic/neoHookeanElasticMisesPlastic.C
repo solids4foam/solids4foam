@@ -482,15 +482,8 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 :
     mechanicalLaw(name, mesh, dict),
     rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
-    mu_(E_/(2.0*(1.0 + nu_))),
-    K_
-    (
-        planeStress()
-      ? (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_
-      : (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_
-    ),
+    mu_("zero", dimPressure, 0.0),
+    K_("zero", dimPressure, 0.0),
     relFPtr_(NULL),
     relFfPtr_(NULL),
     JPtr_(NULL),
@@ -794,6 +787,44 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     // Force storage of old time for adjustable time-step calculations
     plasticN_.oldTime();
 
+    // Read elastic parameters
+    // The user can specify E and nu or mu and K
+    if (dict.found("E") && dict.found("nu"))
+    {
+        // Read the Young's modulus
+        const dimensionedScalar E = dimensionedScalar(dict.lookup("E"));
+
+        // Read the Poisson's ratio
+        const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
+
+        // Set the shear modulus
+        mu_ = E/(2.0*(1.0 + nu));
+
+        // Set the bulk modulus
+        if (planeStress())
+        {
+            K_ = (nu*E/((1.0 + nu)*(1.0 - nu))) + (2.0/3.0)*mu_;
+        }
+        else
+        {
+            K_ = (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*mu_;
+        }
+    }
+    else if (dict.found("mu") && dict.found("K"))
+    {
+        mu_ = dimensionedScalar(dict.lookup("mu"));
+        K_ = dimensionedScalar(dict.lookup("K"));
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic::()"
+        )   << "Either E and nu or mu and K elastic parameters should be "
+            << "specified" << abort(FatalError);
+    }
+
+    // Check if plasticity is a nonlinear function of plastic strain
     if (nonLinearPlasticity_)
     {
         Info<< "    Plasticity is nonlinear" << endl;

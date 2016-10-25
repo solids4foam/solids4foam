@@ -30,6 +30,11 @@ Description
 
     Neo-Hookean elasticity with Mises/J2 plasticity.
 
+    For elastic parameters, the user can specify:
+        - Young's modulus (E) and Poisson's ratio (nu)
+    or
+        - Shear modulus (mu) and bulk modulus (K)
+
     More details found in:
 
     Simo & Hughes, Computational Inelasticity, 1998, Springer.
@@ -70,17 +75,11 @@ class neoHookeanElasticMisesPlastic
         //- Initial density
         const dimensionedScalar rho_;
 
-        //- Young's modulus
-        const dimensionedScalar E_;
-
-        //- Poisson's ratio
-        const dimensionedScalar nu_;
-
         //- Shear modulus
-        const dimensionedScalar mu_;
+        dimensionedScalar mu_;
 
         //- Bulk modulus
-        const dimensionedScalar K_;
+        dimensionedScalar K_;
 
         //- Relative deformation gradient volField
         volTensorField* relFPtr_;
