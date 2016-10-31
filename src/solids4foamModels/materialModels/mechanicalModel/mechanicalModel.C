@@ -30,6 +30,8 @@ License
 #include "gaussGrad.H"
 #include "twoDPointCorrector.H"
 
+#include "fixedGradientFvPatchFields.H"
+
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 
@@ -2691,14 +2693,37 @@ Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
     // however, numerically "div(grad(phi))" uses a larger stencil than the
     // "laplacian(phi)"; the difference between these two approximations is
     // a small amount of numerical diffusion that quells oscillations
-    return
-    (
-        fvc::laplacian
+    if (D.name() == "DD")
+    {
+        return
         (
-            impKfcorr(), D, "laplacian(D" + D.name() + ',' + D.name() + ')'
-        )
-      - fvc::div(impKfcorr()*mesh().Sf() & fvc::interpolate(gradD))
-    );
+            fvc::laplacian
+            (
+                impKfcorr(), D, "laplacian(D" + D.name() + ',' + D.name() + ')'
+            )
+          - fvc::div(impKfcorr()*mesh().Sf() & fvc::interpolate(gradD))
+        );
+    }
+    else
+    {
+        // We will calculate this numerical diffusion based on the increment of
+        // displacement, as it may become large of we base it on the total
+        // displacement
+        return
+        (
+            fvc::laplacian
+            (
+                impKfcorr(),
+                D - D.oldTime(),
+                "laplacian(D" + D.name() + ',' + D.name() + ')'
+            )
+          - fvc::div
+            (
+                impKfcorr()*mesh().Sf()
+              & fvc::interpolate(gradD - gradD.oldTime())
+            )
+        );
+    }
 }
 
 
