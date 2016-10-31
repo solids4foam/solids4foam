@@ -144,6 +144,32 @@ bool nonLinGeomTotalLagSolid::converged
 }
 
 
+void nonLinGeomTotalLagSolid::predict()
+{
+    Info << "Predicting solid model" << endl;
+
+    // Predict D using the velocity field
+    // Note: the case may be steady-state but U_ can still be calculated using a
+    // transient method
+    D_ = D_.oldTime() + U_*runTime().deltaT();
+
+    // Update gradient of displacement
+    mechanical().grad(D_, gradD_);
+
+    // Total deformation gradient
+    F_ = I + gradD_.T();
+
+    // Inverse of the deformation gradient
+    Finv_ = inv(F_);
+
+    // Jacobian of the deformation gradient
+    J_ = det(F_);
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma_);
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
@@ -289,10 +315,12 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
             IOobject::NO_WRITE
         )
     ),
-    maxIterReached_(0)
+    maxIterReached_(0),
+    predict_(solidProperties().lookupOrDefault<Switch>("predict", false))
 {
     D_.oldTime().oldTime();
     pointD_.oldTime();
+    gradD_.oldTime();
 }
 
 
@@ -675,11 +703,17 @@ bool nonLinGeomTotalLagSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
 
+    if (predict_)
+    {
+        predict();
+    }
+
     int iCorr = 0;
     lduMatrix::solverPerformance solverPerfD;
     lduMatrix::debug = 0;
 
-    Info<< "Solving the momentum equation for D" << endl;
+    Info<< "Solving the total Lagrangian form of the momentum equation for D"
+        << endl;
 
     // Momentum equation loop
     do
@@ -693,7 +727,7 @@ bool nonLinGeomTotalLagSolid::evolve()
             rho_*fvm::d2dt2(D_)
          == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
           - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
-          + fvc::div((J_*sigma_ & Finv_.T()), "div(sigma)")
+          + fvc::div(J_*Finv_ & sigma_, "div(sigma)")
           + rho_*g_
           + mechanical().RhieChowCorrection(D_, gradD_)
         );

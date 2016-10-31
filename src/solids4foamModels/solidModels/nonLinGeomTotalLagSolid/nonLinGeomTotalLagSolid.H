@@ -141,6 +141,9 @@ class nonLinGeomTotalLagSolid
         //  momentum equation
         int maxIterReached_;
 
+        //- Predict new time-step fields using the velocity field
+        const Switch predict_;
+
 
     // Private Member Functions
 
@@ -150,6 +153,10 @@ class nonLinGeomTotalLagSolid
             const int iCorr,
             const lduMatrix::solverPerformance& solverPerfD
         );
+
+        //- Predict the fields for the next time-step based on the
+        //  previous time-steps
+        void predict();
 
         //- Disallow default bitwise copy construct
         nonLinGeomTotalLagSolid(const nonLinGeomTotalLagSolid&);

@@ -759,7 +759,8 @@ bool nonLinGeomUpdatedLagSolid::evolve()
     lduMatrix::solverPerformance solverPerfDD;
     lduMatrix::debug = 0;
 
-    Info<< "Solving the momentum equation for DD" << endl;
+    Info<< "Solving the updated Lagrangian form of the momentum equation for DD"
+        << endl;
 
     // Momentum equation loop
     do
@@ -774,7 +775,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
           + fvc::d2dt2(rho_.oldTime(), D_.oldTime())
          == fvm::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
-          + fvc::div((relJ_*sigma_ & relFinv_.T()), "div(sigma)")
+          + fvc::div(relJ_*relFinv_ & sigma_, "div(sigma)")
           + rho_*g_
           + mechanical().RhieChowCorrection(DD_, gradDD_)
         );
