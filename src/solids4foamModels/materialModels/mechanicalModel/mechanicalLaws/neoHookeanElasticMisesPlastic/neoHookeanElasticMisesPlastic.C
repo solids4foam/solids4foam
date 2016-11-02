@@ -26,6 +26,8 @@ License
 #include "neoHookeanElasticMisesPlastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformGeometricField.H"
+#include "logVolFields.H"
+#include "fvc.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -39,18 +41,17 @@ namespace Foam
 
 // * * * * * * * * * * * * * * Static Members  * * * * * * * * * * * * * * * //
 
-        // Tolerance for Newton loop
-        scalar neoHookeanElasticMisesPlastic::LoopTol_ = 1e-8;
+    // Tolerance for Newton loop
+    scalar neoHookeanElasticMisesPlastic::LoopTol_ = 1e-8;
 
-        // Maximum number of iterations for Newton loop
-        label neoHookeanElasticMisesPlastic::MaxNewtonIter_ = 200;
+    // Maximum number of iterations for Newton loop
+    label neoHookeanElasticMisesPlastic::MaxNewtonIter_ = 200;
 
-        // finiteDiff is the delta for finite difference differentiation
-        scalar neoHookeanElasticMisesPlastic::finiteDiff_ = 0.25e-6;
+    // finiteDiff is the delta for finite difference differentiation
+    scalar neoHookeanElasticMisesPlastic::finiteDiff_ = 0.25e-6;
 
-        // Store sqrt(2/3) as we use it often
-        scalar neoHookeanElasticMisesPlastic::sqrtTwoOverThree_ =
-            ::sqrt(2.0/3.0);
+    // Store sqrt(2/3) as we use it often
+    scalar neoHookeanElasticMisesPlastic::sqrtTwoOverThree_ = ::sqrt(2.0/3.0);
 
 } // End of namespace Foam
 
@@ -199,6 +200,42 @@ Foam::surfaceScalarField& Foam::neoHookeanElasticMisesPlastic::Jf()
     }
 
     return *JfPtr_;
+}
+
+
+void Foam::neoHookeanElasticMisesPlastic::makeF()
+{
+    if (FPtr_)
+    {
+        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeF()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    FPtr_ =
+        new volTensorField
+        (
+            IOobject
+            (
+                "F",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, I)
+        );
+}
+
+
+Foam::volTensorField& Foam::neoHookeanElasticMisesPlastic::F()
+{
+    if (!FPtr_)
+    {
+        makeF();
+    }
+
+    return *FPtr_;
 }
 
 
@@ -445,19 +482,13 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 :
     mechanicalLaw(name, mesh, dict),
     rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
-    mu_(E_/(2.0*(1.0 + nu_))),
-    K_
-    (
-        planeStress()
-      ? (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_
-      : (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_
-    ),
+    mu_("zero", dimPressure, 0.0),
+    K_("zero", dimPressure, 0.0),
     relFPtr_(NULL),
     relFfPtr_(NULL),
     JPtr_(NULL),
     JfPtr_(NULL),
+    FPtr_(NULL),
     stressPlasticStrainSeries_(dict),
     sigmaY_
     (
@@ -744,7 +775,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
         dict.lookupOrDefault<Switch>
         (
             "updateBEbarConsistent",
-            Switch(false)
+            Switch(true)
         )
     ),
     Hp_(0.0),
@@ -753,6 +784,47 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
         mesh.time().controlDict().lookupOrDefault<scalar>("maxDeltaErr", 0.01)
     )
 {
+    // Force storage of old time for adjustable time-step calculations
+    plasticN_.oldTime();
+
+    // Read elastic parameters
+    // The user can specify E and nu or mu and K
+    if (dict.found("E") && dict.found("nu"))
+    {
+        // Read the Young's modulus
+        const dimensionedScalar E = dimensionedScalar(dict.lookup("E"));
+
+        // Read the Poisson's ratio
+        const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
+
+        // Set the shear modulus
+        mu_ = E/(2.0*(1.0 + nu));
+
+        // Set the bulk modulus
+        if (planeStress())
+        {
+            K_ = (nu*E/((1.0 + nu)*(1.0 - nu))) + (2.0/3.0)*mu_;
+        }
+        else
+        {
+            K_ = (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*mu_;
+        }
+    }
+    else if (dict.found("mu") && dict.found("K"))
+    {
+        mu_ = dimensionedScalar(dict.lookup("mu"));
+        K_ = dimensionedScalar(dict.lookup("K"));
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic::()"
+        )   << "Either E and nu or mu and K elastic parameters should be "
+            << "specified" << abort(FatalError);
+    }
+
+    // Check if plasticity is a nonlinear function of plastic strain
     if (nonLinearPlasticity_)
     {
         Info<< "    Plasticity is nonlinear" << endl;
@@ -790,7 +862,13 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::neoHookeanElasticMisesPlastic::~neoHookeanElasticMisesPlastic()
-{}
+{
+    deleteDemandDrivenData(relFPtr_);
+    deleteDemandDrivenData(relFfPtr_);
+    deleteDemandDrivenData(JPtr_);
+    deleteDemandDrivenData(JfPtr_);
+    deleteDemandDrivenData(FPtr_);
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -1404,6 +1482,78 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
 
     //     trBEbarOver3Minus1.write();
     // }
+}
+
+
+Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
+{
+    // In the calculation of the plastic strain increment, the return direction
+    // is kept constant for the time-step; we can approximate the error based on
+    // the difference in the return direction from the start to the end of the
+    // time-step, where the return direction is given normalised deviatoric
+    // strain. The error approximation is obtained using the difference between
+    // the trapezoidal rule and the EUler backward method, as described in:
+
+    // Nam-Sua Lee, Klaus-Jurgen Bathe, Error indicators and adaptive remeshing
+    // in large deformation finite element analysis, Finite Elements in
+    // Analysis and Design 16 (1994) 99-139.
+
+    // Update the total deformatio gradient
+    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    {
+        F() = fvc::average(relFf()) & F().oldTime();
+    }
+    else
+    {
+        F() = relF() & F().oldTime();
+    }
+
+    // Calculate the total true (Hencky) strain
+    const volSymmTensorField epsilon = 0.5*log(symm(F().T() & F()));
+
+    // Calculate equivalent strain, for normalisation of the error
+    const volScalarField epsilonEq = sqrt((2.0/3.0)*magSqr(dev(epsilon)));
+
+    // Take reference to internal fields
+    const symmTensorField& DEpsilonPI = DEpsilonP_.internalField();
+    const symmTensorField& plasticNI = plasticN_.internalField();
+    const symmTensorField& plasticNIold = plasticN_.oldTime().internalField();
+    const scalarField& epsilonEqI = epsilonEq.internalField();
+
+    // Calculate error field
+    const symmTensorField DEpsilonPErrorI =
+        Foam::sqrt(3.0/8.0)*DEpsilonPI*mag(plasticNI - plasticNIold)
+       /(epsilonEqI + SMALL);
+
+    // Max error
+    const scalar maxMagDEpsilonPErr = gMax(mag(DEpsilonPErrorI));
+
+    if (maxMagDEpsilonPErr > SMALL)
+    {
+        Info<< "    " << name() << ": max time integration error = "
+            << maxMagDEpsilonPErr
+            << endl;
+
+        if (maxMagDEpsilonPErr > 50*maxDeltaErr_)
+        {
+            WarningIn
+            (
+                "Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()"
+                " const"
+            )   << "The error in the plastic strain is lover 50 times larger "
+                << "than the desired value!\n    Consider starting the "
+                << "simulation with a smaller initial time-step" << endl;
+        }
+
+        // Calculate the time-step scaling factor, where maxDeltaErr_ is the
+        // maximum allowed error
+        const scalar scaleFac = maxDeltaErr_/maxMagDEpsilonPErr;
+
+        // Return the new time-step size
+        return scaleFac*mesh().time().deltaTValue();
+    }
+
+    return mesh().time().endTime().value();
 }
 
 

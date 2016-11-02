@@ -845,15 +845,47 @@ Foam::scalar Foam::linearElasticMohrCoulombPlastic::residual()
 
 void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
 {
-    Info<< type() << endl;
+    Info<< type() << ": updating total fields" << endl;
 
     // Calculate increment of plastic strain
     // This is complicated because DEpsilonP also has a volumetric term
     symmTensorField& DEpsilonPI = DEpsilonP_.internalField();
 
-    const volSymmTensorField& epsilon =
-        mesh().lookupObject<volSymmTensorField>("epsilon");
-    const volSymmTensorField DEpsilon = epsilon - epsilon.oldTime();
+    // Calculate the increment of total strain
+    volSymmTensorField DEpsilon
+    (
+        IOobject
+        (
+            "DEpsilon",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
+    );
+
+    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    {
+        // Lookup gradient of displacement increment
+        const volTensorField& gradDD =
+            mesh().lookupObject<volTensorField>("grad(DD)");
+
+        DEpsilon = symm(gradDD);
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const volTensorField& gradD =
+            mesh().lookupObject<volTensorField>("grad(D)");
+
+        // Calculate gradient of displacement increment
+        const volTensorField gradDD = gradD - gradD.oldTime();
+
+        DEpsilon = symm(gradDD);
+    }
+
     const symmTensorField& DEpsilonI = DEpsilon.internalField();
     const symmTensorField& sigmaEffI = sigmaEff_.internalField();
     const scalar mu = mu_.value();

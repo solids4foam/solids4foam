@@ -44,9 +44,6 @@ addToRunTimeSelectionTable
 );
 
 
-// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 AitkenCouplingInterface::AitkenCouplingInterface

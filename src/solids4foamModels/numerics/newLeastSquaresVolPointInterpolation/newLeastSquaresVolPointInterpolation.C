@@ -150,11 +150,11 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
         pointBndFaces[pointI] = bndFaceSet.toc();
         pointCyclicFaces[pointI] = cyclicFaceSet.toc();
 
-        const labelList& glPoints = 
+        const labelList& glPoints =
             mesh().globalData().sharedPointLabels();
 
         bool globalPoint(findIndex(glPoints, pointI) != -1);
-        
+
         if (!globalPoint)
         {
             labelList allPointProcFaces = procFaceSet.toc();
@@ -169,7 +169,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                 label start = mesh().boundaryMesh()[patchID].start();
                 label localFaceID = faceID - start;
 
-                allCentres[faceI] = 
+                allCentres[faceI] =
                     mesh().C().boundaryField()[patchID][localFaceID];
             }
 
@@ -204,7 +204,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                 if (!duplicate)
                 {
                     centres[nCentres] = allCentres[faceI];
-                    pointProcFaces[pointI][nCentres] = 
+                    pointProcFaces[pointI][nCentres] =
                         allPointProcFaces[faceI];
                     nCentres++;
                 }
@@ -242,7 +242,7 @@ void newLeastSquaresVolPointInterpolation::makeAxisEdges() const
 
     forAll(mesh().boundaryMesh(), patchI)
     {
-        if 
+        if
         (
             mesh().boundaryMesh()[patchI].type()
          == wedgePolyPatch::typeName
@@ -265,19 +265,19 @@ void newLeastSquaresVolPointInterpolation::makeAxisEdges() const
 
                     if (curEdgeFaces.size() == 2)
                     {
-                        label patch0 = 
+                        label patch0 =
                             mesh().boundaryMesh().whichPatch
                             (
                                 curEdgeFaces[0]
                             );
 
-                        label patch1 = 
+                        label patch1 =
                             mesh().boundaryMesh().whichPatch
                             (
                                 curEdgeFaces[1]
                             );
 
-                        if 
+                        if
                         (
                             mesh().boundaryMesh()[patch0].type()
                          == mesh().boundaryMesh()[patch1].type()
@@ -321,7 +321,7 @@ void newLeastSquaresVolPointInterpolation::makePointAxisEdges() const
 
     pointAxisEdgesPtr_ = new Map<labelList>();
 
-    Map<labelList>& pointAxisEdges = 
+    Map<labelList>& pointAxisEdges =
         *pointAxisEdgesPtr_;
 
     const edgeList& edges = mesh().edges();
@@ -409,12 +409,12 @@ makeGlobalPointNgbProcBndFaceCentres() const
 
     globalPointNgbProcBndFaceCentresPtr_ = new Map<vectorField>();
 
-    Map<vectorField>& globalPointNgbProcBndFaceCentres = 
+    Map<vectorField>& globalPointNgbProcBndFaceCentres =
         *globalPointNgbProcBndFaceCentresPtr_;
 
     globalPointNgbProcBndFaceFieldData
     (
-        mesh().C(), 
+        mesh().C(),
         globalPointNgbProcBndFaceCentres
     );
 }
@@ -445,7 +445,7 @@ makeGlobalPointNgbProcCellCentres() const
 
     globalPointNgbProcCellCentresPtr_ = new Map<vectorField>();
 
-    Map<vectorField>& globalPointNgbProcCellCentres = 
+    Map<vectorField>& globalPointNgbProcCellCentres =
         *globalPointNgbProcCellCentresPtr_;
 
     globalPointNgbProcCellFieldData(mesh().C(), globalPointNgbProcCellCentres);
@@ -518,7 +518,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
             labelHashSet pointSet;
             SLList<labelPair> pointFaceSet;
 
-            const labelList& glPoints = 
+            const labelList& glPoints =
                 mesh().globalData().sharedPointLabels();
 
             forAll(bndPoints, pointI)
@@ -530,7 +530,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
 
                 if (!glPoint)
                 {
-                    const labelList& curPointBndFaces = 
+                    const labelList& curPointBndFaces =
                         ptBndFaces[curMeshPoint];
 
                     forAll(curPointBndFaces, faceI)
@@ -542,7 +542,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
                         if (!pointSet.found(curPoint))
                         {
                             pointSet.insert(curPoint);
-                        }                            
+                        }
                         pointFaceSet.insert
                         (
                             labelPair(curPoint, curPointBndFaces[faceI])
@@ -552,18 +552,18 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
 //                     if (curPointBndFaces.size())
 //                     {
 //                         Pout << procPatch.neighbProcNo()
-//                             << ", " 
-//                             << curMeshPoint 
-//                             << ", " 
-//                             << pointCells[curMeshPoint] 
-//                             << ", " 
+//                             << ", "
+//                             << curMeshPoint
+//                             << ", "
+//                             << pointCells[curMeshPoint]
+//                             << ", "
 //                             << curPointBndFaces
-//                             << ", " 
+//                             << ", "
 //                             << vectorField(C, pointCells[curMeshPoint]);
 
 //                         forAll(curPointBndFaces, fI)
 //                         {
-//                             Pout << ", " << 
+//                             Pout << ", " <<
 //                                 mesh().boundaryMesh().whichPatch
 //                                 (
 //                                     curPointBndFaces[fI]
@@ -576,7 +576,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
 
             procBndFaces[procPatch.neighbProcNo()] = faceSet.toc();
 
-//             Pout << "xxxxxxxxxxxxxxxx" 
+//             Pout << "xxxxxxxxxxxxxxxx"
 //                 << procBndFaces[procPatch.neighbProcNo()] << endl;
 
             // Point face addressing
@@ -593,14 +593,14 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
                 {
                     if
                     (
-                        patchPointsFaces[pI].first() 
+                        patchPointsFaces[pI].first()
                      == patchPoints[pointI]
                     )
                     {
                         label pointFace =
                             findIndex
                             (
-                                procBndFaces[procPatch.neighbProcNo()], 
+                                procBndFaces[procPatch.neighbProcNo()],
                                 patchPointsFaces[pI].second()
                             );
                         faceSet.insert(pointFace);
@@ -640,7 +640,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
             {
                 label curNgbPoint = ngbPatchPoints[pointI];
 
-                label curLocalPoint = 
+                label curLocalPoint =
                     findIndex(procPatch.neighbPoints(), curNgbPoint);
 //                     procPatch.neighbPoints()[curNgbPoint];
 
@@ -651,7 +651,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
                 );
                 forAll(addressing, faceI)
                 {
-                    addressing[faceI] = 
+                    addressing[faceI] =
                         labelPair
                         (
                             procPatch.neighbProcNo(),
@@ -692,7 +692,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
                 << abort(FatalError);
     }
 
-    procBndFaceCentresPtr_ = 
+    procBndFaceCentresPtr_ =
         new FieldField<Field, vector>
         (
             Pstream::nProcs()
@@ -709,7 +709,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
             if (procI != Pstream::myProcNo())
             {
                 vectorField procCentres(Cf, procBndFaces()[procI]);
-                
+
                 {
                     OPstream toNeighbProc
                     (
@@ -717,7 +717,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
                         procI
                         // size of field
                     );
-                    
+
                     toNeighbProc << procCentres;
                 }
             }
@@ -814,7 +814,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
             labelHashSet pointSet;
             SLList<labelPair> pointCellSet;
 
-            const labelList& glPoints = 
+            const labelList& glPoints =
                 mesh().globalData().sharedPointLabels();
 
             forAll(meshPoints, pointI)
@@ -846,8 +846,8 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                             if (!pointSet.found(pointI))
                             {
                                 pointSet.insert(pointI);
-                            }                
-            
+                            }
+
                             pointCellSet.insert
                             (
                                 labelPair(pointI, curCells[cellI])
@@ -873,16 +873,16 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
                 forAll(patchPointsCells, pI)
                 {
-                    if 
+                    if
                     (
-                        patchPointsCells[pI].first() 
+                        patchPointsCells[pI].first()
                      == patchPoints[pointI]
                     )
                     {
                         label pointCell =
                             findIndex
                             (
-                                procCells[procPatch.neighbProcNo()], 
+                                procCells[procPatch.neighbProcNo()],
                                 patchPointsCells[pI].second()
                             );
                         cellSet.insert(pointCell);
@@ -957,7 +957,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
                 forAll(addressing, cellI)
                 {
-                    addressing[cellI] = 
+                    addressing[cellI] =
                         labelPair
                         (
                             procPatch.neighbProcNo(),
@@ -997,7 +997,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
                 << abort(FatalError);
     }
 
-    procCellCentresPtr_ = 
+    procCellCentresPtr_ =
         new FieldField<Field, vector>
         (
             Pstream::nProcs()
@@ -1015,7 +1015,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
             if (procI != Pstream::myProcNo())
             {
                 vectorField procCentres(CI, procCells()[procI]);
-                
+
                 {
                     OPstream toNeighbProc
                     (
@@ -1023,7 +1023,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
                         procI
                         // size of field
                     );
-                    
+
                     toNeighbProc << procCentres;
                 }
             }
@@ -1129,7 +1129,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 //         // Boundary faces from neighbour processors
 //         if (ptNgbProcBndFaceCentres.found(pointI))
 //         {
-//              interpNgbProcBndFaceCentres = 
+//              interpNgbProcBndFaceCentres =
 //                 ptNgbProcBndFaceCentres[pointI];
 //         }
 
@@ -1138,7 +1138,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
         // Boundary faces from neighbour processors
         if (gPtNgbProcBndFaceCentres.found(pointI))
         {
-             glInterpNgbProcBndFaceCentres = 
+             glInterpNgbProcBndFaceCentres =
                 gPtNgbProcBndFaceCentres[pointI];
         }
 
@@ -1147,7 +1147,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
         // Boundary faces from neighbour processors
         if (gPtNgbProcCellCentres.found(pointI))
         {
-             glInterpNgbProcCellCentres = 
+             glInterpNgbProcCellCentres =
                 gPtNgbProcCellCentres[pointI];
         }
 
@@ -1161,7 +1161,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
             forAll(pc, cI)
             {
-                interpNgbProcCellCentres[cI] = 
+                interpNgbProcCellCentres[cI] =
                     procCentres
                     [
                         pc[cI].first()
@@ -1183,7 +1183,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
             forAll(pf, fI)
             {
-                interpNgbProcBndFaceCentres[fI] = 
+                interpNgbProcBndFaceCentres[fI] =
                     procBndFaceCent
                     [
                         pf[fI].first()
@@ -1232,15 +1232,15 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
             label start = mesh().boundaryMesh()[patchID].start();
             label localFaceID = faceID - start;
-            
-            const unallocLabelList& faceCells = 
+
+            const unallocLabelList& faceCells =
                 mesh().boundary()[patchID].faceCells();
 
             label sizeby2 = faceCells.size()/2;
 
             if (localFaceID < sizeby2)
             {
-                vector delta = 
+                vector delta =
                     C[faceCells[localFaceID + sizeby2]]
                   - mesh().Cf().boundaryField()[patchID]
                     [
@@ -1251,12 +1251,12 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
             }
             else
             {
-                vector delta = 
+                vector delta =
                     C[faceCells[localFaceID - sizeby2]]
                   - mesh().Cf().boundaryField()[patchID]
                     [
                         localFaceID - sizeby2
-                    ];                
+                    ];
 
                 allPoints[pointID++] = Cf[faceID] + delta;
             }
@@ -1270,43 +1270,43 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
             label start = mesh().boundaryMesh()[patchID].start();
             label localFaceID = faceID - start;
-            
-            allPoints[pointID++] = 
+
+            allPoints[pointID++] =
                 mesh().C().boundaryField()[patchID][localFaceID];
         }
 
 //         // Boundary faces from neighbour processors
 //         for (label i=0; i<interpNgbProcBndFaceCentres.size(); i++)
 //         {
-//             allPoints[pointID++] = 
+//             allPoints[pointID++] =
 //                 interpNgbProcBndFaceCentres[i];
 //         }
 
         // Global point bnd faces from neighbour processors
         for (label i=0; i<glInterpNgbProcBndFaceCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 glInterpNgbProcBndFaceCentres[i];
         }
 
         // Global point bnd faces from neighbour processors
         for (label i=0; i<glInterpNgbProcCellCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 glInterpNgbProcCellCentres[i];
         }
 
         // Cells from neighbour processors
         for (label i=0; i<interpNgbProcCellCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 interpNgbProcCellCentres[i];
         }
 
         // Boundary faces from neighbour processors
         for (label i=0; i<interpNgbProcBndFaceCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 interpNgbProcBndFaceCentres[i];
         }
 
@@ -1320,12 +1320,12 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
             forAll(allPoints, pI)
             {
-                allMirrorPoints[pI] = 
+                allMirrorPoints[pI] =
                     p[pointI] + transform(I-2*n*n, (allPoints[pI]-p[pointI]));
             }
         }
 
-        // Weights 
+        // Weights
         scalarField W(allPoints.size() + allMirrorPoints.size(), 1.0);
 
         // philipc: force weights to 1.0: required for block coupled solver
@@ -1414,7 +1414,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 //         // Boundary faces from neighbour processors
 //         if (ptNgbProcBndFaceCentres.found(pointI))
 //         {
-//              interpNgbProcBndFaceCentres = 
+//              interpNgbProcBndFaceCentres =
 //                 ptNgbProcBndFaceCentres[pointI];
 //         }
 
@@ -1423,7 +1423,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
         // Boundary faces from neighbour processors
         if (gPtNgbProcBndFaceCentres.found(pointI))
         {
-             glInterpNgbProcBndFaceCentres = 
+             glInterpNgbProcBndFaceCentres =
                 gPtNgbProcBndFaceCentres[pointI];
         }
 
@@ -1432,7 +1432,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
         // Boundary faces from neighbour processors
         if (gPtNgbProcCellCentres.found(pointI))
         {
-             glInterpNgbProcCellCentres = 
+             glInterpNgbProcCellCentres =
                 gPtNgbProcCellCentres[pointI];
         }
 
@@ -1446,7 +1446,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
             forAll(pc, cI)
             {
-                interpNgbProcCellCentres[cI] = 
+                interpNgbProcCellCentres[cI] =
                     procCentres
                     [
                         pc[cI].first()
@@ -1468,7 +1468,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
             forAll(pf, fI)
             {
-                interpNgbProcBndFaceCentres[fI] = 
+                interpNgbProcBndFaceCentres[fI] =
                     procBndFaceCent
                     [
                         pf[fI].first()
@@ -1517,15 +1517,15 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
             label start = mesh().boundaryMesh()[patchID].start();
             label localFaceID = faceID - start;
-            
-            const unallocLabelList& faceCells = 
+
+            const unallocLabelList& faceCells =
                 mesh().boundary()[patchID].faceCells();
 
             label sizeby2 = faceCells.size()/2;
 
             if (localFaceID < sizeby2)
             {
-                vector delta = 
+                vector delta =
                     C[faceCells[localFaceID + sizeby2]]
                   - mesh().Cf().boundaryField()[patchID]
                     [
@@ -1536,12 +1536,12 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
             }
             else
             {
-                vector delta = 
+                vector delta =
                     C[faceCells[localFaceID - sizeby2]]
                   - mesh().Cf().boundaryField()[patchID]
                     [
                         localFaceID - sizeby2
-                    ];                
+                    ];
 
                 allPoints[pointID++] = Cf[faceID] + delta;
             }
@@ -1564,43 +1564,43 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
             label start = mesh().boundaryMesh()[patchID].start();
             label localFaceID = faceID - start;
-            
-            allPoints[pointID++] = 
+
+            allPoints[pointID++] =
                 mesh().C().boundaryField()[patchID][localFaceID];
         }
 
 //         // Boundary faces from neighbour processors
 //         for (label i=0; i<interpNgbProcBndFaceCentres.size(); i++)
 //         {
-//             allPoints[pointID++] = 
+//             allPoints[pointID++] =
 //                 interpNgbProcBndFaceCentres[i];
 //         }
 
         // Global point bnd faces from neighbour processors
         for (label i=0; i<glInterpNgbProcBndFaceCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 glInterpNgbProcBndFaceCentres[i];
         }
 
         // Global point cells from neighbour processors
         for (label i=0; i<glInterpNgbProcCellCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 glInterpNgbProcCellCentres[i];
         }
 
         // Cells from neighbour processors
         for (label i=0; i<interpNgbProcCellCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 interpNgbProcCellCentres[i];
         }
 
         // Boundary faces from neighbour processors
         for (label i=0; i<interpNgbProcBndFaceCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 interpNgbProcBndFaceCentres[i];
         }
 
@@ -1614,7 +1614,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
             forAll(allPoints, pI)
             {
-                allMirrorPoints[pI] = 
+                allMirrorPoints[pI] =
                     p[pointI] + transform(I-2*n*n, (allPoints[pI]-p[pointI]));
             }
         }
@@ -1650,8 +1650,10 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
     // if the pointer is already set
     if (invLsMatrices_.size() != 0)
     {
-        FatalErrorIn("newLeastSquaresVolPointInterpolation::makeInvLsMatrices()")
-            << "least square linear inerpolation matrices already exist"
+        FatalErrorIn
+        (
+            "newLeastSquaresVolPointInterpolation::makeInvLsMatrices()"
+        )   << "least square linear inerpolation matrices already exist"
             << abort(FatalError);
     }
 
@@ -1699,16 +1701,16 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 //         // Boundary faces from neighbour processors
 //         if (ptNgbProcBndFaceCentres.found(pointI))
 //         {
-//              interpNgbProcBndFaceCentres = 
+//              interpNgbProcBndFaceCentres =
 //                 ptNgbProcBndFaceCentres[pointI];
 //         }
-        
+
         vectorField glInterpNgbProcBndFaceCentres(0);
 
         // Boundar faces from neighbour processors
         if (gPtNgbProcBndFaceCentres.found(pointI))
         {
-             glInterpNgbProcBndFaceCentres = 
+             glInterpNgbProcBndFaceCentres =
                 gPtNgbProcBndFaceCentres[pointI];
         }
 
@@ -1717,7 +1719,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
         // Cells from neighbour processors
         if (gPtNgbProcCellCentres.found(pointI))
         {
-             glInterpNgbProcCellCentres = 
+             glInterpNgbProcCellCentres =
                 gPtNgbProcCellCentres[pointI];
         }
 
@@ -1731,7 +1733,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
             forAll(pc, cI)
             {
-                interpNgbProcCellCentres[cI] = 
+                interpNgbProcCellCentres[cI] =
                     procCentres
                     [
                         pc[cI].first()
@@ -1753,7 +1755,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
             forAll(pf, fI)
             {
-                interpNgbProcBndFaceCentres[fI] = 
+                interpNgbProcBndFaceCentres[fI] =
                     procBndFaceCent
                     [
                         pf[fI].first()
@@ -1802,15 +1804,15 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
             label start = mesh().boundaryMesh()[patchID].start();
             label localFaceID = faceID - start;
-            
-            const unallocLabelList& faceCells = 
+
+            const unallocLabelList& faceCells =
                 mesh().boundary()[patchID].faceCells();
 
             label sizeby2 = faceCells.size()/2;
 
             if (localFaceID < sizeby2)
             {
-                vector delta = 
+                vector delta =
                     C[faceCells[localFaceID + sizeby2]]
                   - mesh().Cf().boundaryField()[patchID]
                     [
@@ -1821,12 +1823,12 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
             }
             else
             {
-                vector delta = 
+                vector delta =
                     C[faceCells[localFaceID - sizeby2]]
                   - mesh().Cf().boundaryField()[patchID]
                     [
                         localFaceID - sizeby2
-                    ];                
+                    ];
 
                 allPoints[pointID++] = Cf[faceID] + delta;
             }
@@ -1849,43 +1851,43 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
             label start = mesh().boundaryMesh()[patchID].start();
             label localFaceID = faceID - start;
-            
-            allPoints[pointID++] = 
+
+            allPoints[pointID++] =
                 mesh().C().boundaryField()[patchID][localFaceID];
         }
 
 //         // Boundary faces from neighbour processors
 //         for (label i=0; i<interpNgbProcBndFaceCentres.size(); i++)
 //         {
-//             allPoints[pointID++] = 
+//             allPoints[pointID++] =
 //                 interpNgbProcBndFaceCentres[i];
 //         }
 
         // Global point bnd faces from neighbour processors
         for (label i=0; i<glInterpNgbProcBndFaceCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 glInterpNgbProcBndFaceCentres[i];
         }
 
         // Global point cells from neighbour processors
         for (label i=0; i<glInterpNgbProcCellCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 glInterpNgbProcCellCentres[i];
         }
 
         // Cells from neighbour processors
         for (label i=0; i<interpNgbProcCellCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 interpNgbProcCellCentres[i];
         }
-        
+
         // Bnd faces from neighbour processors
         for (label i=0; i<interpNgbProcBndFaceCentres.size(); i++)
         {
-            allPoints[pointID++] = 
+            allPoints[pointID++] =
                 interpNgbProcBndFaceCentres[i];
         }
 
@@ -1907,36 +1909,35 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
         if (allPoints.size() + allMirrorPoints.size() < nCoeffs)
         {
             FatalErrorIn
-	        (
+            (
                 "newLeastSquaresVolPointInterpolation::makeInvInvMatrices()"
-            )
-                << "allPoints.size() < " << nCoeffs << " : "
-                    << allPoints.size() + allMirrorPoints.size() 
-                    << abort(FatalError);
+            )   << "allPoints.size() < " << nCoeffs << " : "
+                << allPoints.size() + allMirrorPoints.size()
+                << abort(FatalError);
         }
 
-//         // Weights 
-//         scalarField W(allPoints.size(), 1.0);
-//         scalar sumW = 0;
-//         for (label i=0; i<allPoints.size(); i++)
-//         {
-//             scalar curR =  mag(allPoints[i] - p[pointI]);
-//             W[i] = 1.0/(sqr(curR) + VSMALL);
-//             sumW += W[i];
-//         }
-//         W /= sumW;
+        // Weights
+        // scalarField W(allPoints.size(), 1.0);
+        // scalar sumW = 0;
+        // for (label i=0; i<allPoints.size(); i++)
+        // {
+        //     scalar curR =  mag(allPoints[i] - p[pointI]);
+        //     W[i] = 1.0/(sqr(curR) + VSMALL);
+        //     sumW += W[i];
+        // }
+        // W /= sumW;
 
         const scalarField& W = w[pointI];
 
         invLsMatrices_.set
         (
-            pointI, 
+            pointI,
             new scalarRectangularMatrix
             (
                 nCoeffs,
                 allPoints.size() + allMirrorPoints.size(),
                 0.0
-            ) 
+            )
         );
         scalarRectangularMatrix& curMatrix = invLsMatrices_[pointI];
 
@@ -2084,17 +2085,17 @@ makeMirrorPlaneTransformation() const
             mesh().points().size(),
             Tuple2<vector, tensor>(vector::zero, tensor::zero)
         );
-    List<Tuple2<vector, tensor> >& mirrorPlaneTransformation = 
+    List<Tuple2<vector, tensor> >& mirrorPlaneTransformation =
         *mirrorPlaneTransformationPtr_;
 
 //     mirrorPlaneTransformationPtr_ = new Map<Tuple2<vector, tensor> >();
-//     Map<Tuple2<vector, tensor> >& mirrorPlaneTransformation = 
+//     Map<Tuple2<vector, tensor> >& mirrorPlaneTransformation =
 //         *mirrorPlaneTransformationPtr_;
 
 
     forAll(mesh().boundaryMesh(), patchI)
     {
-        if 
+        if
         (
             (
                 mesh().boundaryMesh()[patchI].type()
@@ -2102,10 +2103,10 @@ makeMirrorPlaneTransformation() const
             )
         )
         {
-            const labelList& meshPoints = 
+            const labelList& meshPoints =
                 mesh().boundaryMesh()[patchI].meshPoints();
 
-            const vectorField& pointNormals = 
+            const vectorField& pointNormals =
                 mesh().boundaryMesh()[patchI].pointNormals();
 
             forAll(meshPoints, pointI)
@@ -2119,7 +2120,7 @@ makeMirrorPlaneTransformation() const
 
 //                 mirrorPlaneTransformation.insert
 //                 (
-//                     meshPoints[pointI], 
+//                     meshPoints[pointI],
 //                     Tuple2<vector, tensor>
 //                     (
 //                         pointNormals[pointI],
@@ -2128,16 +2129,16 @@ makeMirrorPlaneTransformation() const
 //                 );
             }
         }
-        else if 
+        else if
         (
             mesh().boundaryMesh()[patchI].type()
          == wedgePolyPatch::typeName
         )
         {
-            const labelList& meshPoints = 
+            const labelList& meshPoints =
                 mesh().boundaryMesh()[patchI].meshPoints();
 
-            const vectorField& pointNormals = 
+            const vectorField& pointNormals =
                 mesh().boundaryMesh()[patchI].pointNormals();
 
             const wedgePolyPatch& wedge =
@@ -2156,7 +2157,7 @@ makeMirrorPlaneTransformation() const
                 }
 //                 mirrorPlaneTransformation.insert
 //                 (
-//                     meshPoints[pointI], 
+//                     meshPoints[pointI],
 //                     Tuple2<vector, tensor>
 //                     (
 //                         pointNormals[pointI],
@@ -2300,7 +2301,7 @@ const labelList& newLeastSquaresVolPointInterpolation
     return *axisEdgesPtr_;
 }
 
-const Map<labelList>& 
+const Map<labelList>&
 newLeastSquaresVolPointInterpolation::pointAxisEdges() const
 {
     if (!pointAxisEdgesPtr_)
@@ -2311,7 +2312,7 @@ newLeastSquaresVolPointInterpolation::pointAxisEdges() const
     return *pointAxisEdgesPtr_;
 }
 
-// const Map<Field<vector> >& 
+// const Map<Field<vector> >&
 // newLeastSquaresVolPointInterpolation::pointNgbProcBndFaceCentres() const
 // {
 //     if (!pointNgbProcBndFaceCentresPtr_)
@@ -2322,7 +2323,7 @@ newLeastSquaresVolPointInterpolation::pointAxisEdges() const
 //     return *pointNgbProcBndFaceCentresPtr_;
 // }
 
-const Map<Field<vector> >& 
+const Map<Field<vector> >&
 newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceCentres() const
 {
     if (!globalPointNgbProcBndFaceCentresPtr_)
@@ -2333,7 +2334,7 @@ newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceCentres() const
     return *globalPointNgbProcBndFaceCentresPtr_;
 }
 
-const Map<Field<vector> >& 
+const Map<Field<vector> >&
 newLeastSquaresVolPointInterpolation::globalPointNgbProcCellCentres() const
 {
     if (!globalPointNgbProcCellCentresPtr_)
@@ -2364,7 +2365,7 @@ const labelListList& newLeastSquaresVolPointInterpolation::procBndFaces() const
     return *procBndFacesPtr_;
 }
 
-const FieldField<Field, vector>& 
+const FieldField<Field, vector>&
 newLeastSquaresVolPointInterpolation::procBndFaceCentres() const
 {
     if (!procBndFaceCentresPtr_)
@@ -2407,7 +2408,7 @@ pointProcCells() const
     return *pointProcCellsPtr_;
 }
 
-const FieldField<Field, vector>& 
+const FieldField<Field, vector>&
 newLeastSquaresVolPointInterpolation::procCellCentres() const
 {
     if (!procCellCentresPtr_)
@@ -2418,7 +2419,7 @@ newLeastSquaresVolPointInterpolation::procCellCentres() const
     return *procCellCentresPtr_;
 }
 
-const FieldField<Field, scalar>& 
+const FieldField<Field, scalar>&
 newLeastSquaresVolPointInterpolation::weights() const
 {
     if (!weightsPtr_)
@@ -2461,7 +2462,7 @@ mirrorPlaneTransformation() const
 //     return *mirrorPlaneTransformationPtr_;
 // }
 
-const PtrList<scalarRectangularMatrix>& 
+const PtrList<scalarRectangularMatrix>&
 newLeastSquaresVolPointInterpolation::invLsMatrices() const
 {
     label size = invLsMatrices_.size();

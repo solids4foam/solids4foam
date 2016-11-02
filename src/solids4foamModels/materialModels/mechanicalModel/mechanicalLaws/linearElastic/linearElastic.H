@@ -73,8 +73,20 @@ class linearElastic
         //- Bulk modulus
         dimensionedScalar k_;
 
+        //- Initial (residual) stress field
+        //  Defaults to zero if not specified
+        const volSymmTensorField sigma0_;
+
+        //- Initial (residual) stress surface field
+        mutable surfaceSymmTensorField* sigma0fPtr_;
 
     // Private Member Functions
+
+        //- Make the initial stress surface field
+        void makeSigma0f() const;
+
+        //- Return a reference to the initial stress surface field
+        const surfaceSymmTensorField& sigma0f() const;
 
         //- Disallow default bitwise copy construct
         linearElastic(const linearElastic&);

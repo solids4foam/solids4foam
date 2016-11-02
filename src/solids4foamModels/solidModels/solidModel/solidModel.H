@@ -275,6 +275,17 @@ public:
             //- Write fields
             virtual void writeFields(const Time& runTime);
 
+            //- Return the desired new time-step size
+            virtual scalar newDeltaT();
+
+            //- Move the mesh to the deformed configuration
+            virtual void moveMesh
+            (
+                const pointField& oldPoints,
+                const volVectorField& DD,
+                pointVectorField& pointDD
+            );
+
             //- End of the program
             virtual void end()
             {}

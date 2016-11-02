@@ -278,6 +278,7 @@ unsLinGeomSolid::unsLinGeomSolid(dynamicFvMesh& mesh)
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
+    pointD_.oldTime();
 }
 
 
@@ -834,7 +835,7 @@ void unsLinGeomSolid::updateTotalFields()
 
 void unsLinGeomSolid::writeFields(const Time& runTime)
 {
-    // Calculate cell strain
+    // Calculate strain
     volSymmTensorField epsilon
     (
         IOobject
@@ -848,7 +849,7 @@ void unsLinGeomSolid::writeFields(const Time& runTime)
         symm(gradD_)
     );
 
-    // Update equivalent strain
+    // Calculate equivalent strain
     volScalarField epsilonEq
     (
         IOobject
@@ -865,7 +866,7 @@ void unsLinGeomSolid::writeFields(const Time& runTime)
     Info<< "Max epsilonEq = " << max(epsilonEq).value()
         << endl;
 
-    // Update equivalent (von Mises) stress
+    // Calculate equivalent (von Mises) stress
     volScalarField sigmaEq
     (
         IOobject

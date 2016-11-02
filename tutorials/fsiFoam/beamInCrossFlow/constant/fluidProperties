@@ -14,15 +14,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidModel consistentIcoFluid;
+fluidModel icoFluid;
 
 icoFluidCoeffs
-{
-    nCorrectors 3;
-    nNonOrthogonalCorrectors 1;
-}
-
-consistentIcoFluidCoeffs
 {
     nCorrectors 3;
     nNonOrthogonalCorrectors 1;

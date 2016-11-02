@@ -30,6 +30,11 @@ Description
 
     Neo-Hookean elasticity with Mises/J2 plasticity.
 
+    For elastic parameters, the user can specify:
+        - Young's modulus (E) and Poisson's ratio (nu)
+    or
+        - Shear modulus (mu) and bulk modulus (K)
+
     More details found in:
 
     Simo & Hughes, Computational Inelasticity, 1998, Springer.
@@ -70,29 +75,27 @@ class neoHookeanElasticMisesPlastic
         //- Initial density
         const dimensionedScalar rho_;
 
-        //- Young's modulus
-        const dimensionedScalar E_;
-
-        //- Poisson's ratio
-        const dimensionedScalar nu_;
-
         //- Shear modulus
-        const dimensionedScalar mu_;
+        dimensionedScalar mu_;
 
         //- Bulk modulus
-        const dimensionedScalar K_;
+        dimensionedScalar K_;
 
-        // Relative deformation gradient volField
+        //- Relative deformation gradient volField
         volTensorField* relFPtr_;
 
-        // Relative deformation gradient surfaceField
+        //- Relative deformation gradient surfaceField
         surfaceTensorField* relFfPtr_;
 
-        // Jacobian of the toal deformation gradient volField
+        //- Jacobian of the toal deformation gradient volField
         volScalarField* JPtr_;
 
-        // Jacobian of the toal deformation gradient surfaceField
+        //- Jacobian of the toal deformation gradient surfaceField
         surfaceScalarField* JfPtr_;
+
+        //- Total deformation gradient volField
+        //  Used in the calculation of the adaptive time-step
+        volTensorField* FPtr_;
 
         //- Table of post-yield stress versus plastic strain
         //  For large strain total Lagrangian models, it expects
@@ -167,9 +170,6 @@ class neoHookeanElasticMisesPlastic
         //- plasticN surface field
         surfaceSymmTensorField plasticNf_;
 
-        //- Current material surface field
-        //mutable surfaceScalarField* curMaterialfPtr_;
-
         //- An iterative procedure is used when the yield stress is a nonlinear
         //  function of plastic strain
         const bool nonLinearPlasticity_;
@@ -229,6 +229,12 @@ class neoHookeanElasticMisesPlastic
 
         //- Return a reference to the Jf field
         surfaceScalarField& Jf();
+
+        //- Make the F field
+        void makeF();
+
+        //- Return a reference to the F field
+        volTensorField& F();
 
         //- Return the current Kirchhoff yield stress
         scalar curYieldStress
@@ -312,6 +318,9 @@ public:
 
         //- Update the yield stress: called at end of time-step
         virtual void updateTotalFields();
+
+        //- Return the desired new time-step
+        virtual scalar newDeltaT();
 };
 
 

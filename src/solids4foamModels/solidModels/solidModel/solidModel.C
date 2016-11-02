@@ -26,6 +26,8 @@ License
 
 #include "solidModel.H"
 #include "volFields.H"
+#include "symmetryPolyPatch.H"
+#include "twoDPointCorrector.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -77,7 +79,14 @@ void Foam::solidModel::calcGlobalFaceZones() const
 
         word decompDictName = "system/decomposeParDict";
 
-        if (isDir(mesh().rootPath()/mesh().caseName()/"../system/solid"))
+        if
+        (
+            isDir
+            (
+                mesh().time().rootPath()/mesh().time().caseName()
+                /"../system/solid"
+            )
+        )
         {
             decompDictName = "../system/solid/decomposeParDict";
         }
@@ -119,6 +128,10 @@ void Foam::solidModel::calcGlobalFaceZones() const
             }
 
             globalFaceZonesPtr_ = new labelList(globalFaceZonesSet);
+        }
+        else
+        {
+            globalFaceZonesPtr_ = new labelList(0);
         }
     }
     else
@@ -488,6 +501,119 @@ void Foam::solidModel::setPressure
 void Foam::solidModel::writeFields(const Time& runTime)
 {
     runTime.write();
+}
+
+
+Foam::scalar Foam::solidModel::newDeltaT()
+{
+    return mechanical().newDeltaT();
+}
+
+
+void Foam::solidModel::moveMesh
+(
+    const pointField& oldPoints,
+    const volVectorField& DD,
+    pointVectorField& pointDD
+)
+{
+    Info<< "Moving the mesh to the deformed configuration" << nl << endl;
+
+    //- Move mesh by interpolating displacement field to vertices
+    // To be checked: sync boundary and global points across procs to make sure
+    // numiercal error does not build up and when end up with the error
+    // "face area does not match neighbour..."
+    // We could sync points as a pointVectorField just as we sync pointDD
+
+    // Interpolate cell displacements to vertices
+    mechanical().interpolate(DD, pointDD);
+
+    // Ensure continuous displacement across processor boundary
+    // Something strange is happening here
+    pointDD.correctBoundaryConditions();
+
+    vectorField& pointDDI = pointDD.internalField();
+
+    vectorField newPoints = oldPoints;
+
+    // Correct symmetryPlane points
+
+    forAll(mesh().boundaryMesh(), patchI)
+    {
+        if (isA<symmetryPolyPatch>(mesh().boundaryMesh()[patchI]))
+        {
+            const labelList& meshPoints =
+                mesh().boundaryMesh()[patchI].meshPoints();
+
+            const vector avgN =
+                gAverage(mesh().boundaryMesh()[patchI].pointNormals());
+
+            const vector i(1, 0, 0);
+            const vector j(0, 1, 0);
+            const vector k(0, 0, 1);
+
+            if (mag(avgN & i) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDDI[meshPoints[pI]].x() = 0;
+                }
+            }
+            else if (mag(avgN & j) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDDI[meshPoints[pI]].y() = 0;
+                }
+            }
+            else if (mag(avgN & k) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDDI[meshPoints[pI]].z() = 0;
+                }
+            }
+        }
+        else if (isA<emptyPolyPatch>(mesh().boundaryMesh()[patchI]))
+        {
+            const labelList& meshPoints =
+                mesh().boundaryMesh()[patchI].meshPoints();
+
+            const vector avgN =
+                gAverage(mesh().boundaryMesh()[patchI].pointNormals());
+            const vector k(0, 0, 1);
+
+            if (mag(avgN & k) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDDI[meshPoints[pI]].z() = 0;
+                }
+            }
+        }
+    }
+
+    // Note: allPoints will have more points than pointDD if there are
+    // globalFaceZones
+    forAll (pointDDI, pointI)
+    {
+        newPoints[pointI] += pointDDI[pointI];
+    }
+
+    // Move unused globalFaceZone points
+    updateGlobalFaceZoneNewPoints(pointDDI, newPoints);
+
+    twoDPointCorrector twoDCorrector(mesh());
+    twoDCorrector.correctPoints(newPoints);
+    twoDCorrector.correctPoints(pointDDI);
+    mesh().movePoints(newPoints);
+    mesh().V00();
+    mesh().moving(false);
+    mesh().changing(false);
+    mesh().setPhi().writeOpt() = IOobject::NO_WRITE;
+
+    // Tell the mechanical model to move the subMeshes, if they exist
+    mechanical().moveSubMeshes();
 }
 
 

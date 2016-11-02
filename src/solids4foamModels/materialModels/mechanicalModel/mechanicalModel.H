@@ -97,26 +97,24 @@ class mechanicalModel
         //- Stress surfaceField for each mechanical law
         mutable PtrList<surfaceSymmTensorField> subMeshSigmaf_;
 
-        //- Displacement volField for each mechanical law
+        //- Displacement (or displacement increment) volField for each
+        //  mechanical
         mutable PtrList<volVectorField> subMeshD_;
 
-        //- Displacement increment volField for each mechanical law
-        mutable PtrList<volVectorField> subMeshDD_;
-
-        //- Displacement gradient volField for each mechanical law
+        //- Displacement  (or displacement increment) gradient volField for each
+        //  mechanical law
         mutable PtrList<volTensorField> subMeshGradD_;
 
-        //- Displacement gradient surfaceField for each mechanical law
+        //- Displacement  (or displacement increment) gradient surfaceField for
+        //  each mechanical law
         mutable PtrList<surfaceTensorField> subMeshGradDf_;
 
-        //- Displacement gradient increment volField for each mechanical law
-        mutable PtrList<volTensorField> subMeshGradDD_;
-
-        //- Displacement gradient increment surfaceField for each mechanical law
-        mutable PtrList<surfaceTensorField> subMeshGradDDf_;
-
-        //- Displacement pointField for each mechanical law
+        //- Displacement (or displacement increment) pointField for each
+        //  mechanical law
         mutable PtrList<pointVectorField> subMeshPointD_;
+
+        //- Are there any bi-material interface faces
+        mutable bool* biMaterialInterfaceActivePtr_;
 
         //- List of faces in the base mesh that are on a bi-material interface
         //  ie. they are shared by two materials
@@ -130,6 +128,10 @@ class mechanicalModel
 
         //- Index of the subMesh on the other side of a bi-material interface
         mutable PtrList<labelList> interfaceShadowFaceID_;
+
+        //- Stress calculated at shadow side of the interface for processor
+        //  faces
+        mutable PtrList<symmTensorField> interfaceShadowSigma_;
 
         //- The implicit stiffness surface field for Rhie-Chow correction
         mutable surfaceScalarField* impKfcorrPtr_;
@@ -192,15 +194,6 @@ class mechanicalModel
         //- Return the subMesh D volFields
         const PtrList<volVectorField>& subMeshD() const;
 
-        //- Calculate the subMesh DD fields
-        void calcSubMeshDD() const;
-
-        //- Return the subMesh DD volFields
-        PtrList<volVectorField>& subMeshDD();
-
-        //- Return the subMesh DD volFields
-        const PtrList<volVectorField>& subMeshDD() const;
-
         //- Calculate the subMesh gradD fields
         void calcSubMeshGradD() const;
 
@@ -219,24 +212,6 @@ class mechanicalModel
         //- Return the subMesh gradDf volFields
         const PtrList<surfaceTensorField>& subMeshGradDf() const;
 
-        //- Calculate the subMesh gradDD fields
-        void calcSubMeshGradDD() const;
-
-        //- Return the subMesh gradDD volFields
-        PtrList<volTensorField>& subMeshGradDD();
-
-        //- Return the subMesh gradDD volFields
-        const PtrList<volTensorField>& subMeshGradDD() const;
-
-        //- Calculate the subMesh gradDDf fields
-        void calcSubMeshGradDDf() const;
-
-        //- Return the subMesh gradDDf volFields
-        PtrList<surfaceTensorField>& subMeshGradDDf();
-
-        //- Return the subMesh gradDDf volFields
-        const PtrList<surfaceTensorField>& subMeshGradDDf() const;
-
         //- Calculate the subMesh pointD fields
         void calcSubMeshPointD() const;
 
@@ -253,6 +228,8 @@ class mechanicalModel
         const labelList& interfaceBaseFaces() const;
 
         //- Calculate the interface shadow subMesh indices
+        //  These are the maps to find which subMesh has the shadow face at a
+        //  bi-material interface
         void calcInterfaceShadowIDs() const;
 
         //- Return the interface shadow subMesh indices
@@ -288,16 +265,17 @@ class mechanicalModel
             const bool useVolFieldSigma
         );
 
-        //- Correct snGrad on bi-material interface patch for subMeshGradD field
-        void correctInterfaceSnGrad
+        //- Correct snGrad on subMeshGradD fields because the default calculated
+        //  patches do not account for non-orthogonality
+        void correctBoundarySnGrad
         (
             PtrList<volVectorField>& subMeshDList,
             PtrList<volTensorField>& subMeshGradDList
         );
 
-        //- Correct snGrad on bi-material interface patch for subMeshGradDf
-        //  field
-        void correctInterfaceSnGradf
+        //- Correct snGrad on subMeshGradD fields because the default calculated
+        //  patches do not account for non-orthogonality
+        void correctBoundarySnGradf
         (
             PtrList<volVectorField>& subMeshDList,
             PtrList<surfaceTensorField>& subMeshGradDfList,
@@ -333,6 +311,23 @@ class mechanicalModel
                 subMshFields,
             GeometricField<Type, pointPatchField, pointMesh>& baseMeshField
         ) const;
+
+        //- Return interfaceShadowSigma
+        const PtrList<symmTensorField>& interfaceShadowSigma() const;
+
+        //- Make interfaceShadowSigma
+        void makeInterfaceShadowSigma() const;
+
+        //- Assemble and update the stress calculated from the other side of the
+        //  interface i.e. calculated in the subMeshes on the other side of the
+        //  interface
+        void updateInterfaceShadowSigma(const bool useVolFieldSigma);
+
+        //- Are there any bi-material interface faces
+        bool biMaterialInterfaceActive() const;
+
+        //- Calculate biMaterialInterfaceActive
+        void calcBiMaterialInterfaceActive() const;
 
         //- Clear out demand driven data
         void clearOut() const;
@@ -433,6 +428,12 @@ public:
 
             //- Update total accumulated fields
             void updateTotalFields();
+
+            //- Return the desired new time-step size
+            scalar newDeltaT();
+
+            //- Move subMeshes
+            void moveSubMeshes();
 
             //- Lookup a field from the base mesh and interpolate it the subMesh
             template<class Type>

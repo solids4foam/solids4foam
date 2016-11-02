@@ -252,6 +252,7 @@ linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
     maxIterReached_(0)
 {
     D_.oldTime().oldTime();
+    pointD_.oldTime();
 }
 
 
@@ -302,7 +303,7 @@ tmp<vectorField> linGeomSolid::faceZonePointDisplacementIncrement
         {
             label localPoint = curPointMap[globalPointI];
 
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
             {
                 label procPoint = zoneMeshPoints[localPoint];
 
@@ -396,8 +397,7 @@ tmp<tensorField> linGeomSolid::faceZoneSurfaceGradientOfVelocity
             velocityGradient
             [
                 mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchGradU[i];
+            ] = patchGradU[i];
         }
 
         // Parallel data exchange: collect field on all processors
@@ -450,7 +450,7 @@ tmp<vectorField> linGeomSolid::currentFaceZonePoints
         {
             label localPoint = curPointMap[globalPointI];
 
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
             {
                 label procPoint = zoneMeshPoints[localPoint];
 
@@ -552,8 +552,7 @@ tmp<vectorField> linGeomSolid::faceZoneNormal
             normals
             [
                 mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchNormals[i];
+            ] = patchNormals[i];
         }
 
         // Parallel data exchange: collect field on all processors
@@ -786,7 +785,7 @@ void linGeomSolid::writeFields(const Time& runTime)
     Info<< "Max epsilonEq = " << max(epsilonEq).value()
         << endl;
 
-    // Calculaute equivalent (von Mises) stress
+    // Calculate equivalent (von Mises) stress
     volScalarField sigmaEq
     (
         IOobject

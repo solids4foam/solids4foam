@@ -303,23 +303,26 @@ void pisoFluid::evolve()
     }
 
     // Construct momentum equation
-    fvVectorMatrix UEqn
+    // Convection-diffusion matrix
+    fvVectorMatrix HUEqn
     (
-        fvm::ddt(U_)
-      + fvm::div(phi_, U_)
+        fvm::div(phi_, U_)
       + turbulence_->divDevReff(U_)
     );
 
+    // Time derivative matrix
+    fvVectorMatrix ddtUEqn(fvm::ddt(U_));
+
     // Solve momentum equation
-    solve(UEqn == -gradp_);
+    solve(ddtUEqn + HUEqn == -gradp_);
 
     // --- PISO loop
 
-    volScalarField rUA = 1.0/UEqn.A();
+    volScalarField aU = HUEqn.A();
 
     for (int corr = 0; corr < nCorr; corr++)
     {
-        U_ = rUA*UEqn.H();
+        U_ = HUEqn.H()/aU;
         phi_ = (fvc::interpolate(U_) & mesh.Sf());
 
         for (int nonOrth = 0; nonOrth <= nNonOrthCorr; nonOrth++)
@@ -327,7 +330,7 @@ void pisoFluid::evolve()
             // Construct pressure equation
             fvScalarMatrix pEqn
             (
-                fvm::laplacian(rUA, p_) == fvc::div(phi_)
+                fvm::laplacian(1/aU, p_) == fvc::div(phi_)
             );
 
             // Solve pressure equation
@@ -371,7 +374,10 @@ void pisoFluid::evolve()
 
         gradp_ = fvc::grad(p_);
 
-        U_ -= rUA*gradp_;
+        U_ = 1.0/(aU + ddtUEqn.A())*
+            (
+                U_*aU - gradp_ + ddtUEqn.H()
+            );
         U_.correctBoundaryConditions();
     }
 

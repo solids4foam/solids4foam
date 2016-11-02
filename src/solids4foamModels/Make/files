@@ -17,7 +17,6 @@ fluidModels/fluidModel/fluidModel.C
 fluidModels/fluidModel/newFluidModel.C
 fluidModels/icoFluid/icoFluid.C
 fluidModels/pisoFluid/pisoFluid.C
-fluidModels/consistentIcoFluid/consistentIcoFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
@@ -43,10 +42,13 @@ $(mechanicalLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 $(mechanicalLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
 $(mechanicalLaws)/thermoLinearElastic/thermoLinearElastic.C
 $(mechanicalLaws)/linearElasticFromFile/linearElasticFromFile.C
+$(mechanicalLaws)/linearElasticCt/linearElasticCt.C
 
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
+$(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
+$(solidFvPatchFields)/oscillateDisplacement/oscillateDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
 $(solidFvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C

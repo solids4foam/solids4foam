@@ -1,0 +1,29 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      meshSmootherDict;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+lambda                0.35;
+mu                    0.34;
+nCorrectors           100;
+
+weighingFunction    "inverseDistance";
+// weighingFunction    "inverseDistanceSquared";
+// weighingFunction    "inverseDistanceSquareRoot";
+// weighingFunction    "none";
+
+writeOption         "overWrite";
+
+// ************************************************************************* //

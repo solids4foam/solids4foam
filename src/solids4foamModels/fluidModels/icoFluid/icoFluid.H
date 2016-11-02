@@ -139,8 +139,14 @@ public:
                 return gradp_;
             }
 
-            //- Return flux field
-            surfaceScalarField& phi()
+            //- Return const reference to flux field
+            virtual const surfaceScalarField& phi() const
+            {
+                return phi_;
+            }
+
+            //- Return reference to flux field
+            virtual surfaceScalarField& phi()
             {
                 return phi_;
             }

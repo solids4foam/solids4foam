@@ -50,7 +50,6 @@ SourceFiles
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
-#include "newLeastSquaresVolPointInterpolation.H"
 #include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -90,9 +89,6 @@ class unsNonLinGeomTotalLagSolid
 
         //- Cauchy (true) stress surface field
         surfaceSymmTensorField sigmaf_;
-
-        //- Cell-to-point interpolation for interpolating DD to pointDD
-        newLeastSquaresVolPointInterpolation volToPoint_;
 
         //- Cell displacement gradient
         volTensorField gradD_;
@@ -229,22 +225,10 @@ public:
                 return sigma_;
             }
 
-            //- Strain tensor
-            // const volSymmTensorField& epsilon() const
-            // {
-            //     return epsilon_;
-            // }
-
             //- Return point displacement field
             virtual const pointVectorField& pointD() const
             {
                 return pointD_;
-            }
-
-            //- Return multi-material interface pointer
-            const newLeastSquaresVolPointInterpolation& volToPoint() const
-            {
-                return volToPoint_;
             }
 
             //- Face zone point displacement increment
@@ -289,22 +273,6 @@ public:
             (
                 const label patchID,
                 const scalarField& pressure
-            );
-
-            //- Set traction at specified patch
-            virtual void setTraction
-            (
-                const label patchID,
-                const label zoneID,
-                const vectorField& zoneTraction
-            );
-
-            //- Set pressure at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const label zoneID,
-                const scalarField& zonePressure
             );
 
             //- Evolve the solid solver and solve the mathematical model

@@ -66,7 +66,22 @@ class poroLinearElastic
 :
     public linearElastic
 {
+    // Private Data
+
+        //- Initial (residual) poro-pressure field
+        //  Defaults to zero if not specified
+        const volScalarField p0_;
+
+        //- Initial (residual) stress surface field
+        mutable surfaceScalarField* p0fPtr_;
+
     // Private Member Functions
+
+        //- Make the initial pore-pressure surface field
+        void makeP0f() const;
+
+        //- Return a reference to the initial pore-pressure surface field
+        const surfaceScalarField& p0f() const;
 
         //- Disallow default bitwise copy construct
         poroLinearElastic(const poroLinearElastic&);

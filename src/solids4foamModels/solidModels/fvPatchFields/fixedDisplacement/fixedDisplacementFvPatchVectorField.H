@@ -45,6 +45,7 @@ Author
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 #include "interpolationTable.H"
+#include "primitivePatchInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -66,6 +67,20 @@ class fixedDisplacementFvPatchVectorField
 
         //- Displacement time series
         interpolationTable<vector> dispSeries_;
+
+        //- Patch interpolator to interpolate face values to the points
+        mutable primitivePatchInterpolation* interpPtr_;
+
+    // Private Functions
+
+        //- Make the patch interpolator
+        void makeInterp() const;
+
+        //- Return the patch interpolator
+        primitivePatchInterpolation& interp();
+
+        //- Set the point displacement field boundary condition
+        void setPointDisplacement(const vectorField& faceDisp);
 
 public:
 
@@ -138,6 +153,13 @@ public:
 
     // Member functions
 
+        // Access functions
+
+        //- Update the coefficients associated with the patch field
+            virtual vectorField& totalDisp()
+            {
+                return totalDisp_;
+            }
 
         // Evaluation functions
 
