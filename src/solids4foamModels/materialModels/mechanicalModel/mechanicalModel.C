@@ -1483,7 +1483,7 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
 {
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
-    if (interfaceBaseFaces().size() == 0)
+    if (returnReduce(interfaceBaseFaces().size(), maxOp<int>()) == 0)
     {
         // No need for any corrections if there are no bi-material interfaces
         forAll(subMeshes, lawI)
@@ -1782,7 +1782,7 @@ void Foam::mechanicalModel::correctInterfaceSnGrad
     PtrList<volTensorField>& subMeshGradDList
 )
 {
-    if (interfaceBaseFaces().size() == 0)
+    if (returnReduce(interfaceBaseFaces().size(), maxOp<int>()) == 0)
     {
         // No need for any corrections if there are no bi-material interfaces
         return;
@@ -1832,7 +1832,7 @@ void Foam::mechanicalModel::correctInterfaceSnGradf
     PtrList<volTensorField>& subMeshGradDList
 )
 {
-    if (interfaceBaseFaces().size() == 0)
+    if (returnReduce(interfaceBaseFaces().size(), maxOp<int>()) == 0)
     {
         // No need for any corrections if there are no bi-material interfaces
         return;
@@ -2304,7 +2304,7 @@ void Foam::mechanicalModel::grad
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
-    if (interfaceBaseFaces().size() == 0)
+    if (returnReduce(interfaceBaseFaces().size(), maxOp<int>()) == 0)
     {
         gradD = fvc::grad(D);
     }
@@ -2373,7 +2373,7 @@ void Foam::mechanicalModel::grad
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
-    if (interfaceBaseFaces().size() == 0)
+    if (returnReduce(interfaceBaseFaces().size(), maxOp<int>()) == 0)
     {
         gradD = fvc::grad(D, pointD);
     }
@@ -2442,7 +2442,7 @@ void Foam::mechanicalModel::grad
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
-    if (interfaceBaseFaces().size() == 0)
+    if (returnReduce(interfaceBaseFaces().size(), maxOp<int>()) == 0)
     {
         gradDf = fvc::fGrad(D, pointD);
     }
@@ -2516,7 +2516,7 @@ void Foam::mechanicalModel::interpolate
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
-    if (interfaceBaseFaces().size() == 0)
+    if (returnReduce(interfaceBaseFaces().size(), maxOp<int>()) == 0)
     {
         volToPoint().interpolate(D, pointD);
     }
