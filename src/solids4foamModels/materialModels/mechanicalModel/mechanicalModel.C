@@ -30,6 +30,8 @@ License
 #include "gaussGrad.H"
 #include "twoDPointCorrector.H"
 
+#include "fixedGradientFvPatchFields.H"
+
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 
@@ -1693,6 +1695,12 @@ void Foam::mechanicalModel::correctBoundarySnGrad
     PtrList<volTensorField>& subMeshGradDList
 )
 {
+    if (interfaceBaseFaces().size() == 0)
+    {
+        // No need for any corrections if there are no bi-material interfaces
+        return;
+    }
+
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
     forAll(subMeshes, lawI)
@@ -1700,7 +1708,6 @@ void Foam::mechanicalModel::correctBoundarySnGrad
         const volVectorField& subMeshD = subMeshDList[lawI];
         volTensorField& subMeshGradD = subMeshGradDList[lawI];
         const fvMesh& subMesh = subMeshes[lawI].subMesh();
-        const labelList& patchMap = subMeshes[lawI].patchMap();
 
         forAll(subMeshGradD.boundaryField(), patchI)
         {
@@ -1734,6 +1741,12 @@ void Foam::mechanicalModel::correctBoundarySnGradf
     PtrList<volTensorField>& subMeshGradDList
 )
 {
+    if (interfaceBaseFaces().size() == 0)
+    {
+        // No need for any corrections if there are no bi-material interfaces
+        return;
+    }
+
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
     forAll(subMeshes, lawI)
@@ -1742,7 +1755,6 @@ void Foam::mechanicalModel::correctBoundarySnGradf
         surfaceTensorField& subMeshGradDf = subMeshGradDfList[lawI];
         const volTensorField& subMeshGradD = subMeshGradDList[lawI];
         const fvMesh& subMesh = subMeshes[lawI].subMesh();
-        const labelList& patchMap = subMeshes[lawI].patchMap();
 
         forAll(subMeshGradDf.boundaryField(), patchI)
         {
@@ -2693,14 +2705,37 @@ Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
     // however, numerically "div(grad(phi))" uses a larger stencil than the
     // "laplacian(phi)"; the difference between these two approximations is
     // a small amount of numerical diffusion that quells oscillations
-    return
-    (
-        fvc::laplacian
+    if (D.name() == "DD")
+    {
+        return
         (
-            impKfcorr(), D, "laplacian(D" + D.name() + ',' + D.name() + ')'
-        )
-      - fvc::div(impKfcorr()*mesh().Sf() & fvc::interpolate(gradD))
-    );
+            fvc::laplacian
+            (
+                impKfcorr(), D, "laplacian(D" + D.name() + ',' + D.name() + ')'
+            )
+          - fvc::div(impKfcorr()*mesh().Sf() & fvc::interpolate(gradD))
+        );
+    }
+    else
+    {
+        // We will calculate this numerical diffusion based on the increment of
+        // displacement, as it may become large of we base it on the total
+        // displacement
+        return
+        (
+            fvc::laplacian
+            (
+                impKfcorr(),
+                D - D.oldTime(),
+                "laplacian(D" + D.name() + ',' + D.name() + ')'
+            )
+          - fvc::div
+            (
+                impKfcorr()*mesh().Sf()
+              & fvc::interpolate(gradD - gradD.oldTime())
+            )
+        );
+    }
 }
 
 
@@ -2750,33 +2785,43 @@ Foam::scalar Foam::mechanicalModel::newDeltaT()
 
 void Foam::mechanicalModel::moveSubMeshes()
 {
-    forAll(subMeshes(), lawI)
+    PtrList<mechanicalLaw>& laws = *this;
+
+    // Sub-meshes only exist when there is more than one material law
+    if (laws.size() > 1)
     {
-        Info<< "    Moving subMesh " << subMeshes()[lawI].subMesh().name()
-            << endl;
-
-        twoDPointCorrector twoDCorrector(subMeshes()[lawI].subMesh());
-        pointField newPoints =
-            subMeshes()[lawI].subMesh().points() + subMeshPointD()[lawI];
-        twoDCorrector.correctPoints(newPoints);
-
-        subMeshes()[lawI].subMesh().movePoints(newPoints);
-        subMeshes()[lawI].subMesh().V00();
-        subMeshes()[lawI].subMesh().moving(false);
-        subMeshes()[lawI].subMesh().changing(false);
-        subMeshes()[lawI].subMesh().setPhi().writeOpt() = IOobject::NO_WRITE;
-
-        if
-        (
-            mesh().time().outputTime()
-         && lookupOrDefault<Switch>("writeSubMeshes",  false)
-        )
+        forAll(subMeshes(), lawI)
         {
-            Info<< "    Writing subMesh "
-                << subMeshes()[lawI].subMesh().name() << endl;
-            subMeshes()[lawI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
-            subMeshes()[lawI].subMesh().setInstance(mesh().time().timeName());
-            subMeshes()[lawI].subMesh().write();
+            Info<< "    Moving subMesh " << subMeshes()[lawI].subMesh().name()
+                << endl;
+
+            twoDPointCorrector twoDCorrector(subMeshes()[lawI].subMesh());
+            pointField newPoints =
+                subMeshes()[lawI].subMesh().points() + subMeshPointD()[lawI];
+            twoDCorrector.correctPoints(newPoints);
+
+            subMeshes()[lawI].subMesh().movePoints(newPoints);
+            subMeshes()[lawI].subMesh().V00();
+            subMeshes()[lawI].subMesh().moving(false);
+            subMeshes()[lawI].subMesh().changing(false);
+            subMeshes()[lawI].subMesh().setPhi().writeOpt() =
+                IOobject::NO_WRITE;
+
+            if
+            (
+                mesh().time().outputTime()
+             && lookupOrDefault<Switch>("writeSubMeshes",  false)
+            )
+            {
+                Info<< "    Writing subMesh "
+                    << subMeshes()[lawI].subMesh().name() << endl;
+                subMeshes()[lawI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
+                subMeshes()[lawI].subMesh().setInstance
+                (
+                    mesh().time().timeName()
+                );
+                subMeshes()[lawI].subMesh().write();
+            }
         }
     }
 }
