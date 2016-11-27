@@ -2693,15 +2693,15 @@ Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
     // however, numerically "div(grad(phi))" uses a larger stencil than the
     // "laplacian(phi)"; the difference between these two approximations is
     // a small amount of numerical diffusion that quells oscillations
-    if (D.name() == "DD")
+    if (D.name() == "DD" || biMaterialInterfaceActive())
     {
         return
         (
             fvc::laplacian
             (
-                impKfcorr(), D, "laplacian(D" + D.name() + ',' + D.name() + ')'
+                impKf(), D, "laplacian(D" + D.name() + ',' + D.name() + ')'
             )
-          - fvc::div(impKfcorr()*mesh().Sf() & fvc::interpolate(gradD))
+          - fvc::div(impKf()*mesh().Sf() & fvc::interpolate(gradD))
         );
     }
     else
@@ -2709,17 +2709,20 @@ Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
         // We will calculate this numerical diffusion based on the increment of
         // displacement, as it may become large of we base it on the total
         // displacement
+        // Issue: The increment field "D - D.oldTime()" will be incorrect on
+        // non-orthogonal meshes as the grad(D - D.oldTime()) field would not be
+        // stored... we can/should fix this
         return
         (
             fvc::laplacian
             (
-                impKfcorr(),
+                impKf(),
                 D - D.oldTime(),
                 "laplacian(D" + D.name() + ',' + D.name() + ')'
             )
           - fvc::div
             (
-                impKfcorr()*mesh().Sf()
+                impKf()*mesh().Sf()
               & fvc::interpolate(gradD - gradD.oldTime())
             )
         );
