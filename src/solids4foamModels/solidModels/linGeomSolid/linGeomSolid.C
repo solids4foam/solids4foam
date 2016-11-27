@@ -253,6 +253,7 @@ linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
 {
     D_.oldTime().oldTime();
     pointD_.oldTime();
+    gradD_.oldTime();
 }
 
 
