@@ -1695,12 +1695,6 @@ void Foam::mechanicalModel::correctBoundarySnGrad
     PtrList<volTensorField>& subMeshGradDList
 )
 {
-    if (interfaceBaseFaces().size() == 0)
-    {
-        // No need for any corrections if there are no bi-material interfaces
-        return;
-    }
-
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
     forAll(subMeshes, lawI)
@@ -1741,12 +1735,6 @@ void Foam::mechanicalModel::correctBoundarySnGradf
     PtrList<volTensorField>& subMeshGradDList
 )
 {
-    if (interfaceBaseFaces().size() == 0)
-    {
-        // No need for any corrections if there are no bi-material interfaces
-        return;
-    }
-
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
     forAll(subMeshes, lawI)
