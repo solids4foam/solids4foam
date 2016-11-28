@@ -16,13 +16,13 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // linearGeometry: assumes small strains and rotations
-solidModel     linearGeometry;
-//solidModel     unsLinearGeometry;
+//solidModel     linearGeometry;
+solidModel     unsLinearGeometry;
 
 "linearGeometryCoeffs|unsLinearGeometryCoeffs"
 {
     // Maximum number of momentum correctors
-    //nCorrectors     10000;
+    //nCorrectors     1000;
 
     // Solution tolerance for displacement
     //solutionTolerance 1e-06;

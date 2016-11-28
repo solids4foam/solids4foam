@@ -37,15 +37,15 @@ divSchemes
 laplacianSchemes
 {
     default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
+    laplacian(DD,D)    Gauss linear corrected 1;
+    laplacian(DDD,DD)  Gauss linear corrected 1;
 }
 
 snGradSchemes
 {
     default            none;
-    snGrad(D)          newSkewCorrected 1;
-    snGrad(DD)         newSkewCorrected 1;
+    snGrad(D)          corrected 1;
+    snGrad(DD)         corrected 1;
 }
 
 interpolationSchemes
