@@ -23,40 +23,42 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    icoFluid
+    transientSimpleFluid
 
 Description
-    icoFoam fluid model
+    transientSimpleFoam fluid model
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
     Zeljko Tukovic, FSB Zagreb.  All rights reserved.
     Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
-    icoFluid.C
+    transientSimpleFluid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef icoFluid_H
-#define icoFluid_H
+#ifndef transientSimpleFluid_H
+#define transientSimpleFluid_H
 
 #include "fluidModel.H"
 #include "volFields.H"
 #include "surfaceFields.H"
+#include "singlePhaseTransportModel.H"
+#include "turbulenceModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+
 namespace fluidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class icoFluid Declaration
+                        Class transientSimpleFluid Declaration
 \*---------------------------------------------------------------------------*/
 
-class icoFluid
+class transientSimpleFluid
 :
     public fluidModel
 {
@@ -68,17 +70,17 @@ class icoFluid
         //- Pressure field
         volScalarField p_;
 
-        //- Gradient of pressure field
+        //- Pressure field
         volVectorField gradp_;
 
         //- Flux field
         surfaceScalarField phi_;
 
-        // Transport properties dictionary
-        IOdictionary transportProperties_;
+        //- Transport model
+        singlePhaseTransportModel laminarTransport_;
 
-        //- Kinematic viscosity
-        dimensionedScalar nu_;
+        //- Turbulence model
+        autoPtr<incompressible::turbulenceModel> turbulence_;
 
         //- Density
         dimensionedScalar rho_;
@@ -90,27 +92,31 @@ class icoFluid
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        icoFluid(const icoFluid&);
+        transientSimpleFluid(const transientSimpleFluid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const icoFluid&);
+        void operator=(const transientSimpleFluid&);
 
+        //- Evolve the fluid model
+        void evolveInconsistent();
+
+        //- Evolve the fluid model
+        void evolveConsistentByJasak();
 
 public:
 
     //- Runtime type information
-    TypeName("icoFluid");
-
+    TypeName("transientSimpleFluid");
 
     // Constructors
 
         //- Construct from components
-        icoFluid(const fvMesh& mesh);
+        transientSimpleFluid(const fvMesh& mesh);
 
 
     // Destructor
 
-        virtual ~icoFluid()
+        virtual ~transientSimpleFluid()
         {}
 
 
@@ -152,12 +158,6 @@ public:
             virtual surfaceScalarField& phi()
             {
                 return phi_;
-            }
-
-            //- Return kinematic viscosity
-            const dimensionedScalar& nu() const
-            {
-                return nu_;
             }
 
             //- Density

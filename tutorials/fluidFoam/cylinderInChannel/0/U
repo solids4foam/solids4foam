@@ -9,43 +9,45 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      controlDict;
+    class       volVectorField;
+    object      U;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     icoFoam;
+dimensions      [0 1 -1 0 0 0 0];
 
-startFrom       startTime;
+internalField   uniform (1 0 0);
 
-startTime       0;
-
-stopAt          endTime;
-
-endTime         0.5;
-
-deltaT          0.005;
-
-writeControl    timeStep;
-
-writeInterval   20;
-
-purgeWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression uncompressed;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable yes;
-
-adjustTimeStep no;
-
-maxCo          1;
+boundaryField
+{
+    TopWall
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    Inlet
+    {
+        type            fixedValue;
+        value           uniform (1 0 0);
+    }
+    Outlet
+    {
+        type            zeroGradient;
+    }
+    CylinderWall
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    BottomWall
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    frontAndBackPlanes
+    {
+        type            empty;
+    }
+}
 
 // ************************************************************************* //

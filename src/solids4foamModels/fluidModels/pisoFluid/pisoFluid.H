@@ -86,6 +86,9 @@ class pisoFluid
         //- Density
         dimensionedScalar rho_;
 
+        //- Consistency in time
+        const Switch consistencyByJasak_;
+
 
     // Private Member Functions
 

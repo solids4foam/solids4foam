@@ -10,42 +10,44 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      controlDict;
+    object      fluidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     icoFoam;
+// fluidModel icoFluid;
+// fluidModel pisoFluid;
+fluidModel transientSimpleFluid;
 
-startFrom       startTime;
+icoFluidCoeffs
+{
+    nCorrectors     3;
+    nNonOrthogonalCorrectors 1;
+    pRefCell        0;
+    pRefValue       0;
 
-startTime       0;
+    consistencyByJasak no;
+}
 
-stopAt          endTime;
+pisoFluidCoeffs
+{
+    nCorrectors     3;
+    nNonOrthogonalCorrectors 1;
+    pRefCell        0;
+    pRefValue       0;
 
-endTime         0.5;
+    consistencyByJasak no;
+}
 
-deltaT          0.005;
+transientSimpleFluidCoeffs
+{
+    nOuterCorrectors 200;
+    nNonOrthogonalCorrectors 0;
+    pRefCell        0;
+    pRefValue       0;
 
-writeControl    timeStep;
+    convergence 1e-7;
 
-writeInterval   20;
-
-purgeWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression uncompressed;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable yes;
-
-adjustTimeStep no;
-
-maxCo          1;
+    consistencyByJasak no;
+}
 
 // ************************************************************************* //

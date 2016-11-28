@@ -101,7 +101,11 @@ icoFluid::icoFluid(const fvMesh& mesh)
         )
     ),
     nu_(transportProperties_.lookup("nu")),
-    rho_(transportProperties_.lookup("rho"))
+    rho_(transportProperties_.lookup("rho")),
+    consistencyByJasak_
+    (
+        fluidProperties().lookupOrDefault<Switch>("consistencyByJasak", false)
+    )
 {}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -229,7 +233,14 @@ tmp<scalarField> icoFluid::faceZoneMuEff
 
 void icoFluid::evolve()
 {
-    Info << "Evolving fluid model" << endl;
+    if (consistencyByJasak_)
+    {
+        Info << "Evolving fluid model (consistency by Jasak)" << endl;
+    }
+    else
+    {
+        Info << "Evolving fluid model" << endl;
+    }
 
     const fvMesh& mesh = this->mesh();
 
@@ -294,9 +305,21 @@ void icoFluid::evolve()
 
     volScalarField aU = HUEqn.A();
 
+    if (!consistencyByJasak_)
+    {
+        aU += ddtUEqn.A();
+    }
+
     for (int corr = 0; corr < nCorr; corr++)
     {
-        U_ = HUEqn.H()/aU;
+        if (consistencyByJasak_)
+        {
+            U_ = HUEqn.H()/aU;
+        }
+        else
+        {
+            U_ = (ddtUEqn.H() + HUEqn.H())/aU;
+        }
         phi_ = (fvc::interpolate(U_) & mesh.Sf());
 
         adjustPhi(phi_, U_, p_);
@@ -335,10 +358,17 @@ void icoFluid::evolve()
 
         gradp_ = fvc::grad(p_);
 
-        U_ = 1.0/(aU + ddtUEqn.A())*
-            (
-                U_*aU - gradp_ + ddtUEqn.H()
-            );
+        if (consistencyByJasak_)
+        {
+            U_ = 1.0/(aU + ddtUEqn.A())*
+                (
+                    U_*aU - gradp_ + ddtUEqn.H()
+                );
+        }
+        else
+        {
+            U_ -= gradp_/aU;
+        }
         U_.correctBoundaryConditions();
     }
 }
