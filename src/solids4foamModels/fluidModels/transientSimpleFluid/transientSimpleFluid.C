@@ -24,7 +24,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "pisoFluid.H"
+#include "transientSimpleFluid.H"
 #include "volFields.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -43,13 +43,13 @@ namespace fluidModels
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(pisoFluid, 0);
-addToRunTimeSelectionTable(fluidModel, pisoFluid, dictionary);
+defineTypeNameAndDebug(transientSimpleFluid, 0);
+addToRunTimeSelectionTable(fluidModel, transientSimpleFluid, dictionary);
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-pisoFluid::pisoFluid(const fvMesh& mesh)
+transientSimpleFluid::transientSimpleFluid(const fvMesh& mesh)
 :
     fluidModel(this->typeName, mesh),
     U_
@@ -119,19 +119,22 @@ pisoFluid::pisoFluid(const fvMesh& mesh)
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-const volVectorField& pisoFluid::U() const
+const volVectorField& transientSimpleFluid::U() const
 {
     return U_;
 }
 
 
-const volScalarField& pisoFluid::p() const
+const volScalarField& transientSimpleFluid::p() const
 {
     return p_;
 }
 
 
-tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
+tmp<vectorField> transientSimpleFluid::patchViscousForce
+(
+    const label patchID
+) const
 {
     tmp<vectorField> tvF
     (
@@ -152,7 +155,10 @@ tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
 }
 
 
-tmp<scalarField> pisoFluid::patchPressureForce(const label patchID) const
+tmp<scalarField> transientSimpleFluid::patchPressureForce
+(
+    const label patchID
+) const
 {
     tmp<scalarField> tpF
     (
@@ -165,7 +171,7 @@ tmp<scalarField> pisoFluid::patchPressureForce(const label patchID) const
 }
 
 
-tmp<vectorField> pisoFluid::faceZoneViscousForce
+tmp<vectorField> transientSimpleFluid::faceZoneViscousForce
 (
     const label zoneID,
     const label patchID
@@ -196,7 +202,7 @@ tmp<vectorField> pisoFluid::faceZoneViscousForce
 }
 
 
-tmp<scalarField> pisoFluid::faceZonePressureForce
+tmp<scalarField> transientSimpleFluid::faceZonePressureForce
 (
     const label zoneID,
     const label patchID
@@ -226,7 +232,7 @@ tmp<scalarField> pisoFluid::faceZonePressureForce
 }
 
 
-tmp<scalarField> pisoFluid::faceZoneMuEff
+tmp<scalarField> transientSimpleFluid::faceZoneMuEff
 (
     const label zoneID,
     const label patchID
@@ -257,95 +263,97 @@ tmp<scalarField> pisoFluid::faceZoneMuEff
 }
 
 
-void pisoFluid::evolve()
+void transientSimpleFluid::evolve()
 {
     if (consistencyByJasak_)
     {
-        Info << "Evolving fluid model (consistency by Jasak)" << endl;
+        evolveConsistentByJasak();
     }
     else
     {
-        Info << "Evolving fluid model" << endl;
+        evolveInconsistent();
     }
+}
+
+
+void transientSimpleFluid::evolveInconsistent()
+{
+    Info<< "Evolving fluid model" << endl;
 
     const fvMesh& mesh = fluidModel::mesh();
 
-    const int nCorr(readInt(fluidProperties().lookup("nCorrectors")));
-
     const int nNonOrthCorr =
         readInt(fluidProperties().lookup("nNonOrthogonalCorrectors"));
+
+    const int nOuterCorr =
+        readInt(fluidProperties().lookup("nOuterCorrectors"));
+
+    scalar convergenceCriterion = 0;
+    fluidProperties().readIfPresent("convergence", convergenceCriterion);
 
     // Prepare for the pressure solution
     label pRefCell = 0;
     scalar pRefValue = 0.0;
     setRefCell(p_, fluidProperties(), pRefCell, pRefValue);
 
-    if (mesh.moving())
-    {
-        // Make the fluxes relative
-        phi_ -= fvc::meshPhi(U_);
-    }
+    phi_.oldTime();
 
-    // Calculate CourantNo
+    for (int oCorr = 0; oCorr < nOuterCorr; oCorr++)
     {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
+        scalar eqnResidual = 1, maxResidual = 0;
+        p_.storePrevIter();
 
-        if (mesh.nInternalFaces())
+        if (mesh.moving())
         {
-            surfaceScalarField SfUfbyDelta =
-                mesh.surfaceInterpolation::deltaCoeffs()*mag(phi_);
-
-            CoNum =
-                max(SfUfbyDelta/mesh.magSf()).value()
-               *runTime().deltaT().value();
-
-            meanCoNum =
-                (sum(SfUfbyDelta)/sum(mesh.magSf())).value()
-               *runTime().deltaT().value();
-
-            velMag = max(mag(phi_)/mesh.magSf()).value();
+            // Make the fluxes relative
+            phi_ -= fvc::meshPhi(U_);
         }
 
-        Info<< "Courant Number mean: " << meanCoNum
-            << " max: " << CoNum
-            << " velocity magnitude: " << velMag << endl;
-    }
-
-    // Construct momentum equation
-    // Convection-diffusion matrix
-    fvVectorMatrix HUEqn
-    (
-        fvm::div(phi_, U_)
-      + turbulence_->divDevReff()
-    );
-
-    // Time derivative matrix
-    fvVectorMatrix ddtUEqn(fvm::ddt(U_));
-
-    // Solve momentum equation
-    solve(ddtUEqn + HUEqn == -gradp_);
-
-    // --- PISO loop
-
-    volScalarField aU = HUEqn.A();
-
-    if (!consistencyByJasak_)
-    {
-        aU += ddtUEqn.A();
-    }
-
-    for (int corr = 0; corr < nCorr; corr++)
-    {
-        if (consistencyByJasak_)
+        // Calculate CourantNo
         {
-            U_ = HUEqn.H()/aU;
+            scalar CoNum = 0.0;
+            scalar meanCoNum = 0.0;
+            scalar velMag = 0.0;
+
+            if (mesh.nInternalFaces())
+            {
+                surfaceScalarField SfUfbyDelta =
+                    mesh.surfaceInterpolation::deltaCoeffs()*mag(phi_);
+
+                CoNum =
+                    max(SfUfbyDelta/mesh.magSf()).value()
+                   *runTime().deltaT().value();
+
+                meanCoNum =
+                    (sum(SfUfbyDelta)/sum(mesh.magSf())).value()
+                   *runTime().deltaT().value();
+
+                velMag = max(mag(phi_)/mesh.magSf()).value();
+            }
+
+            Info<< "Courant Number mean: " << meanCoNum
+                << " max: " << CoNum
+                << " velocity magnitude: " << velMag << endl;
         }
-        else
-        {
-            U_ = (ddtUEqn.H() + HUEqn.H())/aU;
-        }
+
+        // Construct momentum equation
+        fvVectorMatrix UEqn
+        (
+            fvm::ddt(U_)
+          + fvm::div(phi_, U_)
+          + turbulence_->divDevReff()
+        );
+
+        UEqn.relax();
+
+        // Solve momentum equation
+        eqnResidual =
+            solve(UEqn == -gradp_).initialResidual();
+        maxResidual = max(eqnResidual, maxResidual);
+
+        volScalarField aU = UEqn.A();
+
+        U_ = UEqn.H()/aU;
         phi_ = (fvc::interpolate(U_) & mesh.Sf());
 
 #       include "adjustPhi.H"
@@ -362,18 +370,7 @@ void pisoFluid::evolve()
 
             pEqn.setReference(pRefCell, pRefValue);
 
-            if
-            (
-                corr == nCorr-1
-             && nonOrth == nNonOrthCorr
-            )
-            {
-                pEqn.solve(mesh.solutionDict().solver("pFinal"));
-            }
-            else
-            {
-                pEqn.solve();
-            }
+            pEqn.solve();
 
             if (nonOrth == nNonOrthCorr)
             {
@@ -397,23 +394,173 @@ void pisoFluid::evolve()
                 << sumLocalContErr << ", global = " << globalContErr << endl;
         }
 
+        // Explicitly relax pressure for momentum corrector
+        p_.relax();
+
         gradp_ = fvc::grad(p_);
 
-        if (consistencyByJasak_)
-        {
-            U_ = 1.0/(aU + ddtUEqn.A())*
-                (
-                    U_*aU - gradp_ + ddtUEqn.H()
-                );
-        }
-        else
-        {
-            U_ -= gradp_/aU;
-        }
+        U_ -= gradp_/aU;
         U_.correctBoundaryConditions();
-    }
 
-    turbulence_->correct();
+        turbulence_->correct();
+
+        if (maxResidual < convergenceCriterion)
+        {
+            Info<< "reached convergence criterion: "
+                << convergenceCriterion << endl;
+            Info<< "Number of iterations: " << oCorr << endl;
+            break;
+        }
+    }
+}
+
+
+void transientSimpleFluid::evolveConsistentByJasak()
+{
+    Info<< "Evolving fluid model (consistency by Jasak)" << endl;
+
+    const fvMesh& mesh = fluidModel::mesh();
+
+    const int nNonOrthCorr =
+        readInt(fluidProperties().lookup("nNonOrthogonalCorrectors"));
+
+    const int nOuterCorr =
+        readInt(fluidProperties().lookup("nOuterCorrectors"));
+
+    scalar convergenceCriterion = 0;
+    fluidProperties().readIfPresent("convergence", convergenceCriterion);
+
+    // Prepare for the pressure solution
+    label pRefCell = 0;
+    scalar pRefValue = 0.0;
+    setRefCell(p_, fluidProperties(), pRefCell, pRefValue);
+
+    phi_.oldTime();
+
+    for (int oCorr = 0; oCorr < nOuterCorr; oCorr++)
+    {
+        scalar eqnResidual = 1, maxResidual = 0;
+        p_.storePrevIter();
+
+        if (mesh.moving())
+        {
+            // Make the fluxes relative
+            phi_ -= fvc::meshPhi(U_);
+        }
+
+        // Calculate CourantNo
+        {
+            scalar CoNum = 0.0;
+            scalar meanCoNum = 0.0;
+            scalar velMag = 0.0;
+
+            if (mesh.nInternalFaces())
+            {
+                surfaceScalarField SfUfbyDelta =
+                    mesh.surfaceInterpolation::deltaCoeffs()*mag(phi_);
+
+                CoNum =
+                    max(SfUfbyDelta/mesh.magSf()).value()
+                   *runTime().deltaT().value();
+
+                meanCoNum =
+                    (sum(SfUfbyDelta)/sum(mesh.magSf())).value()
+                   *runTime().deltaT().value();
+
+                velMag = max(mag(phi_)/mesh.magSf()).value();
+            }
+
+            Info<< "Courant Number mean: " << meanCoNum
+                << " max: " << CoNum
+                << " velocity magnitude: " << velMag << endl;
+        }
+
+        // Construct momentum equation
+        // Convection-diffusion matrix
+        fvVectorMatrix HUEqn
+        (
+            fvm::div(phi_, U_)
+          + turbulence_->divDevReff()
+        );
+
+        // Time derivative matrix
+        fvVectorMatrix ddtUEqn(fvm::ddt(U_));
+
+        tmp<fvVectorMatrix> UEqn(ddtUEqn + HUEqn);
+
+        UEqn().relax();
+
+        // Solve momentum equation
+        eqnResidual =
+            solve(UEqn() == -gradp_).initialResidual();
+        maxResidual = max(eqnResidual, maxResidual);
+
+        UEqn.clear();
+
+        volScalarField aU = HUEqn.A();
+
+        U_ = HUEqn.H()/aU;
+        phi_ = (fvc::interpolate(U_) & mesh.Sf());
+
+#       include "adjustPhi.H"
+
+        for (int nonOrth = 0; nonOrth <= nNonOrthCorr; nonOrth++)
+        {
+            // Construct pressure equation
+            fvScalarMatrix pEqn
+            (
+                fvm::laplacian(1/aU, p_) == fvc::div(phi_)
+            );
+
+            // Solve pressure equation
+
+            pEqn.setReference(pRefCell, pRefValue);
+
+            pEqn.solve();
+
+            if (nonOrth == nNonOrthCorr)
+            {
+                phi_ -= pEqn.flux();
+            }
+        }
+
+        // Calculate Continuity error
+        {
+            volScalarField contErr = fvc::div(phi_);
+
+            scalar sumLocalContErr =
+                runTime().deltaT().value()
+               *mag(contErr)().weightedAverage(mesh.V()).value();
+
+            scalar globalContErr =
+                runTime().deltaT().value()
+               *contErr.weightedAverage(mesh.V()).value();
+
+            Info<< "time step continuity errors : sum local = "
+                << sumLocalContErr << ", global = " << globalContErr << endl;
+        }
+
+        // Explicitly relax pressure for momentum corrector
+        p_.relax();
+
+        gradp_ = fvc::grad(p_);
+
+        U_ = 1.0/(aU + ddtUEqn.A())*
+            (
+                U_*aU - gradp_ + ddtUEqn.H()
+            );
+        U_.correctBoundaryConditions();
+
+        turbulence_->correct();
+
+        if (maxResidual < convergenceCriterion)
+        {
+            Info<< "reached convergence criterion: "
+                << convergenceCriterion << endl;
+            Info<< "Number of iterations: " << oCorr << endl;
+            break;
+        }
+    }
 }
 
 
