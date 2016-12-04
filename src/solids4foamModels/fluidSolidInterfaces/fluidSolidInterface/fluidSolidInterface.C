@@ -1014,11 +1014,12 @@ void Foam::fluidSolidInterface::updateForce()
         fluidZoneTraction - fluidZonePressure*n;
 
 
-    vectorField solidZoneTraction =
-        ggiInterpolator().masterToSlave
-        (
-           -fluidZoneTraction
-        );
+    // Philip: this is not used?
+    //vectorField solidZoneTraction =
+    //  ggiInterpolator().masterToSlave
+    //  (
+    //     -fluidZoneTraction
+    //  );
 
     const vectorField solidZoneTotalTraction =
         ggiInterpolator().masterToSlave
@@ -1026,47 +1027,53 @@ void Foam::fluidSolidInterface::updateForce()
             -fluidZoneTotalTraction
         );
 
-    const scalarField solidZoneMuEff =
-        ggiInterpolator().masterToSlave
-        (
-            fluid().faceZoneMuEff(fluidZoneIndex(), fluidPatchIndex())
-        );
+    // Philip: this is not used?
+    //const scalarField solidZoneMuEff =
+    //  ggiInterpolator().masterToSlave
+    //  (
+    //      fluid().faceZoneMuEff(fluidZoneIndex(), fluidPatchIndex())
+    //  );
 
-    const tensorField solidZoneSurfaceGradientOfVelocity =
-        solid().faceZoneSurfaceGradientOfVelocity
-        (
-            solidZoneIndex(),
-            solidPatchIndex()
-        );
+    // Philip: this is not used?
+    //const tensorField solidZoneSurfaceGradientOfVelocity =
+    //  solid().faceZoneSurfaceGradientOfVelocity
+    //  (
+    //      solidZoneIndex(),
+    //      solidPatchIndex()
+    //  );
 
-    const vectorField solidZoneNormal =
-        solid().faceZoneNormal
-        (
-            solidZoneIndex(),
-            solidPatchIndex()
-        );
+    // Philip: this is not used?
+    //const vectorField solidZoneNormal =
+    //  solid().faceZoneNormal
+    //  (
+    //      solidZoneIndex(),
+    //      solidPatchIndex()
+    //  );
 
+    // Philip: this is not used?
     // Add part of the viscous force present only
     // at the deforming and moving walls
-    solidZoneTraction +=
-        solidZoneMuEff
-       *(
-           -2*tr(solidZoneSurfaceGradientOfVelocity)*solidZoneNormal
-          + (solidZoneSurfaceGradientOfVelocity&solidZoneNormal)
-        );
+    // solidZoneTraction +=
+    //   solidZoneMuEff
+    //   *(
+    //      -2*tr(solidZoneSurfaceGradientOfVelocity)*solidZoneNormal
+    //    + (solidZoneSurfaceGradientOfVelocity&solidZoneNormal)
+    //  );
 
-    const vectorField movingTraction =
-        solidZoneMuEff
-       *(
-           -2*tr(solidZoneSurfaceGradientOfVelocity)*solidZoneNormal
-          + (solidZoneSurfaceGradientOfVelocity&solidZoneNormal)
-        );
+    // Philip: this is not used?
+    //const vectorField movingTraction =
+    //  solidZoneMuEff
+    // *(
+    //     -2*tr(solidZoneSurfaceGradientOfVelocity)*solidZoneNormal
+    //    + (solidZoneSurfaceGradientOfVelocity&solidZoneNormal)
+    //  );
 
-    solidZonePressure_ =
-        ggiInterpolator().masterToSlave
-        (
-            fluidZonePressure
-        );
+    // Philip: this is not used?
+    //solidZonePressure_ =
+    //  ggiInterpolator().masterToSlave
+    //  (
+    //      fluidZonePressure
+    //  );
 
     if (!coupled_)
     {
