@@ -279,6 +279,9 @@ unsLinGeomSolid::unsLinGeomSolid(dynamicFvMesh& mesh)
 {
     D_.oldTime().oldTime();
     pointD_.oldTime();
+    gradDf_.oldTime();
+    sigma_.oldTime();
+    sigmaf_.oldTime();
 }
 
 
@@ -753,6 +756,7 @@ bool unsLinGeomSolid::evolve()
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigmaf_);
+        mechanical().correct(sigma_);
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 

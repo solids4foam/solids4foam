@@ -2693,7 +2693,8 @@ Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
     // however, numerically "div(grad(phi))" uses a larger stencil than the
     // "laplacian(phi)"; the difference between these two approximations is
     // a small amount of numerical diffusion that quells oscillations
-    if (D.name() == "DD" || biMaterialInterfaceActive())
+    //if (D.name() == "DD" || biMaterialInterfaceActive())
+    if (true)
     {
         return
         (

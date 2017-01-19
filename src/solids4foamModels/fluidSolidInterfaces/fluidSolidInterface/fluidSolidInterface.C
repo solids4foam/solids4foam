@@ -936,6 +936,10 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             motionUFluidPatch ==
                 accumulatedFluidInterfaceDisplacement()
                /fluid().runTime().deltaT().value();
+
+            InfoIn("moveFluidMesh")
+                << "motionUFluidPatch: "
+                << max(mag(motionUFluidPatch)) << endl;
         }
         else
         {
