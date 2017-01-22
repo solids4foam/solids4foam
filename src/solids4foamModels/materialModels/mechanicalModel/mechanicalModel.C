@@ -900,7 +900,7 @@ void Foam::mechanicalModel::calcImpKfcorr() const
     if (laws.size() > 1)
     {
         // To disable Rhie-Chow correction on bi-material interface, we will set
-        // newImpKf to zero on bi-material interface faces
+        // impKfcorr to zero on bi-material interface faces
 
         surfaceScalarField& impKfcorr = *impKfcorrPtr_;
         scalarField& impKfcorrI = impKfcorrPtr_->internalField();
@@ -1336,9 +1336,11 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
     }
 
     const fvMesh& mesh = this->mesh();
+    const vectorField& DI = D.internalField();
 
-    // Assemble and sync the processor shadow sigma fields
-    updateInterfaceShadowSigma(useVolFieldSigma);
+    // Update the interface shadow sigma fields
+    // This can require parallel communication
+    updateInterfaceShadowSigmaGradD(useVolFieldSigma);
 
     forAll(subMeshes, lawI)
     {
@@ -1352,12 +1354,12 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
 
         // Store interface field as it is overwritten with the interpolated
         // value by the interpolate function
-        vectorField Dinterface(0);
+        vectorField DinterfacePrev(0);
         forAll(subMeshD.boundaryField(), patchI)
         {
             if (patchMap[patchI] == -1)
             {
-                Dinterface = subMeshD.boundaryField()[patchI];
+                DinterfacePrev = subMeshD.boundaryField()[patchI];
             }
         }
 
@@ -1366,13 +1368,14 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
         subMeshD = subMeshes[lawI].interpolate(D);
 
         // Overwrite the interface values with the previous interface values
-        forAll(subMeshD.boundaryField(), patchI)
-        {
-            if (patchMap[patchI] == -1)
-            {
-                subMeshD.boundaryField()[patchI] = Dinterface;
-            }
-        }
+        // DISABLED - not needed
+        // forAll(subMeshD.boundaryField(), patchI)
+        // {
+        //     if (patchMap[patchI] == -1)
+        //     {
+        //         subMeshD.boundaryField()[patchI] = DinterfacePrev;
+        //     }
+        // }
 
         // Check if a large strain procedure is being used, if so we must
         // calculate the deformed normals
@@ -1382,6 +1385,8 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
         // gradient: relative deformation gradient for updated Lagrangian
         // approaches and the total deformation gradient for total
         // approaches
+        // What about uns approaches? I may need to include surfaceField options
+        // here
         const bool useDeformedNormals = mesh.foundObject<volTensorField>("F");
         const volTensorField* FinvPtr = NULL;
         const volScalarField* JPtr = NULL;
@@ -1411,6 +1416,7 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                 // Interface displacement
                 vectorField& Dinterface = subMeshD.boundaryField()[patchI];
 
+                // Patch start face index
                 const label start = subMesh.boundaryMesh()[patchI].start();
 
                 // Base mesh owner cells
@@ -1445,17 +1451,23 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
 
                 // Stress in the current subMesh at the interface
                 const symmTensorField* sigmaPatchPtr = NULL;
+                //const tensorField* gradDPatchPtr = NULL;
                 if (useVolFieldSigma)
                 {
                     sigmaPatchPtr =
                         &(subMeshSigma()[lawI].boundaryField()[patchI]);
+                    //gradDPatchPtr =
+                    //    &(subMeshGradD()[lawI].boundaryField()[patchI]);
                 }
                 else
                 {
                     sigmaPatchPtr =
                         &(subMeshSigmaf()[lawI].boundaryField()[patchI]);
+                    //gradDPatchPtr =
+                    //    &(subMeshGradDf()[lawI].boundaryField()[patchI]);
                 }
                 const symmTensorField& sigmaPatch = *sigmaPatchPtr;
+                //const tensorField& gradDPatch = *gradDPatchPtr;
 
                 const labelList& faceCells =
                     subMesh.boundaryMesh()[patchI].faceCells();
@@ -1465,6 +1477,8 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                 // subMesh on the other side)
                 const symmTensorField& interfaceShadSigma =
                     interfaceShadowSigma()[lawI];
+                //const tensorField& interfaceShadGradD =
+                //    interfaceShadowGradD()[lawI];
 
                 // Calculate the interface displacements
                 forAll(Dinterface, faceI)
@@ -1523,25 +1537,61 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                         // For now, we will linearly interpolate the value
                         // Weighted-harmonic interpolation may be a better
                         // candidate
-                        const scalar Kav =
-                            baseW*KI[baseOwnID] + (1.0 - baseW)*KI[baseNeiID];
+                        scalar Ka = KI[baseOwnID];
+                        scalar Kb = KI[baseNeiID];
+                        //const scalar Kav = baseW*Ka + (1.0 - baseW)*Kb;
 
-                        // Lookup stress for side-a and side-b
-                        symmTensor sigmaa = sigmaPatch[faceI];
-                        symmTensor sigmab = interfaceShadSigma[faceI];
+                        // Lookup displacement for side-a and side-b
+                        vector DP = DI[baseOwnID];
+                        vector DN = DI[baseNeiID];
 
-                        // Check if we need to switch the side-a and side-b
-                        // stress, so that the side-a is the owner side
+                        // The base own cell should be side a
                         if (baseOwnID != cellMap[faceCells[faceI]])
                         {
-                            sigmaa = interfaceShadSigma[faceI];
-                            sigmab = sigmaPatch[faceI];
+                            n = -n;
+                            Swap(Ka, Kb);
+                            Swap(DP, DN);
                         }
 
+                        // Lookup stress for side-a and side-b
+                        // const vector tractionExpa =
+                        //     (n & sigmaPatch[faceI])
+                        //   - Ka*(n & gradDPatch[faceI]);
+                        // const vector tractionExpb =
+                        //     (n & interfaceShadSigma[faceI])
+                        //   - Kb*(n & interfaceShadGradD[faceI]);
+                        const vector tractionExpa =
+                            (n & sigmaPatch[faceI])
+                          - Ka*(DinterfacePrev[faceI] - DP)/da;
+                        const vector tractionExpb =
+                            (n & interfaceShadSigma[faceI])
+                          - Kb*(DN - DinterfacePrev[faceI])/db;
+
+                        // const vector tractiona =
+                        //     (n & sigmaPatch[faceI]);
+                        // const vector tractionb =
+                        //     (n & interfaceShadSigma[faceI]);
+
+                        // Approach 1
                         // Add correction to the interface displacement
                         // This correction goes to zero on convergence
-                        Dinterface[faceI] +=
-                            ((da*db)/(da + db))*(n & (sigmab - sigmaa)/Kav);
+                        // Dinterface[faceI] +=
+                        //     ((da*db)/(da + db))*(n & (sigmab - sigmaa)/Kav);
+
+                        // Approach 2
+                        // Correction that is consistent with Tukovic method
+                        Dinterface[faceI] =
+                            (1.0/(db*Ka + da*Kb))
+                           *(
+                               db*Ka*DP + da*Kb*DN
+                             + da*db*(tractionExpb - tractionExpa)
+                            );
+
+                        // Approach 3
+                        // Not working at the moment
+                        // Dinterface[faceI] =
+                        //     DinterfacePrev[faceI]
+                        //+ ((da + db)/(db*Ka + da*Kb))*(tractionb - tractiona);
                     }
                     else
                     {
@@ -1656,31 +1706,53 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                         // For now, we will linearly interpolate the value
                         // Weighted-harmonic interpolation may be a better
                         // candidate
-                        const scalar Kav =
-                            baseW*KI[baseOwnID]
-                         + (1.0 - baseW)
-                          *K.boundaryField()[basePatchID][baseLocalFaceID];
+                        const scalar Ka = KI[baseOwnID];
+                        const scalar Kb =
+                            K.boundaryField()[basePatchID][baseLocalFaceID];
+                        //const scalar Kav = baseW*Ka + (1.0 - baseW)*Kb;
 
-                        // Stress calculated from side-a of the interface
-                        const symmTensor& sigmaa = sigmaPatch[faceI];
+                        // Lookup displacement for side-a and side-b
+                        const vector& DP = DI[baseOwnID];
+                        const vector& DN =
+                            D.boundaryField()[basePatchID][baseLocalFaceID];
 
-                        // Stress calculated from side-b of the interface
-                        const symmTensor& sigmab = interfaceShadSigma[faceI];
+                        // Stress calculated from both sides of the interface
+                        // const vector tractionExpa =
+                        //     (n & sigmaPatch[faceI])
+                        //   - Ka*(n & gradDPatch[faceI]);
+                        // const vector tractionExpb =
+                        //     (n & interfaceShadSigma[faceI])
+                        //   - Kb*(n & interfaceShadGradD[faceI]);
+                        const vector tractionExpa =
+                            (n & sigmaPatch[faceI])
+                          - Ka*(DinterfacePrev[faceI] - DP)/da;
+                        const vector tractionExpb =
+                            (n & interfaceShadSigma[faceI])
+                          - Kb*(DN - DinterfacePrev[faceI])/db;
 
                         // Note: no need to check owner and neighbour as the
                         // current side is always the owner at a processor patch
 
+                        // Iterative correction method
                         // Add correction to the interface displacement
                         // This correction goes to zero on convergence
-                        Dinterface[faceI] +=
-                            ((da*db)/(da + db))*(n & (sigmab - sigmaa)/Kav);
+                        // Dinterface[faceI] +=
+                        //    ((da*db)/(da + db))*(n & (sigmab - sigmaa)/Kav);
+
+                        // Correction that is consistent with Tukovic method
+                        Dinterface[faceI] =
+                            (1.0/(db*Ka + da*Kb))
+                           *(
+                               db*Ka*DP + da*Kb*DN
+                             + da*db*(tractionExpb - tractionExpa)
+                            );
                     }
                 }
             }
             else
             {
                 // These are other patches including processor patches, but it
-                // seems that interface processor patch face are placed in the
+                // seems that interface processor patch faces are placed in the
                 // oldInternalFaces patch, so we check for them above.
                 // For now, no need to do anything here.
             }
@@ -1775,16 +1847,31 @@ Foam::mechanicalModel::interfaceShadowSigma() const
 {
     if (interfaceShadowSigma_.empty())
     {
-        makeInterfaceShadowSigma();
+        makeInterfaceShadowSigmaGradD();
     }
 
     return interfaceShadowSigma_;
 }
 
 
-void Foam::mechanicalModel::makeInterfaceShadowSigma() const
+const Foam::PtrList<Foam::tensorField>&
+Foam::mechanicalModel::interfaceShadowGradD() const
 {
-    if (!interfaceShadowSigma_.empty())
+    if (interfaceShadowGradD_.empty())
+    {
+        makeInterfaceShadowSigmaGradD();
+    }
+
+    return interfaceShadowGradD_;
+}
+
+
+void Foam::mechanicalModel::makeInterfaceShadowSigmaGradD() const
+{
+    if
+    (
+        !interfaceShadowSigma_.empty() || !interfaceShadowGradD_.empty()
+    )
     {
         FatalErrorIn
         (
@@ -1793,6 +1880,7 @@ void Foam::mechanicalModel::makeInterfaceShadowSigma() const
     }
 
     interfaceShadowSigma_.setSize(subMeshes().size());
+    interfaceShadowGradD_.setSize(subMeshes().size());
 
     // Set values for each subMesh
     forAll(subMeshes(), subMeshI)
@@ -1819,7 +1907,8 @@ void Foam::mechanicalModel::makeInterfaceShadowSigma() const
         {
             FatalErrorIn
             (
-                "void Foam::mechanicalModel::makeInterfaceShadowSigma() const"
+                "void Foam::mechanicalModel::makeInterfaceShadowSigmaGradD()"
+                "const"
             )   << "Interface patch not found!" << abort(FatalError);
         }
 
@@ -1832,18 +1921,28 @@ void Foam::mechanicalModel::makeInterfaceShadowSigma() const
                 symmTensor::zero
             )
         );
-    }
+
+        interfaceShadowGradD_.set
+        (
+            subMeshI,
+            new tensorField
+            (
+                subMesh.boundaryMesh()[patchID].size(),
+                tensor::zero
+            )
+        );
+}
 }
 
 
-void Foam::mechanicalModel::updateInterfaceShadowSigma
+void Foam::mechanicalModel::updateInterfaceShadowSigmaGradD
 (
     const bool useVolFieldSigma
 )
 {
-    if (interfaceShadowSigma_.empty())
+    if (interfaceShadowSigma_.empty() || interfaceShadowGradD_.empty())
     {
-        makeInterfaceShadowSigma();
+        makeInterfaceShadowSigmaGradD();
     }
 
     // Field used for syncing the processor patch values
@@ -1859,6 +1958,20 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
         ),
         mesh(),
         dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+    );
+
+    volTensorField baseGradDForSyncing
+    (
+        IOobject
+        (
+            "baseGradDForSyncing",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedTensor("zero", dimPressure, tensor::zero)
     );
 
     // Set values for each subMesh
@@ -1887,14 +2000,15 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
         {
             FatalErrorIn
             (
-                "void Foam::updateInterfaceShadowSigma\n"
+                "void Foam::updateInterfaceShadowSigmaGradD\n"
                 "(\n"
                 "    const bool useVolFieldSigma\n"
                 ")"
             )   << "Interface patch not found!" << abort(FatalError);
         }
 
-        symmTensorField& result = interfaceShadowSigma_[subMeshI];
+        symmTensorField& resultSigma = interfaceShadowSigma_[subMeshI];
+        tensorField& resultGradD = interfaceShadowGradD_[subMeshI];
 
         const labelList& interfaceShadowSubMeshID =
             this->interfaceShadowSubMeshID()[subMeshI];
@@ -1904,7 +2018,7 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
             this->interfaceShadowFaceID()[subMeshI];
 
         // Assemble the shadow stress for each face
-        forAll(result, faceI)
+        forAll(resultSigma, faceI)
         {
             // Check if the face is not on a processor
             if (interfaceShadowSubMeshID[faceI] != -1)
@@ -1921,16 +2035,28 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
                 // Stress calculated at the other side of the interface
                 if (useVolFieldSigma)
                 {
-                    result[faceI] =
+                    resultSigma[faceI] =
                         subMeshSigma()
+                        [
+                            shadowSubMeshID
+                        ].boundaryField()[shadowPatchID][shadowFaceID];
+
+                    resultGradD[faceI] =
+                        subMeshGradD()
                         [
                             shadowSubMeshID
                         ].boundaryField()[shadowPatchID][shadowFaceID];
                 }
                 else
                 {
-                    result[faceI] =
+                    resultSigma[faceI] =
                         subMeshSigmaf()
+                        [
+                            shadowSubMeshID
+                        ].boundaryField()[shadowPatchID][shadowFaceID];
+
+                    resultGradD[faceI] =
+                        subMeshGradDf()
                         [
                             shadowSubMeshID
                         ].boundaryField()[shadowPatchID][shadowFaceID];
@@ -1973,6 +2099,15 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
                         [
                             subMeshI
                         ].boundaryField()[patchID][faceI];
+
+                    baseGradDForSyncing.internalField()
+                        [
+                            faceCells[baseLocalFaceID]
+                        ]
+                      = subMeshGradD()
+                        [
+                            subMeshI
+                        ].boundaryField()[patchID][faceI];
                 }
                 else
                 {
@@ -1980,6 +2115,15 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
                         [
                             faceCells[baseLocalFaceID]
                         ] = subMeshSigmaf()
+                        [
+                            subMeshI
+                        ].boundaryField()[patchID][faceI];
+
+                    baseGradDForSyncing.internalField()
+                        [
+                            faceCells[baseLocalFaceID]
+                        ]
+                      = subMeshGradDf()
                         [
                             subMeshI
                         ].boundaryField()[patchID][faceI];
@@ -1991,9 +2135,8 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
     // Sync base mesh processor patches
     // This will pass the patch internal field and store it on the neighbour
     // patch
-    //baseSigmaForSyncing.write();
     baseSigmaForSyncing.correctBoundaryConditions();
-    //baseSigmaForSyncing.boundaryField().evaluateCoupled();
+    baseGradDForSyncing.correctBoundaryConditions();
 
     // Assemble processor values that have been synced
     forAll(subMeshes(), subMeshI)
@@ -2021,19 +2164,20 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
         {
             FatalErrorIn
             (
-                "Foam::tmp<Foam::symmTensorField> Foam::interfaceShadowSigma\n"
+                "void Foam::updateInterfaceShadowSigmaGrad\n"
                 "(\n"
-                "    const label subMeshI\n"
+                "    const bool useVolFieldSigma\n"
                 ")"
             )   << "Interface patch not found!" << abort(FatalError);
         }
 
-        symmTensorField& result = interfaceShadowSigma_[subMeshI];
+        symmTensorField& resultSigma = interfaceShadowSigma_[subMeshI];
+        tensorField& resultGradD = interfaceShadowGradD_[subMeshI];
 
         const labelList& interfaceShadowSubMeshID =
             this->interfaceShadowSubMeshID()[subMeshI];
 
-        forAll(result, faceI)
+        forAll(resultSigma, faceI)
         {
             // Check if the face is on a processor
             if (interfaceShadowSubMeshID[faceI] == -1)
@@ -2059,8 +2203,14 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
                 const label baseLocalFaceID = baseFaceID - basePatchStart;
 
                 // Copy patch neighbour field values into the result field
-                result[faceI] =
+                resultSigma[faceI] =
                     baseSigmaForSyncing.boundaryField()
+                    [
+                        basePatchID
+                    ][baseLocalFaceID];
+
+                resultGradD[faceI] =
+                    baseGradDForSyncing.boundaryField()
                     [
                         basePatchID
                     ][baseLocalFaceID];
@@ -2112,6 +2262,7 @@ void Foam::mechanicalModel::clearOut() const
     interfaceShadowPatchID_.clear();
     interfaceShadowFaceID_.clear();
     interfaceShadowSigma_.clear();
+    interfaceShadowGradD_.clear();
     deleteDemandDrivenData(impKfcorrPtr_);
     deleteDemandDrivenData(pointNumOfMaterialsPtr_);
     deleteDemandDrivenData(isolatedInterfacePointsPtr_);
@@ -2156,6 +2307,7 @@ Foam::mechanicalModel::mechanicalModel(const fvMesh& mesh)
     interfaceShadowPatchID_(),
     interfaceShadowFaceID_(),
     interfaceShadowSigma_(),
+    interfaceShadowGradD_(),
     impKfcorrPtr_(NULL),
     pointNumOfMaterialsPtr_(NULL),
     isolatedInterfacePointsPtr_(NULL)
@@ -2353,54 +2505,31 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::impK() const
 
 Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalModel::impKf() const
 {
-    const PtrList<mechanicalLaw>& laws = *this;
+    // Check the interpolaiton scheme
+    // Harmonic interpolation should typically be used unless you know what you
+    // are doing!
 
-    if (laws.size() == 1)
+    const volScalarField impK = this->impK();
+    const word interpName = "interpolate(" + impK.name() + ')';
+
+    if
+    (
+        word(mesh().schemesDict().interpolationScheme(interpName)) != "harmonic"
+    )
     {
-        return laws[0].impKf();
-    }
-    else
-    {
-        // Accumulate data for all fields
-        tmp<surfaceScalarField> tresult
+        WarningIn
         (
-            new surfaceScalarField
-            (
-                IOobject
-                (
-                    "impKf",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE
-                ),
-                mesh(),
-                dimensionedScalar("zero", dimForce/dimArea, 0),
-                calculatedFvPatchScalarField::typeName
-            )
-        );
-        surfaceScalarField& result = tresult();
-
-        // Accumulated subMesh fields and then map to the base mesh
-        PtrList<surfaceScalarField> impKfs(laws.size());
-
-        forAll(laws, lawI)
-        {
-            impKfs.set
-            (
-                lawI,
-                new surfaceScalarField(laws[lawI].impKf())
-            );
-        }
-
-        // Map subMesh fields to the base mesh
-        mapSubMeshSurfaceFields<scalar>(impKfs, result);
-
-        // Clear subMesh fields
-        impKfs.clear();
-
-        return tresult;
+            "Foam::tmp<Foam::surfaceScalarField> "
+            "Foam::mechanicalModel::impKf() const"
+        )   << "The interpolation scheme for " << interpName << " is currently"
+            << " set to "
+            << word(mesh().schemesDict().interpolationScheme(interpName))
+            << "; however," << nl
+            << " harmonic typically gives the best convergence,"
+            << " particularly for multi-material cases!" << endl;
     }
+
+    return fvc::interpolate(impK, interpName);
 }
 
 
@@ -2700,9 +2829,9 @@ Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
         (
             fvc::laplacian
             (
-                impKf(), D, "laplacian(D" + D.name() + ',' + D.name() + ')'
+                impKfcorr(), D, "laplacian(D" + D.name() + ',' + D.name() + ')'
             )
-          - fvc::div(impKf()*mesh().Sf() & fvc::interpolate(gradD))
+          - fvc::div(impKfcorr()*mesh().Sf() & fvc::interpolate(gradD))
         );
     }
     else

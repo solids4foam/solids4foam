@@ -133,6 +133,10 @@ class mechanicalModel
         //  faces
         mutable PtrList<symmTensorField> interfaceShadowSigma_;
 
+        //- GradD calculated at shadow side of the interface for processor
+        //  faces
+        mutable PtrList<tensorField> interfaceShadowGradD_;
+
         //- The implicit stiffness surface field for Rhie-Chow correction
         mutable surfaceScalarField* impKfcorrPtr_;
 
@@ -315,13 +319,16 @@ class mechanicalModel
         //- Return interfaceShadowSigma
         const PtrList<symmTensorField>& interfaceShadowSigma() const;
 
+        //- Return interfaceShadowGradD
+        const PtrList<tensorField>& interfaceShadowGradD() const;
+
         //- Make interfaceShadowSigma
-        void makeInterfaceShadowSigma() const;
+        void makeInterfaceShadowSigmaGradD() const;
 
         //- Assemble and update the stress calculated from the other side of the
         //  interface i.e. calculated in the subMeshes on the other side of the
         //  interface
-        void updateInterfaceShadowSigma(const bool useVolFieldSigma);
+        void updateInterfaceShadowSigmaGradD(const bool useVolFieldSigma);
 
         //- Are there any bi-material interface faces
         bool biMaterialInterfaceActive() const;
