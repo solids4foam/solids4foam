@@ -16,8 +16,8 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // linearGeometry: assumes small strains and rotations
-//solidModel     linearGeometry;
-solidModel     unsLinearGeometry;
+solidModel     linearGeometry;
+//solidModel     unsLinearGeometry;
 
 "linearGeometryCoeffs|unsLinearGeometryCoeffs"
 {
