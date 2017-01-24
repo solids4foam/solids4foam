@@ -411,6 +411,16 @@ public:
                 surfaceTensorField& gradDf
             );
 
+            //- Update the gradient of displacement vol and surface field using
+            //  pointD
+            void grad
+            (
+                const volVectorField& D,
+                const pointVectorField& pointD,
+                volTensorField& gradD,
+                surfaceTensorField& gradDf
+            );
+
             //- Interpolate D to pointD
             void interpolate
             (

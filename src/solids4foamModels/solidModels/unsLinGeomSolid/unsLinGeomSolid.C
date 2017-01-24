@@ -751,8 +751,7 @@ bool unsLinGeomSolid::evolve()
         mechanical().interpolate(D_, pointD_, false);
 
         // Update gradient of displacement
-        mechanical().grad(D_, pointD_, gradD_);
-        mechanical().grad(D_, pointD_, gradDf_);
+        mechanical().grad(D_, pointD_, gradD_, gradDf_);
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigmaf_);
@@ -760,36 +759,11 @@ bool unsLinGeomSolid::evolve()
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
-    // Calculate cell stress
-    mechanical().correct(sigma_);
-
     // Velocity
     U_ = fvc::ddt(D_);
 
     return true;
 }
-
-
-// void unsLinGeomSolid::predict()
-// {
-//     Info << "Predicting solid model" << endl;
-
-//     D_ = D_ + U_*runTime().deltaT();
-
-//     if (interface().valid())
-//     {
-//         interface()->updateDisplacement(pointD_);
-//         interface()->updateDisplacementGradient(gradD_, gradDf_);
-//     }
-//     else
-//     {
-//         mechanical().volToPoint().interpolate(D_, pointD_);
-//         gradD_ = fvc::grad(D_, pointD_);
-//         gradDf_ = fvc::fGrad(D_, pointD_);
-//     }
-
-//     D_.correctBoundaryConditions();
-// }
 
 
 tmp<vectorField> unsLinGeomSolid::tractionBoundarySnGrad

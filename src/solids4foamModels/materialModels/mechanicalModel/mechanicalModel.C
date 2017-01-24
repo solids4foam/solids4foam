@@ -1503,6 +1503,10 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                             n /= mag(n);
                         }
 
+                        // In surfaceInterpolation.C the deltaCoeffs are
+                        // calculated as:
+                        // 1.0/max(unitArea & delta, 0.05*mag(delta));
+
                         // Normal distance from the interface to the cell-centre
                         // on side-a
                         scalar da =
@@ -1738,7 +1742,7 @@ void Foam::mechanicalModel::correctBoundarySnGradf
 
             const vectorField n = subMesh.boundary()[patchI].nf();
             const vectorField delta = subMesh.boundary()[patchI].delta();
-            const vectorField k = delta - n*(n & delta);
+            const vectorField k = delta - (sqr(n) & delta);
             const scalarField& deltaCoeffs =
                 subMesh.boundary()[patchI].deltaCoeffs();
 
@@ -2494,10 +2498,7 @@ void Foam::mechanicalModel::grad
         // Map subMesh gradD to the base gradD
         correctBoundarySnGrad(subMeshD(), subMeshGradD());
 
-        mapSubMeshVolFields<tensor>
-        (
-            subMeshGradD(), gradD
-        );
+        mapSubMeshVolFields<tensor>(subMeshGradD(), gradD);
 
         // Correct boundary snGrad
         fv::gaussGrad<vector>
@@ -2523,24 +2524,19 @@ void Foam::mechanicalModel::grad
     }
     else
     {
-        // Accumulate data for all fields
+        // Calculate subMesh gradient fields
         forAll(laws, lawI)
         {
-            // Map subMesh gradD to the base gradD
             volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
             subMeshGradD = fvc::grad(subMeshD()[lawI], subMeshPointD()[lawI]);
         }
 
-        // Correct snGrad on the interface patch of subMeshGradDf because
-        // the default calculated boundaries disable non-orthogonal
-        // correction
+        // Correct snGrad on boundaries because the default calculated
+        // boundaries disable non-orthogonal correction
         correctBoundarySnGrad(subMeshD(), subMeshGradD());
 
         // Map subMesh gradD fields to the base gradD field
-        mapSubMeshVolFields<tensor>
-        (
-            this->subMeshGradD(), gradD
-        );
+        mapSubMeshVolFields<tensor>(subMeshGradD(), gradD);
 
         // Correct boundary snGrad
         fv::gaussGrad<vector>
@@ -2566,29 +2562,72 @@ void Foam::mechanicalModel::grad
     }
     else
     {
-        // Accumulate data for all fields
+        // Calculate subMesh gradient fields
         forAll(laws, lawI)
         {
             surfaceTensorField& subMeshGradDf = this->subMeshGradDf()[lawI];
             subMeshGradDf = fvc::fGrad(subMeshD()[lawI], subMeshPointD()[lawI]);
         }
 
-        // Correct snGrad on the boundaries of subMeshGradDf because
-        // the default calculated boundaries disable non-orthogonal
-        // correction
-        correctBoundarySnGradf
-        (
-            subMeshD(), subMeshGradDf(), subMeshGradD()
-        );
+        // Correct snGrad on boundaries because the default calculated
+        // boundaries disable non-orthogonal correction
+        correctBoundarySnGradf(subMeshD(), subMeshGradDf(), subMeshGradD());
 
         // Map subMesh gradDf fields to the base gradDf field
-        mapSubMeshSurfaceFields<tensor>
-        (
-            subMeshGradDf(), gradDf
-        );
+        mapSubMeshSurfaceFields<tensor>(subMeshGradDf(), gradDf);
 
         // Replace normal component
         // If we don't do this then we don't get convergence in many cases
+        const surfaceVectorField n = mesh().Sf()/mesh().magSf();
+        gradDf += n*fvc::snGrad(D) - (sqr(n) & gradDf);
+    }
+}
+
+
+void Foam::mechanicalModel::grad
+(
+    const volVectorField& D,
+    const pointVectorField& pointD,
+    volTensorField& gradD,
+    surfaceTensorField& gradDf
+)
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        gradD = fvc::grad(D, pointD);
+        gradDf = fvc::fGrad(D, pointD);
+    }
+    else
+    {
+        // Calculate subMesh gradient fields
+        forAll(laws, lawI)
+        {
+            volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
+            subMeshGradD = fvc::grad(subMeshD()[lawI], subMeshPointD()[lawI]);
+
+            surfaceTensorField& subMeshGradDf = this->subMeshGradDf()[lawI];
+            subMeshGradDf = fvc::fGrad(subMeshD()[lawI], subMeshPointD()[lawI]);
+        }
+
+        // Correct snGrad on boundaries because the default calculated
+        // boundaries disable non-orthogonal correction
+        correctBoundarySnGrad(subMeshD(), subMeshGradD());
+        correctBoundarySnGradf(subMeshD(), subMeshGradDf(), subMeshGradD());
+
+        // Map subMesh fields to the base field
+
+        mapSubMeshVolFields<tensor>(subMeshGradD(), gradD);
+        mapSubMeshSurfaceFields<tensor>(subMeshGradDf(), gradDf);
+
+        // Correct boundary snGrad of gradD
+        fv::gaussGrad<vector>
+        (
+            mesh()
+        ).correctBoundaryConditions(D, gradD);
+
+        // Correct snGrad component of gradDf
         const surfaceVectorField n = mesh().Sf()/mesh().magSf();
         gradDf += n*fvc::snGrad(D) - (sqr(n) & gradDf);
     }
