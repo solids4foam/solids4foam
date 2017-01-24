@@ -39,6 +39,7 @@ $(mechanicalLaws)/poroLinearElastic/poroLinearElastic.C
 $(mechanicalLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
 $(mechanicalLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(mechanicalLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
+$(mechanicalLaws)/neoHookeanElasticMisesPlasticRubin/neoHookeanElasticMisesPlasticRubin.C
 $(mechanicalLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 $(mechanicalLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
 $(mechanicalLaws)/thermoLinearElastic/thermoLinearElastic.C
