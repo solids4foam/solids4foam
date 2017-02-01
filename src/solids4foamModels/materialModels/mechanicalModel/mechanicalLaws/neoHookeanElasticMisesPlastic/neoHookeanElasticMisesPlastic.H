@@ -277,18 +277,16 @@ class neoHookeanElasticMisesPlastic
             const scalar maxMagDEpsilon    // Max strain increment magnitude
         ) const;
 
-        //- Update bEbar after the deviatoric stress has been calculated
-        void updateBEbar
+        //- Calcualte Ibar such that det(bEbar) == 1
+        tmp<volScalarField> Ibar
         (
-            volSymmTensorField& bEbar,
-            const volSymmTensorField& bEbarTrial
+            const volSymmTensorField& devBEbar
         );
 
-        //- Update bEbar after the deviatoric stress has been calculated
-        void updateBEbar
+        //- Calcualte Ibar such that det(bEbar) == 1
+        tmp<surfaceScalarField> Ibar
         (
-            surfaceSymmTensorField& bEbar,
-            const surfaceSymmTensorField& bEbarTrial
+            const surfaceSymmTensorField& devBEbar
         );
 
 public:

@@ -398,17 +398,16 @@ void Foam::neoHookeanElasticMisesPlastic::newtonLoop
 }
 
 
-void Foam::neoHookeanElasticMisesPlastic::updateBEbar
+Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
 (
-    volSymmTensorField& bEbar,
-    const volSymmTensorField& devBEbarTrial
+    const volSymmTensorField& devBEbar
 )
 {
     // From Simo & Hughes 1998:
     // but this incorrectly results in det(bEbar) =! 1
     //bEbar = (s/mu) + Ibar*I;
 
-    // A method of calculating Ibar o denforce det(bEbar) == 1 is proposed
+    // A method of calculating Ibar to enforce det(bEbar) == 1 is proposed
     // by solving a cubic equation.
     // Rubin and Attia, CALCULATION OF HYPERELASTIC RESPONSE OF FINITELY
     // DEFORMED ELASTIC-VISCOPLASTIC MATERIALS, INTERNATIONAL JOURNAL FOR
@@ -425,23 +424,39 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
     // Method implemented below is translated from the SmoothMultiPhase fortran
     // subroutine of Rubin
 
-    // Calculate deviatoric component of trial bEbar
-    //const volSymmTensorField devBEbarTrial = dev(bEbarTrial);
+    tmp<volScalarField> tIbar
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "Ibar",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimless, 0.0)
+        )
+    );
+
+    volScalarField& Ibar = tIbar();
 
     // Take reference to internal fields for efficiency
-    symmTensorField& bEbarI = bEbar.internalField();
-    const symmTensorField& devBEbarTrialI = devBEbarTrial.internalField();
+    scalarField& IbarI = Ibar.internalField();
+    const symmTensorField devBEbarI = devBEbar.internalField();
 
     // Calculate internal field
-    forAll(bEbarI, cellI)
+    forAll(IbarI, cellI)
     {
-        const scalar detdevBepr = det(devBEbarTrialI[cellI]);
-        const scalar dotprod = devBEbarTrialI[cellI] && devBEbarTrialI[cellI];
+        const scalar detdevBepr = det(devBEbarI[cellI]);
+        const scalar dotprod = devBEbarI[cellI] && devBEbarI[cellI];
         const scalar fac1 = 2.0*dotprod/3.0;
 
         scalar alpha1 = 0.0;
 
-        if (fac1 == 0.0) // maybe check abs is less than SMALL
+        if (mag(fac1) < SMALL)
         {
             alpha1 = 3.0;
         }
@@ -459,33 +474,33 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
             }
         }
 
-        bEbarI[cellI] = devBEbarTrialI[cellI] + (alpha1/3.0)*I;
+        IbarI[cellI] = alpha1/3.0;
     }
 
     // Calculate boundary field
-    forAll(bEbar.boundaryField(), patchI)
+    forAll(Ibar.boundaryField(), patchI)
     {
         if
         (
-            !bEbar.boundaryField()[patchI].coupled()
-         && bEbar.boundaryField()[patchI].type() != "empty"
+            !Ibar.boundaryField()[patchI].coupled()
+         && Ibar.boundaryField()[patchI].type() != "empty"
         )
         {
             // Take reference to patch fields for efficiency
-            symmTensorField& bEbarP = bEbar.boundaryField()[patchI];
-            const symmTensorField& devBEbarTrialP =
-                devBEbarTrial.boundaryField()[patchI];
+            scalarField& IbarP = Ibar.boundaryField()[patchI];
+            const symmTensorField& devBEbarP =
+                devBEbar.boundaryField()[patchI];
 
-            forAll(bEbarP, faceI)
+            forAll(IbarP, faceI)
             {
-                const scalar detdevBepr = det(devBEbarTrialP[faceI]);
+                const scalar detdevBepr = det(devBEbarP[faceI]);
                 const scalar dotprod =
-                    devBEbarTrialP[faceI] && devBEbarTrialP[faceI];
+                    devBEbarP[faceI] && devBEbarP[faceI];
                 const scalar fac1 = 2.0*dotprod/3.0;
 
                 scalar alpha1 = 0.0;
 
-                if (fac1 == 0.0) // maybe check abs is less than SMALL
+                if (mag(fac1) < SMALL)
                 {
                     alpha1 = 3.0;
                 }
@@ -508,26 +523,27 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
                     }
                 }
 
-                bEbarP[faceI] = devBEbarTrialP[faceI] + (alpha1/3.0)*I;
+                IbarP[faceI] = alpha1/3.0;
             }
         }
     }
 
-    bEbar.correctBoundaryConditions();
+    Ibar.correctBoundaryConditions();
+
+    return tIbar;
 }
 
 
-void Foam::neoHookeanElasticMisesPlastic::updateBEbar
+Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
 (
-    surfaceSymmTensorField& bEbar,
-    const surfaceSymmTensorField& devBEbarTrial
+    const surfaceSymmTensorField& devBEbar
 )
 {
     // From Simo & Hughes 1998:
     // but this incorrectly results in det(bEbar) =! 1
     //bEbar = (s/mu) + Ibar*I;
 
-    // A method of calculating Ibar o denforce det(bEbar) == 1 is proposed
+    // A method of calculating Ibar to enforce det(bEbar) == 1 is proposed
     // by solving a cubic equation.
     // Rubin and Attia, CALCULATION OF HYPERELASTIC RESPONSE OF FINITELY
     // DEFORMED ELASTIC-VISCOPLASTIC MATERIALS, INTERNATIONAL JOURNAL FOR
@@ -544,23 +560,39 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
     // Method implemented below is translated from the SmoothMultiPhase fortran
     // subroutine of Rubin
 
-    // Calculate deviatoric component of trial bEbar
-    //const volSymmTensorField devBEbarTrial = dev(bEbarTrial);
+    tmp<surfaceScalarField> tIbar
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "Ibar",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimless, 0.0)
+        )
+    );
+
+    surfaceScalarField& Ibar = tIbar();
 
     // Take reference to internal fields for efficiency
-    symmTensorField& bEbarI = bEbar.internalField();
-    const symmTensorField& devBEbarTrialI = devBEbarTrial.internalField();
+    scalarField& IbarI = Ibar.internalField();
+    const symmTensorField devBEbarI = devBEbar.internalField();
 
     // Calculate internal field
-    forAll(bEbarI, faceI)
+    forAll(IbarI, cellI)
     {
-        const scalar detdevBepr = det(devBEbarTrialI[faceI]);
-        const scalar dotprod = devBEbarTrialI[faceI] && devBEbarTrialI[faceI];
+        const scalar detdevBepr = det(devBEbarI[cellI]);
+        const scalar dotprod = devBEbarI[cellI] && devBEbarI[cellI];
         const scalar fac1 = 2.0*dotprod/3.0;
 
         scalar alpha1 = 0.0;
 
-        if (fac1 == 0.0) // maybe check abs is less than SMALL
+        if (mag(fac1) < SMALL)
         {
             alpha1 = 3.0;
         }
@@ -578,29 +610,33 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
             }
         }
 
-        bEbarI[faceI] = devBEbarTrialI[faceI] + (alpha1/3.0)*I;
+        IbarI[cellI] = alpha1/3.0;
     }
 
     // Calculate boundary field
-    forAll(bEbar.boundaryField(), patchI)
+    forAll(Ibar.boundaryField(), patchI)
     {
-        if (bEbar.boundaryField()[patchI].type() != "empty")
+        if
+        (
+            !Ibar.boundaryField()[patchI].coupled()
+         && Ibar.boundaryField()[patchI].type() != "empty"
+        )
         {
             // Take reference to patch fields for efficiency
-            symmTensorField& bEbarP = bEbar.boundaryField()[patchI];
-            const symmTensorField& devBEbarTrialP =
-                devBEbarTrial.boundaryField()[patchI];
+            scalarField& IbarP = Ibar.boundaryField()[patchI];
+            const symmTensorField& devBEbarP =
+                devBEbar.boundaryField()[patchI];
 
-            forAll(bEbarP, faceI)
+            forAll(IbarP, faceI)
             {
-                const scalar detdevBepr = det(devBEbarTrialP[faceI]);
+                const scalar detdevBepr = det(devBEbarP[faceI]);
                 const scalar dotprod =
-                    devBEbarTrialP[faceI] && devBEbarTrialP[faceI];
+                    devBEbarP[faceI] && devBEbarP[faceI];
                 const scalar fac1 = 2.0*dotprod/3.0;
 
                 scalar alpha1 = 0.0;
 
-                if (fac1 == 0.0) // maybe check abs is less than SMALL
+                if (mag(fac1) < SMALL)
                 {
                     alpha1 = 3.0;
                 }
@@ -623,13 +659,16 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
                     }
                 }
 
-                bEbarP[faceI] = devBEbarTrialP[faceI] + (alpha1/3.0)*I;
+                IbarP[faceI] = alpha1/3.0;
             }
         }
     }
 
-    bEbar.correctBoundaryConditions();
+    Ibar.correctBoundaryConditions();
+
+    return tIbar;
 }
+
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -1131,13 +1170,13 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 
     // Calculate the relative deformation gradient with the volumetric term
     // removed
-    volTensorField relFbar = pow(relJ, -1.0/3.0)*relF();
+    const volTensorField relFbar = pow(relJ, -1.0/3.0)*relF();
 
     // Update bE trial
     bEbarTrial_ = transform(relFbar, bEbar_.oldTime());
 
     // Calculate trial deviatoric stress
-    volSymmTensorField sTrial = mu_*dev(bEbarTrial_);
+    const volSymmTensorField sTrial = mu_*dev(bEbarTrial_);
 
     const volScalarField Ibar = tr(bEbarTrial_)/3.0;
     const volScalarField muBar = Ibar*mu_;
@@ -1314,7 +1353,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     if (updateBEbarConsistent_)
     {
         const volSymmTensorField devBEbar = (s/mu_);
-        updateBEbar(bEbar_, devBEbar);
+        bEbar_ = devBEbar + this->Ibar(devBEbar)*I;
     }
     else
     {
@@ -1547,7 +1586,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     if (updateBEbarConsistent_)
     {
         const surfaceSymmTensorField devBEbar = (s/mu_);
-        updateBEbar(bEbarf_, devBEbar);
+        bEbarf_ = devBEbar + this->Ibar(devBEbar)*I;
     }
     else
     {

@@ -43,13 +43,6 @@ Description
     Lagrangian cell-centred finite volume method for metal forming simulation,
     doi=10.1002/nme.5345.
 
-    This law differs from neoHookeanElasticMisesPlastic in that it implements
-    modifications proposed by Rubin and Cardiff to enforce a consistent
-    derivation of the constitutive law and integration algorithm; more info in:
-    Rubin and Cardiff, Inconsistency in the standard finite deformation
-    hyperelastic model of J2 plasticity, To be submitted to Computational
-    Mechanics.
-
 SourceFiles
     neoHookeanElasticMisesPlasticRubin.C
 
@@ -91,11 +84,20 @@ class neoHookeanElasticMisesPlasticRubin
         //- Relative deformation gradient volField
         volTensorField* relFPtr_;
 
+        //- Relative deformation gradient surfaceField
+        surfaceTensorField* relFfPtr_;
+
         //- Jacobian of the toal deformation gradient volField
         volScalarField* JPtr_;
 
+        //- Jacobian of the toal deformation gradient surfaceField
+        surfaceScalarField* JfPtr_;
+
         //- Total deformation gradient volField
         volTensorField* FPtr_;
+
+        //- Total deformation gradient surfaceField
+        surfaceTensorField* FfPtr_;
 
         //- Table of post-yield stress versus plastic strain
         //  For large strain total Lagrangian models, it expects
@@ -108,14 +110,11 @@ class neoHookeanElasticMisesPlasticRubin
         //- Cauchy yield stress
         volScalarField sigmaY_;
 
-        //- Elastic Jacobian of total deformation gradient
+        //- Incremental change in sigmaY
         volScalarField Je_;
 
         //- Total plastic strain
         volSymmTensorField epsilonP_;
-
-        //- Incremental change of plastic strain
-        volSymmTensorField DEpsilonP_;
 
         //- Elastic left Cauchy-Green trial strain tensor with volumetric term
         //  removed. Trial means that plasticity is neglected.
@@ -124,10 +123,10 @@ class neoHookeanElasticMisesPlasticRubin
         //- Elastic left Cauchy-Green strain tensor with volumetric term removed
         volSymmTensorField bEbar_;
 
-        //- Equivalent plastic strain increment
-        volScalarField DEpsilonPEq_;
+        //- Plastic multiplier increment - plastric strain scaled by sqrt(2/3)
+        volScalarField DLambda_;
 
-        //- Plastic multiplier
+        //- Plastic multiplier for Rubin algorithm
         volScalarField lambda_;
 
         //- Equivalent plastic strain
@@ -139,7 +138,16 @@ class neoHookeanElasticMisesPlasticRubin
         volScalarField activeYield_;
 
         //- plasticN is the return direction to the yield surface
-        //volSymmTensorField plasticN_;
+        volSymmTensorField plasticN_;
+
+        //- Switch between PC (plastic compaction) and C (J == Je) algorithms
+        const Switch plasticCompaction_;
+
+        //- Use Rubin algorithm
+        const Switch rubin_;
+
+        //- Store sqrt(2/3) as it is used often
+        static scalar sqrtTwoOverThree_;
 
 
     // Private Member Functions
@@ -189,18 +197,11 @@ class neoHookeanElasticMisesPlasticRubin
         //- Return a reference to the Ff field
         surfaceTensorField& Ff();
 
-        //- Update bEbar after the deviatoric stress has been calculated
+        //- Calcualte Ibar such that det(bEbar) == 1
         tmp<volScalarField> Ibar
         (
-            const volSymmTensorField& bEbarTrial
+            const volSymmTensorField& devBEbar
         );
-
-        // //- Update bEbar after the deviatoric stress has been calculated
-        // void updateBEbar
-        // (
-        //     surfaceSymmTensorField& bEbar,
-        //     const surfaceSymmTensorField& bEbarTrial
-        // );
 
 public:
 

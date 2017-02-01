@@ -2344,21 +2344,25 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalModel::impKf() const
     const volScalarField impK = this->impK();
     const word interpName = "interpolate(" + impK.name() + ')';
 
-    if
-    (
-        word(mesh().schemesDict().interpolationScheme(interpName)) != "harmonic"
-    )
+    if (PtrList<mechanicalLaw>::size() > 1)
     {
-        WarningIn
+        if
         (
-            "Foam::tmp<Foam::surfaceScalarField> "
-            "Foam::mechanicalModel::impKf() const"
-        )   << "The interpolation scheme for " << interpName << " is currently"
-            << " set to "
-            << word(mesh().schemesDict().interpolationScheme(interpName))
-            << "; however," << nl
-            << " harmonic typically gives the best convergence,"
-            << " particularly for multi-material cases!" << endl;
+            word(mesh().schemesDict().interpolationScheme(interpName))
+         != "harmonic"
+        )
+        {
+            WarningIn
+            (
+                "Foam::tmp<Foam::surfaceScalarField> "
+                "Foam::mechanicalModel::impKf() const"
+            )   << "The interpolation scheme for " << interpName << " is "
+                << " currently set to "
+                << word(mesh().schemesDict().interpolationScheme(interpName))
+                << "; however," << nl
+                << "    harmonic typically gives the best convergence,"
+                << " particularly for multi-material cases!" << endl;
+        }
     }
 
     return fvc::interpolate(impK, interpName);
