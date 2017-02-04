@@ -89,42 +89,6 @@ Foam::volTensorField& Foam::neoHookeanElasticMisesPlasticRubin::relF()
 }
 
 
-void Foam::neoHookeanElasticMisesPlasticRubin::makeRelFf()
-{
-    if (relFfPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlasticRubin::makeRelFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    relFfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "lawRelFf",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::surfaceTensorField& Foam::neoHookeanElasticMisesPlasticRubin::relFf()
-{
-    if (!relFfPtr_)
-    {
-        makeRelFf();
-    }
-
-    return *relFfPtr_;
-}
-
-
 void Foam::neoHookeanElasticMisesPlasticRubin::makeJ()
 {
     if (JPtr_)
@@ -164,45 +128,6 @@ Foam::volScalarField& Foam::neoHookeanElasticMisesPlasticRubin::J()
 }
 
 
-void Foam::neoHookeanElasticMisesPlasticRubin::makeJf()
-{
-    if (JfPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlasticRubin::makeJf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    JfPtr_ =
-        new surfaceScalarField
-        (
-            IOobject
-            (
-                "lawJf",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedScalar("one", dimless, 1.0)
-        );
-
-    // Store the old-time
-    JfPtr_->oldTime();
-}
-
-
-Foam::surfaceScalarField& Foam::neoHookeanElasticMisesPlasticRubin::Jf()
-{
-    if (!JfPtr_)
-    {
-        makeJf();
-    }
-
-    return *JfPtr_;
-}
-
-
 void Foam::neoHookeanElasticMisesPlasticRubin::makeF()
 {
     if (FPtr_)
@@ -239,45 +164,6 @@ Foam::volTensorField& Foam::neoHookeanElasticMisesPlasticRubin::F()
     }
 
     return *FPtr_;
-}
-
-
-void Foam::neoHookeanElasticMisesPlasticRubin::makeFf()
-{
-    if (FfPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlasticRubin::makeFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "lawFf",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-
-    // Store the old-time
-    FfPtr_->oldTime();
-}
-
-
-Foam::surfaceTensorField& Foam::neoHookeanElasticMisesPlasticRubin::Ff()
-{
-    if (!FfPtr_)
-    {
-        makeFf();
-    }
-
-    return *FfPtr_;
 }
 
 
@@ -430,19 +316,29 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
     mechanicalLaw(name, mesh, dict),
     rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
-    K_("zero", dimPressure, 0.0),
-    relFPtr_(NULL),
-    relFfPtr_(NULL),
-    JPtr_(NULL),
-    JfPtr_(NULL),
-    FPtr_(NULL),
-    FfPtr_(NULL),
-    stressPlasticStrainSeries_(dict),
-    sigmaHyd_
+    k_("zero", dimPressure, 0.0),
+    kappa_
     (
         IOobject
         (
-            "sigmaHyd",
+            "yieldStress",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedScalar(dict.lookup("initialYieldStress"))
+    ),
+    K_(dict.lookup("hardeningModulus")),
+    relFPtr_(NULL),
+    JPtr_(NULL),
+    FPtr_(NULL),
+    P_
+    (
+        IOobject
+        (
+            "P",
             mesh.time().timeName(),
             mesh,
             IOobject::NO_READ,
@@ -450,22 +346,6 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
         ),
         mesh,
         dimensionedScalar("zero", dimPressure, 0.0)
-    ),
-    sigmaY_
-    (
-        IOobject
-        (
-            "sigmaY",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar
-        (
-            "initialYieldStress", dimPressure, stressPlasticStrainSeries_(0.0)
-        )
     ),
     Je_
     (
@@ -479,19 +359,6 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
         ),
         mesh,
         dimensionedScalar("1", dimless, 1.0)
-    ),
-    epsilonP_
-    (
-        IOobject
-        (
-            "epsilonP",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     bEbarTrial_
     (
@@ -519,19 +386,6 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
         mesh,
         dimensionedSymmTensor("I", dimless, I)
     ),
-    DLambda_
-    (
-        IOobject
-        (
-            "DLambda",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("0", dimless, 0.0)
-    ),
     lambda_
     (
         IOobject
@@ -544,19 +398,6 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
         ),
         mesh,
         dimensionedScalar("one", dimless, 1.0)
-    ),
-    epsilonPEq_
-    (
-        IOobject
-        (
-            "epsilonPEq",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("0", dimless, 0.0)
     ),
     activeYield_
     (
@@ -571,29 +412,14 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
         mesh,
         dimensionedScalar("0", dimless, 0)
     ),
-    plasticN_
-    (
-        IOobject
-        (
-            "plasticN",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
-    plasticCompaction_(dict.lookup("plasticCompaction")),
-    rubin_(dict.lookupOrDefault<Switch>("rubin", true))
+    plasticCompaction_(dict.lookup("plasticCompaction"))
 {
     // Force storage of old time for adjustable time-step calculations
-    plasticN_.oldTime();
     bEbar_.oldTime();
     Je_.oldTime();
 
     // Read elastic parameters
-    // The user can specify E and nu or mu and K
+    // The user can specify E and nu or mu and k
     if (dict.found("E") && dict.found("nu"))
     {
         // Read the Young's modulus
@@ -608,17 +434,17 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
         // Set the bulk modulus
         if (planeStress())
         {
-            K_ = (nu*E/((1.0 + nu)*(1.0 - nu))) + (2.0/3.0)*mu_;
+            k_ = (nu*E/((1.0 + nu)*(1.0 - nu))) + (2.0/3.0)*mu_;
         }
         else
         {
-            K_ = (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*mu_;
+            k_ = (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*mu_;
         }
     }
-    else if (dict.found("mu") && dict.found("K"))
+    else if (dict.found("mu") && dict.found("k"))
     {
         mu_ = dimensionedScalar(dict.lookup("mu"));
-        K_ = dimensionedScalar(dict.lookup("K"));
+        k_ = dimensionedScalar(dict.lookup("k"));
     }
     else
     {
@@ -626,7 +452,7 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
         (
             "neoHookeanElasticMisesPlasticRubin::"
             "neoHookeanElasticMisesPlasticRubin::()"
-        )   << "Either E and nu or mu and K elastic parameters should be "
+        )   << "Either E and nu or mu and k elastic parameters should be "
             << "specified" << abort(FatalError);
     }
 }
@@ -637,11 +463,8 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
 Foam::neoHookeanElasticMisesPlasticRubin::~neoHookeanElasticMisesPlasticRubin()
 {
     deleteDemandDrivenData(relFPtr_);
-    deleteDemandDrivenData(relFfPtr_);
     deleteDemandDrivenData(JPtr_);
-    deleteDemandDrivenData(JfPtr_);
     deleteDemandDrivenData(FPtr_);
-    deleteDemandDrivenData(FfPtr_);
 }
 
 
@@ -686,7 +509,7 @@ Foam::neoHookeanElasticMisesPlasticRubin::impK() const
                 IOobject::NO_WRITE
             ),
             mesh(),
-            (4.0/3.0)*mu_ + K_, // == 2*mu + lambda
+            (4.0/3.0)*mu_ + k_, // == 2*mu + lambda
             zeroGradientFvPatchScalarField::typeName
         )
     );
@@ -736,109 +559,67 @@ void Foam::neoHookeanElasticMisesPlasticRubin::correct
     // Update bE trial
     bEbarTrial_ = transform(relFbar, bEbar_.oldTime());
 
-    if (rubin_)
+    // Calculate the equiavlent trial stress
+    // Note: tr(bEbar & bEbar) == magSqr(bEbar)
+    const volSymmTensorField devBEbarTrial = dev(bEbarTrial_);
+    const volScalarField sigmaEqTrial =
+        mu_*sqrt((3.0/2.0)*tr(devBEbarTrial & devBEbarTrial));
+
+    // Store previous iteration for calculation of the residual
+    lambda_.storePrevIter();
+
+    // Calculate the plastic multiplier
+    // Note: kappa is assumed here to be the Kirchhoff yield stress; we could
+    // scale it by J to specify the Cauchy yield stress
+    lambda_ =
+        min
+        (
+            (
+                (kappa_.oldTime()/sigmaEqTrial) + (K_/(3.0*mu_))
+            )/(1.0 + (K_/(3.0*mu_))),
+            1.0
+        );
+
+    // Deviatoric component of bEbar
+    const volSymmTensorField devBEbar = lambda_*dev(bEbarTrial_);
+
+    // Calculate the hardening
+    kappa_ = kappa_.oldTime() + (1.0 - lambda_)*(K_/(3.0*mu_))*sigmaEqTrial;
+
+    // Calcualte Je
+    if (plasticCompaction_)
     {
-        // Calculate sigmaStar
-        // Note: tr(bEbar & bEbar) == magSqr(bEbar)
-
-        const volSymmTensorField devBEbarTrial = dev(bEbarTrial_);
-
-        const volScalarField sigmaStar =
-            mu_*sqrt((3.0/2.0)*tr(devBEbarTrial & devBEbarTrial));
-
-        // Calculate yield function
-        const volScalarField fTrial = sigmaStar/sigmaY_;
-
-        // Or we can enforce Cauchy yield stress instead of Kirchhoff yield
-        // stress
-        //const volScalarField fTrial = sigmaStar/(J()*sigmaY_);
-
-        // Store previous iteration for calculation of the residual
-        lambda_.storePrevIter();
-
-        // Calculate plastic multiplier
-        lambda_ = 1.0/max(1.0, fTrial);
-
-        // Deviatoric component of bEbar
-        const volSymmTensorField devBEbar = lambda_*dev(bEbarTrial_);
-
-        // Calculate bEBar
-        bEbar_ = devBEbar + Ibar(devBEbar)*I;
-
-        // Calcualte Je
-        if (plasticCompaction_)
-        {
-            Je_ =
-                relJ*Je_.oldTime()
-               *exp
-                (
-                    (3.0/2.0)*((1.0 - lambda_)/lambda_)
-                    *(
-                        1.0 - (9.0/(tr(bEbar_)*tr(inv(bEbar_))))
-                    )
-                );
-        }
-        else
-        {
-            Je_ = 1.0*J();
-        }
-
-        // Reciprocal of J
-        const volScalarField rJ = 1.0/J();
-
-        // Calculate the deviatoric Cauchy stress
-        const volSymmTensorField Tprime = rJ*mu_*dev(bEbar_);
-
-        // Update hydrostatic pressure
-        // Note: P == -sigmaHyd
-        sigmaHyd_ = -rJ*0.5*K_*(1.0 - pow(Je_, 2.0));
-
-        // Update the Cauchy stress
-        sigma = Tprime + sigmaHyd_*I;
+        Je_ =
+            relJ*Je_.oldTime()
+            *exp
+            (
+                (3.0/2.0)*((1.0 - lambda_)/lambda_)
+                *(
+                    1.0 - (9.0/(tr(bEbar_)*tr(inv(bEbar_))))
+                )
+            );
     }
     else
     {
-        // Calculate trial deviatoric stress
-        const volSymmTensorField sTrial = mu_*dev(bEbarTrial_);
-
-        const volScalarField Ibar = tr(bEbarTrial_)/3.0;
-        const volScalarField muBar = Ibar*mu_;
-
-        // Check for plastic loading
-        // and calculate increment of plastic equivalent strain
-        // i.e. the plastic multiplier
-
-        // Trial yield function
-        // sigmaY is the Cauchy yield stress so we scale it by J
-        const volScalarField fTrial =
-            mag(sTrial) - sqrtTwoOverThree_*J()*sigmaY_;
-
-        // Return direction
-        plasticN_ =
-            sTrial
-           /(mag(sTrial) + dimensionedScalar("SMALL", dimPressure, SMALL));
-
-        // Store previous iteration for calculation of the residual
-        DLambda_.storePrevIter();
-
-        // Plastic multiplier
-        DLambda_ = pos(fTrial)*(fTrial/(2.0*muBar));
-
-        // Calculate deviatoric stress
-        const volSymmTensorField s = sTrial - 2.0*mu_*Ibar*DLambda_*plasticN_;
-
-        // Calculate the deviatoric component of bEbar
-        const volSymmTensorField devBEbar = s/mu_;
-
-        // Update bEbar
-        bEbar_ = devBEbar + this->Ibar(devBEbar)*I;
-
-        // Update hydrostatic stress (negative of pressure)
-        sigmaHyd_ = 0.5*K_*(pow(J(), 2.0) - 1.0);
-
-        // Update the Cauchy stress
-        sigma = (1.0/J())*(sigmaHyd_*I + s);
+        //Je_ = 1.0*J();
+        Je_ = relJ*Je_.oldTime();
     }
+
+    // Reciprocal of J
+    const volScalarField rJ = 1.0/J();
+
+    // Calculate the deviatoric Cauchy stress
+    const volSymmTensorField devT = rJ*mu_*dev(bEbar_);
+
+    // Update hydrostatic pressure
+    // Note: P == -sigmaHyd
+    P_ = rJ*0.5*k_*(1.0 - pow(Je_, 2.0));
+
+    // Update the Cauchy stress
+    sigma = devT - P_*I;
+
+    // Update bEBar
+    bEbar_ = devBEbar + Ibar(devBEbar)*I;
 }
 
 
@@ -855,9 +636,7 @@ Foam::scalar Foam::neoHookeanElasticMisesPlasticRubin::residual()
 {
     // Note: we remove mag(I) when we normalise the residual so that the
     // residual is like a strain residual
-    if (rubin_)
-    {
-        return
+    return
         gMax
         (
             mag
@@ -866,19 +645,6 @@ Foam::scalar Foam::neoHookeanElasticMisesPlasticRubin::residual()
               - lambda_.prevIter().internalField()
             )
         )/0.1;
-    }
-    else
-    {
-        return
-        gMax
-        (
-            mag
-            (
-                DLambda_.internalField()
-              - DLambda_.prevIter().internalField()
-            )
-        )/(gMax(mag(DLambda_.prevIter().internalField())) + SMALL);
-    }
 }
 
 
@@ -890,12 +656,11 @@ void Foam::neoHookeanElasticMisesPlasticRubin::updateTotalFields()
     int numCellsYielding = 0;
 
     scalarField& activeYieldI = activeYield_.internalField();
-    const scalarField& DLambdaI = DLambda_.internalField();
     const scalarField& lambdaI = lambda_.internalField();
 
     forAll(activeYieldI, cellI)
     {
-        if (DLambdaI[cellI] > SMALL || lambdaI[cellI] < (1.0 - SMALL))
+        if (lambdaI[cellI] < (1.0 - SMALL))
         {
             activeYieldI[cellI] = 1.0;
             numCellsYielding++;
@@ -913,12 +678,11 @@ void Foam::neoHookeanElasticMisesPlasticRubin::updateTotalFields()
         if (!activeYield_.boundaryField()[patchI].coupled())
         {
             scalarField& activeYieldP = activeYield_.boundaryField()[patchI];
-            const scalarField& DLambdaP = DLambda_.boundaryField()[patchI];
             const scalarField& lambdaP = lambda_.boundaryField()[patchI];
 
             forAll(activeYieldP, faceI)
             {
-                if (DLambdaP[faceI] > SMALL || lambdaP[faceI] < (1.0 - SMALL))
+                if (lambdaP[faceI] < (1.0 - SMALL))
                 {
                     activeYieldP[faceI] = 1.0;
                 }
@@ -943,7 +707,7 @@ void Foam::neoHookeanElasticMisesPlasticRubin::updateTotalFields()
         const volSymmTensorField s = mu_*dev(bEbar_);
 
         // Calculate the Kirchhoff stress
-        const volSymmTensorField tau("tau", s + sigmaHyd_*I);
+        const volSymmTensorField tau("tau", s - P_*I);
 
         // Calculate the equivalent Kirchhoff stress
         const volScalarField tauEq("tauEq", sqrt((3.0/2.0)*magSqr(dev(tau))));

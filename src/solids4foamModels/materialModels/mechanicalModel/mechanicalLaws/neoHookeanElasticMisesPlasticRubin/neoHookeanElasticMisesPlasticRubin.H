@@ -79,42 +79,28 @@ class neoHookeanElasticMisesPlasticRubin
         dimensionedScalar mu_;
 
         //- Bulk modulus
+        dimensionedScalar k_;
+
+        //- Kirchhoff yield stress
+        volScalarField kappa_;
+
+        //- Hardening modulus: do not confuse with the bulk modulus k
         dimensionedScalar K_;
 
         //- Relative deformation gradient volField
         volTensorField* relFPtr_;
 
-        //- Relative deformation gradient surfaceField
-        surfaceTensorField* relFfPtr_;
-
         //- Jacobian of the toal deformation gradient volField
         volScalarField* JPtr_;
-
-        //- Jacobian of the toal deformation gradient surfaceField
-        surfaceScalarField* JfPtr_;
 
         //- Total deformation gradient volField
         volTensorField* FPtr_;
 
-        //- Total deformation gradient surfaceField
-        surfaceTensorField* FfPtr_;
-
-        //- Table of post-yield stress versus plastic strain
-        //  For large strain total Lagrangian models, it expects
-        //  the true stress and true plastic strain.
-        interpolationTable<scalar> stressPlasticStrainSeries_;
-
-        //- Hydrostatic stress
-        volScalarField sigmaHyd_;
-
-        //- Cauchy yield stress
-        volScalarField sigmaY_;
+        //- Hydrostatic pressure == -hydrostatic stress
+        volScalarField P_;
 
         //- Incremental change in sigmaY
         volScalarField Je_;
-
-        //- Total plastic strain
-        volSymmTensorField epsilonP_;
 
         //- Elastic left Cauchy-Green trial strain tensor with volumetric term
         //  removed. Trial means that plasticity is neglected.
@@ -123,28 +109,16 @@ class neoHookeanElasticMisesPlasticRubin
         //- Elastic left Cauchy-Green strain tensor with volumetric term removed
         volSymmTensorField bEbar_;
 
-        //- Plastic multiplier increment - plastric strain scaled by sqrt(2/3)
-        volScalarField DLambda_;
-
         //- Plastic multiplier for Rubin algorithm
         volScalarField lambda_;
-
-        //- Equivalent plastic strain
-        volScalarField epsilonPEq_;
 
         //- Active yielding flag
         //     1.0 for active yielding
         //     0.0 otherwise
         volScalarField activeYield_;
 
-        //- plasticN is the return direction to the yield surface
-        volSymmTensorField plasticN_;
-
         //- Switch between PC (plastic compaction) and C (J == Je) algorithms
         const Switch plasticCompaction_;
-
-        //- Use Rubin algorithm
-        const Switch rubin_;
 
         //- Store sqrt(2/3) as it is used often
         static scalar sqrtTwoOverThree_;
