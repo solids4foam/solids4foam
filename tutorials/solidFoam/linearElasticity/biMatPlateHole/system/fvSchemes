@@ -27,6 +27,7 @@ ddtSchemes
 gradSchemes
 {
     default            extendedLeastSquares 0;
+    //default            cellLimited extendedLeastSquares 0 1;
 }
 
 divSchemes
@@ -51,7 +52,8 @@ snGradSchemes
 interpolationSchemes
 {
     default            none;
-    interpolate(impK)  linear;
+    interpolate(impK)  harmonic;
+    //interpolate(impK)  linear;
     interpolate(grad(D)) linear;
     interpolate(sigma0) linear;
 }
