@@ -86,6 +86,7 @@ $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarFiel
 functionObjects/setInletVelocity/setInletVelocity.C
 functionObjects/solidForces/solidForces.C
 functionObjects/solidForcesDisplacements/solidForcesDisplacements.C
+functionObjects/solidStresses/solidStresses.C
 functionObjects/solidDisplacements/solidDisplacements.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
 functionObjects/principalStresses/principalStresses.C
