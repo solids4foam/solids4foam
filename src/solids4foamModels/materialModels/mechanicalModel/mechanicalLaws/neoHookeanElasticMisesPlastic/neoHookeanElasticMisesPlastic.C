@@ -29,6 +29,9 @@ License
 #include "logVolFields.H"
 #include "fvc.H"
 
+#include "fvm.H"
+#include "fixedGradientFvPatchFields.H"
+
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
@@ -703,8 +706,10 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
             IOobject::AUTO_WRITE
         ),
         mesh,
-        dimensionedScalar("zero", dimPressure, 0.0)
+        dimensionedScalar("zero", dimPressure, 0.0),
+        zeroGradientFvPatchScalarField::typeName
     ),
+    smoothPressure_(dict.lookupOrDefault<Switch>("smoothPressure", true)),
     sigmaY_
     (
         IOobject
@@ -1002,6 +1007,8 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     // Force storage of old time for adjustable time-step calculations
     plasticN_.oldTime();
     bEbar_.oldTime();
+
+    Info<< "    smoothPressure: " << smoothPressure_ << endl;
 
     // Read elastic parameters
     // The user can specify E and nu or mu and K
@@ -1361,7 +1368,50 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     }
 
     // Update hydrostatic stress (negative of pressure)
-    sigmaHyd_ = 0.5*K_*(pow(J(), 2.0) - 1.0);
+    if (smoothPressure_)
+    {
+        // Calculate the hydrostatic pressure by solving a Laplace equation;
+        // this ensures smoothness of the field and quells oscillations
+
+        // Lookup the momentum equation inverse diagonal field
+        const volScalarField AD = mesh().lookupObject<volScalarField>("DEqnA");
+
+        // Pressure diffusivity field
+        const surfaceScalarField rDAf
+        (
+            "rDAf", fvc::interpolate(K_/AD, "interpolate(grad(sigmaHyd))")
+        );
+
+        const dimensionedScalar one("one", dimless, 1.0);
+
+        // Construct the pressure equation
+        fvScalarMatrix sigmaHydEqn
+        (
+            fvm::Sp(one, sigmaHyd_)
+          - fvm::laplacian(rDAf, sigmaHyd_, "laplacian(DDD,DD)")
+         ==
+            0.5*K_*(pow(J(), 2.0) - 1.0)
+          - fvc::div(rDAf*fvc::interpolate(fvc::grad(sigmaHyd_)) & mesh().Sf())
+        );
+
+        // Store the pressue field to allow under-relaxation
+        sigmaHyd_.storePrevIter();
+
+        // Under-relax the linear system
+        sigmaHydEqn.relax(0.7);
+
+        // Solve the pressure equation
+        sigmaHydEqn.solve();
+
+        // Under-relax the pressure field
+        sigmaHyd_.relax(0.2);
+    }
+    else
+    {
+        // Calculate the hydrostatic pressure directly from the displacement
+        // field
+        sigmaHyd_ = 0.5*K_*(pow(J(), 2.0) - 1.0);
+    }
 
     // Update the Cauchy stress
     sigma = (1.0/J())*(sigmaHyd_*I + s);
@@ -1689,23 +1739,7 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
 
     // if (mesh().time().outputTime())
     // {
-    //     Info<< "Writing det(bEbar)" << endl;
-
-    //     volScalarField detBEbarMinus1
-    //     (
-    //         "detBEbarMinus1",
-    //         det(bEbar_) - 1.0
-    //     );
-
-    //     detBEbarMinus1.write();
-
-    //     volScalarField trBEbarOver3Minus1
-    //     (
-    //         "trBEbarOver3Minus1",
-    //         (tr(bEbar_)/3.0) - 1.0
-    //     );
-
-    //     trBEbarOver3Minus1.write();
+    //     Info<< "Writing field" << endl;
     // }
 }
 

@@ -752,6 +752,11 @@ bool nonLinGeomTotalLagSolid::evolve()
         // Jacobian of the deformation gradient
         J_ = det(F_);
 
+        // Update the momentum equation inverse diagonal field
+        // This may be used by the mechanical law when calculating the
+        // hydrostatic pressure
+        const volScalarField DEqnA("DEqnA", DEqn.A());
+
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma_);
     }

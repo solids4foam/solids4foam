@@ -63,8 +63,8 @@ class mechanicalLaw
         //- Const reference to mesh
         const fvMesh& mesh_;
 
-        //- Const reference to law dictionary
-        const dictionary& dict_;
+        //- Mechanical law dictionary
+        const dictionary dict_;
 
         //- Name of the baseMesh region
         word baseMeshRegionName_;

@@ -363,18 +363,12 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
             IOobject::NO_WRITE
         )
     ),
-    maxIterReached_(0),
-    stabilisePressure_
-    (
-        solidProperties().lookupOrDefault<Switch>("stabilisePressure", false)
-    )
+    maxIterReached_(0)
 {
     DD_.oldTime().oldTime();
     D_.oldTime();
     pointDD_.oldTime();
     pointD_.oldTime();
-
-    Info<< "stabilisePressure: " << stabilisePressure_ << endl;
 }
 
 
@@ -802,29 +796,15 @@ bool nonLinGeomUpdatedLagSolid::evolve()
         F_ = relF_ & F_.oldTime();
 
         // Relative Jacobian (Jacobian of relative deformation gradient)
-        if (stabilisePressure_)
-        {
-            // Reconstruct face gradients to relJ: this will avoid
-            // pressure oscillations
-            // This is just det(I + gradDD.T()) where the gradDD has
-            // been averaged from the face gradDD field
-            relJ_ =
-                det
-                (
-                    I
-                    + fvc::reconstruct
-                    (
-                        mesh().magSf()*fvc::snGrad(DD_)
-                    )().T()
-                );
-        }
-        else
-        {
-            relJ_ = det(relF_);
-        }
+        relJ_ = det(relF_);
 
         // Jacobian of deformation gradient
         J_ = relJ_*J_.oldTime();
+
+        // Update the momentum equation inverse diagonal field
+        // This may be used by the mechanical law when calculating the
+        // hydrostatic pressure
+        const volScalarField DEqnA("DEqnA", DDEqn.A());
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma_);

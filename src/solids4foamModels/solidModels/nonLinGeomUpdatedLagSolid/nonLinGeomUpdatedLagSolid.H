@@ -156,10 +156,6 @@ class nonLinGeomUpdatedLagSolid
         //  momentum equation
         int maxIterReached_;
 
-        //- Stabilise hydrostatic pressure
-        //  Apply smoothing to the relative Jacobian calculation
-        const Switch stabilisePressure_;
-
 
     // Private Member Functions
 
