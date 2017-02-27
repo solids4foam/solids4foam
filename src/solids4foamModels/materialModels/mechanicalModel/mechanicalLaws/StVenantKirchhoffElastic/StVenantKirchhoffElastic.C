@@ -34,7 +34,7 @@ namespace Foam
     defineTypeNameAndDebug(StVenantKirchhoffElastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, StVenantKirchhoffElastic, dictionary
+        mechanicalLaw, StVenantKirchhoffElastic, nonLinGeomMechLaw
     );
 }
 
@@ -120,10 +120,11 @@ Foam::StVenantKirchhoffElastic::StVenantKirchhoffElastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),

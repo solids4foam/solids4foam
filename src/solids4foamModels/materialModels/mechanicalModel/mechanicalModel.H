@@ -55,6 +55,7 @@ Author
 #include "surfaceFields.H"
 #include "newFvMeshSubset.H"
 #include "newLeastSquaresVolPointInterpolation.H"
+#include "nonLinearGeometry.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -344,7 +345,11 @@ public:
     // Constructors
 
         //- Construct from an fvMesh
-        mechanicalModel(const fvMesh& mesh);
+        mechanicalModel
+        (
+            const fvMesh& mesh,
+            const nonLinearGeometry::nonLinearType& nonLinGeom
+        );
 
 
     //- Destructor

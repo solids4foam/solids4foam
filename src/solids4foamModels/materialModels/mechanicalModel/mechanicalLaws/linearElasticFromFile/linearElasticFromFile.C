@@ -37,7 +37,7 @@ namespace Foam
     defineTypeNameAndDebug(linearElasticFromFile, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, linearElasticFromFile, dictionary
+        mechanicalLaw, linearElasticFromFile, linGeomMechLaw
     );
 }
 
@@ -49,10 +49,11 @@ Foam::linearElasticFromFile::linearElasticFromFile
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
     E_
     (

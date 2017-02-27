@@ -2108,7 +2108,11 @@ void Foam::mechanicalModel::clearOut() const
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::mechanicalModel::mechanicalModel(const fvMesh& mesh)
+Foam::mechanicalModel::mechanicalModel
+(
+    const fvMesh& mesh,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
+)
 :
     IOdictionary
     (
@@ -2154,16 +2158,51 @@ Foam::mechanicalModel::mechanicalModel(const fvMesh& mesh)
 
     if (laws.size() == 1)
     {
-        laws.set
-        (
-            0,
-            mechanicalLaw::New
+        if (nonLinGeom == nonLinearGeometry::LINEAR_GEOMETRY)
+        {
+            laws.set
             (
-                lawEntries[0].keyword(),
-                mesh,
-                lawEntries[0].dict()
-            )
-        );
+                0,
+                mechanicalLaw::NewLinGeomMechLaw
+                (
+                    lawEntries[0].keyword(),
+                    mesh,
+                    lawEntries[0].dict(),
+                    nonLinGeom
+                )
+            );
+        }
+        else if
+        (
+            nonLinGeom == nonLinearGeometry::UPDATED_LAGRANGIAN
+         || nonLinGeom == nonLinearGeometry::TOTAL_LAGRANGIAN
+        )
+        {
+            laws.set
+            (
+                0,
+                mechanicalLaw::NewNonLinGeomMechLaw
+                (
+                    lawEntries[0].keyword(),
+                    mesh,
+                    lawEntries[0].dict(),
+                    nonLinGeom
+                )
+            );
+        }
+        else
+        {
+            FatalErrorIn
+            (
+                "Foam::mechanicalModel::mechanicalModel\n"
+                "(\n"
+                "    const fvMesh& mesh,\n"
+                "    const nonLinearGeometry::nonLinearType& nonLinGeom\n"
+                ")"
+            )   << "It is not clear what type of mechanical law should be "
+                << "created for a solidModel with nonLinGeom = " << nonLinGeom
+                << abort(FatalError);
+        }
     }
     else
     {
@@ -2178,16 +2217,51 @@ Foam::mechanicalModel::mechanicalModel(const fvMesh& mesh)
 
         forAll(laws, lawI)
         {
-            laws.set
-            (
-                lawI,
-                mechanicalLaw::New
+            if (nonLinGeom == nonLinearGeometry::LINEAR_GEOMETRY)
+            {
+                laws.set
                 (
-                    lawEntries[lawI].keyword(),
-                    subMeshes()[lawI].subMesh(),
-                    lawEntries[lawI].dict()
-                )
-            );
+                    lawI,
+                    mechanicalLaw::NewLinGeomMechLaw
+                    (
+                        lawEntries[lawI].keyword(),
+                        subMeshes()[lawI].subMesh(),
+                        lawEntries[lawI].dict(),
+                        nonLinGeom
+                    )
+                );
+            }
+            else if
+            (
+                nonLinGeom == nonLinearGeometry::UPDATED_LAGRANGIAN
+             || nonLinGeom == nonLinearGeometry::TOTAL_LAGRANGIAN
+            )
+            {
+                laws.set
+                (
+                    lawI,
+                    mechanicalLaw::NewNonLinGeomMechLaw
+                    (
+                        lawEntries[lawI].keyword(),
+                        subMeshes()[lawI].subMesh(),
+                        lawEntries[lawI].dict(),
+                        nonLinGeom
+                    )
+                );
+            }
+            else
+            {
+                FatalErrorIn
+                (
+                    "Foam::mechanicalModel::mechanicalModel\n"
+                    "(\n"
+                    "    const fvMesh& mesh,\n"
+                    "    const nonLinearGeometry::nonLinearType& nonLinGeom\n"
+                    ")"
+                )   << "It is not clear what type of mechanical law should be "
+                    << "created for a solidModel with nonLinGeom = "
+                    << nonLinGeom << abort(FatalError);
+            }
 
             if (lookupOrDefault<Switch>("writeSubMeshes",  false))
             {

@@ -180,6 +180,17 @@ class unsNonLinGeomTotalLagSolid
         void operator=(const unsNonLinGeomTotalLagSolid&);
 
 
+protected:
+
+    // Protected member functions
+
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const
+        {
+            return nonLinearGeometry::TOTAL_LAGRANGIAN;
+        }
+
+
 public:
 
     //- Runtime type information

@@ -144,7 +144,8 @@ public:
         (
             const word& name,
             const fvMesh& mesh,
-            const dictionary& dict
+            const dictionary& dict,
+            const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
 

@@ -36,7 +36,7 @@ namespace Foam
     defineTypeNameAndDebug(orthotropicLinearElastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, orthotropicLinearElastic, dictionary
+        mechanicalLaw, orthotropicLinearElastic, linGeomMechLaw
     );
 }
 
@@ -202,10 +202,11 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
     E1_(dict.lookup("E1")),
     E2_(dict.lookup("E2")),

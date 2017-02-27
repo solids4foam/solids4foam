@@ -35,7 +35,7 @@ namespace Foam
     defineTypeNameAndDebug(poroLinearElasticMohrCoulombPlastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, poroLinearElasticMohrCoulombPlastic, dictionary
+        mechanicalLaw, poroLinearElasticMohrCoulombPlastic, linGeomMechLaw
     );
 }
 
@@ -47,10 +47,11 @@ Foam::poroLinearElasticMohrCoulombPlastic::poroLinearElasticMohrCoulombPlastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    linearElasticMohrCoulombPlastic(name, mesh, dict)
+    linearElasticMohrCoulombPlastic(name, mesh, dict, nonLinGeom)
 {}
 
 

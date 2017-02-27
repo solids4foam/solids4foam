@@ -27,7 +27,7 @@ Class
 
 Description
     Mathematical model for finite strains and rotations, where a total
-    Lagrangian and total displacement approach is employed.
+    Lagrangian and incremental displacement approach is employed.
 
     The stress is calculated by the run-time selectable mechanical law.
 
@@ -73,6 +73,9 @@ class nonLinGeomTotalLagSolid
 {
     // Private data
 
+        //- Displacement increment field
+        volVectorField DD_;
+
         //- Total displacement field
         volVectorField D_;
 
@@ -87,6 +90,9 @@ class nonLinGeomTotalLagSolid
 
         //- Cauchy (true) stress field
         volSymmTensorField sigma_;
+
+        //- Cell displacement increment gradient
+        volTensorField gradDD_;
 
         //- Cell displacement gradient
         volTensorField gradD_;
@@ -116,8 +122,8 @@ class nonLinGeomTotalLagSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- D equation under-relaxation factor
-        const scalar DEqnRelaxFactor_;
+        //- DD equation under-relaxation factor
+        const scalar DDEqnRelaxFactor_;
 
         //- Solution standard tolerance
         const scalar solutionTol_;
@@ -141,9 +147,6 @@ class nonLinGeomTotalLagSolid
         //  momentum equation
         int maxIterReached_;
 
-        //- Predict new time-step fields using the velocity field
-        const Switch predict_;
-
 
     // Private Member Functions
 
@@ -154,15 +157,22 @@ class nonLinGeomTotalLagSolid
             const lduMatrix::solverPerformance& solverPerfD
         );
 
-        //- Predict the fields for the next time-step based on the
-        //  previous time-steps
-        void predict();
-
         //- Disallow default bitwise copy construct
         nonLinGeomTotalLagSolid(const nonLinGeomTotalLagSolid&);
 
         //- Disallow default bitwise assignment
         void operator=(const nonLinGeomTotalLagSolid&);
+
+
+protected:
+
+    // Protected member functions
+
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const
+        {
+            return nonLinearGeometry::TOTAL_LAGRANGIAN;
+        }
 
 
 public:

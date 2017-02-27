@@ -46,6 +46,7 @@ SourceFiles
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
 #include "mechanicalModel.H"
+#include "nonLinearGeometry.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -69,7 +70,7 @@ class solidModel
         dictionary solidProperties_;
 
         //- Mechanical model
-        mechanicalModel mechanical_;
+        mutable autoPtr<mechanicalModel> mechanicalPtr_;
 
         //- Global face zones
         mutable labelList* globalFaceZonesPtr_;
@@ -85,6 +86,9 @@ class solidModel
         //- Find global to local point addressing
         void calcGlobalToLocalFaceZonePointMap() const;
 
+        //- Make the mechanical model
+        void makeMechanicalModel() const;
+
         //- Disallow default bitwise copy construct
         solidModel(const solidModel&);
 
@@ -96,6 +100,9 @@ protected:
 
     // Protected member functions
 
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
+
         //- Return solid properties dictionary
         dictionary& solidProperties()
         {
@@ -103,10 +110,7 @@ protected:
         }
 
         //- Return mechanical model
-        mechanicalModel& mechanical()
-        {
-            return mechanical_;
-        }
+        mechanicalModel& mechanical();
 
 public:
 
@@ -178,10 +182,7 @@ public:
             }
 
             //- Return mechanical model
-            const mechanicalModel& mechanical() const
-            {
-                return mechanical_;
-            }
+            const mechanicalModel& mechanical() const;
 
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement

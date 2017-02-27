@@ -33,7 +33,7 @@ namespace Foam
     defineTypeNameAndDebug(viscousHookeanElastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, viscousHookeanElastic, dictionary
+        mechanicalLaw, viscousHookeanElastic, linGeomMechLaw
     );
 }
 
@@ -45,10 +45,11 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
     EInf_(dict.lookup("EInfinity")),
     E_(dict.lookup("E")),

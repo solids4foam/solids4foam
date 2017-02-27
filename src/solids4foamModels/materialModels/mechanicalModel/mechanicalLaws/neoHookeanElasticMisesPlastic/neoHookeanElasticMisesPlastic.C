@@ -39,7 +39,7 @@ namespace Foam
     defineTypeNameAndDebug(neoHookeanElasticMisesPlastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, neoHookeanElasticMisesPlastic, dictionary
+        mechanicalLaw, neoHookeanElasticMisesPlastic, nonLinGeomMechLaw
     );
 
 // * * * * * * * * * * * * * * Static Members  * * * * * * * * * * * * * * * //
@@ -681,10 +681,11 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
@@ -1144,7 +1145,8 @@ Foam::neoHookeanElasticMisesPlastic::impK() const
 
 void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 {
-    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    // Check if the mathematical model is in total or updated Lagrangian form
+    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
@@ -1156,7 +1158,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
         // Update the total deformation gradient
         F() = relF() & F().oldTime();
     }
-    else
+    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
         // Lookup gradient of displacement
         const volTensorField& gradD =
@@ -1167,6 +1169,14 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 
         // Update the relative deformation gradient
         relF() = F() & inv(F().oldTime());
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void Foam::neoHookeanElasticMisesPlastic::"
+            "correct(volSymmTensorField& sigma)"
+        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
     }
 
     // Update the Jacobian of the total deformation gradient

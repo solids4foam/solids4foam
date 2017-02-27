@@ -37,38 +37,77 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-autoPtr<mechanicalLaw> mechanicalLaw::New
+autoPtr<mechanicalLaw> mechanicalLaw::NewLinGeomMechLaw
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 {
     word mechTypeName = dict.lookup("type");
 
     Info<< "Selecting mechanical law " << mechTypeName << endl;
 
-    dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(mechTypeName);
+    linGeomMechLawConstructorTable::iterator cstrIter =
+        linGeomMechLawConstructorTablePtr_->find(mechTypeName);
 
-    if (cstrIter == dictionaryConstructorTablePtr_->end())
+    if (cstrIter == linGeomMechLawConstructorTablePtr_->end())
     {
         FatalIOErrorIn
         (
             "mechanicalLaw::New(\n"
             "    const word& name,\n"
             "    const fvMehs& mesh,\n"
-            "    const dictionary& dict\n"
+            "    const dictionary& dict,\n"
+            "    const nonLinearGeometry::nonLinearType& nonLinGeom\n"
             ")",
             dict
         )   << "Unknown mechanicalLaw type "
             << mechTypeName << endl << endl
-            << "Valid  mechanicalLaws are : " << endl
-            << dictionaryConstructorTablePtr_->toc()
+            << "Valid linearGeometry mechanicalLaws are : " << endl
+            << linGeomMechLawConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
-    return autoPtr<mechanicalLaw>(cstrIter()(name, mesh, dict));
+    return autoPtr<mechanicalLaw>(cstrIter()(name, mesh, dict, nonLinGeom));
+}
+
+
+autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
+(
+    const word& name,
+    const fvMesh& mesh,
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
+)
+{
+    word mechTypeName = dict.lookup("type");
+
+    Info<< "Selecting mechanical law " << mechTypeName << endl;
+
+    nonLinGeomMechLawConstructorTable::iterator cstrIter =
+        nonLinGeomMechLawConstructorTablePtr_->find(mechTypeName);
+
+    if (cstrIter == nonLinGeomMechLawConstructorTablePtr_->end())
+    {
+        FatalIOErrorIn
+        (
+            "mechanicalLaw::New(\n"
+            "    const word& name,\n"
+            "    const fvMehs& mesh,\n"
+            "    const dictionary& dict,\n"
+            "    const nonLinearGeometry::nonLinearType& nonLinGeom\n"
+            ")",
+            dict
+        )   << "Unknown mechanicalLaw type "
+            << mechTypeName << endl << endl
+            << "Valid nonLinearGeometry mechanicalLaws are : " << endl
+            << nonLinGeomMechLawConstructorTablePtr_->toc()
+            << exit(FatalIOError);
+    }
+
+    return autoPtr<mechanicalLaw>(cstrIter()(name, mesh, dict, nonLinGeom));
 }
 
 

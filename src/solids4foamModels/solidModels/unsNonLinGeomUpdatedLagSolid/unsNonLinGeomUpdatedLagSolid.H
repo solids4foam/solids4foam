@@ -203,6 +203,17 @@ class unsNonLinGeomUpdatedLagSolid
         void operator=(const unsNonLinGeomUpdatedLagSolid&);
 
 
+protected:
+
+    // Protected member functions
+
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const
+        {
+            return nonLinearGeometry::UPDATED_LAGRANGIAN;
+        }
+
+
 public:
 
     //- Runtime type information

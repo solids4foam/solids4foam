@@ -36,7 +36,7 @@ namespace Foam
     defineTypeNameAndDebug(neoHookeanElasticMisesPlasticRubin, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, neoHookeanElasticMisesPlasticRubin, dictionary
+        mechanicalLaw, neoHookeanElasticMisesPlasticRubin, nonLinGeomMechLaw
     );
 
 // * * * * * * * * * * * * * * Static Members  * * * * * * * * * * * * * * * //
@@ -310,10 +310,11 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
     k_("zero", dimPressure, 0.0),

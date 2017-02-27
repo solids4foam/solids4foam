@@ -35,7 +35,7 @@ namespace Foam
     defineTypeNameAndDebug(thermoLinearElastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, thermoLinearElastic, dictionary
+        mechanicalLaw, thermoLinearElastic, linGeomMechLaw
     );
 }
 
@@ -47,10 +47,11 @@ Foam::thermoLinearElastic::thermoLinearElastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    linearElastic(name, mesh, dict),
+    linearElastic(name, mesh, dict, nonLinGeom),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
     lambda_

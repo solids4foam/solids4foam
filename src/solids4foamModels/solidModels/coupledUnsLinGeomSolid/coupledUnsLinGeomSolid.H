@@ -188,6 +188,17 @@ class coupledUnsLinGeomSolid
         void operator=(const coupledUnsLinGeomSolid&);
 
 
+protected:
+
+    // Protected member functions
+
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const
+        {
+            return nonLinearGeometry::LINEAR_GEOMETRY;
+        }
+
+
 public:
 
     //- Runtime type information

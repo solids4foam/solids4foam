@@ -385,6 +385,34 @@ void Foam::solidModel::updateGlobalFaceZoneNewPoints
 }
 
 
+void Foam::solidModel::makeMechanicalModel() const
+{
+    if (!mechanicalPtr_.empty())
+    {
+        FatalErrorIn("void Foam::solidModel::makeMechanicalModel() const")
+            << "pointer alrady set!" << abort(FatalError);
+    }
+
+    mechanicalPtr_.set
+    (
+        new mechanicalModel(mesh(), nonLinGeom())
+    );
+}
+
+
+// * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
+
+Foam::mechanicalModel& Foam::solidModel::mechanical()
+{
+    if (mechanicalPtr_.empty())
+    {
+        makeMechanicalModel();
+    }
+
+    return mechanicalPtr_();
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::solidModel::solidModel
@@ -397,7 +425,6 @@ Foam::solidModel::solidModel
     (
         IOobject
         (
-            // PC: maybe this should be a Dict instead of a Properties
             "solidProperties",
             mesh.time().constant(),
             mesh,
@@ -407,7 +434,7 @@ Foam::solidModel::solidModel
     ),
     mesh_(mesh),
     solidProperties_(subDict(type + "Coeffs")),
-    mechanical_(mesh),
+    mechanicalPtr_(NULL),
     globalFaceZonesPtr_(NULL),
     globalToLocalFaceZonePointMapPtr_(NULL)
 {}
@@ -423,6 +450,17 @@ Foam::solidModel::~solidModel()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+const Foam::mechanicalModel& Foam::solidModel::mechanical() const
+{
+    if (mechanicalPtr_.empty())
+    {
+        makeMechanicalModel();
+    }
+
+    return mechanicalPtr_();
+}
 
 
 const Foam::labelList& Foam::solidModel::globalFaceZones() const

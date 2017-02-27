@@ -23,49 +23,34 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    poroLinGeomSolid
+    nonLinGeomTotalLagTotalDispSolid
 
 Description
-    Mathematical model for poro-elasticity, where linear geometry is assumed
-    i.e. small strains and small rotations are assumed.
-
-    The poro-pressure equation is solved.
+    Mathematical model for finite strains and rotations, where a total
+    Lagrangian and total displacement approach is employed.
 
     The stress is calculated by the run-time selectable mechanical law.
 
-    The approach is based on the elastoPlasticBiotFoam in the miniGeotechFoam
-    toolbox shared by Tian Tang, found at:
-    https://bitbucket.org/tiantang/minigeotechfoam
-
-    More reading at:
-
-    T.Tang, O.Hededal & P.Cardiff (2014). On finite volume method implementation
-    of poro-elasto-plasticity soil model. International Journal for
-    Numerical and Analytical Methods in Geomechanics, 10.1002/nag.2361.
-
-    T.Tang & O.Hededal (2014). Simulation of pore pressure accumulation under
-    cyclic loading using finite volume method. Proceedings of the 8th European
-    Conference on Numerical Methods in Geotechnical Engineering (NUMGE14),
-    Volume 2, Pages 1301-1306.
-
+    More details in:
+    P. Cardiff, Z. Tukovic, P. De Jaeger, M. Clancy and A. Ivankovic. A
+    Lagrangian cell-centred finite volume method for metal forming simulation,
+    doi=10.1002/nme.5345.
 
 Author
-    Tian Tang, DTU.  All rights reserved.
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
-    poroLinGeomSolid.C
+    nonLinGeomTotalLagTotalDispSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef poroLinGeomSolid_H
-#define poroLinGeomSolid_H
+#ifndef nonLinGeomTotalLagTotalDispSolid_H
+#define nonLinGeomTotalLagTotalDispSolid_H
 
 #include "solidModel.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
-#include "newLeastSquaresVolPointInterpolation.H"
 #include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -79,16 +64,16 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class poroLinGeomSolid Declaration
+                        Class nonLinGeomTotalLagTotalDispSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class poroLinGeomSolid
+class nonLinGeomTotalLagTotalDispSolid
 :
     public solidModel
 {
     // Private data
 
-        //- Displacement field
+        //- Total displacement field
         volVectorField D_;
 
         //- Velocity field
@@ -100,19 +85,22 @@ class poroLinGeomSolid
         //- Point displacement field
         pointVectorField pointD_;
 
-        //- Strain field
-        volSymmTensorField epsilon_;
-
-        //- Stress field
+        //- Cauchy (true) stress field
         volSymmTensorField sigma_;
-
-        //- Cell-to-point interpolation
-        newLeastSquaresVolPointInterpolation volToPoint_;
 
         //- Cell displacement gradient
         volTensorField gradD_;
 
-        //- Density
+        //- Total deformation gradient
+        volTensorField F_;
+
+        //- Inverse of the total deformation gradient
+        volTensorField Finv_;
+
+        //- Jacobian of total deformation gradient
+        volScalarField J_;
+
+        //- Density (reference configuration)
         const volScalarField rho_;
 
         //- Implicit stiffness; coefficient of the Laplacian term
@@ -128,37 +116,8 @@ class poroLinGeomSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- Poro pressure field
-        volScalarField p_;
-
-        //- Cell pressure gradient
-        volVectorField gradp_;
-
-        //- Hydraulic conductivity
-        //  Note: Tang et al (2014) refers to this term as permeability
-        dimensionedScalar hydraulicConductivity_;
-
-        //- Specific weight of water
-        //  Note: Tang et al (2014) refers to this term as water density
-        dimensionedScalar gammaWater_;
-
-        //- Porosity
-        dimensionedScalar porosity_;
-
-        //- Degree of saturation
-        dimensionedScalar saturation_;
-
-        //- Bulk modulus of water
-        dimensionedScalar KWater_;
-
-        //- Reciprocal of the effective bulk modulus of water and air mixture
-        dimensionedScalar rKprime_;
-
         //- D equation under-relaxation factor
         const scalar DEqnRelaxFactor_;
-
-        //- p equation under-relaxation factor
-        const scalar pEqnRelaxFactor_;
 
         //- Solution standard tolerance
         const scalar solutionTol_;
@@ -172,31 +131,41 @@ class poroLinGeomSolid
         //- Write frequency for residuals information
         const int infoFrequency_;
 
-        //- Maximum number of momentum-pressure correctors
+        //- Maximum number of momentum correctors
         const int nCorr_;
 
         //- Gravitational acceleration
         const uniformDimensionedVectorField g_;
 
         //- Number of times the maximum number of correctors was reached in the
-        //  momentum-pressure corrector loop
+        //  momentum equation
         int maxIterReached_;
+
+        //- Predict new time-step fields using the velocity field
+        const Switch predict_;
+
 
     // Private Member Functions
 
-        //- Check if the momentum and pressure equations are converged
+        //- Check if the momentum equation is converged
         bool converged
         (
             const int iCorr,
-            const lduMatrix::solverPerformance& solverPerfD,
-            const lduMatrix::solverPerformance& solverPerfp
+            const lduMatrix::solverPerformance& solverPerfD
         );
 
+        //- Predict the fields for the next time-step based on the
+        //  previous time-steps
+        void predict();
+
         //- Disallow default bitwise copy construct
-        poroLinGeomSolid(const poroLinGeomSolid&);
+        nonLinGeomTotalLagTotalDispSolid
+        (
+            const nonLinGeomTotalLagTotalDispSolid&
+        );
 
         //- Disallow default bitwise assignment
-        void operator=(const poroLinGeomSolid&);
+        void operator=(const nonLinGeomTotalLagTotalDispSolid&);
 
 
 protected:
@@ -206,24 +175,24 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            return nonLinearGeometry::LINEAR_GEOMETRY;
+            return nonLinearGeometry::TOTAL_LAGRANGIAN;
         }
 
 
 public:
 
     //- Runtime type information
-    TypeName("poroLinearGeometry");
+    TypeName("nonLinearGeometryTotalLagrangianTotalDisplacement");
 
     // Constructors
 
         //- Construct from components
-        poroLinGeomSolid(dynamicFvMesh& mesh);
+        nonLinGeomTotalLagTotalDispSolid(dynamicFvMesh& mesh);
 
 
     // Destructor
 
-        virtual ~poroLinGeomSolid()
+        virtual ~nonLinGeomTotalLagTotalDispSolid()
         {}
 
 
@@ -243,28 +212,10 @@ public:
                 return D_;
             }
 
-            //- Return const access to the cell pressure field
-            const volScalarField& p() const
-            {
-                return p_;
-            }
-
-            //- Return non-const access to the cell pressure field
-            volScalarField& p()
-            {
-                return p_;
-            }
-
             //- Return point mesh
             const pointMesh& pMesh() const
             {
                 return pMesh_;
-            }
-
-            //- Gradient of displacement
-            const volTensorField& gradD() const
-            {
-                return gradD_;
             }
 
             //- Stress tensor
@@ -273,34 +224,10 @@ public:
                 return sigma_;
             }
 
-            //- Strain tensor
-            const volSymmTensorField& epsilon() const
-            {
-                return epsilon_;
-            }
-
-            //- Implicit stiffness
-            const volScalarField& impK() const
-            {
-                return impK_;
-            }
-
-            //- Reciprocal of the implicit stiffness
-            const volScalarField& rImpK() const
-            {
-                return rImpK_;
-            }
-
             //- Return point displacement field
             virtual const pointVectorField& pointD() const
             {
                 return pointD_;
-            }
-
-            //- Return multi-material interface pointer
-            const newLeastSquaresVolPointInterpolation& volToPoint() const
-            {
-                return volToPoint_;
             }
 
             //- Face zone point displacement increment
@@ -345,22 +272,6 @@ public:
             (
                 const label patchID,
                 const scalarField& pressure
-            );
-
-            //- Set traction at specified patch
-            virtual void setTraction
-            (
-                const label patchID,
-                const label zoneID,
-                const vectorField& zoneTraction
-            );
-
-            //- Set pressure at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const label zoneID,
-                const scalarField& zonePressure
             );
 
             //- Evolve the solid solver and solve the mathematical model

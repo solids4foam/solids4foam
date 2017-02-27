@@ -35,7 +35,7 @@ namespace Foam
     defineTypeNameAndDebug(poroLinearElastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, poroLinearElastic, dictionary
+        mechanicalLaw, poroLinearElastic, linGeomMechLaw
     );
 }
 
@@ -77,10 +77,11 @@ Foam::poroLinearElastic::poroLinearElastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    linearElastic(name, mesh, dict),
+    linearElastic(name, mesh, dict, nonLinGeom),
     p0_
     (
         IOobject
