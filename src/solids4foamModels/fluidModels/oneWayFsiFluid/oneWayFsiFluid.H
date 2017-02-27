@@ -68,6 +68,9 @@ class oneWayFsiFluid
         //- Pressure field
         volScalarField p_;
 
+        //- Flux field
+        surfaceScalarField phi_;
+
         // Transport properties dictionary
         IOdictionary transportProperties_;
 
@@ -116,17 +119,7 @@ public:
             virtual const volScalarField& p() const;
 
             //- Return const reference to phi
-            virtual const surfaceScalarField& phi() const
-            {
-                notImplemented
-                (
-                    type() + "virtual const surfaceScalarField& phi() const"
-                );
-
-                // Keep compiler happy
-                surfaceScalarField* ptr = NULL;
-                return *ptr;
-            };
+            virtual const surfaceScalarField& phi() const;
 
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce
