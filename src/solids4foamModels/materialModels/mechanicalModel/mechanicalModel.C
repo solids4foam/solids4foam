@@ -2080,7 +2080,7 @@ void Foam::mechanicalModel::calcBiMaterialInterfaceActive() const
 }
 
 
-void Foam::mechanicalModel::clearOut() const
+void Foam::mechanicalModel::clearOut()
 {
     deleteDemandDrivenData(volToPointPtr_);
     subMeshVolToPoint_.clear();
@@ -2099,6 +2099,12 @@ void Foam::mechanicalModel::clearOut() const
     deleteDemandDrivenData(impKfcorrPtr_);
     deleteDemandDrivenData(pointNumOfMaterialsPtr_);
     deleteDemandDrivenData(isolatedInterfacePointsPtr_);
+
+    // Clear the list of mechanical laws
+    // Note: we should do this before clearing the subMeshes, as the mechanical
+    // laws can store geometricFields that must be deleted before deleting
+    // mesh
+    PtrList<mechanicalLaw>::clear();
 
     // Make sure to clear the subMeshes after (not before) clearing the subMesh
     // fields

@@ -444,6 +444,7 @@ Foam::solidModel::solidModel
 
 Foam::solidModel::~solidModel()
 {
+    mechanicalPtr_.clear();
     deleteDemandDrivenData(globalFaceZonesPtr_);
     deleteDemandDrivenData(globalToLocalFaceZonePointMapPtr_);
 }

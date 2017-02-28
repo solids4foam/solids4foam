@@ -331,7 +331,7 @@ class mechanicalModel
         void calcBiMaterialInterfaceActive() const;
 
         //- Clear out demand driven data
-        void clearOut() const;
+        void clearOut();
 
         //- Disallow default bitwise copy construct
         mechanicalModel(const mechanicalModel&);
