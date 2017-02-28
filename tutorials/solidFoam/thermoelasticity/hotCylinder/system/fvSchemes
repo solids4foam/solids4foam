@@ -39,7 +39,7 @@ laplacianSchemes
     default            none;
     laplacian(DD,D)    Gauss linear newSkewCorrected 1;
     laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
-    laplacian(k,T)     Gauss linear newSkewCorrected 1;
+    laplacian(k,T)     Gauss linear corrected;
 }
 
 snGradSchemes
@@ -53,6 +53,9 @@ interpolationSchemes
 {
     default            none;
     interpolate(impK)  linear;
+    interpolate(grad(DD)) linear;
+    interpolate(grad(D)) linear;
+    interpolate(grad(sigmaHyd)) linear;
 }
 
 // ************************************************************************* //

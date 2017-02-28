@@ -51,7 +51,7 @@ snGradSchemes
 interpolationSchemes
 {
     default            none;
-    interpolate(impK)  linear;
+    interpolate(impK)  harmonic;
     interpolate(grad(D)) linear;
 }
 
