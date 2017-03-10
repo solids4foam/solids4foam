@@ -34,6 +34,7 @@ mechanicalLaws = materialModels/mechanicalModel/mechanicalLaws
 $(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
 $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
 $(mechanicalLaws)/linearElastic/linearElastic.C
+$(mechanicalLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
 $(mechanicalLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
 $(mechanicalLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C
 $(mechanicalLaws)/poroLinearElastic/poroLinearElastic.C
