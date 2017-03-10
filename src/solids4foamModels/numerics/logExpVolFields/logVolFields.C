@@ -70,32 +70,32 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
     // strain
 
     volDiagTensorField eigenVal
+    (
+        IOobject
         (
-            IOobject
-            (
-                "eigenVal("+vf.name()+")",
-                vf.time().timeName(),
-                vf.db(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            vf.mesh(),
-            dimensionedDiagTensor("zero", vf.dimensions(), diagTensor::zero)
-        );
+            "eigenVal("+vf.name()+")",
+            vf.time().timeName(),
+            vf.db(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        vf.mesh(),
+        dimensionedDiagTensor("zero", vf.dimensions(), diagTensor::zero)
+    );
 
     volTensorField eigenVec
+    (
+        IOobject
         (
-            IOobject
-            (
-                "eigenVec("+vf.name()+")",
-                vf.time().timeName(),
-                vf.db(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            vf.mesh(),
-            dimensionedTensor("zero", dimless, tensor::zero)
-        );
+            "eigenVec("+vf.name()+")",
+            vf.time().timeName(),
+            vf.db(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        vf.mesh(),
+        dimensionedTensor("zero", dimless, tensor::zero)
+    );
 
     // Calculate eigen values and eigen vectors of vf
     eig3Field(vf, eigenVec, eigenVal);
@@ -114,8 +114,8 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
         if
         (
             eigenValI[cellI][diagTensor::XX] < SMALL
-            || eigenValI[cellI][diagTensor::YY] < SMALL
-            || eigenValI[cellI][diagTensor::ZZ] < SMALL
+         || eigenValI[cellI][diagTensor::YY] < SMALL
+         || eigenValI[cellI][diagTensor::ZZ] < SMALL
         )
         {
             FatalError
@@ -140,8 +140,8 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
         if
         (
             !vf.boundaryField()[patchI].coupled()
-            && vf.boundaryField()[patchI].type()
-                != emptyFvPatchField<symmTensor>::typeName
+         && vf.boundaryField()[patchI].type()
+         != emptyFvPatchField<symmTensor>::typeName
         )
         {
             const diagTensorField& eigenValB = eigenVal.boundaryField()[patchI];
@@ -154,8 +154,8 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
                 if
                 (
                     eigenValB[faceI][diagTensor::XX] < SMALL
-                    || eigenValB[faceI][diagTensor::YY] < SMALL
-                    || eigenValB[faceI][diagTensor::ZZ] < SMALL
+                 || eigenValB[faceI][diagTensor::YY] < SMALL
+                 || eigenValB[faceI][diagTensor::ZZ] < SMALL
                 )
                 {
                     FatalError

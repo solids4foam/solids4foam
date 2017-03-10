@@ -28,9 +28,7 @@ License
 #include "transformGeometricField.H"
 #include "logVolFields.H"
 #include "fvc.H"
-
 #include "fvm.H"
-#include "fixedGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -703,7 +701,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
             "sigmaHyd",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
         mesh,
@@ -1009,7 +1007,8 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     plasticN_.oldTime();
     bEbar_.oldTime();
 
-    Info<< "    smoothPressure: " << smoothPressure_ << endl;
+    Info<< "    smoothPressure: " << smoothPressure_ << nl
+        << "    updateBEbarConsistent: " << updateBEbarConsistent_ << endl;
 
     // Read elastic parameters
     // The user can specify E and nu or mu and K
@@ -1074,11 +1073,6 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
                   - stressPlasticStrainSeries_[0].first()
                 );
         }
-    }
-
-    if (updateBEbarConsistent_)
-    {
-        Info<< "updateBEbarConsistent is active" << endl;
     }
 }
 
@@ -1387,12 +1381,18 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
         const volScalarField AD = mesh().lookupObject<volScalarField>("DEqnA");
 
         // Pressure diffusivity field
+        // Note: (4.0/3.0)*mu + K == 2*mu + lambda
         const surfaceScalarField rDAf
         (
-            "rDAf", fvc::interpolate(K_/AD, "interpolate(grad(sigmaHyd))")
+            "rDAf",
+            fvc::interpolate
+            (
+                ((4.0/3.0)*mu_ + K_)/AD, "interpolate(grad(sigmaHyd))"
+            )
         );
 
         const dimensionedScalar one("one", dimless, 1.0);
+        //const dimensionedScalar fac(dict().lookup("smoothFactor"));
 
         // Construct the pressure equation
         fvScalarMatrix sigmaHydEqn
@@ -1746,11 +1746,6 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
 
     Info<< "    " << numCellsYielding << " cells are actively yielding"
         << nl << endl;
-
-    // if (mesh().time().outputTime())
-    // {
-    //     Info<< "Writing field" << endl;
-    // }
 }
 
 
@@ -1761,7 +1756,7 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
     // the difference in the return direction from the start to the end of the
     // time-step, where the return direction is given normalised deviatoric
     // strain. The error approximation is obtained using the difference between
-    // the trapezoidal rule and the EUler backward method, as described in:
+    // the trapezoidal rule and the Euler backward method, as described in:
 
     // Nam-Sua Lee, Klaus-Jurgen Bathe, Error indicators and adaptive remeshing
     // in large deformation finite element analysis, Finite Elements in
