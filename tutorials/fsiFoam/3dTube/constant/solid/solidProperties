@@ -14,12 +14,12 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel linearGeometry;
+//solidModel linearGeometryTotalDisplacement;
 solidModel unsLinearGeometry;
 //solidModel unsTotalLagrangianSolid;
 //solidModel nonLinearGeometryTotalLagrangian;
 
-"linearGeometryCoeffs|unsLinearGeometryCoeffs"
+"linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
 {
     nCorrectors             200;
     convergenceTolerance    1e-7;

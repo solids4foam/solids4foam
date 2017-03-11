@@ -557,6 +557,7 @@ Foam::tmp<Foam::volScalarField>
 Foam::linearElasticMisesPlastic::impK() const
 {
     // Calculate scaling factor to ensure optimal convergence
+    // This is similar to the tangent matrix in FE procedures
 
     // Calculate deviatoric strain
     const volSymmTensorField e = dev(epsilon_);
@@ -564,17 +565,12 @@ Foam::linearElasticMisesPlastic::impK() const
     // Calculate deviatoric trial stress
     const volSymmTensorField sTrial = 2.0*mu_*(e - dev(epsilonP_.oldTime()));
 
+    // Magnitude of the deviatoric trial stress
+    const volScalarField magSTrial =
+        max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL));
+
     // Calculate scaling factor
-    const volScalarField scaleFactor =
-        max
-        (
-            1.0
-          - (
-                2.0*mu_*DLambda_
-               /(mag(sTrial) + dimensionedScalar("SMALL", dimPressure, SMALL))
-            ),
-            0.01
-        );
+    const volScalarField scaleFactor = 1.0 - (2.0*mu_*DLambda_/magSTrial);
 
     return tmp<volScalarField>
     (

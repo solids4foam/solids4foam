@@ -44,4 +44,13 @@ timePrecision   6;
 
 runTimeModifiable no;
 
+functions
+{
+    forceDisp1
+    {
+        type          solidForcesDisplacements;
+        historyPatch  right;
+    }
+}
+
 // ************************************************************************* //

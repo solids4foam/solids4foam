@@ -33,7 +33,7 @@ thermalLinearGeometryCoeffs
     infoFrequencyT  100;
 }
 
-linearGeometryCoeffs
+linearGeometryTotalDisplacementCoeffs
 {
     // Maximum number of correctors
     nCorrectors     1000;

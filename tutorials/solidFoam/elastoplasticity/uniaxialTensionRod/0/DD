@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -10,7 +10,8 @@ FoamFile
     version     2.0;
     format      ascii;
     class       volVectorField;
-    object      D;
+    location    "0";
+    object      DD;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -20,47 +21,47 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-    left
+    loading
     {
-        type            solidSymmetry;
-        patchType       symmetryPlane;
-        value           uniform (0 0 0);
-    }
-    right
-    {
-        //type            solidTraction;
-        type            fixedDisplacementZeroShear;
-        //tractionSeries
+        type            fixedDisplacement;
         displacementSeries
         {
-            //fileName    "$FOAM_CASE/constant/timeVsTraction";
-            fileName    "$FOAM_CASE/constant/timeVsDisp";
-            outOfBounds clamp;
+            fileName        "$FOAM_CASE/constant/timeVsDisp";
+            outOfBounds     clamp;
         }
+        value           uniform (0 0 0);
+    }
+
+    tracFree
+    {
+        type            solidTraction;
+        traction        uniform (0 0 0);
         pressure        uniform 0;
         value           uniform (0 0 0);
     }
-    down
+
+    symmPlane
     {
         type            solidSymmetry;
         patchType       symmetryPlane;
         value           uniform (0 0 0);
     }
-    up
+
+    back
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
+        type            solidWedge;
+        patchType       wedge;
         value           uniform (0 0 0);
     }
-    hole
+
+    front
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
+        type            solidWedge;
+        patchType       wedge;
         value           uniform (0 0 0);
     }
-    frontAndBack
+
+    axis
     {
         type            empty;
     }
