@@ -438,6 +438,14 @@ public:
             tmp<volVectorField> RhieChowCorrection
             (
                 const volVectorField& D,
+                const volTensorField& gradD,
+                const surfaceScalarField& gamma
+            ) const;
+
+            //- Return explicit Rhie-Chow correction field to quell oscillations
+            tmp<volVectorField> RhieChowCorrection
+            (
+                const volVectorField& D,
                 const volTensorField& gradD
             ) const;
 

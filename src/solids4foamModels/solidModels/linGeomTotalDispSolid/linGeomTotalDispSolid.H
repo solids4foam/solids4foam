@@ -23,12 +23,12 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    linGeomSolid
+    linGeomTotalDispSolid
 
 Description
     Mathematical model where linear geometry is assumed i.e. small strains and
-    small rotations are assumed, where the increment of displacement is the
-    primary unknown.
+    small rotations are assumed, and the total displacement is the primary
+    unknown.
 
     The stress is calculated by the run-time selectable mechanical law.
 
@@ -36,12 +36,12 @@ Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
-    linGeomSolid.C
+    linGeomTotalDispSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef linGeomSolid_H
-#define linGeomSolid_H
+#ifndef linGeomTotalDispSolid_H
+#define linGeomTotalDispSolid_H
 
 #include "solidModel.H"
 #include "volFields.H"
@@ -60,18 +60,14 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class linGeomSolid Declaration
+                        Class linGeomTotalDispSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class linGeomSolid
+class linGeomTotalDispSolid
 :
     public solidModel
 {
     // Private data
-
-        //- Increment of displacement field
-        //  DD = D - D.oldTime()
-        volVectorField DD_;
 
         //- Displacement field
         volVectorField D_;
@@ -88,11 +84,8 @@ class linGeomSolid
         //- Stress field
         volSymmTensorField sigma_;
 
-        //- Cell displacement increment gradient
-        volTensorField gradDD_;
-
-        //- Strain field
-        volSymmTensorField epsilon_;
+        //- Cell displacement gradient
+        volTensorField gradD_;
 
         //- Density
         const volScalarField rho_;
@@ -100,18 +93,18 @@ class linGeomSolid
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        volScalarField impK_;
+        const volScalarField impK_;
 
         //- Implicit stiffness surface field
-        surfaceScalarField impKf_;
+        const surfaceScalarField impKf_;
 
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
         //  will store the reciprocal for effficiency
-        volScalarField rImpK_;
+        const volScalarField rImpK_;
 
-        //- DD equation under-relaxation factor
-        const scalar DDEqnRelaxFactor_;
+        //- D equation under-relaxation factor
+        const scalar DEqnRelaxFactor_;
 
         //- Solution standard tolerance
         const scalar solutionTol_;
@@ -141,14 +134,14 @@ class linGeomSolid
         bool converged
         (
             const int iCorr,
-            const lduMatrix::solverPerformance& solverPerfDD
+            const lduMatrix::solverPerformance& solverPerfD
         );
 
         //- Disallow default bitwise copy construct
-        linGeomSolid(const linGeomSolid&);
+        linGeomTotalDispSolid(const linGeomTotalDispSolid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const linGeomSolid&);
+        void operator=(const linGeomTotalDispSolid&);
 
 
 protected:
@@ -165,23 +158,71 @@ protected:
 public:
 
     //- Runtime type information
-    TypeName("linearGeometry");
+    TypeName("linearGeometryTotalDisplacement");
 
     // Constructors
 
         //- Construct from components
-        linGeomSolid(dynamicFvMesh& mesh);
+        linGeomTotalDispSolid(dynamicFvMesh& mesh);
 
 
     // Destructor
 
-        virtual ~linGeomSolid()
+        virtual ~linGeomTotalDispSolid()
         {}
 
 
     // Member Functions
 
         // Access
+
+            //- Return const access to the cell displacement field
+            const volVectorField& D() const
+            {
+                return D_;
+            }
+
+            //- Return non-const access to thecell displacement field
+            volVectorField& D()
+            {
+                return D_;
+            }
+
+            //- Return point mesh
+            const pointMesh& pMesh() const
+            {
+                return pMesh_;
+            }
+
+            //- Gradient of displacement
+            const volTensorField& gradD() const
+            {
+                return gradD_;
+            }
+
+            //- Stress tensor
+            const volSymmTensorField& sigma() const
+            {
+                return sigma_;
+            }
+
+            //- Implicit stiffness
+            const volScalarField& impK() const
+            {
+                return impK_;
+            }
+
+            //- Reciprocal of the implicit stiffness
+            const volScalarField& rImpK() const
+            {
+                return rImpK_;
+            }
+
+            //- Return point displacement field
+            virtual const pointVectorField& pointD() const
+            {
+                return pointD_;
+            }
 
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
@@ -250,6 +291,18 @@ public:
 
             //- End of the program
             virtual void end();
+
+            //- Return const acess to the solution (displacement field)
+            virtual const volVectorField& solution() const
+            {
+                return D_;
+            }
+
+            //- Return non-const access to the solution (displacement field)
+            virtual volVectorField& solution()
+            {
+                return D_;
+            }
 };
 
 

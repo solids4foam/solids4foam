@@ -2760,7 +2760,8 @@ void Foam::mechanicalModel::interpolate
 Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
 (
     const volVectorField& D,
-    const volTensorField& gradD
+    const volTensorField& gradD,
+    const surfaceScalarField& gamma
 ) const
 {
     // Mathematically "div(grad(phi))" is equivalent to "laplacian(phi)";
@@ -2774,9 +2775,11 @@ Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
         (
             fvc::laplacian
             (
-                impKfcorr(), D, "laplacian(D" + D.name() + ',' + D.name() + ')'
+                gamma,
+                D,
+                "laplacian(D" + D.name() + ',' + D.name() + ')'
             )
-          - fvc::div(impKfcorr()*mesh().Sf() & fvc::interpolate(gradD))
+          - fvc::div(gamma*mesh().Sf() & fvc::interpolate(gradD))
         );
     }
     else
@@ -2791,17 +2794,27 @@ Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
         (
             fvc::laplacian
             (
-                impKf(),
+                gamma,
                 D - D.oldTime(),
                 "laplacian(D" + D.name() + ',' + D.name() + ')'
             )
           - fvc::div
             (
-                impKf()*mesh().Sf()
+                gamma*mesh().Sf()
               & fvc::interpolate(gradD - gradD.oldTime())
             )
         );
     }
+}
+
+
+Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
+(
+    const volVectorField& D,
+    const volTensorField& gradD
+) const
+{
+    return RhieChowCorrection(D, gradD, impKfcorr());
 }
 
 

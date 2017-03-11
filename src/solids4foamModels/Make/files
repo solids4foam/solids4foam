@@ -1,6 +1,7 @@
 solidModels/solidModel/solidModel.C
 solidModels/solidModel/newSolidModel.C
 solidModels/linGeomSolid/linGeomSolid.C
+solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
 solidModels/coupledHybridLinGeomSolid/coupledHybridLinGeomSolid.C
 solidModels/simpleHybridLinGeomSolid/simpleHybridLinGeomSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C

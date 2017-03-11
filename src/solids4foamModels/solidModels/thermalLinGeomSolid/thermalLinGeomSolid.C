@@ -284,44 +284,44 @@ bool thermalLinGeomSolid::evolve()
 }
 
 
-tmp<vectorField> thermalLinGeomSolid::tractionBoundarySnGrad
-(
-    const vectorField& traction,
-    const scalarField& pressure,
-    const fvPatch& patch
-) const
-{
-    // Patch index
-    const label patchID = patch.index();
+// tmp<vectorField> thermalLinGeomSolid::tractionBoundarySnGrad
+// (
+//     const vectorField& traction,
+//     const scalarField& pressure,
+//     const fvPatch& patch
+// ) const
+// {
+//     // Patch index
+//     const label patchID = patch.index();
 
-    // Patch mechanical property
-    const scalarField& impK = linGeomSolid::impK().boundaryField()[patchID];
+//     // Patch mechanical property
+//     const scalarField& impK = linGeomSolid::impK().boundaryField()[patchID];
 
-    // Patch reciprocal implicit stiffness field
-    const scalarField& rImpK = linGeomSolid::rImpK().boundaryField()[patchID];
+//     // Patch reciprocal implicit stiffness field
+//     const scalarField& rImpK = linGeomSolid::rImpK().boundaryField()[patchID];
 
-    // Patch gradient
-    const tensorField& gradD = linGeomSolid::gradD().boundaryField()[patchID];
+//     // Patch gradient
+//     const tensorField& gradD = linGeomSolid::gradD().boundaryField()[patchID];
 
-    // Patch stress
-    const symmTensorField& sigma =
-        linGeomSolid::sigma().boundaryField()[patchID];
+//     // Patch stress
+//     const symmTensorField& sigma =
+//         linGeomSolid::sigma().boundaryField()[patchID];
 
-    // Patch unit normals
-    const vectorField n = patch.nf();
+//     // Patch unit normals
+//     const vectorField n = patch.nf();
 
-    // Return patch snGrad
-    return tmp<vectorField>
-    (
-        new vectorField
-        (
-            (
-                (traction - n*pressure)
-              - (n & (sigma - impK*gradD))
-            )*rImpK
-        )
-    );
-}
+//     // Return patch snGrad
+//     return tmp<vectorField>
+//     (
+//         new vectorField
+//         (
+//             (
+//                 (traction - n*pressure)
+//               - (n & (sigma - impK*gradD))
+//             )*rImpK
+//         )
+//     );
+// }
 
 
 void thermalLinGeomSolid::updateTotalFields()

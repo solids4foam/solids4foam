@@ -391,9 +391,20 @@ void Foam::viscousHookeanElastic::correct(volSymmTensorField& sigma)
 
     forAll(h_, MaxwellModelI)
     {
+        // Approach 1
+        // Eqn 10.3.12 in Simo and Hughes 1998
         h_[MaxwellModelI] =
             Foam::exp(-deltaT/tau_[MaxwellModelI])*h_[MaxwellModelI].oldTime()
           + Foam::exp(-deltaT/(2.0*tau_[MaxwellModelI]))*(s_ - s_.oldTime());
+
+        // Approach 2
+        // Eqn 10.3.16 in Simo and Hughes 1998
+        // h_[MaxwellModelI] =
+        //    Foam::exp(-deltaT/tau_[MaxwellModelI])*h_[MaxwellModelI].oldTime()
+        //   + (
+        //         (1.0 - Foam::exp(-deltaT/tau_[MaxwellModelI]))
+        //        /(deltaT/tau_[MaxwellModelI])
+        //     )*(s_ - s_.oldTime());
     }
 
     // Calculate the current total stress, where the volumetric term is

@@ -556,6 +556,26 @@ Foam::tmp<Foam::volScalarField> Foam::linearElasticMisesPlastic::rho() const
 Foam::tmp<Foam::volScalarField>
 Foam::linearElasticMisesPlastic::impK() const
 {
+    // Calculate scaling factor to ensure optimal convergence
+
+    // Calculate deviatoric strain
+    const volSymmTensorField e = dev(epsilon_);
+
+    // Calculate deviatoric trial stress
+    const volSymmTensorField sTrial = 2.0*mu_*(e - dev(epsilonP_.oldTime()));
+
+    // Calculate scaling factor
+    const volScalarField scaleFactor =
+        max
+        (
+            1.0
+          - (
+                2.0*mu_*DLambda_
+               /(mag(sTrial) + dimensionedScalar("SMALL", dimPressure, SMALL))
+            ),
+            0.01
+        );
+
     return tmp<volScalarField>
     (
         new volScalarField
@@ -568,9 +588,10 @@ Foam::linearElasticMisesPlastic::impK() const
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            mesh(),
-            (4.0/3.0)*mu_ + K_, // == 2*mu + lambda
-            zeroGradientFvPatchScalarField::typeName
+            //mesh(),
+            //(4.0/3.0)*mu_ + K_, // == 2*mu + lambda
+            //zeroGradientFvPatchScalarField::typeName
+            scaleFactor*(4.0/3.0)*mu_ + K_
         )
     );
 }
@@ -600,7 +621,7 @@ void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
     const volSymmTensorField e = dev(epsilon_);
 
     // Calculate deviatoric trial stress
-    const volSymmTensorField sTrial = 2.0*mu_*e;
+    const volSymmTensorField sTrial = 2.0*mu_*(e - dev(epsilonP_.oldTime()));
 
     // Calculate the yield function
     const volScalarField fTrial = mag(sTrial) - sqrtTwoOverThree_*sigmaY_;
@@ -769,6 +790,11 @@ void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
 
 void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 {
+    notImplemented
+    (
+        type() + "::void Foam::linearElasticMisesPlastic::"
+        + "correct(surfaceSymmTensorField& sigma)"
+    )
 }
 
 

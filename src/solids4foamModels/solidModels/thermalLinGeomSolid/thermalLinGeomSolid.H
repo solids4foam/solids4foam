@@ -165,12 +165,12 @@ public:
             //  should return the surface normal gradient
             //  This function is used by traction-type boundary conditions to
             //  set the boundary gradient
-            virtual tmp<vectorField> tractionBoundarySnGrad
-            (
-                const vectorField& traction,
-                const scalarField& pressure,
-                const fvPatch& patch
-            ) const;
+            // virtual tmp<vectorField> tractionBoundarySnGrad
+            // (
+            //     const vectorField& traction,
+            //     const scalarField& pressure,
+            //     const fvPatch& patch
+            // ) const;
 
             //- Update total accumulated fields
             virtual void updateTotalFields();
