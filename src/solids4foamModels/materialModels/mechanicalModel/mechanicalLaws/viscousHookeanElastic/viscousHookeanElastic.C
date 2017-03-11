@@ -139,7 +139,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             "    const fvMesh& mesh,\n"
             "    const dictionary& dict\n"
             ")"
-        )   << "The E and tau lists should have the same length!"
+        )   << "The E and relaxationTimes lists should have the same length!"
             << abort(FatalError);
     }
 
@@ -240,13 +240,13 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
         );
 
         // We need to store the old time field
-        h_[MaxwellModelI].storeOldTime();
-        hf_[MaxwellModelI].storeOldTime();
+        h_[MaxwellModelI].oldTime();
+        hf_[MaxwellModelI].oldTime();
     }
 
     // Store the old time s field
-    s_.storeOldTime();
-    sf_.storeOldTime();
+    s_.oldTime();
+    sf_.oldTime();
 }
 
 
