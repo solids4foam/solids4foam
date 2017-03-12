@@ -4,4 +4,4 @@
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
 cleanCase
-\rm -f constant/polyMesh/boundary case.foam
+\rm -rf constant/polyMesh/boundary case.foam history

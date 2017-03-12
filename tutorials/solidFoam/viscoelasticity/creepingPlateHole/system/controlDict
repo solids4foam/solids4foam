@@ -22,7 +22,7 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         100;
+endTime         10;
 
 deltaT          1;
 
@@ -43,5 +43,14 @@ timeFormat      general;
 timePrecision   6;
 
 runTimeModifiable no;
+
+functions
+{
+    forceDisp1
+    {
+        type          solidForcesDisplacements;
+        historyPatch  right;
+    }
+}
 
 // ************************************************************************* //

@@ -54,11 +54,11 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     EInf_(dict.lookup("EInfinity")),
     E_(dict.lookup("E")),
     tau_(dict.lookup("relaxationTimes")),
-    gammaInf_(0.0),
+    gammaInf_("gammInf", dimless, 0.0),
     gamma_(E_.size(), 0.0),
     nu_(dict.lookup("nu")),
     lambda_("lambda", dimPressure, 0.0),
-    mu_(EInf_/(2.0*(1.0 + nu_))),
+    mu_("mu", dimPressure, 0.0),
     k_("k", dimPressure, 0.0),
     h_(),
     hf_(),
@@ -89,45 +89,6 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
         dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
     )
 {
-    // Check for physical Poisson's ratio
-    if (nu_.value() < -1.0 || nu_.value() > 0.5)
-    {
-        FatalErrorIn
-        (
-            "Foam::viscousHookeanElastic::viscousHookeanElastic\n"
-            "(\n"
-            "    const word& name,\n"
-            "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
-            ")"
-        )   << "Unphysical Poisson's ratio: nu should be >= -1.0 and <= 0.5"
-            << abort(FatalError);
-    }
-
-    // Check for incompressibility
-    if (nu_.value() == 0.5)
-    {
-        Info<< "Material is incompressible: make sure to use a hybrid"
-            << " approach solid model" << endl;
-
-        // Set lambda and k to GREAT
-        lambda_.value() = GREAT;
-        k_.value() = GREAT;
-    }
-    else
-    {
-        if (planeStress())
-        {
-            lambda_ = nu_*EInf_/((1.0 + nu_)*(1.0 - nu_));
-        }
-        else
-        {
-            lambda_ = nu_*EInf_/((1.0 + nu_)*(1.0 - 2.0*nu_));
-        }
-
-        k_ = lambda_ + (2.0/3.0)*mu_;
-    }
-
     // Check E_ and tau_ are the same length
     if (E_.size() != tau_.size())
     {
@@ -145,13 +106,14 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
 
     // Calculate relative modulii
 
-    const scalar E0 = EInf_.value() + sum(E_);
+    const dimensionedScalar E0 =
+        EInf_ + dimensionedScalar("sum(E)", dimPressure, sum(E_));
 
-    gammaInf_ = EInf_.value()/E0;
+    gammaInf_ = EInf_/E0;
 
     forAll(gamma_, i)
     {
-        gamma_[i] = E_[i]/E0;
+        gamma_[i] = E_[i]/E0.value();
     }
 
     // Check all the relaxation times are positive
@@ -187,7 +149,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     // Print out the relative module
 
     Info<< "Relative modulii" << nl
-        << "    gammaInfinity: " << gammaInf_ << nl;
+        << "    gammaInfinity: " << gammaInf_.value() << nl;
 
     forAll(gamma_, i)
     {
@@ -247,6 +209,48 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     // Store the old time s field
     s_.oldTime();
     sf_.oldTime();
+
+    // Set initial shear modulus
+    mu_ = E0/(2.0*(1.0 + nu_));
+
+    // Check for physical Poisson's ratio
+    if (nu_.value() < -1.0 || nu_.value() > 0.5)
+    {
+        FatalErrorIn
+        (
+            "Foam::viscousHookeanElastic::viscousHookeanElastic\n"
+            "(\n"
+            "    const word& name,\n"
+            "    const fvMesh& mesh,\n"
+            "    const dictionary& dict\n"
+            ")"
+        )   << "Unphysical Poisson's ratio: nu should be >= -1.0 and <= 0.5"
+            << abort(FatalError);
+    }
+
+    // Check for incompressibility
+    if (nu_.value() == 0.5)
+    {
+        Info<< "Material is incompressible: make sure to use a hybrid"
+            << " approach solid model" << endl;
+
+        // Set lambda and k to GREAT
+        lambda_.value() = GREAT;
+        k_.value() = GREAT;
+    }
+    else
+    {
+        if (planeStress())
+        {
+            lambda_ = nu_*EInf_/((1.0 + nu_)*(1.0 - nu_));
+        }
+        else
+        {
+            lambda_ = nu_*EInf_/((1.0 + nu_)*(1.0 - 2.0*nu_));
+        }
+
+        k_ = lambda_ + (2.0/3.0)*mu_;
+    }
 }
 
 
@@ -286,6 +290,17 @@ Foam::tmp<Foam::volScalarField> Foam::viscousHookeanElastic::rho() const
 
 Foam::tmp<Foam::volScalarField> Foam::viscousHookeanElastic::impK() const
 {
+    // Calculate scaling factor to ensure optimal convergence
+    // This is similar to the tangent matrix in FE procedures
+    scalar scaleFactor = gammaInf_.value();
+
+    forAll(gamma_, i)
+    {
+        scaleFactor +=
+            gamma_[i]*Foam::exp(-mesh().time().deltaTValue()/(2.0*tau_[i]));
+
+    }
+
     if (nu_.value() == 0.5 || mesh().foundObject<volScalarField>("p"))
     {
         return tmp<volScalarField>
@@ -301,7 +316,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscousHookeanElastic::impK() const
                     IOobject::NO_WRITE
                 ),
                 mesh(),
-                2.0*mu_
+                scaleFactor*2.0*mu_
             )
         );
     }
@@ -320,7 +335,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscousHookeanElastic::impK() const
                     IOobject::NO_WRITE
                 ),
                 mesh(),
-                2.0*mu_ + lambda_
+                scaleFactor*2.0*mu_ + lambda_
             )
         );
     }

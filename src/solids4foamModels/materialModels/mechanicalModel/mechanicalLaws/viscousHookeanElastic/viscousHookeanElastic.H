@@ -87,10 +87,12 @@ class viscousHookeanElastic
         List<scalar> E_;
 
         //- List of relaxation times for each Maxwell model
+        //  Note: tau_i = eta_i/E_i, where eta_i is the viscosity of the dashpot
+        //  for the i^th Maxwell model
         List<scalar> tau_;
 
         //- Relaxed (long term) nondimensional relative modulus
-        scalar gammaInf_;
+        dimensionedScalar gammaInf_;
 
         //- List of nondimensional relative modulii
         List<scalar> gamma_;
