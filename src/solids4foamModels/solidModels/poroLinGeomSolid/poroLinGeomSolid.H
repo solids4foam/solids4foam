@@ -121,7 +121,7 @@ class poroLinGeomSolid
         const volScalarField impK_;
 
         //- Implicit stiffness surface field
-        const surfaceScalarField impKf_;
+        surfaceScalarField impKf_;
 
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
@@ -347,22 +347,6 @@ public:
                 const scalarField& pressure
             );
 
-            //- Set traction at specified patch
-            virtual void setTraction
-            (
-                const label patchID,
-                const label zoneID,
-                const vectorField& zoneTraction
-            );
-
-            //- Set pressure at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const label zoneID,
-                const scalarField& zonePressure
-            );
-
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
@@ -386,18 +370,6 @@ public:
 
             //- End of the program
             virtual void end();
-
-            //- Return const acess to the solution (displacement field)
-            virtual const volVectorField& solution() const
-            {
-                return D_;
-            }
-
-            //- Return non-const access to the solution (displacement field)
-            virtual volVectorField& solution()
-            {
-                return D_;
-            }
 };
 
 

@@ -190,7 +190,8 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::rho() const
 
 Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 {
-    if (nu_.value() == 0.5 || mesh().foundObject<volScalarField>("p"))
+    //if (nu_.value() == 0.5 || mesh().foundObject<volScalarField>("p"))
+    if (nu_.value() == 0.5)
     {
         return tmp<volScalarField>
         (
@@ -286,15 +287,16 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
 
         // Check if a hybrid approach is being used
         // Currently, this will only work when there is no material interface
-        if (mesh().foundObject<volScalarField>("p"))
-        {
-            const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+        // if (mesh().foundObject<volScalarField>("p"))
+        // {
+        //     const volScalarField& p =
+        //         mesh().lookupObject<volScalarField>("p");
 
-            // Calculate stress using Hooke's law in uncoupled deviatoric
-            // volumetric form
-            sigma = mu_*dev(twoSymm(gradD)) - p*I + sigma0_;
-        }
-        else
+        //     // Calculate stress using Hooke's law in uncoupled deviatoric
+        //     // volumetric form
+        //     sigma = mu_*dev(twoSymm(gradD)) - p*I + sigma0_;
+        // }
+        // else
         {
             // Calculate stress based on Hooke's law
             sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I + sigma0_;

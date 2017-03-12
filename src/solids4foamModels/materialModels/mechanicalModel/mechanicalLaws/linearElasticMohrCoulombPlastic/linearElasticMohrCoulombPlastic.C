@@ -817,7 +817,11 @@ void Foam::linearElasticMohrCoulombPlastic::correct
 Foam::scalar Foam::linearElasticMohrCoulombPlastic::residual()
 {
     // Calculate residual based on change in plastic strain increment
-    if (mesh().foundObject<surfaceTensorField>("Ff"))
+    if
+    (
+        mesh().foundObject<surfaceVectorField>("grad(D)")
+     || mesh().foundObject<surfaceVectorField>("grad(DD)")
+    )
     {
         return
             gMax

@@ -84,7 +84,7 @@ void Foam::poroLinearElasticMohrCoulombPlastic::correct
         ).lookupBaseMeshVolField<scalar>("p", mesh());
 
 
-    // The total stress is equal to the sum of the efffective stress and
+    // The total stress is equal to the sum of the effective stress and
     // pore-pressure components
     sigma -= p*symmTensor(I);
 }
@@ -110,7 +110,7 @@ void Foam::poroLinearElasticMohrCoulombPlastic::correct
 
     const surfaceScalarField pf = fvc::interpolate(p);
 
-    // The total stress is equal to the sum of the efffective stress and
+    // The total stress is equal to the sum of the effective stress and
     // pore-pressure components
     sigma -= pf*symmTensor(I);
 }

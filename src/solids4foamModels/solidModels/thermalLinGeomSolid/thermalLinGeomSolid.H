@@ -160,18 +160,6 @@ public:
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
-            //- Traction boundary surface normal gradient
-            //  Given the user-specified boundary patch traction, this function
-            //  should return the surface normal gradient
-            //  This function is used by traction-type boundary conditions to
-            //  set the boundary gradient
-            // virtual tmp<vectorField> tractionBoundarySnGrad
-            // (
-            //     const vectorField& traction,
-            //     const scalarField& pressure,
-            //     const fvPatch& patch
-            // ) const;
-
             //- Update total accumulated fields
             virtual void updateTotalFields();
 
@@ -180,18 +168,6 @@ public:
 
             //- End of the program
             virtual void end();
-
-            //- Return const acess to the solution (temperature field)
-            // virtual const volVectorField& solution() const
-            // {
-            //     return T_;
-            // }
-
-            //- Return non-const access to the solution (temperature field)
-            // virtual volVectorField& solution()
-            // {
-            //     return T_;
-            // }
 };
 
 

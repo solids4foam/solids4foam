@@ -328,6 +328,8 @@ poroLinGeomSolid::poroLinGeomSolid(dynamicFvMesh& mesh)
 {
     D_.oldTime().oldTime();
     pointD_.oldTime();
+    gradD_.oldTime();
+    sigma_.oldTime();
     p_.oldTime();
 }
 
@@ -705,56 +707,6 @@ void poroLinGeomSolid::setPressure
 }
 
 
-void poroLinGeomSolid::setTraction
-(
-    const label patchID,
-    const label zoneID,
-    const vectorField& faceZoneTraction
-)
-{
-    vectorField patchTraction(mesh().boundary()[patchID].size(), vector::zero);
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(patchTraction, i)
-    {
-        patchTraction[i] =
-            faceZoneTraction
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ];
-    }
-
-    setTraction(patchID, patchTraction);
-}
-
-
-void poroLinGeomSolid::setPressure
-(
-    const label patchID,
-    const label zoneID,
-    const scalarField& faceZonePressure
-)
-{
-    scalarField patchPressure(mesh().boundary()[patchID].size(), 0.0);
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(patchPressure, i)
-    {
-        patchPressure[i] =
-            faceZonePressure
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ];
-    }
-
-    setPressure(patchID, patchPressure);
-}
-
-
 bool poroLinGeomSolid::evolve()
 {
     Info << "Evolving poro solid solver" << endl;
@@ -806,8 +758,10 @@ bool poroLinGeomSolid::evolve()
         (
             rho_*fvm::d2dt2(D_)
          == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
-          + fvc::div(sigma_ - impK_*gradD_, "div(sigma)")
+          - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
+          + fvc::div(sigma_, "div(sigma)")
           + rho_*g_
+          + mechanical().RhieChowCorrection(D_, gradD_)
         );
 
         // Under-relaxation the linear system
@@ -820,22 +774,29 @@ bool poroLinGeomSolid::evolve()
         D_.relax();
 
         // Update gradient of displacement
-        gradD_ = fvc::grad(D_);
+        mechanical().grad(D_, gradD_);
 
-        // Velocity
+        // Update velocity as it is used in the pEqn
         U_ = fvc::ddt(D_);
-
-        // Update the strain
-        epsilon_ = symm(gradD_);
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma_);
+
+        // Update impKf to improve convergence
+        // Note: impK and rImpK are not updated as they are used for traction
+        // boundaries
+        if (iCorr % 10 == 0)
+        {
+            impKf_ = mechanical().impKf();
+        }
     }
     while (!converged(iCorr, solverPerfD, solverPerfp) && ++iCorr < nCorr_);
 
     // Interpolate cell displacements to vertices
-    volToPoint_.interpolate(D_, pointD_);
-    pointD_.correctBoundaryConditions();
+    mechanical().interpolate(D_, pointD_);
+
+    // Update strain
+    epsilon_ = symm(gradD_);
 
     return true;
 }
