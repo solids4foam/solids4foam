@@ -100,7 +100,7 @@ class linGeomSolid
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        volScalarField impK_;
+        const volScalarField impK_;
 
         //- Implicit stiffness surface field
         surfaceScalarField impKf_;
@@ -108,7 +108,7 @@ class linGeomSolid
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
         //  will store the reciprocal for effficiency
-        volScalarField rImpK_;
+        const volScalarField rImpK_;
 
         //- DD equation under-relaxation factor
         const scalar DDEqnRelaxFactor_;

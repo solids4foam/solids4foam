@@ -1117,6 +1117,22 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlastic::rho() const
 Foam::tmp<Foam::volScalarField>
 Foam::neoHookeanElasticMisesPlastic::impK() const
 {
+    // Calculate scaling factor to ensure optimal convergence
+    // This is similar to the tangent matrix in FE procedures
+
+    // Calculate deviatoric trial stress
+    const volSymmTensorField sTrial = mu_*dev(bEbarTrial_);
+
+    const volScalarField Ibar = tr(bEbarTrial_)/3.0;
+    const volScalarField muBar = Ibar*mu_;
+
+    // Magnitude of the deviatoric trial stress
+    const volScalarField magSTrial =
+        max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL));
+
+    // Calculate scaling factor
+    const volScalarField scaleFactor = 1.0 - (2.0*muBar*DLambda_/magSTrial);
+
     return tmp<volScalarField>
     (
         new volScalarField
@@ -1129,9 +1145,10 @@ Foam::neoHookeanElasticMisesPlastic::impK() const
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            mesh(),
-            (4.0/3.0)*mu_ + K_, // == 2*mu + lambda
-            zeroGradientFvPatchScalarField::typeName
+            //mesh(),
+            //(4.0/3.0)*mu_ + K_, // == 2*mu + lambda
+            //zeroGradientFvPatchScalarField::typeName
+            scaleFactor*(4.0/3.0)*mu_ + K_
         )
     );
 }

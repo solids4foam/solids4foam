@@ -103,7 +103,12 @@ void Foam::orthotropicLinearElastic::makeElasticC() const
 
     volSymmTensor4thOrderField& C = *elasticCPtr_;
 
-    C = transform(matDir_, C);
+    // Calculate rotating matrix from local directions to global directions
+    const volTensorField matDir =
+        matDirX_*matDirX_ + matDirY_*matDirY_ + matDirZ_*matDirZ_;
+
+    // Rotate C from local directions to global directions
+    C = transform(matDir, C);
 }
 
 
@@ -179,7 +184,12 @@ void Foam::orthotropicLinearElastic::makeElasticCf() const
 
     surfaceSymmTensor4thOrderField& C = *elasticCfPtr_;
 
-    C = transform(fvc::interpolate(matDir_), C);
+    // Calculate rotating matrix from local directions to global directions
+    const volTensorField matDir =
+        matDirX_*matDirX_ + matDirY_*matDirY_ + matDirZ_*matDirZ_;
+
+    // Rotate C from local directions to global directions
+    C = transform(fvc::interpolate(matDir), C);
 }
 
 
@@ -222,48 +232,52 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
     G31_(dict.lookup("G31")),
     elasticCPtr_(NULL),
     elasticCfPtr_(NULL),
-    matDir_
+    matDirX_
     (
         IOobject
         (
-            "materialDirections",
+            "materialDirectionsX",
              mesh.time().timeName(),
              mesh,
              IOobject::READ_IF_PRESENT,
              IOobject::NO_WRITE
         ),
         mesh,
-        dimensionedTensor
+        dimensionedVector
         (
-            "localMaterialDirections",
-            dimless,
-            tensor
-            (
-                vector(1,0,0)
-               *vector
-                (
-                    dict.lookupOrDefault<vector>
-                    (
-                        "materialDirection1", vector(1,0,0)
-                    )
-                )
-              + vector(0,1,0)
-               *vector
-                (
-                    dict.lookupOrDefault<vector>
-                    (
-                        "materialDirection2", vector(0,1,0)
-                    )
-                )
-              + vector(0,0,1)
-               *vector
-                (
-                    dict.lookupOrDefault<vector>
-                    (
-                        "materialDirection2", vector(0,0,1)
-                    )
-                )
-            )
+            dict.lookupOrDefault<vector>("materialDirectionX", vector(1,0,0))
+        )
+    ),
+    matDirY_
+    (
+        IOobject
+        (
+            "materialDirectionsY",
+             mesh.time().timeName(),
+             mesh,
+             IOobject::READ_IF_PRESENT,
+             IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector
+        (
+            dict.lookupOrDefault<vector>("materialDirectionY", vector(0,1,0))
+        )
+    ),
+    matDirZ_
+    (
+        IOobject
+        (
+            "materialDirectionsZ",
+             mesh.time().timeName(),
+             mesh,
+             IOobject::READ_IF_PRESENT,
+             IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector
+        (
+            dict.lookupOrDefault<vector>("materialDirectionZ", vector(0,0,1))
         )
     )
 {
@@ -349,7 +363,12 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
 
 
     // Check the direction vectors
-    if (min(mag(matDir_)).value() < SMALL)
+    if
+    (
+        min(mag(matDirX_)).value() < SMALL
+     || min(mag(matDirY_)).value() < SMALL
+     || min(mag(matDirZ_)).value() < SMALL
+    )
     {
         FatalErrorIn
         (
@@ -364,7 +383,29 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
     }
 
     // Normalise the direction vectors
-    matDir_ /= mag(matDir_);
+    matDirX_ /= mag(matDirX_);
+    matDirY_ /= mag(matDirY_);
+    matDirZ_ /= mag(matDirZ_);
+
+    // Check the material direcction vectors are locally orthogonal
+    if
+    (
+        max(matDirX_ & matDirY_).value() > SMALL
+     || max(matDirX_ & matDirZ_).value() > SMALL
+     || max(matDirY_ & matDirZ_).value() > SMALL
+    )
+    {
+        FatalErrorIn
+        (
+            "Foam::orthotropicLinearElastic::orthotropicLinearElastic\n"
+            "(\n"
+            "    const word& name,\n"
+            "    const fvMesh& mesh,\n"
+            "    const dictionary& dict\n"
+            ")"
+        )   << "The direction vectors should be locally orthogonal!"
+            << abort(FatalError);
+    }
 }
 
 

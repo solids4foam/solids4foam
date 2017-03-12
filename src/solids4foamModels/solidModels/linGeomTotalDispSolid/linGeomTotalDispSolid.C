@@ -674,6 +674,14 @@ bool linGeomTotalDispSolid::evolve()
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma_);
+
+        // Update impKf to improve convergence
+        // Note: impK and rImpK are not updated as they are used for traction
+        // boundaries
+        if (iCorr % 10 == 0)
+        {
+            impKf_ = mechanical().impKf();
+        }
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
@@ -685,28 +693,6 @@ bool linGeomTotalDispSolid::evolve()
 
     return true;
 }
-
-
-// void linGeomTotalDispSolid::predict()
-// {
-//     Info << "Predicting solid model" << endl;
-
-//     D_ = D_ + U_*runTime().deltaT();
-
-//     if (interface().valid())
-//     {
-//         interface()->updateDisplacement(pointD_);
-//         interface()->updateDisplacementGradient(gradD_, gradDf_);
-//     }
-//     else
-//     {
-//         volToPoint_.interpolate(D_, pointD_);
-//         gradD_ = fvc::grad(D_, pointD_);
-//         gradDf_ = fvc::fGrad(D_, pointD_);
-//     }
-
-//     D_.correctBoundaryConditions();
-// }
 
 
 tmp<vectorField> linGeomTotalDispSolid::tractionBoundarySnGrad

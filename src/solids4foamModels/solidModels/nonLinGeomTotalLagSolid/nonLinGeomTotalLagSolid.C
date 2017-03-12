@@ -760,6 +760,14 @@ bool nonLinGeomTotalLagSolid::evolve()
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma_);
+
+        // Update impKf to improve convergence
+        // Note: impK and rImpK are not updated as they are used for traction
+        // boundaries
+        if (iCorr % 10 == 0)
+        {
+            impKf_ = mechanical().impKf();
+        }
     }
     while (!converged(iCorr, solverPerfDD) && ++iCorr < nCorr_);
 

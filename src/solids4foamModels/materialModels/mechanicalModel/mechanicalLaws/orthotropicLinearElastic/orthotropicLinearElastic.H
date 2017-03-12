@@ -120,11 +120,14 @@ class orthotropicLinearElastic
         //  Relative to the global Cartesian axis
         mutable surfaceSymmTensor4thOrderField* elasticCfPtr_;
 
-        //- Material directions tensor field
-        //  Local material direction 1 is (xx xy xz)
-        //  Local material direction 2 is (yx yy yz)
-        //  Local material direction 3 is (zx zy zz)
-        volTensorField matDir_;
+        //- Material local x direction field
+        volVectorField matDirX_;
+
+        //- Material local y direction field
+        volVectorField matDirY_;
+
+        //- Material local z direction field
+        volVectorField matDirZ_;
 
 
     // Private Member Functions

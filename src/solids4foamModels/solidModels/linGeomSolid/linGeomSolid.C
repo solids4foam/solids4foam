@@ -698,6 +698,9 @@ bool linGeomSolid::evolve()
         // Update gradient of displacement
         mechanical().grad(DD_, gradDD_);
 
+        // Update the total displacement
+        D_ = D_.oldTime() + DD_;
+
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma_);
 
