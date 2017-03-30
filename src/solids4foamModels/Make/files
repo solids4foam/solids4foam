@@ -14,6 +14,7 @@ solidModels/coupledUnsLinGeomSolid/coupledUnsLinGeomSolid.C
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C
+solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/fluidModel/newFluidModel.C

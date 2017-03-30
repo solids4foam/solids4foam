@@ -15,18 +15,17 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     newStressedFoam;
+application     solidFoam;
 
 startFrom       startTime;
-//startFrom       latestTime;
 
 startTime       0;
 
 stopAt          endTime;
 
-endTime         10;
+endTime         5;
 
-deltaT          10;
+deltaT          1;
 
 writeControl    timeStep;
 

@@ -17,31 +17,44 @@ FoamFile
 
 dimensions      [0 0 0 1 0 0 0];
 
-internalField   uniform 0;
+internalField   uniform 300;
 
 boundaryField
 {
     symmx
     {
-        type            symmetryPlane;
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform 300;
     }
     symmy
     {
-        type            symmetryPlane;
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform 300;
     }
     symmz
     {
-        type            symmetryPlane;
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform 300;
     }
     inside
     {
-        type            fixedValue;
-        value           uniform 100;
+        type            fixedTemperature;
+        temperatureSeries
+        {
+            fileName    "$FOAM_CASE/constant/timeVsTemperature";
+            outOfBounds clamp;
+        }
+        value           uniform 300;
     }
     outside
     {
-        type            fixedValue;
-        value           uniform 0;
+        type            thermalConvection;
+        alpha           uniform 90;
+        Tinf            300;
+        value           uniform 300;
     }
 }
 

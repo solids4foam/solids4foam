@@ -11,7 +11,7 @@ FoamFile
     format      ascii;
     class       volVectorField;
     location    "0";
-    object      DD;
+    object      D;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -43,7 +43,11 @@ boundaryField
     {
         type            solidTraction;
         traction        uniform ( 0 0 0 );
-        pressure        uniform 10e6;
+        pressureSeries
+        {
+            fileName    "$FOAM_CASE/constant/timeVsPressure";
+            outOfBounds clamp;
+        }
         value           uniform (0 0 0);
     }
     outside

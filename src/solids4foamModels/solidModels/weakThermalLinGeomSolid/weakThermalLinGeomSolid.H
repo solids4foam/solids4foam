@@ -23,14 +23,11 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    thermalLinGeomSolid
+    weakThermalLinGeomSolid
 
 Description
     Mathematical model where linear geometry is assumed i.e. small strains and
-    small rotations are assumed.
-
-    The heat equation and momentum equation are solved in a strongly coupled
-    fashion i.e. just like in solidDisplacementFoam.
+    small rotations are assumed, and the heat equation is solved.
 
     The stress is calculated by the run-time selectable mechanical law.
 
@@ -38,15 +35,14 @@ Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
-    thermalLinGeomSolid.C
+    weakThermalLinGeomSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef thermalLinGeomSolid_H
-#define thermalLinGeomSolid_H
+#ifndef weakThermalLinGeomSolid_H
+#define weakThermalLinGeomSolid_H
 
-#include "solidModel.H"
-#include "uniformDimensionedFields.H"
+#include "linGeomSolid.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -59,51 +55,14 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class thermalLinGeomSolid Declaration
+                        Class weakThermalLinGeomSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class thermalLinGeomSolid
+class weakThermalLinGeomSolid
 :
-    public solidModel
+    public linGeomSolid
 {
     // Private data
-
-        //- Displacement field
-        volVectorField D_;
-
-        //- Velocity field
-        volVectorField U_;
-
-        //- Point mesh
-        pointMesh pMesh_;
-
-        //- Point displacement field
-        pointVectorField pointD_;
-
-        //- Stress field
-        volSymmTensorField sigma_;
-
-        //- Cell displacement gradient
-        volTensorField gradD_;
-
-        //- Density
-        const volScalarField rho_;
-
-        //- Implicit stiffness; coefficient of the Laplacian term
-        //  The value of this term only affects convergence and not the answer
-        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        const volScalarField impK_;
-
-        //- Implicit stiffness surface field
-        surfaceScalarField impKf_;
-
-        //- Reciprocal of impK
-        //  We divide by impK every time tractionBoundarySnGrad is called so we
-        //  will store the reciprocal for effficiency
-        const volScalarField rImpK_;
-
-        //- D equation under-relaxation factor
-        const scalar DEqnRelaxFactor_;
 
         //- Temperature field
         volScalarField T_;
@@ -123,28 +82,20 @@ class thermalLinGeomSolid
         //- T equation under-relaxation factor
         const scalar TEqnRelaxFactor_;
 
-        //- Solution standard tolerance
+        //- Solution tolerance for outer non-orthogonality correctors
         const scalar solutionTol_;
 
-        //- Solution tighter tolerance
+        //- Alternative tolerance for outer non-orthogonality correctors
         const scalar alternativeTol_;
-
-        //- Material law tolerance
-        const scalar materialTol_;
 
         //- Write frequency for residuals information
         const int infoFrequency_;
 
-        //- Maximum number of momentum correctors
+        //- Maximum number of thermal correctors
         const int nCorr_;
 
-        //- Gravitational acceleration
-        const uniformDimensionedVectorField g_;
-
-        //- Number of times the maximum number of correctors was reached in the
-        //  momentum equation
+        //- Number of times the maximum number of correctors was reached
         int maxIterReached_;
-
 
     // Private Member Functions
 
@@ -152,15 +103,14 @@ class thermalLinGeomSolid
         bool converged
         (
             const int iCorr,
-            const lduMatrix::solverPerformance& solverPerfT,
             const lduMatrix::solverPerformance& solverPerfD
         );
 
         //- Disallow default bitwise copy construct
-        thermalLinGeomSolid(const thermalLinGeomSolid&);
+        weakThermalLinGeomSolid(const weakThermalLinGeomSolid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const thermalLinGeomSolid&);
+        void operator=(const weakThermalLinGeomSolid&);
 
 
 protected:
@@ -177,17 +127,17 @@ protected:
 public:
 
     //- Runtime type information
-    TypeName("thermalLinearGeometry");
+    TypeName("weakThermalLinearGeometry");
 
     // Constructors
 
         //- Construct from components
-        thermalLinGeomSolid(dynamicFvMesh& mesh);
+        weakThermalLinGeomSolid(dynamicFvMesh& mesh);
 
 
     // Destructor
 
-        virtual ~thermalLinGeomSolid()
+        virtual ~weakThermalLinGeomSolid()
         {}
 
 
@@ -207,64 +157,8 @@ public:
                 return T_;
             }
 
-            //- Face zone point displacement increment
-            virtual tmp<vectorField> faceZonePointDisplacementIncrement
-            (
-                const label zoneID
-            ) const;
-
-            //- Face zone velocity surface (tangential) gradient
-            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
-
-            //- Face zone current normal
-            virtual tmp<vectorField> faceZoneNormal
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
-
-            //- Face zone primitive patch in current configuration
-            virtual tmp<vectorField> currentFaceZonePoints
-            (
-                const label zoneID
-            ) const;
-
-        // Edit
-
-            //- Set traction on the specified patch
-            //  This function enables the FSI procedure to pass a traction from
-            //  fluid to the solid
-            virtual void setTraction
-            (
-                const label patchID,
-                const vectorField& traction
-            );
-
-            //- Set pressure at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const scalarField& pressure
-            );
-
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
-
-            //- Traction boundary surface normal gradient
-            //  Given the user-specified boundary patch traction, this function
-            //  should return the surface normal gradient
-            //  This function is used by traction-type boundary conditions to
-            //  set the boundary gradient
-            virtual tmp<vectorField> tractionBoundarySnGrad
-            (
-                const vectorField& traction,
-                const scalarField& pressure,
-                const fvPatch& patch
-            ) const;
 
             //- Update total accumulated fields
             virtual void updateTotalFields();
