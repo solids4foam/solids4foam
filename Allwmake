@@ -6,4 +6,5 @@ set -x
 wmake libso src/solids4foamModels
 wmake libso src/blockCoupledSolidTools
 
+wmake all applications/utilities
 wmake all applications/solvers
