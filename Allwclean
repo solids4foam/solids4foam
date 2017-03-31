@@ -6,6 +6,7 @@ wclean lib src/solids4foamModels
 wclean applications/utilities/addTinyPatch
 wclean applications/utilities/projectPatchToSphere
 wclean applications/utilities/surfaceTractions
+wclean applications/utilities/flattenPatch
 
 wclean applications/solvers/solidFoam
 wclean applications/solvers/fluidFoam
