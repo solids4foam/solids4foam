@@ -29,6 +29,9 @@ Description
 
         projectPatchToSphere leftPatch "(0 0 0)" 0.5
 
+    Take care as this does not move internal points so it may cause invalid
+    cells.
+
 Author
     Philip Cardiff, UCD. All rights reserved.
 
