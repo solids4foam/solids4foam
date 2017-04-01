@@ -39,9 +39,6 @@ Author
 
 #include "fvCFD.H"
 #include "argList.H"
-#include "fvMesh.H"
-#include "pointMesh.H"
-#include "pointFields.H"
 
 using namespace Foam;
 
@@ -55,7 +52,6 @@ int main(int argc, char *argv[])
     argList::validArgs.append("patch name");
     argList::validArgs.append("origin");
     argList::validArgs.append("radius");
-    Foam::argList::validOptions.insert("overwrite", "");
 
 #   include "setRootCase.H"
 
@@ -71,8 +67,6 @@ int main(int argc, char *argv[])
             << "radius must be greater than zero"
             << abort(FatalError);
     }
-
-    const bool overwrite = args.optionFound("overwrite");
 
     Info<< "Patch:" << patchName << nl
         << "origin:" << origin << nl
@@ -95,23 +89,24 @@ int main(int argc, char *argv[])
             << abort(FatalError);
     }
 
-    // Calculate point motion field
-
-    pointMesh pMesh(mesh);
-
-    pointVectorField pointMotion
+    // Read the points field
+    pointIOField points
     (
         IOobject
         (
-            "pointMotion",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        pMesh,
-        dimensionedVector("zero", dimLength, vector::zero)
+            "points",
+            runTime.findInstance(polyMesh::meshSubDir, "points"),
+            polyMesh::meshSubDir,
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        )
     );
+
+    Info<< "Reading points field from " << points.path() << nl << endl;
+
+    // Calculate point motion field
 
     // Patch points
     const vectorField localPoints = mesh.boundaryMesh()[patchID].localPoints();
@@ -119,14 +114,21 @@ int main(int argc, char *argv[])
     // Patch point addressing
     const labelList meshPoints = mesh.boundaryMesh()[patchID].meshPoints();
 
-    // New mesh points
-    vectorField newPoints = mesh.points();
-
     // Calculate the new position of each point on the patch
+
+    scalar maxDisp = 0.0;
+
     forAll(localPoints, pointI)
     {
+        // Global point index
+        const label pointID = meshPoints[pointI];
+
+        // Old point
+        //const point oldPoint = localPoints[pointI];
+        const point oldPoint = points[pointID];
+
         // Vector from the origin to the patch point
-        const vector r = localPoints[pointI] - origin;
+        const vector r = oldPoint - origin;
         scalar magR = mag(r);
 
         if (magR < SMALL)
@@ -137,34 +139,19 @@ int main(int argc, char *argv[])
         }
 
         // Scale point to the correct radius
-        const vector newPoint = origin + radius*(r/magR);
+        points[pointID] = origin + radius*(r/magR);
 
-        const label pointID = meshPoints[pointI];
-
-        newPoints[pointID] = newPoint;
-        pointMotion[pointID] = newPoint - localPoints[pointI];
+        maxDisp = max(maxDisp, mag(points[pointID] - oldPoint));
     }
 
-    // Write mesh
-    if (overwrite)
-    {
-        mesh.setInstance(oldInstance);
-    }
-    else
-    {
-        runTime++;
-    }
+    Info<< "Maximum point displacement: " << maxDisp << nl << endl;
 
-    mesh.movePoints(newPoints);
-    mesh.moving(false);
-    mesh.changing(false);
-    mesh.setPhi().writeOpt() = IOobject::NO_WRITE;
+    // Increase the write precision
+    IOstream::defaultPrecision(16);
 
-    Info<< "Writing mesh and pointMotion field to time "
-        << runTime.value() << endl;
-
-    mesh.write();
-    pointMotion.write();
+    // Write the points
+    Info<< "Writing the new points to " << points.path() << endl;
+    points.write();
 
     Info << "End\n" << endl;
 

@@ -37,9 +37,6 @@ Author
 
 #include "fvCFD.H"
 #include "argList.H"
-#include "fvMesh.H"
-#include "pointMesh.H"
-#include "pointFields.H"
 
 using namespace Foam;
 
@@ -106,6 +103,8 @@ int main(int argc, char *argv[])
         )
     );
 
+    Info<< "Reading points field from " << points.path() << nl << endl;
+
     // Patch points
     const vectorField localPoints = mesh.boundaryMesh()[patchID].localPoints();
 
@@ -113,6 +112,9 @@ int main(int argc, char *argv[])
     const labelList meshPoints = mesh.boundaryMesh()[patchID].meshPoints();
 
     // Calculate the new position of each point on the patch
+
+    scalar maxDisp = 0.0;
+
     forAll(localPoints, pointI)
     {
         const point& oldPoint = localPoints[pointI];
@@ -127,15 +129,13 @@ int main(int argc, char *argv[])
         const label pointID = meshPoints[pointI];
 
         // Project the point back to the plane
-        if ((planeNormal & d) > 0.0)
-        {
-            points[pointID] = oldPoint - nd;
-        }
-        else
-        {
-            points[pointID] = oldPoint + nd;
-        }
+        points[pointID] = oldPoint - nd;
+
+        // Record max displacement
+        maxDisp = max(maxDisp, mag(nd));
     }
+
+    Info<< "Maximum point displacement: " << maxDisp << nl << endl;
 
     // Set the precision of the points data to 10
     IOstream::defaultPrecision(10);
