@@ -86,10 +86,13 @@ bool thermalLinGeomSolid::converged
             )
         );
 
+    // Calculate material residual
+    const scalar materialResidual = mechanical().residual();
+
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
     // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1)
+    if (iCorr > 1 && materialResidual < materialTol_)
     {
         if
         (
@@ -129,7 +132,8 @@ bool thermalLinGeomSolid::converged
     // Print residual information
     if (iCorr == 0)
     {
-        Info<< "    Corr, res (T & D), relRes (T & D), iters (T & D)" << endl;
+        Info<< "    Corr, res (T & D), relRes (T & D), matRes, iters (T & D)"
+            << endl;
     }
     else if (iCorr % infoFrequency_ == 0 || converged)
     {
@@ -138,6 +142,7 @@ bool thermalLinGeomSolid::converged
             << ", " << solverPerfD.initialResidual()
             << ", " << residualT
             << ", " << residualD
+            << ", " << materialResidual
             << ", " << solverPerfT.nIterations()
             << ", " << solverPerfD.nIterations() << endl;
 
@@ -776,7 +781,7 @@ bool thermalLinGeomSolid::evolve()
         // Under-relaxation the linear system
         DEqn.relax(DEqnRelaxFactor_);
 
-// Solve the linear system
+        // Solve the linear system
         solverPerfD = DEqn.solve();
 
         // Under-relax the field

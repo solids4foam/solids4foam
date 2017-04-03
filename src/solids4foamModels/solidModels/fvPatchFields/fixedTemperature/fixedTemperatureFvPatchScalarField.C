@@ -73,20 +73,13 @@ fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
     // Check if temperature is time-varying
     if (dict.found("temperatureSeries"))
     {
-        Info<< "    temperature is time-varying" << endl;
+        Info<< "temperature is time-varying" << endl;
         temperatureSeries_ =
             interpolationTable<scalar>(dict.subDict("temperatureSeries"));
 
         fvPatchField<scalar>::operator==
         (
             temperatureSeries_(this->db().time().timeOutputValue())
-        );
-    }
-    else
-    {
-        fvPatchField<scalar>::operator==
-        (
-            scalarField(dict.lookup("value"))
         );
     }
 }

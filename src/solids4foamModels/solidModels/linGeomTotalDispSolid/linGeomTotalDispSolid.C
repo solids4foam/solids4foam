@@ -686,6 +686,7 @@ bool linGeomTotalDispSolid::evolve()
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 
     // Interpolate cell displacements to vertices
+    Info<< "Interpolating D to pointD" << endl;
     mechanical().interpolate(D_, pointD_);
 
     // Velocity
