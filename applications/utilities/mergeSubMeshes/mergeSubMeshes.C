@@ -91,14 +91,17 @@ int main(int argc, char *argv[])
         Info<< "    " << regionNames[meshI]
             << ", nCells: " << meshes[meshI].nCells() << endl;
 
-        // If the sugMesh has no cellZones then we will add one cellZone which
-        // contains all the cells in the mesh
+        // If the subMesh has no cellZones then we will add one cellZone which
+        // contains all the cells in the subMesh
+
         polyMesh& mesh = meshes[meshI];
+
         if (mesh.cellZones().size() == 0)
         {
             mesh.cellZones().setSize(1);
 
             labelList addr = labelList(mesh.nCells(), -1);
+
             forAll(addr, cI)
             {
                 addr[cI] = cI;
@@ -142,30 +145,21 @@ int main(int argc, char *argv[])
         }
     }
 
+    // Write the first subMesh to the base mesh
     {
-        Info<< "Copying region " << regionNames[0] << " into the base mesh"
-            << nl << endl;
+        Info<< nl << "Copying region " << regionNames[0]
+            << " into the base mesh" << nl << endl;
 
-        // Read the first region mesh and write it to eh base mesh
-        polyMesh mesh
-        (
-            IOobject
-            (
-                regionNames[0],
-                runTime.timeName(),
-                runTime
-            )
-        );
+        polyMesh& mesh = meshes[0];
 
         mesh.rename(polyMesh::defaultRegion);
-        //mesh.instance() = polyMesh::defaultRegion;
-        mesh.path() = fileName(mesh.rootPath()/mesh.caseName());
 
-        mesh.setInstance(mesh.pointsInstance());
+        mesh.path() = fileName(mesh.rootPath()/mesh.caseName());
+        mesh.setInstance("constant");
         mesh.polyMesh::write();
     }
 
-    // Merge the other region meshes
+    // Merge the other region meshes into the base mesh
     for (int meshI = 1; meshI < regionNames.size(); meshI++)
     {
         Info<< "Merging region " << regionNames[meshI]
@@ -185,7 +179,8 @@ int main(int argc, char *argv[])
         mesh.merge();
 
         // Write the new merged mesh
-        mesh.setInstance(mesh.pointsInstance());
+        mesh.path() = fileName(mesh.rootPath()/mesh.caseName());
+        mesh.setInstance("constant");
         mesh.polyMesh::write();
     }
 
