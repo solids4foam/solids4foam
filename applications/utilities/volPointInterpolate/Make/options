@@ -12,7 +12,9 @@ EXE_INC = \
 
 
 EXE_LIBS = \
-    -L$(FOAM_USER_LIBBIN) -lsolids4FoamModels \
+    -L$(FOAM_USER_LIBBIN) \
+    -lsolids4FoamModels \
+    -lblockCoupledSolidTools \
     -lfiniteVolume \
     -lfiniteArea \
     -lmeshTools \
