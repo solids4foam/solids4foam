@@ -19,21 +19,4 @@ EXE_INC = \
     -I$(LIB_SRC)/transportModels/incompressible/singlePhaseTransportModel \
     -I$(LIB_SRC)/tetFiniteElement/lnInclude
 
-EXE_LIBS = \
-    -lfiniteVolume \
-    -lmeshTools \
-    -lfiniteArea \
-    -ldynamicFvMesh \
-    -ldynamicMesh \
-    -ltopoChangerFvMesh \
-    -llagrangian \
-    -lsampling \
-    -lsurfMesh \
-    -lfoamCalcFunctions \
-    -lforces \
-    -lerrorEstimation \
-    -lcfMesh \
-    -lincompressibleTurbulenceModel \
-    -lincompressibleRASModels \
-    -lincompressibleLESModels \
-    -lincompressibleTransportModels
+EXE_LIBS =
