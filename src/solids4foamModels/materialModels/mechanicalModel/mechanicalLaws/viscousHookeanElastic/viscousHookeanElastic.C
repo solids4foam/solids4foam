@@ -406,6 +406,8 @@ void Foam::viscousHookeanElastic::correct(volSymmTensorField& sigma)
 
     forAll(h_, MaxwellModelI)
     {
+        h_[MaxwellModelI].storePrevIter();
+
         // Approach 1
         // Eqn 10.3.12 in Simo and Hughes 1998
         h_[MaxwellModelI] =
@@ -475,6 +477,8 @@ void Foam::viscousHookeanElastic::correct(surfaceSymmTensorField& sigma)
 
     forAll(hf_, MaxwellModelI)
     {
+        hf_[MaxwellModelI].storePrevIter();
+
         hf_[MaxwellModelI] =
             Foam::exp(-deltaT/tau_[MaxwellModelI])*hf_[MaxwellModelI].oldTime()
           + Foam::exp(-deltaT/(2.0*tau_[MaxwellModelI]))*(sf_ - sf_.oldTime());
@@ -487,6 +491,73 @@ void Foam::viscousHookeanElastic::correct(surfaceSymmTensorField& sigma)
     forAll(hf_, MaxwellModelI)
     {
         sigma += gamma_[MaxwellModelI]*hf_[MaxwellModelI];
+    }
+}
+
+
+Foam::scalar Foam::viscousHookeanElastic::residual()
+{
+    // Calculate residual based on change in internal variables
+
+    scalar res = 0.0;
+
+    if
+    (
+        mesh().db().lookupObject<fvMesh>
+        (
+            baseMeshRegionName()
+        ).foundObject<surfaceTensorField>("Ff")
+    )
+    {
+        forAll(hf_, MaxwellModelI)
+        {
+            res =
+                max
+                (
+                    res,
+                    gMax
+                    (
+                        mag
+                        (
+                            hf_[MaxwellModelI].internalField()
+                          - hf_[MaxwellModelI].prevIter().internalField()
+                        )
+                    )
+                   /gMax
+                    (
+                        SMALL
+                      + mag(hf_[MaxwellModelI].prevIter().internalField())
+                    )
+                );
+        }
+
+        return res;
+    }
+    else
+    {
+        forAll(h_, MaxwellModelI)
+        {
+            res =
+                max
+                (
+                    res,
+                    gMax
+                    (
+                        mag
+                        (
+                            h_[MaxwellModelI].internalField()
+                          - h_[MaxwellModelI].prevIter().internalField()
+                        )
+                    )
+                   /gMax
+                    (
+                        SMALL
+                      + mag(h_[MaxwellModelI].prevIter().internalField())
+                    )
+                );
+        }
+
+        return res;
     }
 }
 
