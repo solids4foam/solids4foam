@@ -44,11 +44,22 @@ bool Foam::solidContactFvPatchVectorField::movingMesh() const
 {
     // If the deformation gradient "F" and the displacement increment DD" are
     // found then we can assume it is a moving mesh (updated Lagrangian) case
-    if
-    (
-        db().foundObject<volVectorField>("DD")
-     && db().foundObject<volTensorField>("F")
-    )
+    if (db().foundObject<volVectorField>("DD") && nonLinearGeometry())
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+
+bool Foam::solidContactFvPatchVectorField::nonLinearGeometry() const
+{
+    // If the deformation gradient "F" is found then we will assume the case to
+    // be nonlinear geometry (i.e. finite strain)
+    if (db().foundObject<volTensorField>("F"))
     {
         return true;
     }
@@ -1107,15 +1118,29 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
     // Calculate and apply contact forces
     if (master_)
     {
-        // Calculate the slave patch face unit normals as they are units by both
-        // the normal and friction models
-        const vectorField shadowPatchFaceNormals =
-            patchField
-            (
-                shadowPatchIndex(),
-                shadowZoneIndex(),
-                shadowZone().faceNormals()
-            );
+        vectorField shadowPatchFaceNormals
+        (
+            patch().boundaryMesh()[shadowPatchIndex()].size(),
+            vector::zero
+        );
+
+        if (nonLinearGeometry())
+        {
+            // Use deformed configuration face unit normals
+            shadowPatchFaceNormals =
+                patchField
+                (
+                    shadowPatchIndex(),
+                    shadowZoneIndex(),
+                    shadowZone().faceNormals()
+                );
+        }
+        else
+        {
+            // Use undeformed configuration face unit normals
+            shadowPatchFaceNormals =
+                patch().boundaryMesh()[shadowPatchIndex()].nf();
+        }
 
         // Calculate normal contact forces
         normalModel().correct

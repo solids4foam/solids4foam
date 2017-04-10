@@ -140,8 +140,11 @@ class solidContactFvPatchVectorField
 
     // Private Member Functions
 
-        //- Is a moving mesh (e.g. updated Lagrangian) approach be used
+        //- Is a moving mesh (e.g. updated Lagrangian) approach being used
         bool movingMesh() const;
+
+        //- Is a nonlinear geometry (i.e. finite strain) approach being used
+        bool nonLinearGeometry() const;
 
         //- Move the master and slave zones to the deformed configuration
         void moveZonesToDeformedConfiguration();
