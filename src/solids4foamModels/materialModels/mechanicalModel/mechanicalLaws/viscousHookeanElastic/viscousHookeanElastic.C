@@ -249,7 +249,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             lambda_ = nu_*EInf_/((1.0 + nu_)*(1.0 - 2.0*nu_));
         }
 
-        k_ = lambda_ + (2.0/3.0)*mu_;
+        k_ = lambda_ + (2.0/3.0)*gammaInf_*mu_;
     }
 }
 
@@ -298,7 +298,6 @@ Foam::tmp<Foam::volScalarField> Foam::viscousHookeanElastic::impK() const
     {
         scaleFactor +=
             gamma_[i]*Foam::exp(-mesh().time().deltaTValue()/(2.0*tau_[i]));
-
     }
 
     if (nu_.value() == 0.5 || mesh().foundObject<volScalarField>("p"))
