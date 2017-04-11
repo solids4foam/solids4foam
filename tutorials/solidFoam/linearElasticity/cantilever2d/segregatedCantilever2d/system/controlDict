@@ -11,47 +11,38 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "system";
-    object      fvSchemes;
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default     steadyState;
-}
+application     coupledSolidFoam;
 
-ddtSchemes
-{
-    default     steadyState;
-}
+startFrom       startTime;
 
-gradSchemes
-{
-     default                none;
-}
+startTime       0;
 
-divSchemes
-{
-    default                 none;
-    fvmDiv(sigma)           pointGaussLeastSquares;
-}
+stopAt          endTime;
 
-laplacianSchemes
-{
-    default                 none;
-    fvmBlockLaplacian(D)    pointGaussLeastSquares;
-}
+endTime         1;
 
-snGradSchemes
-{
-    default                 none;
-}
+deltaT          1;
 
-interpolationSchemes
-{
-    default                 none;
-    mu                      linear;
-    lambda                  linear;
-}
+writeControl    timeStep;
+
+writeInterval   1;
+
+cycleWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
 
 // ************************************************************************* //
