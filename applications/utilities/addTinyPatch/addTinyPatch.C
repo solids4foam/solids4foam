@@ -60,6 +60,9 @@ int main(int argc, char *argv[])
 #   include "createTime.H"
 #   include "createPolyMesh.H"
 
+    // Store points instance (i.e. where the mesh was read from)
+    const word pointsInstance = mesh.pointsInstance();
+
     // Read arguments
     const word currentPatchName(args.additionalArgs()[0]);
     const word newTinyPatchName(args.additionalArgs()[1]);
@@ -194,7 +197,7 @@ int main(int argc, char *argv[])
 
     // Write the mesh
     Info<< "Overwriting the mesh" << endl;
-    mesh.setInstance(mesh.pointsInstance());
+    mesh.setInstance(pointsInstance);
     mesh.write();
 
     Info<< nl << "End" << nl << endl;
