@@ -35,6 +35,10 @@ Description
     series) i.e. a spring in parallel with multiple Maxwell models, where a
     Maxwell model is a spring in series with a dashpot.
 
+    The relaxation times can be optionally scaled by the temperature field using
+    the Williams-Landel-Ferry (WLF) approximation and the parameters C1 and C2,
+    where the scaling factor is: a(T) = -C1*(T - T0)/(C2 + (T - T0));
+
     The material is specifed as, for example:
 
     @verbatim
@@ -42,10 +46,13 @@ Description
     {
         type            viscousHookeanElastic;
         rho             rho [1 -3 0 0 0 0 0] 7854;
-        EInfinity       E [1 -1 -2 0 0 0 0] 200e+9;
+        EInfinity       EInfinity [1 -1 -2 0 0 0 0] 200e+9;
         E               ( 100e+09 50e+09 10e+09 );
         relaxationTimes ( 100 10 1 );
         nu              nu [0 0 0 0 0 0 0] 0.3;
+        //WilliamsLandelFerry yes;
+        //C1            C1 [0 0 0 0 0 0 0] 17.44;
+        //C2            C2 [0 0 0 1 0 0 0] 51.6;
     }
     @endverbatim
 
@@ -121,6 +128,16 @@ class viscousHookeanElastic
 
         //- Deviatoric component of the "initial stress" surface field
         surfaceSymmTensorField sf_;
+
+        //- Enable WLF method to scale the relaxation times based on the
+        //  temperature field
+        const Switch WilliamsLandelFerryShift_;
+
+        //- First WLF parameter
+        const dimensionedScalar C1_;
+
+        //- Second WLF parameter
+        const dimensionedScalar C2_;
 
 
     // Private Member Functions

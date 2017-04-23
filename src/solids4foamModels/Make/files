@@ -58,6 +58,7 @@ $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
 $(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
 $(solidFvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
+$(solidFvPatchFields)/normalDisplacement/normalDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/oscillateDisplacement/oscillateDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/rigidCylinderContact/rigidCylinderContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
@@ -89,6 +90,7 @@ $(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C
 
 fluidFvPatchFields = fluidModels/fvPatchFields
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/transitionalParaboloidVelocity/transitionalParaboloidVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarField.C
 
 functionObjects/setInletVelocity/setInletVelocity.C
@@ -96,6 +98,8 @@ functionObjects/solidForces/solidForces.C
 functionObjects/solidForcesDisplacements/solidForcesDisplacements.C
 functionObjects/solidStresses/solidStresses.C
 functionObjects/solidDisplacements/solidDisplacements.C
+functionObjects/solidPointStress/solidPointStress.C
+functionObjects/solidPointTemperature/solidPointTemperature.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
 functionObjects/principalStresses/principalStresses.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
