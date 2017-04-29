@@ -139,6 +139,9 @@ class viscousHookeanElastic
         //- Second WLF parameter
         const dimensionedScalar C2_;
 
+        //- Reference temperature for WLF
+        const dimensionedScalar Tref_;
+
 
     // Private Member Functions
 

@@ -643,6 +643,13 @@ bool linGeomTotalDispSolid::evolve()
 
     Info<< "Solving the momentum equation for D" << endl;
 
+    // Stablisation viscosity
+    // const dimensionedScalar eta_ =
+    //    solidProperties().lookupOrDefault<dimensionedScalar>
+    //    (
+    //        "numericalViscosity", dimensionedScalar("eta", dimless/dimTime, 0.0)
+    //    );
+
     // Momentum equation loop
     do
     {
@@ -653,6 +660,7 @@ bool linGeomTotalDispSolid::evolve()
         fvVectorMatrix DEqn
         (
             rho_*fvm::d2dt2(D_)
+            //+ eta_*rho_*fvm::ddt(D_)
          == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
           - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
           + fvc::div(sigma_, "div(sigma)")

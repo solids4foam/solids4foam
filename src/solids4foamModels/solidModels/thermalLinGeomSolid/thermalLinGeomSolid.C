@@ -63,16 +63,14 @@ bool thermalLinGeomSolid::converged
     bool converged = false;
 
     // Calculate relative residuals
-
+    const scalar absResidualT =
+        gMax(mag(T_.internalField() - T_.oldTime().internalField()));
     const scalar residualT =
-        gMax
+        absResidualT
+       /max
         (
-            mag(T_.internalField() - T_.prevIter().internalField())
-           /max
-            (
-                gMax(mag(T_.internalField() - T_.oldTime().internalField())),
-                SMALL
-            )
+            gMax(mag(T_.internalField() - T_.oldTime().internalField())),
+            SMALL
         );
 
     const scalar residualD =
@@ -94,38 +92,41 @@ bool thermalLinGeomSolid::converged
     // force at leaast 1 outer iteration and the material law must be converged
     if (iCorr > 1 && materialResidual < materialTol_)
     {
+        bool convergedD = false;
+        bool convergedT = false;
+
         if
         (
-            solverPerfT.initialResidual() < solutionTol_
-         && residualT < solutionTol_
-         && solverPerfD.initialResidual() < solutionTol_
-         && residualD < solutionTol_
+            (
+                solverPerfD.initialResidual() < solutionTol_
+             && residualD < solutionTol_
+            )
+         || solverPerfD.initialResidual() < alternativeTol_
+         || residualD < alternativeTol_
         )
         {
-            Info<< "    Both residuals have converged" << endl;
-            converged = true;
+            convergedD = true;
         }
-        else if
+
+        if
         (
-            residualT < alternativeTol_
-         && residualD < alternativeTol_
+            (
+                solverPerfT.initialResidual() < solutionTol_
+             && residualT < solutionTol_
+            )
+         || solverPerfT.initialResidual() < alternativeTol_
+         || residualT < alternativeTol_
+         || absResidualT < absTTol_
         )
         {
-            Info<< "    The relative residual has converged" << endl;
-            converged = true;
+            convergedT = true;
         }
-        else if
-        (
-            solverPerfT.initialResidual() < alternativeTol_
-         && solverPerfD.initialResidual() < alternativeTol_
-        )
+
+
+        if (convergedD && convergedT)
         {
-            Info<< "    The solver residual has converged" << endl;
+            Info<< "    The residuals have converged" << endl;
             converged = true;
-        }
-        else
-        {
-            converged = false;
         }
     }
 
@@ -324,6 +325,14 @@ thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
     materialTol_
     (
         solidProperties().lookupOrDefault<scalar>("materialTolerance", 1e-05)
+    ),
+    absTTol_
+    (
+        solidProperties().lookupOrDefault<scalar>
+        (
+            "absoluteTemperatureTolerance",
+            1e-06
+        )
     ),
     infoFrequency_
     (

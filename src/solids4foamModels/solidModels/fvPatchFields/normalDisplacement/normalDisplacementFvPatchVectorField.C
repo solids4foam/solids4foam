@@ -208,17 +208,20 @@ normalDisplacementFvPatchVectorField::snGrad() const
             "grad(" + dimensionedInternalField().name() + ")"
         );
 
-    vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
+    // Unit normal vectors
+    const vectorField n = patch().nf();
 
-    //- correction vector
-    vectorField k = delta - n*(n&delta);
+    // Delta vectors
+    const vectorField delta = patch().delta();
+
+    // Correction vectors
+    const vectorField k = (I - sqr(n)) & delta;
 
     return
     (
         *this
         - (patchInternalField() + (k & gradField.patchInternalField()))
-    )*this->patch().deltaCoeffs();
+    )*patch().deltaCoeffs();
 }
 
 tmp<Field<vector> >
@@ -230,11 +233,14 @@ normalDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
             "grad(" + dimensionedInternalField().name() + ")"
         );
 
-    vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
+    // Unit normal vectors
+    const vectorField n = patch().nf();
 
-    //- correction vector
-    vectorField k = delta - n*(n&delta);
+    // Delta vectors
+    const vectorField delta = patch().delta();
+
+    // Correction vectors
+    const vectorField k = (I - sqr(n)) & delta;
 
     return
     (
@@ -242,6 +248,7 @@ normalDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
        *(*this - (k & gradField.patchInternalField()))
     );
 }
+
 
 void normalDisplacementFvPatchVectorField::write(Ostream& os) const
 {

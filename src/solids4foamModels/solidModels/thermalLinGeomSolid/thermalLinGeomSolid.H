@@ -132,6 +132,9 @@ class thermalLinGeomSolid
         //- Material law tolerance
         const scalar materialTol_;
 
+        //- Absolute temperature tolerance (in degrees)
+        const scalar absTTol_;
+
         //- Write frequency for residuals information
         const int infoFrequency_;
 

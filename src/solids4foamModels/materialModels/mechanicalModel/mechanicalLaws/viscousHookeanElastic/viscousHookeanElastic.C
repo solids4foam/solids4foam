@@ -94,17 +94,24 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     ),
     C1_
     (
-        dict.lookupOrDefault<dimensionedScalar>
-        (
-            "C1", dimensionedScalar("C1", dimless, 0.0)
-        )
+        WilliamsLandelFerryShift_
+      ? dimensionedScalar(dict.subDict("WilliamsLandelFerryCoeffs").lookup("C1"))
+      : dimensionedScalar("C1", dimless, 0.0)
     ),
     C2_
     (
-        dict.lookupOrDefault<dimensionedScalar>
+        WilliamsLandelFerryShift_
+      ? dimensionedScalar(dict.subDict("WilliamsLandelFerryCoeffs").lookup("C2"))
+      : dimensionedScalar("C2", dimTemperature, 0.0)
+    ),
+    Tref_
+    (
+        WilliamsLandelFerryShift_
+      ? dimensionedScalar
         (
-            "C2", dimensionedScalar("C2", dimTemperature, 0.0)
+            dict.subDict("WilliamsLandelFerryCoeffs").lookup("Tref")
         )
+      : dimensionedScalar("Tref", dimTemperature, 0.0)
     )
 {
     // Check E_ and tau_ are the same length
@@ -423,49 +430,38 @@ void Foam::viscousHookeanElastic::correct(volSymmTensorField& sigma)
 
     const scalar deltaT = mesh().time().deltaTValue();
 
+    forAll(h_, MaxwellModelI)
     {
-        forAll(h_, MaxwellModelI)
+        volSymmTensorField& hI = h_[MaxwellModelI];
+        const scalar tauI = tau_[MaxwellModelI];
+
+        hI.storePrevIter();
+
+        if (WilliamsLandelFerryShift_)
         {
-            volSymmTensorField& hI = h_[MaxwellModelI];
-            const scalar tauI = tau_[MaxwellModelI];
+            // Here we shift the relaxation time based on the temperature
+            // field using the Williams-Landel-Ferry (WLF) approximation
 
-            hI.storePrevIter();
+            // Lookup the current temperature from the solver
+            const volScalarField& T = mesh().lookupObject<volScalarField>("T");
 
-            if
-            (
-                WilliamsLandelFerryShift_
-             && mesh().foundObject<volScalarField>("T")
-            )
-            {
-                // Here we shift the relaxation time based on the temperature
-                // field using the Williams-Landel-Ferry (WLF) approximation
+            // Calculate the WLF shift function
+            const volScalarField aT =
+                pow(10, -C1_*(T - Tref_)/(C2_ + (T - Tref_)));
 
-                // Current temperature
-                const volScalarField& T =
-                    mesh().lookupObject<volScalarField>("T");
-
-                // Reference temperature
-                const volScalarField& T0 =
-                    mesh().lookupObject<volScalarField>("T0");
-
-                // WLF shift function
-                const volScalarField aT =
-                    Foam::exp(-C1_*(T - T0)/(C2_ + (T - T0)));
-
-                // Eqn 10.3.12 in Simo and Hughes 1998, where we shift the
-                // relaxation time based on the temperature field using the
-                // Williams-Landel-Ferry approximation
-                hI =
-                    Foam::exp(-deltaT/(aT*tauI))*hI.oldTime()
-                  + Foam::exp(-deltaT/(aT*2.0*tauI))*(s_ - s_.oldTime());
-            }
-            else
-            {
-                // Eqn 10.3.12 in Simo and Hughes 1998
-                hI =
-                    Foam::exp(-deltaT/tauI)*hI.oldTime()
-                  + Foam::exp(-deltaT/(2.0*tauI))*(s_ - s_.oldTime());
-            }
+            // Eqn 10.3.12 in Simo and Hughes 1998, where we shift the
+            // relaxation time based on the temperature field using the
+            // Williams-Landel-Ferry approximation
+            hI =
+                Foam::exp(-deltaT/(aT*tauI))*hI.oldTime()
+              + Foam::exp(-deltaT/(2.0*aT*tauI))*(s_ - s_.oldTime());
+        }
+        else
+        {
+            // Eqn 10.3.12 in Simo and Hughes 1998
+            hI =
+                Foam::exp(-deltaT/tauI)*hI.oldTime()
+              + Foam::exp(-deltaT/(2.0*tauI))*(s_ - s_.oldTime());
         }
     }
 
@@ -522,11 +518,38 @@ void Foam::viscousHookeanElastic::correct(surfaceSymmTensorField& sigma)
 
     forAll(hf_, MaxwellModelI)
     {
-        hf_[MaxwellModelI].storePrevIter();
+        surfaceSymmTensorField& hI = hf_[MaxwellModelI];
+        const scalar tauI = tau_[MaxwellModelI];
 
-        hf_[MaxwellModelI] =
-            Foam::exp(-deltaT/tau_[MaxwellModelI])*hf_[MaxwellModelI].oldTime()
-          + Foam::exp(-deltaT/(2.0*tau_[MaxwellModelI]))*(sf_ - sf_.oldTime());
+        hI.storePrevIter();
+
+        if (WilliamsLandelFerryShift_)
+        {
+            // Here we shift the relaxation time based on the temperature
+            // field using the Williams-Landel-Ferry (WLF) approximation
+
+            // Lookup the current temperature from the solver
+            const surfaceScalarField& T =
+                mesh().lookupObject<surfaceScalarField>("T");
+
+            // Calculate the WLF shift function
+            const surfaceScalarField aT =
+                pow(10, -C1_*(T - Tref_)/(C2_ + (T - Tref_)));
+
+            // Eqn 10.3.12 in Simo and Hughes 1998, where we shift the
+            // relaxation time based on the temperature field using the
+            // Williams-Landel-Ferry approximation
+            hI =
+                Foam::exp(-deltaT/(aT*tauI))*hI.oldTime()
+              + Foam::exp(-deltaT/(2.0*aT*tauI))*(sf_ - sf_.oldTime());
+        }
+        else
+        {
+            // Eqn 10.3.12 in Simo and Hughes 1998
+            hI =
+                Foam::exp(-deltaT/tauI)*hI.oldTime()
+              + Foam::exp(-deltaT/(2.0*tauI))*(sf_ - sf_.oldTime());
+        }
     }
 
     // Calculate the current total stress, where the volumetric term is
