@@ -95,13 +95,19 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     C1_
     (
         WilliamsLandelFerryShift_
-      ? dimensionedScalar(dict.subDict("WilliamsLandelFerryCoeffs").lookup("C1"))
+      ? dimensionedScalar
+        (
+            dict.subDict("WilliamsLandelFerryCoeffs").lookup("C1")
+        )
       : dimensionedScalar("C1", dimless, 0.0)
     ),
     C2_
     (
         WilliamsLandelFerryShift_
-      ? dimensionedScalar(dict.subDict("WilliamsLandelFerryCoeffs").lookup("C2"))
+      ? dimensionedScalar
+        (
+            dict.subDict("WilliamsLandelFerryCoeffs").lookup("C2")
+        )
       : dimensionedScalar("C2", dimTemperature, 0.0)
     ),
     Tref_
@@ -448,6 +454,9 @@ void Foam::viscousHookeanElastic::correct(volSymmTensorField& sigma)
             // Calculate the WLF shift function
             const volScalarField aT =
                 pow(10, -C1_*(T - Tref_)/(C2_ + (T - Tref_)));
+
+            //Info<< "min(aT): " << min(aT).value() << nl
+            //    << "max(aT): " << max(aT).value() << nl << endl;
 
             // Eqn 10.3.12 in Simo and Hughes 1998, where we shift the
             // relaxation time based on the temperature field using the
