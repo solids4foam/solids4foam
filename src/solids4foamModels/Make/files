@@ -99,6 +99,7 @@ functionObjects/solidForces/solidForces.C
 functionObjects/solidForcesDisplacements/solidForcesDisplacements.C
 functionObjects/solidStresses/solidStresses.C
 functionObjects/solidDisplacements/solidDisplacements.C
+functionObjects/solidPointDisplacement/solidPointDisplacement.C
 functionObjects/solidPointStress/solidPointStress.C
 functionObjects/solidPointTemperature/solidPointTemperature.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C

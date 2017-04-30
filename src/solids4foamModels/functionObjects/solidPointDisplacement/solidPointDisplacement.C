@@ -24,7 +24,7 @@ License
 
 \*----------------------------------------------------------------------------*/
 
-#include "solidPointTemperature.H"
+#include "solidPointDisplacement.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
@@ -33,12 +33,12 @@ License
 
 namespace Foam
 {
-    defineTypeNameAndDebug(solidPointTemperature, 0);
+    defineTypeNameAndDebug(solidPointDisplacement, 0);
 
     addToRunTimeSelectionTable
     (
         functionObject,
-        solidPointTemperature,
+        solidPointDisplacement,
         dictionary
     );
 }
@@ -46,7 +46,7 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-bool Foam::solidPointTemperature::writeData()
+bool Foam::solidPointDisplacement::writeData()
 {
     // Lookup the solid mesh
     const fvMesh* meshPtr = NULL;
@@ -60,49 +60,53 @@ bool Foam::solidPointTemperature::writeData()
     }
     const fvMesh& mesh = *meshPtr;
 
-    if (mesh.foundObject<volScalarField>("T"))
+    if (mesh.foundObject<volVectorField>("D"))
     {
-        // Read the temperature field
-        const volScalarField& T = mesh.lookupObject<volScalarField>("T");
+        // Read the displacement field
+        const volVectorField& D = mesh.lookupObject<volVectorField>("D");
 
         // Create a point mesh
         pointMesh pMesh(mesh);
 
-        // Create a point temperature field
-        pointScalarField pointT
+        // Create a point field
+        pointVectorField pointD
         (
             IOobject
             (
-                "pointT",
+                "volToPoint(D)",
                 mesh.time().timeName(),
                 mesh,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
             pMesh,
-            dimensionedScalar("zero", T.dimensions(), 0.0)
+            dimensionedVector("zero", D.dimensions(), vector::zero)
         );
 
-        interpPtr_->interpolate(T, pointT);
+        interpPtr_->interpolate(D, pointD);
 
-        scalar pointTValue = 0.0;
+        vector pointDValue = vector::zero;
         if (pointID_ > -1)
         {
-            pointTValue = pointT[pointID_];
+            pointDValue = pointD[pointID_];
         }
-        reduce(pointTValue, sumOp<scalar>());
+        reduce(pointDValue, sumOp<vector>());
 
         if (Pstream::master())
         {
             historyFilePtr_()
                 << time_.time().value()
-                << " " << pointTValue << endl;
+                << " " << pointDValue.x()
+                << " " << pointDValue.y()
+                << " " << pointDValue.z()
+                << " " << mag(pointDValue)
+                << endl;
         }
     }
     else
     {
         InfoIn(this->name() + " function object constructor")
-            << "volScalarField T not found" << endl;
+            << "volVectorField D not found" << endl;
     }
 
     return true;
@@ -110,7 +114,7 @@ bool Foam::solidPointTemperature::writeData()
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::solidPointTemperature::solidPointTemperature
+Foam::solidPointDisplacement::solidPointDisplacement
 (
     const word& name,
     const Time& t,
@@ -214,7 +218,7 @@ Foam::solidPointTemperature::solidPointTemperature
             (
                 new OFstream
                 (
-                    historyDir/"solidPointTemperature_" + name + ".dat"
+                    historyDir/"solidPointDisplacement_" + name + ".dat"
                 )
             );
 
@@ -222,7 +226,7 @@ Foam::solidPointTemperature::solidPointTemperature
             if (historyFilePtr_.valid())
             {
                 historyFilePtr_()
-                    << "# Time value" << endl;
+                    << "# Time Dx Dy Dz magD" << endl;
             }
         }
     }
@@ -231,19 +235,19 @@ Foam::solidPointTemperature::solidPointTemperature
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-bool Foam::solidPointTemperature::start()
+bool Foam::solidPointDisplacement::start()
 {
     return writeData();
 }
 
 
-bool Foam::solidPointTemperature::execute()
+bool Foam::solidPointDisplacement::execute()
 {
     return writeData();
 }
 
 
-bool Foam::solidPointTemperature::read(const dictionary& dict)
+bool Foam::solidPointDisplacement::read(const dictionary& dict)
 {
     return true;
 }
