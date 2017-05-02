@@ -91,7 +91,7 @@ $(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C
 
 fluidFvPatchFields = fluidModels/fvPatchFields
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
-$(fluidFvPatchFields)/transitionalParaboloidVelocity/transitionalParaboloidVelocityFvPatchVectorField.C
+/*$(fluidFvPatchFields)/transitionalParaboloidVelocity/transitionalParaboloidVelocityFvPatchVectorField.C*/
 $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarField.C
 
 functionObjects/setInletVelocity/setInletVelocity.C
