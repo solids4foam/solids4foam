@@ -132,7 +132,7 @@ class solidContactFvPatchVectorField
 
         //- Region where the contact is expected to be. This aims to save
         // time in the GGI distance calculations
-        const boundBox regionOfInterest_;
+        //const boundBox regionOfInterest_;
 
         //- Current time index
         label curTimeIndex_;

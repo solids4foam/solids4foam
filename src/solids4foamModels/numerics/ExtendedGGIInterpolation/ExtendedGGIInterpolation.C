@@ -438,8 +438,8 @@ ExtendedGGIInterpolation<MasterPatch, SlavePatch>::ExtendedGGIInterpolation
     const scalar slaveNonOverlapFaceTol,
     const bool rescaleGGIWeightingFactors,
     //const GGIInterpolationName::quickReject reject,
-    const newGGIInterpolationName::quickReject reject,
-    const boundBox& regionOfInterest
+    const newGGIInterpolationName::quickReject reject //,
+    //const boundBox& regionOfInterest
 )
 :
     //GGIInterpolation<MasterPatch, SlavePatch>
@@ -453,8 +453,8 @@ ExtendedGGIInterpolation<MasterPatch, SlavePatch>::ExtendedGGIInterpolation
         masterNonOverlapFaceTol,
         slaveNonOverlapFaceTol,
         rescaleGGIWeightingFactors,
-        reject,
-        regionOfInterest
+        reject //,
+        //regionOfInterest
     ),
     masterPointAddressingPtr_(NULL),
     masterPointWeightsPtr_(NULL),

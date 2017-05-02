@@ -128,9 +128,9 @@ class ExtendedGGIInterpolation
             // const GGIInterpolationName::quickReject reject =
             //     GGIInterpolationName::AABB,
             const newGGIInterpolationName::quickReject reject =
-                newGGIInterpolationName::AABB,
-            const boundBox& regionOfInterest =
-                boundBox(vector::min, vector::max)
+                newGGIInterpolationName::AABB //,
+            // const boundBox& regionOfInterest =
+            //     boundBox(vector::min, vector::max)
         );
 
 

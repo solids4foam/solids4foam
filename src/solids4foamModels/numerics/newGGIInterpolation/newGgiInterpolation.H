@@ -1,7 +1,7 @@
 /*---------------------------------------------------------------------------*\
   =========                 |
   \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
+   \\    /   O peration     | Version:     4.0
     \\  /    A nd           | Web:         http://www.foam-extend.org
      \\/     M anipulation  | For copyright notice see file Copyright
 -------------------------------------------------------------------------------
@@ -23,9 +23,6 @@ License
 
 Class
     newGgiInterpolation
-
-    PhilipC: GGIInterpolation class where we have modified the quick reject
-    algorithms
 
 Author
     Hrvoje Jasak, Wikki Ltd.  All rights reserved
@@ -59,6 +56,12 @@ namespace Foam
         PrimitivePatch<face, List, const pointField&>,
         PrimitivePatch<face, List, const pointField&>
     >   newGgiZoneInterpolation;
+
+    typedef newGGIInterpolation
+    <
+        PrimitivePatch<face, List, pointField>,
+        PrimitivePatch<face, List, pointField>
+    >   newGgiStandAlonePatchInterpolation;
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

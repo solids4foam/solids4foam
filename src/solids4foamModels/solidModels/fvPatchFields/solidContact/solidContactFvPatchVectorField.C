@@ -633,8 +633,8 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZone() const
                 0,              // Master non-overlapping face tolerances
                 0,              // Slave non-overlapping face tolerances
                 true,           // Rescale weighting factors
-                quickReject_,
-                regionOfInterest_
+                quickReject_ //,
+                //regionOfInterest_
             );
 
         //Info<< "Region of interest: " << regionOfInterest_ << endl;
@@ -770,7 +770,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowZonePtr_(NULL),
     zoneToZonePtr_(NULL),
     quickReject_(Foam::extendedGgiInterpolation::AABB),
-    regionOfInterest_(vector::min, vector::max),
+    //regionOfInterest_(vector::min, vector::max),
     curTimeIndex_(-1)
 {}
 
@@ -798,7 +798,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowZonePtr_(NULL),
     zoneToZonePtr_(NULL),
     quickReject_(ptf.quickReject_),
-    regionOfInterest_(ptf.regionOfInterest_),
+    //regionOfInterest_(ptf.regionOfInterest_),
     curTimeIndex_(ptf.curTimeIndex_)
 {
     // Copy pointer objects
@@ -865,14 +865,14 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
             dict.lookupOrDefault<word>("quickReject", "AABB")
         ]
     ),
-    regionOfInterest_
-    (
-        dict.lookupOrDefault<boundBox>
-        (
-            "regionOfInterest",
-            boundBox(vector::min, vector::max)
-        )
-    ),
+    // regionOfInterest_
+    // (
+    //     dict.lookupOrDefault<boundBox>
+    //     (
+    //         "regionOfInterest",
+    //         boundBox(vector::min, vector::max)
+    //     )
+    // ),
     curTimeIndex_(-1)
 {
     Info<< "Creating " << solidContactFvPatchVectorField::typeName << " patch"
@@ -945,7 +945,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowZonePtr_(ptf.shadowZonePtr_),
     zoneToZonePtr_(ptf.zoneToZonePtr_),
     quickReject_(ptf.quickReject_),
-    regionOfInterest_(ptf.regionOfInterest_),
+    //regionOfInterest_(ptf.regionOfInterest_),
     curTimeIndex_(ptf.curTimeIndex_)
 {
     // Copy pointer objects
@@ -1006,7 +1006,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowZonePtr_(NULL),
     zoneToZonePtr_(NULL),
     quickReject_(ptf.quickReject_),
-    regionOfInterest_(ptf.regionOfInterest_),
+    //regionOfInterest_(ptf.regionOfInterest_),
     curTimeIndex_(ptf.curTimeIndex_)
 {
     // Copy pointer objects
@@ -1378,8 +1378,8 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
     os.writeKeyword("shadowPatch")
         << patch().boundaryMesh().mesh().boundary()[shadowPatchIndex()].name()
         << token::END_STATEMENT << nl;
-    os.writeKeyword("regionOfInterest")
-        << regionOfInterest_ << token::END_STATEMENT << nl;
+    // os.writeKeyword("regionOfInterest")
+    //     << regionOfInterest_ << token::END_STATEMENT << nl;
     os.writeKeyword("writeZoneVTK")
         << writeZoneVTK_ << token::END_STATEMENT << nl;
 
