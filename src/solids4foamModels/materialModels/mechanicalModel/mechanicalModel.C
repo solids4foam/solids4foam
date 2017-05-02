@@ -2156,6 +2156,8 @@ Foam::mechanicalModel::mechanicalModel
 {
     Info<< "Creating the mechanicalModel" << endl;
 
+    Info<< "    To-do: move planeStress switch to law" << endl;
+
     // Read the mechanical laws
     const PtrList<entry> lawEntries(lookup("mechanical"));
 

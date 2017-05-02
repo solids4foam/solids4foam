@@ -76,6 +76,7 @@ class mechanicalModel
         const fvMesh& mesh_;
 
         //- Is the current case plane stress or plain strain/3-D
+        //  Todo: this should be moved to actual mechanical law
         const Switch planeStress_;
 
         //- Name of the cellZone for each material

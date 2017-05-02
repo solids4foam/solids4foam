@@ -89,6 +89,9 @@ class linearElasticMisesPlastic
         //  where p is the hydrostatic pressure
         volScalarField sigmaHyd_;
 
+        //- Hydrostatic stress surface field
+        surfaceScalarField sigmaHydf_;
+
         //- Yield stress
         volScalarField sigmaY_;
 
