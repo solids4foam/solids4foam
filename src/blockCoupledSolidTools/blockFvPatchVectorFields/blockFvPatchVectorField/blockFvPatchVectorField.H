@@ -69,6 +69,11 @@ public:
         //- Null Constructor
         blockFvPatchVectorField();
 
+    // Destructors
+
+        virtual ~blockFvPatchVectorField()
+        {}
+
 
     // Member functions
 

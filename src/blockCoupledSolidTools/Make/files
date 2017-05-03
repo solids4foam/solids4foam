@@ -16,6 +16,7 @@ BlockLduSolvers/BlockEigenBiCGStab/BlockEigenBiCGStabSolver.C
 BlockLduSolvers/BlockEigenFoamBiCGStab/BlockEigenFoamBiCGStabSolver.C
 BlockLduSolvers/BlockEigenGMRes/BlockEigenGMResSolver.C
 BlockLduSolvers/BlockEigenILUTPrecon/BlockEigenILUTPrecon.C
+/*BlockLduSolvers/BlockMUMPS/BlockMUMPS.C*/
 
 solidPolyMesh/solidPolyBoundaryMesh.C
 solidPolyMesh/solidPolyMeshLduAddressing.C
