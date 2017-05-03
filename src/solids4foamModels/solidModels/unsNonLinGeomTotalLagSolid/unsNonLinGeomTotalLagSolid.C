@@ -790,9 +790,15 @@ bool unsNonLinGeomTotalLagSolid::evolve()
             curConvergenceTolerance = solutionTol_;
         }
 
-        if (lduMatrix::debug)
+        if
+        (
+            lduMatrix::debug
+         || (iCorr % infoFrequency_) == 0
+         || res < curConvergenceTolerance
+         || maxIterReached_ == nCorr_
+        )
         {
-            Info<< "Relative residual = " << res << endl;
+            Info<< "Corr " << iCorr << ", relative residual = " << res << endl;
         }
 
         if (maxIterReached_ == nCorr_)
