@@ -110,7 +110,7 @@ void Foam::fluidSolidInterface::calcCurrentSolidZonePatch() const
 
 void Foam::fluidSolidInterface::calcGgiInterpolator() const
 {
-    // Create extended ggi interpolation
+    // Create ggi interpolation
     if (ggiInterpolatorPtr_)
     {
         FatalErrorIn
@@ -128,12 +128,13 @@ void Foam::fluidSolidInterface::calcGgiInterpolator() const
 
     //currentSolidZonePatch().movePoints(currentSolidZonePoints());
 
-    Info<< "Create extended GGI zone-to-zone interpolator" << endl;
+    Info<< "Create GGI zone-to-zone interpolator" << endl;
 
     currentSolidZonePatch(),
 
     ggiInterpolatorPtr_ =
-        new extendedGgiZoneInterpolation
+        //new extendedGgiZoneInterpolation
+        new newGgiZoneInterpolation
         (
             fluidMesh().faceZones()[fluidZoneIndex_](),
             currentSolidZonePatch(),
@@ -618,7 +619,8 @@ Foam::fluidSolidInterface::currentSolidZonePatch() const
 }
 
 
-const Foam::extendedGgiZoneInterpolation&
+//const Foam::extendedGgiZoneInterpolation&
+const Foam::newGgiZoneInterpolation&
 Foam::fluidSolidInterface::ggiInterpolator() const
 {
     if (!ggiInterpolatorPtr_)
@@ -937,15 +939,14 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 accumulatedFluidInterfaceDisplacement()
                /fluid().runTime().deltaT().value();
 
-            InfoIn("moveFluidMesh")
-                << "motionUFluidPatch: "
+            Info<< "moveFluidMesh: max(mag(motionUFluidPatch) is "
                 << max(mag(motionUFluidPatch)) << endl;
         }
         else
         {
             FatalErrorIn("fluidSolidInterface::moveFluidMesh()")
                 << "Problem with fluid mesh motion solver selection"
-                    << abort(FatalError);
+                << abort(FatalError);
         }
 
         fluidMesh_.update();

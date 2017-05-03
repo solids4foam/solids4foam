@@ -766,11 +766,10 @@ calcMasterPointAddressing() const
     {
         FatalErrorIn
         (
-            "void ExtendednewGGIInterpolation::"
+            "void newGGIInterpolation::"
             "calcMasterPointAddressing() const"
-        )
-            << "Master points addressing already exists"
-                << abort(FatalError);
+        )   << "Master points addressing already exists"
+            << abort(FatalError);
     }
 
     masterPointAddressingPtr_ =
@@ -878,7 +877,7 @@ calcMasterPointAddressing() const
         masterPointDist[pointI] = distance;
     }
 
-    Info << "Extended GGI, master point distance, max: "
+    Info<< "GGI, master point distance, max: "
         << max(masterPointDist)
         << ", avg: " << average(masterPointDist)
         << ", min: " << min(masterPointDist) << endl;
@@ -914,17 +913,10 @@ calcMasterPointAddressing() const
         }
     }
 
-    // if (nIncorrectPoints > 0)
-    // {
-    //     WarningIn
-    //     (
-    //         "template<class FromPatch, class ToPatch>\n"
-    //         "void newGGIInterpolation<FromPatch, ToPatch>::"
-    //         "calcMasterPointAddressing() const"
-    //     )   << "Ignoring " << nIncorrectPoints << " points on master zone "
-    //         << "that are incorrectly found to be in contact!"
-    //         << endl;
-    // }
+    Info<< "GGI, master point orientation (<0), max: "
+        << max(orientation)
+        << ", min: " << min(orientation) << ", nIncorrectPoints: "
+        << nIncorrectPoints << "/" << masterPointAddr.size() << endl;
 }
 
 
@@ -937,11 +929,10 @@ calcMasterPointWeights() const
     {
         FatalErrorIn
         (
-            "void ExtendednewGGIInterpolation::"
+            "void newGGIInterpolation::"
             "calcMasterPointAddressing() const"
-        )
-            << "Master point weights already exist"
-                << abort(FatalError);
+        )   << "Master point weights already exist"
+            << abort(FatalError);
     }
 
     masterPointWeightsPtr_ =
@@ -1004,11 +995,10 @@ void newGGIInterpolation<FromPatch, ToPatch>::calcSlavePointAddressing() const
     {
         FatalErrorIn
         (
-            "void ExtendednewGGIInterpolation::"
+            "void newGGIInterpolation::"
             "calcSlavePointAddressing() const"
-        )
-            << "Slave points addressing already exists"
-                << abort(FatalError);
+        )   << "Slave points addressing already exists"
+            << abort(FatalError);
     }
 
     slavePointAddressingPtr_ =
@@ -1112,19 +1102,14 @@ void newGGIInterpolation<FromPatch, ToPatch>::calcSlavePointAddressing() const
             }
         }
 
-//         Info << "MinEta " << MinEta << endl;
-
         slavePointAddr[pointI] = faceTriangle;
         slavePointDist[pointI] = distance;
-
-//         Info << "slave " << pointI << ", "
-//             << slavePointAddr[pointI] << endl;
     }
 
-//     Info << "Extended GGI, slave point distance, max: "
-//         << max(slavePointDist)
-//         << ", avg: " << average(slavePointDist)
-//         << ", min: " << min(slavePointDist) << endl;
+    Info<< "GGI, slave point distance, max: "
+        << max(slavePointDist)
+        << ", avg: " << average(slavePointDist)
+        << ", min: " << min(slavePointDist) << endl;
 
     // Check orientation
 
@@ -1159,17 +1144,10 @@ void newGGIInterpolation<FromPatch, ToPatch>::calcSlavePointAddressing() const
         }
     }
 
-    // if (nIncorrectPoints > 0)
-    // {
-    //     WarningIn
-    //     (
-    //         "template<class FromPatch, class ToPatch>\n"
-    //         "void newGGIInterpolation<FromPatch, ToPatch>::"
-    //         "calcSlavePointAddressing() const"
-    //     )   << "Ignoring " << nIncorrectPoints << " points on slave zone"
-    //         << " that are incorrectly found to be in contact!"
-    //         << endl;
-    // }
+    Info<< "GGI, slave point orientation (<0), max: "
+        << max(orientation)
+        << ", min: " << min(orientation) << ", nIncorrectPoints: "
+        << nIncorrectPoints << "/" << slavePointAddr.size() << endl;
 }
 
 template<class FromPatch, class ToPatch>
@@ -1181,11 +1159,10 @@ calcSlavePointWeights() const
     {
         FatalErrorIn
         (
-            "void ExtendednewGGIInterpolation::"
+            "void newGGIInterpolation::"
             "calcSlavePointAddressing() const"
-        )
-            << "Slave point weights already exist"
-                << abort(FatalError);
+        )   << "Slave point weights already exist"
+            << abort(FatalError);
     }
 
     slavePointWeightsPtr_ =
