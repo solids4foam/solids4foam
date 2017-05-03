@@ -50,6 +50,7 @@ $(mechanicalLaws)/thermoLinearElastic/thermoLinearElastic.C
 $(mechanicalLaws)/linearElasticFromFile/linearElasticFromFile.C
 $(mechanicalLaws)/linearElasticCt/linearElasticCt.C
 $(mechanicalLaws)/viscousHookeanElastic/viscousHookeanElastic.C
+$(mechanicalLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
 
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
