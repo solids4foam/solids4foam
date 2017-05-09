@@ -1,0 +1,12 @@
+decomposeMesh.C
+decomposeParFsi.C
+domainDecomposition.C
+distributeCells.C
+faMeshDecomposition.C
+fvFieldDecomposer.C
+faFieldDecomposer.C
+pointFieldDecomposer.C
+tetPointFieldDecomposer.C
+lagrangianFieldDecomposer.C
+
+EXE = $(FOAM_USER_APPBIN)/decomposeParFsi
