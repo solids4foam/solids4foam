@@ -1,0 +1,38 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    sides
+    {
+        type            fixedRotation;
+        rotationAngleSeries
+        {
+            fileName        "$FOAM_CASE/constant/timeVsAngle";
+            outOfBounds     clamp;
+        }
+        rotationAxis    ( 0 0 1 );
+        rotationOrigin  ( 0 0 0 );
+        value           uniform ( 0 0 0 );
+    }
+}
+
+// ************************************************************************* //

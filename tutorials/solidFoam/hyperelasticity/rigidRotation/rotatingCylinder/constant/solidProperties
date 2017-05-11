@@ -15,18 +15,18 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     nonLinearGeometryTotalLagrangian;
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-nonLinearGeometryTotalLagrangianCoeffs
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     // Maximum number of momentum correctors
     //nCorrectors             1000;
 
     // Solution tolerance for displacement
-    //solutionTolerance       1e-06;
+    solutionTolerance       1e-11;
 
     // Alternative solution tolerance for displacement
-    //alternativeTolerance    1e-07;
+    alternativeTolerance    1e-11;
 
     // Material law solution tolerance
     //materialTolerance       1e-05;

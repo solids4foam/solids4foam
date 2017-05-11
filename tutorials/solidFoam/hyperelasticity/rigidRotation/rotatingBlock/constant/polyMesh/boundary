@@ -9,31 +9,50 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    location    "constant";
-    object      solidProperties;
+    class       polyBoundaryMesh;
+    location    "constant/polyMesh";
+    object      boundary;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     nonLinearGeometryTotalLagrangian;
-
-nonLinearGeometryTotalLagrangianCoeffs
-{
-    // Maximum number of momentum correctors
-    //nCorrectors             1000;
-
-    // Solution tolerance for displacement
-    //solutionTolerance       1e-06;
-
-    // Alternative solution tolerance for displacement
-    //alternativeTolerance    1e-07;
-
-    // Material law solution tolerance
-    //materialTolerance       1e-05;
-
-    // Write frequency for the residuals
-    //infoFrequency           100;
-}
-
+6
+(
+    top
+    {
+        type            patch;
+        nFaces          10;
+        startFace       180;
+    }
+    left
+    {
+        type            patch;
+        nFaces          10;
+        startFace       190;
+    }
+    right
+    {
+        type            patch;
+        nFaces          10;
+        startFace       200;
+    }
+    bottom
+    {
+        type            patch;
+        nFaces          10;
+        startFace       210;
+    }
+    front
+    {
+        type            empty;
+        nFaces          100;
+        startFace       220;
+    }
+    back
+    {
+        type            empty;
+        nFaces          100;
+        startFace       320;
+    }
+)
 
 // ************************************************************************* //
