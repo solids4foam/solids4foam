@@ -148,6 +148,8 @@ $(cellRemovalLaws)/cellRemovalLaw/cellRemovalLaw.C
 $(cellRemovalLaws)/cellRemovalLaw/newCellRemovalLaw.C
 $(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 
+numerics/ddtSchemes/backwardDdtScheme.C
+numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/newLeastSquaresVolPointInterpolation/newLeastSquaresVolPointInterpolation.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newSkewCorrectedSnGrad/newSkewCorrectedSnGrads.C
