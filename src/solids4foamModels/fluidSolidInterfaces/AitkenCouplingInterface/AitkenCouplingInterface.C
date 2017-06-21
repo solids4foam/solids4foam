@@ -147,6 +147,8 @@ void AitkenCouplingInterface::updateDisplacement()
 
         if (aitkenRelaxationFactor_ > 1)
         {
+            // PC: in this case, would 1.0 be a better option?
+            // Of course, the current option is more more stable
             aitkenRelaxationFactor_ = relaxationFactor_;
         }
 
