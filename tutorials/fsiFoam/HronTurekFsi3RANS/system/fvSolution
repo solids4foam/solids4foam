@@ -20,7 +20,7 @@ solvers
     {
         solver          GAMG;
         tolerance       1e-06;
-        relTol          0.1;
+        relTol          0.01;
         minIter         1;
         maxIter         1000;
         smoother        GaussSeidel;
@@ -39,7 +39,7 @@ solvers
     {
         solver          GAMG;
         tolerance       1e-06;
-        relTol          0;
+        relTol          0.01;
         minIter         1;
         maxIter         1000;
         smoother        GaussSeidel;
@@ -87,11 +87,20 @@ solvers
         solver           PBiCG;
         preconditioner   DILU;
 
-        minIter          0;
+        minIter          1;
         maxIter          500;
         tolerance        1e-05;
-        relTol           0.1;
+        relTol           0.01;
     };
 }
+
+relaxationFactors
+{
+    U 0.7;
+    p 0.4;
+    k 0.5;
+    epsilon 0.5;
+}
+
 
 // ************************************************************************* //

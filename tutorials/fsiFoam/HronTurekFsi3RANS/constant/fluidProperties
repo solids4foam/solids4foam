@@ -22,14 +22,13 @@ fluidModel    transientSimpleFluid;
 {
     nCorrectors 3;
     nNonOrthogonalCorrectors 1;
-    consistencyByJasak false;
 }
 
 transientSimpleFluidCoeffs
 {
-    nOuterCorrectors 3;
+    nOuterCorrectors 10;
     nNonOrthogonalCorrectors 1;
-    consistencyByJasak false;
+    convergence 1e-6;
 }
 
 // ************************************************************************* //

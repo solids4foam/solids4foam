@@ -1,15 +1,16 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
-|    \\/     M anipulation  |                                                 |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
     class       volScalarField;
+    location    "0";
     object      epsilon;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -22,32 +23,32 @@ boundaryField
 {
     plate
     {
-        type    zeroGradient;
+        type            zeroGradient;
     }
     outlet
     {
-        type    zeroGradient;
+        type            zeroGradient;
     }
     inlet
     {
-        type    fixedValue;
-        value   uniform 0.001;
+        type            fixedValue;
+        value           uniform 0.001;
     }
     cylinder
     {
-        type    zeroGradient;
+        type            zeroGradient;
     }
     bottom
     {
-        type    zeroGradient;
+        type            zeroGradient;
     }
     top
     {
-        type    zeroGradient;
+        type            zeroGradient;
     }
     frontAndBackPlanes
     {
-        type    empty;
+        type            empty;
     }
 }
 

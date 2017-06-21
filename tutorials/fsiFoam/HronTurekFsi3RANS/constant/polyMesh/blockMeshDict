@@ -164,7 +164,7 @@ edges
 
 patches
 (
-     patch plate
+     wall plate
      (
          (19 18 50 51)
          (20 19 51 52)
@@ -189,7 +189,7 @@ patches
 	 (5 37 32 0)
      )
 
-     patch cylinder
+     wall cylinder
      (
          (16 48 49 17)
 	 (17 49 50 18)
@@ -198,7 +198,7 @@ patches
 	 (12 44 43 11)
      )
 
-     patch bottom
+     wall bottom
      (
          (1 0 32 33)
          (2 1 33 34)
@@ -207,7 +207,7 @@ patches
          (4 64 70 36)
      )
 
-     patch top
+     wall top
      (
          (27 28 60 59)
 	 (28 29 61 60)

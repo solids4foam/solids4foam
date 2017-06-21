@@ -53,6 +53,7 @@ AitkenCouplingInterface::AitkenCouplingInterface
 )
 :
     fluidSolidInterface(typeName, fluidMesh, solidMesh),
+    predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
     relaxationFactor_
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
@@ -71,6 +72,16 @@ void AitkenCouplingInterface::evolve()
 
     scalar residualNorm = 0;
 
+    if (predictSolid_)
+    {
+        updateForce();
+
+        solid().evolve();
+
+        residualNorm = 
+            updateResidual();
+    }
+    
     do
     {
         outerCorr()++;

@@ -42,7 +42,7 @@ IQNILSCoeffs
     coupled              no;
 
     // Enable coupling at specified time
-    couplingStartTime    2.0;
+    couplingStartTime    0.5;
 }
 
 // ************************************************************************* //
