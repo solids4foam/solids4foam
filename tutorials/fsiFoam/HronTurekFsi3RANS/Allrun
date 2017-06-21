@@ -11,13 +11,7 @@ runApplication blockMesh
 runApplication setSet -batch setBatch
 runApplication setsToZones -noFlipMap
 
-# Run serial
 runApplication fsiFoam
-
-# Run parallel
-#runApplication decomposeParFsi
-#runApplication -l log.decomposeParFsi.solid decomposeParFsi -region solid
-#runParallel fsiFoam
 
 # ----------------------------------------------------------------- end-of-file
 

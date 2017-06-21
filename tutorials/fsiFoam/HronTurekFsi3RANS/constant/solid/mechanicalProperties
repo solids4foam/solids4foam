@@ -10,49 +10,21 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      mechanicalProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            backward;
-}
+planeStress no;
 
-ddtSchemes
-{
-    default            backward;
-}
-
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
-
-divSchemes
-{
-    default            Gauss linear;
-}
-
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
-}
-
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          newSkewCorrected 1;
-    snGrad(DD)         newSkewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-    interpolate(sigma0) linear;
-}
+mechanical
+(
+    rubber
+    {
+        type    neoHookeanElastic;
+        rho     rho [1 -3 0 0 0 0 0] 1000;
+        E       E [1 -1 -2 0 0 0 0] 5.6e6;
+        nu      nu [0 0 0 0 0 0 0] 0.4;
+    }
+);
 
 // ************************************************************************* //

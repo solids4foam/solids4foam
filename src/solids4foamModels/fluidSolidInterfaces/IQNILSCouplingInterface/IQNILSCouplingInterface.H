@@ -71,6 +71,9 @@ class IQNILSCouplingInterface
         //- Coupling reuse
         label couplingReuse_;
 
+        //- Predict solid
+        const bool predictSolid_;
+  
         //- Coupling field V
         DynamicList<vectorField> fluidPatchPointsV_;
 

@@ -10,49 +10,39 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      fsiProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            backward;
-}
+fluidSolidInterface    IQNILS;
 
-ddtSchemes
+IQNILSCoeffs
 {
-    default            backward;
-}
+    solidPatch           plate;
+    solidZone            plateZone;
 
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
+    fluidPatch           plate;
+    fluidZone            plateZone;
 
-divSchemes
-{
-    default            Gauss linear;
-}
+    relaxationFactor     0.05;
 
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
-}
+    interfaceDeformationLimit 0;
 
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          newSkewCorrected 1;
-    snGrad(DD)         newSkewCorrected 1;
-}
+    // FSI loop tolerance
+    outerCorrTolerance   1e-6;
 
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-    interpolate(sigma0) linear;
+    // FSI loop maximum number of correctors
+    nOuterCorr           30;
+
+    //interpolatorUpdateFrequency 0;
+
+    //couplingReuse        0;
+
+    // Enable/disable coupling
+    coupled              no;
+
+    // Enable coupling at specified time
+    couplingStartTime    0.5;
 }
 
 // ************************************************************************* //

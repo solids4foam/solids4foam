@@ -35,7 +35,7 @@ fixedRelaxationCoeffs
 
     interpolatorUpdateFrequency 0;
 
-    couplingReuse 0;
+    // couplingReuse 0;
 
     coupled yes;
 }
@@ -57,7 +57,7 @@ AitkenCoeffs
 
     interpolatorUpdateFrequency 0;
 
-    couplingReuse 0;
+    // couplingReuse 0;
 
     coupled yes;
 }

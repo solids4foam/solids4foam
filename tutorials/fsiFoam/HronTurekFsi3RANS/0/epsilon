@@ -9,33 +9,47 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    location    "constant";
-    object      solidProperties;
+    class       volScalarField;
+    location    "0";
+    object      epsilon;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel nonLinearGeometryUpdatedLagrangian;
-//solidModel unsNonLinearGeometryUpdatedLagrangian;
-//solidModel nonLinearGeometryTotalLagrangian;
-solidModel unsNonLinearGeometryTotalLagrangian;
+dimensions      [0 2 -3 0 0 0 0];
 
-unsNonLinearGeometryTotalLagrangianCoeffs
+internalField   uniform 0;
+
+boundaryField
 {
-    // Maximum number of momentum correctors
-    nCorrectors             1000;
-
-    // Solution tolerance for displacement
-    solutionTolerance       1e-7;
-
-    // Relative solution tolerance for displacement in outer FSI iterations
-    relConvergenceTolerance 1e-3;
-
-    // Material law solution tolerance
-    //materialTolerance       1e-05;
-
-    // Write frequency for the residuals
-    infoFrequency           1000;
+    plate
+    {
+        type            zeroGradient;
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+    inlet
+    {
+        type            fixedValue;
+        value           uniform 0.001;
+    }
+    cylinder
+    {
+        type            zeroGradient;
+    }
+    bottom
+    {
+        type            zeroGradient;
+    }
+    top
+    {
+        type            zeroGradient;
+    }
+    frontAndBackPlanes
+    {
+        type            empty;
+    }
 }
 
 

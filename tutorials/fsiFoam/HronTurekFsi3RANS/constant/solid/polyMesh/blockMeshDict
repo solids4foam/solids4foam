@@ -10,49 +10,58 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      blockMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            backward;
-}
+convertToMeters 0.001;
 
-ddtSchemes
-{
-    default            backward;
-}
+vertices
+(
+   (248.9898 190 0)     //0=12
+   (600 190 0)          //1=14
+   (600 210 0)          //2=20
+   (248.9898 210 0)     //3=18
 
-gradSchemes
-{
-    default            extendedLeastSquares 0;
-}
+   (248.9898 190 15)     //4=44
+   (600 190 15)          //5=46
+   (600 210 15)          //6=52
+   (248.9898 210 15)     //7=50
+);
 
-divSchemes
-{
-    default            Gauss linear;
-}
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (105 6 1) simpleGrading (1 1 1)
+);
 
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
-}
+edges
+(
+);
 
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          newSkewCorrected 1;
-    snGrad(DD)         newSkewCorrected 1;
-}
+patches
+(
+     patch plateFix
+     (
+         (3 7 4 0)
+     )
 
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-    interpolate(sigma0) linear;
-}
+     patch plate
+     (
+      (3 2 6 7)
+      (6 2 1 5)
+      (1 0 4 5)
+     )
+
+     empty frontAndBackPlanes
+     (
+	 (0 1 2 3)
+	 (7 6 5 4)
+     )
+
+);
+
+mergePatchPairs
+(
+);
 
 // ************************************************************************* //

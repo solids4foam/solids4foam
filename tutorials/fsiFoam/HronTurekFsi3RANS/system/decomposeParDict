@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  1.5                                   |
+|   \\  /    A nd           | Web:      http://www.OpenFOAM.org               |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -10,23 +10,26 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fluidProperties;
+    object      decomposeParDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidModel icoFluid;
+numberOfSubdomains 2;
 
+method          simple;
 
-icoFluidCoeffs
+globalFaceZones ( plateZone );
+
+simpleCoeffs
 {
-    nCorrectors 3;
-    nNonOrthogonalCorrectors 1;
+    n               (2 1 1);
+    delta           0.001;
 }
 
-consistentIcoFluidCoeffs
-{
-    nCorrectors 3;
-    nNonOrthogonalCorrectors 1;
-}
+distributed     no;
+
+roots
+(
+);
 
 // ************************************************************************* //

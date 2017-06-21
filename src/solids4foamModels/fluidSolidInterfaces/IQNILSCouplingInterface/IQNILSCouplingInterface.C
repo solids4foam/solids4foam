@@ -67,6 +67,7 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
     ),
     couplingReuse_(fsiProperties().lookupOrDefault<int>("couplingReuse", 0)),
+    predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
     fluidPatchPointsV_(),
     fluidPatchPointsW_(),
     fluidPatchPointsT_()
@@ -81,6 +82,16 @@ void IQNILSCouplingInterface::evolve()
     updateInterpolator();
 
     scalar residualNorm = 0;
+
+    if (predictSolid_)
+    {
+        updateForce();
+
+        solid().evolve();
+
+        residualNorm = 
+            updateResidual();
+    }
 
     do
     {
