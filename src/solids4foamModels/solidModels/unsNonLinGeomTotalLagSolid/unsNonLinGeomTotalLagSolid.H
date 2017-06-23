@@ -268,6 +268,18 @@ public:
                 const label zoneID
             ) const;
 
+            //- Return nonLinear geometry switch
+            const Switch& nonLinear() const
+            {
+                return nonLinear_;
+            }
+
+            //- Return enforceLinear switch
+            const Switch& enforceLinear() const
+            {
+                return enforceLinear_;
+            }
+
         // Edit
 
             //- Set traction on the specified patch

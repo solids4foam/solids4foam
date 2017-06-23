@@ -26,6 +26,8 @@ License
 #include "StVenantKirchhoffElastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformGeometricField.H"
+// TESTING
+#include "unsNonLinGeomTotalLagSolid.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -235,6 +237,14 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 
 void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 {
+    // TESTING-------------------------------
+    const solidModels::unsNonLinGeomTotalLagSolid& solid =
+        mesh().lookupObject<solidModels::unsNonLinGeomTotalLagSolid>
+        (
+            "solidProperties"
+        );
+    // TESTING-------------------------------
+
     if (mesh().foundObject<volTensorField>("grad(DD)f"))
     {
         // Lookup gradient of displacement increment
@@ -243,6 +253,22 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 
         // Update the total deformation gradient
         Ff() = (I + gradDD.T()) & Ff().oldTime();
+
+        // TESTING-------------------------------
+        if (solid.enforceLinear())
+        {
+            WarningIn
+            (
+                "void Foam::StVenantKirchhoffElastic::"
+                "correct(surfaceSymmTensorField& sigma)"
+            )   << "Material linearity enforced for stability!" << endl;
+
+            // Calculate stress using Hooke's law
+            sigma =
+                sigma.oldTime() + 2.0*mu_*symm(gradDD) + lambda_*tr(gradDD)*I;
+            return;
+        }
+        // TESTING-------------------------------
     }
     else
     {
@@ -252,6 +278,21 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 
         // Update the total deformation gradient
         Ff() = I + gradD.T();
+
+        // TESTING-------------------------------
+        if (solid.enforceLinear())
+        {
+            WarningIn
+            (
+                "void Foam::StVenantKirchhoffElastic::"
+                "correct(surfaceSymmTensorField& sigma)"
+            )   << "Material linearity enforced for stability!" << endl;
+
+            // Calculate stress using Hooke's law
+            sigma = 2.0*mu_*symm(gradD) + lambda_*tr(gradD)*I;
+            return;
+        }
+        // TESTING-------------------------------
     }
 
     // Calculate the right Cauchy–Green deformation tensor

@@ -684,6 +684,9 @@ bool unsNonLinGeomTotalLagSolid::evolve()
     scalar curConvergenceTolerance = solutionTol_;
     lduMatrix::debug = 0;
 
+    // Reset enforceLinear switch
+    enforceLinear_ = false;
+
     do
     {
         if (lduMatrix::debug)
@@ -768,7 +771,8 @@ bool unsNonLinGeomTotalLagSolid::evolve()
 
             if ((minJf < 0.01) || (maxJf > 100))
             {
-                Info<< minJf << ", " << maxJf << endl;
+                Info<< "Enforcing linear geometry: "
+                    << "minJ: " << minJf << ", maxJ: " << maxJf << endl;
 
                 // Enable enforce linear to try improve convergence
                 enforceLinear_ = true;
@@ -865,30 +869,48 @@ tmp<vectorField> unsNonLinGeomTotalLagSolid::tractionBoundarySnGrad
     // Patch stress
     const symmTensorField& sigma = sigmaf_.boundaryField()[patchID];
 
-    // Patch total deformation gradient inverse
-    const tensorField& Finv = Finvf_.boundaryField()[patchID];
-
-    // Patch total Jacobian
-    const scalarField& J = Jf_.boundaryField()[patchID];
-
     // Patch unit normals (initial configuration)
     const vectorField n = patch.nf();
 
-    // Patch unit normals (deformed configuration)
-    const vectorField nCurrent = J*Finv.T() & n;
-
-    // Return patch snGrad
-    return tmp<vectorField>
-    (
-        new vectorField
+    if (enforceLinear_)
+    {
+        // Return patch snGrad
+        return tmp<vectorField>
         (
+            new vectorField
             (
-                (traction - n*pressure)
-              - (nCurrent & sigma)
-              + (n & (impK*gradD))
-            )*rImpK
-        )
-    );
+                (
+                    (traction - n*pressure)
+                  - (n & sigma)
+                  + (n & (impK*gradD))
+                )*rImpK
+            )
+        );
+    }
+    else
+    {
+        // Patch total deformation gradient inverse
+        const tensorField& Finv = Finvf_.boundaryField()[patchID];
+
+        // Patch total Jacobian
+        const scalarField& J = Jf_.boundaryField()[patchID];
+
+        // Patch unit normals (deformed configuration)
+        const vectorField nCurrent = J*Finv.T() & n;
+
+        // Return patch snGrad
+        return tmp<vectorField>
+        (
+            new vectorField
+            (
+                (
+                    (traction - nCurrent*pressure)
+                  - (nCurrent & sigma)
+                  + (n & (impK*gradD))
+                )*rImpK
+            )
+        );
+    }
 }
 
 
