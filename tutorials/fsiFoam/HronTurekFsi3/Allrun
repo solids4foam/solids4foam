@@ -13,5 +13,9 @@ runApplication setsToZones -noFlipMap
 
 runApplication fsiFoam
 
+#runApplication -l log.decomposeParFsi.fluid decomposeParFsi
+#runApplication -l log.decomposeParFsi.solid decomposeParFsi -region solid
+#runParallel fsiFoam 4
+
 # ----------------------------------------------------------------- end-of-file
 

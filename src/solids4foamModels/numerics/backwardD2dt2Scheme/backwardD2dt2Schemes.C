@@ -22,62 +22,21 @@ License
     along with OpenFOAM; if not, write to the Free Software Foundation,
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-Application
-    fsiFoam
-
 Description
-    Finite volume fluid solid interaction solver based on partitioned approach
-    and strong coupling, where the fluid, solid and interface models are run-
-    time selectable.
-
-Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
-    Philip Cardiff, UCD.  All rights reserved.
-
+    
 \*---------------------------------------------------------------------------*/
 
-#include "fvCFD.H"
-#include "dynamicFvMesh.H"
-#include "fluidSolidInterface.H"
+#include "backwardD2dt2Scheme.H"
+#include "fvMesh.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-int main(int argc, char *argv[])
+namespace Foam
 {
-#   include "setRootCase.H"
-#   include "createTime.H"
-#   include "createDynamicFvMesh.H"
-#   include "createSolidMesh.H"
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-    // Create fluid-solid interface coupling class
-    autoPtr<fluidSolidInterface> fsi =
-        fluidSolidInterface::New(mesh, solidMesh);
-
-    Info<< "\nStarting time loop\n" << endl;
-
-    for (runTime++; !runTime.end(); runTime++)
-    {
-        Info<< "Time = " << runTime.timeName() << nl << endl;
-
-        // Evolve the fluid-solid interface
-        fsi().evolve();
-
-        if (runTime.outputTime())
-        {
-            fsi().solid().writeFields(runTime);
-        }
-
-        Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
-            << "  ClockTime = " << runTime.elapsedClockTime() << " s"
-            << nl << endl;
-    }
-
-    Info<< "End\n" << endl;
-
-    return(0);
+namespace fv
+{
+    makeFvD2dt2Scheme(backwardD2dt2Scheme)
 }
-
+}
 
 // ************************************************************************* //

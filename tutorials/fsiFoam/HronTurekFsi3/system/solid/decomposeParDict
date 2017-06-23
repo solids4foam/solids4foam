@@ -18,7 +18,7 @@ numberOfSubdomains 4;
 
 method          simple;
 
-globalFaceZones ( plate-zone );
+globalFaceZones ( plateZone );
 
 simpleCoeffs
 {
