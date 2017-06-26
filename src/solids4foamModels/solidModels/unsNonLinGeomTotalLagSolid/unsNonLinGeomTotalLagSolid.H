@@ -154,9 +154,6 @@ class unsNonLinGeomTotalLagSolid
         //- Switch to enable/disable nonlinear geometry
         const Switch nonLinear_;
 
-        //- Switch to enable/disable enforce linear to help convergence
-        Switch enforceLinear_;
-
         //- Debug switch for the print-out of residuals
         const Switch debug_;
 
@@ -272,12 +269,6 @@ public:
             const Switch& nonLinear() const
             {
                 return nonLinear_;
-            }
-
-            //- Return enforceLinear switch
-            const Switch& enforceLinear() const
-            {
-                return enforceLinear_;
             }
 
         // Edit

@@ -25,6 +25,7 @@ License
 
 #include "neoHookeanElastic.H"
 #include "addToRunTimeSelectionTable.H"
+#include "solidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -192,6 +193,11 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 
 void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 {
+    // Check if the solidModel is enforcing linearity for convergence
+    // If it is then we will calculate the stress using Hooke's law
+    const Switch& enforceLinear =
+        mesh().lookupObject<solidModel>("solidProperties").enforceLinear();
+
     if (mesh().foundObject<volTensorField>("grad(DD)"))
     {
         // Lookup gradient of displacement increment
@@ -200,6 +206,22 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 
         // Update the total deformation gradient
         F() = (I + gradDD.T()) & F().oldTime();
+
+        if (enforceLinear)
+        {
+            WarningIn
+            (
+                "void Foam::neoHookeanElastic::"
+                "correct(volSymmTensorField& sigma)"
+            )   << "Material linearity enforced for stability!" << endl;
+
+            // Calculate stress using Hooke's law
+            sigma =
+                sigma.oldTime()
+              + 2.0*mu_*symm(gradDD) + (K_ - (2.0/3.0)*mu_)*tr(gradDD)*I;
+
+            return;
+        }
     }
     else
     {
@@ -209,6 +231,20 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 
         // Update the total deformation gradient
         F() = I + gradD.T();
+
+        if (enforceLinear)
+        {
+            WarningIn
+            (
+                "void Foam::neoHookeanElastic::"
+                "correct(volSymmTensorField& sigma)"
+            )   << "Material linearity enforced for stability!" << endl;
+
+            // Calculate stress using Hooke's law
+            sigma = 2.0*mu_*symm(gradD) + (K_ - (2.0/3.0)*mu_)*tr(gradD)*I;
+
+            return;
+        }
     }
 
     // Calculate the Jacobian of the deformation gradient
@@ -227,6 +263,11 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 
 void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 {
+    // Check if the solidModel is enforcing linearity for convergence
+    // If it is then we will calculate the stress using Hooke's law
+    const Switch& enforceLinear =
+        mesh().lookupObject<solidModel>("solidProperties").enforceLinear();
+
     if (mesh().foundObject<volTensorField>("grad(DD)f"))
     {
         // Lookup gradient of displacement increment
@@ -235,6 +276,22 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 
         // Update the total deformation gradient
         Ff() = (I + gradDD.T()) & Ff().oldTime();
+
+            if (enforceLinear)
+        {
+            WarningIn
+            (
+                "void Foam::neoHookeanElastic::"
+                "correct(surfaceSymmTensorField& sigma)"
+            )   << "Material linearity enforced for stability!" << endl;
+
+            // Calculate stress using Hooke's law
+            sigma =
+                sigma.oldTime()
+              + 2.0*mu_*symm(gradDD) + (K_ - (2.0/3.0)*mu_)*tr(gradDD)*I;
+
+            return;
+        }
     }
     else
     {
@@ -244,6 +301,20 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 
         // Update the total deformation gradient
         Ff() = I + gradD.T();
+
+        if (enforceLinear)
+        {
+            WarningIn
+            (
+                "void Foam::neoHookeanElastic::"
+                "correct(surfaceSymmTensorField& sigma)"
+            )   << "Material linearity enforced for stability!" << endl;
+
+            // Calculate stress using Hooke's law
+            sigma = 2.0*mu_*symm(gradD) + (K_ - (2.0/3.0)*mu_)*tr(gradD)*I;
+
+            return;
+        }
     }
 
     // Calculate the Jacobian of the deformation gradient

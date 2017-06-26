@@ -679,6 +679,7 @@ bool linGeomSolid::evolve()
         fvVectorMatrix DDEqn
         (
             rho_*fvm::d2dt2(DD_)
+          + rho_*fvc::d2dt2(D_.oldTime())
          == fvm::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           + fvc::div(sigma_, "div(sigma)")

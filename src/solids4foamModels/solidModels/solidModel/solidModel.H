@@ -78,6 +78,9 @@ class solidModel
         //- Global to local face zone point mapping
         mutable labelListList* globalToLocalFaceZonePointMapPtr_;
 
+        //- Switch to enable/disable enforce linear to help convergence
+        Switch enforceLinear_;
+
     // Private Member Functions
 
         //- Find global face zones
@@ -215,6 +218,18 @@ public:
 
             //- Get global to local face zone point addressing
             const labelListList& globalToLocalFaceZonePointMap() const;
+
+            //- Return enforceLinear switch
+            const Switch& enforceLinear() const
+            {
+                return enforceLinear_;
+            }
+
+            //- Return enforceLinear switch
+            Switch& enforceLinear()
+            {
+                return enforceLinear_;
+            }
 
         // Edit
 

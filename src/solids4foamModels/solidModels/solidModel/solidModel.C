@@ -436,7 +436,8 @@ Foam::solidModel::solidModel
     solidProperties_(subDict(type + "Coeffs")),
     mechanicalPtr_(NULL),
     globalFaceZonesPtr_(NULL),
-    globalToLocalFaceZonePointMapPtr_(NULL)
+    globalToLocalFaceZonePointMapPtr_(NULL),
+    enforceLinear_(false)
 {}
 
 

@@ -26,8 +26,7 @@ License
 #include "StVenantKirchhoffElastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformGeometricField.H"
-// TESTING
-#include "unsNonLinGeomTotalLagSolid.H"
+#include "solidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -198,6 +197,12 @@ Foam::tmp<Foam::volScalarField> Foam::StVenantKirchhoffElastic::impK() const
 
 void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 {
+    // Check if the solidModel is enforcing linearity for convergence
+    // If it is then we will calculate the stress using Hooke's law
+    const Switch& enforceLinear =
+        mesh().lookupObject<solidModel>("solidProperties").enforceLinear();
+
+    // Update deformation gradient F
     if (mesh().foundObject<volTensorField>("grad(DD)"))
     {
         // Lookup gradient of displacement increment
@@ -206,6 +211,21 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 
         // Update the total deformation gradient
         F() = (I + gradDD.T()) & F().oldTime();
+
+        if (enforceLinear)
+        {
+            WarningIn
+            (
+                "void Foam::StVenantKirchhoffElastic::"
+                "correct(volSymmTensorField& sigma)"
+            )   << "Material linearity enforced for stability!" << endl;
+
+            // Calculate stress using Hooke's law
+            sigma =
+                sigma.oldTime() + 2.0*mu_*symm(gradDD) + lambda_*tr(gradDD)*I;
+
+            return;
+        }
     }
     else
     {
@@ -215,6 +235,20 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 
         // Update the total deformation gradient
         F() = I + gradD.T();
+
+        if (enforceLinear)
+        {
+            WarningIn
+            (
+                "void Foam::StVenantKirchhoffElastic::"
+                "correct(volSymmTensorField& sigma)"
+            )   << "Material linearity enforced for stability!" << endl;
+
+            // Calculate stress using Hooke's law
+            sigma = 2.0*mu_*symm(gradD) + lambda_*tr(gradD)*I;
+
+            return;
+        }
     }
 
     // Calculate the right Cauchy–Green deformation tensor
@@ -237,14 +271,12 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 
 void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // TESTING-------------------------------
-    const solidModels::unsNonLinGeomTotalLagSolid& solid =
-        mesh().lookupObject<solidModels::unsNonLinGeomTotalLagSolid>
-        (
-            "solidProperties"
-        );
-    // TESTING-------------------------------
+    // Check if the solidModel is enforcing linearity for convergence
+    // If it is then we will calculate the stress using Hooke's law
+    const Switch& enforceLinear =
+        mesh().lookupObject<solidModel>("solidProperties").enforceLinear();
 
+    // Update deformation gradient F
     if (mesh().foundObject<volTensorField>("grad(DD)f"))
     {
         // Lookup gradient of displacement increment
@@ -254,8 +286,7 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
         // Update the total deformation gradient
         Ff() = (I + gradDD.T()) & Ff().oldTime();
 
-        // TESTING-------------------------------
-        if (solid.enforceLinear())
+        if (enforceLinear)
         {
             WarningIn
             (
@@ -266,9 +297,9 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
             // Calculate stress using Hooke's law
             sigma =
                 sigma.oldTime() + 2.0*mu_*symm(gradDD) + lambda_*tr(gradDD)*I;
+
             return;
         }
-        // TESTING-------------------------------
     }
     else
     {
@@ -279,8 +310,7 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
         // Update the total deformation gradient
         Ff() = I + gradD.T();
 
-        // TESTING-------------------------------
-        if (solid.enforceLinear())
+        if (enforceLinear)
         {
             WarningIn
             (
@@ -290,9 +320,9 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 
             // Calculate stress using Hooke's law
             sigma = 2.0*mu_*symm(gradD) + lambda_*tr(gradD)*I;
+
             return;
         }
-        // TESTING-------------------------------
     }
 
     // Calculate the right Cauchy–Green deformation tensor

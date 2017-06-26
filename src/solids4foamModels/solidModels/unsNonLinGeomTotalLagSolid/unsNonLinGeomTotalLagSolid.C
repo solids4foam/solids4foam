@@ -280,7 +280,6 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
         )
     ),
     nonLinear_(solidProperties().lookupOrDefault<Switch>("nonLinear", true)),
-    enforceLinear_(false),
     debug_(solidProperties().lookupOrDefault<Switch>("debug", false)),
     K_
     (
@@ -685,7 +684,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
     lduMatrix::debug = 0;
 
     // Reset enforceLinear switch
-    enforceLinear_ = false;
+    enforceLinear() = false;
 
     do
     {
@@ -717,7 +716,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         }
 
         // Enforce linear to improve convergence
-        if (enforceLinear_)
+        if (enforceLinear())
         {
             // Replace nonlinear terms with linear
             // Note: the mechanical law could still be nonlinear
@@ -756,7 +755,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         // Jacobian of the deformation gradient
         Jf_ = det(Ff_);
 
-        if (nonLinear_ && !enforceLinear_)
+        if (nonLinear_ && !enforceLinear())
         {
             //surfaceScalarField Det = det(I + gradDf_);
 
@@ -772,7 +771,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
                     << "minJ: " << minJf << ", maxJ: " << maxJf << endl;
 
                 // Enable enforce linear to try improve convergence
-                enforceLinear_ = true;
+                enforceLinear() = true;
             }
         }
 
@@ -834,11 +833,11 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         << ", No outer iterations = " << iCorr << nl
         << " Max relative residual = " << maxRes
         << ", Relative residual = " << res
-        << ", enforceLinear = " << enforceLinear_ << endl;
+        << ", enforceLinear = " << enforceLinear() << endl;
 
     lduMatrix::debug = 1;
 
-    if (nonLinear_ && enforceLinear_)
+    if (nonLinear_ && enforceLinear())
     {
         return false;
     }
@@ -872,7 +871,7 @@ tmp<vectorField> unsNonLinGeomTotalLagSolid::tractionBoundarySnGrad
     // Patch unit normals (initial configuration)
     const vectorField n = patch.nf();
 
-    if (enforceLinear_)
+    if (enforceLinear())
     {
         // Return patch snGrad
         return tmp<vectorField>
