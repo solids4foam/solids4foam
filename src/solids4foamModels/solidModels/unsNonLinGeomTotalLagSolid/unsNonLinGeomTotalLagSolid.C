@@ -756,9 +756,6 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         // Jacobian of the deformation gradient
         Jf_ = det(Ff_);
 
-        // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigmaf_);
-
         if (nonLinear_ && !enforceLinear_)
         {
             //surfaceScalarField Det = det(I + gradDf_);
@@ -778,6 +775,9 @@ bool unsNonLinGeomTotalLagSolid::evolve()
                 enforceLinear_ = true;
             }
         }
+
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigmaf_);
 
         // Calculate relative momentum residual
         res = residual();
