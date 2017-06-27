@@ -277,7 +277,7 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         // Update the total deformation gradient
         Ff() = (I + gradDD.T()) & Ff().oldTime();
 
-            if (enforceLinear)
+        if (enforceLinear)
         {
             WarningIn
             (
