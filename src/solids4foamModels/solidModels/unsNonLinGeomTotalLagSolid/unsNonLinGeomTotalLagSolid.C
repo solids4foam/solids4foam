@@ -755,24 +755,10 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         // Jacobian of the deformation gradient
         Jf_ = det(Ff_);
 
+        // Check if outer loops are diverging
         if (nonLinear_ && !enforceLinear())
         {
-            //surfaceScalarField Det = det(I + gradDf_);
-
-            scalar minJf = min(Jf_).value();
-            reduce(minJf, minOp<scalar>());
-
-            scalar maxJf = max(Jf_).value();
-            reduce(maxJf, maxOp<scalar>());
-
-            if ((minJf < 0.01) || (maxJf > 100))
-            {
-                Info<< "Enforcing linear geometry: "
-                    << "minJ: " << minJf << ", maxJ: " << maxJf << endl;
-
-                // Enable enforce linear to try improve convergence
-                enforceLinear() = true;
-            }
+            checkEnforceLinear(Jf_);
         }
 
         // Calculate the stress using run-time selectable mechanical law

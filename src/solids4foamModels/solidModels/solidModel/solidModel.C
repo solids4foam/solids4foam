@@ -538,6 +538,48 @@ void Foam::solidModel::setPressure
 }
 
 
+Foam::Switch& Foam::solidModel::checkEnforceLinear(const volScalarField& J)
+{
+    scalar minJ = min(J).value();
+    reduce(minJ, minOp<scalar>());
+
+    scalar maxJ = max(J).value();
+    reduce(maxJ, maxOp<scalar>());
+
+    if ((minJ < 0.01) || (maxJ > 100))
+    {
+        Info<< "Enforcing linear geometry: "
+            << "minJ: " << minJ << ", maxJ: " << maxJ << endl;
+
+        // Enable enforce linear to try improve convergence
+        enforceLinear() = true;
+    }
+
+    return enforceLinear();
+}
+
+
+Foam::Switch& Foam::solidModel::checkEnforceLinear(const surfaceScalarField& J)
+{
+    scalar minJ = min(J).value();
+    reduce(minJ, minOp<scalar>());
+
+    scalar maxJ = max(J).value();
+    reduce(maxJ, maxOp<scalar>());
+
+    if ((minJ < 0.01) || (maxJ > 100))
+    {
+        Info<< "Enforcing linear geometry: "
+            << "minJ: " << minJ << ", maxJ: " << maxJ << endl;
+
+        // Enable enforce linear to try improve convergence
+        enforceLinear() = true;
+    }
+
+    return enforceLinear();
+}
+
+
 void Foam::solidModel::writeFields(const Time& runTime)
 {
     runTime.write();
@@ -548,7 +590,6 @@ Foam::scalar Foam::solidModel::newDeltaT()
 {
     return mechanical().newDeltaT();
 }
-
 
 void Foam::solidModel::moveMesh
 (

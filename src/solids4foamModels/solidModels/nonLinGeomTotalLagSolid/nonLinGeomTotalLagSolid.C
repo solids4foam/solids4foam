@@ -708,6 +708,9 @@ bool nonLinGeomTotalLagSolid::evolve()
     Info<< "Solving the total Lagrangian form of the momentum equation for DD"
         << endl;
 
+    // Reset enforceLinear switch
+    enforceLinear() = false;
+
     // Momentum equation loop
     do
     {
@@ -725,6 +728,16 @@ bool nonLinGeomTotalLagSolid::evolve()
           + rho_*g_
           + mechanical().RhieChowCorrection(DD_, gradDD_)
         );
+
+        // Enforce linear to improve convergence
+        if (enforceLinear())
+        {
+            // Replace nonlinear terms with linear
+            // Note: the mechanical law could still be nonlinear
+            DDEqn +=
+                fvc::div(J_*Finv_ & sigma_, "div(sigma)")
+              - fvc::div(sigma_);
+        }
 
         // Under-relax the linear system
         DDEqn.relax(DDEqnRelaxFactor_);
@@ -752,6 +765,12 @@ bool nonLinGeomTotalLagSolid::evolve()
 
         // Jacobian of the deformation gradient
         J_ = det(F_);
+
+        // Check if outer loops are diverging
+        if (!enforceLinear())
+        {
+            checkEnforceLinear(J_);
+        }
 
         // Update the momentum equation inverse diagonal field
         // This may be used by the mechanical law when calculating the
@@ -803,28 +822,46 @@ tmp<vectorField> nonLinGeomTotalLagSolid::tractionBoundarySnGrad
     // Patch Cauchy stress
     const symmTensorField& sigma = sigma_.boundaryField()[patchID];
 
-    // Patch total deformation gradient inverse
-    const tensorField& Finv = Finv_.boundaryField()[patchID];
-
     // Patch unit normals (initial configuration)
     const vectorField n = patch.nf();
 
-    // Patch unit normals (deformed configuration)
-    vectorField nCurrent = Finv.T() & n;
-    nCurrent /= mag(nCurrent);
-
-    // Return patch snGrad
-    return tmp<vectorField>
-    (
-        new vectorField
+    if (enforceLinear())
+    {
+        // Return patch snGrad
+        return tmp<vectorField>
         (
+            new vectorField
             (
-                (traction - nCurrent*pressure)
-              - (nCurrent & sigma)
-              + impK*(n & gradDD)
-            )*rImpK
-        )
-    );
+                (
+                    (traction - n*pressure)
+                  - (n & sigma)
+                  + impK*(n & gradDD)
+                )*rImpK
+            )
+        );
+    }
+    else
+    {
+        // Patch total deformation gradient inverse
+        const tensorField& Finv = Finv_.boundaryField()[patchID];
+
+        // Patch unit normals (deformed configuration)
+        vectorField nCurrent = Finv.T() & n;
+        nCurrent /= mag(nCurrent);
+
+        // Return patch snGrad
+        return tmp<vectorField>
+        (
+            new vectorField
+            (
+                (
+                    (traction - nCurrent*pressure)
+                  - (nCurrent & sigma)
+                  + impK*(n & gradDD)
+                )*rImpK
+            )
+        );
+    }
 }
 
 

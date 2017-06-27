@@ -270,6 +270,12 @@ public:
                 const scalarField& faceZonePressure
             );
 
+            //- Check if solid model is diverging using the Jacobian field
+            virtual Switch& checkEnforceLinear(const volScalarField& J);
+
+            //- Check if solid model is diverging using the Jacobian field
+            virtual Switch& checkEnforceLinear(const surfaceScalarField& J);
+
             //- Evolve the solid model
             virtual bool evolve() = 0;
 
