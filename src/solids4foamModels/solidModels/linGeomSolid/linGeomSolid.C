@@ -33,6 +33,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fvcGradf.H"
 
+#include "linearElasticMisesPlastic.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -224,19 +225,19 @@ linGeomSolid::linGeomSolid(dynamicFvMesh& mesh)
         mesh,
         dimensionedTensor("0", dimless, tensor::zero)
     ),
-    epsilon_
-    (
-        IOobject
-        (
-            "epsilon",
-            runTime().timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("0", dimless, symmTensor::zero)
-    ),
+    // epsilon_
+    // (
+    //     IOobject
+    //     (
+    //         "epsilon",
+    //         runTime().timeName(),
+    //         mesh,
+    //         IOobject::NO_READ,
+    //         IOobject::NO_WRITE
+    //     ),
+    //     mesh,
+    //     dimensionedSymmTensor("0", dimless, symmTensor::zero)
+    // ),
     rho_(mechanical().rho()),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
@@ -669,6 +670,13 @@ bool linGeomSolid::evolve()
 
     Info<< "Solving the momentum equation for DD" << endl;
 
+    // Testing
+    // Lookup linearElasticMisesPlastic law:
+    // const PtrList<mechanicalLaw>& mechLaws = mechanical();
+    // const linearElasticMisesPlastic& mech =
+    //     refCast<const linearElasticMisesPlastic>(mechLaws[0]);
+    // volDiagTensorField impKdiagTensor = mech.impKdiagTensor();
+
     // Momentum equation loop
     do
     {
@@ -682,6 +690,8 @@ bool linGeomSolid::evolve()
           + rho_*fvc::d2dt2(D_.oldTime())
          == fvm::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
+         // == fvm::laplacian(impKdiagTensor, DD_, "laplacian(DDD,DD)")
+         //  - fvc::laplacian(impKdiagTensor, DD_, "laplacian(DDD,DD)")
           + fvc::div(sigma_, "div(sigma)")
           + rho_*g_
           + mechanical().RhieChowCorrection(DD_, gradDD_)
@@ -693,8 +703,8 @@ bool linGeomSolid::evolve()
         // Solve the linear system
         solverPerfDD = DDEqn.solve();
 
-        // Under-relax the field
-        DD_.relax();
+        // Fixed or adaptive field under-relaxation
+        relaxField(DD_, iCorr);
 
         // Update gradient of displacement
         mechanical().grad(DD_, gradDD_);
@@ -708,18 +718,29 @@ bool linGeomSolid::evolve()
         // Update impKf to improve convergence
         // Note: impK and rImpK are not updated as they are used for traction
         // boundaries
-        if (iCorr % 10 == 0)
-        {
-            impKf_ = mechanical().impKf();
-        }
+        // const int corrFreq = 1;
+        // if (iCorr % corrFreq == 0)
+        // {
+        //     //impKf_ = mechanical().impKf();
+        //     impKdiagTensor = mech.impKdiagTensor();
+        // }
     }
     while (!converged(iCorr, solverPerfDD) && ++iCorr < nCorr_);
+
+    // Info<< "Writing impKdiagTensor!!!" << endl;
+    // //impKdiagTensor.write();
+    // volVectorField impKdiagTensorVec =
+    //     (vector(1,0,0) & impKdiagTensor)
+    //   + (vector(0,1,0) & impKdiagTensor)
+    //   + (vector(0,0,1) & impKdiagTensor);
+    // impKdiagTensorVec.rename("impKdiagTensorVec");
+    // impKdiagTensorVec.write();
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D_, pointD_);
 
     // Update the strain
-    epsilon_ = epsilon_.oldTime() + symm(gradDD_);
+    //epsilon_ = epsilon_.oldTime() + symm(gradDD_);
 
     // Velocity
     U_ = fvc::ddt(D_);
@@ -776,21 +797,21 @@ void linGeomSolid::updateTotalFields()
 void linGeomSolid::writeFields(const Time& runTime)
 {
     // Calculaute equivalent strain
-    volScalarField epsilonEq
-    (
-        IOobject
-        (
-            "epsilonEq",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        sqrt((2.0/3.0)*magSqr(dev(epsilon_)))
-    );
+    // volScalarField epsilonEq
+    // (
+    //     IOobject
+    //     (
+    //         "epsilonEq",
+    //         runTime.timeName(),
+    //         mesh(),
+    //         IOobject::NO_READ,
+    //         IOobject::AUTO_WRITE
+    //     ),
+    //     sqrt((2.0/3.0)*magSqr(dev(epsilon_)))
+    // );
 
-    Info<< "Max epsilonEq = " << max(epsilonEq).value()
-        << endl;
+    // Info<< "Max epsilonEq = " << max(epsilonEq).value()
+    //     << endl;
 
     // Calculate equivalent (von Mises) stress
     volScalarField sigmaEq

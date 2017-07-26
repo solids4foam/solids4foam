@@ -92,7 +92,7 @@ class linGeomSolid
         volTensorField gradDD_;
 
         //- Strain field
-        volSymmTensorField epsilon_;
+        //volSymmTensorField epsilon_;
 
         //- Density
         const volScalarField rho_;

@@ -81,6 +81,34 @@ class solidModel
         //- Switch to enable/disable enforce linear to help convergence
         Switch enforceLinear_;
 
+        //- Under-relaxation method
+        //  It can be 'fixed', 'Aitken' or 'QuasiNewton'
+        const word relaxationMethod_;
+
+        //- Aitken's under-relaxation factor field
+        volScalarField aitkenAlpha_;
+
+        //- Aitken's residual field
+        volVectorField aitkenResidual_;
+
+        //- Restart frequency for the Quasi-Newton method
+        const int QuasiNewtonRestartFreq_;
+
+        //- Quasi-Newton method input vector field
+        DynamicList<vectorField> QuasiNewtonV_;
+
+        //- Quasi-Newton method output vector field
+        DynamicList<vectorField> QuasiNewtonW_;
+
+        //- Quasi-Newton method time indices for the input-ouput fields
+        DynamicList<scalar> QuasiNewtonT_;
+
+        //- Reference D field used for Quasi-Newton method
+        volVectorField DRef_;
+
+        //- Reference D (without relaxation) field used for Quasi-Newton method
+        volVectorField unrelaxedDRef_;
+
     // Private Member Functions
 
         //- Find global face zones
@@ -111,6 +139,9 @@ protected:
         {
             return solidProperties_;
         }
+
+        //- Apply fixed or Aitken's adaptive under-relaxation to the field
+        void relaxField(volVectorField& D, int iCorr);
 
         //- Return mechanical model
         mechanicalModel& mechanical();

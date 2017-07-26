@@ -745,8 +745,8 @@ bool nonLinGeomTotalLagSolid::evolve()
         // Solve the linear system
         solverPerfDD = DDEqn.solve();
 
-        // Under-relax the DD field
-        DD_.relax();
+        // Under-relax the DD field using fixed or adaptive under-relaxation
+        relaxField(DD_, iCorr);
 
         // Update the total displacement
         D_ = D_.oldTime() + DD_;
@@ -783,10 +783,10 @@ bool nonLinGeomTotalLagSolid::evolve()
         // Update impKf to improve convergence
         // Note: impK and rImpK are not updated as they are used for traction
         // boundaries
-        if (iCorr % 10 == 0)
-        {
-            impKf_ = mechanical().impKf();
-        }
+        // if (iCorr % 10 == 0)
+        // {
+        //     impKf_ = mechanical().impKf();
+        // }
     }
     while (!converged(iCorr, solverPerfDD) && ++iCorr < nCorr_);
 

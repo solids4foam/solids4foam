@@ -780,8 +780,8 @@ bool nonLinGeomUpdatedLagSolid::evolve()
         // Solve the linear system
         solverPerfDD = DDEqn.solve();
 
-        // Under-relax the DD field
-        DD_.relax();
+        // Under-relax the DD field using fixed or adaptive under-relaxation
+        relaxField(DD_, iCorr);
 
         // Update gradient of displacement increment
         mechanical().grad(DD_, gradDD_);
