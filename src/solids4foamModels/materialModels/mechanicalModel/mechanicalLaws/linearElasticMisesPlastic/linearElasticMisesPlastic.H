@@ -245,6 +245,9 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+        //- Return the implicit stiffness as a diagTensor
+        virtual tmp<volDiagTensorField> impKdiagTensor() const;
+
         //- Update the stress
         virtual void correct(volSymmTensorField& sigma);
 
