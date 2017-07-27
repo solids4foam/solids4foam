@@ -915,6 +915,37 @@ void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
         epsilonf_ = symm(gradD);
     }
 
+    // For planeStress, correct strain in the out of plane direction
+    if (planeStress())
+    {
+        if (mesh().solutionD()[vector::Z] > -1)
+        {
+            FatalErrorIn
+            (
+                "void Foam::linearElasticMisesPlastic::"
+                "correct(surfaceSymmTensorField& sigma)"
+            )   << "For planeStress, this material law assumes the empty "
+                << "direction is the Z direction!" << abort(FatalError);
+        }
+
+        // Poisson's ratio
+        const dimensionedScalar nu_ = (3.0*K_ - 2.0*mu_)/(2.0*(3.0*K_ + mu_));
+
+        // Young's modulus
+        const dimensionedScalar E_ = 9.0*K_*mu_/(3.0*K_ + mu_);
+
+        epsilonf_.replace
+        (
+            symmTensor::ZZ,
+           -(nu_/E_)
+           *(sigma.component(symmTensor::XX) + sigma.component(symmTensor::YY))
+          - (
+                epsilonPf_.component(symmTensor::XX)
+              + epsilonPf_.component(symmTensor::YY)
+            )
+        );
+    }
+
     // Calculate deviatoric strain
     const surfaceSymmTensorField e = dev(epsilonf_);
 
