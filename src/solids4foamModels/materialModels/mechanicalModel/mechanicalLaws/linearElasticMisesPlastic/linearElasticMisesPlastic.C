@@ -153,8 +153,6 @@ void Foam::linearElasticMisesPlastic::newtonLoop
     while ((mag(residual) > LoopTol_) && ++i < MaxNewtonIter_);
 
     // Update current yield stress
-    // Note: we divide by J to change the Kirchhoff yield stress to Cauchy yield
-    // stress
     curSigmaY =
         curYieldStress
         (
@@ -178,6 +176,8 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
     rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
+    E_("zero", dimPressure, 0.0),
+    nu_("zero", dimless, 0.0),
     stressPlasticStrainSeries_(dict),
     sigmaHyd_
     (
@@ -467,6 +467,7 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
 {
     // Force storage of old time for adjustable time-step calculations
     epsilon_.oldTime();
+    epsilonP_.oldTime();
     plasticN_.oldTime();
 
     // Read elastic parameters
@@ -474,32 +475,30 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
     if (dict.found("E") && dict.found("nu"))
     {
         // Read the Young's modulus
-        const dimensionedScalar E = dimensionedScalar(dict.lookup("E"));
+        E_ = dimensionedScalar(dict.lookup("E"));
 
         // Read the Poisson's ratio
-        const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
+        nu_ = dimensionedScalar(dict.lookup("nu"));
 
         // Set the shear modulus
-        mu_ = E/(2.0*(1.0 + nu));
+        mu_ = E_/(2.0*(1.0 + nu_));
 
         // Set the bulk modulus
-        K_ = (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*mu_;
-
-        // This should no longer be performed because we directly update
-        // epsilon_ZZ
-        // if (planeStress())
-        // {
-        //     K_ = (nu*E/((1.0 + nu)*(1.0 - nu))) + (2.0/3.0)*mu_;
-        // }
-        // else
-        // {
-        //     K_ = (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*mu_;
-        // }
+        K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
     }
     else if (dict.found("mu") && dict.found("K"))
     {
+        // Read shear modulus
         mu_ = dimensionedScalar(dict.lookup("mu"));
+
+        // Read bulk modulus
         K_ = dimensionedScalar(dict.lookup("K"));
+
+        // Calculate Young's modulus
+        E_ = 9.0*K_*mu_/(3.0*K_ + mu_);
+
+        // Calculate Poisson's ratio
+        nu_ = (3.0*K_ - 2.0*mu_)/(2.0*(3.0*K_ + mu_));
     }
     else
     {
@@ -711,12 +710,6 @@ void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
                 << "direction is the Z direction!" << abort(FatalError);
         }
 
-        // Poisson's ratio
-        const dimensionedScalar nu_ = (3.0*K_ - 2.0*mu_)/(2.0*(3.0*K_ + mu_));
-
-        // Young's modulus
-        const dimensionedScalar E_ = 9.0*K_*mu_/(3.0*K_ + mu_);
-
         epsilon_.replace
         (
             symmTensor::ZZ,
@@ -878,10 +871,20 @@ void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
         }
     }
 
-    // Update DEpsilonP and DEpsilonPEq
+    // Update DEpsilonPEq
     DEpsilonPEq_ = sqrtTwoOverThree_*DLambda_;
+
+    // Update DEpsilonP
     DEpsilonP_ = DLambda_*plasticN_;
+
+    // Under-relax DEpsilonP
     DEpsilonP_.relax();
+
+    // Update total plastic strain
+    epsilonP_ = epsilonP_.oldTime() + DEpsilonP_;
+
+    // Update equivalent total plastic strain
+    epsilonPEq_ = epsilonPEq_.oldTime() + DEpsilonPEq_;
 
     // Calculate deviatoric stress
     const volSymmTensorField s = sTrial - 2*mu_*DEpsilonP_;
@@ -927,12 +930,6 @@ void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
             )   << "For planeStress, this material law assumes the empty "
                 << "direction is the Z direction!" << abort(FatalError);
         }
-
-        // Poisson's ratio
-        const dimensionedScalar nu_ = (3.0*K_ - 2.0*mu_)/(2.0*(3.0*K_ + mu_));
-
-        // Young's modulus
-        const dimensionedScalar E_ = 9.0*K_*mu_/(3.0*K_ + mu_);
 
         epsilonf_.replace
         (
@@ -1096,10 +1093,20 @@ void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
         }
     }
 
-    // Update DEpsilonP and DEpsilonPEq
+    // Update DEpsilonPEq
     DEpsilonPEqf_ = sqrtTwoOverThree_*DLambdaf_;
+
+    // Update DEpsilonP
     DEpsilonPf_ = DLambdaf_*plasticNf_;
+
+    // Under-relax DEpsilonP
     DEpsilonPf_.relax();
+
+    // Update total plastic strain
+    epsilonPf_ = epsilonPf_.oldTime() + DEpsilonPf_;
+
+    // Update equivalent total plastic strain
+    epsilonPEqf_ = epsilonPEqf_.oldTime() + DEpsilonPEqf_;
 
     // Calculate deviatoric stress
     const surfaceSymmTensorField s = sTrial - 2*mu_*DEpsilonPf_;
@@ -1203,6 +1210,25 @@ void Foam::linearElasticMisesPlastic::updateTotalFields()
         << 100.0*scalar(numCellsYielding)/scalar(nTotalCells)
         << "% of the cells in this material) are actively yielding"
         << nl << endl;
+
+    // Testing
+    if (mesh().time().outputTime())
+    {
+        volScalarField epsilonPMag
+        (
+            IOobject
+            (
+                "epsilonPMag",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            sqrt((2.0/3.0)*magSqr(dev(epsilonP_)))
+        );
+
+        epsilonPMag.write();
+    }
 }
 
 

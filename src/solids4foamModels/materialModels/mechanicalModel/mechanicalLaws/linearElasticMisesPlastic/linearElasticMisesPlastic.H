@@ -81,6 +81,12 @@ class linearElasticMisesPlastic
         //- Bulk modulus
         dimensionedScalar K_;
 
+        //- Young's modulus
+        dimensionedScalar E_;
+
+        //- Poisson's ratio
+        dimensionedScalar nu_;
+
         //- Table of post-yield stress versus plastic strain
         interpolationTable<scalar> stressPlasticStrainSeries_;
 
