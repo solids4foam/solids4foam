@@ -46,4 +46,33 @@ timePrecision   6;
 
 runTimeModifiable yes;
 
+functions
+{
+    analyticalHotCylinder
+    {
+        type    hotCylinderAnalyticalSolution;
+
+        // Inner pipe radius
+        rInner  0.5;
+
+        // Outer pipe radius
+        rOuter  0.7;
+
+        // Inner pipe temperature
+        TInner  100;
+
+        // Outer pipe temperature
+        TOuter  0;
+
+        // Young's modulus
+        E       200e9;
+
+        // Poisson's ratio
+        nu      0.3;
+
+        // Coefficient for linear thermal expansion
+        alpha   1e-5;
+    }
+}
+
 // ************************************************************************* //
