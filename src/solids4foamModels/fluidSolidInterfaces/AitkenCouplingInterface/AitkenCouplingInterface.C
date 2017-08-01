@@ -53,11 +53,11 @@ AitkenCouplingInterface::AitkenCouplingInterface
 )
 :
     fluidSolidInterface(typeName, fluidMesh, solidMesh),
-    predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
     relaxationFactor_
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
     ),
+    predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
     aitkenRelaxationFactor_(relaxationFactor_)
 {}
 

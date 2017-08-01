@@ -73,7 +73,7 @@ class IQNILSCouplingInterface
 
         //- Predict solid
         const bool predictSolid_;
-  
+
         //- Coupling field V
         DynamicList<vectorField> fluidPatchPointsV_;
 

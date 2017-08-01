@@ -89,7 +89,7 @@ void IQNILSCouplingInterface::evolve()
 
         solid().evolve();
 
-        residualNorm = 
+        residualNorm =
             updateResidual();
     }
 
