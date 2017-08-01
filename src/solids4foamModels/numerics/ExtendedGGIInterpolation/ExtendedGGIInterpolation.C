@@ -166,42 +166,42 @@ calcMasterPointAddressing() const
         masterPointDist[pointI] = distance;
     }
 
-    Info<< "Extended GGI, master point distance, max: "
-        << max(masterPointDist)
-        << ", avg: " << average(masterPointDist)
-        << ", min: " << min(masterPointDist) << endl;
+//     Info<< "Extended GGI, master point distance, max: "
+//         << max(masterPointDist)
+//         << ", avg: " << average(masterPointDist)
+//         << ", min: " << min(masterPointDist) << endl;
 
 
     // Check orientation
 
-    const pointField& masterPointNormals =
-        this->masterPatch().pointNormals();
+//     const pointField& masterPointNormals =
+//         this->masterPatch().pointNormals();
 
-    const vectorField& slaveFaceNormals =
-        this->slavePatch().faceNormals();
+//     const vectorField& slaveFaceNormals =
+//         this->slavePatch().faceNormals();
 
-    scalarField orientation(masterPointAddr.size(), 0);
+//     scalarField orientation(masterPointAddr.size(), 0);
 
-    label nIncorrectPoints = 0;
+//     label nIncorrectPoints = 0;
 
-    forAll(masterPointAddr, pointI)
-    {
-        orientation[pointI] =
-            (
-                masterPointNormals[pointI]
-              & slaveFaceNormals[masterPointAddr[pointI].first()]
-            );
+//     forAll(masterPointAddr, pointI)
+//     {
+//         orientation[pointI] =
+//             (
+//                 masterPointNormals[pointI]
+//               & slaveFaceNormals[masterPointAddr[pointI].first()]
+//             );
 
-        if (orientation[pointI] > -SMALL)
-        {
-            nIncorrectPoints++;
-        }
-    }
+//         if (orientation[pointI] > -SMALL)
+//         {
+//             nIncorrectPoints++;
+//         }
+//     }
 
-    Info << "Extended GGI, master point orientation (<0), max: "
-        << max(orientation)
-        << ", min: " << min(orientation) << ", nIncorrectPoints: "
-        << nIncorrectPoints << "/" << masterPointAddr.size() << endl;
+//     Info << "Extended GGI, master point orientation (<0), max: "
+//         << max(orientation)
+//         << ", min: " << min(orientation) << ", nIncorrectPoints: "
+//         << nIncorrectPoints << "/" << masterPointAddr.size() << endl;
 }
 
 template<class FromPatch, class ToPatch>
@@ -393,41 +393,41 @@ calcSlavePointAddressing() const
         slavePointDist[pointI] = distance;
     }
 
-    Info<< "Extended GGI, slave point distance, max: "
-        << max(slavePointDist)
-        << ", avg: " << average(slavePointDist)
-        << ", min: " << min(slavePointDist) << endl;
+//     Info<< "Extended GGI, slave point distance, max: "
+//         << max(slavePointDist)
+//         << ", avg: " << average(slavePointDist)
+//         << ", min: " << min(slavePointDist) << endl;
 
     // Check orientation
 
-    const pointField& slavePointNormals =
-        this->slavePatch().pointNormals();
+//     const pointField& slavePointNormals =
+//         this->slavePatch().pointNormals();
 
-    const vectorField& masterFaceNormals =
-        this->masterPatch().faceNormals();
+//     const vectorField& masterFaceNormals =
+//         this->masterPatch().faceNormals();
 
-    scalarField orientation(slavePointAddr.size(), 0);
+//     scalarField orientation(slavePointAddr.size(), 0);
 
-    label nIncorrectPoints = 0;
+//     label nIncorrectPoints = 0;
 
-    forAll(slavePointAddr, pointI)
-    {
-        orientation[pointI] =
-            (
-                slavePointNormals[pointI]
-              & masterFaceNormals[slavePointAddr[pointI].first()]
-            );
+//     forAll(slavePointAddr, pointI)
+//     {
+//         orientation[pointI] =
+//             (
+//                 slavePointNormals[pointI]
+//               & masterFaceNormals[slavePointAddr[pointI].first()]
+//             );
 
-        if (orientation[pointI] > -SMALL)
-        {
-            nIncorrectPoints++;
-        }
-    }
+//         if (orientation[pointI] > -SMALL)
+//         {
+//             nIncorrectPoints++;
+//         }
+//     }
 
-    Info << "Extended GGI, slave point orientation (<0), max: "
-        << max(orientation)
-        << ", min: " << min(orientation) << ", nIncorrectPoints: "
-        << nIncorrectPoints << "/" << slavePointAddr.size() << endl;
+//     Info << "Extended GGI, slave point orientation (<0), max: "
+//         << max(orientation)
+//         << ", min: " << min(orientation) << ", nIncorrectPoints: "
+//         << nIncorrectPoints << "/" << slavePointAddr.size() << endl;
 }
 
 template<class FromPatch, class ToPatch>
