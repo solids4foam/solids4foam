@@ -280,46 +280,53 @@ void blockFixedDisplacementFvPatchVectorField::insertBlockCoeffs
     // Index offset for addressing the diagonal of the boundary faces
     const label start = ppatch.start();
 
+    // We will calculate the average of the current diagonal to scale the
+    // coefficients for the fixedValue boundary conditions
+    // If we don't do this then the convergence can be worse and also the
+    // results can be strange
+    // Note that this scale factor is just approximate and its exact value
+    // does not matter
+    const tensor averageDiag = gAverage(d);
+    scalar diagSign =
+        (averageDiag.xx() + averageDiag.yy() + averageDiag.zz());
+    diagSign /= mag(diagSign);
+    const scalar scaleFac = diagSign*(1.0/3.0)*magSqr(averageDiag);
+
+    if (mag(scaleFac) < SMALL)
+    {
+        FatalErrorIn
+        (
+            "void blockFixedDisplacementFvPatchVectorField::insertBlockCoeffs\n"
+            "(\n"
+            "    const solidPolyMesh& solidMesh,\n"
+            "    const surfaceScalarField& muf,\n"
+            "    const surfaceScalarField& lambdaf,\n"
+            "    const GeometricField<vector, fvPatchField, volMesh>& U,\n"
+            "    Field<vector>& blockB,\n"
+            "    BlockLduMatrix<vector>& blockM\n"
+            ") const"
+        )   << "The average diagonal coefficient is zero! The internal faces "
+            << "should be discretised before inserting the boundary condition "
+            << "equations" << abort(FatalError);
+    }
+
     // We currently assume that the tangential gradient along fixedValue
     // boundaries is zero i.e. the values are uniform... do we?
     // This BC just forces the value so we don't make any simplifying
     // assumptions.
     forAll(ppatch, faceI)
     {
+        // Find the face index in the linear system
+        const label varI = solidMesh.findOldVariableID(start + faceI);
+
         // For displacement, the value is fixed so we will set the
         // diag and source so as to force this fixed value
 
-        // The preconditioner will take care of scaling this coefficients;
-        // however, scaling the coefficients here does affect the number of
-        // iterations
-
-        //const scalar scaleFac = (d[0].xx() + d[0].yy() + d[0].zz())/3.0;
-        // if (mag(scaleFac) < SMALL)
-        // {
-        //     FatalErrorIn
-        //     (
-        //         "void blockFixedDisplacementFvPatchVectorField::"
-        //         "insertBlockCoeffs\n"
-        //         "(\n"
-        //         "    const solidPolyMesh& solidMesh,\n"
-        //         "    const surfaceScalarField& muf,\n"
-        //         "    const surfaceScalarField& lambdaf,\n"
-        //         "    const GeometricField<vector, fvPatchField, volMesh>&,\n"
-        //         "    Field<vector>& blockB,\n"
-        //         "    BlockLduMatrix<vector>& blockM\n"
-        //         ") const"
-        //     )   << "displacement scaleFac is zero" << abort(FatalError);
-        // }
-
-        const label varI = solidMesh.findOldVariableID(start + faceI);
-
         // Diagonal contribution for the boundary face
-        //d[varI] += tensor(scaleFac*I);
-        d[varI] += tensor(I);
+        d[varI] += tensor(scaleFac*I);
 
         // Source contribution
-        //blockB[varI] += scaleFac*pU[faceI];
-        blockB[varI] += pU[faceI];
+        blockB[varI] += scaleFac*pU[faceI];
     }
 }
 
