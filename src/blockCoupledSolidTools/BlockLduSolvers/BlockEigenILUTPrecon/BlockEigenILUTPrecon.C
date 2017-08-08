@@ -461,7 +461,7 @@ Foam::BlockEigenILUTPrecon::BlockEigenILUTPrecon
     APtr_(NULL),
     preconPtr_(NULL),
     twoD_(false),
-    fillFactor_(10)
+    fillFactor_(0)
 {
     calcPrecon(matrix);
 }
@@ -477,11 +477,11 @@ Foam::BlockEigenILUTPrecon::BlockEigenILUTPrecon
     APtr_(NULL),
     preconPtr_(NULL),
     twoD_(false),
-    fillFactor_(dict.lookupOrDefault<label>("fillFactor", 10))
+    fillFactor_(readInt(dict.lookup("fillFactor")))
 {
-    calcPrecon(matrix);
-
     Info<< "    fill factor: " << fillFactor_ << endl;
+
+    calcPrecon(matrix);
 }
 
 
