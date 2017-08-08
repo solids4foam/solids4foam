@@ -290,7 +290,7 @@ void blockFixedDisplacementFvPatchVectorField::insertBlockCoeffs
     scalar diagSign =
         (averageDiag.xx() + averageDiag.yy() + averageDiag.zz());
     diagSign /= mag(diagSign);
-    const scalar scaleFac = diagSign*(1.0/3.0)*magSqr(averageDiag);
+    const scalar scaleFac = diagSign*(1.0/sqrt(3.0))*mag(averageDiag);
 
     if (mag(scaleFac) < SMALL)
     {

@@ -99,7 +99,7 @@ Foam::BlockEigenSparseLUSolver::solve
     }
 
     // Tolerance for the inclusion of coefficients
-    const scalar tol = 1e-3;
+    const scalar tol = VSMALL;
 
     // Create local references to avoid the spread this-> ugliness
     const BlockLduMatrix<vector>& matrix = this->matrix_;
@@ -137,9 +137,27 @@ Foam::BlockEigenSparseLUSolver::solve
     bool twoD = false;
     if (nDir == 2)
     {
-        Warning
-            << this->typeName << ": for 2-D models, it is assumed that z is the"
-            << " empty direction" << endl;
+        if
+        (
+            matrix.mesh().thisDb().parent().lookupObject<polyMesh>
+            (
+                "region0" // polyMesh::defaultRegion,
+            ).solutionD()[vector::Z]
+          > -1
+        )
+        {
+            FatalErrorIn
+            (
+                "Foam::BlockSolverPerformance<Foam::vector>"
+                "Foam::BlockEigenSparseLUSolver::solve"
+                "("
+                "    Field<Foam::vector>& U,"
+                "    const Field<Foam::vector>& blockB"
+                ")"
+            )   << this->typeName << ": for 2-D models, the empty direction "
+                << "must be z!" << abort(FatalError);
+        }
+
         twoD = true;
     }
     else if (nDir != 3)

@@ -123,7 +123,7 @@ class pointGaussLsBlockLaplacianTransposeScheme
 public:
 
     //- Runtime type information
-    TypeName("pointGaussLeastSquares");
+    TypeName("pointGaussLeastSquaresLaplacianTranspose");
 
 
     // Constructors

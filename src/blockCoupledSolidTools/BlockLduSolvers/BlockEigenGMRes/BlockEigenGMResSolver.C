@@ -96,7 +96,7 @@ Foam::BlockEigenGMResSolver::solve
     }
 
     // Tolerance for the inclusion of coefficients
-    const scalar tol = 1e-3;
+    const scalar tol = VSMALL;
 
     // Create local references to avoid the spread this-> ugliness
     const BlockLduMatrix<vector>& matrix = this->matrix_;

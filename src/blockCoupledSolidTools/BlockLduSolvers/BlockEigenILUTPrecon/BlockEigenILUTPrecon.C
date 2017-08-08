@@ -55,7 +55,7 @@ void Foam::BlockEigenILUTPrecon::calcPrecon
     Info<< "void Foam::BlockEigenILUTPrecon::calcPrecon(matrix)" << endl;
 
     // Tolerance for the inclusion of coefficients
-    const scalar tol = 1e-3;
+    const scalar tol = VSMALL;
 
     // Matrix addressing
     const unallocLabelList& lowerAddr = matrix.mesh().lduAddr().lowerAddr();
@@ -412,7 +412,7 @@ void Foam::BlockEigenILUTPrecon::calcPrecon
     // Create the preconditioner
     Info<< "    Creating Eigen::IncompleteLUT" << endl;
     //preconPtr_ = new Eigen::IncompleteLUT<scalar>(A);
-    preconPtr_ = new Eigen::IncompleteLUT<scalar>(A, SMALL, fillFactor_);
+    preconPtr_ = new Eigen::IncompleteLUT<scalar>(A, VSMALL, fillFactor_);
 
     Info<< "void Foam::BlockEigenILUTPrecon::calcPrecon(matrix) done" << endl;
 }
