@@ -24,12 +24,13 @@ solvers
         //solver              EigenSparseLU;
 
         // Iterative solver
-        solver            BiCGStab;
+        solver            EigenFoamBiCGStab;
+        //solver            BiCGStab;
         preconditioner    myCholesky;
         tolerance         1e-10;
         relTol            0;
         minIter           0;
-        maxIter           1000;
+        maxIter           10000;
     }
 
     // Segregated solver
