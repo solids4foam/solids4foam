@@ -25,6 +25,8 @@ solidPolyMesh/solidPolyMesh.C
 
 BlockFvm/BlockFvmDivSigma.C
 
+BlockFvm/blockTangentialCoeffs/blockTangentialCoeffs.C
+
 BlockFvm/divSigmaSchemes/divSigmaScheme/divSigmaScheme.C
 BlockFvm/divSigmaSchemes/pointGaussLsDivSigmaScheme/pointGaussLsDivSigmaScheme.C
 BlockFvm/divSigmaSchemes/pointGaussLsDivSigmaScheme/pointGaussLsDivSigmaSchemeTang.C

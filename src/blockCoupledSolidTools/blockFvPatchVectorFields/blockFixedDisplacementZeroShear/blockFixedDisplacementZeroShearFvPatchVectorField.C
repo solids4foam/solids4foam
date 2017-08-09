@@ -28,7 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
-#include "fvcMeshPhi.H"
+#include "blockTangentialCoeffs.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -195,10 +195,10 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
     const bool nonOrthogonalMesh = !mesh.orthogonal();
 
     // Least squares vol-to-point interpolation origins, weights and matrices
-
     const newLeastSquaresVolPointInterpolation& volToPointInterp =
         solidMesh.volToPointInterp();
 
+    // There is something not right when using least squares weights
     const vectorField& origins = volToPointInterp.origins();
     const FieldField<Field, scalar>& weights = volToPointInterp.weights();
     const PtrList<scalarRectangularMatrix>& invMatrices =
@@ -238,6 +238,7 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
         solidMesh.gPtNgbProcCellCoeffs();
 
     // Fixed points: value and direction
+    const bool enforcePointConstraints = false;
     const Map<vector>& pointFixedComp = solidMesh.pointFixedComponent(U);
     const Map<symmTensor>& pointFixedDir = solidMesh.pointFixedDirection(U);
 
@@ -250,12 +251,43 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
     const vectorField pN = fpatch.nf();
     const scalarField& pMagSf = fpatch.magSf();
     const scalarField& pMu = muf.boundaryField()[fpatch.index()];
-    //const scalarField& pLambda = lambdaf.boundaryField()[fpatch.index()];
+    const scalarField& pLambda = lambdaf.boundaryField()[fpatch.index()];
     const scalarField& pDeltaCoeffs = fpatch.deltaCoeffs();
     const vectorField pDelta = fpatch.delta();
 
     // Index offset for addressing the diagonal of the boundary faces
     const label start = ppatch.start();
+
+    // We will calculate the average of the current diagonal to scale the
+    // coefficients for the fixedValue boundary conditions
+    // If we don't do this then the convergence can be worse and also the
+    // results can be strange
+    // Note that this scale factor is just approximate and its exact value
+    // does not matter
+    const tensor averageDiag = gAverage(d);
+    scalar diagSign =
+        (averageDiag.xx() + averageDiag.yy() + averageDiag.zz());
+    diagSign /= mag(diagSign);
+    const scalar scaleFac = diagSign*(1.0/sqrt(3.0))*mag(averageDiag);
+
+    if (mag(scaleFac) < SMALL)
+    {
+        FatalErrorIn
+        (
+            "void blockFixedDisplacementZeroShearFvPatchVectorField"
+            "::insertBlockCoeffs\n"
+            "(\n"
+            "    const solidPolyMesh& solidMesh,\n"
+            "    const surfaceScalarField& muf,\n"
+            "    const surfaceScalarField& lambdaf,\n"
+            "    const GeometricField<vector, fvPatchField, volMesh>& U,\n"
+            "    Field<vector>& blockB,\n"
+            "    BlockLduMatrix<vector>& blockM\n"
+            ") const"
+        )   << "The average diagonal coefficient is zero! The internal faces "
+            << "should be discretised before inserting the boundary condition "
+            << "equations" << abort(FatalError);
+    }
 
     forAll(fpatch, faceI)
     {
@@ -266,7 +298,7 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
 
         const vector& faceN = pN[faceI];
         const scalar faceMu = pMu[faceI];
-        //const scalar faceLambda = pLambda[faceI];
+        const scalar faceLambda = pLambda[faceI];
         //const scalar faceTwoMuLambda = 2*faceMu + faceLambda;
         const scalar faceMagSf = pMagSf[faceI];
         const scalar faceDeltaCoeff = pDeltaCoeffs[faceI];
@@ -291,11 +323,11 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
         if (curImplicitBondID == -1)
         {
             FatalErrorIn
-                (
-                    "pointGaussLsDivSigmaScheme::"
-                    "insertCoeffBc(): blockFixedDisplacementZeroShear"
-                )   << "curImplicitBond not found"
-                    << abort(FatalError);
+            (
+                "pointGaussLsDivSigmaScheme::"
+                "insertCoeffBc(): blockFixedDisplacementZeroShear"
+            )   << "curImplicitBond not found"
+                << abort(FatalError);
         }
 
         l[curImplicitBondID] += coeff;
@@ -339,10 +371,10 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
             const tensor LeFaceN = Le*faceN;
 
             // Non-orthogonal correction component
-            scalar* kDotLePtr = NULL;
+            scalar kDotLe = 0.0;
             if (nonOrthogonalMesh)
             {
-                kDotLePtr = new scalar((*faceKPtr) & Le);
+                kDotLe = (*faceKPtr) & Le;
             }
 
             const label startPointID = curEdge.start();
@@ -380,8 +412,7 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
 
                 // Vector between current point and the average
                 // position of the neighbours
-                vector dr = points[sePointID] - origins[sePointID];
-                //vector dr = vector::zero;
+                const vector dr = points[sePointID] - origins[sePointID];
 
                 // Least square inverse matrix terms
                 const scalarRectangularMatrix& curInvMatrix =
@@ -395,23 +426,19 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                 //const scalar sumW = sum(sqr(w));
                 const scalar sumW = sum(w);
 
-                // Mirror point, if any
-                const Tuple2<vector, tensor>& sePointMirr =
-                    mirrorPlaneTrans[sePointID];
-                bool pointHasMirror = false;
-                if (mag(sePointMirr.first()) > SMALL)
-                {
-                    pointHasMirror = true;
-                }
-
                 // Check if the point has any fixed components
-                const bool pointHasFixedComp =
-                    pointFixedComp.found(sePointID);
-                //const bool pointHasFixedComp = false;
+                bool pointHasFixedComp = false;
                 symmTensor sePointFixedDir = symmTensor::zero;
-                if (pointHasFixedComp)
+                vector sePointFixedComp = vector::zero;
+                if (enforcePointConstraints)
                 {
-                    sePointFixedDir = pointFixedDir[sePointID];
+                    pointHasFixedComp = pointFixedComp.found(sePointID);
+
+                    if (pointHasFixedComp)
+                    {
+                        sePointFixedDir = pointFixedDir[sePointID];
+                        sePointFixedComp = pointFixedComp[sePointID];
+                    }
                 }
 
 
@@ -419,69 +446,45 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                 //~         Add coeffs for local point cells         ~//
                 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-
                 const labelList& sePointCells = pointCells[sePointID];
 
                 for (label i = 0; i < sePointCells.size(); i++)
                 {
-                    scalar wCell = w[neiID]/sumW;
-
                     // Coefficient is composed of the contribution from
                     // pure averaging (inverse distance) and a
                     // correction least squares
+                    const vector m =
+                        vector
+                        (
+                            curInvMatrix[0][neiID],
+                            curInvMatrix[1][neiID],
+                            curInvMatrix[2][neiID]
+                        );
 
-                    const vector m
+                    // Calculate coefficient
+                    tensor coeff = tensor::zero;
+                    fv::blockFvmCalculateCoeff
                     (
-                        curInvMatrix[0][neiID],
-                        curInvMatrix[1][neiID],
-                        curInvMatrix[2][neiID]
+                        coeff,
+                        blockB[varI],
+                        w[neiID]/sumW,
+                        m,
+                        dr,
+                        faceMu,
+                        faceLambda,
+                        faceN,
+                        LeFaceN,
+                        kDotLe,
+                        nonOrthogonalMesh,
+                        mirrorPlaneTrans[sePointID],
+                        pointHasFixedComp,
+                        sePointFixedComp,
+                        sePointFixedDir,
+                        3
                     );
 
-                    // Contribution from pure inverse distance average
-                    // (wCell) and a correction from least squares due
-                    // a nonuniform distribution of points (m & dr)
-                    // So least squares correction is zero if the vertex
-                    // is located at the average position of the
-                    // neighbours
-                    tensor coeff =
-                        0.5*(wCell + (m & dr))
-                        //*(faceLambda*LeFaceN.T());
-                        *(faceMu*LeFaceN);
-                    //*(faceMu*LeFaceN + faceLambda*LeFaceN.T());
-
-                    // Add non-orthogonal correction term
-                    // Hmnn: I cancel out this term when I remove the
-                    // normal component
-                    if (nonOrthogonalMesh)
-                    {
-                        coeff +=
-                            tensor
-                            (
-                                0.5*(wCell + (m & dr))*
-                                (
-                                    //sqr(faceN)*
-                                    //faceTwoMuLambda*(*kDotLePtr) +
-                                    (I - sqr(faceN))*faceMu*(*kDotLePtr)
-                                )
-                            );
-                    }
-
-                    // Add contribution from mirrored cell, if any
-                    if (pointHasMirror)
-                    {
-                        coeff +=
-                            transform(sePointMirr.second(), coeff);
-                    }
-
-                    // Check if the point has a fixed component
-                    if (pointHasFixedComp)
-                    {
-                        // Remove coeff in fixed direction
-                        coeff = (coeff & (I - sePointFixedDir));
-
-                        // Add explicitly to the source
-                        blockB += coeff & pointFixedComp[sePointID];
-                    }
+                    // Remove normal component
+                    coeff = (I - sqr(faceN)) & coeff;
 
                     // Add coeff contribution to cellI from
                     // pointCell
@@ -503,12 +506,12 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                     if (curImplicitBondID == -1)
                     {
                         FatalErrorIn
-                            (
-                                "pointGaussLsDivSigmaScheme::"
-                                "insertCoeffBC() "
-                                "blockFixedDisplacementZeroShear"
-                            )   << "curImplicitBond not found"
-                                << abort(FatalError);
+                        (
+                            "pointGaussLsDivSigmaScheme::"
+                            "insertCoeffBC() "
+                            "blockFixedDisplacementZeroShear"
+                        )   << "curImplicitBond not found"
+                            << abort(FatalError);
                     }
 
                     if (debug > 1)
@@ -527,68 +530,45 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                 //~        Add coeffs for local boundary faces       ~//
                 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-
-                const labelList& sePointBndFaces =
-                    pointBndFaces[sePointID];
+                const labelList& sePointBndFaces = pointBndFaces[sePointID];
 
                 for (label i = 0; i < sePointBndFaces.size(); i++)
                 {
-                    scalar wCell = w[neiID]/sumW;
-
                     // Coefficient is composed of the contribution from
                     // pure averaging (inverse distance) and a
                     // correction least squares
+                    const vector m =
+                        vector
+                        (
+                            curInvMatrix[0][neiID],
+                            curInvMatrix[1][neiID],
+                            curInvMatrix[2][neiID]
+                        );
 
-                    const vector m
+                    // Calculate coefficient
+                    tensor coeff = tensor::zero;
+                    fv::blockFvmCalculateCoeff
                     (
-                        curInvMatrix[0][neiID],
-                        curInvMatrix[1][neiID],
-                        curInvMatrix[2][neiID]
+                        coeff,
+                        blockB[varI],
+                        w[neiID]/sumW,
+                        m,
+                        dr,
+                        faceMu,
+                        faceLambda,
+                        faceN,
+                        LeFaceN,
+                        kDotLe,
+                        nonOrthogonalMesh,
+                        mirrorPlaneTrans[sePointID],
+                        pointHasFixedComp,
+                        sePointFixedComp,
+                        sePointFixedDir,
+                        3
                     );
 
-                    // Contribution from pure inverse distance average
-                    // (wCell) and a correction from least squares due
-                    // a nonuniform distribution of points (m & dr)
-                    // So least squares correction is zero if the vertex
-                    // is located at the average position of the
-                    // neighbours
-                    tensor coeff =
-                        0.5*(wCell + (m & dr))
-                        //*(faceLambda*LeFaceN.T());
-                        *(faceMu*LeFaceN);
-                    //*(faceMu*LeFaceN + faceLambda*LeFaceN.T());
-
-                    // Add non-orthogonal correction term
-                    if (nonOrthogonalMesh)
-                    {
-                        coeff +=
-                            tensor
-                            (
-                                0.5*(wCell + (m & dr))*
-                                (
-                                    //sqr(faceN)*
-                                    //faceTwoMuLambda*(*kDotLePtr) +
-                                    (I - sqr(faceN))*faceMu*(*kDotLePtr)
-                                )
-                            );
-                    }
-
-                    // Add contribution from mirrored cell, if any
-                    if (pointHasMirror)
-                    {
-                        coeff +=
-                            transform(sePointMirr.second(), coeff);
-                    }
-
-                    // Check if the point has a fixed component
-                    if (pointHasFixedComp)
-                    {
-                        // Remove coeff in fixed direction
-                        coeff = (coeff & (I - sePointFixedDir));
-
-                        // Add explicitly to the source
-                        blockB += coeff & pointFixedComp[sePointID];
-                    }
+                    // Remove normal component
+                    coeff = (I - sqr(faceN)) & coeff;
 
                     // Add coeff contribution to the upper of cellI from
                     // boundary the face
@@ -617,12 +597,12 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                         if (curImplicitBondID == -1)
                         {
                             FatalErrorIn
-                                (
-                                    "pointGaussLsDivSigmaScheme::"
-                                    "insertCoeffBc()"
-                                    " blockFixedDisplacementZeroShear"
-                                )   << "bndFace: curImplicitBond not found"
-                                    << abort(FatalError);
+                            (
+                                "pointGaussLsDivSigmaScheme::"
+                                "insertCoeffBc()"
+                                " blockFixedDisplacementZeroShear"
+                            )   << "bndFace: curImplicitBond not found"
+                                << abort(FatalError);
                         }
 
                         // Contributions to upper/lower
@@ -660,19 +640,19 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                 if (sePointCyclicFaces.size())
                 {
                     FatalErrorIn
-                        (
-                            "void insertCoeffsBc\n"
-                            "(\n"
-                            "    const solidPolyMesh& solidMesh,\n"
-                            "    const surfaceScalarField& muf,\n"
-                            "    const surfaceScalarField& lambdaf,\n"
-                            "    GeometricField<vector, fvPatchField, "
-                            "volMesh>& U,\n"
-                            "    Field<vector>& blockB,\n"
-                            "    BlockLduMatrix<vector>& blockM\n"
-                            ")\n"
-                        )   << "cyclic faces not implemented"
-                            << abort(FatalError);
+                    (
+                        "void insertCoeffsBc\n"
+                        "(\n"
+                        "    const solidPolyMesh& solidMesh,\n"
+                        "    const surfaceScalarField& muf,\n"
+                        "    const surfaceScalarField& lambdaf,\n"
+                        "    GeometricField<vector, fvPatchField, "
+                        "volMesh>& U,\n"
+                        "    Field<vector>& blockB,\n"
+                        "    BlockLduMatrix<vector>& blockM\n"
+                        ")\n"
+                    )   << "cyclic faces not implemented"
+                        << abort(FatalError);
                 }
 
 
@@ -683,68 +663,45 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                 // These are the cells across the proc boundary which
                 // are accessible using standard proc-proc data transfer
 
-                const labelList& sePointProcFaces =
-                    pointProcFaces[sePointID];
+                const labelList& sePointProcFaces = pointProcFaces[sePointID];
 
                 for (label i = 0; i < sePointProcFaces.size(); i++)
                 {
-                    scalar wCell = w[neiID]/sumW;
-
                     // Coefficient is composed of the contribution from
                     // pure averaging (inverse distance) and a
-                    // correction from least squares
+                    // correction least squares
+                    const vector m =
+                        vector
+                        (
+                            curInvMatrix[0][neiID],
+                            curInvMatrix[1][neiID],
+                            curInvMatrix[2][neiID]
+                        );
 
-                    const vector m
+                    // Calculate coefficient
+                    tensor coeff = tensor::zero;
+                    fv::blockFvmCalculateCoeff
                     (
-                        curInvMatrix[0][neiID],
-                        curInvMatrix[1][neiID],
-                        curInvMatrix[2][neiID]
+                        coeff,
+                        blockB[varI],
+                        w[neiID]/sumW,
+                        m,
+                        dr,
+                        faceMu,
+                        faceLambda,
+                        faceN,
+                        LeFaceN,
+                        kDotLe,
+                        nonOrthogonalMesh,
+                        mirrorPlaneTrans[sePointID],
+                        pointHasFixedComp,
+                        sePointFixedComp,
+                        sePointFixedDir,
+                        3
                     );
 
-                    // Contribution from pure inverse distance average
-                    // (wCell) and a correction from least squares due
-                    // to a nonuniform distribution of points (m & dr)
-                    // So least squares correction is zero if the vertex
-                    // is located at the average position of the
-                    // neighbours
-                    tensor coeff =
-                        0.5*(wCell + (m & dr))
-                        //*(faceLambda*LeFaceN.T());
-                        *(faceMu*LeFaceN);
-                    // *(faceMu*LeFaceN + faceLambda*LeFaceN.T());
-
-                    // Add non-orthogonal correction term
-                    if (nonOrthogonalMesh)
-                    {
-                        coeff +=
-                            tensor
-                            (
-                                0.5*(wCell + (m & dr))*
-                                (
-                                    //sqr(faceN)*
-                                    //faceTwoMuLambda*(*kDotLePtr)
-                                    (I - sqr(faceN))*
-                                    faceMu*(*kDotLePtr)
-                                )
-                            );
-                    }
-
-                    // Add contribution from mirrored cell, if any
-                    if (pointHasMirror)
-                    {
-                        coeff +=
-                            transform(sePointMirr.second(), coeff);
-                    }
-
-                    // Check if the point has a fixed component
-                    if (pointHasFixedComp)
-                    {
-                        // Remove coeff in fixed direction
-                        coeff = (coeff & (I - sePointFixedDir));
-
-                        // Add explicitly to the source
-                        blockB += coeff & pointFixedComp[sePointID];
-                    }
+                    // Remove normal component
+                    coeff = (I - sqr(faceN)) & coeff;
 
                     // Add coeff contribution to globalCoeff
                     pointProcFacesCoeffs[varI][sePointID][i] -= coeff;
@@ -768,60 +725,41 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
 
                     for (label i = 0; i < glNgbProcBndFaces.size(); i++)
                     {
-                        scalar wCell = w[neiID]/sumW;
+                        // Coefficient is composed of the contribution from
+                        // pure averaging (inverse distance) and a
+                        // correction least squares
+                        const vector m =
+                            vector
+                            (
+                                curInvMatrix[0][neiID],
+                                curInvMatrix[1][neiID],
+                                curInvMatrix[2][neiID]
+                            );
 
-                        // Contribution from pure inverse distance
-                        // average (wCell) and a correction from least
-                        // squares due to a nonuniform distribution of
-                        // points (m & dr) so least squares correction
-                        // is zero if the vertex is located at the
-                        // average position of the neighbours
-
-                        const vector m
+                        // Calculate coefficient
+                        tensor coeff = tensor::zero;
+                        fv::blockFvmCalculateCoeff
                         (
-                            curInvMatrix[0][neiID],
-                            curInvMatrix[1][neiID],
-                            curInvMatrix[2][neiID]
+                            coeff,
+                            blockB[varI],
+                            w[neiID]/sumW,
+                            m,
+                            dr,
+                            faceMu,
+                            faceLambda,
+                            faceN,
+                            LeFaceN,
+                            kDotLe,
+                            nonOrthogonalMesh,
+                            mirrorPlaneTrans[sePointID],
+                            pointHasFixedComp,
+                            sePointFixedComp,
+                            sePointFixedDir,
+                            3
                         );
 
-                        tensor coeff =
-                            0.5*(wCell + (m & dr))
-                            //*(faceLambda*LeFaceN.T());
-                            *(faceMu*LeFaceN);
-                        //*(faceMu*LeFaceN + faceLambda*LeFaceN.T());
-
-                        // Add non-orthogonal correction term
-                        if (nonOrthogonalMesh)
-                        {
-                            coeff +=
-                                tensor
-                                (
-                                    0.5*(wCell + (m & dr))*
-                                    (
-                                        //sqr(faceN)*
-                                        //faceTwoMuLambda*(*kDotLePtr)
-                                        (I - sqr(faceN))*
-                                        faceMu*(*kDotLePtr)
-                                    )
-                                );
-                        }
-
-                        // Add contribution from mirrored cell, if any
-                        if (pointHasMirror)
-                        {
-                            coeff +=
-                                transform(sePointMirr.second(), coeff);
-                        }
-
-                        // Check if the point has a fixed component
-                        if (pointHasFixedComp)
-                        {
-                            // Remove coeff in fixed direction
-                            coeff = (coeff & (I - sePointFixedDir));
-
-                            // Add explicitly to the source
-                            blockB += coeff & pointFixedComp[sePointID];
-                        }
+                        // Remove normal component
+                        coeff = (I - sqr(faceN)) & coeff;
 
                         // Add coeff contribution to globalCoeff
                         gPtNgbProcBndFaceCoeffs[varI][sePointID][i] -=
@@ -847,60 +785,41 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
 
                     for (label i = 0; i < glNgbProcCells.size(); i++)
                     {
-                        scalar wCell = w[neiID]/sumW;
+                        // Coefficient is composed of the contribution from
+                        // pure averaging (inverse distance) and a
+                        // correction least squares
+                        const vector m =
+                            vector
+                            (
+                                curInvMatrix[0][neiID],
+                                curInvMatrix[1][neiID],
+                                curInvMatrix[2][neiID]
+                            );
 
-                        // Contribution from pure inverse distance
-                        // average (wCell) and a correction from least
-                        // squares due to a nonuniform distribution of
-                        // points (m & dr) so least squares correction
-                        // is zero if the vertex is located at the
-                        // average position of the neighbours
-
-                        const vector m
+                        // Calculate coefficient
+                        tensor coeff = tensor::zero;
+                        fv::blockFvmCalculateCoeff
                         (
-                            curInvMatrix[0][neiID],
-                            curInvMatrix[1][neiID],
-                            curInvMatrix[2][neiID]
+                            coeff,
+                            blockB[varI],
+                            w[neiID]/sumW,
+                            m,
+                            dr,
+                            faceMu,
+                            faceLambda,
+                            faceN,
+                            LeFaceN,
+                            kDotLe,
+                            nonOrthogonalMesh,
+                            mirrorPlaneTrans[sePointID],
+                            pointHasFixedComp,
+                            sePointFixedComp,
+                            sePointFixedDir,
+                            3
                         );
 
-                        tensor coeff =
-                            0.5*(wCell + (m & dr))
-                            //*(faceLambda*LeFaceN.T());
-                            *(faceMu*LeFaceN);
-                        //*(faceMu*LeFaceN + faceLambda*LeFaceN.T());
-
-                        // Add non-orthogonal correction term
-                        if (nonOrthogonalMesh)
-                        {
-                            coeff +=
-                                tensor
-                                (
-                                    0.5*(wCell + (m & dr))*
-                                    (
-                                        //sqr(faceN)*
-                                        //faceTwoMuLambda*(*kDotLePtr)
-                                        (I - sqr(faceN))*
-                                        faceMu*(*kDotLePtr)
-                                    )
-                                );
-                        }
-
-                        // Add contribution from mirrored cell, if any
-                        if (pointHasMirror)
-                        {
-                            coeff +=
-                                transform(sePointMirr.second(), coeff);
-                        }
-
-                        // Check if the point has a fixed component
-                        if (pointHasFixedComp)
-                        {
-                            // Remove coeff in fixed direction
-                            coeff = (coeff & (I - sePointFixedDir));
-
-                            // Add explicitly to the source
-                            blockB += coeff & pointFixedComp[sePointID];
-                        }
+                        // Remove normal component
+                        coeff = (I - sqr(faceN)) & coeff;
 
                         // Add coeff contribution to globalCoeff
                         gPtNgbProcCellCoeffs[varI][sePointID][i] -=
@@ -929,60 +848,41 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
 
                     for (label i = 0; i < sePointProcCells.size(); i++)
                     {
-                        scalar wCell = w[neiID]/sumW;
+                        // Coefficient is composed of the contribution from
+                        // pure averaging (inverse distance) and a
+                        // correction least squares
+                        const vector m =
+                            vector
+                            (
+                                curInvMatrix[0][neiID],
+                                curInvMatrix[1][neiID],
+                                curInvMatrix[2][neiID]
+                            );
 
-                        // Contribution from pure inverse distance
-                        // average (wCell) and a correction from least
-                        // squares due to a nonuniform distribution of
-                        // points (m & dr) so least squares correction
-                        // is zero if the vertex is located at the
-                        // average position of the neighbours
-
-                        const vector m
+                        // Calculate coefficient
+                        tensor coeff = tensor::zero;
+                        fv::blockFvmCalculateCoeff
                         (
-                            curInvMatrix[0][neiID],
-                            curInvMatrix[1][neiID],
-                            curInvMatrix[2][neiID]
+                            coeff,
+                            blockB[varI],
+                            w[neiID]/sumW,
+                            m,
+                            dr,
+                            faceMu,
+                            faceLambda,
+                            faceN,
+                            LeFaceN,
+                            kDotLe,
+                            nonOrthogonalMesh,
+                            mirrorPlaneTrans[sePointID],
+                            pointHasFixedComp,
+                            sePointFixedComp,
+                            sePointFixedDir,
+                            3
                         );
 
-                        tensor coeff =
-                            0.5*(wCell + (m & dr))
-                            //*(faceLambda*LeFaceN.T());
-                            *(faceMu*LeFaceN);
-                        //*(faceMu*LeFaceN + faceLambda*LeFaceN.T());
-
-                        // Add non-orthogonal correction term
-                        if (nonOrthogonalMesh)
-                        {
-                            coeff +=
-                                tensor
-                                (
-                                    0.5*(wCell + (m & dr))*
-                                    (
-                                        //sqr(faceN)*
-                                        //faceTwoMuLambda*(*kDotLePtr)
-                                        (I - sqr(faceN))*
-                                        faceMu*(*kDotLePtr)
-                                    )
-                                );
-                        }
-
-                        // Add contribution from mirrored cell, if any
-                        if (pointHasMirror)
-                        {
-                            coeff +=
-                                transform(sePointMirr.second(), coeff);
-                        }
-
-                        // Check if the point has a fixed component
-                        if (pointHasFixedComp)
-                        {
-                            // Remove coeff in fixed direction
-                            coeff = (coeff & (I - sePointFixedDir));
-
-                            // Add explicitly to the source
-                            blockB += coeff & pointFixedComp[sePointID];
-                        }
+                        // Remove normal component
+                        coeff = (I - sqr(faceN)) & coeff;
 
                         // Add coeff contribution to globalCoeff
                         pointProcCellsCoeffs[varI][sePointID][i] -=
@@ -1002,65 +902,43 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
                     const List<labelPair>& sePointProcBndFaces =
                         pointProcBndFaces[sePointID];
 
-                    for
-                    (
-                        label i = 0; i < sePointProcBndFaces.size(); i++
-                    )
+                    for (label i = 0; i < sePointProcBndFaces.size(); i++)
                     {
-                        const scalar wCell = w[neiID]/sumW;
+                        // Coefficient is composed of the contribution from
+                        // pure averaging (inverse distance) and a
+                        // correction least squares
+                        const vector m =
+                            vector
+                            (
+                                curInvMatrix[0][neiID],
+                                curInvMatrix[1][neiID],
+                                curInvMatrix[2][neiID]
+                            );
 
-                        // Contribution from pure inverse distance
-                        // average (wCell) and a correction from least
-                        // squares due to a nonuniform distribution of
-                        // points (m & dr) so least squares correction
-                        // is zero if the vertex is located at the
-                        // average position of the neighbours
-
-                        const vector m
+                        // Calculate coefficient
+                        tensor coeff = tensor::zero;
+                        fv::blockFvmCalculateCoeff
                         (
-                            curInvMatrix[0][neiID],
-                            curInvMatrix[1][neiID],
-                            curInvMatrix[2][neiID]
+                            coeff,
+                            blockB[varI],
+                            w[neiID]/sumW,
+                            m,
+                            dr,
+                            faceMu,
+                            faceLambda,
+                            faceN,
+                            LeFaceN,
+                            kDotLe,
+                            nonOrthogonalMesh,
+                            mirrorPlaneTrans[sePointID],
+                            pointHasFixedComp,
+                            sePointFixedComp,
+                            sePointFixedDir,
+                            3
                         );
 
-                        tensor coeff =
-                            0.5*(wCell + (m & dr))
-                            //*(faceLambda*LeFaceN.T());
-                            *(faceMu*LeFaceN);
-                        //*(faceMu*LeFaceN + faceLambda*LeFaceN.T());
-
-                        // Add non-orthogonal correction term
-                        if (nonOrthogonalMesh)
-                        {
-                            coeff +=
-                                tensor
-                                (
-                                    0.5*(wCell + (m & dr))*
-                                    (
-                                        //sqr(faceN)*
-                                        //faceTwoMuLambda*(*kDotLePtr)
-                                        (I - sqr(faceN))*
-                                        faceMu*(*kDotLePtr)
-                                    )
-                                );
-                        }
-
-                        // Add contribution from mirrored cell, if any
-                        if (pointHasMirror)
-                        {
-                            coeff +=
-                                transform(sePointMirr.second(), coeff);
-                        }
-
-                        // Check if the point has a fixed component
-                        if (pointHasFixedComp)
-                        {
-                            // Remove coeff in fixed direction
-                            coeff = (coeff & (I - sePointFixedDir));
-
-                            // Add explicitly to the source
-                            blockB += coeff & pointFixedComp[sePointID];
-                        }
+                        // Remove normal component
+                        coeff = (I - sqr(faceN)) & coeff;
 
                         // Add coeff contribution to globalCoeff
                         pointProcBndFacesCoeffs[varI][sePointID][i] -=
@@ -1074,29 +952,15 @@ void blockFixedDisplacementZeroShearFvPatchVectorField::insertBlockCoeffs
             } // for the edge start and end points
         } // forAll edges of current face
 
-        // force normal
-
-        // We will use the first cell
-        //const scalar scaleFac = (d[0].xx() + d[0].yy() + d[0].zz())/3.0;
-        // if (mag(scaleFac) < SMALL)
-        // {
-        //     FatalErrorIn("pointGaussLsDivSigmaScheme::insertCoeffBc")
-        //         << "blockFixedDisplacementZeroShear scaleFac is zero"
-        //         << abort(FatalError);
-        // }
+        // Now we enforce the normal displacement (fixedValue) condition
 
         // Diagonal contribution for the boundary face
-        // d[varI] += tensor(scaleFac*I);
-
-        //d[varI] = scaleFac*sqr(faceN) + (d[varI] & (I - sqr(faceN)));
-        d[varI] = sqr(faceN) + (d[varI] & (I - sqr(faceN)));
-        //d[varI] = scaleFac*sqr(faceN) + ((I - sqr(faceN)) & d[varI]);
+        d[varI] = scaleFac*sqr(faceN) + ((I - sqr(faceN)) & d[varI]);
 
         // Source contribution
         // This is the only difference with a symmetry plane: we force a
         // non-zero normal dislacement
-        //blockB[varI] += scaleFac*(sqr(faceN) & disp[faceI]);
-        blockB[varI] += (sqr(faceN) & disp[faceI]);
+        blockB[varI] += scaleFac*(sqr(faceN) & disp[faceI]);
     }
 }
 

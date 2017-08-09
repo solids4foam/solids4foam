@@ -1087,6 +1087,10 @@ void solidPolyMesh::calcPointFixed(const volVectorField& D) const
     }
     const pointVectorField& pf = *pfPtr;
 
+    // Force pointD to correct boundary condition e.g. so fixedValue boundaries
+    // will set the point internalField values
+    const_cast<pointVectorField&>(pf).correctBoundaryConditions();
+
     forAll(D.boundaryField(), patchI)
     {
         const word pType = D.boundaryField()[patchI].type();
@@ -1103,21 +1107,20 @@ void solidPolyMesh::calcPointFixed(const volVectorField& D) const
             {
                 const label pointID = meshPoints[pI];
 
-               // Add point and overwrite if is is already there
-               pointFixedComp.set(pointID, pf[pointID]);
-               pointFixedDir.set(pointID, fixedDir);
+                // Add point and overwrite if is is already there
+                pointFixedComp.set(pointID, pf[pointID]);
+                pointFixedDir.set(pointID, fixedDir);
             }
         }
-        else if //(false)
+        else if
         (
             pType == blockFixedDisplacementZeroShearFvPatchVectorField::typeName
          || pType == solidSymmetryFvPatchVectorField::typeName
         )
         {
-            //Info<< "patch " << patchI << endl;
-            WarningIn("solidPolyMesh.C")
-                << "Applying point fixed components on patch "
-                << mesh.boundaryMesh()[patchI].name() << endl;
+            // WarningIn("solidPolyMesh.C")
+            //     << "Applying point fixed components on patch "
+            //     << mesh.boundaryMesh()[patchI].name() << endl;
 
             const labelList& meshPoints =
                 mesh.boundaryMesh()[patchI].meshPoints();
@@ -1137,8 +1140,6 @@ void solidPolyMesh::calcPointFixed(const volVectorField& D) const
                 {
                     pointFixedComp.insert(pointID, pf[pointID]);
                     pointFixedDir.insert(pointID, sqr(pointNormals[pI]));
-                    //Info<< "point " << pointID
-                    //    << " n2 " << sqr(pointNormals[pI]) << endl;
                 }
                 else
                 {
@@ -1153,17 +1154,16 @@ void solidPolyMesh::calcPointFixed(const volVectorField& D) const
                         const vector prevComp = pointFixedComp[pointID];
                         const symmTensor newDir = sqr(pointNormals[pI]);
 
+                        pointFixedComp.set
+                        (
+                            pointID,
+                            (newDir & pf[pointID]) + ((I - newDir) & prevComp)
+                        );
+
                         pointFixedDir.set
                         (
                             pointID,
                             symm(newDir + ((I - newDir) & prevDir))
-                        );
-
-                        pointFixedComp.set
-                        (
-                            pointID,
-                            (newDir & pf[pointID])
-                            + ((I - newDir) & prevComp)
                         );
 
                         if (debug)
