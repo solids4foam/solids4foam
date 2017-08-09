@@ -30,7 +30,7 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
-#include "solidTractionFvPatchVectorField.H"
+#include "blockSolidTractionFvPatchVectorField.H"
 #include "fvcGradf.H"
 #include "BlockFvmDivSigma.H"
 #include "linearElastic.H"
@@ -557,7 +557,7 @@ void coupledUnsLinGeomLinearElasticSolid::setTraction
     if
     (
         D_.boundaryField()[patchID].type()
-     != solidTractionFvPatchVectorField::typeName
+     != blockSolidTractionFvPatchVectorField::typeName
     )
     {
         FatalErrorIn
@@ -566,14 +566,14 @@ void coupledUnsLinGeomLinearElasticSolid::setTraction
         )   << "Bounary condition on " << D_.name()
             <<  " is "
             << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
-            << ", instead "
-            << solidTractionFvPatchVectorField::typeName
+            << " for patch" << mesh().boundary()[patchID].name()
+            << ", instead it should be "
+            << blockSolidTractionFvPatchVectorField::typeName
             << abort(FatalError);
     }
 
-    solidTractionFvPatchVectorField& patchU =
-        refCast<solidTractionFvPatchVectorField>
+    blockSolidTractionFvPatchVectorField& patchU =
+        refCast<blockSolidTractionFvPatchVectorField>
         (
             D_.boundaryField()[patchID]
         );
@@ -591,7 +591,7 @@ void coupledUnsLinGeomLinearElasticSolid::setPressure
     if
     (
         D_.boundaryField()[patchID].type()
-     != solidTractionFvPatchVectorField::typeName
+     != blockSolidTractionFvPatchVectorField::typeName
     )
     {
         FatalErrorIn
@@ -602,12 +602,12 @@ void coupledUnsLinGeomLinearElasticSolid::setPressure
             << D_.boundaryField()[patchID].type()
             << "for patch" << mesh().boundary()[patchID].name()
             << ", instead "
-            << solidTractionFvPatchVectorField::typeName
+            << blockSolidTractionFvPatchVectorField::typeName
             << abort(FatalError);
     }
 
-    solidTractionFvPatchVectorField& patchU =
-        refCast<solidTractionFvPatchVectorField>
+    blockSolidTractionFvPatchVectorField& patchU =
+        refCast<blockSolidTractionFvPatchVectorField>
         (
             D_.boundaryField()[patchID]
         );
