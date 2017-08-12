@@ -26,6 +26,7 @@ License
 #include "linearElastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
+#include "fvm.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -69,6 +70,112 @@ const Foam::surfaceSymmTensorField& Foam::linearElastic::sigma0f() const
 }
 
 
+void Foam::linearElastic::calculateHydrostaticStress
+(
+    volScalarField& sigmaHyd,
+    const volScalarField& trEpsilon
+)
+{
+    if (solvePressureEqn_)
+    {
+        // Store previous iteration to allow relaxation, if needed
+        sigmaHyd.storePrevIter();
+
+        // Lookup the momentum equation inverse diagonal field
+        const volScalarField* ADPtr = NULL;
+        if (mesh().foundObject<volScalarField>("DEqnA"))
+        {
+            ADPtr = &mesh().lookupObject<volScalarField>("DEqnA");
+        }
+        else if (mesh().foundObject<volScalarField>("DDEqnA"))
+        {
+            ADPtr = &mesh().lookupObject<volScalarField>("DDEqnA");
+        }
+        else
+        {
+            FatalErrorIn
+            (
+                "void Foam::linearElasticMisesPlastic::"
+                "calculateHydrostaticStress\n"
+                "(\n"
+                "    volScalarField& sigmaHyd,\n"
+                "    const volScalarField& trEpsilon\n"
+                ")"
+            )   << "Cannot find the DEqnA or DDEqnA field: this should be "
+                << "stored in the solidModel" << abort(FatalError);
+        }
+        const volScalarField& AD = *ADPtr;
+
+        // Pressure diffusivity field multiple by (4.0/3.0)*mu + K, which is
+        // equivalent to (2*mu + lambda)
+        // Note: we can scale this coefficient by pressureSmoothingCoeff to
+        // provide greater smoothing
+        const surfaceScalarField rDAf
+        (
+            "rDAf",
+            pressureSmoothingCoeff_
+           *fvc::interpolate
+            (
+                ((4.0/3.0)*mu_ + K_)/AD, "interpolate(grad(sigmaHyd))"
+            )
+        );
+
+        // Solve pressure laplacian
+        // Note: the the laplacian and div terms combine to produce a
+        // third-order smoothing/dissipation term
+        // If we only used the laplacian term then the smoothing/dissipation
+        // would be second-order.
+        // It would be interesting to see how this compares to the JST 2nd/4th
+        // order dissipation term
+        fvScalarMatrix sigmaHydEqn
+        (
+            fvm::Sp(1.0, sigmaHyd)
+          - fvm::laplacian(rDAf, sigmaHyd, "laplacian(DA,sigmaHyd)")
+          + fvc::div(rDAf*fvc::interpolate(fvc::grad(sigmaHyd)) & mesh().Sf())
+         ==
+            K_*trEpsilon
+        );
+
+        // Solve the pressure equation
+        sigmaHydEqn.solve();
+
+        // Relax the field
+        sigmaHyd.relax();
+    }
+    else
+    {
+        // Directly calculate hydrostatic stress from displacement field
+        sigmaHyd = K_*trEpsilon;
+    }
+}
+
+
+void Foam::linearElastic::calculateHydrostaticStress
+(
+    surfaceScalarField& sigmaHyd,
+    const surfaceScalarField& trEpsilon
+)
+{
+    if (solvePressureEqn_)
+    {
+        FatalErrorIn
+        (
+            "void Foam::linearElastic::calculateHydrostaticStress\n"
+            "(\n"
+            "    surfaceScalarField& sigmaHyd,\n"
+            "    const surfaceScalarField& trEpsilon\n"
+            ")"
+        )   << "'solvePressureEqn' option only implemented for volField stress "
+            << "calculation" << abort(FatalError);
+    }
+    else
+    {
+        // Directly calculate hydrostatic stress from displacement field
+        sigmaHyd = K_*trEpsilon;
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -82,11 +189,72 @@ Foam::linearElastic::linearElastic
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
+    mu_("mu", dimPressure, 0.0),
+    K_("K", dimPressure, 0.0),
+    E_("E", dimPressure, 0.0),
+    nu_("nu", dimless, 0.0),
     lambda_("lambda", dimPressure, 0.0),
-    mu_(E_/(2.0*(1.0 + nu_))),
-    k_("k", dimPressure, 0.0),
+    solvePressureEqn_
+    (
+        dict.lookupOrDefault<Switch>("solvePressureEqn", false)
+    ),
+    pressureSmoothingCoeff_
+    (
+        dict.lookupOrDefault<scalar>("pressureSmoothingCoeff", 1.0)
+    ),
+    sigmaHyd_
+    (
+        IOobject
+        (
+            "sigmaHyd",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedScalar("zero", dimPressure, 0.0),
+        zeroGradientFvPatchScalarField::typeName
+    ),
+    sigmaHydf_
+    (
+        IOobject
+        (
+            "sigmaHydf",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedScalar("zero", dimPressure, 0.0)
+    ),
+    epsilon_
+    (
+        IOobject
+        (
+            "epsilon",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
+    ),
+    epsilonf_
+    (
+        IOobject
+        (
+            "epsilonf",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
+    ),
     sigma0_
     (
         IOobject
@@ -106,6 +274,65 @@ Foam::linearElastic::linearElastic
     ),
     sigma0fPtr_(NULL)
 {
+    // Force storage of strain old time
+    epsilon_.oldTime();
+
+    // Read elastic parameters
+    // The user can specify E and nu or mu and K
+    if (dict.found("E") && dict.found("nu"))
+    {
+        // Read the Young's modulus
+        E_ = dimensionedScalar(dict.lookup("E"));
+
+        // Read the Poisson's ratio
+        nu_ = dimensionedScalar(dict.lookup("nu"));
+
+        // Set the shear modulus
+        mu_ = E_/(2.0*(1.0 + nu_));
+
+        // Set the bulk modulus
+        if (nu_.value() < 0.5)
+        {
+            K_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_;
+        }
+        else
+        {
+            K_.value() = GREAT;
+        }
+    }
+    else if (dict.found("mu") && dict.found("K"))
+    {
+        // Read shear modulus
+        mu_ = dimensionedScalar(dict.lookup("mu"));
+
+        // Read bulk modulus
+        K_ = dimensionedScalar(dict.lookup("K"));
+
+        // Calculate Young's modulus
+        E_ = 9.0*K_*mu_/(3.0*K_ + mu_);
+
+        // Calculate Poisson's ratio
+        nu_ = (3.0*K_ - 2.0*mu_)/(2.0*(3.0*K_ + mu_));
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "linearElasticMisesPlastic::linearElasticMisesPlastic::()"
+        )   << "Either E and nu or mu and K elastic parameters should be "
+            << "specified" << abort(FatalError);
+    }
+
+    // Set first Lame parameter
+    if (nu_.value() < 0.5)
+    {
+        lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_));
+    }
+    else
+    {
+        lambda_.value() = GREAT;
+    }
+
     // Check for physical Poisson's ratio
     if (nu_.value() < -1.0 || nu_.value() > 0.5)
     {
@@ -121,28 +348,19 @@ Foam::linearElastic::linearElastic
             << abort(FatalError);
     }
 
-    // Check for incompressibility
-    if (nu_.value() == 0.5)
+    // Check for incompressibility or quasi-incompressibility
+    if (nu_.value() > 0.49 && !solvePressureEqn_)
     {
-        Info<< "Material is incompressible: make sure to use a hybrid"
-            << " approach solid model" << endl;
-
-        // Set lambda and k to GREAT
-        lambda_.value() = GREAT;
-        k_.value() = GREAT;
+        WarningIn(type() + "::" + type())
+            << "Poisson's ratio is greater than 0.49: "
+            << "consider setting 'solvePressureEqn' to 'yes'!" << endl;
     }
-    else
-    {
-        if (planeStress())
-        {
-            lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - nu_));
-        }
-        else
-        {
-            lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_));
-        }
 
-        k_ = lambda_ + (2.0/3.0)*mu_;
+    if (solvePressureEqn_)
+    {
+        Info<< "    Laplacian equation will be solved for pressure" << nl
+            << "    pressureSmoothingCoeff: " << pressureSmoothingCoeff_
+            << endl;
     }
 
     if (gMax(mag(sigma0_)()) > SMALL)
@@ -248,7 +466,7 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::K() const
                 IOobject::NO_WRITE
             ),
             mesh(),
-            k_
+            K_
         )
     );
 }
@@ -268,16 +486,14 @@ const Foam::dimensionedScalar& Foam::linearElastic::lambda() const
 
 void Foam::linearElastic::correct(volSymmTensorField& sigma)
 {
+    // Calculate total strain
     if (mesh().foundObject<volTensorField>("grad(DD)"))
     {
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
             mesh().lookupObject<volTensorField>("grad(DD)");
 
-        // Calculate stress based on incremental form of Hooke's law
-        sigma =
-            sigma.oldTime() + mu_*twoSymm(gradDD) + lambda_*tr(gradDD)*I
-          + sigma0_;
+        epsilon_ = epsilon_.oldTime() + symm(gradDD);
     }
     else
     {
@@ -285,38 +501,50 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
         const volTensorField& gradD =
             mesh().lookupObject<volTensorField>("grad(D)");
 
-        // Check if a hybrid approach is being used
-        // Currently, this will only work when there is no material interface
-        // if (mesh().foundObject<volScalarField>("p"))
-        // {
-        //     const volScalarField& p =
-        //         mesh().lookupObject<volScalarField>("p");
-
-        //     // Calculate stress using Hooke's law in uncoupled deviatoric
-        //     // volumetric form
-        //     sigma = mu_*dev(twoSymm(gradD)) - p*I + sigma0_;
-        // }
-        // else
-        {
-            // Calculate stress based on Hooke's law
-            sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I + sigma0_;
-        }
+        epsilon_ = symm(gradD);
     }
+
+    // For planeStress, correct strain in the out of plane direction
+    if (planeStress())
+    {
+        if (mesh().solutionD()[vector::Z] > -1)
+        {
+            FatalErrorIn
+            (
+                "void Foam::linearElasticMisesPlastic::"
+                "correct(volSymmTensorField& sigma)"
+            )   << "For planeStress, this material law assumes the empty "
+                << "direction is the Z direction!" << abort(FatalError);
+        }
+
+        epsilon_.replace
+        (
+            symmTensor::ZZ,
+           -(nu_/E_)
+           *(sigma.component(symmTensor::XX) + sigma.component(symmTensor::YY))
+        );
+    }
+
+    // Hooke's law : standard form
+    //sigma = 2.0*mu_*epsilon_ + lambda_*tr(epsilon_)*I + sigma0_;
+
+    // Hooke's law : partitioned deviatoric and dilation form
+    const volScalarField trEpsilon = tr(epsilon_);
+    calculateHydrostaticStress(sigmaHyd_, trEpsilon);
+    sigma = 2.0*mu_*dev(epsilon_) + sigmaHyd_*I + sigma0_;
 }
 
 
 void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
 {
+    // Calculate total strain
     if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
     {
         // Lookup gradient of displacement increment
         const surfaceTensorField& gradDD =
             mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
-        // Calculate stress based on incremental form of Hooke's law
-        sigma =
-            sigma.oldTime() + mu_*twoSymm(gradDD) + lambda_*tr(gradDD)*I
-          + sigma0f();
+        epsilonf_ = epsilonf_.oldTime() + symm(gradDD);
     }
     else
     {
@@ -324,9 +552,37 @@ void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
         const surfaceTensorField& gradD =
             mesh().lookupObject<surfaceTensorField>("grad(D)f");
 
-        // Calculate stress based on Hooke's law
-        sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I + sigma0f();
+        epsilonf_ = symm(gradD);
     }
+
+    // For planeStress, correct strain in the out of plane direction
+    if (planeStress())
+    {
+        if (mesh().solutionD()[vector::Z] > -1)
+        {
+            FatalErrorIn
+            (
+                "void Foam::linearElasticMisesPlastic::"
+                "correct(surfaceSymmTensorField& sigma)"
+            )   << "For planeStress, this material law assumes the empty "
+                << "direction is the Z direction!" << abort(FatalError);
+        }
+
+        epsilonf_.replace
+        (
+            symmTensor::ZZ,
+           -(nu_/E_)
+           *(sigma.component(symmTensor::XX) + sigma.component(symmTensor::YY))
+        );
+    }
+
+    // Hooke's law : standard form
+    //sigma = 2.0*mu_*epsilonf_ + lambda_*tr(epsilonf_)*I + sigma0f();
+
+    // Hooke's law : partitioned deviatoric and dilation form
+    const surfaceScalarField trEpsilon = tr(epsilonf_);
+    calculateHydrostaticStress(sigmaHydf_, trEpsilon);
+    sigma = 2.0*mu_*dev(epsilonf_) + sigmaHydf_*I + sigma0f();
 }
 
 

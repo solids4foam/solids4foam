@@ -713,6 +713,7 @@ bool linGeomSolid::evolve()
         D_ = D_.oldTime() + DD_;
 
         // Calculate the stress using run-time selectable mechanical law
+        const volScalarField DDEqnA("DDEqnA", DDEqn.A());
         mechanical().correct(sigma_);
 
         // Update impKf to improve convergence
