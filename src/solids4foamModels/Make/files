@@ -1,5 +1,6 @@
 solidModels/solidModel/solidModel.C
 solidModels/solidModel/newSolidModel.C
+solidModels/freeVibrationSolid/freeVibrationSolid.C
 solidModels/linGeomSolid/linGeomSolid.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
 solidModels/coupledHybridLinGeomSolid/coupledHybridLinGeomSolid.C

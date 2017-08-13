@@ -22,10 +22,10 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    BlockEigenGMResSolver
+    BlockEigenBiCGStabSolver
 
 Description
-    The GMRes iterative sparse linear equation solver from package Eigen is
+    The BiCGStab iterative sparse linear equation solver from package Eigen is
     called to solve the system.
 
     Notes
@@ -40,72 +40,54 @@ Author
     Philip Cardiff, UCD.  All rights reserved
 
 SourceFiles
-    BlockEigenGMResSolver.C
+    BlockEigenBiCGStabSolver.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef BlockEigenGMResSolver_H
-#define BlockEigenGMResSolver_H
+#ifndef BlockEigenBiCGStabSolver_H
+#define BlockEigenBiCGStabSolver_H
 
-#include "Field.H"
+#include "BlockEigenSolver.H"
 #include "typeInfo.H"
-
 #include "runTimeSelectionTables.H"
-
-#include "Switch.H"
-
-#include "BlockLduMatrix.H"
-#include "BlockLduSolver.H"
-#include "blockLduSolvers.H"
-#include "BlockSolverPerformance.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
-
 /*---------------------------------------------------------------------------*\
-                      Class BlockEigenGMResSolver Declaration
+                      Class BlockEigenBiCGStabSolver Declaration
 \*---------------------------------------------------------------------------*/
 
-class BlockEigenGMResSolver
+class BlockEigenBiCGStabSolver
 :
-    public blockVectorSolver //BlockLduSolver<vector>
+    public BlockEigenSolver
 {
-        //- Write matrix and source to file for solution in Matlab
-        // System can be read and solved like this:
-        //     % Matlab '.m' script
-        //     load matlabSparseMatrix.txt;
-        //     A = spconvert(matrix);
-        //     B = dlmread('matlabSource.txt', ' ');
-        //     x = A\B;
-        const Switch exportSystemMatlab_;
-
         // Tolerance for iterative solution
         const scalar tol_;
 
-        // Restart frequency
-        const int restart_;
+        // Maximum number of iterations
+        const int maxIter_;
 
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        BlockEigenGMResSolver(const BlockEigenGMResSolver&);
+        BlockEigenBiCGStabSolver(const BlockEigenBiCGStabSolver&);
 
         //- Disallow default bitwise assignment
-        void operator=(const BlockEigenGMResSolver&);
+        void operator=(const BlockEigenBiCGStabSolver&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("EigenGMRes");
+    TypeName("EigenBiCGStab");
 
 
     // Constructors
 
         //- Construct from matrix
-        BlockEigenGMResSolver
+        BlockEigenBiCGStabSolver
         (
             const word& fieldName,
             const BlockLduMatrix<vector>& matrix,
@@ -126,12 +108,6 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-//#ifdef NoRepository
-//#   include "BlockEigenGMResSolver.C"
-//#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

@@ -22,11 +22,14 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    BlockEigenSparseLUSolver
+    BlockEigenProblemSolver
 
 Description
-    The SparseLU direct sparse linear equation solver from package Eigen is
-    called to solve the system.
+    The SelfAdjointEigenSolver eigen problem solver from the package Eigen is
+    called to calculate the eigenvalues and eigenvectors for the system.
+
+    This solver is used to solve, for example, linear buckling problems, free
+    vibration problems, etc.
 
     Notes
     - The solver does not run in parallel
@@ -40,79 +43,69 @@ Author
     Philip Cardiff, UCD.  All rights reserved
 
 SourceFiles
-    BlockEigenSparseLUSolver.C
+    BlockEigenProblemSolver.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef BlockEigenSparseLUSolver_H
-#define BlockEigenSparseLUSolver_H
+#ifndef BlockEigenProblemSolver_H
+#define BlockEigenProblemSolver_H
+
+#include "BlockEigenSolver.H"
 
 #include "Field.H"
 #include "typeInfo.H"
-
 #include "runTimeSelectionTables.H"
-
 #include "Switch.H"
-
 #include "BlockLduMatrix.H"
 #include "BlockLduSolver.H"
 #include "blockLduSolvers.H"
 #include "BlockSolverPerformance.H"
+#include <Eigen/Sparse>
+#include <Eigen/Eigenvalues>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
-
-// template<class Type>
-// class BlockLduMatrix;
-
-// template<class Type>
-// class BlockLduSolver;
-
-// template<class vector>
-// class BlockSolverPerformance;
-
 /*---------------------------------------------------------------------------*\
-                      Class BlockEigenSparseLUSolver Declaration
+                      Class BlockEigenProblemSolver Declaration
 \*---------------------------------------------------------------------------*/
 
-class BlockEigenSparseLUSolver
+class BlockEigenProblemSolver
 :
-    public blockVectorSolver //BlockLduSolver<vector>
+    public BlockEigenSolver
 {
-        //- Write matrix and source to file for solution in Matlab
-        // System can be read and solved like this:
-        //     % Matlab '.m' script
-        //     load matlabSparseMatrix.txt;
-        //     A = spconvert(matrix);
-        //     B = dlmread('matlabSource.txt', ' ');
-        //     x = A\B;
-        const Switch exportSystemMatlab_;
+        // Pointer to the eigenvalues
+        autoPtr
+        <
+            Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf>::RealVectorType
+        > eigenvaluesPtr_;
 
-        // If the system should be scaled before solving to equilibrate rows
-        // and column norms in matrices
-        const Switch scale_;
+        // Pointer to the eigenvectors
+        autoPtr
+        <
+            Eigen::MatrixXf
+        > eigenvectorsPtr_;
 
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        BlockEigenSparseLUSolver(const BlockEigenSparseLUSolver&);
+        BlockEigenProblemSolver(const BlockEigenProblemSolver&);
 
         //- Disallow default bitwise assignment
-        void operator=(const BlockEigenSparseLUSolver&);
+        void operator=(const BlockEigenProblemSolver&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("EigenSparseLU");
+    TypeName("EigenProblem");
 
 
     // Constructors
 
         //- Construct from matrix
-        BlockEigenSparseLUSolver
+        BlockEigenProblemSolver
         (
             const word& fieldName,
             const BlockLduMatrix<vector>& matrix,
@@ -128,17 +121,16 @@ public:
             Field<vector>& x,
             const Field<vector>& b
         );
+
+    // Access Functions
+
+        //- Retrieve a mode
+        void mode(const int modeI, Field<vector>& x) const;
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-//#ifdef NoRepository
-//#   include "BlockEigenSparseLUSolver.C"
-//#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

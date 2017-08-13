@@ -169,43 +169,54 @@ void blockFixedDisplacementFvPatchVectorField::updateCoeffs()
 
     if
     (
-        mesh.lookupObject<pointVectorField>
+        mesh.foundObject<pointVectorField>
         (
             "point" + dimensionedInternalField().name()
-        ).boundaryField()[patch().index()].type() == "fixedValue"
+        )
     )
     {
-        if (dimensionedInternalField().name() == "DD")
-        {
-            const pointVectorField& pointD =
-                mesh.objectRegistry::lookupObject
-                <
-                pointVectorField
-                >("pointD");
-
-            const pointVectorField& pointDOld = pointD.oldTime();
-
-            const labelList& meshPoints = patch().patch().meshPoints();
-
-            forAll(meshPoints, pI)
-            {
-                const label pointID = meshPoints[pI];
-
-                pointDisp[pI] -= pointDOld[pointID];
-            }
-        }
-
-        fixedValuePointPatchVectorField& patchPointDD =
-            refCast<fixedValuePointPatchVectorField>
+        if
+        (
+            mesh.lookupObject<pointVectorField>
             (
-                const_cast<pointVectorField&>
-                (
+                "point" + dimensionedInternalField().name()
+            ).boundaryField()[patch().index()].type() == "fixedValue"
+        )
+        {
+            if (dimensionedInternalField().name() == "DD")
+            {
+                // Old time field
+                const pointVectorField& pointD =
                     mesh.objectRegistry::lookupObject<pointVectorField>
-                    ("point" + dimensionedInternalField().name())
-                ).boundaryField()[patch().index()]
-            );
+                    (
+                        "pointD"
+                    );
 
-        patchPointDD == pointDisp;
+                const pointVectorField& pointDOld = pointD.oldTime();
+
+                const labelList& meshPoints = patch().patch().meshPoints();
+
+                forAll(meshPoints, pI)
+                {
+                    const label pointID = meshPoints[pI];
+
+                    pointDisp[pI] -= pointDOld[pointID];
+                }
+            }
+
+            fixedValuePointPatchVectorField& patchPointDD =
+                refCast<fixedValuePointPatchVectorField>
+                (
+                    const_cast<pointVectorField&>
+                    (
+                        mesh.objectRegistry::lookupObject<pointVectorField>
+                        (
+                            "point" + dimensionedInternalField().name())
+                        ).boundaryField()[patch().index()]
+                );
+
+            patchPointDD == pointDisp;
+        }
     }
 
     fixedValueFvPatchVectorField::updateCoeffs();

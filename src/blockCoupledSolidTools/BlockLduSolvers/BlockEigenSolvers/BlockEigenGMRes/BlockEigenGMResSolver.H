@@ -22,10 +22,10 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    BlockEigenBiCGStabSolver
+    BlockEigenGMResSolver
 
 Description
-    The BiCGStab iterative sparse linear equation solver from package Eigen is
+    The GMRes iterative sparse linear equation solver from package Eigen is
     called to solve the system.
 
     Notes
@@ -40,81 +40,55 @@ Author
     Philip Cardiff, UCD.  All rights reserved
 
 SourceFiles
-    BlockEigenBiCGStabSolver.C
+    BlockEigenGMResSolver.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef BlockEigenBiCGStabSolver_H
-#define BlockEigenBiCGStabSolver_H
+#ifndef BlockEigenGMResSolver_H
+#define BlockEigenGMResSolver_H
 
-#include "Field.H"
+#include "BlockEigenSolver.H"
 #include "typeInfo.H"
-
 #include "runTimeSelectionTables.H"
-
-#include "Switch.H"
-
-#include "BlockLduMatrix.H"
-#include "BlockLduSolver.H"
-#include "blockLduSolvers.H"
-#include "BlockSolverPerformance.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-// template<class Type>
-// class BlockLduMatrix;
-
-// template<class Type>
-// class BlockLduSolver;
-
-// template<class vector>
-// class BlockSolverPerformance;
-
 /*---------------------------------------------------------------------------*\
-                      Class BlockEigenBiCGStabSolver Declaration
+                      Class BlockEigenGMResSolver Declaration
 \*---------------------------------------------------------------------------*/
 
-class BlockEigenBiCGStabSolver
+class BlockEigenGMResSolver
 :
-    public blockVectorSolver //BlockLduSolver<vector>
+    public BlockEigenSolver
 {
-        //- Write matrix and source to file for solution in Matlab
-        // System can be read and solved like this:
-        //     % Matlab '.m' script
-        //     load matlabSparseMatrix.txt;
-        //     A = spconvert(matrix);
-        //     B = dlmread('matlabSource.txt', ' ');
-        //     x = A\B;
-        const Switch exportSystemMatlab_;
-
         // Tolerance for iterative solution
         const scalar tol_;
 
-        // Maximum number of iterations
-        const int maxIter_;
+        // Restart frequency
+        const int restart_;
 
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        BlockEigenBiCGStabSolver(const BlockEigenBiCGStabSolver&);
+        BlockEigenGMResSolver(const BlockEigenGMResSolver&);
 
         //- Disallow default bitwise assignment
-        void operator=(const BlockEigenBiCGStabSolver&);
+        void operator=(const BlockEigenGMResSolver&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("EigenBiCGStab");
+    TypeName("EigenGMRes");
 
 
     // Constructors
 
         //- Construct from matrix
-        BlockEigenBiCGStabSolver
+        BlockEigenGMResSolver
         (
             const word& fieldName,
             const BlockLduMatrix<vector>& matrix,
@@ -135,12 +109,6 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-//#ifdef NoRepository
-//#   include "BlockEigenBiCGStabSolver.C"
-//#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

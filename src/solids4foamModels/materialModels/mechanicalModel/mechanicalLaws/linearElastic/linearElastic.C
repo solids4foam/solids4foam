@@ -224,7 +224,7 @@ Foam::linearElastic::linearElastic
             mesh.time().timeName(),
             mesh,
             IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
+            IOobject::NO_WRITE
         ),
         mesh,
         dimensionedScalar("zero", dimPressure, 0.0)
@@ -250,7 +250,7 @@ Foam::linearElastic::linearElastic
             mesh.time().timeName(),
             mesh,
             IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
+            IOobject::NO_WRITE
         ),
         mesh,
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
