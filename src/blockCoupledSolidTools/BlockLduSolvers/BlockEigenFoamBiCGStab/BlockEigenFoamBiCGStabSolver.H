@@ -26,7 +26,7 @@ Class
 
 Description
     The BiCGStab iterative sparse linear equation solver from package Eigen is
-    called to solve the system; on contrast to EigenBiCGStab, the Eigen code has
+    called to solve the system; in contrast to EigenBiCGStab, the Eigen code has
     actually been copied here to use the Amul functionality.
 
     Notes

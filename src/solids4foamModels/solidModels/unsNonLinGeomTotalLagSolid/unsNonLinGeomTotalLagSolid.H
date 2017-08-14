@@ -151,9 +151,6 @@ class unsNonLinGeomTotalLagSolid
         //- Switch to enable/disable nonlinear geometry
         const Switch nonLinear_;
 
-        //- Switch to enable/disable enforce linear to help convergence
-        Switch enforceLinear_;
-
         //- Debug switch for the print-out of residuals
         const Switch debug_;
 
@@ -175,6 +172,17 @@ class unsNonLinGeomTotalLagSolid
 
         //- Disallow default bitwise assignment
         void operator=(const unsNonLinGeomTotalLagSolid&);
+
+
+protected:
+
+    // Protected member functions
+
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const
+        {
+            return nonLinearGeometry::TOTAL_LAGRANGIAN;
+        }
 
 
 public:
@@ -253,6 +261,12 @@ public:
             (
                 const label zoneID
             ) const;
+
+            //- Return nonLinear geometry switch
+            const Switch& nonLinear() const
+            {
+                return nonLinear_;
+            }
 
         // Edit
 

@@ -105,7 +105,13 @@ class neoHookeanElasticMisesPlastic
         interpolationTable<scalar> stressPlasticStrainSeries_;
 
         //- Hydrostatic stress
+        //  Note: sigmaHyd_ == tr(sigmaCauchy)/3.0 == -p,
+        //  where p is the hydrostatic pressure
         volScalarField sigmaHyd_;
+
+        //- Switch to enable solution of a pressure equation, which ensures a
+        //  smooth sigmaHyd field
+        Switch smoothPressure_;
 
         //- Cauchy yield stress
         volScalarField sigmaY_;
@@ -277,18 +283,16 @@ class neoHookeanElasticMisesPlastic
             const scalar maxMagDEpsilon    // Max strain increment magnitude
         ) const;
 
-        //- Update bEbar after the deviatoric stress has been calculated
-        void updateBEbar
+        //- Calcualte Ibar such that det(bEbar) == 1
+        tmp<volScalarField> Ibar
         (
-            volSymmTensorField& bEbar,
-            const volSymmTensorField& bEbarTrial
+            const volSymmTensorField& devBEbar
         );
 
-        //- Update bEbar after the deviatoric stress has been calculated
-        void updateBEbar
+        //- Calcualte Ibar such that det(bEbar) == 1
+        tmp<surfaceScalarField> Ibar
         (
-            surfaceSymmTensorField& bEbar,
-            const surfaceSymmTensorField& bEbarTrial
+            const surfaceSymmTensorField& devBEbar
         );
 
 public:
@@ -306,7 +310,8 @@ public:
         (
             const word& name,
             const fvMesh& mesh,
-            const dictionary& dict
+            const dictionary& dict,
+            const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
 

@@ -167,6 +167,17 @@ class coupledHybridLinGeomSolid
         void operator=(const coupledHybridLinGeomSolid&);
 
 
+protected:
+
+    // Protected member functions
+
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const
+        {
+            return nonLinearGeometry::LINEAR_GEOMETRY;
+        }
+
+
 public:
 
     //- Runtime type information

@@ -14,19 +14,10 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolver            icoFluid;
-//fluidSolver            consistentIcoFluid;
-//fluidSolver            pisoFluid;
+fluidModel icoFluid;
+// fluidModel pisoFluid;
 
 icoFluidCoeffs
-{
-    nCorrectors     2;
-    nNonOrthogonalCorrectors 0;
-    pRefCell        0;
-    pRefValue       0;
-}
-
-consistentIcoFluidCoeffs
 {
     nCorrectors     2;
     nNonOrthogonalCorrectors 0;

@@ -303,14 +303,12 @@ void standardPenalty::correct
     // This is using the original mesh weights; it would be better to use the
     // deformed patch, and it might help
     // This could be changed to used the current weights
-    // WarningIn("standardPenalty::correct(...)")
-    //    << "Philip: check pointToFace interpolator" << endl;
     primitivePatchInterpolation localSlaveInterpolator
     (
         mesh.boundaryMesh()[slavePatchIndex]
     );
 
-    vectorField newSlavePressure =
+    const vectorField newSlavePressure =
         localSlaveInterpolator.pointToFaceInterpolate<scalar>
         (
             totalSlavePointPressure_
@@ -320,41 +318,44 @@ void standardPenalty::correct
     slavePressure_ =
         relaxFac_*newSlavePressure + (1.0 - relaxFac_)*slavePressure_;
 
-    scalar maxMagSlaveTraction = 0.0;
-    if (slavePressure_.size() > 0)
-    {
-        maxMagSlaveTraction = max(mag(slavePressure_));
-    }
-    reduce(maxMagSlaveTraction, maxOp<scalar>());
-    reduce(numSlaveContactPoints, sumOp<int>());
+    // Remove any tangential component as the normal model should only
+    // contribute to the normal stress
+    slavePressure_ = sqr(slavePatchFaceNormals) & slavePressure_;
 
-    // Write to contact file
-    if
-    (
-        Pstream::master()
-     && (contactIterNum_++ %  infoFreq_ == 0)
-     && writeDebugFile_
-    )
+    // Write contact debug file
+    if ((contactIterNum_++ %  infoFreq_ == 0) && writeDebugFile_)
     {
-        OFstream& contactFile = *contactFilePtr_;
-        int width = 20;
-        contactFile
-            << mesh.time().value();
-        contactFile.width(width);
-        contactFile
-            << contactIterNum_;
-        contactFile.width(width);
-        contactFile
-            << numSlaveContactPoints;
-        contactFile.width(width);
-        contactFile
-            << minSlavePointPenetration;
-        contactFile.width(width);
-        contactFile
-            << maxMagSlaveTraction;
-        contactFile.width(width);
-        contactFile
-            << endl;
+        scalar maxMagSlaveTraction = 0.0;
+        if (slavePressure_.size() > 0)
+        {
+            maxMagSlaveTraction = max(mag(slavePressure_));
+        }
+        reduce(maxMagSlaveTraction, maxOp<scalar>());
+        reduce(numSlaveContactPoints, sumOp<int>());
+
+        // Master processor writes file
+        if (Pstream::master())
+        {
+            OFstream& contactFile = *contactFilePtr_;
+            const int width = 20;
+            contactFile
+                << mesh.time().value();
+            contactFile.width(width);
+            contactFile
+                << contactIterNum_;
+            contactFile.width(width);
+            contactFile
+                << numSlaveContactPoints;
+            contactFile.width(width);
+            contactFile
+                << minSlavePointPenetration;
+            contactFile.width(width);
+            contactFile
+                << maxMagSlaveTraction;
+            contactFile.width(width);
+            contactFile
+                << endl;
+        }
     }
 }
 

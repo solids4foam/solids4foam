@@ -57,14 +57,23 @@ void Foam::fluidModel::calcGlobalFaceZones() const
     {
         const faceZone& curFaceZone = faceZones[zoneI];
 
+        bool globalFaceZone = false;
+
         forAll(curFaceZone, faceI)
         {
-            // if unused face exist
+            // If unused face exist, then this must be a global face zone
             if (curFaceZone[faceI] >= mesh().nFaces())
             {
                 globalFaceZonesSet.insert(zoneI);
                 break;
             }
+        }
+
+        reduce(globalFaceZone, orOp<bool>());
+
+        if (globalFaceZone)
+        {
+            globalFaceZonesSet.insert(zoneI);
         }
     }
 

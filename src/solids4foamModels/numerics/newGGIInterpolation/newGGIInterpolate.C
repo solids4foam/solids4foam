@@ -1,7 +1,7 @@
 /*---------------------------------------------------------------------------*\
   =========                 |
   \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
+   \\    /   O peration     | Version:     4.0
     \\  /    A nd           | Web:         http://www.foam-extend.org
      \\/     M anipulation  | For copyright notice see file Copyright
 -------------------------------------------------------------------------------
@@ -120,8 +120,8 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedBridge
     // Note: tricky algorithm
     // In order for a face to be bridged it needs to be both in the
     // mask and in selection of faces that are bridged (addr).
-    // This implies an n-squared search, but we can use the fact that
-    // both lists are ordered.
+    // This implies an n-squared search, but we can avoid it by
+    // using the fact that both lists are ordered.
 
     label maskAddrI = 0;
 
@@ -284,17 +284,27 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedMasterToSlave
     if (this->doTransform() && pTraits<Type>::rank > 0)
     {
         // Transform master data to slave
-        Field<Type> transformFF;
+        Field<Type> transformFF(ff.size());
 
         if (reverseT_.size() == 1)
         {
             // Constant transform
-            transformFF = transform(reverseT_[0], ff);
+            // Transform only masked elements.  HJ, 25/May/2016
+            forAll (mask, maskI)
+            {
+                transformFF[mask[maskI]] =
+                    transform(reverseT_[0], ff[mask[maskI]]);
+            }
         }
         else
         {
             // Full patch transform
-            transformFF = transform(reverseT_, ff);
+            // Transform only masked elements.  HJ, 25/May/2016
+            forAll (mask, maskI)
+            {
+                transformFF[mask[maskI]] =
+                    transform(reverseT_[mask[maskI]], ff[mask[maskI]]);
+            }
         }
 
         newGGIInterpolation<MasterPatch, SlavePatch>::maskedInterpolate
@@ -445,16 +455,26 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedSlaveToMaster
     if (this->doTransform() && pTraits<Type>::rank > 0)
     {
         // Transform slave data to master
-        Field<Type> transformFF;
+        Field<Type> transformFF(ff.size());
         if (forwardT_.size() == 1)
         {
             // Constant transform
-            transformFF = transform(forwardT_[0], ff);
+            // Transform only masked elements.  HJ, 25/May/2016
+            forAll (mask, maskI)
+            {
+                transformFF[mask[maskI]] =
+                    transform(forwardT_[0], ff[mask[maskI]]);
+            }
         }
         else
         {
             // Full patch transform
-            transformFF = transform(forwardT_, ff);
+            // Transform only masked elements.  HJ, 25/May/2016
+            forAll (mask, maskI)
+            {
+                transformFF[mask[maskI]] =
+                    transform(forwardT_[mask[maskI]], ff[mask[maskI]]);
+            }
         }
 
         newGGIInterpolation<MasterPatch, SlavePatch>::maskedInterpolate
@@ -606,6 +626,8 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedBridgeSlave
 
     maskedBridge(bridgeField, ff, mask, uncoveredSlaveFaces());
 }
+
+
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

@@ -165,6 +165,43 @@ calcMasterPointAddressing() const
         masterPointAddr[pointI] = faceTriangle;
         masterPointDist[pointI] = distance;
     }
+
+//     Info<< "Extended GGI, master point distance, max: "
+//         << max(masterPointDist)
+//         << ", avg: " << average(masterPointDist)
+//         << ", min: " << min(masterPointDist) << endl;
+
+
+    // Check orientation
+
+//     const pointField& masterPointNormals =
+//         this->masterPatch().pointNormals();
+
+//     const vectorField& slaveFaceNormals =
+//         this->slavePatch().faceNormals();
+
+//     scalarField orientation(masterPointAddr.size(), 0);
+
+//     label nIncorrectPoints = 0;
+
+//     forAll(masterPointAddr, pointI)
+//     {
+//         orientation[pointI] =
+//             (
+//                 masterPointNormals[pointI]
+//               & slaveFaceNormals[masterPointAddr[pointI].first()]
+//             );
+
+//         if (orientation[pointI] > -SMALL)
+//         {
+//             nIncorrectPoints++;
+//         }
+//     }
+
+//     Info << "Extended GGI, master point orientation (<0), max: "
+//         << max(orientation)
+//         << ", min: " << min(orientation) << ", nIncorrectPoints: "
+//         << nIncorrectPoints << "/" << masterPointAddr.size() << endl;
 }
 
 template<class FromPatch, class ToPatch>
@@ -355,6 +392,42 @@ calcSlavePointAddressing() const
         slavePointAddr[pointI] = faceTriangle;
         slavePointDist[pointI] = distance;
     }
+
+//     Info<< "Extended GGI, slave point distance, max: "
+//         << max(slavePointDist)
+//         << ", avg: " << average(slavePointDist)
+//         << ", min: " << min(slavePointDist) << endl;
+
+    // Check orientation
+
+//     const pointField& slavePointNormals =
+//         this->slavePatch().pointNormals();
+
+//     const vectorField& masterFaceNormals =
+//         this->masterPatch().faceNormals();
+
+//     scalarField orientation(slavePointAddr.size(), 0);
+
+//     label nIncorrectPoints = 0;
+
+//     forAll(slavePointAddr, pointI)
+//     {
+//         orientation[pointI] =
+//             (
+//                 slavePointNormals[pointI]
+//               & masterFaceNormals[slavePointAddr[pointI].first()]
+//             );
+
+//         if (orientation[pointI] > -SMALL)
+//         {
+//             nIncorrectPoints++;
+//         }
+//     }
+
+//     Info << "Extended GGI, slave point orientation (<0), max: "
+//         << max(orientation)
+//         << ", min: " << min(orientation) << ", nIncorrectPoints: "
+//         << nIncorrectPoints << "/" << slavePointAddr.size() << endl;
 }
 
 template<class FromPatch, class ToPatch>
@@ -437,13 +510,13 @@ ExtendedGGIInterpolation<MasterPatch, SlavePatch>::ExtendedGGIInterpolation
     const scalar masterNonOverlapFaceTol,
     const scalar slaveNonOverlapFaceTol,
     const bool rescaleGGIWeightingFactors,
-    //const GGIInterpolationName::quickReject reject,
-    const newGGIInterpolationName::quickReject reject,
-    const boundBox& regionOfInterest
+    const GGIInterpolationName::quickReject reject //,
+    //const newGGIInterpolationName::quickReject reject //,
+    //const boundBox& regionOfInterest
 )
 :
-    //GGIInterpolation<MasterPatch, SlavePatch>
-    newGGIInterpolation<MasterPatch, SlavePatch>
+    GGIInterpolation<MasterPatch, SlavePatch>
+    //newGGIInterpolation<MasterPatch, SlavePatch>
     (
         masterPatch,
         slavePatch,
@@ -453,8 +526,8 @@ ExtendedGGIInterpolation<MasterPatch, SlavePatch>::ExtendedGGIInterpolation
         masterNonOverlapFaceTol,
         slaveNonOverlapFaceTol,
         rescaleGGIWeightingFactors,
-        reject,
-        regionOfInterest
+        reject //,
+        //regionOfInterest
     ),
     masterPointAddressingPtr_(NULL),
     masterPointWeightsPtr_(NULL),
@@ -623,6 +696,15 @@ slaveToMasterPointInterpolate
               + weights[pointI][1]*pf[hitFace.nextLabel(pI)]
               + weights[pointI][2]*ctrF;
         }
+        else
+        {
+            FatalErrorIn
+            (
+                "ExtendedGGIInterpolation::masterToSlavePointInterpolate"
+                "(const Field<Type> pf)"
+            )   << "Master point addressing is not correct"
+                << abort(FatalError);
+        }
     }
 
     return tresult;
@@ -711,8 +793,8 @@ bool ExtendedGGIInterpolation<MasterPatch, SlavePatch>::movePoints
     deleteDemandDrivenData(slavePointWeightsPtr_);
     deleteDemandDrivenData(slavePointDistancePtr_);
 
-    //return GGIInterpolation<MasterPatch, SlavePatch>::movePoints
-    return newGGIInterpolation<MasterPatch, SlavePatch>::movePoints
+    return GGIInterpolation<MasterPatch, SlavePatch>::movePoints
+    //return newGGIInterpolation<MasterPatch, SlavePatch>::movePoints
         (
             forwardT,
             reverseT,

@@ -55,71 +55,97 @@ addToRunTimeSelectionTable(solidModel, thermalLinGeomSolid, dictionary);
 bool thermalLinGeomSolid::converged
 (
     const int iCorr,
-    const lduSolverPerformance& solverPerfT
+    const lduSolverPerformance& solverPerfT,
+    const lduSolverPerformance& solverPerfD
 )
 {
     // We will check a number of different residuals for convergence
     bool converged = false;
 
-    // Calculate displacement residual
+    // Calculate relative residuals
+    const scalar absResidualT =
+        gMax(mag(T_.internalField() - T_.oldTime().internalField()));
     const scalar residualT =
+        absResidualT
+       /max
+        (
+            gMax(mag(T_.internalField() - T_.oldTime().internalField())),
+            SMALL
+        );
+
+    const scalar residualD =
         gMax
         (
-            mag(T_.internalField() - T_.prevIter().internalField())
+            mag(D_.internalField() - D_.prevIter().internalField())
            /max
             (
-                gMax(mag(T_.internalField() - T_.oldTime().internalField())),
+                gMax(mag(D_.internalField() - D_.oldTime().internalField())),
                 SMALL
             )
         );
 
+    // Calculate material residual
+    const scalar materialResidual = mechanical().residual();
+
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
     // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1)
+    if (iCorr > 1 && materialResidual < materialTol_)
     {
+        bool convergedD = false;
+        bool convergedT = false;
+
         if
         (
-            solverPerfT.initialResidual() < solutionTol_
-         && residualT < solutionTol_
+            (
+                solverPerfD.initialResidual() < solutionTol_
+             && residualD < solutionTol_
+            )
+         || solverPerfD.initialResidual() < alternativeTol_
+         || residualD < alternativeTol_
         )
         {
-            Info<< "    Both residuals have converged" << endl;
-            converged = true;
+            convergedD = true;
         }
-        else if
+
+        if
         (
-            residualT < alternativeTol_
+            (
+                solverPerfT.initialResidual() < solutionTol_
+             && residualT < solutionTol_
+            )
+         || solverPerfT.initialResidual() < alternativeTol_
+         || residualT < alternativeTol_
+         || absResidualT < absTTol_
         )
         {
-            Info<< "    The relative residual has converged" << endl;
-            converged = true;
+            convergedT = true;
         }
-        else if
-        (
-            solverPerfT.initialResidual() < alternativeTol_
-        )
+
+
+        if (convergedD && convergedT)
         {
-            Info<< "    The solver residual has converged" << endl;
+            Info<< "    The residuals have converged" << endl;
             converged = true;
-        }
-        else
-        {
-            converged = false;
         }
     }
 
     // Print residual information
     if (iCorr == 0)
     {
-        Info<< "    Corr, res, relRes, iters" << endl;
+        Info<< "    Corr, res (T & D), relRes (T & D), matRes, iters (T & D)"
+            << endl;
     }
     else if (iCorr % infoFrequency_ == 0 || converged)
     {
         Info<< "    " << iCorr
             << ", " << solverPerfT.initialResidual()
+            << ", " << solverPerfD.initialResidual()
             << ", " << residualT
-            << ", " << solverPerfT.nIterations() << endl;
+            << ", " << residualD
+            << ", " << materialResidual
+            << ", " << solverPerfT.nIterations()
+            << ", " << solverPerfD.nIterations() << endl;
 
         if (converged)
         {
@@ -130,7 +156,7 @@ bool thermalLinGeomSolid::converged
     {
         maxIterReached_++;
         Warning
-            << "Max iterations reached within temperature loop" << endl;
+            << "Max iterations reached within the enery-momentum loop" << endl;
     }
 
     return converged;
@@ -141,7 +167,76 @@ bool thermalLinGeomSolid::converged
 
 thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
 :
-    linGeomSolid(mesh),
+    solidModel(typeName, mesh),
+    D_
+    (
+        IOobject
+        (
+            "D",
+            runTime().timeName(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh
+    ),
+    U_
+    (
+        IOobject
+        (
+            "U",
+            runTime().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedVector("0", dimLength/dimTime, vector::zero)
+    ),
+    pMesh_(mesh),
+    pointD_
+    (
+        IOobject
+        (
+            "pointD",
+            runTime().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh_,
+        dimensionedVector("0", dimLength, vector::zero)
+    ),
+    sigma_
+    (
+        IOobject
+        (
+            "sigma",
+            runTime().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
+    ),
+    gradD_
+    (
+        IOobject
+        (
+            "grad(" + D_.name() + ")",
+            runTime().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedTensor("0", dimless, tensor::zero)
+    ),
+    rho_(mechanical().rho()),
+    impK_(mechanical().impK()),
+    impKf_(mechanical().impKf()),
+    rImpK_(1.0/impK_),
     T_
     (
         IOobject
@@ -215,13 +310,40 @@ thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
             "alternativeToleranceT", 1e-06
         )
     ),
+    materialTol_
+    (
+        solidProperties().lookupOrDefault<scalar>("materialTolerance", 1e-05)
+    ),
+    absTTol_
+    (
+        solidProperties().lookupOrDefault<scalar>
+        (
+            "absoluteTemperatureTolerance",
+            1e-06
+        )
+    ),
     infoFrequency_
     (
         solidProperties().lookupOrDefault<int>("infoFrequencyT", 100)
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectorsT", 10000)),
+    g_
+    (
+        IOobject
+        (
+            "g",
+            runTime().constant(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
     maxIterReached_(0)
 {
+    D_.oldTime().oldTime();
+    pointD_.oldTime();
+    gradD_.oldTime();
+    sigma_.oldTime();
     T_.oldTime();
 }
 
@@ -234,10 +356,12 @@ bool thermalLinGeomSolid::evolve()
     Info << "Evolving thermal solid solver" << endl;
 
     int iCorr = 0;
+    lduSolverPerformance solverPerfD;
     lduSolverPerformance solverPerfT;
     blockLduMatrix::debug = 0;
 
-    Info<< "Solving the energy equation for T" << endl;
+    Info<< "Solving coupled energy and displacements equation for T and D"
+        << endl;
 
     // Energy equation non-orthogonality corrector loop
     do
@@ -250,6 +374,7 @@ bool thermalLinGeomSolid::evolve()
         (
             rhoC_*fvm::ddt(T_)
          == fvm::laplacian(k_, T_, "laplacian(k,T)")
+          + (sigma_ && fvc::grad(U_))
         );
 
         // Under-relaxation the linear system
@@ -263,16 +388,52 @@ bool thermalLinGeomSolid::evolve()
 
         // Update gradient of temperature
         gradT_ = fvc::grad(T_);
-    }
-    while (!converged(iCorr, solverPerfT) && ++iCorr < nCorr_);
 
-    // Now solve the momentum equation
-    // Note: a thermal elastic mechanical law should be chosen, if the effect of
-    // thermal stress is to be included in the momentum equation. In that case,
-    // the thermal stress term is included explicitly.
-    // We could add an additional loop over the TEqn and DEqn here but it is
-    // typically not needed.
-    linGeomSolid::evolve();
+        // Store fields for under-relaxation and residual calculation
+        D_.storePrevIter();
+
+        // Linear momentum equation total displacement form
+        fvVectorMatrix DEqn
+        (
+            rho_*fvm::d2dt2(D_)
+         == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
+          - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
+          + fvc::div(sigma_, "div(sigma)")
+          + rho_*g_
+          + mechanical().RhieChowCorrection(D_, gradD_)
+        );
+
+        // Under-relaxation the linear system
+        DEqn.relax();
+
+        // Solve the linear system
+        solverPerfD = DEqn.solve();
+
+        // Under-relax the field
+        D_.relax();
+
+        // Update velocity
+        U_ = fvc::ddt(D_);
+
+        // Update gradient of displacement
+        mechanical().grad(D_, gradD_);
+
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigma_);
+
+        // Update impKf to improve convergence
+        // Note: impK and rImpK are not updated as they are used for traction
+        // boundaries
+        if (iCorr % 10 == 0)
+        {
+            impKf_ = mechanical().impKf();
+        }
+    }
+    while (!converged(iCorr, solverPerfT, solverPerfD) && ++iCorr < nCorr_);
+
+    // Interpolate cell displacements to vertices
+    Info<< "Interpolating D to pointD" << endl;
+    mechanical().interpolate(D_, pointD_);
 
     return true;
 }
@@ -289,17 +450,16 @@ tmp<vectorField> thermalLinGeomSolid::tractionBoundarySnGrad
     const label patchID = patch.index();
 
     // Patch mechanical property
-    const scalarField& impK = linGeomSolid::impK().boundaryField()[patchID];
+    const scalarField& impK = impK_.boundaryField()[patchID];
 
     // Patch reciprocal implicit stiffness field
-    const scalarField& rImpK = linGeomSolid::rImpK().boundaryField()[patchID];
+    const scalarField& rImpK = rImpK_.boundaryField()[patchID];
 
     // Patch gradient
-    const tensorField& gradD = linGeomSolid::gradD().boundaryField()[patchID];
+    const tensorField& gradD = gradD_.boundaryField()[patchID];
 
     // Patch stress
-    const symmTensorField& sigma =
-        linGeomSolid::sigma().boundaryField()[patchID];
+    const symmTensorField& sigma = sigma_.boundaryField()[patchID];
 
     // Patch unit normals
     const vectorField n = patch.nf();
@@ -320,12 +480,15 @@ tmp<vectorField> thermalLinGeomSolid::tractionBoundarySnGrad
 
 void thermalLinGeomSolid::updateTotalFields()
 {
-    linGeomSolid::updateTotalFields();
+    mechanical().updateTotalFields();
 }
 
 
 void thermalLinGeomSolid::writeFields(const Time& runTime)
 {
+    Info<< "Max T = " << max(T_).value() << nl
+        << "Min T = " << min(T_).value() << endl;
+
     // Heat flux
     volVectorField heatFlux
     (
@@ -343,7 +506,40 @@ void thermalLinGeomSolid::writeFields(const Time& runTime)
     Info<< "Max magnitude of heat flux = " << max(mag(heatFlux)).value()
         << endl;
 
-    linGeomSolid::writeFields(runTime);
+    // Calculaute equivalent strain
+    volScalarField epsilonEq
+    (
+        IOobject
+        (
+            "epsilonEq",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        sqrt((2.0/3.0)*magSqr(dev(symm(gradD_))))
+    );
+
+    Info<< "Max epsilonEq = " << max(epsilonEq).value()
+        << endl;
+
+    // Calculate equivalent (von Mises) stress
+    volScalarField sigmaEq
+    (
+        IOobject
+        (
+            "sigmaEq",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        sqrt((3.0/2.0)*magSqr(dev(sigma_)))
+    );
+
+    Info<< "Max sigmaEq = " << gMax(sigmaEq) << endl;
+
+    solidModel::writeFields(runTime);
 }
 
 
@@ -361,7 +557,7 @@ void thermalLinGeomSolid::end()
             << nl << endl;
     }
 
-    linGeomSolid::end();
+    solidModel::end();
 }
 
 

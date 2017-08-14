@@ -379,7 +379,8 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
         }
 
         // Calculate inverse
-        tensor invLsM = inv(lsM);
+        //tensor invLsM = inv(lsM);
+        tensor invLsM = hinv(lsM);
 
         scalarRectangularMatrix curInvMatrix
         (

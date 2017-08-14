@@ -30,7 +30,7 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
-#include "solidTractionFvPatchVectorField.H"
+#include "blockSolidTractionFvPatchVectorField.H"
 #include "fvcGradf.H"
 #include "BlockFvmDivSigma.H"
 #include "linearElastic.H"
@@ -279,7 +279,7 @@ coupledUnsLinGeomLinearElasticSolid::faceZonePointDisplacementIncrement
         {
             label localPoint = curPointMap[globalPointI];
 
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
             {
                 label procPoint = zoneMeshPoints[localPoint];
 
@@ -551,7 +551,7 @@ void coupledUnsLinGeomLinearElasticSolid::setTraction
     if
     (
         D_.boundaryField()[patchID].type()
-     != solidTractionFvPatchVectorField::typeName
+     != blockSolidTractionFvPatchVectorField::typeName
     )
     {
         FatalErrorIn
@@ -560,14 +560,14 @@ void coupledUnsLinGeomLinearElasticSolid::setTraction
         )   << "Bounary condition on " << D_.name()
             <<  " is "
             << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
-            << ", instead "
-            << solidTractionFvPatchVectorField::typeName
+            << " for patch" << mesh().boundary()[patchID].name()
+            << ", instead it should be "
+            << blockSolidTractionFvPatchVectorField::typeName
             << abort(FatalError);
     }
 
-    solidTractionFvPatchVectorField& patchU =
-        refCast<solidTractionFvPatchVectorField>
+    blockSolidTractionFvPatchVectorField& patchU =
+        refCast<blockSolidTractionFvPatchVectorField>
         (
             D_.boundaryField()[patchID]
         );
@@ -585,7 +585,7 @@ void coupledUnsLinGeomLinearElasticSolid::setPressure
     if
     (
         D_.boundaryField()[patchID].type()
-     != solidTractionFvPatchVectorField::typeName
+     != blockSolidTractionFvPatchVectorField::typeName
     )
     {
         FatalErrorIn
@@ -596,12 +596,12 @@ void coupledUnsLinGeomLinearElasticSolid::setPressure
             << D_.boundaryField()[patchID].type()
             << "for patch" << mesh().boundary()[patchID].name()
             << ", instead "
-            << solidTractionFvPatchVectorField::typeName
+            << blockSolidTractionFvPatchVectorField::typeName
             << abort(FatalError);
     }
 
-    solidTractionFvPatchVectorField& patchU =
-        refCast<solidTractionFvPatchVectorField>
+    blockSolidTractionFvPatchVectorField& patchU =
+        refCast<blockSolidTractionFvPatchVectorField>
         (
             D_.boundaryField()[patchID]
         );
@@ -765,6 +765,18 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
         true
     );
 
+    // Under-relax the linear system
+//     if (mesh().solutionDict().relaxEquation("DEqn"))
+//     {
+//         Info<< "Under-relaxing the equation" << endl;
+//         blockM.relax
+//         (
+//             solutionVec_,
+//             blockB,
+//             mesh().solutionDict().equationRelaxationFactor("DEqn")
+//         );
+//     }
+
     // Block coupled solver call
     solverPerfD =
         BlockLduSolver<vector>::New
@@ -778,40 +790,41 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     extendedMesh_.copySolutionVector(solutionVec_, D_);
 
     // Under-relax the field
-    D_.relax();
+    //D_.relax();
 
     // Update gradient of displacement
     volToPoint_.interpolate(D_, pointD_);
 
     // Enforce zero normal displacement on symmetry
     // Todo: we should create a blockSymmetry boundary condition
-    pointField& pointDI = pointD_.internalField();
-    forAll(mesh().boundaryMesh(), patchI)
-    {
-        if
-        (
-            D_.boundaryField()[patchI].type()
-         == blockFixedDisplacementZeroShearFvPatchVectorField::typeName
-        )
-        {
-            WarningIn("coupledUnsLinGeomLinearElasticSolid::evolve()")
-                << "Setting the normal displacement on patch "
-                << mesh().boundaryMesh()[patchI].name() << " to zero" << endl;
+    // pointField& pointDI = pointD_.internalField();
+    // forAll(mesh().boundaryMesh(), patchI)
+    // {
+    //     if
+    //     (
+    //         D_.boundaryField()[patchI].type()
+    //      == blockFixedDisplacementZeroShearFvPatchVectorField::typeName
+    //     )
+    //     {
+    //         WarningIn("coupledUnsLinGeomLinearElasticSolid::evolve()")
+    //             << "Setting the normal displacement on patch "
+    //             << mesh().boundaryMesh()[patchI].name() << " to zero"
+    //             << endl;
 
-            const labelList& meshPoints =
-                mesh().boundaryMesh()[patchI].meshPoints();
-            const vectorField& pointNormals =
-                mesh().boundaryMesh()[patchI].pointNormals();
+    //         const labelList& meshPoints =
+    //             mesh().boundaryMesh()[patchI].meshPoints();
+    //         const vectorField& pointNormals =
+    //             mesh().boundaryMesh()[patchI].pointNormals();
 
-            // Remove normal component
-            forAll(meshPoints, pI)
-            {
-                const label pointID = meshPoints[pI];
-                pointDI[pointID] =
-                    ((I - sqr(pointNormals[pI])) & pointDI[pointID]);
-            }
-        }
-    }
+    //         // Remove normal component
+    //         forAll(meshPoints, pI)
+    //         {
+    //             const label pointID = meshPoints[pI];
+    //             pointDI[pointID] =
+    //                 ((I - sqr(pointNormals[pI])) & pointDI[pointID]);
+    //         }
+    //     }
+    // }
     gradD_ = fvc::grad(D_, pointD_);
 
     // We will call fvc::grad a second time as fixed displacement boundaries

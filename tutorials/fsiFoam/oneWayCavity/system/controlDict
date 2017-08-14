@@ -26,6 +26,10 @@ endTime         0.5;
 
 deltaT          0.005;
 
+adjustTimeStep  no;
+
+maxCo           1.0;
+
 writeControl    timeStep;
 
 writeInterval   20;

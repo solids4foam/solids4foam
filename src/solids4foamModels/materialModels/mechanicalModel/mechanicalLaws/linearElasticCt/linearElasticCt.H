@@ -104,8 +104,8 @@ public:
         (
             const word& name,
             const fvMesh& mesh,
-        //     const volSymmTensorField& sigma,
-            const dictionary& dict
+            const dictionary& dict,
+            const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
 

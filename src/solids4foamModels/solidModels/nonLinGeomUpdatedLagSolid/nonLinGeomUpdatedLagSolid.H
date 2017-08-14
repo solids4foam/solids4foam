@@ -153,10 +153,6 @@ class nonLinGeomUpdatedLagSolid
         //  momentum equation
         int maxIterReached_;
 
-        //- Stabilise hydrostatic pressure
-        //  Apply smoothing to the relative Jacobian calculation
-        const Switch stabilisePressure_;
-
 
     // Private Member Functions
 
@@ -175,6 +171,17 @@ class nonLinGeomUpdatedLagSolid
 
         //- Disallow default bitwise assignment
         void operator=(const nonLinGeomUpdatedLagSolid&);
+
+
+protected:
+
+    // Protected member functions
+
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const
+        {
+            return nonLinearGeometry::UPDATED_LAGRANGIAN;
+        }
 
 
 public:

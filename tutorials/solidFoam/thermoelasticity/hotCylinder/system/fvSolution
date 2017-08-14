@@ -17,12 +17,28 @@ FoamFile
 
 solvers
 {
-    "D|T"
+    "D|DD"
     {
         solver          PCG;
         preconditioner  FDIC;
         tolerance       1e-09;
         relTol          0.1;
+    }
+
+    sigmaHyd
+    {
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-09;
+        relTol          0.1;
+    }
+
+    T
+    {
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-09;
+        relTol          0.001;
     }
 }
 

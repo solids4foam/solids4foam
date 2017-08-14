@@ -27,7 +27,8 @@ Class
 
 Description
     Mathematical model where linear geometry is assumed i.e. small strains and
-    small rotations are assumed.
+    small rotations are assumed, where the increment of displacement is the
+    primary unknown.
 
     The stress is calculated by the run-time selectable mechanical law.
 
@@ -68,6 +69,10 @@ class linGeomSolid
 {
     // Private data
 
+        //- Increment of displacement field
+        //  DD = D - D.oldTime()
+        volVectorField DD_;
+
         //- Displacement field
         volVectorField D_;
 
@@ -83,8 +88,8 @@ class linGeomSolid
         //- Stress field
         volSymmTensorField sigma_;
 
-        //- Cell displacement gradient
-        volTensorField gradD_;
+        //- Cell displacement increment gradient
+        volTensorField gradDD_;
 
         //- Density
         const volScalarField rho_;
@@ -95,7 +100,7 @@ class linGeomSolid
         const volScalarField impK_;
 
         //- Implicit stiffness surface field
-        const surfaceScalarField impKf_;
+        surfaceScalarField impKf_;
 
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
@@ -130,7 +135,7 @@ class linGeomSolid
         bool converged
         (
             const int iCorr,
-            const lduSolverPerformance& solverPerfD
+            const lduSolverPerformance& solverPerfDD
         );
 
         //- Disallow default bitwise copy construct
@@ -138,6 +143,17 @@ class linGeomSolid
 
         //- Disallow default bitwise assignment
         void operator=(const linGeomSolid&);
+
+
+protected:
+
+    // Protected member functions
+
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const
+        {
+            return nonLinearGeometry::LINEAR_GEOMETRY;
+        }
 
 
 public:
@@ -160,54 +176,6 @@ public:
     // Member Functions
 
         // Access
-
-            //- Return const access to the cell displacement field
-            const volVectorField& D() const
-            {
-                return D_;
-            }
-
-            //- Return non-const access to thecell displacement field
-            volVectorField& D()
-            {
-                return D_;
-            }
-
-            //- Return point mesh
-            const pointMesh& pMesh() const
-            {
-                return pMesh_;
-            }
-
-            //- Gradient of displacement
-            const volTensorField& gradD() const
-            {
-                return gradD_;
-            }
-
-            //- Stress tensor
-            const volSymmTensorField& sigma() const
-            {
-                return sigma_;
-            }
-
-            //- Implicit stiffness
-            const volScalarField& impK() const
-            {
-                return impK_;
-            }
-
-            //- Reciprocal of the implicit stiffness
-            const volScalarField& rImpK() const
-            {
-                return rImpK_;
-            }
-
-            //- Return point displacement field
-            virtual const pointVectorField& pointD() const
-            {
-                return pointD_;
-            }
 
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
@@ -276,18 +244,6 @@ public:
 
             //- End of the program
             virtual void end();
-
-            //- Return const acess to the solution (displacement field)
-            virtual const volVectorField& solution() const
-            {
-                return D_;
-            }
-
-            //- Return non-const access to the solution (displacement field)
-            virtual volVectorField& solution()
-            {
-                return D_;
-            }
 };
 
 

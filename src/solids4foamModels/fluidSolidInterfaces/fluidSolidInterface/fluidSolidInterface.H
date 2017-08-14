@@ -48,7 +48,8 @@ SourceFiles
 #include "fluidModel.H"
 #include "solidModel.H"
 #include "dynamicFvMesh.H"
-#include "extendedGgiInterpolation.H"
+//#include "extendedGgiInterpolation.H"
+#include "newGgiInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -100,7 +101,8 @@ class fluidSolidInterface
             currentSolidZonePatchPtr_;
 
         //- Ggi zone-to-zone interpolation
-        mutable extendedGgiZoneInterpolation* ggiInterpolatorPtr_;
+        //mutable extendedGgiZoneInterpolation* ggiInterpolatorPtr_;
+        mutable newGgiZoneInterpolation* ggiInterpolatorPtr_;
 
         //- Outer correction loop stoping tolerance
         scalar outerCorrTolerance_;
@@ -325,7 +327,8 @@ public:
             currentSolidZonePatch() const;
 
             //- Return fluid to solid interpolator
-            const extendedGgiZoneInterpolation& ggiInterpolator() const;
+            //const extendedGgiZoneInterpolation& ggiInterpolator() const;
+            const newGgiZoneInterpolation& ggiInterpolator() const;
 
             //- Return outer corrector loop tolerance
             scalar outerCorrTolerance() const

@@ -3,6 +3,14 @@ set -x
 
 wclean lib src/solids4foamModels
 
+wclean applications/utilities/addPatch
+wclean applications/utilities/addTinyPatch
+wclean applications/utilities/flattenPatch
+wclean applications/utilities/projectPatchToSphere
+wclean applications/utilities/surfaceTractions
+wclean applications/utilities/volPointInterpolate
+wclean applications/utilities/mergeSubMeshes
+
 wclean applications/solvers/solidFoam
 wclean applications/solvers/fluidFoam
 wclean applications/solvers/fsiFoam

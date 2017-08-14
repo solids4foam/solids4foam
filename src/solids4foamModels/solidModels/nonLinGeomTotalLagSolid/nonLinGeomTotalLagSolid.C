@@ -58,20 +58,20 @@ addToRunTimeSelectionTable
 bool nonLinGeomTotalLagSolid::converged
 (
     const int iCorr,
-    const lduSolverPerformance& solverPerfD
+    const lduSolverPerformance& solverPerfDD
 )
 {
     // We will check a number of different residuals for convergence
     bool converged = false;
 
     // Calculate displacement residual
-    const scalar residualD =
+    const scalar residualDD =
         gMax
         (
-            mag(D_.internalField() - D_.prevIter().internalField())
+            mag(DD_.internalField() - DD_.prevIter().internalField())
            /max
             (
-                gMax(mag(D_.internalField() - D_.oldTime().internalField())),
+                gMax(mag(DD_.internalField() - DD_.oldTime().internalField())),
                 SMALL
             )
         );
@@ -86,8 +86,8 @@ bool nonLinGeomTotalLagSolid::converged
     {
         if
         (
-            solverPerfD.initialResidual() < solutionTol_
-         && residualD < solutionTol_
+            solverPerfDD.initialResidual() < solutionTol_
+         && residualDD < solutionTol_
         )
         {
             Info<< "    Both residuals have converged" << endl;
@@ -95,7 +95,7 @@ bool nonLinGeomTotalLagSolid::converged
         }
         else if
         (
-            residualD < alternativeTol_
+            residualDD < alternativeTol_
         )
         {
             Info<< "    The relative residual has converged" << endl;
@@ -103,7 +103,7 @@ bool nonLinGeomTotalLagSolid::converged
         }
         else if
         (
-            solverPerfD.initialResidual() < alternativeTol_
+            solverPerfDD.initialResidual() < alternativeTol_
         )
         {
             Info<< "    The solver residual has converged" << endl;
@@ -123,10 +123,10 @@ bool nonLinGeomTotalLagSolid::converged
     else if (iCorr % infoFrequency_ == 0 || converged)
     {
         Info<< "    " << iCorr
-            << ", " << solverPerfD.initialResidual()
-            << ", " << residualD
+            << ", " << solverPerfDD.initialResidual()
+            << ", " << residualDD
             << ", " << materialResidual
-            << ", " << solverPerfD.nIterations() << endl;
+            << ", " << solverPerfDD.nIterations() << endl;
 
         if (converged)
         {
@@ -144,37 +144,23 @@ bool nonLinGeomTotalLagSolid::converged
 }
 
 
-void nonLinGeomTotalLagSolid::predict()
-{
-    Info << "Predicting solid model" << endl;
-
-    // Predict D using the velocity field
-    // Note: the case may be steady-state but U_ can still be calculated using a
-    // transient method
-    D_ = D_.oldTime() + U_*runTime().deltaT();
-
-    // Update gradient of displacement
-    mechanical().grad(D_, gradD_);
-
-    // Total deformation gradient
-    F_ = I + gradD_.T();
-
-    // Inverse of the deformation gradient
-    Finv_ = inv(F_);
-
-    // Jacobian of the deformation gradient
-    J_ = det(F_);
-
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma_);
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
 :
     solidModel(typeName, mesh),
+    DD_
+    (
+        IOobject
+        (
+            "DD",
+            runTime().timeName(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh
+    ),
     D_
     (
         IOobject
@@ -182,10 +168,11 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
             "D",
             runTime().timeName(),
             mesh,
-            IOobject::MUST_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh,
+        dimensionedVector("0", dimLength, vector::zero)
     ),
     U_
     (
@@ -226,6 +213,19 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
         ),
         mesh,
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
+    ),
+    gradDD_
+    (
+        IOobject
+        (
+            "grad(" + DD_.name() + ")",
+            runTime().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedTensor("0", dimless, tensor::zero)
     ),
     gradD_
     (
@@ -309,12 +309,11 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
             IOobject::NO_WRITE
         )
     ),
-    maxIterReached_(0),
-    predict_(solidProperties().lookupOrDefault<Switch>("predict", false))
+    maxIterReached_(0)
 {
-    D_.oldTime().oldTime();
+    DD_.oldTime().oldTime();
     pointD_.oldTime();
-    gradD_.oldTime();
+    gradDD_.oldTime();
 }
 
 
@@ -636,14 +635,14 @@ void nonLinGeomTotalLagSolid::setTraction
 {
     if
     (
-        D_.boundaryField()[patchID].type()
+        DD_.boundaryField()[patchID].type()
      != solidTractionFvPatchVectorField::typeName
     )
     {
         FatalErrorIn("void nonLinGeomTotalLagSolid::setTraction(...)")
-            << "Boundary condition on " << D_.name()
+            << "Boundary condition on " << DD_.name()
             <<  " is "
-            << D_.boundaryField()[patchID].type()
+            << DD_.boundaryField()[patchID].type()
             << " for patch" << mesh().boundary()[patchID].name()
             << ", instead "
             << solidTractionFvPatchVectorField::typeName
@@ -653,7 +652,7 @@ void nonLinGeomTotalLagSolid::setTraction
     solidTractionFvPatchVectorField& patchU =
         refCast<solidTractionFvPatchVectorField>
         (
-            D_.boundaryField()[patchID]
+            DD_.boundaryField()[patchID]
         );
 
     patchU.traction() = traction;
@@ -668,14 +667,14 @@ void nonLinGeomTotalLagSolid::setPressure
 {
     if
     (
-        D_.boundaryField()[patchID].type()
+        DD_.boundaryField()[patchID].type()
      != solidTractionFvPatchVectorField::typeName
     )
     {
         FatalErrorIn("void nonLinGeomTotalLagSolid::setPressure(...)")
-            << "Boundary condition on " << D_.name()
+            << "Boundary condition on " << DD_.name()
             <<  " is "
-            << D_.boundaryField()[patchID].type()
+            << DD_.boundaryField()[patchID].type()
             << " for patch" << mesh().boundary()[patchID].name()
             << ", instead "
             << solidTractionFvPatchVectorField::typeName
@@ -685,7 +684,7 @@ void nonLinGeomTotalLagSolid::setPressure
     solidTractionFvPatchVectorField& patchU =
         refCast<solidTractionFvPatchVectorField>
         (
-            D_.boundaryField()[patchID]
+            DD_.boundaryField()[patchID]
         );
 
     patchU.pressure() = pressure;
@@ -696,46 +695,61 @@ bool nonLinGeomTotalLagSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
 
-    if (predict_)
-    {
-        predict();
-    }
-
     int iCorr = 0;
-    lduSolverPerformance solverPerfD;
+    lduSolverPerformance solverPerfDD;
     blockLduMatrix::debug = 0;
 
-    Info<< "Solving the total Lagrangian form of the momentum equation for D"
+    Info<< "Solving the total Lagrangian form of the momentum equation for DD"
         << endl;
+
+    // Reset enforceLinear switch
+    enforceLinear() = false;
 
     // Momentum equation loop
     do
     {
         // Store fields for under-relaxation and residual calculation
-        D_.storePrevIter();
+        DD_.storePrevIter();
 
-        // Momentum equation total displacement total Lagrangian form
-        fvVectorMatrix DEqn
+        // Momentum equation incremental displacement total Lagrangian form
+        fvVectorMatrix DDEqn
         (
-            rho_*fvm::d2dt2(D_)
-         == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
-          - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
+            fvm::d2dt2(rho_, DD_)
+          + fvc::d2dt2(rho_.oldTime(), D_.oldTime())
+         == fvm::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
+          - fvc::laplacian(impKf_, DD_, "laplacian(DDD,DD)")
           + fvc::div(J_*Finv_ & sigma_, "div(sigma)")
           + rho_*g_
-          + mechanical().RhieChowCorrection(D_, gradD_)
+          + mechanical().RhieChowCorrection(DD_, gradDD_)
         );
 
+        // Enforce linear to improve convergence
+        if (enforceLinear())
+        {
+            // Replace nonlinear terms with linear
+            // Note: the mechanical law could still be nonlinear
+            DDEqn +=
+                fvc::div(J_*Finv_ & sigma_, "div(sigma)")
+              - fvc::div(sigma_);
+        }
+
         // Under-relax the linear system
-        DEqn.relax();
+        DDEqn.relax();
 
         // Solve the linear system
-        solverPerfD = DEqn.solve();
+        solverPerfDD = DDEqn.solve();
 
-        // Under-relax the D field
-        D_.relax();
+        // Under-relax the DD field using fixed or adaptive under-relaxation
+        relaxField(DD_, iCorr);
 
-        // Update gradient of displacement
-        mechanical().grad(D_, gradD_);
+        // Update the total displacement
+        D_ = D_.oldTime() + DD_;
+
+        // Update gradient of displacement increment
+        mechanical().grad(DD_, gradDD_);
+
+        // Update the gradient of total displacement
+        gradD_ = gradD_.oldTime() + gradDD_;
 
         // Total deformation gradient
         F_ = I + gradD_.T();
@@ -746,10 +760,29 @@ bool nonLinGeomTotalLagSolid::evolve()
         // Jacobian of the deformation gradient
         J_ = det(F_);
 
+        // Check if outer loops are diverging
+        if (!enforceLinear())
+        {
+            checkEnforceLinear(J_);
+        }
+
+        // Update the momentum equation inverse diagonal field
+        // This may be used by the mechanical law when calculating the
+        // hydrostatic pressure
+        const volScalarField DEqnA("DEqnA", DDEqn.A());
+
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigma_);
+
+        // Update impKf to improve convergence
+        // Note: impK and rImpK are not updated as they are used for traction
+        // boundaries
+        // if (iCorr % 10 == 0)
+        // {
+        //     impKf_ = mechanical().impKf();
+        // }
     }
-    while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
+    while (!converged(iCorr, solverPerfDD) && ++iCorr < nCorr_);
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D_, pointD_);
@@ -778,33 +811,51 @@ tmp<vectorField> nonLinGeomTotalLagSolid::tractionBoundarySnGrad
     const scalarField& rImpK = rImpK_.boundaryField()[patchID];
 
     // Patch gradient
-    const tensorField& gradD = gradD_.boundaryField()[patchID];
+    const tensorField& gradDD = gradDD_.boundaryField()[patchID];
 
     // Patch Cauchy stress
     const symmTensorField& sigma = sigma_.boundaryField()[patchID];
 
-    // Patch total deformation gradient inverse
-    const tensorField& Finv = Finv_.boundaryField()[patchID];
-
     // Patch unit normals (initial configuration)
     const vectorField n = patch.nf();
 
-    // Patch unit normals (deformed configuration)
-    vectorField nCurrent = Finv.T() & n;
-    nCurrent /= mag(nCurrent);
-
-    // Return patch snGrad
-    return tmp<vectorField>
-    (
-        new vectorField
+    if (enforceLinear())
+    {
+        // Return patch snGrad
+        return tmp<vectorField>
         (
+            new vectorField
             (
-                (traction - nCurrent*pressure)
-              - (nCurrent & sigma)
-              + impK*(n & gradD)
-            )*rImpK
-        )
-    );
+                (
+                    (traction - n*pressure)
+                  - (n & sigma)
+                  + impK*(n & gradDD)
+                )*rImpK
+            )
+        );
+    }
+    else
+    {
+        // Patch total deformation gradient inverse
+        const tensorField& Finv = Finv_.boundaryField()[patchID];
+
+        // Patch unit normals (deformed configuration)
+        vectorField nCurrent = Finv.T() & n;
+        nCurrent /= mag(nCurrent);
+
+        // Return patch snGrad
+        return tmp<vectorField>
+        (
+            new vectorField
+            (
+                (
+                    (traction - nCurrent*pressure)
+                  - (nCurrent & sigma)
+                  + impK*(n & gradDD)
+                )*rImpK
+            )
+        );
+    }
 }
 
 

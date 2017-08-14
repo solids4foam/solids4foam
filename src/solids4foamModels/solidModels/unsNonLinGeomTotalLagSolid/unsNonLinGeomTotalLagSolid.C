@@ -274,7 +274,6 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid(dynamicFvMesh& mesh)
         )
     ),
     nonLinear_(solidProperties().lookupOrDefault<Switch>("nonLinear", true)),
-    enforceLinear_(false),
     debug_(solidProperties().lookupOrDefault<Switch>("debug", false)),
     K_
     (
@@ -678,6 +677,9 @@ bool unsNonLinGeomTotalLagSolid::evolve()
     scalar curConvergenceTolerance = solutionTol_;
     blockLduMatrix::debug = 0;
 
+    // Reset enforceLinear switch
+    enforceLinear() = false;
+
     do
     {
         if (lduMatrix::debug)
@@ -708,7 +710,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         }
 
         // Enforce linear to improve convergence
-        if (enforceLinear_)
+        if (enforceLinear())
         {
             // Replace nonlinear terms with linear
             // Note: the mechanical law could still be nonlinear
@@ -747,27 +749,14 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         // Jacobian of the deformation gradient
         Jf_ = det(Ff_);
 
+        // Check if outer loops are diverging
+        if (nonLinear_ && !enforceLinear())
+        {
+            checkEnforceLinear(Jf_);
+        }
+
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigmaf_);
-
-        if (nonLinear_ && !enforceLinear_)
-        {
-            //surfaceScalarField Det = det(I + gradDf_);
-
-            scalar minJf = min(Jf_).value();
-            reduce(minJf, minOp<scalar>());
-
-            scalar maxJf = max(Jf_).value();
-            reduce(maxJf, maxOp<scalar>());
-
-            if ((minJf < 0.01) || (maxJf > 100))
-            {
-                Info<< minJf << ", " << maxJf << endl;
-
-                // Enable enforce linear to try improve convergence
-                enforceLinear_ = true;
-            }
-        }
 
         // Calculate relative momentum residual
         res = residual();
@@ -784,9 +773,15 @@ bool unsNonLinGeomTotalLagSolid::evolve()
             curConvergenceTolerance = solutionTol_;
         }
 
-        if (lduMatrix::debug)
+        if
+        (
+            lduMatrix::debug
+         || (iCorr % infoFrequency_) == 0
+         || res < curConvergenceTolerance
+         || maxIterReached_ == nCorr_
+        )
         {
-            Info<< "Relative residual = " << res << endl;
+            Info<< "Corr " << iCorr << ", relative residual = " << res << endl;
         }
 
         if (maxIterReached_ == nCorr_)
@@ -818,11 +813,11 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         << ", No outer iterations = " << iCorr << nl
         << " Max relative residual = " << maxRes
         << ", Relative residual = " << res
-        << ", enforceLinear = " << enforceLinear_ << endl;
+        << ", enforceLinear = " << enforceLinear() << endl;
 
     lduMatrix::debug = 1;
 
-    if (nonLinear_ && enforceLinear_)
+    if (nonLinear_ && enforceLinear())
     {
         return false;
     }
@@ -853,30 +848,48 @@ tmp<vectorField> unsNonLinGeomTotalLagSolid::tractionBoundarySnGrad
     // Patch stress
     const symmTensorField& sigma = sigmaf_.boundaryField()[patchID];
 
-    // Patch total deformation gradient inverse
-    const tensorField& Finv = Finvf_.boundaryField()[patchID];
-
-    // Patch total Jacobian
-    const scalarField& J = Jf_.boundaryField()[patchID];
-
     // Patch unit normals (initial configuration)
     const vectorField n = patch.nf();
 
-    // Patch unit normals (deformed configuration)
-    const vectorField nCurrent = J*Finv.T() & n;
-
-    // Return patch snGrad
-    return tmp<vectorField>
-    (
-        new vectorField
+    if (enforceLinear())
+    {
+        // Return patch snGrad
+        return tmp<vectorField>
         (
+            new vectorField
             (
-                (traction - n*pressure)
-              - (nCurrent & sigma)
-              + (n & (impK*gradD))
-            )*rImpK
-        )
-    );
+                (
+                    (traction - n*pressure)
+                  - (n & sigma)
+                  + (n & (impK*gradD))
+                )*rImpK
+            )
+        );
+    }
+    else
+    {
+        // Patch total deformation gradient inverse
+        const tensorField& Finv = Finvf_.boundaryField()[patchID];
+
+        // Patch total Jacobian
+        const scalarField& J = Jf_.boundaryField()[patchID];
+
+        // Patch unit normals (deformed configuration)
+        const vectorField nCurrent = J*Finv.T() & n;
+
+        // Return patch snGrad
+        return tmp<vectorField>
+        (
+            new vectorField
+            (
+                (
+                    (traction - nCurrent*pressure)
+                  - (nCurrent & sigma)
+                  + (n & (impK*gradD))
+                )*rImpK
+            )
+        );
+    }
 }
 
 

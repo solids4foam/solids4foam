@@ -57,6 +57,7 @@ AitkenCouplingInterface::AitkenCouplingInterface
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
     ),
+    predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
     aitkenRelaxationFactor_(relaxationFactor_)
 {}
 
@@ -71,6 +72,16 @@ void AitkenCouplingInterface::evolve()
 
     scalar residualNorm = 0;
 
+    if (predictSolid_)
+    {
+        updateForce();
+
+        solid().evolve();
+
+        residualNorm = 
+            updateResidual();
+    }
+    
     do
     {
         outerCorr()++;
@@ -147,6 +158,8 @@ void AitkenCouplingInterface::updateDisplacement()
 
         if (aitkenRelaxationFactor_ > 1)
         {
+            // PC: in this case, would 1.0 be a better option?
+            // Of course, the current option is more more stable
             aitkenRelaxationFactor_ = relaxationFactor_;
         }
 

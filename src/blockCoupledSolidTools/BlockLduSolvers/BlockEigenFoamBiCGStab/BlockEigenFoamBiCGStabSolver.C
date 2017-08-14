@@ -175,7 +175,7 @@ Foam::BlockEigenFoamBiCGStabSolver::solve
         scalar rho_old = rho;
 
         //rho = r0.dot(r);
-        rho = sum(r0 & r);
+        rho = gSum(r0 & r);
 
         if (mag(rho) < eps2*r0_sqnorm)
         {
@@ -184,7 +184,7 @@ Foam::BlockEigenFoamBiCGStabSolver::solve
             // Let's restart with a new r0:
             r0 = r;
             // rho = r0_sqnorm = r.squaredNorm();
-            r0_sqnorm = sum(magSqr(r));
+            r0_sqnorm = gSum(magSqr(r));
             rho = r0_sqnorm;
             if (restarts++ == 0)
             {
@@ -202,7 +202,7 @@ Foam::BlockEigenFoamBiCGStabSolver::solve
         matrix.Amul(v, y);
 
         // alpha = rho/r0.dot(v);
-        alpha = rho/sum(r0 & v);
+        alpha = rho/gSum(r0 & v);
         s = r - alpha*v;
 
         //z = precond.solve(s);
@@ -211,12 +211,12 @@ Foam::BlockEigenFoamBiCGStabSolver::solve
         matrix.Amul(t, z);
 
         // RealScalar tmp = t.squaredNorm();
-        scalar tmp = sum(magSqr(t));
+        scalar tmp = gSum(magSqr(t));
         //if (tmp > RealScalar(0))
         if (tmp > VSMALL)
         {
             // w = t.dot(s)/tmp;
-            w = sum(t & s)/tmp;
+            w = gSum(t & s)/tmp;
         }
         else
         {

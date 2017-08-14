@@ -1,0 +1,61 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    location    "0";
+    object      T;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform 300;
+
+boundaryField
+{
+    symmx
+    {
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform 300;
+    }
+    symmy
+    {
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform 300;
+    }
+    symmz
+    {
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform 300;
+    }
+    inside
+    {
+        type            fixedTemperature;
+        temperatureSeries
+        {
+            fileName    "$FOAM_CASE/constant/timeVsTemperature";
+            outOfBounds clamp;
+        }
+        value           uniform 300;
+    }
+    outside
+    {
+        type            thermalConvection;
+        alpha           uniform 90;
+        Tinf            300;
+        value           uniform 300;
+    }
+}
+
+// ************************************************************************* //

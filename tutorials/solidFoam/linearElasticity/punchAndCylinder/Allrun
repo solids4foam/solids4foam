@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Get application name
+application=`getApplication`
+
+# Create top mesh
+\cp system/punch_top/meshDict system/meshDict
+runApplication -l log.cartesianMesh.punch_top cartesianMesh
+mkdir constant/punch_top
+\mv constant/polyMesh constant/punch_top/
+
+# Create bottom mesh
+\cp system/punch_bottom/meshDict system/meshDict
+runApplication -l log.cartesianMesh.punch_bottom cartesianMesh
+mkdir constant/punch_bottom
+\mv constant/polyMesh constant/punch_bottom/
+
+# Merge sub meshes
+runApplication mergeSubMeshes punch_top punch_bottom
+
+# Create patches
+runApplication autoPatch 45 -overwrite
+runApplication createPatch -overwrite
+
+# Create contact face zones
+runApplication setSet -batch batch.setSet 
+runApplication setsToZones -noFlipMap
+
+# Scale the geometry to metres
+echo "Running transformPoints -scale \"(0.001 0.001 0.001)\""
+transformPoints -scale "(0.001 0.001 0.001)" >& log.transformPoints
+
+# Remove the sub meshes
+\rm -rf constant/punch_top constant/punch_bottom system/meshDict
+
+# Run the solver
+runApplication $application
+
+# ----------------------------------------------------------------- end-of-file
+

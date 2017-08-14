@@ -59,7 +59,8 @@ fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface
     relaxationFactor_
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
-    )
+    ),
+    predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true))
 {}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -71,6 +72,16 @@ void fixedRelaxationCouplingInterface::evolve()
     updateInterpolator();
 
     scalar residualNorm = 0;
+
+    if (predictSolid_)
+    {
+        updateForce();
+
+        solid().evolve();
+
+        residualNorm =
+            updateResidual();
+    }
 
     do
     {

@@ -27,7 +27,10 @@ Class
 
 Description
     Mathematical model where linear geometry is assumed i.e. small strains and
-    small rotations are assumed, and the heat equation is solved.
+    small rotations are assumed.
+
+    The heat equation and momentum equation are solved in a strongly coupled
+    fashion i.e. just like in solidDisplacementFoam.
 
     The stress is calculated by the run-time selectable mechanical law.
 
@@ -42,7 +45,8 @@ SourceFiles
 #ifndef thermalLinGeomSolid_H
 #define thermalLinGeomSolid_H
 
-#include "linGeomSolid.H"
+#include "solidModel.H"
+#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -60,9 +64,43 @@ namespace solidModels
 
 class thermalLinGeomSolid
 :
-    public linGeomSolid
+    public solidModel
 {
     // Private data
+
+        //- Displacement field
+        volVectorField D_;
+
+        //- Velocity field
+        volVectorField U_;
+
+        //- Point mesh
+        pointMesh pMesh_;
+
+        //- Point displacement field
+        pointVectorField pointD_;
+
+        //- Stress field
+        volSymmTensorField sigma_;
+
+        //- Cell displacement gradient
+        volTensorField gradD_;
+
+        //- Density
+        const volScalarField rho_;
+
+        //- Implicit stiffness; coefficient of the Laplacian term
+        //  The value of this term only affects convergence and not the answer
+        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
+        const volScalarField impK_;
+
+        //- Implicit stiffness surface field
+        surfaceScalarField impKf_;
+
+        //- Reciprocal of impK
+        //  We divide by impK every time tractionBoundarySnGrad is called so we
+        //  will store the reciprocal for effficiency
+        const volScalarField rImpK_;
 
         //- Temperature field
         volScalarField T_;
@@ -79,20 +117,31 @@ class thermalLinGeomSolid
         //- Thermal conductivity
         volScalarField k_;
 
-        //- Solution tolerance for outer non-orthogonality correctors
+        //- Solution standard tolerance
         const scalar solutionTol_;
 
-        //- Alternative tolerance for outer non-orthogonality correctors
+        //- Solution tighter tolerance
         const scalar alternativeTol_;
+
+        //- Material law tolerance
+        const scalar materialTol_;
+
+        //- Absolute temperature tolerance (in degrees)
+        const scalar absTTol_;
 
         //- Write frequency for residuals information
         const int infoFrequency_;
 
-        //- Maximum number of thermal correctors
+        //- Maximum number of momentum correctors
         const int nCorr_;
 
-        //- Number of times the maximum number of correctors was reached
+        //- Gravitational acceleration
+        const uniformDimensionedVectorField g_;
+
+        //- Number of times the maximum number of correctors was reached in the
+        //  momentum equation
         int maxIterReached_;
+
 
     // Private Member Functions
 
@@ -100,6 +149,7 @@ class thermalLinGeomSolid
         bool converged
         (
             const int iCorr,
+            const lduSolverPerformance& solverPerfT,
             const lduSolverPerformance& solverPerfD
         );
 
@@ -108,6 +158,17 @@ class thermalLinGeomSolid
 
         //- Disallow default bitwise assignment
         void operator=(const thermalLinGeomSolid&);
+
+
+protected:
+
+    // Protected member functions
+
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const
+        {
+            return nonLinearGeometry::LINEAR_GEOMETRY;
+        }
 
 
 public:
@@ -166,18 +227,6 @@ public:
 
             //- End of the program
             virtual void end();
-
-            //- Return const acess to the solution (temperature field)
-            // virtual const volVectorField& solution() const
-            // {
-            //     return T_;
-            // }
-
-            //- Return non-const access to the solution (temperature field)
-            // virtual volVectorField& solution()
-            // {
-            //     return T_;
-            // }
 };
 
 

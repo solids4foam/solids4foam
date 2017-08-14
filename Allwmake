@@ -1,9 +1,27 @@
 #!/bin/sh
 set -x
 
+# Check if the foam files have been replaced
+if cmp --silent "./filesToReplaceInOF/solution.C" "$FOAM_SRC/foam/matrices/solution/solution.C"
+then
+    echo "solution.C has already been replaced"
+else
+    echo "You should replace the file $FOAM_SRC/foam/matrices/solution/solution.C with filesToReplaceInOF/solution.C"
+    exit 1;
+fi
+
+if cmp --silent "./filesToReplaceInOF/WedgePointPatchField.C" "$FOAM_SRC/foam/fields/PointPatchFieldTemplates/constraint/wedge/WedgePointPatchField.C"
+then
+    echo "WedgePointPatchField.C has already been replaced"
+else
+    echo "You should replace the file $FOAM_SRC/foam/fields/PointPatchFieldTemplates/constraint/wedge/WedgePointPatchField.C with filesToReplaceInOF/WedgePointPatchField.C"
+    exit 1;
+fi
+
 (cd ThirdParty && ./Allwmake)
 
 wmake libso src/solids4foamModels
 wmake libso src/blockCoupledSolidTools
 
+wmake all applications/utilities
 wmake all applications/solvers

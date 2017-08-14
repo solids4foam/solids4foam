@@ -11,13 +11,4 @@ EXE_INC = \
     -I$(LIB_SRC)/lagrangian/lnInclude \
     -I$(LIB_SRC)/sampling/lnInclude
 
-EXE_LIBS = \
-    -L$(FOAM_USER_LIBBIN) -lsolids4FoamModels \
-    -lmeshTools \
-    -lfiniteVolume \
-    -lfiniteArea \
-    -ldynamicMesh \
-    -ldynamicFvMesh \
-    -ltopoChangerFvMesh \
-    -llagrangian \
-    -lsampling
+EXE_LIBS =

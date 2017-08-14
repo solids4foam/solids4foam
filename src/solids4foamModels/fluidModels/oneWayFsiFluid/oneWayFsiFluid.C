@@ -72,6 +72,19 @@ oneWayFsiFluid::oneWayFsiFluid(const fvMesh& mesh)
         ),
         mesh
     ),
+    phi_
+    (
+        IOobject
+        (
+            "phi",
+            runTime().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar("zero", dimVelocity, 0.0)
+    ),
     transportProperties_
     (
         IOobject
@@ -98,6 +111,12 @@ const volVectorField& oneWayFsiFluid::U() const
 const volScalarField& oneWayFsiFluid::p() const
 {
     return p_;
+}
+
+
+const surfaceScalarField& oneWayFsiFluid::phi() const
+{
+    return phi_;
 }
 
 

@@ -35,7 +35,7 @@ namespace Foam
     defineTypeNameAndDebug(poroLinearElasticMohrCoulombPlastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, poroLinearElasticMohrCoulombPlastic, dictionary
+        mechanicalLaw, poroLinearElasticMohrCoulombPlastic, linGeomMechLaw
     );
 }
 
@@ -47,10 +47,11 @@ Foam::poroLinearElasticMohrCoulombPlastic::poroLinearElasticMohrCoulombPlastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    linearElasticMohrCoulombPlastic(name, mesh, dict)
+    linearElasticMohrCoulombPlastic(name, mesh, dict, nonLinGeom)
 {}
 
 
@@ -83,7 +84,7 @@ void Foam::poroLinearElasticMohrCoulombPlastic::correct
         ).lookupBaseMeshVolField<scalar>("p", mesh());
 
 
-    // The total stress is equal to the sum of the efffective stress and
+    // The total stress is equal to the sum of the effective stress and
     // pore-pressure components
     sigma -= p*symmTensor(I);
 }
@@ -109,7 +110,7 @@ void Foam::poroLinearElasticMohrCoulombPlastic::correct
 
     const surfaceScalarField pf = fvc::interpolate(p);
 
-    // The total stress is equal to the sum of the efffective stress and
+    // The total stress is equal to the sum of the effective stress and
     // pore-pressure components
     sigma -= pf*symmTensor(I);
 }

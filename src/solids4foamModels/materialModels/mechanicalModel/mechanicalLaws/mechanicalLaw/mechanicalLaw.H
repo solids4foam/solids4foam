@@ -42,7 +42,7 @@ SourceFiles
 #include "volFields.H"
 #include "tmp.H"
 #include "autoPtr.H"
-#include "IOdictionary.H"
+#include "nonLinearGeometry.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -63,11 +63,15 @@ class mechanicalLaw
         //- Const reference to mesh
         const fvMesh& mesh_;
 
-        //- Const reference to law dictionary
-        const dictionary& dict_;
+        //- Mechanical law dictionary
+        const dictionary dict_;
 
         //- Name of the baseMesh region
         word baseMeshRegionName_;
+
+        //- Nonlinear geometry enumerator
+        const nonLinearGeometry::nonLinearType nonLinGeom_;
+
 
     // Private Member Functions
 
@@ -101,6 +105,12 @@ protected:
             return baseMeshRegionName_;
         }
 
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const
+        {
+            return nonLinGeom_;
+        }
+
 public:
 
     //- Runtime type information
@@ -109,28 +119,56 @@ public:
 
     // Declare run-time constructor selection table
 
+        //- Mechanical law for linear geometry i.e. small strains and rotations
         declareRunTimeSelectionTable
         (
             autoPtr,
             mechanicalLaw,
-            dictionary,
+            linGeomMechLaw,
             (
                 const word name,
                 const fvMesh& mesh,
-                const dictionary& dict
+                const dictionary& dict,
+                const nonLinearGeometry::nonLinearType& nonLinGeom
             ),
-            (name, mesh, dict)
+            (name, mesh, dict, nonLinGeom)
+        );
+
+        //- Mechanical law for nonlinear geometry i.e. finite strains and
+        //  rotations
+        declareRunTimeSelectionTable
+        (
+            autoPtr,
+            mechanicalLaw,
+            nonLinGeomMechLaw,
+            (
+                const word name,
+                const fvMesh& mesh,
+                const dictionary& dict,
+                const nonLinearGeometry::nonLinearType& nonLinGeom
+            ),
+            (name, mesh, dict, nonLinGeom)
         );
 
 
     // Selectors
 
-        //- Return a reference to the selected mechanical model
-        static autoPtr<mechanicalLaw> New
+        //- Create a linear geometry mechanical law
+        static autoPtr<mechanicalLaw> NewLinGeomMechLaw
         (
             const word& name,
             const fvMesh& mesh,
-            const dictionary& dict
+            const dictionary& dict,
+            const nonLinearGeometry::nonLinearType& nonLinGeom
+        );
+
+        //- Create a nonlinear geometry mechanical law
+        static autoPtr<mechanicalLaw> NewNonLinGeomMechLaw
+        (
+            const word& name,
+            const fvMesh& mesh,
+            const dictionary& dict,
+            const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
 
@@ -141,7 +179,8 @@ public:
         (
             const word& name,
             const fvMesh& mesh,
-            const dictionary& dict
+            const dictionary& dict,
+            const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
 

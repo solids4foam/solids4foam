@@ -396,13 +396,13 @@ public:
                     volVectorField& vf
                 ) const;
 
-            // Return fixed point components map
+            //- Return fixed point components map
             const Map<vector>& pointFixedComponent
             (
                 const volVectorField& D
             ) const;
 
-            // Return fixed point directions map
+            //- Return fixed point directions map
             const Map<symmTensor>& pointFixedDirection
             (
                 const volVectorField& D

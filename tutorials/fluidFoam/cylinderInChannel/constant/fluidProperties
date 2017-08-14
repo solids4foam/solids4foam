@@ -1,0 +1,53 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fluidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// fluidModel icoFluid;
+// fluidModel pisoFluid;
+fluidModel transientSimpleFluid;
+
+icoFluidCoeffs
+{
+    nCorrectors     3;
+    nNonOrthogonalCorrectors 1;
+    pRefCell        0;
+    pRefValue       0;
+
+    consistencyByJasak no;
+}
+
+pisoFluidCoeffs
+{
+    nCorrectors     3;
+    nNonOrthogonalCorrectors 1;
+    pRefCell        0;
+    pRefValue       0;
+
+    consistencyByJasak no;
+}
+
+transientSimpleFluidCoeffs
+{
+    nOuterCorrectors 200;
+    nNonOrthogonalCorrectors 0;
+    pRefCell        0;
+    pRefValue       0;
+
+    convergence 1e-7;
+
+    consistencyByJasak no;
+}
+
+// ************************************************************************* //

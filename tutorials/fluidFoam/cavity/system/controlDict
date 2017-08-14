@@ -14,7 +14,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application icoFoam;
+application     icoFoam;
 
 startFrom       startTime;
 
@@ -43,5 +43,9 @@ timeFormat      general;
 timePrecision   6;
 
 runTimeModifiable yes;
+
+adjustTimeStep no;
+
+maxCo          1;
 
 // ************************************************************************* //

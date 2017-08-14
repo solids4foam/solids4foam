@@ -53,6 +53,7 @@ interpolationSchemes
     default            none;
     interpolate(impK)  linear;
     interpolate(grad(DD)) linear;
+    interpolate(grad(sigmaHyd)) linear;
 }
 
 // ************************************************************************* //

@@ -99,7 +99,7 @@ void eig3Field
         if
         (
             !A.boundaryField()[patchI].coupled()
-            && A.boundaryField()[patchI].type() != "empty"
+         && A.boundaryField()[patchI].type() != "empty"
         )
         {
             const symmTensorField& AB = A.boundaryField()[patchI];
@@ -137,7 +137,7 @@ void eig3Field
         if
         (
             !A.boundaryField()[patchI].coupled()
-            && A.boundaryField()[patchI].type() != "empty"
+         && A.boundaryField()[patchI].type() != "empty"
         )
         {
             const symmTensorField& AB = A.boundaryField()[patchI];

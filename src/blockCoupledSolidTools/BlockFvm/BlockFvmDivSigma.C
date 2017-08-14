@@ -100,7 +100,7 @@ laplacianTranspose
         U.mesh(),
         U.mesh().schemesDict().laplacianScheme
         (
-            "fvmBlockLaplacian(" + U.name() + ')'
+            "fvmBlockLaplacianTranspose(" + U.name() + ')'
         )
     )().fvmBlockLaplacianTranspose(solidMesh, muf, U, blockB);
 }
@@ -120,7 +120,7 @@ laplacianTrace
         U.mesh(),
         U.mesh().schemesDict().laplacianScheme
         (
-            "fvmBlockLaplacian(" + U.name() + ')'
+            "fvmBlockLaplacianTrace(" + U.name() + ')'
         )
     )().fvmBlockLaplacianTrace(solidMesh, lambdaf, U, blockB);
 }

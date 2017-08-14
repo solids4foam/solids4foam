@@ -14,7 +14,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidModel consistentIcoFluid;
+fluidModel icoFluid;
 
 
 icoFluidCoeffs

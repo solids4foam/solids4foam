@@ -35,9 +35,6 @@ Description
         laplacian transpose;
         laplacian trace.
 
-    For now, the three terms are discretised as one, although it should be
-    straight-forward to seperate them.
-
     Returns a BlockLduMatrix.
 
     Note: not templated.

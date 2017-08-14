@@ -55,6 +55,7 @@ Author
 #include "surfaceFields.H"
 #include "newFvMeshSubset.H"
 #include "newLeastSquaresVolPointInterpolation.H"
+#include "nonLinearGeometry.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -75,6 +76,7 @@ class mechanicalModel
         const fvMesh& mesh_;
 
         //- Is the current case plane stress or plain strain/3-D
+        //  Todo: this should be moved to actual mechanical law
         const Switch planeStress_;
 
         //- Name of the cellZone for each material
@@ -330,7 +332,7 @@ class mechanicalModel
         void calcBiMaterialInterfaceActive() const;
 
         //- Clear out demand driven data
-        void clearOut() const;
+        void clearOut();
 
         //- Disallow default bitwise copy construct
         mechanicalModel(const mechanicalModel&);
@@ -344,7 +346,11 @@ public:
     // Constructors
 
         //- Construct from an fvMesh
-        mechanicalModel(const fvMesh& mesh);
+        mechanicalModel
+        (
+            const fvMesh& mesh,
+            const nonLinearGeometry::nonLinearType& nonLinGeom
+        );
 
 
     //- Destructor
@@ -411,6 +417,16 @@ public:
                 surfaceTensorField& gradDf
             );
 
+            //- Update the gradient of displacement vol and surface field using
+            //  pointD
+            void grad
+            (
+                const volVectorField& D,
+                const pointVectorField& pointD,
+                volTensorField& gradD,
+                surfaceTensorField& gradDf
+            );
+
             //- Interpolate D to pointD
             void interpolate
             (
@@ -418,6 +434,14 @@ public:
                 pointVectorField& pointD,
                 const bool useVolFieldSigma = true
             );
+
+            //- Return explicit Rhie-Chow correction field to quell oscillations
+            tmp<volVectorField> RhieChowCorrection
+            (
+                const volVectorField& D,
+                const volTensorField& gradD,
+                const surfaceScalarField& gamma
+            ) const;
 
             //- Return explicit Rhie-Chow correction field to quell oscillations
             tmp<volVectorField> RhieChowCorrection

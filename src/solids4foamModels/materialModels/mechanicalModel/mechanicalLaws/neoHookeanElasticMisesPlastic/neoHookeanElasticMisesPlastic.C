@@ -28,6 +28,7 @@ License
 #include "transformGeometricField.H"
 #include "logVolFields.H"
 #include "fvc.H"
+#include "fvm.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -36,7 +37,7 @@ namespace Foam
     defineTypeNameAndDebug(neoHookeanElasticMisesPlastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, neoHookeanElasticMisesPlastic, dictionary
+        mechanicalLaw, neoHookeanElasticMisesPlastic, nonLinGeomMechLaw
     );
 
 // * * * * * * * * * * * * * * Static Members  * * * * * * * * * * * * * * * //
@@ -398,17 +399,16 @@ void Foam::neoHookeanElasticMisesPlastic::newtonLoop
 }
 
 
-void Foam::neoHookeanElasticMisesPlastic::updateBEbar
+Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
 (
-    volSymmTensorField& bEbar,
-    const volSymmTensorField& devBEbarTrial
+    const volSymmTensorField& devBEbar
 )
 {
     // From Simo & Hughes 1998:
     // but this incorrectly results in det(bEbar) =! 1
     //bEbar = (s/mu) + Ibar*I;
 
-    // A method of calculating Ibar o denforce det(bEbar) == 1 is proposed
+    // A method of calculating Ibar to enforce det(bEbar) == 1 is proposed
     // by solving a cubic equation.
     // Rubin and Attia, CALCULATION OF HYPERELASTIC RESPONSE OF FINITELY
     // DEFORMED ELASTIC-VISCOPLASTIC MATERIALS, INTERNATIONAL JOURNAL FOR
@@ -425,23 +425,39 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
     // Method implemented below is translated from the SmoothMultiPhase fortran
     // subroutine of Rubin
 
-    // Calculate deviatoric component of trial bEbar
-    //const volSymmTensorField devBEbarTrial = dev(bEbarTrial);
+    tmp<volScalarField> tIbar
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "Ibar",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimless, 0.0)
+        )
+    );
+
+    volScalarField& Ibar = tIbar();
 
     // Take reference to internal fields for efficiency
-    symmTensorField& bEbarI = bEbar.internalField();
-    const symmTensorField& devBEbarTrialI = devBEbarTrial.internalField();
+    scalarField& IbarI = Ibar.internalField();
+    const symmTensorField devBEbarI = devBEbar.internalField();
 
     // Calculate internal field
-    forAll(bEbarI, cellI)
+    forAll(IbarI, cellI)
     {
-        const scalar detdevBepr = det(devBEbarTrialI[cellI]);
-        const scalar dotprod = devBEbarTrialI[cellI] && devBEbarTrialI[cellI];
+        const scalar detdevBepr = det(devBEbarI[cellI]);
+        const scalar dotprod = devBEbarI[cellI] && devBEbarI[cellI];
         const scalar fac1 = 2.0*dotprod/3.0;
 
         scalar alpha1 = 0.0;
 
-        if (fac1 == 0.0) // maybe check abs is less than SMALL
+        if (mag(fac1) < SMALL)
         {
             alpha1 = 3.0;
         }
@@ -459,33 +475,33 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
             }
         }
 
-        bEbarI[cellI] = devBEbarTrialI[cellI] + (alpha1/3.0)*I;
+        IbarI[cellI] = alpha1/3.0;
     }
 
     // Calculate boundary field
-    forAll(bEbar.boundaryField(), patchI)
+    forAll(Ibar.boundaryField(), patchI)
     {
         if
         (
-            !bEbar.boundaryField()[patchI].coupled()
-         && bEbar.boundaryField()[patchI].type() != "empty"
+            !Ibar.boundaryField()[patchI].coupled()
+         && Ibar.boundaryField()[patchI].type() != "empty"
         )
         {
             // Take reference to patch fields for efficiency
-            symmTensorField& bEbarP = bEbar.boundaryField()[patchI];
-            const symmTensorField& devBEbarTrialP =
-                devBEbarTrial.boundaryField()[patchI];
+            scalarField& IbarP = Ibar.boundaryField()[patchI];
+            const symmTensorField& devBEbarP =
+                devBEbar.boundaryField()[patchI];
 
-            forAll(bEbarP, faceI)
+            forAll(IbarP, faceI)
             {
-                const scalar detdevBepr = det(devBEbarTrialP[faceI]);
+                const scalar detdevBepr = det(devBEbarP[faceI]);
                 const scalar dotprod =
-                    devBEbarTrialP[faceI] && devBEbarTrialP[faceI];
+                    devBEbarP[faceI] && devBEbarP[faceI];
                 const scalar fac1 = 2.0*dotprod/3.0;
 
                 scalar alpha1 = 0.0;
 
-                if (fac1 == 0.0) // maybe check abs is less than SMALL
+                if (mag(fac1) < SMALL)
                 {
                     alpha1 = 3.0;
                 }
@@ -508,26 +524,27 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
                     }
                 }
 
-                bEbarP[faceI] = devBEbarTrialP[faceI] + (alpha1/3.0)*I;
+                IbarP[faceI] = alpha1/3.0;
             }
         }
     }
 
-    bEbar.correctBoundaryConditions();
+    Ibar.correctBoundaryConditions();
+
+    return tIbar;
 }
 
 
-void Foam::neoHookeanElasticMisesPlastic::updateBEbar
+Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
 (
-    surfaceSymmTensorField& bEbar,
-    const surfaceSymmTensorField& devBEbarTrial
+    const surfaceSymmTensorField& devBEbar
 )
 {
     // From Simo & Hughes 1998:
     // but this incorrectly results in det(bEbar) =! 1
     //bEbar = (s/mu) + Ibar*I;
 
-    // A method of calculating Ibar o denforce det(bEbar) == 1 is proposed
+    // A method of calculating Ibar to enforce det(bEbar) == 1 is proposed
     // by solving a cubic equation.
     // Rubin and Attia, CALCULATION OF HYPERELASTIC RESPONSE OF FINITELY
     // DEFORMED ELASTIC-VISCOPLASTIC MATERIALS, INTERNATIONAL JOURNAL FOR
@@ -544,23 +561,39 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
     // Method implemented below is translated from the SmoothMultiPhase fortran
     // subroutine of Rubin
 
-    // Calculate deviatoric component of trial bEbar
-    //const volSymmTensorField devBEbarTrial = dev(bEbarTrial);
+    tmp<surfaceScalarField> tIbar
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "Ibar",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimless, 0.0)
+        )
+    );
+
+    surfaceScalarField& Ibar = tIbar();
 
     // Take reference to internal fields for efficiency
-    symmTensorField& bEbarI = bEbar.internalField();
-    const symmTensorField& devBEbarTrialI = devBEbarTrial.internalField();
+    scalarField& IbarI = Ibar.internalField();
+    const symmTensorField devBEbarI = devBEbar.internalField();
 
     // Calculate internal field
-    forAll(bEbarI, faceI)
+    forAll(IbarI, cellI)
     {
-        const scalar detdevBepr = det(devBEbarTrialI[faceI]);
-        const scalar dotprod = devBEbarTrialI[faceI] && devBEbarTrialI[faceI];
+        const scalar detdevBepr = det(devBEbarI[cellI]);
+        const scalar dotprod = devBEbarI[cellI] && devBEbarI[cellI];
         const scalar fac1 = 2.0*dotprod/3.0;
 
         scalar alpha1 = 0.0;
 
-        if (fac1 == 0.0) // maybe check abs is less than SMALL
+        if (mag(fac1) < SMALL)
         {
             alpha1 = 3.0;
         }
@@ -578,29 +611,33 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
             }
         }
 
-        bEbarI[faceI] = devBEbarTrialI[faceI] + (alpha1/3.0)*I;
+        IbarI[cellI] = alpha1/3.0;
     }
 
     // Calculate boundary field
-    forAll(bEbar.boundaryField(), patchI)
+    forAll(Ibar.boundaryField(), patchI)
     {
-        if (bEbar.boundaryField()[patchI].type() != "empty")
+        if
+        (
+            !Ibar.boundaryField()[patchI].coupled()
+         && Ibar.boundaryField()[patchI].type() != "empty"
+        )
         {
             // Take reference to patch fields for efficiency
-            symmTensorField& bEbarP = bEbar.boundaryField()[patchI];
-            const symmTensorField& devBEbarTrialP =
-                devBEbarTrial.boundaryField()[patchI];
+            scalarField& IbarP = Ibar.boundaryField()[patchI];
+            const symmTensorField& devBEbarP =
+                devBEbar.boundaryField()[patchI];
 
-            forAll(bEbarP, faceI)
+            forAll(IbarP, faceI)
             {
-                const scalar detdevBepr = det(devBEbarTrialP[faceI]);
+                const scalar detdevBepr = det(devBEbarP[faceI]);
                 const scalar dotprod =
-                    devBEbarTrialP[faceI] && devBEbarTrialP[faceI];
+                    devBEbarP[faceI] && devBEbarP[faceI];
                 const scalar fac1 = 2.0*dotprod/3.0;
 
                 scalar alpha1 = 0.0;
 
-                if (fac1 == 0.0) // maybe check abs is less than SMALL
+                if (mag(fac1) < SMALL)
                 {
                     alpha1 = 3.0;
                 }
@@ -623,13 +660,16 @@ void Foam::neoHookeanElasticMisesPlastic::updateBEbar
                     }
                 }
 
-                bEbarP[faceI] = devBEbarTrialP[faceI] + (alpha1/3.0)*I;
+                IbarP[faceI] = alpha1/3.0;
             }
         }
     }
 
-    bEbar.correctBoundaryConditions();
+    Ibar.correctBoundaryConditions();
+
+    return tIbar;
 }
+
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -639,10 +679,11 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
@@ -660,12 +701,14 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
             "sigmaHyd",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
         mesh,
-        dimensionedScalar("zero", dimPressure, 0.0)
+        dimensionedScalar("zero", dimPressure, 0.0),
+        zeroGradientFvPatchScalarField::typeName
     ),
+    smoothPressure_(dict.lookupOrDefault<Switch>("smoothPressure", true)),
     sigmaY_
     (
         IOobject
@@ -964,6 +1007,9 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     plasticN_.oldTime();
     bEbar_.oldTime();
 
+    Info<< "    smoothPressure: " << smoothPressure_ << nl
+        << "    updateBEbarConsistent: " << updateBEbarConsistent_ << endl;
+
     // Read elastic parameters
     // The user can specify E and nu or mu and K
     if (dict.found("E") && dict.found("nu"))
@@ -1076,6 +1122,22 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlastic::rho() const
 Foam::tmp<Foam::volScalarField>
 Foam::neoHookeanElasticMisesPlastic::impK() const
 {
+    // Calculate scaling factor to ensure optimal convergence
+    // This is similar to the tangent matrix in FE procedures
+
+    // Calculate deviatoric trial stress
+    const volSymmTensorField sTrial = mu_*dev(bEbarTrial_);
+
+    const volScalarField Ibar = tr(bEbarTrial_)/3.0;
+    const volScalarField muBar = Ibar*mu_;
+
+    // Magnitude of the deviatoric trial stress
+    const volScalarField magSTrial =
+        max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL));
+
+    // Calculate scaling factor
+    const volScalarField scaleFactor = 1.0 - (2.0*muBar*DLambda_/magSTrial);
+
     return tmp<volScalarField>
     (
         new volScalarField
@@ -1088,9 +1150,10 @@ Foam::neoHookeanElasticMisesPlastic::impK() const
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            mesh(),
-            (4.0/3.0)*mu_ + K_, // == 2*mu + lambda
-            zeroGradientFvPatchScalarField::typeName
+            //mesh(),
+            //(4.0/3.0)*mu_ + K_, // == 2*mu + lambda
+            //zeroGradientFvPatchScalarField::typeName
+            scaleFactor*(4.0/3.0)*mu_ + K_
         )
     );
 }
@@ -1098,7 +1161,8 @@ Foam::neoHookeanElasticMisesPlastic::impK() const
 
 void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 {
-    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    // Check if the mathematical model is in total or updated Lagrangian form
+    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
@@ -1110,7 +1174,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
         // Update the total deformation gradient
         F() = relF() & F().oldTime();
     }
-    else
+    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
         // Lookup gradient of displacement
         const volTensorField& gradD =
@@ -1122,6 +1186,14 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
         // Update the relative deformation gradient
         relF() = F() & inv(F().oldTime());
     }
+    else
+    {
+        FatalErrorIn
+        (
+            "void Foam::neoHookeanElasticMisesPlastic::"
+            "correct(volSymmTensorField& sigma)"
+        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+    }
 
     // Update the Jacobian of the total deformation gradient
     J() = det(F());
@@ -1131,13 +1203,13 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 
     // Calculate the relative deformation gradient with the volumetric term
     // removed
-    volTensorField relFbar = pow(relJ, -1.0/3.0)*relF();
+    const volTensorField relFbar = pow(relJ, -1.0/3.0)*relF();
 
     // Update bE trial
     bEbarTrial_ = transform(relFbar, bEbar_.oldTime());
 
     // Calculate trial deviatoric stress
-    volSymmTensorField sTrial = mu_*dev(bEbarTrial_);
+    const volSymmTensorField sTrial = mu_*dev(bEbarTrial_);
 
     const volScalarField Ibar = tr(bEbarTrial_)/3.0;
     const volScalarField muBar = Ibar*mu_;
@@ -1314,7 +1386,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     if (updateBEbarConsistent_)
     {
         const volSymmTensorField devBEbar = (s/mu_);
-        updateBEbar(bEbar_, devBEbar);
+        bEbar_ = devBEbar + this->Ibar(devBEbar)*I;
     }
     else
     {
@@ -1322,7 +1394,56 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     }
 
     // Update hydrostatic stress (negative of pressure)
-    sigmaHyd_ = 0.5*K_*(pow(J(), 2.0) - 1.0);
+    if (smoothPressure_)
+    {
+        // Calculate the hydrostatic pressure by solving a Laplace equation;
+        // this ensures smoothness of the field and quells oscillations
+
+        // Lookup the momentum equation inverse diagonal field
+        const volScalarField AD = mesh().lookupObject<volScalarField>("DEqnA");
+
+        // Pressure diffusivity field
+        // Note: (4.0/3.0)*mu + K == 2*mu + lambda
+        const surfaceScalarField rDAf
+        (
+            "rDAf",
+            fvc::interpolate
+            (
+                ((4.0/3.0)*mu_ + K_)/AD, "interpolate(grad(sigmaHyd))"
+            )
+        );
+
+        const dimensionedScalar one("one", dimless, 1.0);
+        //const dimensionedScalar fac(dict().lookup("smoothFactor"));
+
+        // Construct the pressure equation
+        fvScalarMatrix sigmaHydEqn
+        (
+            fvm::Sp(one, sigmaHyd_)
+          - fvm::laplacian(rDAf, sigmaHyd_, "laplacian(DDD,DD)")
+         ==
+            0.5*K_*(pow(J(), 2.0) - 1.0)
+          - fvc::div(rDAf*fvc::interpolate(fvc::grad(sigmaHyd_)) & mesh().Sf())
+        );
+
+        // Store the pressue field to allow under-relaxation
+        sigmaHyd_.storePrevIter();
+
+        // Under-relax the linear system
+        sigmaHydEqn.relax(0.7);
+
+        // Solve the pressure equation
+        sigmaHydEqn.solve();
+
+        // Under-relax the pressure field
+        sigmaHyd_.relax(0.2);
+    }
+    else
+    {
+        // Calculate the hydrostatic pressure directly from the displacement
+        // field
+        sigmaHyd_ = 0.5*K_*(pow(J(), 2.0) - 1.0);
+    }
 
     // Update the Cauchy stress
     sigma = (1.0/J())*(sigmaHyd_*I + s);
@@ -1547,7 +1668,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     if (updateBEbarConsistent_)
     {
         const surfaceSymmTensorField devBEbar = (s/mu_);
-        updateBEbar(bEbarf_, devBEbar);
+        bEbarf_ = devBEbar + this->Ibar(devBEbar)*I;
     }
     else
     {
@@ -1647,27 +1768,6 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
 
     Info<< "    " << numCellsYielding << " cells are actively yielding"
         << nl << endl;
-
-    // if (mesh().time().outputTime())
-    // {
-    //     Info<< "Writing det(bEbar)" << endl;
-
-    //     volScalarField detBEbarMinus1
-    //     (
-    //         "detBEbarMinus1",
-    //         det(bEbar_) - 1.0
-    //     );
-
-    //     detBEbarMinus1.write();
-
-    //     volScalarField trBEbarOver3Minus1
-    //     (
-    //         "trBEbarOver3Minus1",
-    //         (tr(bEbar_)/3.0) - 1.0
-    //     );
-
-    //     trBEbarOver3Minus1.write();
-    // }
 }
 
 

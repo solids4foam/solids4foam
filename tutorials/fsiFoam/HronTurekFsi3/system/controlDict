@@ -37,7 +37,7 @@ writeFormat     ascii;
 
 writePrecision  6;
 
-writeCompression compressed;
+writeCompression uncompressed;
 
 timeFormat      general;
 
@@ -51,18 +51,11 @@ maxCo           0.2;
 
 functions
 (
-//    pointHistory
-//    {
-//        type pointHistory;
-//        functionObjectLibs
-//        (
-//          "libpointHistory.so"
-//        );
-
-//        region solid;
-
-//        refHistoryPoint (0.6 0.2 0.025334);
-//    }
+   pointDisp
+   {
+       type    solidPointDisplacement;
+       point   (0.6 0.2 0.0075);
+   }
 );
 
 

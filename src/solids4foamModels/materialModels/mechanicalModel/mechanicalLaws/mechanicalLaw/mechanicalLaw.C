@@ -39,7 +39,8 @@ InClass
 namespace Foam
 {
     defineTypeNameAndDebug(mechanicalLaw, 0);
-    defineRunTimeSelectionTable(mechanicalLaw, dictionary);
+    defineRunTimeSelectionTable(mechanicalLaw, linGeomMechLaw);
+    defineRunTimeSelectionTable(mechanicalLaw, nonLinGeomMechLaw);
 }
 
 // * * * * * * * * * * * * * * Protected Members * * * * * * * * * * * * * * //
@@ -86,13 +87,15 @@ Foam::mechanicalLaw::mechanicalLaw
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
     name_(name),
     mesh_(mesh),
     dict_(dict),
-    baseMeshRegionName_()
+    baseMeshRegionName_(),
+    nonLinGeom_(nonLinGeom)
 {
     // Set the base mesh region name
     // For an FSI case, the region will be called solid, else it will be called

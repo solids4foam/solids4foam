@@ -1,3 +1,0 @@
-analyticalHotCylinder.C
-
-EXE = $(FOAM_APPBIN)/analyticalHotCylinder

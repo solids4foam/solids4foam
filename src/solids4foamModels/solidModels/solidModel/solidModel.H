@@ -46,6 +46,7 @@ SourceFiles
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
 #include "mechanicalModel.H"
+#include "nonLinearGeometry.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -69,13 +70,44 @@ class solidModel
         dictionary solidProperties_;
 
         //- Mechanical model
-        mechanicalModel mechanical_;
+        mutable autoPtr<mechanicalModel> mechanicalPtr_;
 
         //- Global face zones
         mutable labelList* globalFaceZonesPtr_;
 
         //- Global to local face zone point mapping
         mutable labelListList* globalToLocalFaceZonePointMapPtr_;
+
+        //- Switch to enable/disable enforce linear to help convergence
+        Switch enforceLinear_;
+
+        //- Under-relaxation method
+        //  It can be 'fixed', 'Aitken' or 'QuasiNewton'
+        const word relaxationMethod_;
+
+        //- Aitken's under-relaxation factor field
+        volScalarField aitkenAlpha_;
+
+        //- Aitken's residual field
+        volVectorField aitkenResidual_;
+
+        //- Restart frequency for the Quasi-Newton method
+        const int QuasiNewtonRestartFreq_;
+
+        //- Quasi-Newton method input vector field
+        DynamicList<vectorField> QuasiNewtonV_;
+
+        //- Quasi-Newton method output vector field
+        DynamicList<vectorField> QuasiNewtonW_;
+
+        //- Quasi-Newton method time indices for the input-ouput fields
+        DynamicList<scalar> QuasiNewtonT_;
+
+        //- Reference D field used for Quasi-Newton method
+        volVectorField DRef_;
+
+        //- Reference D (without relaxation) field used for Quasi-Newton method
+        volVectorField unrelaxedDRef_;
 
     // Private Member Functions
 
@@ -84,6 +116,9 @@ class solidModel
 
         //- Find global to local point addressing
         void calcGlobalToLocalFaceZonePointMap() const;
+
+        //- Make the mechanical model
+        void makeMechanicalModel() const;
 
         //- Disallow default bitwise copy construct
         solidModel(const solidModel&);
@@ -96,17 +131,20 @@ protected:
 
     // Protected member functions
 
+        //- Return nonlinear geometry enumerator
+        virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
+
         //- Return solid properties dictionary
         dictionary& solidProperties()
         {
             return solidProperties_;
         }
 
+        //- Apply fixed or Aitken's adaptive under-relaxation to the field
+        void relaxField(volVectorField& D, int iCorr);
+
         //- Return mechanical model
-        mechanicalModel& mechanical()
-        {
-            return mechanical_;
-        }
+        mechanicalModel& mechanical();
 
 public:
 
@@ -178,10 +216,7 @@ public:
             }
 
             //- Return mechanical model
-            const mechanicalModel& mechanical() const
-            {
-                return mechanical_;
-            }
+            const mechanicalModel& mechanical() const;
 
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
@@ -214,6 +249,18 @@ public:
 
             //- Get global to local face zone point addressing
             const labelListList& globalToLocalFaceZonePointMap() const;
+
+            //- Return enforceLinear switch
+            const Switch& enforceLinear() const
+            {
+                return enforceLinear_;
+            }
+
+            //- Return enforceLinear switch
+            Switch& enforceLinear()
+            {
+                return enforceLinear_;
+            }
 
         // Edit
 
@@ -253,6 +300,12 @@ public:
                 const label zoneID,
                 const scalarField& faceZonePressure
             );
+
+            //- Check if solid model is diverging using the Jacobian field
+            virtual Switch& checkEnforceLinear(const volScalarField& J);
+
+            //- Check if solid model is diverging using the Jacobian field
+            virtual Switch& checkEnforceLinear(const surfaceScalarField& J);
 
             //- Evolve the solid model
             virtual bool evolve() = 0;

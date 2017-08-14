@@ -34,7 +34,7 @@ namespace Foam
     defineTypeNameAndDebug(linearElasticMohrCoulombPlastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, linearElasticMohrCoulombPlastic, dictionary
+        mechanicalLaw, linearElasticMohrCoulombPlastic, linGeomMechLaw
     );
 }
 
@@ -403,10 +403,11 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict
+    const dictionary& dict,
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
@@ -816,7 +817,11 @@ void Foam::linearElasticMohrCoulombPlastic::correct
 Foam::scalar Foam::linearElasticMohrCoulombPlastic::residual()
 {
     // Calculate residual based on change in plastic strain increment
-    if (mesh().foundObject<surfaceTensorField>("Ff"))
+    if
+    (
+        mesh().foundObject<surfaceVectorField>("grad(D)")
+     || mesh().foundObject<surfaceVectorField>("grad(DD)")
+    )
     {
         return
             gMax

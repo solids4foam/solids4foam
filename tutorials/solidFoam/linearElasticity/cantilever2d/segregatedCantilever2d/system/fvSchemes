@@ -17,29 +17,29 @@ FoamFile
 
 d2dt2Schemes
 {
-    default     steadyState;
+    default                 steadyState;
 }
 
 ddtSchemes
 {
-    default     steadyState;
+    default                 steadyState;
 }
 
 gradSchemes
 {
-     default                 extendedLeastSquares 0;
+     default                none;
+     grad(D)                extendedLeastSquares 0;
 }
 
 divSchemes
 {
-    default                 Gauss linear;
-    fvmDiv(sigma)           pointGaussLeastSquares;
+    default                 none;
+    div(sigma)              Gauss linear;
 }
 
 laplacianSchemes
 {
     default                 none;
-    fvmBlockLaplacian(D)    pointGaussLeastSquares;
     laplacian(DD,D)         Gauss linear corrected;
 }
 
@@ -50,7 +50,9 @@ snGradSchemes
 
 interpolationSchemes
 {
-    default                 linear;
+    default                 none;
+    interpolate(impK)       linear;
+    interpolate(grad(D))    linear;
 }
 
 // ************************************************************************* //
