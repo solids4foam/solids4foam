@@ -1,5 +1,5 @@
-#!/bin/sh
-set -x
+#!/bin/bash
+cd ${0%/*} || exit 1    # run from this directory
 
 # Eigen library
 # http://eigen.tuxfamily.org/index.php?title=Main_Page
@@ -7,6 +7,7 @@ set -x
 # For example, add the following line to your ~.bashrc:
 #     export EIGEN_DIR="/opt/local/include/eigen3"
 # Check if src/eigen3 directory is found
+echo "Checking eigen installation"
 if [ -d $(pwd)/eigen3 ]
 then
     echo "eigen3 found."

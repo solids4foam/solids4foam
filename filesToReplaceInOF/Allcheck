@@ -1,0 +1,20 @@
+#!/bin/bash
+cd ${0%/*} || exit 1    # run from this directory
+
+# Check if the foam files have been replaced
+echo "Check filesToReplaceInOF"
+if cmp --silent "./solution.C" "$FOAM_SRC/foam/matrices/solution/solution.C"
+then
+    echo "solution.C has already been replaced"
+else
+    echo "You should replace the file $FOAM_SRC/foam/matrices/solution/solution.C with filesToReplaceInOF/solution.C"
+    exit 1;
+fi
+
+if cmp --silent "./WedgePointPatchField.C" "$FOAM_SRC/foam/fields/PointPatchFieldTemplates/constraint/wedge/WedgePointPatchField.C"
+then
+    echo "WedgePointPatchField.C has already been replaced"
+else
+    echo "You should replace the file $FOAM_SRC/foam/fields/PointPatchFieldTemplates/constraint/wedge/WedgePointPatchField.C with filesToReplaceInOF/WedgePointPatchField.C"
+    exit 1;
+fi
