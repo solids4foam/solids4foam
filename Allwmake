@@ -1,7 +1,8 @@
-#!/bin/sh
-set -x
+#!/bin/bash
+cd ${0%/*} || exit 1    # run from this directory
 
 # Check if the foam files have been replaced
+echo "Check filesToReplaceInOF"
 if cmp --silent "./filesToReplaceInOF/solution.C" "$FOAM_SRC/foam/matrices/solution/solution.C"
 then
     echo "solution.C has already been replaced"
