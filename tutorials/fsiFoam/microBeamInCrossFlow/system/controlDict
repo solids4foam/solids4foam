@@ -10,22 +10,51 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    location    "system";
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress     no;
+application     fsiFoam;
 
-mechanical
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         4;
+
+deltaT          0.01;
+
+writeControl    runTime;
+
+writeInterval   0.05;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
+
+adjustTimeStep  yes;
+
+maxCo           20.0; //2.0;
+
+functions
 (
-    steel
+    pointDisp
     {
-        type            thermoLinearElastic;
-        //type            linearElastic;
-        rho             rho [1 -3 0 0 0 0 0] 7750;
-        E               E [1 -1 -2 0 0 0 0] 190e+9;
-        nu              nu [0 0 0 0 0 0 0] 0.305;
-        alpha           alpha [0 0 0 -1 0 0 0] 9.7e-06;
+        type    solidPointDisplacement;
+        point   (105e-6 50e-6 0);
     }
 );
 

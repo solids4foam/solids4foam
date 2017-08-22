@@ -15,24 +15,19 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel nonLinearGeometryUpdatedLagrangian;
-//solidModel unsNonLinearGeometryUpdatedLagrangian;
-//solidModel nonLinearGeometryTotalLagrangian;
-//solidModel nonLinearGeometryTotalLagrangianTotalDisplacement;
-solidModel unsNonLinearGeometryTotalLagrangian;
+//solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+solidModel     nonLinearGeometryUpdatedLagrangian;
 
-//nonLinearGeometryTotalLagrangianCoeffs
-//nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
-unsNonLinearGeometryTotalLagrangianCoeffs
+"nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs|nonLinearGeometryUpdatedLagrangianCoeffs"
 {
     // Maximum number of momentum correctors
-    nCorrectors             1000;
+    //nCorrectors             1000;
 
     // Solution tolerance for displacement
-    solutionTolerance       1e-7;
+    solutionTolerance       1e-05;
 
-    // Relative solution tolerance for displacement in outer FSI iterations
-    relConvergenceTolerance 1e-3;
+    // Alternative solution tolerance for displacement
+    alternativeTolerance    1e-05;
 
     // Material law solution tolerance
     //materialTolerance       1e-05;

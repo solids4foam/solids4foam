@@ -14,18 +14,16 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress     no;
+planeStress no;
 
 mechanical
 (
-    steel
+    rubber
     {
-        type            thermoLinearElastic;
-        //type            linearElastic;
-        rho             rho [1 -3 0 0 0 0 0] 7750;
-        E               E [1 -1 -2 0 0 0 0] 190e+9;
-        nu              nu [0 0 0 0 0 0 0] 0.305;
-        alpha           alpha [0 0 0 -1 0 0 0] 9.7e-06;
+        type        neoHookeanElastic;
+        rho         rho [1 -3 0 0 0 0 0] 7850;
+        E           E [1 -1 -2 0 0 0 0] 200e3;
+        nu          nu [0 0 0 0 0 0 0] 0.33;
     }
 );
 

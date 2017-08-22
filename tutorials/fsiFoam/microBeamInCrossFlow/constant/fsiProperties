@@ -1,0 +1,60 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+//fluidSolidInterface    fixedRelaxation;
+fluidSolidInterface    Aitken;
+//fluidSolidInterface    IQNILS;
+
+"fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
+{
+    // Solid interface patch
+    solidPatch interface;
+
+    // Solid interface zone
+    solidZone interface-zone;
+
+    // Fluid interface patch
+    fluidPatch interface;
+
+    // Fluid interface zone
+    fluidZone interface-zone;
+
+    // Fixed under-relaxation factor
+    // Some methods use this as the initial factor
+    relaxationFactor 0.1;
+
+    // The entire fluid domain mesh is moved when the interface moves more
+    // than this limit
+    interfaceDeformationLimit 0;
+
+    // Tolerance for the FSI outer loop
+    outerCorrTolerance 1e-3;
+
+    // Maximum number of FSI outer iterations
+    nOuterCorr 20;
+
+    // Frequency at which the weights of interpolator between the fluid and
+    // solid interface is updated
+    interpolatorUpdateFrequency 0;
+
+    // Re-use of the coupling
+    couplingReuse 0;
+
+    // Enable FSI coupling
+    coupled    yes;
+}
+
+// ************************************************************************* //

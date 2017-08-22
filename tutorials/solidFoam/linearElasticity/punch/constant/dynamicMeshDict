@@ -11,27 +11,11 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "constant";
-    object      solidProperties;
+    object      dynamicMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     thermalLinearGeometry;
-//solidModel     linearGeometryTotalDisplacement;
+dynamicFvMesh   staticFvMesh;
 
-"linearGeometryTotalDisplacementCoeffs|thermalLinearGeometryCoeffs"
-{
-    // Maximum number of correctors
-    nCorrectors     10000;
-    nCorrectorsT    10000;
-
-    // Solution tolerance
-    solutionToleranceT 1e-10;
-
-    // Alternative solution toleranc
-    alternativeToleranceT 1e-10;
-
-    // Write frequency for the residuals
-    infoFrequencyT  100;
-}
 
 // ************************************************************************* //
