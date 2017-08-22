@@ -23,7 +23,7 @@ boundaryField
 {
     right
     {
-        type            solidTraction;
+        type            blockSolidTraction;
         traction        uniform ( 0 -1e6 0 );
         pressure        uniform 0;
         value           uniform (0 0 0);
@@ -31,7 +31,7 @@ boundaryField
 
     top
     {
-        type            solidTraction;
+        type            blockSolidTraction;
         traction        uniform ( 0 0 0 );
         pressure        uniform 0;
         value           uniform (0 0 0);
@@ -39,7 +39,7 @@ boundaryField
 
     bottom
     {
-        type            solidTraction;
+        type            blockSolidTraction;
         traction        uniform ( 0 0 0 );
         pressure        uniform 0;
         value           uniform (0 0 0);
@@ -47,7 +47,7 @@ boundaryField
 
     left
     {
-        type            fixedDisplacement;
+        type            blockFixedDisplacement;
         value           uniform ( 0 0 0 );
     }
 

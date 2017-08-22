@@ -29,6 +29,7 @@ divSchemes
     default none;
     div(phi,U)   Gauss linearUpwind cellLimited leastSquares 1;
     div((nuEff*dev(grad(U).T()))) Gauss linear;
+    div((nuEff*dev(T(grad(U))))) Gauss linear;
     div(phi,epsilon) Gauss upwind;
     div(phi,k) Gauss upwind;
 }

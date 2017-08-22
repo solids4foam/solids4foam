@@ -15,7 +15,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     coupledSolidFoam;
+application     solidFoam;
 
 startFrom       startTime;
 
@@ -27,9 +27,9 @@ endTime         1;
 
 deltaT          1;
 
-writeControl    timeStep;
+writeControl     timeStep;
 
-writeInterval   1;
+writeInterval    1;
 
 cycleWrite      0;
 
