@@ -766,16 +766,16 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     );
 
     // Under-relax the linear system
-//     if (mesh().solutionDict().relaxEquation("DEqn"))
-//     {
-//         Info<< "Under-relaxing the equation" << endl;
-//         blockM.relax
-//         (
-//             solutionVec_,
-//             blockB,
-//             mesh().solutionDict().equationRelaxationFactor("DEqn")
-//         );
-//     }
+    if (mesh().solutionDict().relax("DEqn"))
+    {
+        Info<< "Under-relaxing the equation" << endl;
+        blockM.relax
+        (
+            solutionVec_,
+            blockB,
+            mesh().solutionDict().relaxationFactor("DEqn")
+        );
+    }
 
     // Block coupled solver call
     solverPerfD =
@@ -790,7 +790,7 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     extendedMesh_.copySolutionVector(solutionVec_, D_);
 
     // Under-relax the field
-    //D_.relax();
+    D_.relax();
 
     // Update gradient of displacement
     volToPoint_.interpolate(D_, pointD_);

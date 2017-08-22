@@ -18,14 +18,14 @@ planeStress     no;
 
 mechanical
 (
-    steel
+    polymer
     {
-        type            thermoLinearElastic;
-        //type            linearElastic;
-        rho             rho [1 -3 0 0 0 0 0] 7750;
-        E               E [1 -1 -2 0 0 0 0] 190e+9;
-        nu              nu [0 0 0 0 0 0 0] 0.305;
-        alpha           alpha [0 0 0 -1 0 0 0] 9.7e-06;
+        type            viscousHookeanElastic;
+        rho             rho [1 -3 0 0 0 0 0] 7850;
+        EInfinity       EInfinity [1 -1 -2 0 0 0 0] 39.58e+9;
+        nu              nu [0 0 0 0 0 0 0] 0.33;
+        E               (2.9318518519e9 5.8637037037e9 6.5966666667e9 18.3240740741e9);
+        relaxationTimes (30 300 3000 12000);
     }
 );
 

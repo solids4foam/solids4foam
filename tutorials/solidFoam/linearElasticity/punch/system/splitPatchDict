@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -10,23 +10,17 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    object      splitPatchDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress     no;
+patchToSplitName    punchContact;
 
-mechanical
+newPatchName        punchTractionFree;
+
+boundBoxes
 (
-    steel
-    {
-        type            thermoLinearElastic;
-        //type            linearElastic;
-        rho             rho [1 -3 0 0 0 0 0] 7750;
-        E               E [1 -1 -2 0 0 0 0] 190e+9;
-        nu              nu [0 0 0 0 0 0 0] 0.305;
-        alpha           alpha [0 0 0 -1 0 0 0] 9.7e-06;
-    }
+    (0 0 0.01) (1 1 1)
 );
 
 // ************************************************************************* //

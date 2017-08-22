@@ -1,0 +1,88 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                |
+| \\      /  F ield         | OpenFOAM GUI Project: creativeFields           |
+|  \\    /   O peration     | Version:  0.8.9.0                              |
+|   \\  /    A nd           | Web: www.c-fields.com                          |
+|    \\/     M anipulation  |                                                |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version 2;
+    format ascii;
+    class dictionary;
+    location "system";
+    object meshDict;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+maxCellSize 4;
+
+surfaceFile "microBeamInCrossFlow.fluid.ftr";
+
+localRefinement
+{
+    CreatedbyGmsh_1
+    {
+        cellSize 1;
+    }
+}
+
+boundaryLayers
+{
+    //nLayers         6;
+    //thicknessRatio  1.2;
+    patchBoundaryLayers
+    {
+        "CreatedbyGmsh_0|CreatedbyGmsh_1|CreatedbyGmsh_2|CreatedbyGmsh_4"
+        {
+            nLayers           4;
+            thicknessRatio    1.2;
+            //maxFirstLayerThickness 0.2;
+            //allowDiscontinuity 0;
+        }
+    }
+}
+
+renameBoundary
+{
+    //defaultName fixedWalls;
+    //defaultType wall;
+
+    newPatchNames
+    {
+        "CreatedbyGmsh_0|CreatedbyGmsh_2|CreatedbyGmsh_4"
+        {
+            newName     wall;
+            newType     wall;
+        }
+        CreatedbyGmsh_1
+        {
+            newName     interface;
+            newType     wall;
+        }
+        CreatedbyGmsh_3
+        {
+            newName     outlet;
+            newType     patch;
+        }
+        CreatedbyGmsh_5
+        {
+            newName     inlet;
+            newType     patch;
+        }
+        bottomEmptyFaces
+        {
+            newName     backPlane;
+            newType     empty;
+        }
+        topEmptyFaces
+        {
+            newName     frontPlane;
+            newType     empty;
+        }
+    }
+}
+
+// ************************************************************************* //
