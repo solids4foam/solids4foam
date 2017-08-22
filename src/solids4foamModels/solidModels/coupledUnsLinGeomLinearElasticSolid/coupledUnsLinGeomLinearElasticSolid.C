@@ -774,13 +774,16 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     // Under-relax the linear system
     if (mesh().solutionDict().relax("DEqn"))
     {
-        Info<< "Under-relaxing the equation" << endl;
-        blockM.relax
-        (
-            solutionVec_,
-            blockB,
-            mesh().solutionDict().relaxationFactor("DEqn")
-        );
+        FatalError
+            << "Equation under-relaxation disabled!"
+            << abort(FatalError);
+        //Info<< "Under-relaxing the equation" << endl;
+        //blockM.relax
+        //(
+        //    solutionVec_,
+        //    blockB,
+        //    mesh().solutionDict().relaxationFactor("DEqn")
+        //);
     }
 
     // Block coupled solver call
