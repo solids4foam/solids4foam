@@ -699,7 +699,6 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
-    //mesh_(mesh),
     meshPtr_
     (
         dynamicFvMesh::New

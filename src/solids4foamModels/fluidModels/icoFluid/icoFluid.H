@@ -105,7 +105,11 @@ public:
     // Constructors
 
         //- Construct from components
-        icoFluid(const fvMesh& mesh);
+        icoFluid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor
@@ -202,7 +206,7 @@ public:
         // Edit
 
             //- Evolve the fluid model
-            virtual void evolve();
+            virtual bool evolve();
 };
 
 

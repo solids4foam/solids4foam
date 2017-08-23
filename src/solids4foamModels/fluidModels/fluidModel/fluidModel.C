@@ -245,21 +245,35 @@ void Foam::fluidModel::calcGlobalToLocalFaceZonePointMap() const
 Foam::fluidModel::fluidModel
 (
     const word& type,
-    const fvMesh& mesh
+    Time& runTime,
+    const word& region
 )
 :
+    physicsModel(type, runTime),
     IOdictionary
     (
         IOobject
         (
             "fluidProperties",
-            mesh.time().constant(),
-            mesh,
+            runTime.constant(),
+            runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
     ),
-    mesh_(mesh),
+    meshPtr_
+    (
+        dynamicFvMesh::New
+        (
+            IOobject
+            (
+                region,
+                runTime.timeName(),
+                runTime,
+                IOobject::MUST_READ
+            )
+        )
+    ),
     fluidProperties_(subDict(type + "Coeffs")),
     globalFaceZonesPtr_(NULL),
     globalToLocalFaceZonePointMapPtr_(NULL)
@@ -276,6 +290,55 @@ Foam::fluidModel::~fluidModel()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
+(
+    Time& runTime,
+    const word& region
+)
+{
+    word fluidModelTypeName;
+
+    // Enclose the creation of the dictionary to ensure it is
+    // deleted before the fluid is created otherwise the dictionary
+    // is entered in the database twice
+    {
+        IOdictionary fluidProperties
+        (
+            IOobject
+            (
+                "fluidProperties",
+                runTime.constant(),
+                runTime,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+
+        fluidProperties.lookup("fluidModel")
+            >> fluidModelTypeName;
+    }
+
+    Info<< nl << "Selecting fluidModel " << fluidModelTypeName << endl;
+
+    dictionaryConstructorTable::iterator cstrIter =
+        dictionaryConstructorTablePtr_->find(fluidModelTypeName);
+
+    if (cstrIter == dictionaryConstructorTablePtr_->end())
+    {
+        FatalErrorIn
+        (
+            "fluidModel::New(Time&, const word&)"
+        )   << "Unknown fluidModel type " << fluidModelTypeName
+            << endl << endl
+            << "Valid fluidModel types are :" << endl
+            << dictionaryConstructorTablePtr_->toc()
+            << exit(FatalError);
+    }
+
+    return autoPtr<fluidModel>(cstrIter()(runTime, region));
+}
+
 
 const Foam::labelList& Foam::fluidModel::globalFaceZones() const
 {
