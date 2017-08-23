@@ -22,53 +22,56 @@ License
     along with OpenFOAM; if not, write to the Free Software Foundation,
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
+Application
+    solids4Foam
+
+Description
+    General solver where the solved mathematical model (fluid, solid or
+    fluid-solid) is chosen at run-time.
+
+Author
+    Philip Cardiff, UCD.  All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
+
 \*---------------------------------------------------------------------------*/
 
-#include "solidModel.H"
+#include "fvCFD.H"
+#include "physicsModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-Foam::autoPtr<Foam::solidModel> Foam::solidModel::New(dynamicFvMesh& mesh)
+int main(int argc, char *argv[])
 {
-    word solidModelTypeName;
+#   include "setRootCase.H"
+#   include "createTime.H"
 
-    // Enclose the creation of the dictionary to ensure it is
-    // deleted before the flow is created otherwise the dictionary
-    // is entered in the database twice
+    // Create the general physics class
+    autoPtr<physicsModel> physics = physicsModel::New(runTime);
+
+    while (runTime.run())
     {
-        IOdictionary solidProperties
-        (
-            IOobject
-            (
-                "solidProperties",
-                mesh.time().constant(),
-                mesh,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        );
+        // Update deltaT, if desired, before moving to the next step
+        physics().setDeltaT();
+        runTime++;
 
-        solidProperties.lookup("solidModel") >> solidModelTypeName;
+        Info<< "Time = " << runTime.timeName() << nl << endl;
+
+        // Solve the mathematical model
+        physics().evolve();
+
+        if (runTime.outputTime())
+        {
+            physics().writeFields(runTime);
+        }
+
+        Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
+            << "  ClockTime = " << runTime.elapsedClockTime() << " s"
+            << nl << endl;
     }
 
-    Info<< "Selecting solidModel " << solidModelTypeName << endl;
+    Info<< "End\n" << endl;
 
-    dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(solidModelTypeName);
-
-    if (cstrIter == dictionaryConstructorTablePtr_->end())
-    {
-        FatalErrorIn
-        (
-            "solidModel::New(dynamicFvMesh&)"
-        )   << "Unknown solidModel type " << solidModelTypeName
-            << endl << endl
-            << "Valid solidModel types are :" << endl
-            << dictionaryConstructorTablePtr_->toc()
-            << exit(FatalError);
-    }
-
-    return autoPtr<solidModel>(cstrIter()(mesh));
+    return(0);
 }
 
 

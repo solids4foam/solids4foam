@@ -82,7 +82,7 @@ weakCouplingInterface::weakCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void weakCouplingInterface::evolve()
+bool weakCouplingInterface::evolve()
 {
     initializeFields();
 
@@ -99,6 +99,8 @@ void weakCouplingInterface::evolve()
     updateWeakTraction();
 
     solid().updateTotalFields();
+
+    return 0;
 }
 
 

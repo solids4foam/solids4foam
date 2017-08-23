@@ -75,7 +75,7 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void IQNILSCouplingInterface::evolve()
+bool IQNILSCouplingInterface::evolve()
 {
     initializeFields();
 
@@ -118,6 +118,8 @@ void IQNILSCouplingInterface::evolve()
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
+
+    return 0;
 }
 
 

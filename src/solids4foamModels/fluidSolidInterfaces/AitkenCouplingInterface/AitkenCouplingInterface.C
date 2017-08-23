@@ -64,7 +64,7 @@ AitkenCouplingInterface::AitkenCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void AitkenCouplingInterface::evolve()
+bool AitkenCouplingInterface::evolve()
 {
     initializeFields();
 
@@ -107,6 +107,8 @@ void AitkenCouplingInterface::evolve()
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
+
+    return 0;
 }
 
 

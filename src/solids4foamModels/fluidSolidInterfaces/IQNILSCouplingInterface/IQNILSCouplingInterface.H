@@ -123,7 +123,7 @@ public:
         // Edit
 
             //- Evolve the interface
-            virtual void evolve();
+            virtual bool evolve();
 
             //- Calculate interface displacement
             virtual void updateDisplacement();

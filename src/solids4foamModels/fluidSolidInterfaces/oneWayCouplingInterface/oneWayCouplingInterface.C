@@ -84,7 +84,7 @@ oneWayCouplingInterface::oneWayCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void oneWayCouplingInterface::evolve()
+bool oneWayCouplingInterface::evolve()
 {
     fluidSolidInterface::initializeFields();
 
@@ -97,6 +97,8 @@ void oneWayCouplingInterface::evolve()
     solid().evolve();
 
     solid().updateTotalFields();
+
+    return 0;
 }
 
 

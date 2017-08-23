@@ -65,7 +65,7 @@ fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void fixedRelaxationCouplingInterface::evolve()
+bool fixedRelaxationCouplingInterface::evolve()
 {
     initializeFields();
 
@@ -108,6 +108,8 @@ void fixedRelaxationCouplingInterface::evolve()
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
+
+    return 0;
 }
 
 

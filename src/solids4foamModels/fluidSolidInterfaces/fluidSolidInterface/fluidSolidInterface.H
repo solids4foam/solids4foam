@@ -41,8 +41,9 @@ SourceFiles
 #ifndef fluidSolidInterface_H
 #define fluidSolidInterface_H
 
-#include "dynamicFvMesh.H"
+#include "physicsModel.H"
 #include "IOdictionary.H"
+#include "dynamicFvMesh.H"
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
 #include "fluidModel.H"
@@ -62,6 +63,7 @@ namespace Foam
 
 class fluidSolidInterface
 :
+    public physicsModel,
     public IOdictionary
 {
     // Private data
@@ -423,7 +425,7 @@ public:
         // Edit
 
             //- Evolve the interface
-            virtual void evolve() = 0;
+            virtual bool evolve() = 0;
 
             //- Initialize fields
             virtual void initializeFields();

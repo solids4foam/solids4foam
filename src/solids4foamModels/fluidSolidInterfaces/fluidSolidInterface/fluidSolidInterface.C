@@ -411,6 +411,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     dynamicFvMesh& solidMesh
 )
 :
+    physicsModel(type, const_cast<Time&>(fluidMesh.time())),
     IOdictionary
     (
         IOobject

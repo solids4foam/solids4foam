@@ -683,21 +683,36 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 Foam::solidModel::solidModel
 (
     const word& type,
-    dynamicFvMesh& mesh
+    Time& runTime,
+    const word& region
 )
 :
+    physicsModel(type, runTime),
     IOdictionary
     (
         IOobject
         (
             "solidProperties",
-            mesh.time().constant(),
-            mesh,
+            runTime.constant(),
+            runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
     ),
-    mesh_(mesh),
+    //mesh_(mesh),
+    meshPtr_
+    (
+        dynamicFvMesh::New
+        (
+            IOobject
+            (
+                region,
+                runTime.timeName(),
+                runTime,
+                IOobject::MUST_READ
+            )
+        )
+    ),
     solidProperties_(subDict(type + "Coeffs")),
     mechanicalPtr_(NULL),
     globalFaceZonesPtr_(NULL),
@@ -712,12 +727,12 @@ Foam::solidModel::solidModel
         IOobject
         (
             "aitkenAlpha",
-            mesh.time().constant(),
-            mesh,
+            runTime.constant(),
+            meshPtr_(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        meshPtr_(),
         dimensionedScalar("one", dimless, 1.0)
     ),
     aitkenResidual_
@@ -725,12 +740,12 @@ Foam::solidModel::solidModel
         IOobject
         (
             "aitkenResidual",
-            mesh.time().constant(),
-            mesh,
+            runTime.constant(),
+            meshPtr_(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        meshPtr_(),
         dimensionedVector("zero", dimLength, vector::zero)
     ),
     QuasiNewtonRestartFreq_
@@ -745,12 +760,12 @@ Foam::solidModel::solidModel
         IOobject
         (
             "DRef",
-            mesh.time().constant(),
-            mesh,
+            runTime.constant(),
+            meshPtr_(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        meshPtr_(),
         dimensionedVector("zero", dimLength, vector::zero)
     ),
     unrelaxedDRef_
@@ -758,12 +773,12 @@ Foam::solidModel::solidModel
         IOobject
         (
             "unrelaxedDRef",
-            mesh.time().constant(),
-            mesh,
+            runTime.constant(),
+            meshPtr_(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        meshPtr_(),
         dimensionedVector("zero", dimLength, vector::zero)
     )
 {
@@ -787,6 +802,55 @@ Foam::solidModel::~solidModel()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
+(
+    Time& runTime,
+    const word& region
+)
+{
+    word solidModelTypeName;
+
+    // Enclose the creation of the dictionary to ensure it is
+    // deleted before the flow is created otherwise the dictionary
+    // is entered in the database twice
+    {
+        IOdictionary solidProperties
+        (
+            IOobject
+            (
+                "solidProperties",
+                runTime.constant(),
+                runTime,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+
+        solidProperties.lookup("solidModel")
+            >> solidModelTypeName;
+    }
+
+    Info<< "Selecting solidModel " << solidModelTypeName << endl;
+
+    dictionaryConstructorTable::iterator cstrIter =
+        dictionaryConstructorTablePtr_->find(solidModelTypeName);
+
+    if (cstrIter == dictionaryConstructorTablePtr_->end())
+    {
+        FatalErrorIn
+        (
+            "solidModel::New(Time&, const word&)"
+        )   << "Unknown solidModel type " << solidModelTypeName
+            << endl << endl
+            << "Valid solidModel types are :" << endl
+            << dictionaryConstructorTablePtr_->toc()
+            << exit(FatalError);
+    }
+
+    return autoPtr<solidModel>(cstrIter()(runTime, region));
+}
 
 
 const Foam::mechanicalModel& Foam::solidModel::mechanical() const

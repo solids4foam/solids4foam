@@ -207,7 +207,7 @@ void solidTractionFvPatchVectorField::updateCoeffs()
     }
 
     gradient() =
-        patch().boundaryMesh().mesh().lookupObject<solidModel>
+        patch().boundaryMesh().mesh().time().lookupObject<solidModel>
         (
             "solidProperties"
         ).tractionBoundarySnGrad

@@ -41,6 +41,7 @@ SourceFiles
 #ifndef solidModel_H
 #define solidModel_H
 
+#include "physicsModel.H"
 #include "dynamicFvMesh.H"
 #include "IOdictionary.H"
 #include "autoPtr.H"
@@ -59,12 +60,13 @@ namespace Foam
 
 class solidModel
 :
+    public physicsModel,
     public IOdictionary
 {
     // Private data
 
-        //- Non-const reference to mesh
-        dynamicFvMesh& mesh_;
+        //- Mesh
+        autoPtr<dynamicFvMesh> meshPtr_;
 
         //- Solid properties dictionary
         dictionary solidProperties_;
@@ -160,9 +162,10 @@ public:
             solidModel,
             dictionary,
             (
-                dynamicFvMesh& mesh
+                Time& runTime,
+                const word& region
             ),
-            (mesh)
+            (runTime, region)
         );
 
 
@@ -172,14 +175,15 @@ public:
         solidModel
         (
             const word& type,
-            dynamicFvMesh& mesh
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
         );
 
 
     // Selectors
 
-        //- Select constructed from mesh
-        static autoPtr<solidModel> New(dynamicFvMesh& mesh);
+        //- Select constructed from time
+        static autoPtr<solidModel> New(Time& runTime, const word& region);
 
 
     // Destructor
@@ -194,19 +198,19 @@ public:
             //- Return mesh
             const dynamicFvMesh& mesh() const
             {
-                return mesh_;
+                return meshPtr_();
             }
 
             //- Return non-const mesh
             dynamicFvMesh& mesh()
             {
-                return mesh_;
+                return meshPtr_();
             }
 
             //- Return time
             const Time& runTime() const
             {
-                return mesh_.time();
+                return meshPtr_().time();
             }
 
             //- Return solid properties dictionary

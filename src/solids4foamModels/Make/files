@@ -1,7 +1,10 @@
+physicsModel/physicsModel.C
+
 solidModels/solidModel/solidModel.C
-solidModels/solidModel/newSolidModel.C
-solidModels/freeVibrationSolid/freeVibrationSolid.C
+/*solidModels/solidModel/newSolidModel.C*/
+/*solidModels/freeVibrationSolid/freeVibrationSolid.C*/
 solidModels/linGeomSolid/linGeomSolid.C
+/*
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
 solidModels/coupledHybridLinGeomSolid/coupledHybridLinGeomSolid.C
 solidModels/simpleHybridLinGeomSolid/simpleHybridLinGeomSolid.C
@@ -16,6 +19,7 @@ solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSo
 solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
+*/
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/fluidModel/newFluidModel.C
@@ -24,6 +28,7 @@ fluidModels/pisoFluid/pisoFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/transientSimpleFluid/transientSimpleFluid.C
 
+/*
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/fluidSolidInterface/newFluidSolidInterface.C
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
@@ -31,6 +36,7 @@ fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInt
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
 fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
 fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
+*/
 
 materialModels/mechanicalModel/mechanicalModel.C
 mechanicalLaws = materialModels/mechanicalModel/mechanicalLaws

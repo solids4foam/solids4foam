@@ -110,7 +110,7 @@ public:
         // Edit
 
             //- Evolve the interface
-            virtual void evolve();
+            virtual bool evolve();
 
             //- Initialize fields
             virtual void initializeFields();
