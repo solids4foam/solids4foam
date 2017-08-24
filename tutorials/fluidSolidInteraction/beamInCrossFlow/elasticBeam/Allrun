@@ -7,19 +7,17 @@ runApplication -l log.blockMesh.solid blockMesh -region solid
 runApplication -l log.setSet.solid setSet -region solid -batch setBatch.solid
 runApplication -l log.setsToZones.solid setsToZones -region solid -noFlipMap
 
-runApplication blockMesh
-runApplication setSet -batch setBatch
-runApplication setsToZones -noFlipMap
+runApplication -l log.blockMesh.fluid blockMesh -region fluid
+runApplication -l log.setSet.fluid setSet -region fluid -batch setBatch.fluid
+runApplication -l log.setsToZones.fluid setsToZones -region fluid -noFlipMap
 
-# Serial
-runApplication fsiFoam
+# Run serial
+runApplication solids4Foam
 
-# Parallel
+# Run parallel
 #runApplication decomposeParFsi
-#runApplication -l log.decomposeParFsi.solid decomposeParFsi -region solid -force
-#runParallel fsiFoam 8
-#runApplication reconstructPar
-
+#runApplication -l log.decomposeParFsi.solid decomposeParFsi -region solid
+#runParallel solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 

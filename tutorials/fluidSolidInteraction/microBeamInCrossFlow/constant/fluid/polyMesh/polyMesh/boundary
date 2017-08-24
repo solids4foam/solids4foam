@@ -3,41 +3,64 @@
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
 |  \\    /   O peration     | Version:     3.2                                |
 |   \\  /    A nd           | Web:         http://www.foam-extend.org         |
-|    \\/     M anipulation  |                                                 |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      createPatchDict;
+    class       polyBoundaryMesh;
+    location    "constant/polyMesh";
+    object      boundary;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-matchTolerance 1e-3;
 
-pointSync false;
-
-patchInfo
+6
 (
-    {
-        name back;
-        dictionary
-        {
-            type empty;
-        }
-        constructFrom patches;
-        patches ("backPlane");
-    }
-    {
-        name front;
-        dictionary
-        {
-            type empty;
-        }
-        constructFrom patches;
-        patches ("frontPlane");
-    }
-);
+wall
+{
+    type wall;
+    nFaces 167;
+    startFace 6123;
+}
+
+interface
+{
+    type wall;
+    nFaces 115;
+    startFace 6290;
+}
+
+outlet
+{
+    type wall;
+    nFaces 32;
+    startFace 6405;
+}
+
+inlet
+{
+    type wall;
+    nFaces 32;
+    startFace 6437;
+}
+
+backPlane
+{
+    type wall;
+    nFaces 3126;
+    startFace 6469;
+}
+
+frontPlane
+{
+    type wall;
+    nFaces 3126;
+    startFace 9595;
+}
+
+)
+
 
 // ************************************************************************* //

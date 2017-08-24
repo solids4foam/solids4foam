@@ -14,7 +14,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     solidFoam;
+application     solids4Foam;
 
 startFrom       latestTime;
 

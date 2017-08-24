@@ -4,7 +4,9 @@
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
 cleanCase
+foamClearPolyMesh -region fluid
+foamClearPolyMesh -region solid
 \rm -rf constant/polyMesh case.foam history 0/polyMesh 0/cellToRegion
 \rm -rf constant/solid/polyMesh
 \rm -rf 0/D[x,y,z]
-\rm -rf system/*Subset
+\rm -rf system/*Subset badSurfaceWithSubsets.fms

@@ -15,7 +15,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     fsiFoam;
+application     solids4Foam;
 
 startFrom       startTime;
 
@@ -51,26 +51,27 @@ maxCo           0.2;
 
 functions
 (
-   setInletVelocity
-   {
-       type setInletVelocity;
-   }
+    setInletVelocity
+    {
+        type                setInletVelocity;
+        region              fluid;
+    }
 
-   forces
-   {
-       type                forces;
-       functionObjectLibs  ( "libforces.so" );
-       outputControl       timeStep;
-       outputInterval      1;
-       patches             (interface);
-       pName               p;
-       UName               U;
-       rhoName             rhoInf;
-       log                 true;
-       rhoInf              1000;
-       CofR                (0.5 0.1 0);
-   }
-
+    forces
+    {
+        type                forces;
+        region              fluid;
+        functionObjectLibs  ( "libforces.so" );
+        outputControl       timeStep;
+        outputInterval      1;
+        patches             (interface);
+        pName               p;
+        UName               U;
+        rhoName             rhoInf;
+        log                 true;
+        rhoInf              1000;
+        CofR                (0.5 0.1 0);
+    }
 );
 
 // ************************************************************************* //

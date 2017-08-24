@@ -3,41 +3,21 @@
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
 |  \\    /   O peration     | Version:     3.2                                |
 |   \\  /    A nd           | Web:         http://www.foam-extend.org         |
-|    \\/     M anipulation  |                                                 |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      createPatchDict;
+    location    "constant";
+    object      physicsProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-matchTolerance 1e-3;
+// type    fluid;
+// type    solid;
+type    fluidSolidInteraction;
 
-pointSync false;
-
-patchInfo
-(
-    {
-        name back;
-        dictionary
-        {
-            type empty;
-        }
-        constructFrom patches;
-        patches ("backPlane");
-    }
-    {
-        name front;
-        dictionary
-        {
-            type empty;
-        }
-        constructFrom patches;
-        patches ("frontPlane");
-    }
-);
 
 // ************************************************************************* //
