@@ -7,4 +7,4 @@ runApplication fluentMeshToFoam cylinderRotation.msh
 runApplication changeDictionary
 
 # Run solver
-runApplication solidFoam
+runApplication solids4Foam

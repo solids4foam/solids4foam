@@ -16,7 +16,7 @@ FoamFile
 
 d2dt2Schemes
 {
-    default            Euler;
+    default            steadyState;
 }
 
 ddtSchemes
@@ -55,6 +55,8 @@ interpolationSchemes
 {
     default            none;
     interpolate(impK)  linear;
+    interpolate(grad(D)) linear;
+    interpolate(grad(DD)) linear;
 }
 
 // ************************************************************************* //

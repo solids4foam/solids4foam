@@ -6,4 +6,4 @@
 runApplication blockMesh
 
 # Run solver
-runApplication solidFoam
+runApplication solids4Foam

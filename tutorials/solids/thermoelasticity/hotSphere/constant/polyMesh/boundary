@@ -1,9 +1,9 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  dev                                   |
-|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
-|    \\/     M anipulation  |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -20,21 +20,18 @@ FoamFile
     symmx
     {
         type            symmetryPlane;
-        inGroups        1(symmetryPlane);
         nFaces          250;
         startFace       25875;
     }
     symmy
     {
         type            symmetryPlane;
-        inGroups        1(symmetryPlane);
         nFaces          250;
         startFace       26125;
     }
     symmz
     {
         type            symmetryPlane;
-        inGroups        1(symmetryPlane);
         nFaces          250;
         startFace       26375;
     }

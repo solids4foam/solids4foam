@@ -7,7 +7,7 @@
 application=`getApplication`
 
 runApplication blockMesh
-runApplication $application
+runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 

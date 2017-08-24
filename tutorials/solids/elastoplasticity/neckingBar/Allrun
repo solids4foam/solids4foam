@@ -8,7 +8,7 @@ m4 constant/polyMesh/blockMeshDict.neckingBar.m4 > constant/polyMesh/blockMeshDi
 runApplication blockMesh
 
 # Run solver
-runApplication solidFoam
+runApplication solids4Foam
 #runApplication decomposePar -force
 #runParallel solidFoam 8
 #runApplication reconstructPar

@@ -55,6 +55,8 @@ interpolationSchemes
 {
     default            none;
     interpolate(impK)  linear;
+    interpolate(grad(D)) linear;
+    interpolate(grad(DD)) linear;
 }
 
 // ************************************************************************* //

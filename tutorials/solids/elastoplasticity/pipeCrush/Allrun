@@ -11,7 +11,7 @@ runApplication setSet -batch batch.setSet
 runApplication setsToZones -noFlipMap
 
 # Run solver
-runApplication solidFoam
+runApplication solids4Foam
 #runApplication decomposePar
 #runParallel solidFoam 8
 #runApplication reconstructPar

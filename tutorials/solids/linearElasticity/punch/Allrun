@@ -38,7 +38,7 @@ runApplication setsToZones -noFlipMap
 \rm -rf constant/punch_top constant/punch_bottom system/meshDict
 
 # Run the solver
-runApplication $application
+runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 

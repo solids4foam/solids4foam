@@ -6,4 +6,4 @@
 runApplication blockMesh
 runApplication setSet -batch batch.setSet
 runApplication setsToZones -noFlipMap
-runApplication solidFoam
+runApplication solids4Foam

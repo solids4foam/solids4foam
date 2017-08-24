@@ -8,4 +8,4 @@ m4 constant/polyMesh/blockMeshDict.thickCylinder.m4 > constant/polyMesh/blockMes
 runApplication blockMesh
 
 # Run solver
-runApplication solidFoam
+runApplication solids4Foam

@@ -8,4 +8,4 @@ runApplication fluentMeshToFoam plate.msh
 runApplication changeDictionary
 
 # Run the solver
-runApplication solidFoam
+runApplication solids4Foam

@@ -17,12 +17,12 @@ FoamFile
 
 d2dt2Schemes
 {
-    default                 Euler;
+    default     steadyState;
 }
 
 ddtSchemes
 {
-    default                 Euler;
+    default     steadyState;
 }
 
 gradSchemes
@@ -39,7 +39,9 @@ divSchemes
 laplacianSchemes
 {
     default                 none;
-    fvmBlockLaplacian(D)    pointGaussLeastSquares;
+    fvmBlockLaplacian(D)    pointGaussLeastSquaresLaplacian;
+    fvmBlockLaplacianTranspose(D) pointGaussLeastSquaresLaplacianTranspose;
+    fvmBlockLaplacianTrace(D) pointGaussLeastSquaresLaplacianTrace;
 }
 
 snGradSchemes

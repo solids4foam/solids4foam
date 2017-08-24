@@ -4,4 +4,4 @@
 
 runApplication blockMesh
 runApplication smoothMesh
-runApplication solidFoam
+runApplication solids4Foam

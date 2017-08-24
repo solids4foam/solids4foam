@@ -7,4 +7,4 @@ m4 constant/polyMesh/blockMeshDict.uniaxialRod.m4 > constant/polyMesh/blockMeshD
 runApplication blockMesh
 
 # Run solver
-runApplication solidFoam
+runApplication solids4Foam
