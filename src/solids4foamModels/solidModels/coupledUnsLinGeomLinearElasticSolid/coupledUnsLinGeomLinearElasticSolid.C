@@ -34,7 +34,6 @@ License
 #include "fvcGradf.H"
 #include "BlockFvmDivSigma.H"
 #include "linearElastic.H"
-
 #include "blockFixedDisplacementZeroShearFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -52,6 +51,10 @@ namespace solidModels
 defineTypeNameAndDebug(coupledUnsLinGeomLinearElasticSolid, 0);
 addToRunTimeSelectionTable
 (
+    physicsModel, coupledUnsLinGeomLinearElasticSolid, solid
+);
+addToRunTimeSelectionTable
+(
     solidModel, coupledUnsLinGeomLinearElasticSolid, dictionary
 );
 
@@ -60,18 +63,19 @@ addToRunTimeSelectionTable
 
 coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
 (
-    dynamicFvMesh& mesh
+    Time& runTime,
+    const word& region
 )
 :
-    solidModel(typeName, mesh),
-    extendedMesh_(mesh),
+    solidModel(typeName, runTime, region),
+    extendedMesh_(mesh()),
     solutionVec_
     (
         IOobject
         (
             "solutionVec",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -82,34 +86,34 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         IOobject
         (
             "D",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     U_
     (
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimLength/dimTime, vector::zero)
     ),
-    pMesh_(mesh),
+    pMesh_(mesh()),
     pointD_
     (
         IOobject
         (
             "pointD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -121,12 +125,12 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         IOobject
         (
             "epsilon",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     sigma_
@@ -134,26 +138,26 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         IOobject
         (
             "sigma",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    volToPoint_(mesh),
+    volToPoint_(mesh()),
     gradD_
     (
         IOobject
         (
             "grad(" + D_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     rho_(mechanical().rho()),
@@ -162,12 +166,12 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         IOobject
         (
             "interpolate(mu)",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedScalar("0", dimPressure, 0.0)
     ),
     lambdaf_
@@ -175,12 +179,12 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         IOobject
         (
             "interpolate(lambda)",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedScalar("0", dimPressure, 0.0)
     ),
     g_
@@ -188,16 +192,16 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         IOobject
         (
             "g",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
     ),
     DEqnRelaxFactor_
     (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
+        mesh().solutionDict().relax("DEqn")
+      ? mesh().solutionDict().relaxationFactor("DEqn")
       : 1.0
     )
 {

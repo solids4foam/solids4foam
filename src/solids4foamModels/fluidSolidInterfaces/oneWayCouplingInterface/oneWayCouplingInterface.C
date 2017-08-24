@@ -41,6 +41,10 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(oneWayCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
+    physicsModel, oneWayCouplingInterface, fluidSolidInteraction
+);
+addToRunTimeSelectionTable
+(
     fluidSolidInterface, oneWayCouplingInterface, dictionary
 );
 
@@ -52,18 +56,18 @@ addToRunTimeSelectionTable
 
 oneWayCouplingInterface::oneWayCouplingInterface
 (
-    dynamicFvMesh& fluidMesh,
-    dynamicFvMesh& solidMesh
+    Time& runTime,
+    const word& region
 )
 :
-    fluidSolidInterface(typeName, fluidMesh, solidMesh),
+    fluidSolidInterface(typeName, runTime, region),
     solidZoneTraction_()
 {
     // Initialize zone traction fields
     solidZoneTraction_ =
         vectorField
         (
-            solidMesh.faceZones()[solidZoneIndex()]().size(),
+            solidMesh().faceZones()[solidZoneIndex()]().size(),
             vector::zero
         );
 
@@ -73,8 +77,8 @@ oneWayCouplingInterface::oneWayCouplingInterface
         (
             "oneWayCouplingInterface::oneWayCouplingInterface\n"
             "(\n"
-            "    dynamicFvMesh& fluidMesh,\n"
-            "    dynamicFvMesh& solidMesh\n"
+            "    Time& runTime,\n"
+            "    const word& region\n"
             ")\n"
         )   << "The " << type() << " FSI coupling can only be used with the "
             << fluidModels::oneWayFsiFluid::typeName << " fluidModel"

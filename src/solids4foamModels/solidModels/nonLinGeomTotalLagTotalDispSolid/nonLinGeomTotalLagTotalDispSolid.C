@@ -49,6 +49,10 @@ namespace solidModels
 defineTypeNameAndDebug(nonLinGeomTotalLagTotalDispSolid, 0);
 addToRunTimeSelectionTable
 (
+    physicsModel, nonLinGeomTotalLagTotalDispSolid, solid
+);
+addToRunTimeSelectionTable
+(
     solidModel, nonLinGeomTotalLagTotalDispSolid, dictionary
 );
 
@@ -172,42 +176,46 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid(dynamicFvMesh& mesh)
+nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    solidModel(typeName, mesh),
+    solidModel(typeName, runTime, region),
     D_
     (
         IOobject
         (
             "D",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     U_
     (
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimLength/dimTime, vector::zero)
     ),
-    pMesh_(mesh),
+    pMesh_(mesh()),
     pointD_
     (
         IOobject
         (
             "pointD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -219,12 +227,12 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid(dynamicFvMesh
         IOobject
         (
             "sigmaCauchy",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
     gradD_
@@ -232,12 +240,12 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid(dynamicFvMesh
         IOobject
         (
             "grad(" + D_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     F_
@@ -245,12 +253,12 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid(dynamicFvMesh
         IOobject
         (
             "F",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("I", dimless, I)
     ),
     Finv_
@@ -258,8 +266,8 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid(dynamicFvMesh
         IOobject
         (
             "Finv",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
@@ -270,8 +278,8 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid(dynamicFvMesh
         IOobject
         (
             "J",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
@@ -283,8 +291,8 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid(dynamicFvMesh
     rImpK_(1.0/impK_),
     DEqnRelaxFactor_
     (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
+        mesh().solutionDict().relax("DEqn")
+      ? mesh().solutionDict().relaxationFactor("DEqn")
       : 1.0
     ),
     solutionTol_
@@ -309,8 +317,8 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid(dynamicFvMesh
         IOobject
         (
             "g",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
@@ -326,7 +334,8 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid(dynamicFvMesh
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-tmp<vectorField> nonLinGeomTotalLagTotalDispSolid::faceZonePointDisplacementIncrement
+tmp<vectorField>
+nonLinGeomTotalLagTotalDispSolid::faceZonePointDisplacementIncrement
 (
     const label zoneID
 ) const

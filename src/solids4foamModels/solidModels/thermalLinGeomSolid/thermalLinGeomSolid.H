@@ -185,7 +185,11 @@ public:
     // Constructors
 
         //- Construct from components
-        thermalLinGeomSolid(dynamicFvMesh& mesh);
+        thermalLinGeomSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor

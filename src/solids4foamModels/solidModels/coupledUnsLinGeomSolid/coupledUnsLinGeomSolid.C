@@ -47,6 +47,7 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(coupledUnsLinGeomSolid, 0);
+addToRunTimeSelectionTable(physicsModel, coupledUnsLinGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, coupledUnsLinGeomSolid, dictionary);
 
 
@@ -143,17 +144,21 @@ bool coupledUnsLinGeomSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
+coupledUnsLinGeomSolid::coupledUnsLinGeomSolid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    solidModel(typeName, mesh),
-    extendedMesh_(mesh),
+    solidModel(typeName, runTime, region),
+    extendedMesh_(mesh()),
     solutionVec_
     (
         IOobject
         (
             "solutionVec",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -164,34 +169,34 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "D",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     U_
     (
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimLength/dimTime, vector::zero)
     ),
-    pMesh_(mesh),
+    pMesh_(mesh()),
     pointD_
     (
         IOobject
         (
             "pointD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -203,12 +208,12 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "epsilon",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     epsilonf_
@@ -216,12 +221,12 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "epsilonf",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     sigma_
@@ -229,12 +234,12 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "sigma",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
     sigmaf_
@@ -242,26 +247,26 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "sigmaf",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    volToPoint_(mesh),
+    volToPoint_(mesh()),
     gradD_
     (
         IOobject
         (
             "grad(" + D_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     gradDf_
@@ -269,12 +274,12 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "grad(" + D_.name() + ")f",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     rho_(mechanical().rho()),
@@ -285,8 +290,8 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
     lambdaf_("lambdaf", 1.5*muf_),
     DEqnRelaxFactor_
     (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
+        mesh().solutionDict().relax("DEqn")
+      ? mesh().solutionDict().relaxationFactor("DEqn")
       : 1.0
     ),
     solutionTol_
@@ -311,8 +316,8 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "g",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )

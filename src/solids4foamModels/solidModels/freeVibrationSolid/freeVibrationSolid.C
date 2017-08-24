@@ -52,6 +52,10 @@ namespace solidModels
 defineTypeNameAndDebug(freeVibrationSolid, 0);
 addToRunTimeSelectionTable
 (
+    physicsModel, freeVibrationSolid, solid
+);
+addToRunTimeSelectionTable
+(
     solidModel, freeVibrationSolid, dictionary
 );
 
@@ -60,19 +64,20 @@ addToRunTimeSelectionTable
 
 freeVibrationSolid::freeVibrationSolid
 (
-    dynamicFvMesh& mesh
+    Time& runTime,
+    const word& region
 )
 :
-    solidModel(typeName, mesh),
+    solidModel(typeName, runTime, region),
     nModes_(readInt(solidProperties().lookup("nModes"))),
-    extendedMesh_(mesh),
+    extendedMesh_(mesh()),
     solutionVec_
     (
         IOobject
         (
             "solutionVec",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -83,22 +88,22 @@ freeVibrationSolid::freeVibrationSolid
         IOobject
         (
             "D",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     Dmodes_(nModes_),
-    pMesh_(mesh),
+    pMesh_(mesh()),
     pointD_
     (
         IOobject
         (
             "pointD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -110,26 +115,26 @@ freeVibrationSolid::freeVibrationSolid
         IOobject
         (
             "sigma",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    volToPoint_(mesh),
+    volToPoint_(mesh()),
     gradD_
     (
         IOobject
         (
             "grad(" + D_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     rho_(mechanical().rho()),
@@ -138,12 +143,12 @@ freeVibrationSolid::freeVibrationSolid
         IOobject
         (
             "interpolate(mu)",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedScalar("0", dimPressure, 0.0)
     ),
     lambdaf_
@@ -151,12 +156,12 @@ freeVibrationSolid::freeVibrationSolid
         IOobject
         (
             "interpolate(lambda)",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedScalar("0", dimPressure, 0.0)
     ),
     g_
@@ -164,8 +169,8 @@ freeVibrationSolid::freeVibrationSolid
         IOobject
         (
             "g",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )

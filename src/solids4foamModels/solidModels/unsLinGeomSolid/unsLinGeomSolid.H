@@ -172,7 +172,11 @@ public:
     // Constructors
 
         //- Construct from components
-        unsLinGeomSolid(dynamicFvMesh& mesh);
+        unsLinGeomSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor

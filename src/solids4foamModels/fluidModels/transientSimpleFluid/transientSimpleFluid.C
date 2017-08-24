@@ -44,37 +44,42 @@ namespace fluidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(transientSimpleFluid, 0);
+addToRunTimeSelectionTable(physicsModel, transientSimpleFluid, fluid);
 addToRunTimeSelectionTable(fluidModel, transientSimpleFluid, dictionary);
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-transientSimpleFluid::transientSimpleFluid(const fvMesh& mesh)
+transientSimpleFluid::transientSimpleFluid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    fluidModel(this->typeName, mesh),
+    fluidModel(typeName, runTime, region),
     U_
     (
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     p_
     (
         IOobject
         (
             "p",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     gradp_(fvc::grad(p_)),
     phi_
@@ -82,12 +87,12 @@ transientSimpleFluid::transientSimpleFluid(const fvMesh& mesh)
         IOobject
         (
             "phi",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        fvc::interpolate(U_) & mesh.Sf()
+        fvc::interpolate(U_) & mesh().Sf()
     ),
     laminarTransport_(U_, phi_),
     turbulence_
@@ -104,8 +109,8 @@ transientSimpleFluid::transientSimpleFluid(const fvMesh& mesh)
             IOobject
             (
                 "transportProperties",
-                runTime().constant(),
-                mesh,
+                runTime.constant(),
+                mesh(),
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE
             )
@@ -263,20 +268,20 @@ tmp<scalarField> transientSimpleFluid::faceZoneMuEff
 }
 
 
-void transientSimpleFluid::evolve()
+bool transientSimpleFluid::evolve()
 {
     if (consistencyByJasak_)
     {
-        evolveConsistentByJasak();
+        return evolveConsistentByJasak();
     }
     else
     {
-        evolveInconsistent();
+        return evolveInconsistent();
     }
 }
 
 
-void transientSimpleFluid::evolveInconsistent()
+bool transientSimpleFluid::evolveInconsistent()
 {
     Info<< "Evolving fluid model" << endl;
 
@@ -412,10 +417,12 @@ void transientSimpleFluid::evolveInconsistent()
             break;
         }
     }
+
+    return 0;
 }
 
 
-void transientSimpleFluid::evolveConsistentByJasak()
+bool transientSimpleFluid::evolveConsistentByJasak()
 {
     Info<< "Evolving fluid model (consistency by Jasak)" << endl;
 
@@ -561,6 +568,8 @@ void transientSimpleFluid::evolveConsistentByJasak()
             break;
         }
     }
+
+    return 0;
 }
 
 

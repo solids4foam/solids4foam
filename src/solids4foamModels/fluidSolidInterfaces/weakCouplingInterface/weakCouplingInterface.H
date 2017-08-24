@@ -94,8 +94,8 @@ public:
         //- Construct from components
         weakCouplingInterface
         (
-            dynamicFvMesh& fluidMesh,
-            dynamicFvMesh& solidMesh
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
         );
 
 
