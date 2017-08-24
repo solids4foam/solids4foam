@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
-|  \\    /   O peration     | Version:  1.6-ext                               |
-|   \\  /    A nd           | Web:      www.extend-project.de                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -10,8 +10,7 @@ FoamFile
     version     2.0;
     format      ascii;
     class       volVectorField;
-    location    "0";
-    object      D;
+    object      DD;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -21,46 +20,46 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-    right
-    {
-        type            blockSolidTraction;
-        traction        uniform ( 0 -1e6 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-//         type            blockFixedDisplacement;
-//         value           uniform ( 0 0 0 );
-    }
-
-    top
-    {
-        type            blockSolidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-
-    bottom
-    {
-        type            blockSolidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-
     left
     {
-        type            blockFixedDisplacement;
-        value           uniform ( 0 0 0 );
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
     }
-
-    back
+    right
     {
-         type            empty;
+        type            solidTraction;
+        tractionSeries
+        {
+            fileName    "$FOAM_CASE/constant/timeVsTraction";
+            outOfBounds clamp;
+        }
+        pressure        uniform 0;
+        value           uniform (0 0 0);
     }
-
-    front
+    down
     {
-         type            empty;
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
+    }
+    up
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    hole
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    frontAndBack
+    {
+        type            empty;
     }
 }
 
