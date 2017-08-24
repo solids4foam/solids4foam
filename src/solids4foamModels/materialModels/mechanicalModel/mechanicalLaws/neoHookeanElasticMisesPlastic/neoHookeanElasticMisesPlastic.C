@@ -1295,79 +1295,72 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 
     forAll(fTrial.boundaryField(), patchI)
     {
-        if (!fTrial.boundaryField()[patchI].coupled())
+        // Take references to the boundary patch fields for efficiency
+        const scalarField& fTrialP = fTrial.boundaryField()[patchI];
+        const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
+        symmTensorField& plasticNP = plasticN_.boundaryField()[patchI];
+        scalarField& DSigmaYP = DSigmaY_.boundaryField()[patchI];
+        scalarField& DLambdaP = DLambda_.boundaryField()[patchI];
+        const scalarField& muBarP = muBar.boundaryField()[patchI];
+        const scalarField& JP = J().boundaryField()[patchI];
+        const scalarField& sigmaYP = sigmaY_.boundaryField()[patchI];
+        const scalarField& epsilonPEqOldP =
+            epsilonPEq_.oldTime().boundaryField()[patchI];
+
+        forAll(fTrialP, faceI)
         {
-            // Take references to the boundary patch fields for efficiency
-            const scalarField& fTrialP = fTrial.boundaryField()[patchI];
-            const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
-            symmTensorField& plasticNP = plasticN_.boundaryField()[patchI];
-            scalarField& DSigmaYP = DSigmaY_.boundaryField()[patchI];
-            scalarField& DLambdaP = DLambda_.boundaryField()[patchI];
-            const scalarField& muBarP = muBar.boundaryField()[patchI];
-            const scalarField& JP = J().boundaryField()[patchI];
-            const scalarField& sigmaYP = sigmaY_.boundaryField()[patchI];
-            const scalarField& epsilonPEqOldP =
-                epsilonPEq_.oldTime().boundaryField()[patchI];
-
-            forAll(fTrialP, faceI)
+            // Calculate direction plasticN
+            const scalar magS = mag(sTrialP[faceI]);
+            if (magS > SMALL)
             {
-                // Calculate direction plasticN
-                const scalar magS = mag(sTrialP[faceI]);
-                if (magS > SMALL)
-                {
-                    plasticNP[faceI] = sTrialP[faceI]/magS;
-                }
+                plasticNP[faceI] = sTrialP[faceI]/magS;
+            }
 
-                // Calculate DEpsilonPEq
-                if (fTrialP[faceI] < SMALL)
+            // Calculate DEpsilonPEq
+            if (fTrialP[faceI] < SMALL)
+            {
+                // elasticity
+                DSigmaYP[faceI] = 0.0;
+                DLambdaP[faceI] = 0.0;
+            }
+            else
+            {
+                // yielding
+                if (nonLinearPlasticity_)
                 {
-                    // elasticity
-                    DSigmaYP[faceI] = 0.0;
-                    DLambdaP[faceI] = 0.0;
+                    scalar curSigmaY = 0.0; // updated in loop below
+
+                    // Calculate DEpsilonPEq and curSigmaY
+                    newtonLoop
+                    (
+                        DLambdaP[faceI],
+                        curSigmaY,
+                        epsilonPEqOldP[faceI],
+                        magS,
+                        muBarP[faceI],
+                        JP[faceI],
+                        maxMagBE
+                    );
+
+                    // Update increment of yield stress
+                    DSigmaYP[faceI] = curSigmaY - sigmaYP[faceI];
                 }
                 else
                 {
-                    // yielding
-                    if (nonLinearPlasticity_)
-                    {
-                        scalar curSigmaY = 0.0; // updated in loop below
+                    // Plastic modulus is linear
+                    DLambdaP[faceI] = fTrialP[faceI]/(2.0*muBarP[faceI]);
 
-                        // Calculate DEpsilonPEq and curSigmaY
-                        newtonLoop
-                        (
-                            DLambdaP[faceI],
-                            curSigmaY,
-                            epsilonPEqOldP[faceI],
-                            magS,
-                            muBarP[faceI],
-                            JP[faceI],
-                            maxMagBE
-                        );
+                    if (magHp > SMALL)
+                    {
+                        DLambdaP[faceI] /= 1.0 + Hp_/(3.0*muBarP[faceI]);
 
                         // Update increment of yield stress
-                        DSigmaYP[faceI] = curSigmaY - sigmaYP[faceI];
-                    }
-                    else
-                    {
-                        // Plastic modulus is linear
-                        DLambdaP[faceI] = fTrialP[faceI]/(2.0*muBarP[faceI]);
-
-                        if (magHp > SMALL)
-                        {
-                            DLambdaP[faceI] /= 1.0 + Hp_/(3.0*muBarP[faceI]);
-
-                            // Update increment of yield stress
-                            DSigmaYP[faceI] = DLambdaP[faceI]*Hp_;
-                        }
+                        DSigmaYP[faceI] = DLambdaP[faceI]*Hp_;
                     }
                 }
             }
         }
     }
-
-    DSigmaY_.correctBoundaryConditions();
-    DLambda_.correctBoundaryConditions();
-    plasticN_.correctBoundaryConditions();
 
     // Update DEpsilonP and DEpsilonPEq
     DEpsilonPEq_ = sqrtTwoOverThree_*DLambda_;
