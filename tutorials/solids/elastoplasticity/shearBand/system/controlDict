@@ -15,7 +15,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     plasticNonLinHybridSolidFoam;
+application     solids4Foam;
 
 startFrom       startTime;
 
