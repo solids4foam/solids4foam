@@ -98,10 +98,10 @@ class transientSimpleFluid
         void operator=(const transientSimpleFluid&);
 
         //- Evolve the fluid model
-        void evolveInconsistent();
+        bool evolveInconsistent();
 
         //- Evolve the fluid model
-        void evolveConsistentByJasak();
+        bool evolveConsistentByJasak();
 
 public:
 
@@ -111,7 +111,11 @@ public:
     // Constructors
 
         //- Construct from components
-        transientSimpleFluid(const fvMesh& mesh);
+        transientSimpleFluid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor
@@ -202,7 +206,7 @@ public:
         // Edit
 
             //- Evolve the fluid model
-            virtual void evolve();
+            virtual bool evolve();
 };
 
 

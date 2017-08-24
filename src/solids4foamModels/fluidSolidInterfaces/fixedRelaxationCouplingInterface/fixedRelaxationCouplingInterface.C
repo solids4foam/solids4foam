@@ -40,6 +40,10 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(fixedRelaxationCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
+    physicsModel, fixedRelaxationCouplingInterface, fluidSolidInteraction
+);
+addToRunTimeSelectionTable
+(
     fluidSolidInterface, fixedRelaxationCouplingInterface, dictionary
 );
 
@@ -51,11 +55,11 @@ addToRunTimeSelectionTable
 
 fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface
 (
-    dynamicFvMesh& fluidMesh,
-    dynamicFvMesh& solidMesh
+    Time& runTime,
+    const word& region
 )
 :
-    fluidSolidInterface(typeName, fluidMesh, solidMesh),
+    fluidSolidInterface(typeName, runTime, region),
     relaxationFactor_
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
@@ -65,7 +69,7 @@ fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void fixedRelaxationCouplingInterface::evolve()
+bool fixedRelaxationCouplingInterface::evolve()
 {
     initializeFields();
 
@@ -108,6 +112,8 @@ void fixedRelaxationCouplingInterface::evolve()
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
+
+    return 0;
 }
 
 

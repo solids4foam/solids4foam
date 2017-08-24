@@ -107,7 +107,11 @@ public:
     // Constructors
 
         //- Construct from components
-        pisoFluid(const fvMesh& mesh);
+        pisoFluid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor
@@ -198,7 +202,7 @@ public:
         // Edit
 
             //- Evolve the fluid model
-            virtual void evolve();
+            virtual bool evolve();
 };
 
 

@@ -94,8 +94,8 @@ public:
         //- Construct from components
         weakCouplingInterface
         (
-            dynamicFvMesh& fluidMesh,
-            dynamicFvMesh& solidMesh
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
         );
 
 
@@ -110,7 +110,7 @@ public:
         // Edit
 
             //- Evolve the interface
-            virtual void evolve();
+            virtual bool evolve();
 
             //- Initialize fields
             virtual void initializeFields();

@@ -144,7 +144,11 @@ public:
     // Constructors
 
         //- Construct from components
-        freeVibrationSolid(dynamicFvMesh& mesh);
+        freeVibrationSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor

@@ -49,6 +49,10 @@ namespace solidModels
 defineTypeNameAndDebug(nonLinGeomUpdatedLagSolid, 0);
 addToRunTimeSelectionTable
 (
+    physicsModel, nonLinGeomUpdatedLagSolid, solid
+);
+addToRunTimeSelectionTable
+(
     solidModel, nonLinGeomUpdatedLagSolid, dictionary
 );
 
@@ -146,32 +150,36 @@ bool nonLinGeomUpdatedLagSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
+nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    solidModel(typeName, mesh),
+    solidModel(typeName, runTime, region),
     DD_
     (
         IOobject
         (
             "DD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     D_
     (
         IOobject
         (
             "D",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimLength, vector::zero)
     ),
     U_
@@ -179,22 +187,22 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimLength/dimTime, vector::zero)
     ),
-    pMesh_(mesh),
+    pMesh_(mesh()),
     pointDD_
     (
         IOobject
         (
             "pointDD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -206,8 +214,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "pointD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -219,12 +227,12 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "sigmaCauchy",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
     gradDD_
@@ -232,12 +240,12 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "grad(" + DD_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     gradD_
@@ -245,12 +253,12 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "grad(" + D_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     F_
@@ -258,12 +266,12 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "F",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("I", dimless, I)
     ),
     J_
@@ -271,8 +279,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "J",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
@@ -283,8 +291,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "relF",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
@@ -295,8 +303,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "relFinv",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
@@ -307,8 +315,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "relJ",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
@@ -319,8 +327,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "rho",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
@@ -331,8 +339,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
     rImpK_(1.0/impK_),
     DDEqnRelaxFactor_
     (
-        mesh.solutionDict().relax("DDEqn")
-      ? mesh.solutionDict().relaxationFactor("DDEqn")
+        mesh().solutionDict().relax("DDEqn")
+      ? mesh().solutionDict().relaxationFactor("DDEqn")
       : 1.0
     ),
     solutionTol_
@@ -357,8 +365,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "g",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )

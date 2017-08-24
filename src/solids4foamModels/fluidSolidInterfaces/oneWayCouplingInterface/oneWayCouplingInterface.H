@@ -85,8 +85,8 @@ public:
         //- Construct from components
         oneWayCouplingInterface
         (
-            dynamicFvMesh& fluidMesh,
-            dynamicFvMesh& solidMesh
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
         );
 
 
@@ -101,7 +101,7 @@ public:
         // Edit
 
             //- Evolve the interface
-            virtual void evolve();
+            virtual bool evolve();
 
             //- Update interface traction
             virtual void updateTraction();

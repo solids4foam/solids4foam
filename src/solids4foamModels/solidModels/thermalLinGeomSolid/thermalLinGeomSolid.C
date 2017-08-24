@@ -47,6 +47,7 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(thermalLinGeomSolid, 0);
+addToRunTimeSelectionTable(physicsModel, thermalLinGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, thermalLinGeomSolid, dictionary);
 
 
@@ -165,42 +166,46 @@ bool thermalLinGeomSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
+thermalLinGeomSolid::thermalLinGeomSolid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    solidModel(typeName, mesh),
+    solidModel(typeName, runTime, region),
     D_
     (
         IOobject
         (
             "D",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     U_
     (
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimLength/dimTime, vector::zero)
     ),
-    pMesh_(mesh),
+    pMesh_(mesh()),
     pointD_
     (
         IOobject
         (
             "pointD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -212,12 +217,12 @@ thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "sigma",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
     gradD_
@@ -225,12 +230,12 @@ thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "grad(" + D_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     rho_(mechanical().rho()),
@@ -239,8 +244,8 @@ thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
     rImpK_(1.0/impK_),
     DEqnRelaxFactor_
     (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
+        mesh().solutionDict().relax("DEqn")
+      ? mesh().solutionDict().relaxationFactor("DEqn")
       : 1.0
     ),
     T_
@@ -248,24 +253,24 @@ thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "T",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     T0_
     (
         IOobject
         (
             "T0",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedScalar("T0", dimTemperature, 0.0)
     ),
     gradT_
@@ -273,12 +278,12 @@ thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "grad(T)",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimTemperature/dimLength, vector::zero)
     ),
     rhoC_
@@ -286,29 +291,29 @@ thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "rhoC",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     k_
     (
         IOobject
         (
             "k",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     TEqnRelaxFactor_
     (
-        mesh.solutionDict().relax("TEqn")
-      ? mesh.solutionDict().relaxationFactor("TEqn")
+        mesh().solutionDict().relax("TEqn")
+      ? mesh().solutionDict().relaxationFactor("TEqn")
       : 1.0
     ),
     solutionTol_
@@ -344,8 +349,8 @@ thermalLinGeomSolid::thermalLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "g",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )

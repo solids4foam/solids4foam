@@ -1,0 +1,68 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant/polyMesh";
+    object      meshMetaDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+surfaceFile     "microBeamInCrossFlow.fluid.ftr";
+
+surfaceMeta
+{
+    nPoints         11880;
+    nFacets         23130;
+    nPatches        6;
+    nFeatureEdges   0;
+    patches
+    {
+        CreatedbyGmsh_0
+        {
+            type            patch;
+            nFacets         84;
+        }
+        CreatedbyGmsh_1
+        {
+            type            patch;
+            nFacets         22464;
+        }
+        CreatedbyGmsh_2
+        {
+            type            patch;
+            nFacets         164;
+        }
+        CreatedbyGmsh_3
+        {
+            type            patch;
+            nFacets         84;
+        }
+        CreatedbyGmsh_4
+        {
+            type            patch;
+            nFacets         252;
+        }
+        CreatedbyGmsh_5
+        {
+            type            patch;
+            nFacets         82;
+        }
+    }
+    pointSubsets
+    {
+    }
+    facetSubsets
+    {
+    }
+    featureEdgeSubsets
+    {
+    }
+}

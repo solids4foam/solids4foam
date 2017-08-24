@@ -40,49 +40,54 @@ namespace fluidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(oneWayFsiFluid, 0);
+addToRunTimeSelectionTable(physicsModel, oneWayFsiFluid, fluid);
 addToRunTimeSelectionTable(fluidModel, oneWayFsiFluid, dictionary);
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-oneWayFsiFluid::oneWayFsiFluid(const fvMesh& mesh)
+oneWayFsiFluid::oneWayFsiFluid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    fluidModel(this->typeName, mesh),
+    fluidModel(typeName, runTime, region),
     U_
     (
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         ),
-        mesh
+        mesh()
     ),
     p_
     (
         IOobject
         (
             "p",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         ),
-        mesh
+        mesh()
     ),
     phi_
     (
         IOobject
         (
             "phi",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedScalar("zero", dimVelocity, 0.0)
     ),
     transportProperties_
@@ -90,8 +95,8 @@ oneWayFsiFluid::oneWayFsiFluid(const fvMesh& mesh)
         IOobject
         (
             "transportProperties",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
@@ -224,12 +229,12 @@ tmp<scalarField> oneWayFsiFluid::faceZoneMuEff
 }
 
 
-void oneWayFsiFluid::evolve()
+bool oneWayFsiFluid::evolve()
 {
     Info << "Evolving fluid model" << endl;
 
     // Read the latest fluid mesh
-    const_cast<fvMesh&>(mesh()).readUpdate();
+    const_cast<dynamicFvMesh&>(mesh()).readUpdate();
 
     // Read the latest velocity and pressure fields
 
@@ -255,6 +260,8 @@ void oneWayFsiFluid::evolve()
 
         p_ = volScalarField(pheader, mesh());
     }
+
+    return 0;
 }
 
 

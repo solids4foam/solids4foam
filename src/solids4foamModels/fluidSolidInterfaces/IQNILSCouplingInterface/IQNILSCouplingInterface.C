@@ -41,6 +41,10 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(IQNILSCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
+    physicsModel, IQNILSCouplingInterface, fluidSolidInteraction
+);
+addToRunTimeSelectionTable
+(
     fluidSolidInterface, IQNILSCouplingInterface, dictionary
 );
 
@@ -57,11 +61,11 @@ label IQNILSCouplingInterface::couplingReuse() const
 
 IQNILSCouplingInterface::IQNILSCouplingInterface
 (
-    dynamicFvMesh& fluidMesh,
-    dynamicFvMesh& solidMesh
+    Time& runTime,
+    const word& region
 )
 :
-    fluidSolidInterface(typeName, fluidMesh, solidMesh),
+    fluidSolidInterface(typeName, runTime, region),
     relaxationFactor_
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
@@ -75,7 +79,7 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void IQNILSCouplingInterface::evolve()
+bool IQNILSCouplingInterface::evolve()
 {
     initializeFields();
 
@@ -118,6 +122,8 @@ void IQNILSCouplingInterface::evolve()
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
+
+    return 0;
 }
 
 

@@ -65,7 +65,7 @@ class AitkenCouplingInterface
 
         //- Predict solid
         const bool predictSolid_;
-  
+
         //- Aitken under-relaxation factor
         scalar aitkenRelaxationFactor_;
 
@@ -90,8 +90,8 @@ public:
         //- Construct from components
         AitkenCouplingInterface
         (
-            dynamicFvMesh& fluidMesh,
-            dynamicFvMesh& solidMesh
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
         );
 
 
@@ -106,7 +106,7 @@ public:
         // Edit
 
             //- Evolve the interface
-            virtual void evolve();
+            virtual bool evolve();
 
             //- Calculate interface displacement
             virtual void updateDisplacement();

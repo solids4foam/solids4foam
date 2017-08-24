@@ -47,6 +47,7 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(coupledHybridLinGeomSolid, 0);
+addToRunTimeSelectionTable(physicsModel, coupledHybridLinGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, coupledHybridLinGeomSolid, dictionary);
 
 
@@ -161,32 +162,36 @@ bool coupledHybridLinGeomSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-coupledHybridLinGeomSolid::coupledHybridLinGeomSolid(dynamicFvMesh& mesh)
+coupledHybridLinGeomSolid::coupledHybridLinGeomSolid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    solidModel(typeName, mesh),
+    solidModel(typeName, runTime, region),
     D_
     (
         IOobject
         (
             "D",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     p_
     (
         IOobject
         (
             "p",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedScalar("zero", dimPressure, 0.0),
         zeroGradientFvPatchField<scalar>::typeName
     ),
@@ -195,12 +200,12 @@ coupledHybridLinGeomSolid::coupledHybridLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimLength/dimTime, vector::zero)
     ),
     pD_
@@ -208,22 +213,22 @@ coupledHybridLinGeomSolid::coupledHybridLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "pD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector4("zero", dimless, vector4::zero)
     ),
-    pMesh_(mesh),
+    pMesh_(mesh()),
     pointD_
     (
         IOobject
         (
             "pointD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -235,12 +240,12 @@ coupledHybridLinGeomSolid::coupledHybridLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "sigma",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
     gradD_
@@ -248,12 +253,12 @@ coupledHybridLinGeomSolid::coupledHybridLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "grad(" + D_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     gradp_
@@ -261,12 +266,12 @@ coupledHybridLinGeomSolid::coupledHybridLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "grad(" + p_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimPressure/dimLength, vector::zero)
     ),
     rho_(mechanical().rho()),
@@ -276,14 +281,14 @@ coupledHybridLinGeomSolid::coupledHybridLinGeomSolid(dynamicFvMesh& mesh)
     rImpK_(1.0/impK_),
     DEqnRelaxFactor_
     (
-        mesh.solutionDict().relax("DEqn")
-      ? mesh.solutionDict().relaxationFactor("DEqn")
+        mesh().solutionDict().relax("DEqn")
+      ? mesh().solutionDict().relaxationFactor("DEqn")
       : 1.0
     ),
     pEqnRelaxFactor_
     (
-        mesh.solutionDict().relax("pEqn")
-      ? mesh.solutionDict().relaxationFactor("pEqn")
+        mesh().solutionDict().relax("pEqn")
+      ? mesh().solutionDict().relaxationFactor("pEqn")
       : 1.0
     ),
     solutionTol_
@@ -322,8 +327,8 @@ coupledHybridLinGeomSolid::coupledHybridLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "g",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
