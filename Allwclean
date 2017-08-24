@@ -11,6 +11,6 @@ wclean applications/utilities/surfaceTractions
 wclean applications/utilities/volPointInterpolate
 wclean applications/utilities/mergeSubMeshes
 
-wclean applications/solvers/solidFoam
-wclean applications/solvers/fluidFoam
-wclean applications/solvers/fsiFoam
+wclean applications/solvers/solids4Foam
+wclean all applications/solvers
+wclean all applications/utilities
