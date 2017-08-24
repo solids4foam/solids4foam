@@ -3,8 +3,11 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Create the mesh
 runApplication blockMesh
-runApplication fluidFoam
+
+# Run the solver
+runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 

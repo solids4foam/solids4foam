@@ -5,4 +5,4 @@
 
 runApplication fluentMeshToFoam cylinderInChannel.msh
 runApplication changeDictionary
-runApplication fluidFoam
+runApplication solids4Foam

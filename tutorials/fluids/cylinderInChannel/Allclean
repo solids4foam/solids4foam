@@ -4,7 +4,6 @@
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
 cleanCase
-cleanTimeDirectories
 \rm -rf processor*
 \rm -f *.ps
 \rm -rf history

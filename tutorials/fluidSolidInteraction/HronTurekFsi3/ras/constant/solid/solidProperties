@@ -1,0 +1,45 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+//solidModel linearGeometry;
+//solidModel nonLinearGeometryUpdatedLagrangian;
+//solidModel unsNonLinearGeometryUpdatedLagrangian;
+//solidModel nonLinearGeometryTotalLagrangian;
+//solidModel nonLinearGeometryTotalLagrangianTotalDisplacement;
+solidModel unsNonLinearGeometryTotalLagrangian;
+
+//linearGeometryCoeffs
+//nonLinearGeometryTotalLagrangianCoeffs
+//nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+unsNonLinearGeometryTotalLagrangianCoeffs
+{
+    // Maximum number of momentum correctors
+    nCorrectors             1000;
+
+    // Solution tolerance for displacement
+    solutionTolerance       1e-7;
+
+    // Relative solution tolerance for displacement in outer FSI iterations
+    // Material law solution tolerance
+    //materialTolerance       1e-05;
+
+    // Write frequency for the residuals
+    infoFrequency           1000;
+}
+
+
+// ************************************************************************* //

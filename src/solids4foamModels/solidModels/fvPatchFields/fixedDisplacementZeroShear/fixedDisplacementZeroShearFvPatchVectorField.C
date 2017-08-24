@@ -22,9 +22,6 @@ License
     along with OpenFOAM; if not, write to the Free Software Foundation,
     Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
-Class
-    fixedDisplacementZeroShearFvPatchVectorField
-
 \*---------------------------------------------------------------------------*/
 
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
@@ -193,12 +190,21 @@ void fixedDisplacementZeroShearFvPatchVectorField::updateCoeffs()
     // Set displacement
     refValue() = disp;
 
+    // Lookup the solidModel object
+    const polyMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel* solModPtr = NULL;
+    if (mesh.foundObject<solidModel>("solidProperties"))
+    {
+        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
+    }
+    else
+    {
+        solModPtr = &mesh.parent().lookupObject<solidModel>("solidProperties");
+    }
+
     // Set gradient to force zero shear traction
     refGrad() =
-        patch().boundaryMesh().mesh().lookupObject<solidModel>
-        (
-            "solidProperties"
-        ).tractionBoundarySnGrad
+        solModPtr->tractionBoundarySnGrad
         (
             vectorField(patch().size(), vector::zero),
             scalarField(patch().size(), 0.0),

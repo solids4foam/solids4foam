@@ -26,7 +26,6 @@ License
 #include "StVenantKirchhoffElastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformGeometricField.H"
-#include "solidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -197,11 +196,6 @@ Foam::tmp<Foam::volScalarField> Foam::StVenantKirchhoffElastic::impK() const
 
 void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 {
-    // Check if the solidModel is enforcing linearity for convergence
-    // If it is then we will calculate the stress using Hooke's law
-    const Switch& enforceLinear =
-        mesh().lookupObject<solidModel>("solidProperties").enforceLinear();
-
     // Update deformation gradient F
     if (mesh().foundObject<volTensorField>("grad(DD)"))
     {
@@ -212,7 +206,7 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
         // Update the total deformation gradient
         F() = (I + gradDD.T()) & F().oldTime();
 
-        if (enforceLinear)
+        if (enforceLinear())
         {
             WarningIn
             (
@@ -236,7 +230,7 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
         // Update the total deformation gradient
         F() = I + gradD.T();
 
-        if (enforceLinear)
+        if (enforceLinear())
         {
             WarningIn
             (
@@ -271,11 +265,6 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 
 void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Check if the solidModel is enforcing linearity for convergence
-    // If it is then we will calculate the stress using Hooke's law
-    const Switch& enforceLinear =
-        mesh().lookupObject<solidModel>("solidProperties").enforceLinear();
-
     // Update deformation gradient F
     if (mesh().foundObject<volTensorField>("grad(DD)f"))
     {
@@ -286,7 +275,7 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
         // Update the total deformation gradient
         Ff() = (I + gradDD.T()) & Ff().oldTime();
 
-        if (enforceLinear)
+        if (enforceLinear())
         {
             WarningIn
             (
@@ -310,7 +299,7 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
         // Update the total deformation gradient
         Ff() = I + gradD.T();
 
-        if (enforceLinear)
+        if (enforceLinear())
         {
             WarningIn
             (
