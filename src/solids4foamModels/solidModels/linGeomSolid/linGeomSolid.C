@@ -33,8 +33,6 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "fvcGradf.H"
 
-#include "linearElasticMisesPlastic.H"
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -674,13 +672,6 @@ bool linGeomSolid::evolve()
     lduMatrix::debug = 0;
 
     Info<< "Solving the momentum equation for DD" << endl;
-
-    // Testing
-    // Lookup linearElasticMisesPlastic law:
-    // const PtrList<mechanicalLaw>& mechLaws = mechanical();
-    // const linearElasticMisesPlastic& mech =
-    //     refCast<const linearElasticMisesPlastic>(mechLaws[0]);
-    // volDiagTensorField impKdiagTensor = mech.impKdiagTensor();
 
     // Momentum equation loop
     do

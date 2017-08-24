@@ -2,10 +2,10 @@ physicsModel/physicsModel.C
 
 solidModels/solidModel/solidModel.C
 /*solidModels/freeVibrationSolid/freeVibrationSolid.C*/
-solidModels/linGeomSolid/linGeomSolid.C
-/*
-solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
 solidModels/coupledHybridLinGeomSolid/coupledHybridLinGeomSolid.C
+solidModels/linGeomSolid/linGeomSolid.C
+solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
+/*
 solidModels/simpleHybridLinGeomSolid/simpleHybridLinGeomSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
 solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
