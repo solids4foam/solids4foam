@@ -71,14 +71,8 @@ class fluidSolidInterface
         //- FSI properties dictionary
         dictionary fsiProperties_;
 
-        //- Fluid mesh
-        dynamicFvMesh& fluidMesh_;
-
         //- Flow solver
         autoPtr<fluidModel> fluid_;
-
-        //- Solid mesh
-        dynamicFvMesh& solidMesh_;
 
         //- Solid solver
         autoPtr<solidModel> solid_;
@@ -193,12 +187,6 @@ class fluidSolidInterface
         void operator=(const fluidSolidInterface&);
 
 
-protected:
-
-    // Protected member functions
-
-
-
 public:
 
     //- Runtime type information
@@ -213,9 +201,10 @@ public:
             fluidSolidInterface,
             dictionary,
             (
-                dynamicFvMesh& fluidMesh, dynamicFvMesh& solidMesh
+                Time& runTime,
+                const word& region
             ),
-            (fluidMesh, solidMesh)
+            (runTime, region)
         );
 
 
@@ -225,8 +214,8 @@ public:
         fluidSolidInterface
         (
             const word& type,
-            dynamicFvMesh& fluidMesh,
-            dynamicFvMesh& solidMesh
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
         );
 
 
@@ -235,8 +224,8 @@ public:
         //- Select constructed from fluid and solid meshes
         static autoPtr<fluidSolidInterface> New
         (
-            dynamicFvMesh& fluidMesh,
-            dynamicFvMesh& solidMesh
+            Time& runTime,
+            const word& region
         );
 
 
@@ -249,22 +238,35 @@ public:
 
         // Access
 
-            //- Return fluid mesh
-            const dynamicFvMesh& fluidMesh() const
+            //- Return reference to the fluid mesh
+            dynamicFvMesh& fluidMesh()
             {
-                return fluidMesh_;
+                return fluid_().mesh();
             }
 
-            //- Return solid mesh
+            //- Return const reference to the fluid mesh
+            const dynamicFvMesh& fluidMesh() const
+            {
+                return fluid_().mesh();
+            }
+
+            //- Return reference to the solid mesh
+            dynamicFvMesh& solidMesh()
+            {
+                return solid_().mesh();
+            }
+
+            //- Return const reference to the solid mesh
             const dynamicFvMesh& solidMesh() const
             {
-                return solidMesh_;
+                return solid_().mesh();
             }
 
             //- Return time
+            // to-do: consider storing a reference to time
             const Time& runTime() const
             {
-                return fluidMesh_.time();
+                return fluid_().mesh().time();
             }
 
             //- Return sub-dictionary

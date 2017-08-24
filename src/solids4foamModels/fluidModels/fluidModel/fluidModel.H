@@ -59,7 +59,7 @@ namespace Foam
 
 class fluidModel
 :
-    public physicsModel,
+    public physicsModel ,
     public IOdictionary
 {
     // Private data
@@ -149,8 +149,14 @@ public:
 
         // Access
 
+            //- Return reference to the mesh
+            dynamicFvMesh& mesh()
+            {
+                return meshPtr_();
+            }
+
             //- Return const reference to the mesh
-            const fvMesh& mesh() const
+            const dynamicFvMesh& mesh() const
             {
                 return meshPtr_();
             }

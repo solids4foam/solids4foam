@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  1.5                                   |
+|   \\  /    A nd           | Web:      http://www.OpenFOAM.org               |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -10,22 +10,26 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    object      decomposeParDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress no;
+numberOfSubdomains 4;
 
-mechanical
+method          simple;
+
+globalFaceZones ( plateZone );
+
+simpleCoeffs
+{
+    n               (2 2 1);
+    delta           0.001;
+}
+
+distributed     no;
+
+roots
 (
-    rubber
-    {
-        type    linearElastic;
-        //type    neoHookeanElastic;
-        rho     rho [1 -3 0 0 0 0 0] 1000;
-        E       E [1 -1 -2 0 0 0 0] 5.6e6;
-        nu      nu [0 0 0 0 0 0 0] 0.4;
-    }
 );
 
 // ************************************************************************* //

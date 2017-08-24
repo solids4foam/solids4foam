@@ -28,13 +28,12 @@ fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/transientSimpleFluid/transientSimpleFluid.C
 */
 
-/*
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
-fluidSolidInterfaces/fluidSolidInterface/newFluidSolidInterface.C
+fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
+/*
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
 fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
-fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
 fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 */
 

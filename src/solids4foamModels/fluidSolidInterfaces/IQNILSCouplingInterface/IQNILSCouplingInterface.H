@@ -107,8 +107,8 @@ public:
         //- Construct from components
         IQNILSCouplingInterface
         (
-            dynamicFvMesh& fluidMesh,
-            dynamicFvMesh& solidMesh
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
         );
 
 

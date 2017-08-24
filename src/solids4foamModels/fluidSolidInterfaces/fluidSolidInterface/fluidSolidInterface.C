@@ -407,27 +407,25 @@ const Foam::scalarField& Foam::fluidSolidInterface::minEdgeLength() const
 Foam::fluidSolidInterface::fluidSolidInterface
 (
     const word& type,
-    dynamicFvMesh& fluidMesh,
-    dynamicFvMesh& solidMesh
+    Time& runTime,
+    const word& region
 )
 :
-    physicsModel(type, const_cast<Time&>(fluidMesh.time())),
+    physicsModel(type, runTime),
     IOdictionary
     (
         IOobject
         (
             "fsiProperties",
-            fluidMesh.time().constant(),
-            fluidMesh,
+            runTime.constant(),
+            runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
     ),
     fsiProperties_(subDict(type + "Coeffs")),
-    fluidMesh_(fluidMesh),
-    fluid_(fluidModel::New(fluidMesh_)),
-    solidMesh_(solidMesh),
-    solid_(solidModel::New(solidMesh_)),
+    fluid_(fluidModel::New(runTime, "fluid")),
+    solid_(solidModel::New(runTime, "solid")),
     solidPatchIndex_(-1),
     solidZoneIndex_(-1),
     fluidPatchIndex_(-1),
@@ -480,7 +478,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
             WarningIn(type + "::fsiProperties(...)")
                 << "When using the coupilngStartTime option, the coupled "
                 << "option should be set to off: resetting coupled to off"
-                 << endl;
+                << endl;
 
             coupled_ = false;
         }
@@ -493,7 +491,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     const polyPatchID solidPatch
     (
         solidPatchName,
-        solidMesh.boundaryMesh()
+        solidMesh().boundaryMesh()
     );
 
     if (!solidPatch.active())
@@ -513,7 +511,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     const faceZoneID solidZone
     (
         solidZoneName,
-        solidMesh.faceZones()
+        solidMesh().faceZones()
     );
 
     if (!solidZone.active())
@@ -534,7 +532,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     const polyPatchID fluidPatch
     (
         fluidPatchName,
-        fluidMesh.boundaryMesh()
+        fluidMesh().boundaryMesh()
     );
 
     if (!fluidPatch.active())
@@ -554,7 +552,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     const faceZoneID fluidZone
     (
         fluidZoneName,
-        fluidMesh.faceZones()
+        fluidMesh().faceZones()
     );
 
     if (!fluidZone.active())
@@ -569,13 +567,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
 
     // Initialize solid zone pressure
     solidZonePressure_ =
-        scalarField(solidMesh.faceZones()[solidZoneIndex()].size(), 0.0);
+        scalarField(solidMesh().faceZones()[solidZoneIndex()].size(), 0.0);
 
     // Initialize residual
     residual_ =
         vectorField
         (
-            fluidMesh.faceZones()[fluidZoneIndex_]().nPoints(),
+            fluidMesh().faceZones()[fluidZoneIndex_]().nPoints(),
             vector::zero
         );
 }
@@ -594,6 +592,54 @@ Foam::fluidSolidInterface::~fluidSolidInterface()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
+(
+    Time& runTime,
+    const word& region
+)
+{
+    word fsiTypeName;
+
+    // Enclose the creation of the dictionary to ensure it is
+    // deleted before the fluid is created otherwise the dictionary
+    // is entered in the database twice
+    {
+        IOdictionary fsiProperties
+        (
+            IOobject
+            (
+                "fsiProperties",
+                runTime.constant(),
+                runTime,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+
+        fsiProperties.lookup("fluidSolidInterface")
+            >> fsiTypeName;
+    }
+
+    Info<< "Selecting fluidSolidInterface " << fsiTypeName << endl;
+
+    dictionaryConstructorTable::iterator cstrIter =
+        dictionaryConstructorTablePtr_->find(fsiTypeName);
+
+    if (cstrIter == dictionaryConstructorTablePtr_->end())
+    {
+        FatalErrorIn
+        (
+            "fluidSolidInterface::New(Time&, const word&)"
+        )   << "Unknown fluidSolidInterface type " << fsiTypeName
+            << endl << endl
+            << "Valid fluidSolidInterface types are :" << endl
+            << dictionaryConstructorTablePtr_->toc()
+            << exit(FatalError);
+    }
+
+    return autoPtr<fluidSolidInterface>(cstrIter()(runTime, region));
+}
 
 
 const Foam::vectorField&
@@ -799,7 +845,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         twoDCorrector.correctPoints(newPoints);
 
-        fluidMesh_.movePoints(newPoints);
+        fluidMesh().movePoints(newPoints);
 
         // Accumulate interface points displacement
         accumulatedFluidInterfaceDisplacement() +=
@@ -824,7 +870,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         twoDCorrector.correctPoints(newPoints);
 
-        fluidMesh_.movePoints(newPoints);
+        fluidMesh().movePoints(newPoints);
 
         accumulatedFluidInterfaceDisplacement() +=
             fluidPatchPointsDispl
@@ -950,7 +996,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 << abort(FatalError);
         }
 
-        fluidMesh_.update();
+        fluidMesh().update();
 
         accumulatedFluidInterfaceDisplacement() =
             vectorField
@@ -982,7 +1028,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         twoDCorrector.correctPoints(newPoints);
 
-        fluidMesh_.movePoints(newPoints);
+        fluidMesh().movePoints(newPoints);
     }
 }
 

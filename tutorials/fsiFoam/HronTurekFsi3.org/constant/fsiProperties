@@ -10,22 +10,39 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    object      fsiProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress no;
+fluidSolidInterface    IQNILS;
 
-mechanical
-(
-    rubber
-    {
-        type    linearElastic;
-        //type    neoHookeanElastic;
-        rho     rho [1 -3 0 0 0 0 0] 1000;
-        E       E [1 -1 -2 0 0 0 0] 5.6e6;
-        nu      nu [0 0 0 0 0 0 0] 0.4;
-    }
-);
+IQNILSCoeffs
+{
+    solidPatch           plate;
+    solidZone            plateZone;
+
+    fluidPatch           plate;
+    fluidZone            plateZone;
+
+    relaxationFactor     0.05;
+
+    interfaceDeformationLimit 0;
+
+    // FSI loop tolerance
+    outerCorrTolerance   1e-6;
+
+    // FSI loop maximum number of correctors
+    nOuterCorr           30;
+
+    //interpolatorUpdateFrequency 0;
+
+    //couplingReuse        0;
+
+    // Enable/disable coupling
+    coupled              no;
+
+    // Enable coupling at specified time
+    couplingStartTime    2.0;
+}
 
 // ************************************************************************* //

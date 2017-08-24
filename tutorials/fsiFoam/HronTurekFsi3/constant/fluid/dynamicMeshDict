@@ -10,22 +10,14 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    object      dynamicMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress no;
+dynamicFvMesh dynamicMotionSolverFvMesh;
 
-mechanical
-(
-    rubber
-    {
-        type    linearElastic;
-        //type    neoHookeanElastic;
-        rho     rho [1 -3 0 0 0 0 0] 1000;
-        E       E [1 -1 -2 0 0 0 0] 5.6e6;
-        nu      nu [0 0 0 0 0 0 0] 0.4;
-    }
-);
+solver velocityLaplacian;
+
+diffusivity quadratic inverseDistance 2(plate cylinder);
 
 // ************************************************************************* //

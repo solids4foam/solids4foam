@@ -194,7 +194,7 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New(Time& runTime)
             (
                 IOobject
                 (
-                    "fluidSolidInteractionProperties",
+                    "fsiProperties",
                     runTime.constant(),
                     runTime,
                     IOobject::MUST_READ,

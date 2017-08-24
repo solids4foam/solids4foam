@@ -10,22 +10,42 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress no;
+application stressFoam;
 
-mechanical
-(
-    rubber
-    {
-        type    linearElastic;
-        //type    neoHookeanElastic;
-        rho     rho [1 -3 0 0 0 0 0] 1000;
-        E       E [1 -1 -2 0 0 0 0] 5.6e6;
-        nu      nu [0 0 0 0 0 0 0] 0.4;
-    }
-);
+startFrom       latestTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         5;
+
+deltaT          1e-3;
+
+writeControl    timeStep;
+
+writeInterval   10;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  no;
+
+maxCo           0.2;
 
 // ************************************************************************* //

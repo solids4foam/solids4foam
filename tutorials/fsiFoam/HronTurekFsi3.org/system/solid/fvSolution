@@ -10,22 +10,28 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress no;
-
-mechanical
-(
-    rubber
-    {
-        type    linearElastic;
-        //type    neoHookeanElastic;
-        rho     rho [1 -3 0 0 0 0 0] 1000;
-        E       E [1 -1 -2 0 0 0 0] 5.6e6;
-        nu      nu [0 0 0 0 0 0 0] 0.4;
+solvers
+{
+    "D|DD"
+    {   
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-09;
+        relTol          0.1;
     }
-);
+}
+
+relaxationFactors
+{
+    //DEqn     0.999;
+    //DDEqn    0.999;
+    //D        0.5;
+    //DD       0.5;
+}
+
 
 // ************************************************************************* //

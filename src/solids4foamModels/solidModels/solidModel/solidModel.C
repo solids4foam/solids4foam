@@ -693,7 +693,12 @@ Foam::solidModel::solidModel
         IOobject
         (
             "solidProperties",
-            runTime.constant(),
+            // If region == "region0" then read from the main case
+            // Otherwise, read from the region/sub-mesh directory e.g.
+            // constant/fluid or constant/solid
+            bool(region == dynamicFvMesh::defaultRegion)
+          ? fileName(runTime.constant())
+          : fileName(runTime.constant()/region),
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
@@ -820,7 +825,8 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
             IOobject
             (
                 "solidProperties",
-                runTime.constant(),
+                //runTime.constant(),
+                fileName("constant"/region),
                 runTime,
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE
