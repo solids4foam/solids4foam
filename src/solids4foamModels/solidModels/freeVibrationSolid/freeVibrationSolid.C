@@ -90,7 +90,6 @@ freeVibrationSolid::freeVibrationSolid
         ),
         mesh
     ),
-    Dmodes_(nModes_),
     pMesh_(mesh),
     pointD_
     (
@@ -433,38 +432,48 @@ bool freeVibrationSolid::evolve()
     // Solve the eigenproblem to calculate the eigenvalues and eigenvectors
     solver.solve(solutionVec_, blockB);
 
-    // Transfer solution vector to D field: this corresponds to the lowest mode
-    extendedMesh_.copySolutionVector(solutionVec_, D_);
-
-    // Update gradient of displacement
-    volToPoint_.interpolate(D_, pointD_);
-    gradD_ = fvc::grad(D_, pointD_);
-
-    // We will call fvc::grad a second time as fixed displacement boundaries
-    // need the patch internal field values to calculate snGrad, which
-    // is then used to set snGrad on the gradD boundary
-    D_.correctBoundaryConditions();
-    gradD_ = fvc::grad(D_, pointD_);
-
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma_);
-
     // Store all requested modes
     for (int modeI = 0; modeI < nModes_; modeI++)
     {
-        // Create a displacement field to hold the results
-        word Dname = word("D_mode" + Foam::name(modeI + 1));
-
-        Info<< "Creating field " << Dname << endl;
-
-        Dmodes_.set(modeI, new volVectorField(Dname, D_));
-        Dmodes_[modeI].writeOpt() = IOobject::AUTO_WRITE;
+        Info<< nl;
 
         // Retrieve the mode from the solver into the solutionVec
         solver.mode(modeI, solutionVec_);
 
         // Transfer solution vector to D field
-        extendedMesh_.copySolutionVector(solutionVec_, Dmodes_[modeI]);
+        extendedMesh_.copySolutionVector(solutionVec_, D_);
+
+        // Update gradient of displacement
+        volToPoint_.interpolate(D_, pointD_);
+        gradD_ = fvc::grad(D_, pointD_);
+
+        // We will call fvc::grad a second time as fixed displacement boundaries
+        // need the patch internal field values to calculate snGrad, which
+        // is then used to set snGrad on the gradD boundary
+        D_.correctBoundaryConditions();
+        gradD_ = fvc::grad(D_, pointD_);
+
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigma_);
+
+        // Write the results to the current time-step
+        runTime().write();
+
+        // Move to the next time-step
+        // Using const_cast is not the prettiest but vibration cases are
+        // relatively exception, for now
+        Info<< "    Writing mode " << (modeI + 1) << " to time "
+            << runTime().value() << endl;
+
+        if (modeI < (nModes_ - 1))
+        {
+            const_cast<Time&>(runTime())++;
+        }
+        else
+        {
+            FatalError
+                << "done" << abort(FatalError);
+        }
     }
 
     return true;

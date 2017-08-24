@@ -85,9 +85,6 @@ class freeVibrationSolid
         //- Displacement field
         volVectorField D_;
 
-        //- Displacement fields for each mode requested
-        PtrList<volVectorField> Dmodes_;
-
         //- Point mesh
         pointMesh pMesh_;
 
