@@ -965,7 +965,7 @@ bool coupledUnsLinGeomSolid::evolve()
         //     )->solve(solutionVec_, blockB);
 
         // Under-relax the linear system
-        if (mesh().solutionDict().relax("DEqn"))
+        if (mesh().solutionDict().relaxEquation("DEqn"))
         {
             FatalError
                 << "Equation under-relaxation disabled"
