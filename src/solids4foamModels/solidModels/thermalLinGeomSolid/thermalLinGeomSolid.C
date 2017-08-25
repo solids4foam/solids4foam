@@ -356,6 +356,378 @@ thermalLinGeomSolid::thermalLinGeomSolid
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
+tmp<vectorField> thermalLinGeomSolid::faceZonePointDisplacementIncrement
+(
+    const label zoneID
+) const
+{
+    tmp<vectorField> tPointDisplacement
+    (
+        new vectorField
+        (
+            mesh().faceZones()[zoneID]().localPoints().size(),
+            vector::zero
+        )
+    );
+    vectorField& pointDisplacement = tPointDisplacement();
+
+    const vectorField& pointDI = pointD_.internalField();
+    const vectorField& oldPointDI = pointD_.oldTime().internalField();
+
+    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+    if (globalZoneIndex != -1)
+    {
+        // global face zone
+
+        const labelList& curPointMap =
+            globalToLocalFaceZonePointMap()[globalZoneIndex];
+
+        const labelList& zoneMeshPoints =
+            mesh().faceZones()[zoneID]().meshPoints();
+
+        vectorField zonePointsDisplGlobal
+        (
+            zoneMeshPoints.size(),
+            vector::zero
+        );
+
+        //- Inter-proc points are shared by multiple procs
+        //  pointNumProc is the number of procs which a point lies on
+        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
+
+        forAll(zonePointsDisplGlobal, globalPointI)
+        {
+            label localPoint = curPointMap[globalPointI];
+
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
+            {
+                label procPoint = zoneMeshPoints[localPoint];
+
+                zonePointsDisplGlobal[globalPointI] =
+                    pointDI[procPoint] - oldPointDI[procPoint];
+
+                pointNumProcs[globalPointI] = 1;
+            }
+        }
+
+        if (Pstream::parRun())
+        {
+            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
+            reduce(pointNumProcs, sumOp<scalarField>());
+
+            //- now average the displacement between all procs
+            zonePointsDisplGlobal /= pointNumProcs;
+        }
+
+        forAll(pointDisplacement, globalPointI)
+        {
+            label localPoint = curPointMap[globalPointI];
+
+            pointDisplacement[localPoint] =
+                zonePointsDisplGlobal[globalPointI];
+        }
+    }
+    else
+    {
+        tPointDisplacement() =
+            vectorField
+            (
+                pointDI - oldPointDI,
+                mesh().faceZones()[zoneID]().meshPoints()
+            );
+    }
+
+    return tPointDisplacement;
+}
+
+
+tmp<tensorField> thermalLinGeomSolid::faceZoneSurfaceGradientOfVelocity
+(
+    const label zoneID,
+    const label patchID
+) const
+{
+    tmp<tensorField> tVelocityGradient
+    (
+        new tensorField
+        (
+            mesh().faceZones()[zoneID]().size(),
+            tensor::zero
+        )
+    );
+    tensorField& velocityGradient = tVelocityGradient();
+
+    vectorField pPointU =
+        mechanical().volToPoint().interpolate
+        (
+            mesh().boundaryMesh()[patchID],
+            U_
+        );
+
+    const faceList& localFaces =
+        mesh().boundaryMesh()[patchID].localFaces();
+
+    vectorField localPoints =
+        mesh().boundaryMesh()[patchID].localPoints();
+    localPoints += pointD_.boundaryField()[patchID].patchInternalField();
+
+    PrimitivePatch<face, List, const pointField&> patch
+    (
+        localFaces,
+        localPoints
+    );
+
+    tensorField patchGradU = fvc::fGrad(patch, pPointU);
+
+    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+    if (globalZoneIndex != -1)
+    {
+        // global face zone
+
+        const label patchStart =
+            mesh().boundaryMesh()[patchID].start();
+
+        forAll(patchGradU, i)
+        {
+            velocityGradient
+            [
+                mesh().faceZones()[zoneID].whichFace(patchStart + i)
+            ] = patchGradU[i];
+        }
+
+        // Parallel data exchange: collect field on all processors
+        reduce(velocityGradient, sumOp<tensorField>());
+    }
+    else
+    {
+        velocityGradient = patchGradU;
+    }
+
+    return tVelocityGradient;
+}
+
+
+tmp<vectorField> thermalLinGeomSolid::currentFaceZonePoints
+(
+    const label zoneID
+) const
+{
+    vectorField pointDisplacement
+    (
+        mesh().faceZones()[zoneID]().localPoints().size(),
+        vector::zero
+    );
+
+    const vectorField& pointDI = pointD_.internalField();
+
+    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+    if (globalZoneIndex != -1)
+    {
+        // global face zone
+        const labelList& curPointMap =
+            globalToLocalFaceZonePointMap()[globalZoneIndex];
+
+        const labelList& zoneMeshPoints =
+            mesh().faceZones()[zoneID]().meshPoints();
+
+        vectorField zonePointsDisplGlobal
+        (
+            zoneMeshPoints.size(),
+            vector::zero
+        );
+
+        //- Inter-proc points are shared by multiple procs
+        //  pointNumProc is the number of procs which a point lies on
+        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
+
+        forAll(zonePointsDisplGlobal, globalPointI)
+        {
+            label localPoint = curPointMap[globalPointI];
+
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
+            {
+                label procPoint = zoneMeshPoints[localPoint];
+
+                zonePointsDisplGlobal[globalPointI] =
+                    pointDI[procPoint];
+
+                pointNumProcs[globalPointI] = 1;
+            }
+        }
+
+        if (Pstream::parRun())
+        {
+            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
+            reduce(pointNumProcs, sumOp<scalarField>());
+
+            //- now average the displacement between all procs
+            zonePointsDisplGlobal /= pointNumProcs;
+        }
+
+        forAll(pointDisplacement, globalPointI)
+        {
+            label localPoint = curPointMap[globalPointI];
+
+            pointDisplacement[localPoint] =
+                zonePointsDisplGlobal[globalPointI];
+        }
+    }
+    else
+    {
+        pointDisplacement =
+            vectorField
+            (
+                pointDI,
+                mesh().faceZones()[zoneID]().meshPoints()
+            );
+    }
+
+    tmp<vectorField> tCurrentPoints
+    (
+        new vectorField
+        (
+            mesh().faceZones()[zoneID]().localPoints()
+          + pointDisplacement
+        )
+    );
+
+    return tCurrentPoints;
+}
+
+
+tmp<vectorField> thermalLinGeomSolid::faceZoneNormal
+(
+    const label zoneID,
+    const label patchID
+) const
+{
+    tmp<vectorField> tNormals
+    (
+        new vectorField
+        (
+            mesh().faceZones()[zoneID]().size(),
+            vector::zero
+        )
+    );
+    vectorField& normals = tNormals();
+
+    const faceList& localFaces =
+        mesh().boundaryMesh()[patchID].localFaces();
+
+    vectorField localPoints =
+        mesh().boundaryMesh()[patchID].localPoints();
+    localPoints += pointD_.boundaryField()[patchID].patchInternalField();
+
+    PrimitivePatch<face, List, const pointField&> patch
+    (
+        localFaces,
+        localPoints
+    );
+
+    vectorField patchNormals(patch.size(), vector::zero);
+
+    forAll(patchNormals, faceI)
+    {
+        patchNormals[faceI] =
+            localFaces[faceI].normal(localPoints);
+    }
+
+    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+    if (globalZoneIndex != -1)
+    {
+        // global face zone
+
+        const label patchStart =
+            mesh().boundaryMesh()[patchID].start();
+
+        forAll(patchNormals, i)
+        {
+            normals
+            [
+                mesh().faceZones()[zoneID].whichFace(patchStart + i)
+            ] = patchNormals[i];
+        }
+
+        // Parallel data exchange: collect field on all processors
+        reduce(normals, sumOp<vectorField>());
+    }
+    else
+    {
+        normals = patchNormals;
+    }
+
+    return tNormals;
+}
+
+
+void thermalLinGeomSolid::setTraction
+(
+    const label patchID,
+    const vectorField& traction
+)
+{
+    if
+    (
+        D_.boundaryField()[patchID].type()
+     != solidTractionFvPatchVectorField::typeName
+    )
+    {
+        FatalErrorIn("void thermalLinGeomSolid::setTraction(...)")
+            << "Boundary condition on " << D_.name()
+            <<  " is "
+            << D_.boundaryField()[patchID].type()
+            << "for patch" << mesh().boundary()[patchID].name()
+            << ", instead "
+            << solidTractionFvPatchVectorField::typeName
+            << abort(FatalError);
+    }
+
+    solidTractionFvPatchVectorField& patchU =
+        refCast<solidTractionFvPatchVectorField>
+        (
+            D_.boundaryField()[patchID]
+        );
+
+    patchU.traction() = traction;
+}
+
+
+void thermalLinGeomSolid::setPressure
+(
+    const label patchID,
+    const scalarField& pressure
+)
+{
+    if
+    (
+        D_.boundaryField()[patchID].type()
+     != solidTractionFvPatchVectorField::typeName
+    )
+    {
+        FatalErrorIn("void thermalLinGeomSolid::setTraction(...)")
+            << "Bounary condition on " << D_.name()
+            <<  " is "
+            << D_.boundaryField()[patchID].type()
+            << "for patch" << mesh().boundary()[patchID].name()
+            << ", instead "
+            << solidTractionFvPatchVectorField::typeName
+            << abort(FatalError);
+    }
+
+    solidTractionFvPatchVectorField& patchU =
+        refCast<solidTractionFvPatchVectorField>
+        (
+            D_.boundaryField()[patchID]
+        );
+
+    patchU.pressure() = pressure;
+}
+
+
 bool thermalLinGeomSolid::evolve()
 {
     Info << "Evolving thermal solid solver" << endl;

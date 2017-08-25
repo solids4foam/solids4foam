@@ -208,6 +208,50 @@ public:
                 return T_;
             }
 
+            //- Face zone point displacement increment
+            virtual tmp<vectorField> faceZonePointDisplacementIncrement
+            (
+                const label zoneID
+            ) const;
+
+            //- Face zone velocity surface (tangential) gradient
+            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
+            (
+                const label zoneID,
+                const label patchID
+            ) const;
+
+            //- Face zone current normal
+            virtual tmp<vectorField> faceZoneNormal
+            (
+                const label zoneID,
+                const label patchID
+            ) const;
+
+            //- Face zone primitive patch in current configuration
+            virtual tmp<vectorField> currentFaceZonePoints
+            (
+                const label zoneID
+            ) const;
+
+        // Edit
+
+            //- Set traction on the specified patch
+            //  This function enables the FSI procedure to pass a traction from
+            //  fluid to the solid
+            virtual void setTraction
+            (
+                const label patchID,
+                const vectorField& traction
+            );
+
+            //- Set pressure at specified patch
+            virtual void setPressure
+            (
+                const label patchID,
+                const scalarField& pressure
+            );
+
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
