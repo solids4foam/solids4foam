@@ -47,6 +47,7 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(poroLinGeomSolid, 0);
+addToRunTimeSelectionTable(physicsModel, poroLinGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, poroLinGeomSolid, dictionary);
 
 
@@ -162,42 +163,46 @@ bool poroLinGeomSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-poroLinGeomSolid::poroLinGeomSolid(dynamicFvMesh& mesh)
+poroLinGeomSolid::poroLinGeomSolid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    solidModel(typeName, mesh),
+    solidModel(typeName, runTime, region),
     D_
     (
         IOobject
         (
             "D",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     U_
     (
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimLength/dimTime, vector::zero)
     ),
-    pMesh_(mesh),
+    pMesh_(mesh()),
     pointD_
     (
         IOobject
         (
             "pointD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -209,12 +214,12 @@ poroLinGeomSolid::poroLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "epsilon",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     sigma_
@@ -222,26 +227,26 @@ poroLinGeomSolid::poroLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "sigma",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    volToPoint_(mesh),
+    volToPoint_(mesh()),
     gradD_
     (
         IOobject
         (
             "grad(" + D_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     rho_(mechanical().rho()),
@@ -253,24 +258,24 @@ poroLinGeomSolid::poroLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "p",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     gradp_
     (
         IOobject
         (
             "grad(p)",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimPressure/dimLength, vector::zero)
     ),
     hydraulicConductivity_(solidProperties().lookup("hydraulicConductivity")),
@@ -306,8 +311,8 @@ poroLinGeomSolid::poroLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "g",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )

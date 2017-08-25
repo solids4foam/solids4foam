@@ -105,6 +105,9 @@ protected:
             return baseMeshRegionName_;
         }
 
+        //- Lookup the enforceLinear Switch in the solidModel
+        const Switch& enforceLinear() const;
+
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {

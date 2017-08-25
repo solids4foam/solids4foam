@@ -44,37 +44,42 @@ namespace fluidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(icoFluid, 0);
+addToRunTimeSelectionTable(physicsModel, icoFluid, fluid);
 addToRunTimeSelectionTable(fluidModel, icoFluid, dictionary);
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-icoFluid::icoFluid(const fvMesh& mesh)
+icoFluid::icoFluid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    fluidModel(this->typeName, mesh),
+    fluidModel(typeName, runTime, region),
     U_
     (
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     p_
     (
         IOobject
         (
             "p",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     gradp_(fvc::grad(p_)),
     phi_
@@ -82,20 +87,20 @@ icoFluid::icoFluid(const fvMesh& mesh)
         IOobject
         (
             "phi",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        fvc::interpolate(U_) & mesh.Sf()
+        fvc::interpolate(U_) & mesh().Sf()
     ),
     transportProperties_
     (
         IOobject
         (
             "transportProperties",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
@@ -231,7 +236,7 @@ tmp<scalarField> icoFluid::faceZoneMuEff
 }
 
 
-void icoFluid::evolve()
+bool icoFluid::evolve()
 {
     if (consistencyByJasak_)
     {
@@ -371,6 +376,8 @@ void icoFluid::evolve()
         }
         U_.correctBoundaryConditions();
     }
+
+    return 0;
 }
 
 

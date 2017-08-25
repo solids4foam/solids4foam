@@ -321,7 +321,7 @@ void Foam::BlockEigenSolver::writeLinearSystemToMatlabFiles
             << "commands:" << nl
             << nl
             << "    load matlabSparseMatrix.txt;" << nl
-            << "    A = spconvert(matrix);" << nl
+            << "    A = spconvert(matlabSparseMatrix);" << nl
             << "    B = dlmread('matlabSource.txt', ' ');" << nl
             << "    x = A\\B;" << nl
             << endl;

@@ -160,8 +160,11 @@ public:
     // Constructors
 
         //- Construct from components
-        linGeomTotalDispSolid(dynamicFvMesh& mesh);
-
+        linGeomTotalDispSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
     // Destructor
 

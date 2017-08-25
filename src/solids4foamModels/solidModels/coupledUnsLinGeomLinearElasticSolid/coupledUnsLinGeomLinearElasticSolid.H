@@ -155,7 +155,12 @@ public:
     // Constructors
 
         //- Construct from components
-        coupledUnsLinGeomLinearElasticSolid(dynamicFvMesh& mesh);
+        coupledUnsLinGeomLinearElasticSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
+
 
 
     // Destructor

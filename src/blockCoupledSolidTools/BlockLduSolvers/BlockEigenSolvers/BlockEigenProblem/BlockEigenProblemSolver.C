@@ -27,6 +27,7 @@ License
 #include "BlockEigenProblemSolver.H"
 #include "addToRunTimeSelectionTable.H"
 #include "objectRegistry.H"
+#include "mathematicalConstants.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -118,6 +119,15 @@ Foam::BlockEigenProblemSolver::solve
             }
         }
 
+        // Testing
+        {
+            // Flip sign so diagonal is positive
+            Warning
+                << "flipping the sign of the matrix!" << endl;
+            A *= -1;
+            b *= -1;
+        }
+
         // Optionally export system to Matlab
         if (writeMatlabFiles())
         {
@@ -133,10 +143,56 @@ Foam::BlockEigenProblemSolver::solve
         // Only for symmetric matrices; only uses the lower
         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> es(A);
 
-        // These methods are much slower and I am not sure if I trust their
-        // answers
-        // Eigen::JacobiSVD<Eigen::MatrixXf> svd
-        // Eigen::BDCSVD<Eigen::MatrixXf> svd
+        /*
+        // Create geometric/stress/inertia/loading stiffness matrix
+        Eigen::SparseMatrix<scalar> B(m, m);
+        // Insert coefficients
+        {
+            std::vector< Eigen::Triplet<scalar> > coefficients;
+            coefficients.reserve(m);
+
+            // Insert the density on the diagonal
+            // TODO: we need rho and nCells from the solidModels to create the
+            // loading matrix
+            //const scalar rho = 8000;
+            // TEST there are 500 cells in the 2-D test case
+            // We do not add density to the boundary condition equations
+            //for (int ID = 0; ID < 1000; ID++)
+            for (int ID = 0; ID < A.rows(); ID++)
+            {
+                // if (twoD)
+                // {
+                //     // 2-D
+                //     ID = 2*dI;
+                // }
+                // else
+                // {
+                //     // 3-D
+                //     ID = 3*dI;
+                // }
+                // if (ID < 1000) // (A.rows() - 1))
+                // {
+                //     coefficients.push_back
+                //     (
+                //         Eigen::Triplet<scalar>(ID, ID, 1e-6*rho)
+                //     );
+                // }
+                // else
+                //{
+                    //coefficients.push_back
+                    //(
+                    //    Eigen::Triplet<scalar>(ID, ID, rho)
+                    //);
+                coefficients.push_back(Eigen::Triplet<scalar>(ID, ID, 7800.0));
+                //}
+            }
+
+            // Insert triplets into the matrix
+            B.setFromTriplets(coefficients.begin(), coefficients.end());
+        }
+        // Create the eigen problem solver
+        Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXf> es(A, B);
+            */
 
         // Store the eigenvalues
         eigenvaluesPtr_.set
@@ -222,19 +278,34 @@ void Foam::BlockEigenProblemSolver::mode
     // Calculate te number of degrees of freedom
     const int m = calcDegreesOfFreedom(matrix_, twoD);
 
-    Info<< "Eigenvalue for mode " << modeI << ": "
-        << eigenvaluesPtr_()(m - modeI) << endl;
+    Info<< "Mode " << modeI << nl
+        << "    eigenvalue: "
+        //<< eigenvaluesPtr_()(m - modeI) << nl
+        << eigenvaluesPtr_()(modeI - 1)
+        << "    frequency: "
+        //<< sqrt(eigenvaluesPtr_()(m - modeI))/mathematicalConstant::twoPi
+        //<< sqrt(eigenvaluesPtr_()(modeI - 1))/mathematicalConstant::twoPi
+        << " Hz" << endl;
+
+    // Testing
+    for (int i = 0; i < 10; i++)
+    {
+        Info<< "eigval[" << i << "] " << eigenvaluesPtr_()(i) << endl;
+    }
 
     label index = 0;
 
     forAll(U, cellI)
     {
-        U[cellI].x() = eigenvectorsPtr_().col(m - modeI)(index++);
-        U[cellI].y() = eigenvectorsPtr_().col(m - modeI)(index++);
+        // U[cellI].x() = eigenvectorsPtr_().col(m - modeI)(index++);
+        // U[cellI].y() = eigenvectorsPtr_().col(m - modeI)(index++);
+        U[cellI].x() = eigenvectorsPtr_().col(modeI - 1)(index++);
+        U[cellI].y() = eigenvectorsPtr_().col(modeI - 1)(index++);
 
         if (!twoD)
         {
-            U[cellI].z() = eigenvectorsPtr_().col(m - modeI)(index++);
+            //U[cellI].z() = eigenvectorsPtr_().col(m - modeI)(index++);
+            U[cellI].z() = eigenvectorsPtr_().col(modeI - 1)(index++);
         }
     }
 }

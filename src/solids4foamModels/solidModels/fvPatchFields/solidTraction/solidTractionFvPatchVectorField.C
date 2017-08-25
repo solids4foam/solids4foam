@@ -206,16 +206,22 @@ void solidTractionFvPatchVectorField::updateCoeffs()
         pressure_ = pressureSeries_(this->db().time().timeOutputValue());
     }
 
+    // Lookup the solidModel object
+    const polyMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel* solModPtr = NULL;
+    if (mesh.foundObject<solidModel>("solidProperties"))
+    {
+        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
+    }
+    else
+    {
+        solModPtr = &mesh.parent().lookupObject<solidModel>("solidProperties");
+    }
+
+    // Set surface-normal gradient on the patch corresponding to the desired
+    // traction
     gradient() =
-        patch().boundaryMesh().mesh().lookupObject<solidModel>
-        (
-            "solidProperties"
-        ).tractionBoundarySnGrad
-        (
-            traction_,
-            pressure_,
-            patch()
-        );
+        solModPtr->tractionBoundarySnGrad(traction_, pressure_, patch());
 
     fixedGradientFvPatchVectorField::updateCoeffs();
 }

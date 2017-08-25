@@ -129,7 +129,11 @@ public:
     // Constructors
 
         //- Construct from components
-        weakThermalLinGeomSolid(dynamicFvMesh& mesh);
+        weakThermalLinGeomSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor

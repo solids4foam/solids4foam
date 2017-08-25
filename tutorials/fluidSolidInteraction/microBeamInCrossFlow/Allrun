@@ -1,0 +1,40 @@
+#!/bin/sh
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Create solid mesh
+\cp system/solid/meshDict system/
+runApplication -l log.cartesian2DMesh.solid cartesian2DMesh
+mkdir constant/solid/polyMesh
+\mv constant/polyMesh/* constant/solid/polyMesh/
+
+# Create fluid mesh
+\cp system/fluid/meshDict system/
+runApplication -l log.cartesian2DMesh.fluid cartesian2DMesh 
+mkdir constant/fluid/polyMesh
+\mv constant/polyMesh/* constant/fluid/polyMesh/
+
+# Correct patch types
+runApplication -l log.createPatch.fluid createPatch -overwrite -region fluid
+runApplication -l log.createPatch.solid createPatch -overwrite -region solid
+
+# Scale from microns to metres
+echo "Running transformPoints on the fluid"
+transformPoints -scale "(1e-6 1e-6 1e-6)" -region fluid \
+    >& log.transformPoints.fluid
+echo "Running transformPoints on the solid"
+transformPoints -scale "(1e-6 1e-6 1e-6)" -region solid \
+    >& log.transformPoints.solid
+
+# Create face zones for FSI interfaces
+runApplication -l log.setSet.fluid setSet -region fluid -batch setBatch.fluid
+runApplication -l log.setsToZones.fluid setsToZones -region fluid -noFlipMap
+runApplication -l log.setSet.solid setSet -region solid -batch setBatch.solid
+runApplication -l log.setsToZones.solid setsToZones -region solid -noFlipMap
+
+# Run the solver
+runApplication solids4Foam
+
+# ----------------------------------------------------------------- end-of-file
+

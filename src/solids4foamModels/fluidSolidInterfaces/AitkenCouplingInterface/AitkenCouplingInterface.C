@@ -40,6 +40,10 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(AitkenCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
+    physicsModel, AitkenCouplingInterface, fluidSolidInteraction
+);
+addToRunTimeSelectionTable
+(
     fluidSolidInterface, AitkenCouplingInterface, dictionary
 );
 
@@ -48,11 +52,11 @@ addToRunTimeSelectionTable
 
 AitkenCouplingInterface::AitkenCouplingInterface
 (
-    dynamicFvMesh& fluidMesh,
-    dynamicFvMesh& solidMesh
+    Time& runTime,
+    const word& region
 )
 :
-    fluidSolidInterface(typeName, fluidMesh, solidMesh),
+    fluidSolidInterface(typeName, runTime, region),
     relaxationFactor_
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
@@ -64,7 +68,7 @@ AitkenCouplingInterface::AitkenCouplingInterface
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void AitkenCouplingInterface::evolve()
+bool AitkenCouplingInterface::evolve()
 {
     initializeFields();
 
@@ -107,6 +111,8 @@ void AitkenCouplingInterface::evolve()
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
+
+    return 0;
 }
 
 

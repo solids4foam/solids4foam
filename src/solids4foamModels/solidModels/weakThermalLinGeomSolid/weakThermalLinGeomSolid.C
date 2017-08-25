@@ -47,6 +47,7 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(weakThermalLinGeomSolid, 0);
+addToRunTimeSelectionTable(physicsModel, weakThermalLinGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, weakThermalLinGeomSolid, dictionary);
 
 
@@ -139,32 +140,36 @@ bool weakThermalLinGeomSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-weakThermalLinGeomSolid::weakThermalLinGeomSolid(dynamicFvMesh& mesh)
+weakThermalLinGeomSolid::weakThermalLinGeomSolid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    linGeomSolid(mesh),
+    linGeomSolid(runTime, region),
     T_
     (
         IOobject
         (
             "T",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     T0_
     (
         IOobject
         (
             "T0",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedScalar("T0", dimTemperature, 0.0)
     ),
     gradT_
@@ -172,12 +177,12 @@ weakThermalLinGeomSolid::weakThermalLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "grad(T)",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimTemperature/dimLength, vector::zero)
     ),
     rhoC_
@@ -185,24 +190,24 @@ weakThermalLinGeomSolid::weakThermalLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "rhoC",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     k_
     (
         IOobject
         (
             "k",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     solutionTol_
     (

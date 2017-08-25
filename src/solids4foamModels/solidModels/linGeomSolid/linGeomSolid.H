@@ -164,7 +164,11 @@ public:
     // Constructors
 
         //- Construct from components
-        linGeomSolid(dynamicFvMesh& mesh);
+        linGeomSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor

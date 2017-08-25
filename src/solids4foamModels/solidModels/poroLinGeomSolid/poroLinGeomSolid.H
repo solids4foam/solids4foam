@@ -212,7 +212,11 @@ public:
     // Constructors
 
         //- Construct from components
-        poroLinGeomSolid(dynamicFvMesh& mesh);
+        poroLinGeomSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor

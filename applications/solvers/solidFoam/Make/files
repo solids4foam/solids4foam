@@ -1,4 +1,0 @@
-processor/processorFvPatchVectorField.C
-solidFoam.C
-
-EXE = $(FOAM_USER_APPBIN)/solidFoam

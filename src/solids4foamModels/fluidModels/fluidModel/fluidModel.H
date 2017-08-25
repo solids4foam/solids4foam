@@ -42,6 +42,7 @@ SourceFiles
 #ifndef fluidModel_H
 #define fluidModel_H
 
+#include "physicsModel.H"
 #include "fvMesh.H"
 #include "IOdictionary.H"
 #include "autoPtr.H"
@@ -58,12 +59,13 @@ namespace Foam
 
 class fluidModel
 :
+    public physicsModel ,
     public IOdictionary
 {
     // Private data
 
-        //- Reference to mesh
-        const fvMesh& mesh_;
+        //- Mesh
+        autoPtr<dynamicFvMesh> meshPtr_;
 
         //- Fluid properties dictionary
         dictionary fluidProperties_;
@@ -114,9 +116,10 @@ public:
             fluidModel,
             dictionary,
             (
-                const fvMesh& mesh
+                Time& runTime,
+                const word& region
             ),
-            (mesh)
+            (runTime, region)
         );
 
 
@@ -126,14 +129,15 @@ public:
         fluidModel
         (
             const word& type,
-            const fvMesh& mesh
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
         );
 
 
     // Selectors
 
         //- Select constructed from mesh
-        static autoPtr<fluidModel> New(const fvMesh& mesh);
+        static autoPtr<fluidModel> New(Time& runTime, const word& region);
 
 
     // Destructor
@@ -145,16 +149,22 @@ public:
 
         // Access
 
-            //- Return const reference to the mesh
-            const fvMesh& mesh() const
+            //- Return reference to the mesh
+            dynamicFvMesh& mesh()
             {
-                return mesh_;
+                return meshPtr_();
+            }
+
+            //- Return const reference to the mesh
+            const dynamicFvMesh& mesh() const
+            {
+                return meshPtr_();
             }
 
             //- Return time
             const Time& runTime() const
             {
-                return mesh_.time();
+                return meshPtr_().time();
             }
 
             //- Return velocity field
@@ -208,7 +218,7 @@ public:
         // Edit
 
             //- Evolve the fluid model
-            virtual void evolve() = 0;
+            virtual bool evolve() = 0;
 
             //- Read fluidProperties dictionary
             virtual bool read();

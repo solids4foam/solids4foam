@@ -85,9 +85,6 @@ class freeVibrationSolid
         //- Displacement field
         volVectorField D_;
 
-        //- Displacement fields for each mode requested
-        PtrList<volVectorField> Dmodes_;
-
         //- Point mesh
         pointMesh pMesh_;
 
@@ -147,7 +144,11 @@ public:
     // Constructors
 
         //- Construct from components
-        freeVibrationSolid(dynamicFvMesh& mesh);
+        freeVibrationSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor

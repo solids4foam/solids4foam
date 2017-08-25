@@ -52,6 +52,10 @@ namespace solidModels
 defineTypeNameAndDebug(freeVibrationSolid, 0);
 addToRunTimeSelectionTable
 (
+    physicsModel, freeVibrationSolid, solid
+);
+addToRunTimeSelectionTable
+(
     solidModel, freeVibrationSolid, dictionary
 );
 
@@ -60,19 +64,20 @@ addToRunTimeSelectionTable
 
 freeVibrationSolid::freeVibrationSolid
 (
-    dynamicFvMesh& mesh
+    Time& runTime,
+    const word& region
 )
 :
-    solidModel(typeName, mesh),
+    solidModel(typeName, runTime, region),
     nModes_(readInt(solidProperties().lookup("nModes"))),
-    extendedMesh_(mesh),
+    extendedMesh_(mesh()),
     solutionVec_
     (
         IOobject
         (
             "solutionVec",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -83,22 +88,21 @@ freeVibrationSolid::freeVibrationSolid
         IOobject
         (
             "D",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
-    Dmodes_(nModes_),
-    pMesh_(mesh),
+    pMesh_(mesh()),
     pointD_
     (
         IOobject
         (
             "pointD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -110,26 +114,26 @@ freeVibrationSolid::freeVibrationSolid
         IOobject
         (
             "sigma",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    volToPoint_(mesh),
+    volToPoint_(mesh()),
     gradD_
     (
         IOobject
         (
             "grad(" + D_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     rho_(mechanical().rho()),
@@ -138,12 +142,12 @@ freeVibrationSolid::freeVibrationSolid
         IOobject
         (
             "interpolate(mu)",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedScalar("0", dimPressure, 0.0)
     ),
     lambdaf_
@@ -151,12 +155,12 @@ freeVibrationSolid::freeVibrationSolid
         IOobject
         (
             "interpolate(lambda)",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedScalar("0", dimPressure, 0.0)
     ),
     g_
@@ -164,8 +168,8 @@ freeVibrationSolid::freeVibrationSolid
         IOobject
         (
             "g",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
@@ -433,38 +437,48 @@ bool freeVibrationSolid::evolve()
     // Solve the eigenproblem to calculate the eigenvalues and eigenvectors
     solver.solve(solutionVec_, blockB);
 
-    // Transfer solution vector to D field: this corresponds to the lowest mode
-    extendedMesh_.copySolutionVector(solutionVec_, D_);
-
-    // Update gradient of displacement
-    volToPoint_.interpolate(D_, pointD_);
-    gradD_ = fvc::grad(D_, pointD_);
-
-    // We will call fvc::grad a second time as fixed displacement boundaries
-    // need the patch internal field values to calculate snGrad, which
-    // is then used to set snGrad on the gradD boundary
-    D_.correctBoundaryConditions();
-    gradD_ = fvc::grad(D_, pointD_);
-
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma_);
-
     // Store all requested modes
     for (int modeI = 0; modeI < nModes_; modeI++)
     {
-        // Create a displacement field to hold the results
-        word Dname = word("D_mode" + Foam::name(modeI + 1));
-
-        Info<< "Creating field " << Dname << endl;
-
-        Dmodes_.set(modeI, new volVectorField(Dname, D_));
-        Dmodes_[modeI].writeOpt() = IOobject::AUTO_WRITE;
+        Info<< nl;
 
         // Retrieve the mode from the solver into the solutionVec
         solver.mode(modeI, solutionVec_);
 
         // Transfer solution vector to D field
-        extendedMesh_.copySolutionVector(solutionVec_, Dmodes_[modeI]);
+        extendedMesh_.copySolutionVector(solutionVec_, D_);
+
+        // Update gradient of displacement
+        volToPoint_.interpolate(D_, pointD_);
+        gradD_ = fvc::grad(D_, pointD_);
+
+        // We will call fvc::grad a second time as fixed displacement boundaries
+        // need the patch internal field values to calculate snGrad, which
+        // is then used to set snGrad on the gradD boundary
+        D_.correctBoundaryConditions();
+        gradD_ = fvc::grad(D_, pointD_);
+
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigma_);
+
+        // Write the results to the current time-step
+        runTime().write();
+
+        // Move to the next time-step
+        // Using const_cast is not the prettiest but vibration cases are
+        // relatively exception, for now
+        Info<< "    Writing mode " << (modeI + 1) << " to time "
+            << runTime().value() << endl;
+
+        if (modeI < (nModes_ - 1))
+        {
+            const_cast<Time&>(runTime())++;
+        }
+        else
+        {
+            FatalError
+                << "done" << abort(FatalError);
+        }
     }
 
     return true;

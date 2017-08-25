@@ -34,6 +34,8 @@ License
 #include "fvcGradf.H"
 #include "BlockFvmDivSigma.H"
 
+#include "SubField.H"
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -47,6 +49,7 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(coupledUnsLinGeomSolid, 0);
+addToRunTimeSelectionTable(physicsModel, coupledUnsLinGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, coupledUnsLinGeomSolid, dictionary);
 
 
@@ -120,7 +123,7 @@ bool coupledUnsLinGeomSolid::converged
     else if (iCorr % infoFrequency_ == 0 || converged)
     {
         Info<< "    " << iCorr
-            << ", " << mag(solverPerfD.initialResidual())
+            << ", " << mag(solverPerfD.finalResidual())
             << ", " << residualD
             << ", " << materialResidual
             << ", " << solverPerfD.nIterations() << endl;
@@ -143,17 +146,21 @@ bool coupledUnsLinGeomSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
+coupledUnsLinGeomSolid::coupledUnsLinGeomSolid
+(
+    Time& runTime,
+    const word& region
+)
 :
-    solidModel(typeName, mesh),
-    extendedMesh_(mesh),
+    solidModel(typeName, runTime, region),
+    extendedMesh_(mesh()),
     solutionVec_
     (
         IOobject
         (
             "solutionVec",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -164,34 +171,34 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "D",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh()
     ),
     U_
     (
         IOobject
         (
             "U",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedVector("0", dimLength/dimTime, vector::zero)
     ),
-    pMesh_(mesh),
+    pMesh_(mesh()),
     pointD_
     (
         IOobject
         (
             "pointD",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
@@ -203,12 +210,12 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "epsilon",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     epsilonf_
@@ -216,12 +223,12 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "epsilonf",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     sigma_
@@ -229,12 +236,12 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "sigma",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
     sigmaf_
@@ -242,26 +249,26 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "sigmaf",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    volToPoint_(mesh),
+    volToPoint_(mesh()),
     gradD_
     (
         IOobject
         (
             "grad(" + D_.name() + ")",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     gradDf_
@@ -269,12 +276,12 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "grad(" + D_.name() + ")f",
-            runTime().timeName(),
-            mesh,
+            runTime.timeName(),
+            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh,
+        mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
     rho_(mechanical().rho()),
@@ -305,8 +312,8 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid(dynamicFvMesh& mesh)
         IOobject
         (
             "g",
-            runTime().constant(),
-            mesh,
+            runTime.constant(),
+            mesh(),
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
@@ -841,6 +848,33 @@ bool coupledUnsLinGeomSolid::evolve()
             blockM, blockB, muf_, lambdaf_, D_
         );
 
+
+        // TESTING start
+        // The implicit component assumes small strain Hookean elastic, so we
+        // will explicitly remove this and then explicitly add on the divergence
+        // of the actual stress
+        /*
+        // Store the div(sigma) coeffs, cells and boundary conditions
+        vectorField AxDivSigma = vectorField(solutionVec_.size(), vector::zero);
+        blockM.Amul(AxDivSigma, solutionVec_);
+
+        // Store the div(sigma) coeffs, just cells
+        vectorField AxDivSigmaCells =
+            SubField<vector>(AxDivSigma, mesh().nCells(), 0);
+            */
+        // We will leave the boundary conditions untouched to be will set the
+        // contribution to zero
+        // for (int varI = mesh().nCells(); varI < Ax.size(); varI++)
+        // {
+        //     Ax[varI] = vector::zero;
+        // }
+
+        // Remove contribution to internal cells
+        //blockB -= Ax;
+        // TESTING end
+
+
+
         // Add terms temporal and gravity terms to the block matrix and source
         // Alos, we explicitly remove the implicit Hooke's law definition of
         // stress and explicitly add the definition of stress from the
@@ -849,24 +883,114 @@ bool coupledUnsLinGeomSolid::evolve()
         (
             blockM,
             blockB,
-            rho_*fvm::d2dt2(D_) - rho_*g_
-          + fvc::div
-            (
-                (mesh().Sf() & (2.0*muf_*epsilonf_))
-              + mesh().Sf()*lambdaf_*tr(epsilonf_)
-            )
-          - fvc::div(mesh().Sf() & sigmaf_),
+            rho_*fvm::d2dt2(D_) - rho_*g_,
             true
         );
 
+        /*
+        // Store the div(sigma) coeffs, cells and boundary conditions
+        vectorField AxD2dt2RhoG =
+            vectorField(solutionVec_.size(), vector::zero);
+        blockM.Amul(AxD2dt2RhoG, solutionVec_);
+        AxD2dt2RhoG -= AxDivSigma;
+
+        // Store the just cell equations
+        vectorField AxD2dt2RhoGCells =
+            SubField<vector>(AxD2dt2RhoG, mesh().nCells(), 0);
+
+
+        // TESTING start
+        // Explicitly add the real definition of stress
+        volVectorField newDivSigma =
+            volVectorField("newDivSigma", fvc::div(mesh().Sf() & sigmaf_));
+        newDivSigma.internalField() *= mesh().V();
+        newDivSigma.write();
+        const surfaceVectorField force = mesh().Sf() & sigmaf_;
+        Info<< "Force[0] is: " << max(mag(force.boundaryField()[0])) << nl
+            << "Force[1] is: " << max(mag(force.boundaryField()[1])) << endl;
+
+        vectorField Ax = vectorField(solutionVec_.size(), vector::zero);
+        blockM.Amul(Ax, solutionVec_);
+        volVectorField AxField("Ax", 0.0*newDivSigma);
+        AxField.internalField() = SubField<vector>(Ax, mesh().nCells(), 0);
+        AxField.write();
+
+        volVectorField blockBField("blockB", 0.0*newDivSigma);
+        blockBField.internalField() =
+            SubField<vector>(blockB, mesh().nCells(), 0);
+        blockBField.write();
+
+        // volVectorField AxD2dt2RhoGCellsField("AxD2dt2RhoG", 0.0*newDivSigma);
+        // AxD2dt2RhoGCellsField.internalField() = AxD2dt2RhoGCells;
+        // AxD2dt2RhoGCellsField.write();
+
+        volVectorField AxDivSigmaCellsField("AxDivSigmaCells", 0.0*newDivSigma);
+        AxDivSigmaCellsField.internalField() = AxDivSigmaCells;
+        AxDivSigmaCellsField.write();
+
+        volVectorField RhoTerm("RhoTerm", 0.0*newDivSigma);
+        RhoTerm.internalField() = rho_*fvc::d2dt2(D_) - rho_*g_;
+        RhoTerm.internalField() *= mesh().V();
+        RhoTerm.write();
+
+        // Minus means we add to the right-hand side
+        volVectorField contrib =
+            volVectorField("contrib", AxDivSigmaCellsField - newDivSigma);
+        const unallocLabelList& faceCells0 =
+            mesh().boundaryMesh()[0].faceCells();
+        forAll(contrib.boundaryField()[0], faceI)
+        {
+            contrib.internalField()[faceCells0[faceI]] = vector::zero;
+        }
+        const unallocLabelList& faceCells1 =
+            mesh().boundaryMesh()[1].faceCells();
+        forAll(contrib.boundaryField()[1], faceI)
+        {
+            contrib.internalField()[faceCells1[faceI]] = vector::zero;
+        }
+        contrib.write();
+        // extendedMesh_.addFvSource
+        // (
+        //     blockB,
+        //     contrib
+        // );
+*/
         // Block coupled solver call
-        solverPerfD =
+        // solverPerfD =
+        //     BlockLduSolver<vector>::New
+        //     (
+        //         D_.name(),
+        //         blockM,
+        //         mesh().solutionDict().solver("blockD")
+        //     )->solve(solutionVec_, blockB);
+
+        // Under-relax the linear system
+        if (mesh().solutionDict().relax("DEqn"))
+        {
+            FatalError
+                << "Equation under-relaxation disabled"
+                << abort(FatalError);
+
+            // Info<< "Under-relaxing the equation" << endl;
+            // blockM.relax
+            // (
+            //     solutionVec_,
+            //     blockB,
+            //     mesh().solutionDict().relaxationFactor("DEqn")
+            // );
+        }
+
+        // Create the linear solver
+        autoPtr<BlockLduSolver<vector> > solver =
             BlockLduSolver<vector>::New
             (
                 D_.name(),
                 blockM,
                 mesh().solutionDict().solver("blockD")
-            )->solve(solutionVec_, blockB);
+            );
+
+        // Solve the linear system
+        solver->solve(solutionVec_, blockB);
 
         // Transfer solution vector to D field
         extendedMesh_.copySolutionVector(solutionVec_, D_);
@@ -891,6 +1015,9 @@ bool coupledUnsLinGeomSolid::evolve()
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigmaf_);
+
+        // TESTING
+        mechanical().correct(sigma_);
     }
     while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
 

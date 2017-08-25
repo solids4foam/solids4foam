@@ -193,7 +193,11 @@ public:
     // Constructors
 
         //- Construct from components
-        unsNonLinGeomTotalLagSolid(dynamicFvMesh& mesh);
+        unsNonLinGeomTotalLagSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
 
     // Destructor

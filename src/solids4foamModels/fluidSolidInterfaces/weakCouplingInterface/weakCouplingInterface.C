@@ -40,6 +40,10 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(weakCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
+    physicsModel, weakCouplingInterface, fluidSolidInteraction
+);
+addToRunTimeSelectionTable
+(
     fluidSolidInterface, weakCouplingInterface, dictionary
 );
 
@@ -51,11 +55,11 @@ addToRunTimeSelectionTable
 
 weakCouplingInterface::weakCouplingInterface
 (
-    dynamicFvMesh& fluidMesh,
-    dynamicFvMesh& solidMesh
+    Time& runTime,
+    const word& region
 )
 :
-    fluidSolidInterface(typeName, fluidMesh, solidMesh),
+    fluidSolidInterface(typeName, runTime, region),
     solidZoneTraction_(),
     solidZoneTractionPrev_(),
     predictedSolidZoneTraction_(),
@@ -68,21 +72,21 @@ weakCouplingInterface::weakCouplingInterface
     solidZoneTraction_ =
         vectorField
         (
-            solidMesh.faceZones()[solidZoneIndex()]().size(),
+            solidMesh().faceZones()[solidZoneIndex()]().size(),
             vector::zero
         );
 
     solidZoneTractionPrev_ =
         vectorField
         (
-            solidMesh.faceZones()[solidZoneIndex()]().size(),
+            solidMesh().faceZones()[solidZoneIndex()]().size(),
             vector::zero
         );
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void weakCouplingInterface::evolve()
+bool weakCouplingInterface::evolve()
 {
     initializeFields();
 
@@ -99,6 +103,8 @@ void weakCouplingInterface::evolve()
     updateWeakTraction();
 
     solid().updateTotalFields();
+
+    return 0;
 }
 
 

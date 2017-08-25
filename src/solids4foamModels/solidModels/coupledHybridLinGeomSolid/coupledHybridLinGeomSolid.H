@@ -186,8 +186,11 @@ public:
     // Constructors
 
         //- Construct from components
-        coupledHybridLinGeomSolid(dynamicFvMesh& mesh);
-
+        coupledHybridLinGeomSolid
+        (
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+        );
 
     // Destructor
 
