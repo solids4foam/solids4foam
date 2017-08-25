@@ -1,3 +1,4 @@
+### solids4foam ###
 solids4foam - a finite volume toolbox for solid mechanics and fluid solid
 interaction simulations
 
