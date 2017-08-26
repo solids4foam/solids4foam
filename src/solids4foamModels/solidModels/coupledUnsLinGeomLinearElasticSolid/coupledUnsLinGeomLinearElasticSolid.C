@@ -81,86 +81,6 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         ),
         vectorField(extendedMesh_.nVariables(), vector::zero)
     ),
-    D_
-    (
-        IOobject
-        (
-            "D",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    U_
-    (
-        IOobject
-        (
-            "U",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedVector("0", dimLength/dimTime, vector::zero)
-    ),
-    pMesh_(mesh()),
-    pointD_
-    (
-        IOobject
-        (
-            "pointD",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        pMesh_,
-        dimensionedVector("0", dimLength, vector::zero)
-    ),
-    epsilon_
-    (
-        IOobject
-        (
-            "epsilon",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
-    sigma_
-    (
-        IOobject
-        (
-            "sigma",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
-    ),
-    volToPoint_(mesh()),
-    gradD_
-    (
-        IOobject
-        (
-            "grad(" + D_.name() + ")",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh(),
-        dimensionedTensor("0", dimless, tensor::zero)
-    ),
-    rho_(mechanical().rho()),
     muf_
     (
         IOobject
@@ -186,22 +106,8 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         ),
         mesh(),
         dimensionedScalar("0", dimPressure, 0.0)
-    ),
-    g_
-    (
-        IOobject
-        (
-            "g",
-            runTime.constant(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        )
     )
 {
-    D_.oldTime().oldTime();
-    pointD_.oldTime();
-
     // We will directly read the linearElastic mechanicalLaw
     const PtrList<mechanicalLaw>& mechLaws = mechanical();
     if (mechLaws.size() != 1)
@@ -238,432 +144,6 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-tmp<vectorField>
-coupledUnsLinGeomLinearElasticSolid::faceZonePointDisplacementIncrement
-(
-    const label zoneID
-) const
-{
-    tmp<vectorField> tPointDisplacement
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().localPoints().size(),
-            vector::zero
-        )
-    );
-    vectorField& pointDisplacement = tPointDisplacement();
-
-    const vectorField& pointDI = pointD_.internalField();
-    const vectorField& oldPointDI = pointD_.oldTime().internalField();
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const labelList& curPointMap =
-            globalToLocalFaceZonePointMap()[globalZoneIndex];
-
-        const labelList& zoneMeshPoints =
-            mesh().faceZones()[zoneID]().meshPoints();
-
-        vectorField zonePointsDisplGlobal
-        (
-            zoneMeshPoints.size(),
-            vector::zero
-        );
-
-        //- Inter-proc points are shared by multiple procs
-        //  pointNumProc is the number of procs which a point lies on
-        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
-
-        forAll(zonePointsDisplGlobal, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            if (zoneMeshPoints[localPoint] < mesh().nPoints())
-            {
-                label procPoint = zoneMeshPoints[localPoint];
-
-                zonePointsDisplGlobal[globalPointI] =
-                    pointDI[procPoint] - oldPointDI[procPoint];
-
-                pointNumProcs[globalPointI] = 1;
-            }
-        }
-
-        if (Pstream::parRun())
-        {
-            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
-            reduce(pointNumProcs, sumOp<scalarField>());
-
-            //- now average the displacement between all procs
-            zonePointsDisplGlobal /= pointNumProcs;
-        }
-
-        forAll(pointDisplacement, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            pointDisplacement[localPoint] =
-                zonePointsDisplGlobal[globalPointI];
-        }
-    }
-    else
-    {
-        tPointDisplacement() =
-            vectorField
-            (
-                pointDI - oldPointDI,
-                mesh().faceZones()[zoneID]().meshPoints()
-            );
-    }
-
-    return tPointDisplacement;
-}
-
-
-tmp<tensorField>
-coupledUnsLinGeomLinearElasticSolid::faceZoneSurfaceGradientOfVelocity
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<tensorField> tVelocityGradient
-    (
-        new tensorField
-        (
-            mesh().faceZones()[zoneID]().size(),
-            tensor::zero
-        )
-    );
-    tensorField& velocityGradient = tVelocityGradient();
-
-    vectorField pPointU =
-        volToPoint_.interpolate(mesh().boundaryMesh()[patchID], U_);
-
-    const faceList& localFaces =
-        mesh().boundaryMesh()[patchID].localFaces();
-
-    vectorField localPoints =
-        mesh().boundaryMesh()[patchID].localPoints();
-    localPoints += pointD_.boundaryField()[patchID].patchInternalField();
-
-    PrimitivePatch<face, List, const pointField&> patch
-    (
-        localFaces,
-        localPoints
-    );
-
-    tensorField patchGradU = fvc::fGrad(patch, pPointU);
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const label patchStart =
-            mesh().boundaryMesh()[patchID].start();
-
-        forAll(patchGradU, i)
-        {
-            velocityGradient
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchGradU[i];
-        }
-
-        // Parallel data exchange: collect field on all processors
-        reduce(velocityGradient, sumOp<tensorField>());
-    }
-    else
-    {
-        velocityGradient = patchGradU;
-    }
-
-    return tVelocityGradient;
-}
-
-
-tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::currentFaceZonePoints
-(
-    const label zoneID
-) const
-{
-    vectorField pointDisplacement
-    (
-        mesh().faceZones()[zoneID]().localPoints().size(),
-        vector::zero
-    );
-
-    const vectorField& pointDI = pointD_.internalField();
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-        const labelList& curPointMap =
-            globalToLocalFaceZonePointMap()[globalZoneIndex];
-
-        const labelList& zoneMeshPoints =
-            mesh().faceZones()[zoneID]().meshPoints();
-
-        vectorField zonePointsDisplGlobal
-        (
-            zoneMeshPoints.size(),
-            vector::zero
-        );
-
-        //- Inter-proc points are shared by multiple procs
-        //  pointNumProc is the number of procs which a point lies on
-        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
-
-        forAll(zonePointsDisplGlobal, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
-            {
-                label procPoint = zoneMeshPoints[localPoint];
-
-                zonePointsDisplGlobal[globalPointI] =
-                    pointDI[procPoint];
-
-                pointNumProcs[globalPointI] = 1;
-            }
-        }
-
-        if (Pstream::parRun())
-        {
-            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
-            reduce(pointNumProcs, sumOp<scalarField>());
-
-            //- now average the displacement between all procs
-            zonePointsDisplGlobal /= pointNumProcs;
-        }
-
-        forAll(pointDisplacement, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            pointDisplacement[localPoint] =
-                zonePointsDisplGlobal[globalPointI];
-        }
-    }
-    else
-    {
-        pointDisplacement =
-            vectorField
-            (
-                pointDI,
-                mesh().faceZones()[zoneID]().meshPoints()
-            );
-    }
-
-    tmp<vectorField> tCurrentPoints
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().localPoints()
-          + pointDisplacement
-        )
-    );
-
-    return tCurrentPoints;
-}
-
-
-tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::faceZoneNormal
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<vectorField> tNormals
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().size(),
-            vector::zero
-        )
-    );
-    vectorField& normals = tNormals();
-
-    const faceList& localFaces =
-        mesh().boundaryMesh()[patchID].localFaces();
-
-    vectorField localPoints =
-        mesh().boundaryMesh()[patchID].localPoints();
-    localPoints += pointD_.boundaryField()[patchID].patchInternalField();
-
-    PrimitivePatch<face, List, const pointField&> patch
-    (
-        localFaces,
-        localPoints
-    );
-
-    vectorField patchNormals(patch.size(), vector::zero);
-
-    forAll(patchNormals, faceI)
-    {
-        patchNormals[faceI] =
-            localFaces[faceI].normal(localPoints);
-    }
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const label patchStart =
-            mesh().boundaryMesh()[patchID].start();
-
-        forAll(patchNormals, i)
-        {
-            normals
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchNormals[i];
-        }
-
-        // Parallel data exchange: collect field on all processors
-        reduce(normals, sumOp<vectorField>());
-    }
-    else
-    {
-        normals = patchNormals;
-    }
-
-    return tNormals;
-}
-
-
-void coupledUnsLinGeomLinearElasticSolid::setTraction
-(
-    const label patchID,
-    const vectorField& traction
-)
-{
-    if
-    (
-        D_.boundaryField()[patchID].type()
-     != blockSolidTractionFvPatchVectorField::typeName
-    )
-    {
-        FatalErrorIn
-        (
-            "void coupledUnsLinGeomLinearElasticSolid::setTraction(...)"
-        )   << "Bounary condition on " << D_.name()
-            <<  " is "
-            << D_.boundaryField()[patchID].type()
-            << " for patch" << mesh().boundary()[patchID].name()
-            << ", instead it should be "
-            << blockSolidTractionFvPatchVectorField::typeName
-            << abort(FatalError);
-    }
-
-    blockSolidTractionFvPatchVectorField& patchU =
-        refCast<blockSolidTractionFvPatchVectorField>
-        (
-            D_.boundaryField()[patchID]
-        );
-
-    patchU.traction() = traction;
-}
-
-
-void coupledUnsLinGeomLinearElasticSolid::setPressure
-(
-    const label patchID,
-    const scalarField& pressure
-)
-{
-    if
-    (
-        D_.boundaryField()[patchID].type()
-     != blockSolidTractionFvPatchVectorField::typeName
-    )
-    {
-        FatalErrorIn
-        (
-            "void coupledUnsLinGeomLinearElasticSolid::setTraction(...)"
-        )   << "Bounary condition on " << D_.name()
-            <<  " is "
-            << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
-            << ", instead "
-            << blockSolidTractionFvPatchVectorField::typeName
-            << abort(FatalError);
-    }
-
-    blockSolidTractionFvPatchVectorField& patchU =
-        refCast<blockSolidTractionFvPatchVectorField>
-        (
-            D_.boundaryField()[patchID]
-        );
-
-    patchU.pressure() = pressure;
-}
-
-
-void coupledUnsLinGeomLinearElasticSolid::setTraction
-(
-    const label patchID,
-    const label zoneID,
-    const vectorField& faceZoneTraction
-)
-{
-    vectorField patchTraction(mesh().boundary()[patchID].size(), vector::zero);
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(patchTraction, i)
-    {
-        patchTraction[i] =
-            faceZoneTraction
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ];
-    }
-
-    setTraction(patchID, patchTraction);
-}
-
-
-void coupledUnsLinGeomLinearElasticSolid::setPressure
-(
-    const label patchID,
-    const label zoneID,
-    const scalarField& faceZonePressure
-)
-{
-    scalarField patchPressure(mesh().boundary()[patchID].size(), 0.0);
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(patchPressure, i)
-    {
-        patchPressure[i] =
-            faceZonePressure
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ];
-    }
-
-    setPressure(patchID, patchPressure);
-}
-
-
 bool coupledUnsLinGeomLinearElasticSolid::evolve()
 {
     Info << "Evolving solid solver" << endl;
@@ -683,7 +163,7 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     extendedMesh_.clearOutGlobalCoeffs();
 
     // Store fields for under-relaxation and residual calculation
-    D_.storePrevIter();
+    D().storePrevIter();
 
     // Create source vector for block matrix
     vectorField blockB(solutionVec_.size(), vector::zero);
@@ -711,15 +191,15 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     // Laplacian
     // non-orthogonal correction is treated implicitly
     BlockLduMatrix<vector> blockMatLap =
-        BlockFvm::laplacian(extendedMesh_, muf_, D_, blockB);
+        BlockFvm::laplacian(extendedMesh_, muf_, D(), blockB);
 
     // Laplacian transpose == div(mu*gradU.T())
     BlockLduMatrix<vector> blockMatLapTran =
-        BlockFvm::laplacianTranspose(extendedMesh_, muf_, D_, blockB);
+        BlockFvm::laplacianTranspose(extendedMesh_, muf_, D(), blockB);
 
     // Laplacian trace == div(lambda*I*tr(gradU))
     BlockLduMatrix<vector> blockMatLapTrac =
-        BlockFvm::laplacianTrace(extendedMesh_, lambdaf_, D_, blockB);
+        BlockFvm::laplacianTrace(extendedMesh_, lambdaf_, D(), blockB);
 
     // Add diagonal contributions
     d += blockMatLap.diag().asSquare();
@@ -757,7 +237,7 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     // the block coupled machinery
     extendedMesh_.insertBoundaryConditions
     (
-        blockM, blockB, muf_, lambdaf_, D_
+        blockM, blockB, muf_, lambdaf_, D()
     );
 
     // Add terms temporal and gravity terms to the block matrix and source
@@ -765,7 +245,7 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     (
         blockM,
         blockB,
-        rho_*fvm::d2dt2(D_) - rho_*g_,
+        rho()*fvm::d2dt2(D()) - rho()*g(),
         true
     );
 
@@ -788,28 +268,28 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     solverPerfD =
         BlockLduSolver<vector>::New
         (
-            D_.name(),
+            D().name(),
             blockM,
             mesh().solutionDict().solver("blockD")
         )->solve(solutionVec_, blockB);
 
     // Transfer solution vector to D field
-    extendedMesh_.copySolutionVector(solutionVec_, D_);
+    extendedMesh_.copySolutionVector(solutionVec_, D());
 
     // Under-relax the field
-    D_.relax();
+    D().relax();
 
     // Update gradient of displacement
-    volToPoint_.interpolate(D_, pointD_);
+    mechanical().interpolate(D(), pointD());
 
     // Enforce zero normal displacement on symmetry
     // Todo: we should create a blockSymmetry boundary condition
-    // pointField& pointDI = pointD_.internalField();
+    // pointField& pointDI = pointD().internalField();
     // forAll(mesh().boundaryMesh(), patchI)
     // {
     //     if
     //     (
-    //         D_.boundaryField()[patchI].type()
+    //         D().boundaryField()[patchI].type()
     //      == blockFixedDisplacementZeroShearFvPatchVectorField::typeName
     //     )
     //     {
@@ -832,48 +312,28 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     //         }
     //     }
     // }
-    gradD_ = fvc::grad(D_, pointD_);
+    gradD() = fvc::grad(D(), pointD());
 
     // We will call fvc::grad a second time as fixed displacement boundaries
     // need the patch internal field values to calculate snGrad, which
     // is then used to set snGrad on the gradD boundary
-    D_.correctBoundaryConditions();
-    gradD_ = fvc::grad(D_, pointD_);
-
-    // Update the strain
-    epsilon_ = symm(gradD_);
+    D().correctBoundaryConditions();
+    gradD() = fvc::grad(D(), pointD());
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma_);
+    mechanical().correct(sigma());
+
+    // Increment of displacement
+    DD() = D() - D().oldTime();
+
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
 
     // Velocity
-    U_ = fvc::ddt(D_);
+    U() = fvc::ddt(D());
 
     return true;
 }
-
-
-// void coupledUnsLinGeomLinearElasticSolid::predict()
-// {
-//     Info << "Predicting solid model" << endl;
-
-//     D_ = D_ + U_*runTime().deltaT();
-
-//     if (interface().valid())
-//     {
-//         interface()->updateDisplacement(pointD_);
-//         interface()->updateDisplacementGradient(gradD_, gradDf_);
-//     }
-//     else
-//     {
-//         volToPoint_.interpolate(D_, pointD_);
-//         gradD_ = fvc::grad(D_, pointD_);
-//         gradDf_ = fvc::fGrad(D_, pointD_);
-//     }
-
-//     D_.correctBoundaryConditions();
-// }
-
 
 tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::tractionBoundarySnGrad
 (
@@ -890,13 +350,13 @@ tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::tractionBoundarySnGrad
     const scalarField& lambda = lambdaf_.boundaryField()[patchID];
 
     // Patch gradient
-    const tensorField& gradD = gradD_.boundaryField()[patchID];
+    const tensorField& pGradD = gradD().boundaryField()[patchID];
 
     // Patch stress
-    const symmTensorField& sigma = sigma_.boundaryField()[patchID];
+    const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField pN = patch.nf();
 
     // Return patch snGrad
     return tmp<vectorField>
@@ -904,61 +364,12 @@ tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::tractionBoundarySnGrad
         new vectorField
         (
             (
-                (traction - n*pressure)
-              - (n & (sigma - (2.0*mu + lambda)*gradD))
+                (traction - pN*pressure)
+              - (pN & (pSigma - (2.0*mu + lambda)*pGradD))
             )/(2.0*mu + lambda)
         )
     );
 }
-
-
-void coupledUnsLinGeomLinearElasticSolid::updateTotalFields()
-{
-    mechanical().updateTotalFields();
-}
-
-
-void coupledUnsLinGeomLinearElasticSolid::writeFields(const Time& runTime)
-{
-    // Update equivalent strain
-    volScalarField epsilonEq
-    (
-        IOobject
-        (
-            "epsilonEq",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        sqrt((2.0/3.0)*magSqr(dev(epsilon_)))
-    );
-
-    Info<< "Max epsilonEq = " << max(epsilonEq).value()
-        << endl;
-
-    // Update equivalent (von Mises) stress
-    volScalarField sigmaEq
-    (
-        IOobject
-        (
-            "sigmaEq",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        sqrt((3.0/2.0)*magSqr(dev(sigma_)))
-    );
-
-    Info<< "Max sigmaEq = " << gMax(sigmaEq) << endl;
-
-    solidModel::writeFields(runTime);
-}
-
-
-void coupledUnsLinGeomLinearElasticSolid::end()
-{}
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

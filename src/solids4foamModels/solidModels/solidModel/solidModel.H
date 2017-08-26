@@ -48,6 +48,7 @@ SourceFiles
 #include "runTimeSelectionTables.H"
 #include "mechanicalModel.H"
 #include "nonLinearGeometry.H"
+#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -74,11 +75,62 @@ class solidModel
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
 
-        //- Global face zones
-        mutable labelList* globalFaceZonesPtr_;
+        //- Total displacement field
+        volVectorField D_;
 
-        //- Global to local face zone point mapping
-        mutable labelListList* globalToLocalFaceZonePointMapPtr_;
+        //- Increment of displacement field
+        //  DD = D - D.oldTime()
+        volVectorField DD_;
+
+        //- Velocity field
+        volVectorField U_;
+
+        //- Point mesh
+        pointMesh pMesh_;
+
+        //- Point total displacement field
+        pointVectorField pointD_;
+
+        //- Point increment of displacement field
+        //  pointDD = pointD - pointD.oldTime()
+        pointVectorField pointDD_;
+
+        //- Gradient of total displacement
+        volTensorField gradD_;
+
+        //- Gradient of the displacement increment
+        volTensorField gradDD_;
+
+        //- Stress field
+        //  This is the engineering stress for linear geometry approaches, and
+        //  true (Cauchy) stress for nonlinear geometry (large strain)
+        //  approaches
+        volSymmTensorField sigma_;
+
+        //- Density
+        mutable autoPtr<volScalarField> rhoPtr_;
+
+        //- Gravitational acceleration
+        const uniformDimensionedVectorField g_;
+
+        //- Solution standard tolerance
+        const scalar solutionTol_;
+
+        //- Solution tighter tolerance
+        const scalar alternativeTol_;
+
+        //- Material law tolerance
+        const scalar materialTol_;
+
+        //- Write frequency for residuals information
+        const int infoFrequency_;
+
+        //- Maximum number of momentum correctors
+        const int nCorr_;
+
+        //- Number of times the maximum number of correctors was reached in the
+        //  momentum equation
+        int maxIterReached_;
 
         //- Switch to enable/disable enforce linear to help convergence
         Switch enforceLinear_;
@@ -111,6 +163,13 @@ class solidModel
         //- Reference D (without relaxation) field used for Quasi-Newton method
         volVectorField unrelaxedDRef_;
 
+        //- Global face zones
+        mutable labelList* globalFaceZonesPtr_;
+
+        //- Global to local face zone point mapping
+        mutable labelListList* globalToLocalFaceZonePointMapPtr_;
+
+
     // Private Member Functions
 
         //- Find global face zones
@@ -121,6 +180,17 @@ class solidModel
 
         //- Make the mechanical model
         void makeMechanicalModel() const;
+
+        //- Make the rho field
+        void makeRho() const;
+
+        //- For calculating the position of the patch/face zone in the deformed
+        //  configuration, we need to move the mesh by the point displacement
+        //  field. For moving mesh approach (updated Lagrangian) we need the
+        //  pointDD field, whereas for linear geometry (small strain) and total
+        //  Lagrangian approaches, we need the pointD field. This function will
+        //  check which field to return
+        const pointVectorField& pointDorPointDD() const;
 
         //- Disallow default bitwise copy construct
         solidModel(const solidModel&);
@@ -142,11 +212,69 @@ protected:
             return solidProperties_;
         }
 
+        //- Return non-const reference to the mechanical model
+        mechanicalModel& mechanical();
+
+        //- Return const reference to the mechanical model
+        const mechanicalModel& mechanical() const;
+
+        //- Return const-reference to the density
+        const volScalarField& rho() const;
+
         //- Apply fixed or Aitken's adaptive under-relaxation to the field
         void relaxField(volVectorField& D, int iCorr);
 
-        //- Return mechanical model
-        mechanicalModel& mechanical();
+        //- Check if the equation has converged
+        bool converged
+        (
+            const int iCorr,
+            const scalar solverPerfInitRes,
+            const int solverPerfNIters,
+            const volVectorField& D
+        );
+
+        //- Return const reference to the gravitational acceleration
+        const uniformDimensionedVectorField& g() const
+        {
+            return g_;
+        }
+
+        //- Return solution standard tolerance
+        scalar solutionTol() const
+        {
+            return solutionTol_;
+        }
+
+        //- Return solution tighter tolerance
+        scalar alternativeTol() const
+        {
+            return alternativeTol_;
+        }
+
+        //- Return material law tolerance
+        scalar materialTol() const
+        {
+            return materialTol_;
+        }
+
+        //- Return write frequency for residuals information
+        int infoFrequency() const
+        {
+            return infoFrequency_;
+        }
+
+        //- Return maximum number of correctors
+        int nCorr() const
+        {
+            return nCorr_;
+        }
+
+        //- Return maxIterReached
+        int& maxIterReached()
+        {
+            return maxIterReached_;
+        }
+
 
 public:
 
@@ -219,34 +347,130 @@ public:
                 return solidProperties_;
             }
 
-            //- Return mechanical model
-            const mechanicalModel& mechanical() const;
+            //- Return non-const reference to D
+            virtual volVectorField& D()
+            {
+                return D_;
+            }
+
+            //- Return const reference to D
+            virtual const volVectorField& D() const
+            {
+                return D_;
+            }
+
+            //- Return non-const reference to DD
+            virtual volVectorField& DD()
+            {
+                return DD_;
+            }
+
+            //- Return const reference to DD
+            virtual const volVectorField& DD() const
+            {
+                return DD_;
+            }
+
+            //- Return non-const reference to U
+            virtual volVectorField& U()
+            {
+                return U_;
+            }
+
+            //- Return const reference to U
+            virtual const volVectorField& U() const
+            {
+                return U_;
+            }
+
+            //- Return non-const reference to pointD
+            virtual pointVectorField& pointD()
+            {
+                return pointD_;
+            }
+
+            //- Return const reference to pointD
+            virtual const pointVectorField& pointD() const
+            {
+                return pointD_;
+            }
+
+            //- Return non-const reference to pointDD
+            virtual pointVectorField& pointDD()
+            {
+                return pointDD_;
+            }
+
+            //- Return const reference to pointDD
+            virtual const pointVectorField& pointDD() const
+            {
+                return pointDD_;
+            }
+
+            //- Return non-const reference to gradD
+            virtual volTensorField& gradD()
+            {
+                return gradD_;
+            }
+
+            //- Return const reference to gradD
+            virtual const volTensorField& gradD() const
+            {
+                return gradD_;
+            }
+
+            //- Return non-const reference to gradDD
+            virtual volTensorField& gradDD()
+            {
+                return gradDD_;
+            }
+
+            //- Return const reference to gradDD
+            virtual const volTensorField& gradDD() const
+            {
+                return gradDD_;
+            }
+
+            //- Return non-const reference to sigma
+            virtual volSymmTensorField& sigma()
+            {
+                return sigma_;
+            }
+
+            //- Return const reference to sigma
+            virtual const volSymmTensorField& sigma() const
+            {
+                return sigma_;
+            }
+
+            //- Each solidModel must indicate whether D or DD is the primary
+            //  solution variable
+            virtual volVectorField& solutionD() = 0;
 
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (
                  const label zoneID
-            ) const = 0;
+            ) const;
 
-            //- Face zone velocity gradient
             virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
             (
                 const label zoneID,
                 const label patchID
-            ) const = 0;
+            ) const;
 
             //- Face zone current normal
             virtual tmp<vectorField> faceZoneNormal
             (
                 const label zoneID,
                 const label patchID
-            ) const = 0;
+            ) const;
 
             //- Face zone primitive patch in current configuration
             virtual tmp<vectorField> currentFaceZonePoints
             (
                 const label zoneID
-            ) const = 0;
+            ) const;
 
             //- Get global face zones list
             const labelList& globalFaceZones() const;
@@ -280,14 +504,28 @@ public:
             (
                 const label patchID,
                 const vectorField& traction
-            ) = 0;
+            );
 
             //- Set traction at specified patch
             virtual void setPressure
             (
                 const label patchID,
                 const scalarField& pressure
-            ) = 0;
+            );
+
+            //- Set traction at specified patch
+            virtual void setTraction
+            (
+                fvPatchVectorField& tractionPatch,
+                const vectorField& traction
+            );
+
+            //- Set pressure at specified patch
+            virtual void setPressure
+            (
+                fvPatchVectorField& pressurePatch,
+                const scalarField& pressure
+            );
 
             //- Set traction at specified patch
             virtual void setTraction
@@ -327,7 +565,7 @@ public:
             ) const = 0;
 
             //- Update total accumulated fields
-            virtual void updateTotalFields() = 0;
+            virtual void updateTotalFields();
 
             //- Write fields
             virtual void writeFields(const Time& runTime);
@@ -344,8 +582,7 @@ public:
             );
 
             //- End of the program
-            virtual void end()
-            {}
+            virtual void end();
 
             //- Read solidProperties dictionary
             virtual bool read();

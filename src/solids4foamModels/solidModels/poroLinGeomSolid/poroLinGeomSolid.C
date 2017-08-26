@@ -25,13 +25,10 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "poroLinGeomSolid.H"
-#include "volFields.H"
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
-#include "solidTractionFvPatchVectorField.H"
-#include "fvcGradf.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -57,7 +54,9 @@ bool poroLinGeomSolid::converged
 (
     const int iCorr,
     const lduSolverPerformance& solverPerfD,
-    const lduSolverPerformance& solverPerfp
+    const lduSolverPerformance& solverPerfp,
+    const volVectorField& D,
+    const volScalarField& p
 )
 {
     // We will check a number of different residuals for convergence
@@ -67,10 +66,10 @@ bool poroLinGeomSolid::converged
     const scalar residualD =
         gMax
         (
-            mag(D_.internalField() - D_.prevIter().internalField())
+            mag(D.internalField() - D.prevIter().internalField())
            /max
             (
-                gMax(mag(D_.internalField() - D_.oldTime().internalField())),
+                gMax(mag(D.internalField() - D.oldTime().internalField())),
                 SMALL
             )
         );
@@ -79,10 +78,10 @@ bool poroLinGeomSolid::converged
     const scalar residualp =
         gMax
         (
-            mag(p_.internalField() - p_.prevIter().internalField())
+            mag(p.internalField() - p.prevIter().internalField())
            /max
             (
-                gMax(mag(p_.internalField() - p_.oldTime().internalField())),
+                gMax(mag(p.internalField() - p.oldTime().internalField())),
                 SMALL
             )
         );
@@ -93,14 +92,14 @@ bool poroLinGeomSolid::converged
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
     // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol_)
+    if (iCorr > 1 && materialResidual < materialTol())
     {
         if
         (
-            solverPerfD.initialResidual() < solutionTol_
-         && solverPerfp.initialResidual() < solutionTol_
-         && residualD < solutionTol_
-         && residualp < solutionTol_
+            solverPerfD.initialResidual() < solutionTol()
+         && solverPerfp.initialResidual() < solutionTol()
+         && residualD < solutionTol()
+         && residualp < solutionTol()
         )
         {
             Info<< "    All residuals have converged" << endl;
@@ -108,8 +107,8 @@ bool poroLinGeomSolid::converged
         }
         else if
         (
-            residualD < alternativeTol_
-         && residualp < alternativeTol_
+            residualD < alternativeTol()
+         && residualp < alternativeTol()
         )
         {
             Info<< "    The relative residuals have converged" << endl;
@@ -117,8 +116,8 @@ bool poroLinGeomSolid::converged
         }
         else if
         (
-            solverPerfD.initialResidual() < alternativeTol_
-         && solverPerfp.initialResidual() < alternativeTol_
+            solverPerfD.initialResidual() < alternativeTol()
+         && solverPerfp.initialResidual() < alternativeTol()
         )
         {
             Info<< "    The solver residuals have converged" << endl;
@@ -135,7 +134,7 @@ bool poroLinGeomSolid::converged
     {
         Info<< "    Corr, resD, resP, relResD, relResP, matRes, iters" << endl;
     }
-    else if (iCorr % infoFrequency_ == 0 || converged)
+    else if (iCorr % infoFrequency() == 0 || converged)
     {
         Info<< "    " << iCorr
             << ", " << solverPerfD.initialResidual()
@@ -150,9 +149,9 @@ bool poroLinGeomSolid::converged
             Info<< endl;
         }
     }
-    else if (iCorr == nCorr_ - 1)
+    else if (iCorr == nCorr() - 1)
     {
-        maxIterReached_++;
+        maxIterReached()++;
         Warning
             << "Max iterations reached within momentum-pressure loop" << endl;
     }
@@ -170,86 +169,6 @@ poroLinGeomSolid::poroLinGeomSolid
 )
 :
     solidModel(typeName, runTime, region),
-    D_
-    (
-        IOobject
-        (
-            "D",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    U_
-    (
-        IOobject
-        (
-            "U",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedVector("0", dimLength/dimTime, vector::zero)
-    ),
-    pMesh_(mesh()),
-    pointD_
-    (
-        IOobject
-        (
-            "pointD",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        pMesh_,
-        dimensionedVector("0", dimLength, vector::zero)
-    ),
-    epsilon_
-    (
-        IOobject
-        (
-            "epsilon",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
-    sigma_
-    (
-        IOobject
-        (
-            "sigma",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
-    ),
-    volToPoint_(mesh()),
-    gradD_
-    (
-        IOobject
-        (
-            "grad(" + D_.name() + ")",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh(),
-        dimensionedTensor("0", dimless, tensor::zero)
-    ),
-    rho_(mechanical().rho()),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
@@ -288,416 +207,14 @@ poroLinGeomSolid::poroLinGeomSolid
         (saturation_/KWater_)
       + (1.0 - saturation_)
         /dimensionedScalar("atmosphericPressure", dimPressure, 1e+05)
-    ),
-    solutionTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
-    ),
-    alternativeTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("alternativeTolerance", 1e-07)
-    ),
-    materialTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("materialTolerance", 1e-05)
-    ),
-    infoFrequency_
-    (
-        solidProperties().lookupOrDefault<int>("infoFrequency", 100)
-    ),
-    nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
-    g_
-    (
-        IOobject
-        (
-            "g",
-            runTime.constant(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        )
-    ),
-    maxIterReached_(0)
+    )
 {
-    D_.oldTime().oldTime();
-    pointD_.oldTime();
-    gradD_.oldTime();
-    sigma_.oldTime();
+    // Store old time of p
     p_.oldTime();
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-tmp<vectorField> poroLinGeomSolid::faceZonePointDisplacementIncrement
-(
-    const label zoneID
-) const
-{
-    tmp<vectorField> tPointDisplacement
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().localPoints().size(),
-            vector::zero
-        )
-    );
-    vectorField& pointDisplacement = tPointDisplacement();
-
-    const vectorField& pointDI = pointD_.internalField();
-    const vectorField& oldPointDI = pointD_.oldTime().internalField();
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const labelList& curPointMap =
-            globalToLocalFaceZonePointMap()[globalZoneIndex];
-
-        const labelList& zoneMeshPoints =
-            mesh().faceZones()[zoneID]().meshPoints();
-
-        vectorField zonePointsDisplGlobal
-        (
-            zoneMeshPoints.size(),
-            vector::zero
-        );
-
-        //- Inter-proc points are shared by multiple procs
-        //  pointNumProc is the number of procs which a point lies on
-        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
-
-        forAll(zonePointsDisplGlobal, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
-            {
-                label procPoint = zoneMeshPoints[localPoint];
-
-                zonePointsDisplGlobal[globalPointI] =
-                    pointDI[procPoint] - oldPointDI[procPoint];
-
-                pointNumProcs[globalPointI] = 1;
-            }
-        }
-
-        if (Pstream::parRun())
-        {
-            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
-            reduce(pointNumProcs, sumOp<scalarField>());
-
-            //- now average the displacement between all procs
-            zonePointsDisplGlobal /= pointNumProcs;
-        }
-
-        forAll(pointDisplacement, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            pointDisplacement[localPoint] =
-                zonePointsDisplGlobal[globalPointI];
-        }
-    }
-    else
-    {
-        tPointDisplacement() =
-            vectorField
-            (
-                pointDI - oldPointDI,
-                mesh().faceZones()[zoneID]().meshPoints()
-            );
-    }
-
-    return tPointDisplacement;
-}
-
-
-tmp<tensorField> poroLinGeomSolid::faceZoneSurfaceGradientOfVelocity
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<tensorField> tVelocityGradient
-    (
-        new tensorField
-        (
-            mesh().faceZones()[zoneID]().size(),
-            tensor::zero
-        )
-    );
-    tensorField& velocityGradient = tVelocityGradient();
-
-    vectorField pPointU =
-        volToPoint_.interpolate(mesh().boundaryMesh()[patchID], U_);
-
-    const faceList& localFaces =
-        mesh().boundaryMesh()[patchID].localFaces();
-
-    vectorField localPoints =
-        mesh().boundaryMesh()[patchID].localPoints();
-    localPoints += pointD_.boundaryField()[patchID].patchInternalField();
-
-    PrimitivePatch<face, List, const pointField&> patch
-    (
-        localFaces,
-        localPoints
-    );
-
-    tensorField patchGradU = fvc::fGrad(patch, pPointU);
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const label patchStart =
-            mesh().boundaryMesh()[patchID].start();
-
-        forAll(patchGradU, i)
-        {
-            velocityGradient
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchGradU[i];
-        }
-
-        // Parallel data exchange: collect field on all processors
-        reduce(velocityGradient, sumOp<tensorField>());
-    }
-    else
-    {
-        velocityGradient = patchGradU;
-    }
-
-    return tVelocityGradient;
-}
-
-
-tmp<vectorField> poroLinGeomSolid::currentFaceZonePoints
-(
-    const label zoneID
-) const
-{
-    vectorField pointDisplacement
-    (
-        mesh().faceZones()[zoneID]().localPoints().size(),
-        vector::zero
-    );
-
-    const vectorField& pointDI = pointD_.internalField();
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-        const labelList& curPointMap =
-            globalToLocalFaceZonePointMap()[globalZoneIndex];
-
-        const labelList& zoneMeshPoints =
-            mesh().faceZones()[zoneID]().meshPoints();
-
-        vectorField zonePointsDisplGlobal
-        (
-            zoneMeshPoints.size(),
-            vector::zero
-        );
-
-        //- Inter-proc points are shared by multiple procs
-        //  pointNumProc is the number of procs which a point lies on
-        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
-
-        forAll(zonePointsDisplGlobal, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
-            {
-                label procPoint = zoneMeshPoints[localPoint];
-
-                zonePointsDisplGlobal[globalPointI] =
-                    pointDI[procPoint];
-
-                pointNumProcs[globalPointI] = 1;
-            }
-        }
-
-        if (Pstream::parRun())
-        {
-            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
-            reduce(pointNumProcs, sumOp<scalarField>());
-
-            //- now average the displacement between all procs
-            zonePointsDisplGlobal /= pointNumProcs;
-        }
-
-        forAll(pointDisplacement, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            pointDisplacement[localPoint] =
-                zonePointsDisplGlobal[globalPointI];
-        }
-    }
-    else
-    {
-        pointDisplacement =
-            vectorField
-            (
-                pointDI,
-                mesh().faceZones()[zoneID]().meshPoints()
-            );
-    }
-
-    tmp<vectorField> tCurrentPoints
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().localPoints()
-          + pointDisplacement
-        )
-    );
-
-    return tCurrentPoints;
-}
-
-
-tmp<vectorField> poroLinGeomSolid::faceZoneNormal
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<vectorField> tNormals
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().size(),
-            vector::zero
-        )
-    );
-    vectorField& normals = tNormals();
-
-    const faceList& localFaces =
-        mesh().boundaryMesh()[patchID].localFaces();
-
-    vectorField localPoints =
-        mesh().boundaryMesh()[patchID].localPoints();
-    localPoints += pointD_.boundaryField()[patchID].patchInternalField();
-
-    PrimitivePatch<face, List, const pointField&> patch
-    (
-        localFaces,
-        localPoints
-    );
-
-    vectorField patchNormals(patch.size(), vector::zero);
-
-    forAll(patchNormals, faceI)
-    {
-        patchNormals[faceI] =
-            localFaces[faceI].normal(localPoints);
-    }
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const label patchStart =
-            mesh().boundaryMesh()[patchID].start();
-
-        forAll(patchNormals, i)
-        {
-            normals
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchNormals[i];
-        }
-
-        // Parallel data exchange: collect field on all processors
-        reduce(normals, sumOp<vectorField>());
-    }
-    else
-    {
-        normals = patchNormals;
-    }
-
-    return tNormals;
-}
-
-
-void poroLinGeomSolid::setTraction
-(
-    const label patchID,
-    const vectorField& traction
-)
-{
-    if
-    (
-        D_.boundaryField()[patchID].type()
-     != solidTractionFvPatchVectorField::typeName
-    )
-    {
-        FatalErrorIn("void poroLinGeomSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
-            <<  " is "
-            << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
-            << ", instead "
-            << solidTractionFvPatchVectorField::typeName
-            << abort(FatalError);
-    }
-
-    solidTractionFvPatchVectorField& patchU =
-        refCast<solidTractionFvPatchVectorField>
-        (
-            D_.boundaryField()[patchID]
-        );
-
-    patchU.traction() = traction;
-}
-
-
-void poroLinGeomSolid::setPressure
-(
-    const label patchID,
-    const scalarField& pressure
-)
-{
-    if
-    (
-        D_.boundaryField()[patchID].type()
-     != solidTractionFvPatchVectorField::typeName
-    )
-    {
-        FatalErrorIn("void poroLinGeomSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
-            <<  " is "
-            << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
-            << ", instead "
-            << solidTractionFvPatchVectorField::typeName
-            << abort(FatalError);
-    }
-
-    solidTractionFvPatchVectorField& patchU =
-        refCast<solidTractionFvPatchVectorField>
-        (
-            D_.boundaryField()[patchID]
-        );
-
-    patchU.pressure() = pressure;
-}
 
 
 bool poroLinGeomSolid::evolve()
@@ -724,7 +241,7 @@ bool poroLinGeomSolid::evolve()
         fvScalarMatrix pEqn
         (
             (porosity_*rKprime_)*fvm::ddt(p_)
-          + fvc::div(U_)
+          + fvc::div(U())
          == (hydraulicConductivity_/gammaWater_)*fvm::laplacian(p_)
         );
 
@@ -744,17 +261,17 @@ bool poroLinGeomSolid::evolve()
         // Momentum equation
 
         // Store fields for under-relaxation and residual calculation
-        D_.storePrevIter();
+        D().storePrevIter();
 
         // Linear momentum equation total displacement form
         fvVectorMatrix DEqn
         (
-            rho_*fvm::d2dt2(D_)
-         == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
-          - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
-          + fvc::div(sigma_, "div(sigma)")
-          + rho_*g_
-          + mechanical().RhieChowCorrection(D_, gradD_)
+            rho()*fvm::d2dt2(D())
+         == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+          - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
+          + fvc::div(sigma(), "div(sigma)")
+          + rho()*g()
+          + mechanical().RhieChowCorrection(D(), gradD())
         );
 
         // Under-relaxation the linear system
@@ -764,16 +281,16 @@ bool poroLinGeomSolid::evolve()
         solverPerfD = DEqn.solve();
 
         // Under-relax the field
-        D_.relax();
+        relaxField(D(), iCorr);
 
         // Update gradient of displacement
-        mechanical().grad(D_, gradD_);
+        mechanical().grad(D(), gradD());
 
         // Update velocity as it is used in the pEqn
-        U_ = fvc::ddt(D_);
+        U() = fvc::ddt(D());
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma_);
+        mechanical().correct(sigma());
 
         // Update impKf to improve convergence
         // Note: impK and rImpK are not updated as they are used for traction
@@ -783,13 +300,20 @@ bool poroLinGeomSolid::evolve()
             impKf_ = mechanical().impKf();
         }
     }
-    while (!converged(iCorr, solverPerfD, solverPerfp) && ++iCorr < nCorr_);
+    while
+    (
+        !converged(iCorr, solverPerfD, solverPerfp, D(), p_)
+     && ++iCorr < nCorr()
+    );
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(D_, pointD_);
+    mechanical().interpolate(D(), pointD());
 
-    // Update strain
-    epsilon_ = symm(gradD_);
+    // Increment of displacement
+    DD() = D() - D().oldTime();
+
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
 
     return true;
 }
@@ -812,10 +336,10 @@ tmp<vectorField> poroLinGeomSolid::tractionBoundarySnGrad
     const scalarField& rImpK = rImpK_.boundaryField()[patchID];
 
     // Patch gradient
-    const tensorField& gradD = gradD_.boundaryField()[patchID];
+    const tensorField& pGradD = gradD().boundaryField()[patchID];
 
     // Patch stress
-    const symmTensorField& sigma = sigma_.boundaryField()[patchID];
+    const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
     const vectorField n = patch.nf();
@@ -827,71 +351,10 @@ tmp<vectorField> poroLinGeomSolid::tractionBoundarySnGrad
         (
             (
                 (traction - n*pressure)
-              - (n & (sigma - impK*gradD))
+              - (n & (pSigma - impK*pGradD))
             )*rImpK
         )
     );
-}
-
-
-void poroLinGeomSolid::updateTotalFields()
-{
-    mechanical().updateTotalFields();
-}
-
-
-void poroLinGeomSolid::writeFields(const Time& runTime)
-{
-    // Calculate equivalent strain
-    volScalarField epsilonEq
-    (
-        IOobject
-        (
-            "epsilonEq",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        sqrt((2.0/3.0)*magSqr(dev(epsilon_)))
-    );
-
-    Info<< "Max epsilonEq = " << max(epsilonEq).value()
-        << endl;
-
-    // Calculate equivalent (von Mises) stress
-    volScalarField sigmaEq
-    (
-        IOobject
-        (
-            "sigmaEq",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        sqrt((3.0/2.0)*magSqr(dev(sigma_)))
-    );
-
-    Info<< "Max sigmaEq = " << gMax(sigmaEq) << endl;
-
-    solidModel::writeFields(runTime);
-}
-
-
-void poroLinGeomSolid::end()
-{
-    if (maxIterReached_ > 0)
-    {
-        WarningIn(type() + "::end()")
-            << "The maximum momentum-pressure correctors were reached in "
-            << maxIterReached_ << " time-steps" << nl << endl;
-    }
-    else
-    {
-        Info<< "The momentum-pressure equations converged in all time-steps"
-            << nl << endl;
-    }
 }
 
 

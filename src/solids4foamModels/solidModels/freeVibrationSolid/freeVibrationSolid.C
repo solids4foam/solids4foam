@@ -25,12 +25,10 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "freeVibrationSolid.H"
-#include "volFields.H"
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
-#include "solidTractionFvPatchVectorField.H"
 #include "fvcGradf.H"
 #include "BlockFvmDivSigma.H"
 #include "linearElastic.H"
@@ -83,60 +81,6 @@ freeVibrationSolid::freeVibrationSolid
         ),
         vectorField(extendedMesh_.nVariables(), vector::zero)
     ),
-    D_
-    (
-        IOobject
-        (
-            "D",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    pMesh_(mesh()),
-    pointD_
-    (
-        IOobject
-        (
-            "pointD",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        pMesh_,
-        dimensionedVector("0", dimLength, vector::zero)
-    ),
-    sigma_
-    (
-        IOobject
-        (
-            "sigma",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
-    ),
-    volToPoint_(mesh()),
-    gradD_
-    (
-        IOobject
-        (
-            "grad(" + D_.name() + ")",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh(),
-        dimensionedTensor("0", dimless, tensor::zero)
-    ),
-    rho_(mechanical().rho()),
     muf_
     (
         IOobject
@@ -162,22 +106,8 @@ freeVibrationSolid::freeVibrationSolid
         ),
         mesh(),
         dimensionedScalar("0", dimPressure, 0.0)
-    ),
-    g_
-    (
-        IOobject
-        (
-            "g",
-            runTime.constant(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        )
     )
 {
-    D_.oldTime().oldTime();
-    pointD_.oldTime();
-
     // We will directly read the linearElastic mechanicalLaw
     const PtrList<mechanicalLaw>& mechLaws = mechanical();
     if (mechLaws.size() != 1)
@@ -212,116 +142,6 @@ freeVibrationSolid::freeVibrationSolid
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-tmp<vectorField>
-freeVibrationSolid::faceZonePointDisplacementIncrement
-(
-    const label zoneID
-) const
-{
-    notImplemented("faceZonePointDisplacementIncrement");
-
-    tmp<vectorField> t
-    (
-        new vectorField()
-    );
-
-    return t;
-}
-
-
-tmp<tensorField>
-freeVibrationSolid::faceZoneSurfaceGradientOfVelocity
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    notImplemented("faceZoneSurfaceGradientOfVelocity");
-
-    tmp<tensorField> t
-    (
-        new tensorField()
-    );
-
-    return t;
-}
-
-
-tmp<vectorField> freeVibrationSolid::currentFaceZonePoints
-(
-    const label zoneID
-) const
-{
-    notImplemented("currentFaceZonePoints");
-
-    tmp<vectorField> t
-    (
-        new vectorField()
-    );
-
-    return t;
-}
-
-
-tmp<vectorField> freeVibrationSolid::faceZoneNormal
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    notImplemented("faceZoneNormal");
-
-    tmp<vectorField> t
-    (
-        new vectorField()
-    );
-
-    return t;
-}
-
-
-void freeVibrationSolid::setTraction
-(
-    const label patchID,
-    const vectorField& traction
-)
-{
-    notImplemented("setTraction");
-}
-
-
-void freeVibrationSolid::setPressure
-(
-    const label patchID,
-    const scalarField& pressure
-)
-{
-    notImplemented("setTraction");
-}
-
-
-void freeVibrationSolid::setTraction
-(
-    const label patchID,
-    const label zoneID,
-    const vectorField& faceZoneTraction
-)
-{
-    notImplemented("setTraction");
-}
-
-
-void freeVibrationSolid::setPressure
-(
-    const label patchID,
-    const label zoneID,
-    const scalarField& faceZonePressure
-)
-{
-    notImplemented("setPressure");
-}
 
 
 bool freeVibrationSolid::evolve()
@@ -368,15 +188,15 @@ bool freeVibrationSolid::evolve()
     // Laplacian
     // non-orthogonal correction is treated implicitly
     BlockLduMatrix<vector> blockMatLap =
-        BlockFvm::laplacian(extendedMesh_, muf_, D_, blockB);
+        BlockFvm::laplacian(extendedMesh_, muf_, D(), blockB);
 
     // Laplacian transpose == div(mu*gradU.T())
     BlockLduMatrix<vector> blockMatLapTran =
-        BlockFvm::laplacianTranspose(extendedMesh_, muf_, D_, blockB);
+        BlockFvm::laplacianTranspose(extendedMesh_, muf_, D(), blockB);
 
     // Laplacian trace == div(lambda*I*tr(gradU))
     BlockLduMatrix<vector> blockMatLapTrac =
-        BlockFvm::laplacianTrace(extendedMesh_, lambdaf_, D_, blockB);
+        BlockFvm::laplacianTrace(extendedMesh_, lambdaf_, D(), blockB);
 
     // Add diagonal contributions
     d += blockMatLap.diag().asSquare();
@@ -414,7 +234,7 @@ bool freeVibrationSolid::evolve()
     // the block coupled machinery
     extendedMesh_.insertBoundaryConditions
     (
-        blockM, blockB, muf_, lambdaf_, D_
+        blockM, blockB, muf_, lambdaf_, D()
     );
 
     // Add terms temporal and gravity terms to the block matrix and source
@@ -422,14 +242,14 @@ bool freeVibrationSolid::evolve()
     (
         blockM,
         blockB,
-        rho_*fvm::d2dt2(D_) - rho_*g_,
+        rho()*fvm::d2dt2(D()) - rho()*g(),
         true
     );
 
     // Create the EigenProblem linear solver
     BlockEigenProblemSolver solver
     (
-        D_.name(),
+        D().name(),
         blockM,
         mesh().solutionDict().solver("blockD")
     );
@@ -446,20 +266,26 @@ bool freeVibrationSolid::evolve()
         solver.mode(modeI, solutionVec_);
 
         // Transfer solution vector to D field
-        extendedMesh_.copySolutionVector(solutionVec_, D_);
+        extendedMesh_.copySolutionVector(solutionVec_, D());
 
         // Update gradient of displacement
-        volToPoint_.interpolate(D_, pointD_);
-        gradD_ = fvc::grad(D_, pointD_);
+        mechanical().interpolate(D(), pointD());
+        gradD() = fvc::grad(D(), pointD());
 
         // We will call fvc::grad a second time as fixed displacement boundaries
         // need the patch internal field values to calculate snGrad, which
         // is then used to set snGrad on the gradD boundary
-        D_.correctBoundaryConditions();
-        gradD_ = fvc::grad(D_, pointD_);
+        D().correctBoundaryConditions();
+        gradD() = fvc::grad(D(), pointD());
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma_);
+        mechanical().correct(sigma());
+
+        // Increment of displacement
+        DD() = D() - D().oldTime();
+
+        // Increment of point displacement
+        pointDD() = pointD() - pointD().oldTime();
 
         // Write the results to the current time-step
         runTime().write();
@@ -500,13 +326,13 @@ tmp<vectorField> freeVibrationSolid::tractionBoundarySnGrad
     const scalarField& lambda = lambdaf_.boundaryField()[patchID];
 
     // Patch gradient
-    const tensorField& gradD = gradD_.boundaryField()[patchID];
+    const tensorField& pGradD = gradD().boundaryField()[patchID];
 
     // Patch stress
-    const symmTensorField& sigma = sigma_.boundaryField()[patchID];
+    const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField pN = patch.nf();
 
     // Return patch snGrad
     return tmp<vectorField>
@@ -514,44 +340,12 @@ tmp<vectorField> freeVibrationSolid::tractionBoundarySnGrad
         new vectorField
         (
             (
-                (traction - n*pressure)
-              - (n & (sigma - (2.0*mu + lambda)*gradD))
+                (traction - pN*pressure)
+              - (pN & (pSigma - (2.0*mu + lambda)*pGradD))
             )/(2.0*mu + lambda)
         )
     );
 }
-
-
-void freeVibrationSolid::updateTotalFields()
-{
-    mechanical().updateTotalFields();
-}
-
-
-void freeVibrationSolid::writeFields(const Time& runTime)
-{
-    // Update equivalent (von Mises) stress
-    volScalarField sigmaEq
-    (
-        IOobject
-        (
-            "sigmaEq",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        sqrt((3.0/2.0)*magSqr(dev(sigma_)))
-    );
-
-    Info<< "Max sigmaEq = " << gMax(sigmaEq) << endl;
-
-    solidModel::writeFields(runTime);
-}
-
-
-void freeVibrationSolid::end()
-{}
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

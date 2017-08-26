@@ -59,6 +59,9 @@ int main(int argc, char *argv[])
         // Solve the mathematical model
         physics().evolve();
 
+        // Let the physics model know the end of the time-step has been reached
+        physics().updateTotalFields();
+
         if (runTime.outputTime())
         {
             physics().writeFields(runTime);

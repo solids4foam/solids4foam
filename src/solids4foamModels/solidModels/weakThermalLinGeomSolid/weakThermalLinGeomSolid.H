@@ -79,31 +79,17 @@ class weakThermalLinGeomSolid
         //- Thermal conductivity
         volScalarField k_;
 
-        //- Solution tolerance for outer non-orthogonality correctors
-        const scalar solutionTol_;
-
-        //- Alternative tolerance for outer non-orthogonality correctors
-        const scalar alternativeTol_;
-
-        //- Write frequency for residuals information
-        const int infoFrequency_;
-
-        //- Maximum number of thermal correctors
-        const int nCorr_;
-
-        //- Number of times the maximum number of correctors was reached
-        int maxIterReached_;
-
     // Private Member Functions
 
-        //- Check if the momentum equation is converged
+        //- Check convergence
         bool converged
         (
             const int iCorr,
-            const lduSolverPerformance& solverPerfD
+            const lduSolverPerformance& solverPerfT,
+            const volScalarField& T
         );
 
-        //- Disallow default bitwise copy construct
+    //- Disallow default bitwise copy construct
         weakThermalLinGeomSolid(const weakThermalLinGeomSolid&);
 
         //- Disallow default bitwise assignment
@@ -161,14 +147,8 @@ public:
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
-            //- Update total accumulated fields
-            virtual void updateTotalFields();
-
             //- Write fields
             virtual void writeFields(const Time& runTime);
-
-            //- End of the program
-            virtual void end();
 };
 
 

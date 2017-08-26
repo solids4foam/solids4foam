@@ -62,11 +62,6 @@ SourceFiles
 #define poroLinGeomSolid_H
 
 #include "solidModel.H"
-#include "volFields.H"
-#include "surfaceFields.H"
-#include "pointFields.H"
-#include "newLeastSquaresVolPointInterpolation.H"
-#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -87,33 +82,6 @@ class poroLinGeomSolid
     public solidModel
 {
     // Private data
-
-        //- Displacement field
-        volVectorField D_;
-
-        //- Velocity field
-        volVectorField U_;
-
-        //- Point mesh
-        pointMesh pMesh_;
-
-        //- Point displacement field
-        pointVectorField pointD_;
-
-        //- Strain field
-        volSymmTensorField epsilon_;
-
-        //- Stress field
-        volSymmTensorField sigma_;
-
-        //- Cell-to-point interpolation
-        newLeastSquaresVolPointInterpolation volToPoint_;
-
-        //- Cell displacement gradient
-        volTensorField gradD_;
-
-        //- Density
-        const volScalarField rho_;
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
@@ -154,28 +122,6 @@ class poroLinGeomSolid
         //- Reciprocal of the effective bulk modulus of water and air mixture
         dimensionedScalar rKprime_;
 
-        //- Solution standard tolerance
-        const scalar solutionTol_;
-
-        //- Solution tighter tolerance
-        const scalar alternativeTol_;
-
-        //- Material law tolerance
-        const scalar materialTol_;
-
-        //- Write frequency for residuals information
-        const int infoFrequency_;
-
-        //- Maximum number of momentum-pressure correctors
-        const int nCorr_;
-
-        //- Gravitational acceleration
-        const uniformDimensionedVectorField g_;
-
-        //- Number of times the maximum number of correctors was reached in the
-        //  momentum-pressure corrector loop
-        int maxIterReached_;
-
     // Private Member Functions
 
         //- Check if the momentum and pressure equations are converged
@@ -183,7 +129,9 @@ class poroLinGeomSolid
         (
             const int iCorr,
             const lduSolverPerformance& solverPerfD,
-            const lduSolverPerformance& solverPerfp
+            const lduSolverPerformance& solverPerfp,
+            const volVectorField& D,
+            const volScalarField& p
         );
 
         //- Disallow default bitwise copy construct
@@ -229,145 +177,26 @@ public:
 
         // Access
 
-            //- Return const access to the cell displacement field
-            const volVectorField& D() const
+            //- Each solidModel must indicate whether D or DD is the primary
+            //  solution variable
+            virtual volVectorField& solutionD()
             {
-                return D_;
+                // This model solves for D
+                return D();
             }
-
-            //- Return non-const access to thecell displacement field
-            volVectorField& D()
-            {
-                return D_;
-            }
-
-            //- Return const access to the cell pressure field
-            const volScalarField& p() const
-            {
-                return p_;
-            }
-
-            //- Return non-const access to the cell pressure field
-            volScalarField& p()
-            {
-                return p_;
-            }
-
-            //- Return point mesh
-            const pointMesh& pMesh() const
-            {
-                return pMesh_;
-            }
-
-            //- Gradient of displacement
-            const volTensorField& gradD() const
-            {
-                return gradD_;
-            }
-
-            //- Stress tensor
-            const volSymmTensorField& sigma() const
-            {
-                return sigma_;
-            }
-
-            //- Strain tensor
-            const volSymmTensorField& epsilon() const
-            {
-                return epsilon_;
-            }
-
-            //- Implicit stiffness
-            const volScalarField& impK() const
-            {
-                return impK_;
-            }
-
-            //- Reciprocal of the implicit stiffness
-            const volScalarField& rImpK() const
-            {
-                return rImpK_;
-            }
-
-            //- Return point displacement field
-            virtual const pointVectorField& pointD() const
-            {
-                return pointD_;
-            }
-
-            //- Return multi-material interface pointer
-            const newLeastSquaresVolPointInterpolation& volToPoint() const
-            {
-                return volToPoint_;
-            }
-
-            //- Face zone point displacement increment
-            virtual tmp<vectorField> faceZonePointDisplacementIncrement
-            (
-                const label zoneID
-            ) const;
-
-            //- Face zone velocity surface (tangential) gradient
-            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
-
-            //- Face zone current normal
-            virtual tmp<vectorField> faceZoneNormal
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
-
-            //- Face zone primitive patch in current configuration
-            virtual tmp<vectorField> currentFaceZonePoints
-            (
-                const label zoneID
-            ) const;
 
         // Edit
-
-            //- Set traction on the specified patch
-            //  This function enables the FSI procedure to pass a traction from
-            //  fluid to the solid
-            virtual void setTraction
-            (
-                const label patchID,
-                const vectorField& traction
-            );
-
-            //- Set pressure at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const scalarField& pressure
-            );
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
             //- Traction boundary surface normal gradient
-            //  Given the user-specified boundary patch traction, this function
-            //  should return the surface normal gradient
-            //  This function is used by traction-type boundary conditions to
-            //  set the boundary gradient
             virtual tmp<vectorField> tractionBoundarySnGrad
             (
                 const vectorField& traction,
                 const scalarField& pressure,
                 const fvPatch& patch
             ) const;
-
-            //- Update total accumulated fields
-            virtual void updateTotalFields();
-
-            //- Write fields
-            virtual void writeFields(const Time& runTime);
-
-            //- End of the program
-            virtual void end();
 };
 
 

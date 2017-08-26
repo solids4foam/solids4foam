@@ -178,6 +178,12 @@ public:
             //- Evolve the mathematical model
             virtual bool evolve() = 0;
 
+            //- This function lets the physics models know the end of the
+            //  time-step has been reached
+            //  For example, solid mechanical laws may use this
+            virtual void updateTotalFields()
+            {}
+
             //- Write fields
             virtual void writeFields(const Time& runTime)
             {

@@ -21,7 +21,8 @@ email philip.cardiff@ucd.ie.
 
 ### Who do I talk to? ###
 
-philip.cardiff@ucd.ie.
+solids4foam is developed by Philip Cardiff and Zeljko Tukovic
+Emails: philip.cardiff@ucd.ie and zeljko.tukovic@fsb.hr
 
 ### Where can I find more information? ###
 

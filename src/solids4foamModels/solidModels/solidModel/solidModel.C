@@ -29,6 +29,9 @@ License
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrector.H"
 #include "RectangularMatrix.H"
+#include "solidTractionFvPatchVectorField.H"
+#include "blockSolidTractionFvPatchVectorField.H"
+#include "fvcGradf.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -390,13 +393,47 @@ void Foam::solidModel::makeMechanicalModel() const
     if (!mechanicalPtr_.empty())
     {
         FatalErrorIn("void Foam::solidModel::makeMechanicalModel() const")
-            << "pointer alrady set!" << abort(FatalError);
+            << "pointer already set!" << abort(FatalError);
     }
 
     mechanicalPtr_.set
     (
         new mechanicalModel(mesh(), nonLinGeom())
     );
+}
+
+
+void Foam::solidModel::makeRho() const
+{
+    if (!rhoPtr_.empty())
+    {
+        FatalErrorIn("void Foam::solidModel::makeRho() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    rhoPtr_.set
+    (
+        new volScalarField(mechanical().rho())
+    );
+}
+
+
+const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
+{
+    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    {
+        // Updated Lagrangian approaches move the mesh at the end of each
+        // time-step so we use the increment of displacement field to calculate
+        // the current deformed face zone points
+        return pointDD();
+    }
+    else
+    {
+        // As linearGeometry and total Lagrangian approaches do not move the
+        // mesh, we use the total displacement field to calculate the current
+        // deformed face zone points
+        return pointD();
+    }
 }
 
 
@@ -410,6 +447,28 @@ Foam::mechanicalModel& Foam::solidModel::mechanical()
     }
 
     return mechanicalPtr_();
+}
+
+
+const Foam::mechanicalModel& Foam::solidModel::mechanical() const
+{
+    if (mechanicalPtr_.empty())
+    {
+        makeMechanicalModel();
+    }
+
+    return mechanicalPtr_();
+}
+
+
+const Foam::volScalarField& Foam::solidModel::rho() const
+{
+    if (rhoPtr_.empty())
+    {
+        makeRho();
+    }
+
+    return rhoPtr_();
 }
 
 
@@ -678,6 +737,91 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 }
 
 
+bool Foam::solidModel::converged
+(
+    const int iCorr,
+    const scalar solverPerfInitRes,
+    const int solverPerfNIters,
+    const volVectorField& D
+)
+{
+    // We will check three residuals:
+    // - relative displacement residual
+    // - linear equation residual
+    // - material model residual
+    bool converged = false;
+
+    // Calculate displacement residual based on the relative change of D
+    scalar denom = gMax(mag(D.internalField() - D.oldTime().internalField()));
+    if (denom < SMALL)
+    {
+        denom = max(gMax(mag(D.internalField())), SMALL);
+    }
+    const scalar residualDD =
+        gMax(mag(D.internalField() - D.prevIter().internalField()))/denom;
+
+    // Calculate material residual
+    const scalar materialResidual = mechanical().residual();
+
+    // If one of the residuals has converged to an order of magnitude
+    // less than the tolerance then consider the solution converged
+    // force at least 1 outer iteration and the material law must be converged
+    if (iCorr > 1 && materialResidual < materialTol_)
+    {
+        if
+        (
+            solverPerfInitRes < solutionTol_
+         && residualDD < solutionTol_
+        )
+        {
+            Info<< "    Both residuals have converged" << endl;
+            converged = true;
+        }
+        else if (residualDD < alternativeTol_)
+        {
+            Info<< "    The relative residual has converged" << endl;
+            converged = true;
+        }
+        else if (solverPerfInitRes < alternativeTol_)
+        {
+            Info<< "    The solver residual has converged" << endl;
+            converged = true;
+        }
+        else
+        {
+            converged = false;
+        }
+    }
+
+    // Print residual information
+    if (iCorr == 0)
+    {
+        Info<< "    Corr, res, relRes, matRes, iters" << endl;
+    }
+    else if (iCorr % infoFrequency_ == 0 || converged)
+    {
+        Info<< "    " << iCorr
+            << ", " << solverPerfInitRes
+            << ", " << residualDD
+            << ", " << materialResidual
+            << ", " << solverPerfNIters << endl;
+
+        if (converged)
+        {
+            Info<< endl;
+        }
+    }
+    else if (iCorr == nCorr_ - 1)
+    {
+        maxIterReached_++;
+        Warning
+            << "Max iterations reached within momentum loop" << endl;
+    }
+
+    return converged;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::solidModel::solidModel
@@ -719,8 +863,141 @@ Foam::solidModel::solidModel
     ),
     solidProperties_(subDict(type + "Coeffs")),
     mechanicalPtr_(NULL),
-    globalFaceZonesPtr_(NULL),
-    globalToLocalFaceZonePointMapPtr_(NULL),
+    D_
+    (
+        IOobject
+        (
+            "D",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedVector("zero", dimLength, vector::zero)
+    ),
+    DD_
+    (
+        IOobject
+        (
+            "DD",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedVector("zero", dimLength, vector::zero)
+    ),
+    U_
+    (
+        IOobject
+        (
+            "U",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedVector("0", dimLength/dimTime, vector::zero)
+    ),
+    pMesh_(mesh()),
+    pointD_
+    (
+        IOobject
+        (
+            "pointD",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh_,
+        dimensionedVector("0", dimLength, vector::zero)
+    ),
+    pointDD_
+    (
+        IOobject
+        (
+            "pointDD",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh_,
+        dimensionedVector("0", dimLength, vector::zero)
+    ),
+    gradD_
+    (
+        IOobject
+        (
+            "grad(" + D_.name() + ")",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedTensor("0", dimless, tensor::zero)
+    ),
+    gradDD_
+    (
+        IOobject
+        (
+            "grad(" + DD_.name() + ")",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedTensor("0", dimless, tensor::zero)
+    ),
+    sigma_
+    (
+        IOobject
+        (
+            "sigma",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
+    ),
+    rhoPtr_(NULL),
+    g_
+    (
+        IOobject
+        (
+            "g",
+            runTime.constant(),
+            mesh(),
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
+    solutionTol_
+    (
+        solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
+    ),
+    alternativeTol_
+    (
+        solidProperties().lookupOrDefault<scalar>("alternativeTolerance", 1e-07)
+    ),
+    materialTol_
+    (
+        solidProperties().lookupOrDefault<scalar>("materialTolerance", 1e-05)
+    ),
+    infoFrequency_
+    (
+        solidProperties().lookupOrDefault<int>("infoFrequency", 100)
+    ),
+    nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
+    maxIterReached_(0),
     enforceLinear_(false),
     relaxationMethod_
     (
@@ -784,10 +1061,38 @@ Foam::solidModel::solidModel
         ),
         meshPtr_(),
         dimensionedVector("zero", dimLength, vector::zero)
-    )
+    ),
+    globalFaceZonesPtr_(NULL),
+    globalToLocalFaceZonePointMapPtr_(NULL)
 {
-    Info<< "    under-relaxation method: " << relaxationMethod_ << endl;
+    // Force old time fields to be stored
+    D_.oldTime().oldTime();
+    DD_.oldTime().oldTime();
+    pointD_.oldTime();
+    pointDD_.oldTime();
+    gradD_.oldTime();
+    gradDD_.oldTime();
+    sigma_.oldTime();
 
+    // Check that at least one of D or DD were read from file
+    if
+    (
+       !IOobject
+        (
+            "D", runTime.timeName(), mesh(), IOobject::MUST_READ
+        ).headerOk()
+    && !IOobject
+        (
+            "DD", runTime.timeName(), mesh(), IOobject::MUST_READ
+        ).headerOk()
+    )
+    {
+        FatalErrorIn("solidModel::solidModel(...)")
+            << "Either D or DD should be specified!" << abort(FatalError);
+    }
+
+    // Print out the relaxation factor
+    Info<< "    under-relaxation method: " << relaxationMethod_ << endl;
     if (relaxationMethod_ == "QuasiNewton")
     {
         Info<< "        restart frequency: " << QuasiNewtonRestartFreq_ << endl;
@@ -806,6 +1111,358 @@ Foam::solidModel::~solidModel()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+void Foam::solidModel::setTraction
+(
+    const label patchID,
+    const vectorField& traction
+)
+{
+    solidModel::setTraction(solutionD().boundaryField()[patchID], traction);
+}
+
+
+void Foam::solidModel::setPressure
+(
+    const label patchID,
+    const scalarField& pressure
+)
+{
+    solidModel::setPressure(solutionD().boundaryField()[patchID], pressure);
+}
+
+
+Foam::tmp<Foam::vectorField>
+Foam::solidModel::faceZonePointDisplacementIncrement
+(
+    const label zoneID
+) const
+{
+    tmp<vectorField> tPointDisplacement
+    (
+        new vectorField
+        (
+            mesh().faceZones()[zoneID]().localPoints().size(),
+            vector::zero
+        )
+    );
+    vectorField& pointDisplacement = tPointDisplacement();
+
+    const vectorField& pointDDI = pointDD().internalField();
+
+    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+    if (globalZoneIndex != -1)
+    {
+        // global face zone
+
+        const labelList& curPointMap =
+            globalToLocalFaceZonePointMap()[globalZoneIndex];
+
+        const labelList& zoneMeshPoints =
+            mesh().faceZones()[zoneID]().meshPoints();
+
+        vectorField zonePointsDisplGlobal
+        (
+            zoneMeshPoints.size(),
+            vector::zero
+        );
+
+        //- Inter-proc points are shared by multiple procs
+        //  pointNumProc is the number of procs which a point lies on
+        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
+
+        forAll(zonePointsDisplGlobal, globalPointI)
+        {
+            label localPoint = curPointMap[globalPointI];
+
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
+            {
+                label procPoint = zoneMeshPoints[localPoint];
+
+                zonePointsDisplGlobal[globalPointI] = pointDDI[procPoint];
+
+                pointNumProcs[globalPointI] = 1;
+            }
+        }
+
+        if (Pstream::parRun())
+        {
+            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
+            reduce(pointNumProcs, sumOp<scalarField>());
+
+            //- now average the displacement between all procs
+            zonePointsDisplGlobal /= pointNumProcs;
+        }
+
+        forAll(pointDisplacement, globalPointI)
+        {
+            label localPoint = curPointMap[globalPointI];
+
+            pointDisplacement[localPoint] =
+                zonePointsDisplGlobal[globalPointI];
+        }
+    }
+    else
+    {
+        tPointDisplacement() =
+            vectorField
+            (
+                pointDDI,
+                mesh().faceZones()[zoneID]().meshPoints()
+            );
+    }
+
+    return tPointDisplacement;
+}
+
+
+Foam::tmp<Foam::tensorField> Foam::solidModel::faceZoneSurfaceGradientOfVelocity
+(
+    const label zoneID,
+    const label patchID
+) const
+{
+    tmp<tensorField> tVelocityGradient
+    (
+        new tensorField
+        (
+            mesh().faceZones()[zoneID]().size(),
+            tensor::zero
+        )
+    );
+    tensorField& velocityGradient = tVelocityGradient();
+
+    vectorField pPointU =
+        mechanical().volToPoint().interpolate
+        (
+            mesh().boundaryMesh()[patchID],
+            U()
+        );
+
+    const faceList& localFaces =
+        mesh().boundaryMesh()[patchID].localFaces();
+
+    vectorField localPoints =
+        mesh().boundaryMesh()[patchID].localPoints();
+    localPoints +=
+        pointDorPointDD().boundaryField()[patchID].patchInternalField();
+
+    PrimitivePatch<face, List, const pointField&> patch
+    (
+        localFaces,
+        localPoints
+    );
+
+    tensorField patchGradU = fvc::fGrad(patch, pPointU);
+
+    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+    if (globalZoneIndex != -1)
+    {
+        // global face zone
+
+        const label patchStart =
+            mesh().boundaryMesh()[patchID].start();
+
+        forAll(patchGradU, i)
+        {
+            velocityGradient
+            [
+                mesh().faceZones()[zoneID].whichFace(patchStart + i)
+            ] = patchGradU[i];
+        }
+
+        // Parallel data exchange: collect field on all processors
+        reduce(velocityGradient, sumOp<tensorField>());
+    }
+    else
+    {
+        velocityGradient = patchGradU;
+    }
+
+    return tVelocityGradient;
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::solidModel::currentFaceZonePoints
+(
+    const label zoneID
+) const
+{
+    vectorField pointDisplacement
+    (
+        mesh().faceZones()[zoneID]().localPoints().size(),
+        vector::zero
+    );
+
+    // Lookup the point displacement field
+    const vectorField& pointDI = pointDorPointDD().internalField();
+
+    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+    if (globalZoneIndex != -1)
+    {
+        // global face zone
+        const labelList& curPointMap =
+            globalToLocalFaceZonePointMap()[globalZoneIndex];
+
+        const labelList& zoneMeshPoints =
+            mesh().faceZones()[zoneID]().meshPoints();
+
+        vectorField zonePointsDisplGlobal
+        (
+            zoneMeshPoints.size(),
+            vector::zero
+        );
+
+        // Inter-proc points are shared by multiple procs
+        // pointNumProc is the number of procs which a point lies on
+        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
+
+        forAll(zonePointsDisplGlobal, globalPointI)
+        {
+            label localPoint = curPointMap[globalPointI];
+
+            if (zoneMeshPoints[localPoint] < mesh().nPoints())
+            {
+                label procPoint = zoneMeshPoints[localPoint];
+
+                zonePointsDisplGlobal[globalPointI] = pointDI[procPoint];
+
+                pointNumProcs[globalPointI] = 1;
+            }
+        }
+
+        if (Pstream::parRun())
+        {
+            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
+            reduce(pointNumProcs, sumOp<scalarField>());
+
+            // now average the displacement between all procs
+            zonePointsDisplGlobal /= pointNumProcs;
+        }
+
+        forAll(pointDisplacement, globalPointI)
+        {
+            const label localPoint = curPointMap[globalPointI];
+
+            pointDisplacement[localPoint] = zonePointsDisplGlobal[globalPointI];
+        }
+    }
+    else
+    {
+        pointDisplacement =
+            vectorField
+            (
+                pointDI,
+                mesh().faceZones()[zoneID]().meshPoints()
+            );
+    }
+
+    tmp<vectorField> tCurrentPoints
+    (
+        new vectorField
+        (
+            mesh().faceZones()[zoneID]().localPoints()
+          + pointDisplacement
+        )
+    );
+
+    return tCurrentPoints;
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneNormal
+(
+    const label zoneID,
+    const label patchID
+) const
+{
+    tmp<vectorField> tNormals
+    (
+        new vectorField
+        (
+            mesh().faceZones()[zoneID]().size(),
+            vector::zero
+        )
+    );
+    vectorField& normals = tNormals();
+
+    const faceList& localFaces =
+        mesh().boundaryMesh()[patchID].localFaces();
+
+    const pointVectorField& pointD = pointDorPointDD();
+
+    // Current deformed patch points
+    vectorField localPoints =
+        mesh().boundaryMesh()[patchID].localPoints();
+    localPoints += pointD.boundaryField()[patchID].patchInternalField();
+
+    PrimitivePatch<face, List, const pointField&> patch
+    (
+        localFaces,
+        localPoints
+    );
+
+    vectorField patchNormals(patch.size(), vector::zero);
+
+    forAll(patchNormals, faceI)
+    {
+        patchNormals[faceI] =
+            localFaces[faceI].normal(localPoints);
+    }
+
+    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+    if (globalZoneIndex != -1)
+    {
+        // global face zone
+
+        const label patchStart =
+            mesh().boundaryMesh()[patchID].start();
+
+        forAll(patchNormals, i)
+        {
+            normals
+            [
+                mesh().faceZones()[zoneID].whichFace(patchStart + i)
+            ] = patchNormals[i];
+        }
+
+        // Parallel data exchange: collect field on all processors
+        reduce(normals, sumOp<vectorField>());
+    }
+    else
+    {
+        normals = patchNormals;
+    }
+
+    return tNormals;
+}
+
+
+void Foam::solidModel::updateTotalFields()
+{
+    mechanical().updateTotalFields();
+}
+
+
+void Foam::solidModel::end()
+{
+    if (maxIterReached_ > 0)
+    {
+        WarningIn(type() + "::end()")
+            << "The maximum momentum correctors were reached in "
+            << maxIterReached_ << " time-steps" << nl << endl;
+    }
+    else
+    {
+        Info<< "The momentum equation converged in all time-steps"
+            << nl << endl;
+    }
+}
 
 
 Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
@@ -858,17 +1515,6 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
 }
 
 
-const Foam::mechanicalModel& Foam::solidModel::mechanical() const
-{
-    if (mechanicalPtr_.empty())
-    {
-        makeMechanicalModel();
-    }
-
-    return mechanicalPtr_();
-}
-
-
 const Foam::labelList& Foam::solidModel::globalFaceZones() const
 {
     if (!globalFaceZonesPtr_)
@@ -889,6 +1535,94 @@ Foam::solidModel::globalToLocalFaceZonePointMap() const
     }
 
     return *globalToLocalFaceZonePointMapPtr_;
+}
+
+
+void Foam::solidModel::setTraction
+(
+    fvPatchVectorField& tractionPatch,
+    const vectorField& traction
+)
+{
+    if (tractionPatch.type() == solidTractionFvPatchVectorField::typeName)
+    {
+        solidTractionFvPatchVectorField& patchD =
+            refCast<solidTractionFvPatchVectorField>(tractionPatch);
+
+        patchD.traction() = traction;
+    }
+    else if
+    (
+        tractionPatch.type() == blockSolidTractionFvPatchVectorField::typeName
+    )
+    {
+        blockSolidTractionFvPatchVectorField& patchD =
+            refCast<blockSolidTractionFvPatchVectorField>(tractionPatch);
+
+        patchD.traction() = traction;
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void Foam::solidModel::setTraction\n"
+            "(\n"
+            "    fvPatchVectorField& tractionPatch,\n"
+            "    const vectorField& traction\n"
+            ")"
+        )   << "Boundary condition "
+            << tractionPatch.type()
+            << "for patch" << tractionPatch.patch().name()
+            << " should instead be type "
+            << solidTractionFvPatchVectorField::typeName
+            << " or "
+            << blockSolidTractionFvPatchVectorField::typeName
+            << abort(FatalError);
+    }
+}
+
+
+void Foam::solidModel::setPressure
+(
+    fvPatchVectorField& pressurePatch,
+    const scalarField& pressure
+)
+{
+    if (pressurePatch.type() == solidTractionFvPatchVectorField::typeName)
+    {
+        solidTractionFvPatchVectorField& patchD =
+            refCast<solidTractionFvPatchVectorField>(pressurePatch);
+
+        patchD.pressure() = pressure;
+    }
+    else if
+    (
+        pressurePatch.type() == blockSolidTractionFvPatchVectorField::typeName
+    )
+    {
+        blockSolidTractionFvPatchVectorField& patchD =
+            refCast<blockSolidTractionFvPatchVectorField>(pressurePatch);
+
+        patchD.pressure() = pressure;
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void Foam::solidModel::setPressure\n"
+            "(\n"
+            "    fvPatchVectorField& pressurePatch,\n"
+            "    const vectorField& pressure\n"
+            ")"
+        )   << "Boundary condition "
+            << pressurePatch.type()
+            << "for patch" << pressurePatch.patch().name()
+            << " should instead be type "
+            << solidTractionFvPatchVectorField::typeName
+            << " or "
+            << blockSolidTractionFvPatchVectorField::typeName
+            << abort(FatalError);
+    }
 }
 
 
@@ -986,6 +1720,22 @@ Foam::Switch& Foam::solidModel::checkEnforceLinear(const surfaceScalarField& J)
 
 void Foam::solidModel::writeFields(const Time& runTime)
 {
+    // Calculaute equivalent (von Mises) stress
+    volScalarField sigmaEq
+    (
+        IOobject
+        (
+            "sigmaEq",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        sqrt((3.0/2.0)*magSqr(dev(sigma())))
+    );
+
+    Info<< "Max sigmaEq = " << gMax(sigmaEq) << endl;
+
     runTime.write();
 }
 

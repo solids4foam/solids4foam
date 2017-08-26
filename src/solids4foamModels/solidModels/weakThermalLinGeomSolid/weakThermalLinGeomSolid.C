@@ -56,7 +56,8 @@ addToRunTimeSelectionTable(solidModel, weakThermalLinGeomSolid, dictionary);
 bool weakThermalLinGeomSolid::converged
 (
     const int iCorr,
-    const lduSolverPerformance& solverPerfT
+    const lduSolverPerformance& solverPerfT,
+    const volScalarField& T
 )
 {
     // We will check a number of different residuals for convergence
@@ -66,10 +67,10 @@ bool weakThermalLinGeomSolid::converged
     const scalar residualT =
         gMax
         (
-            mag(T_.internalField() - T_.prevIter().internalField())
+            mag(T.internalField() - T.prevIter().internalField())
            /max
             (
-                gMax(mag(T_.internalField() - T_.oldTime().internalField())),
+                gMax(mag(T.internalField() - T.oldTime().internalField())),
                 SMALL
             )
         );
@@ -81,8 +82,8 @@ bool weakThermalLinGeomSolid::converged
     {
         if
         (
-            solverPerfT.initialResidual() < solutionTol_
-         && residualT < solutionTol_
+            solverPerfT.initialResidual() < solutionTol()
+         && residualT < solutionTol()
         )
         {
             Info<< "    Both residuals have converged" << endl;
@@ -90,7 +91,7 @@ bool weakThermalLinGeomSolid::converged
         }
         else if
         (
-            residualT < alternativeTol_
+            residualT < alternativeTol()
         )
         {
             Info<< "    The relative residual has converged" << endl;
@@ -98,7 +99,7 @@ bool weakThermalLinGeomSolid::converged
         }
         else if
         (
-            solverPerfT.initialResidual() < alternativeTol_
+            solverPerfT.initialResidual() < alternativeTol()
         )
         {
             Info<< "    The solver residual has converged" << endl;
@@ -115,7 +116,7 @@ bool weakThermalLinGeomSolid::converged
     {
         Info<< "    Corr, res, relRes, iters" << endl;
     }
-    else if (iCorr % infoFrequency_ == 0 || converged)
+    else if (iCorr % infoFrequency() == 0 || converged)
     {
         Info<< "    " << iCorr
             << ", " << solverPerfT.initialResidual()
@@ -127,9 +128,9 @@ bool weakThermalLinGeomSolid::converged
             Info<< endl;
         }
     }
-    else if (iCorr == nCorr_ - 1)
+    else if (iCorr == nCorr() - 1)
     {
-        maxIterReached_++;
+        maxIterReached()++;
         Warning
             << "Max iterations reached within temperature loop" << endl;
     }
@@ -208,24 +209,7 @@ weakThermalLinGeomSolid::weakThermalLinGeomSolid
             IOobject::AUTO_WRITE
         ),
         mesh()
-    ),
-    solutionTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("solutionToleranceT", 1e-06)
-    ),
-    alternativeTol_
-    (
-        solidProperties().lookupOrDefault<scalar>
-        (
-            "alternativeToleranceT", 1e-06
-        )
-    ),
-    infoFrequency_
-    (
-        solidProperties().lookupOrDefault<int>("infoFrequencyT", 100)
-    ),
-    nCorr_(solidProperties().lookupOrDefault<int>("nCorrectorsT", 10000)),
-    maxIterReached_(0)
+    )
 {
     T_.oldTime();
 }
@@ -269,7 +253,7 @@ bool weakThermalLinGeomSolid::evolve()
         // Update gradient of temperature
         gradT_ = fvc::grad(T_);
     }
-    while (!converged(iCorr, solverPerfT) && ++iCorr < nCorr_);
+    while (!converged(iCorr, solverPerfT, T_) && ++iCorr < nCorr());
 
     // Now solve the momentum equation
     // Note: a thermal elastic mechanical law should be chosen, if the effect of
@@ -280,12 +264,6 @@ bool weakThermalLinGeomSolid::evolve()
     linGeomSolid::evolve();
 
     return true;
-}
-
-
-void weakThermalLinGeomSolid::updateTotalFields()
-{
-    linGeomSolid::updateTotalFields();
 }
 
 
@@ -312,24 +290,6 @@ void weakThermalLinGeomSolid::writeFields(const Time& runTime)
         << endl;
 
     linGeomSolid::writeFields(runTime);
-}
-
-
-void weakThermalLinGeomSolid::end()
-{
-    if (maxIterReached_ > 0)
-    {
-        WarningIn(type() + "::end()")
-            << "The maximum energy correctors were reached in "
-            << maxIterReached_ << " time-steps" << nl << endl;
-    }
-    else
-    {
-        Info<< "The energy equation converged in all time-steps"
-            << nl << endl;
-    }
-
-    linGeomSolid::end();
 }
 
 

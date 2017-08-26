@@ -53,97 +53,6 @@ addToRunTimeSelectionTable(physicsModel, coupledUnsLinGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, coupledUnsLinGeomSolid, dictionary);
 
 
-// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
-
-bool coupledUnsLinGeomSolid::converged
-(
-    const int iCorr,
-    const BlockSolverPerformance<vector>& solverPerfD
-)
-{
-    // We will check a number of different residuals for convergence
-    bool converged = false;
-
-    // Calculate displacement residual
-    const scalar residualD =
-        gMax
-        (
-            mag(D_.internalField() - D_.prevIter().internalField())
-           /max
-            (
-                gMax(mag(D_.internalField() - D_.oldTime().internalField())),
-                SMALL
-            )
-        );
-
-    // Calculate material residual
-    const scalar materialResidual = mechanical().residual();
-
-    // If one of the residuals has converged to an order of magnitude
-    // less than the tolerance then consider the solution converged
-    // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol_)
-    {
-        if
-        (
-            mag(solverPerfD.initialResidual()) < solutionTol_
-         && residualD < solutionTol_
-        )
-        {
-            Info<< "    Both residuals have converged" << endl;
-            converged = true;
-        }
-        else if
-        (
-            residualD < alternativeTol_
-        )
-        {
-            Info<< "    The relative residual has converged" << endl;
-            converged = true;
-        }
-        else if
-        (
-            mag(solverPerfD.initialResidual()) < alternativeTol_
-        )
-        {
-            Info<< "    The solver residual has converged" << endl;
-            converged = true;
-        }
-        else
-        {
-            converged = false;
-        }
-    }
-
-    // Print residual information
-    if (iCorr == 0)
-    {
-        Info<< "    Corr, res, relRes, matRes, iters" << endl;
-    }
-    else if (iCorr % infoFrequency_ == 0 || converged)
-    {
-        Info<< "    " << iCorr
-            << ", " << mag(solverPerfD.finalResidual())
-            << ", " << residualD
-            << ", " << materialResidual
-            << ", " << solverPerfD.nIterations() << endl;
-
-        if (converged)
-        {
-            Info<< endl;
-        }
-    }
-    else if (iCorr == nCorr_ - 1)
-    {
-        maxIterReached_++;
-        Warning
-            << "Max iterations reached within momentum loop" << endl;
-    }
-
-    return converged;
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 coupledUnsLinGeomSolid::coupledUnsLinGeomSolid
@@ -166,84 +75,6 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid
         ),
         vectorField(extendedMesh_.nVariables(), vector::zero)
     ),
-    D_
-    (
-        IOobject
-        (
-            "D",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    U_
-    (
-        IOobject
-        (
-            "U",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedVector("0", dimLength/dimTime, vector::zero)
-    ),
-    pMesh_(mesh()),
-    pointD_
-    (
-        IOobject
-        (
-            "pointD",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        pMesh_,
-        dimensionedVector("0", dimLength, vector::zero)
-    ),
-    epsilon_
-    (
-        IOobject
-        (
-            "epsilon",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
-    epsilonf_
-    (
-        IOobject
-        (
-            "epsilonf",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
-    sigma_
-    (
-        IOobject
-        (
-            "sigma",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
-    ),
     sigmaf_
     (
         IOobject
@@ -257,25 +88,11 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid
         mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    volToPoint_(mesh()),
-    gradD_
-    (
-        IOobject
-        (
-            "grad(" + D_.name() + ")",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh(),
-        dimensionedTensor("0", dimless, tensor::zero)
-    ),
     gradDf_
     (
         IOobject
         (
-            "grad(" + D_.name() + ")f",
+            "grad(" + D().name() + ")f",
             runTime.timeName(),
             mesh(),
             IOobject::NO_READ,
@@ -284,468 +101,15 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid
         mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
-    rho_(mechanical().rho()),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
     muf_("muf", impKf_/3.5), // assuming a Poisson's ratio of 0.3
-    lambdaf_("lambdaf", 1.5*muf_),
-    solutionTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
-    ),
-    alternativeTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("alternativeTolerance", 1e-07)
-    ),
-    materialTol_
-    (
-        solidProperties().lookupOrDefault<scalar>("materialTolerance", 1e-05)
-    ),
-    infoFrequency_
-    (
-        solidProperties().lookupOrDefault<int>("infoFrequency", 1)
-    ),
-    nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 100)),
-    g_
-    (
-        IOobject
-        (
-            "g",
-            runTime.constant(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        )
-    ),
-    maxIterReached_(0)
-{
-    D_.oldTime().oldTime();
-    pointD_.oldTime();
-}
+    lambdaf_("lambdaf", 1.5*muf_)
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-tmp<vectorField> coupledUnsLinGeomSolid::faceZonePointDisplacementIncrement
-(
-    const label zoneID
-) const
-{
-    tmp<vectorField> tPointDisplacement
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().localPoints().size(),
-            vector::zero
-        )
-    );
-    vectorField& pointDisplacement = tPointDisplacement();
-
-    const vectorField& pointDI = pointD_.internalField();
-    const vectorField& oldPointDI = pointD_.oldTime().internalField();
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const labelList& curPointMap =
-            globalToLocalFaceZonePointMap()[globalZoneIndex];
-
-        const labelList& zoneMeshPoints =
-            mesh().faceZones()[zoneID]().meshPoints();
-
-        vectorField zonePointsDisplGlobal
-        (
-            zoneMeshPoints.size(),
-            vector::zero
-        );
-
-        //- Inter-proc points are shared by multiple procs
-        //  pointNumProc is the number of procs which a point lies on
-        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
-
-        forAll(zonePointsDisplGlobal, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
-            {
-                label procPoint = zoneMeshPoints[localPoint];
-
-                zonePointsDisplGlobal[globalPointI] =
-                    pointDI[procPoint] - oldPointDI[procPoint];
-
-                pointNumProcs[globalPointI] = 1;
-            }
-        }
-
-        if (Pstream::parRun())
-        {
-            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
-            reduce(pointNumProcs, sumOp<scalarField>());
-
-            //- now average the displacement between all procs
-            zonePointsDisplGlobal /= pointNumProcs;
-        }
-
-        forAll(pointDisplacement, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            pointDisplacement[localPoint] =
-                zonePointsDisplGlobal[globalPointI];
-        }
-    }
-    else
-    {
-        tPointDisplacement() =
-            vectorField
-            (
-                pointDI - oldPointDI,
-                mesh().faceZones()[zoneID]().meshPoints()
-            );
-    }
-
-    return tPointDisplacement;
-}
-
-
-tmp<tensorField> coupledUnsLinGeomSolid::faceZoneSurfaceGradientOfVelocity
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<tensorField> tVelocityGradient
-    (
-        new tensorField
-        (
-            mesh().faceZones()[zoneID]().size(),
-            tensor::zero
-        )
-    );
-    tensorField& velocityGradient = tVelocityGradient();
-
-    vectorField pPointU =
-        volToPoint_.interpolate(mesh().boundaryMesh()[patchID], U_);
-
-    const faceList& localFaces =
-        mesh().boundaryMesh()[patchID].localFaces();
-
-    vectorField localPoints =
-        mesh().boundaryMesh()[patchID].localPoints();
-    localPoints += pointD_.boundaryField()[patchID].patchInternalField();
-
-    PrimitivePatch<face, List, const pointField&> patch
-    (
-        localFaces,
-        localPoints
-    );
-
-    tensorField patchGradU = fvc::fGrad(patch, pPointU);
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const label patchStart =
-            mesh().boundaryMesh()[patchID].start();
-
-        forAll(patchGradU, i)
-        {
-            velocityGradient
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchGradU[i];
-        }
-
-        // Parallel data exchange: collect field on all processors
-        reduce(velocityGradient, sumOp<tensorField>());
-    }
-    else
-    {
-        velocityGradient = patchGradU;
-    }
-
-    return tVelocityGradient;
-}
-
-
-tmp<vectorField> coupledUnsLinGeomSolid::currentFaceZonePoints
-(
-    const label zoneID
-) const
-{
-    vectorField pointDisplacement
-    (
-        mesh().faceZones()[zoneID]().localPoints().size(),
-        vector::zero
-    );
-
-    const vectorField& pointDI = pointD_.internalField();
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-        const labelList& curPointMap =
-            globalToLocalFaceZonePointMap()[globalZoneIndex];
-
-        const labelList& zoneMeshPoints =
-            mesh().faceZones()[zoneID]().meshPoints();
-
-        vectorField zonePointsDisplGlobal
-        (
-            zoneMeshPoints.size(),
-            vector::zero
-        );
-
-        //- Inter-proc points are shared by multiple procs
-        //  pointNumProc is the number of procs which a point lies on
-        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
-
-        forAll(zonePointsDisplGlobal, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            if(zoneMeshPoints[localPoint] < mesh().nPoints())
-            {
-                label procPoint = zoneMeshPoints[localPoint];
-
-                zonePointsDisplGlobal[globalPointI] =
-                    pointDI[procPoint];
-
-                pointNumProcs[globalPointI] = 1;
-            }
-        }
-
-        if (Pstream::parRun())
-        {
-            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
-            reduce(pointNumProcs, sumOp<scalarField>());
-
-            //- now average the displacement between all procs
-            zonePointsDisplGlobal /= pointNumProcs;
-        }
-
-        forAll(pointDisplacement, globalPointI)
-        {
-            label localPoint = curPointMap[globalPointI];
-
-            pointDisplacement[localPoint] =
-                zonePointsDisplGlobal[globalPointI];
-        }
-    }
-    else
-    {
-        pointDisplacement =
-            vectorField
-            (
-                pointDI,
-                mesh().faceZones()[zoneID]().meshPoints()
-            );
-    }
-
-    tmp<vectorField> tCurrentPoints
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().localPoints()
-          + pointDisplacement
-        )
-    );
-
-    return tCurrentPoints;
-}
-
-
-tmp<vectorField> coupledUnsLinGeomSolid::faceZoneNormal
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<vectorField> tNormals
-    (
-        new vectorField
-        (
-            mesh().faceZones()[zoneID]().size(),
-            vector::zero
-        )
-    );
-    vectorField& normals = tNormals();
-
-    const faceList& localFaces =
-        mesh().boundaryMesh()[patchID].localFaces();
-
-    vectorField localPoints =
-        mesh().boundaryMesh()[patchID].localPoints();
-    localPoints += pointD_.boundaryField()[patchID].patchInternalField();
-
-    PrimitivePatch<face, List, const pointField&> patch
-    (
-        localFaces,
-        localPoints
-    );
-
-    vectorField patchNormals(patch.size(), vector::zero);
-
-    forAll(patchNormals, faceI)
-    {
-        patchNormals[faceI] =
-            localFaces[faceI].normal(localPoints);
-    }
-
-    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
-
-    if (globalZoneIndex != -1)
-    {
-        // global face zone
-
-        const label patchStart =
-            mesh().boundaryMesh()[patchID].start();
-
-        forAll(patchNormals, i)
-        {
-            normals
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ] =
-                patchNormals[i];
-        }
-
-        // Parallel data exchange: collect field on all processors
-        reduce(normals, sumOp<vectorField>());
-    }
-    else
-    {
-        normals = patchNormals;
-    }
-
-    return tNormals;
-}
-
-
-void coupledUnsLinGeomSolid::setTraction
-(
-    const label patchID,
-    const vectorField& traction
-)
-{
-    if
-    (
-        D_.boundaryField()[patchID].type()
-     != solidTractionFvPatchVectorField::typeName
-    )
-    {
-        FatalErrorIn("void coupledUnsLinGeomSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
-            <<  " is "
-            << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
-            << ", instead "
-            << solidTractionFvPatchVectorField::typeName
-            << abort(FatalError);
-    }
-
-    solidTractionFvPatchVectorField& patchU =
-        refCast<solidTractionFvPatchVectorField>
-        (
-            D_.boundaryField()[patchID]
-        );
-
-    patchU.traction() = traction;
-}
-
-
-void coupledUnsLinGeomSolid::setPressure
-(
-    const label patchID,
-    const scalarField& pressure
-)
-{
-    if
-    (
-        D_.boundaryField()[patchID].type()
-     != solidTractionFvPatchVectorField::typeName
-    )
-    {
-        FatalErrorIn("void coupledUnsLinGeomSolid::setTraction(...)")
-            << "Bounary condition on " << D_.name()
-            <<  " is "
-            << D_.boundaryField()[patchID].type()
-            << "for patch" << mesh().boundary()[patchID].name()
-            << ", instead "
-            << solidTractionFvPatchVectorField::typeName
-            << abort(FatalError);
-    }
-
-    solidTractionFvPatchVectorField& patchU =
-        refCast<solidTractionFvPatchVectorField>
-        (
-            D_.boundaryField()[patchID]
-        );
-
-    patchU.pressure() = pressure;
-}
-
-
-void coupledUnsLinGeomSolid::setTraction
-(
-    const label patchID,
-    const label zoneID,
-    const vectorField& faceZoneTraction
-)
-{
-    vectorField patchTraction(mesh().boundary()[patchID].size(), vector::zero);
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(patchTraction, i)
-    {
-        patchTraction[i] =
-            faceZoneTraction
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ];
-    }
-
-    setTraction(patchID, patchTraction);
-}
-
-
-void coupledUnsLinGeomSolid::setPressure
-(
-    const label patchID,
-    const label zoneID,
-    const scalarField& faceZonePressure
-)
-{
-    scalarField patchPressure(mesh().boundary()[patchID].size(), 0.0);
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(patchPressure, i)
-    {
-        patchPressure[i] =
-            faceZonePressure
-            [
-                mesh().faceZones()[zoneID].whichFace(patchStart + i)
-            ];
-    }
-
-    setPressure(patchID, patchPressure);
-}
 
 
 bool coupledUnsLinGeomSolid::evolve()
@@ -771,7 +135,7 @@ bool coupledUnsLinGeomSolid::evolve()
         extendedMesh_.clearOutGlobalCoeffs();
 
         // Store fields for under-relaxation and residual calculation
-        D_.storePrevIter();
+        D().storePrevIter();
 
         // Create source vector for block matrix
         vectorField blockB(solutionVec_.size(), vector::zero);
@@ -799,15 +163,15 @@ bool coupledUnsLinGeomSolid::evolve()
         // Laplacian
         // non-orthogonal correction is treated implicitly
         BlockLduMatrix<vector> blockMatLap =
-            BlockFvm::laplacian(extendedMesh_, muf_, D_, blockB);
+            BlockFvm::laplacian(extendedMesh_, muf_, D(), blockB);
 
         // Laplacian transpose == div(mu*gradU.T())
         BlockLduMatrix<vector> blockMatLapTran =
-            BlockFvm::laplacianTranspose(extendedMesh_, muf_, D_, blockB);
+            BlockFvm::laplacianTranspose(extendedMesh_, muf_, D(), blockB);
 
         // Laplacian trace == div(lambda*I*tr(gradU))
         BlockLduMatrix<vector> blockMatLapTrac =
-            BlockFvm::laplacianTrace(extendedMesh_, lambdaf_, D_, blockB);
+            BlockFvm::laplacianTrace(extendedMesh_, lambdaf_, D(), blockB);
 
         // Add diagonal contributions
         d += blockMatLap.diag().asSquare();
@@ -845,7 +209,7 @@ bool coupledUnsLinGeomSolid::evolve()
         // the block coupled machinery
         extendedMesh_.insertBoundaryConditions
         (
-            blockM, blockB, muf_, lambdaf_, D_
+            blockM, blockB, muf_, lambdaf_, D()
         );
 
 
@@ -883,7 +247,7 @@ bool coupledUnsLinGeomSolid::evolve()
         (
             blockM,
             blockB,
-            rho_*fvm::d2dt2(D_) - rho_*g_,
+            rho()*fvm::d2dt2(D()) - rho()*g(),
             true
         );
 
@@ -929,7 +293,7 @@ bool coupledUnsLinGeomSolid::evolve()
         AxDivSigmaCellsField.write();
 
         volVectorField RhoTerm("RhoTerm", 0.0*newDivSigma);
-        RhoTerm.internalField() = rho_*fvc::d2dt2(D_) - rho_*g_;
+        RhoTerm.internalField() = rho()*fvc::d2dt2(D()) - rho()*g();
         RhoTerm.internalField() *= mesh().V();
         RhoTerm.write();
 
@@ -959,7 +323,7 @@ bool coupledUnsLinGeomSolid::evolve()
         // solverPerfD =
         //     BlockLduSolver<vector>::New
         //     (
-        //         D_.name(),
+        //         D().name(),
         //         blockM,
         //         mesh().solutionDict().solver("blockD")
         //     )->solve(solutionVec_, blockB);
@@ -984,7 +348,7 @@ bool coupledUnsLinGeomSolid::evolve()
         autoPtr<BlockLduSolver<vector> > solver =
             BlockLduSolver<vector>::New
             (
-                D_.name(),
+                D().name(),
                 blockM,
                 mesh().solutionDict().solver("blockD")
             );
@@ -993,67 +357,54 @@ bool coupledUnsLinGeomSolid::evolve()
         solver->solve(solutionVec_, blockB);
 
         // Transfer solution vector to D field
-        extendedMesh_.copySolutionVector(solutionVec_, D_);
+        extendedMesh_.copySolutionVector(solutionVec_, D());
 
         // Under-relax the field
-        D_.relax();
+        D().relax();
 
         // Update gradient of displacement
-        volToPoint_.interpolate(D_, pointD_);
-        gradD_ = fvc::grad(D_, pointD_);
-        gradDf_ = fvc::fGrad(D_, pointD_);
+        mechanical().interpolate(D(), pointD());
+        gradD() = fvc::grad(D(), pointD());
+        gradDf_ = fvc::fGrad(D(), pointD());
 
         // We will call fvc::grad a second time as fixed displacement boundaries
         // need the patch internal field values to calculate snGrad, which
         // is then used to set snGrad on the gradD boundary
-        D_.correctBoundaryConditions();
-        gradD_ = fvc::grad(D_, pointD_);
-        gradDf_ = fvc::fGrad(D_, pointD_);
-
-        // Update the strain
-        epsilonf_ = symm(gradDf_);
+        D().correctBoundaryConditions();
+        gradD() = fvc::grad(D(), pointD());
+        gradDf_ = fvc::fGrad(D(), pointD());
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigmaf_);
 
         // TESTING
-        mechanical().correct(sigma_);
+        mechanical().correct(sigma());
     }
-    while (!converged(iCorr, solverPerfD) && ++iCorr < nCorr_);
-
-    // Calculate cell strain
-    epsilon_ = symm(gradD_);
+    while
+    (
+       !converged
+        (
+            iCorr,
+            mag(solverPerfD.initialResidual()),
+            solverPerfD.nIterations(),
+            D()
+        ) && ++iCorr < nCorr()
+    );
 
     // Calculate cell stress
-    mechanical().correct(sigma_);
+    mechanical().correct(sigma());
+
+    // Increment of displacement
+    DD() = D() - D().oldTime();
+
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
 
     // Velocity
-    U_ = fvc::ddt(D_);
+    U() = fvc::ddt(D());
 
     return true;
 }
-
-
-// void coupledUnsLinGeomSolid::predict()
-// {
-//     Info << "Predicting solid model" << endl;
-
-//     D_ = D_ + U_*runTime().deltaT();
-
-//     if (interface().valid())
-//     {
-//         interface()->updateDisplacement(pointD_);
-//         interface()->updateDisplacementGradient(gradD_, gradDf_);
-//     }
-//     else
-//     {
-//         volToPoint_.interpolate(D_, pointD_);
-//         gradD_ = fvc::grad(D_, pointD_);
-//         gradDf_ = fvc::fGrad(D_, pointD_);
-//     }
-
-//     D_.correctBoundaryConditions();
-// }
 
 
 tmp<vectorField> coupledUnsLinGeomSolid::tractionBoundarySnGrad
@@ -1092,67 +443,6 @@ tmp<vectorField> coupledUnsLinGeomSolid::tractionBoundarySnGrad
             )*rImpK
         )
     );
-}
-
-
-void coupledUnsLinGeomSolid::updateTotalFields()
-{
-    mechanical().updateTotalFields();
-}
-
-
-void coupledUnsLinGeomSolid::writeFields(const Time& runTime)
-{
-    // Update equivalent strain
-    volScalarField epsilonEq
-    (
-        IOobject
-        (
-            "epsilonEq",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        sqrt((2.0/3.0)*magSqr(dev(epsilon_)))
-    );
-
-    Info<< "Max epsilonEq = " << max(epsilonEq).value()
-        << endl;
-
-    // Update equivalent (von Mises) stress
-    volScalarField sigmaEq
-    (
-        IOobject
-        (
-            "sigmaEq",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        sqrt((3.0/2.0)*magSqr(dev(sigma_)))
-    );
-
-    Info<< "Max sigmaEq = " << gMax(sigmaEq) << endl;
-
-    solidModel::writeFields(runTime);
-}
-
-
-void coupledUnsLinGeomSolid::end()
-{
-    if (maxIterReached_ > 0)
-    {
-        WarningIn(type() + "::end()")
-            << "The maximum momentum correctors were reached in "
-            << maxIterReached_ << " time-steps" << nl << endl;
-    }
-    else
-    {
-        Info<< "The momentum equation converged in all time-steps"
-            << nl << endl;
-    }
 }
 
 

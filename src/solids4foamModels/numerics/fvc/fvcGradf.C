@@ -30,6 +30,7 @@ License
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "ggiFvPatch.H"
+#include "fvc.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

@@ -46,7 +46,6 @@ SourceFiles
 #define thermalLinGeomSolid_H
 
 #include "solidModel.H"
-#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -67,27 +66,6 @@ class thermalLinGeomSolid
     public solidModel
 {
     // Private data
-
-        //- Displacement field
-        volVectorField D_;
-
-        //- Velocity field
-        volVectorField U_;
-
-        //- Point mesh
-        pointMesh pMesh_;
-
-        //- Point displacement field
-        pointVectorField pointD_;
-
-        //- Stress field
-        volSymmTensorField sigma_;
-
-        //- Cell displacement gradient
-        volTensorField gradD_;
-
-        //- Density
-        const volScalarField rho_;
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
@@ -117,31 +95,8 @@ class thermalLinGeomSolid
         //- Thermal conductivity
         volScalarField k_;
 
-        //- Solution standard tolerance
-        const scalar solutionTol_;
-
-        //- Solution tighter tolerance
-        const scalar alternativeTol_;
-
-        //- Material law tolerance
-        const scalar materialTol_;
-
         //- Absolute temperature tolerance (in degrees)
         const scalar absTTol_;
-
-        //- Write frequency for residuals information
-        const int infoFrequency_;
-
-        //- Maximum number of momentum correctors
-        const int nCorr_;
-
-        //- Gravitational acceleration
-        const uniformDimensionedVectorField g_;
-
-        //- Number of times the maximum number of correctors was reached in the
-        //  momentum equation
-        int maxIterReached_;
-
 
     // Private Member Functions
 
@@ -149,8 +104,10 @@ class thermalLinGeomSolid
         bool converged
         (
             const int iCorr,
+            const lduSolverPerformance& solverPerfD,
             const lduSolverPerformance& solverPerfT,
-            const lduSolverPerformance& solverPerfD
+            const volVectorField& D,
+            const volScalarField& T
         );
 
         //- Disallow default bitwise copy construct
@@ -196,6 +153,14 @@ public:
 
         // Access
 
+            //- Each solidModel must indicate whether D or DD is the primary
+            //  solution variable
+            virtual volVectorField& solutionD()
+            {
+                // This model solves for D
+                return D();
+            }
+
             //- Return const access to the cell temperature field
             const volScalarField& T() const
             {
@@ -208,58 +173,12 @@ public:
                 return T_;
             }
 
-            //- Face zone point displacement increment
-            virtual tmp<vectorField> faceZonePointDisplacementIncrement
-            (
-                const label zoneID
-            ) const;
-
-            //- Face zone velocity surface (tangential) gradient
-            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
-
-            //- Face zone current normal
-            virtual tmp<vectorField> faceZoneNormal
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
-
-            //- Face zone primitive patch in current configuration
-            virtual tmp<vectorField> currentFaceZonePoints
-            (
-                const label zoneID
-            ) const;
-
         // Edit
-
-            //- Set traction on the specified patch
-            //  This function enables the FSI procedure to pass a traction from
-            //  fluid to the solid
-            virtual void setTraction
-            (
-                const label patchID,
-                const vectorField& traction
-            );
-
-            //- Set pressure at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const scalarField& pressure
-            );
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
             //- Traction boundary surface normal gradient
-            //  Given the user-specified boundary patch traction, this function
-            //  should return the surface normal gradient
-            //  This function is used by traction-type boundary conditions to
-            //  set the boundary gradient
             virtual tmp<vectorField> tractionBoundarySnGrad
             (
                 const vectorField& traction,
@@ -267,14 +186,8 @@ public:
                 const fvPatch& patch
             ) const;
 
-            //- Update total accumulated fields
-            virtual void updateTotalFields();
-
             //- Write fields
             virtual void writeFields(const Time& runTime);
-
-            //- End of the program
-            virtual void end();
 };
 
 
