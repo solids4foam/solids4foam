@@ -65,19 +65,8 @@ bool Foam::solidStresses::writeData()
         // Calculate the arithmetic average
         symmTensor averageStress = symmTensor::zero;
 
-        // Check if it is a linear or nonlinear geometry case
-        if (mesh.foundObject<volSymmTensorField>("sigmaCauchy"))
-        {
-            // Lookup the Cauchy stress
-            const symmTensorField& sigma =
-                mesh.lookupObject<volSymmTensorField>
-                (
-                    "sigmaCauchy"
-                ).boundaryField()[historyPatchID_];
-
-            averageStress = gAverage(sigma);
-        }
-        else if (mesh.foundObject<volSymmTensorField>("sigma"))
+        // Lookup the stress field
+        if (mesh.foundObject<volSymmTensorField>("sigma"))
         {
             // Lookup the stress
             const symmTensorField& sigma =

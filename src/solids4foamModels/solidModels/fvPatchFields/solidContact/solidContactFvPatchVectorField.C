@@ -1308,28 +1308,15 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
 //     // Todo: we should use trapezoidal rule
 //     vectorField curTraction(patch().size(), vector::zero);
 
-//     // sigma/sigmaCauchy is up-to-date as Qc is called after momentum loop
+//     // sigma is up-to-date as Qc is called after momentum loop
 //     // has converged and sigma has been updated and mesh moved
-//     if (db().foundObject<volSymmTensorField>("sigmaCauchy"))
-//     {
-//         const symmTensorField& sigma =
-//             db().lookupObject<volSymmTensorField>
-//             (
-//                 "sigmaCauchy"
-//             ).boundaryField()[patch().index()];
+//     const symmTensorField& sigma =
+//         db().lookupObject<volSymmTensorField>
+//         (
+//             "sigma"
+//         ).boundaryField()[patch().index()];
 
-//         curTraction = patch().nf() & sigma;
-//     }
-//     else
-//     {
-//         const symmTensorField& sigma =
-//             db().lookupObject<volSymmTensorField>
-//             (
-//                 "sigma"
-//             ).boundaryField()[patch().index()];
-
-//         curTraction = patch().nf() & sigma;
-//     }
+//     curTraction = patch().nf() & sigma;
 
 //     // Calculate slip
 

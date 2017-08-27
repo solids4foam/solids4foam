@@ -64,16 +64,8 @@ bool Foam::hydrostaticPressure::writeData()
         const fvMesh& mesh = *meshPtr;
 
         // Lookup stress tensor
-        const volSymmTensorField* sigmaPtr = NULL;
-        if (mesh.foundObject<volSymmTensorField>("sigma"))
-        {
-            sigmaPtr = &(mesh.lookupObject<volSymmTensorField>("sigma"));
-        }
-        else if (mesh.foundObject<volSymmTensorField>("sigmaCauchy"))
-        {
-            sigmaPtr = &(mesh.lookupObject<volSymmTensorField>("sigmaCauchy"));
-        }
-        const volSymmTensorField& sigma = *sigmaPtr;;
+        const volSymmTensorField& sigma =
+            mesh.lookupObject<volSymmTensorField>("sigma");
 
         // Calculate hydrostatic stress
 

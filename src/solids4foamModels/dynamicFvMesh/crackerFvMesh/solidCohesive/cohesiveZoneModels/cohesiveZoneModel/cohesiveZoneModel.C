@@ -92,10 +92,10 @@ void Foam::cohesiveZoneModel::updateMeshTraction() const
     const surfaceVectorField n = mesh.Sf()/mesh.magSf();
 
     // Lookup the stress field from the solver: this should be up-to-date
-    if (mesh.foundObject<surfaceSymmTensorField>("sigma"))
+    if (mesh.foundObject<surfaceSymmTensorField>("sigmaf"))
     {
         const surfaceSymmTensorField& sigma =
-            mesh.lookupObject<surfaceSymmTensorField>("sigma");
+            mesh.lookupObject<surfaceSymmTensorField>("sigmaf");
 
         traction_ = n & sigma;
     }
@@ -105,16 +105,6 @@ void Foam::cohesiveZoneModel::updateMeshTraction() const
             mesh.lookupObject<volSymmTensorField>("sigma");
 
         traction_ = n & fvc::interpolate(sigma);
-    }
-    else if
-    (
-        mesh.foundObject<volSymmTensorField>("sigmaCauchy")
-     || mesh.foundObject<surfaceSymmTensorField>("sigmaCauchy")
-    )
-    {
-        FatalErrorIn("modeICohesiveZoneModel::initiationTractionFraction()")
-            << "Not implemented yet for nonlinear geometry approaches."
-            << abort(FatalError);
     }
     else
     {

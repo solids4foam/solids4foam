@@ -99,7 +99,7 @@ class linearElasticMisesPlastic
         scalar pressureSmoothingCoeff_;
 
         //- Hydrostatic stress
-        //  Note: sigmaHyd_ == tr(sigmaCauchy)/3.0 == -p,
+        //  Note: sigmaHyd_ == tr(sigma)/3.0 == -p,
         //  where p is the hydrostatic pressure
         volScalarField sigmaHyd_;
 

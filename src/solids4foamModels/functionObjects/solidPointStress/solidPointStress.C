@@ -60,23 +60,11 @@ bool Foam::solidPointStress::writeData()
     }
     const fvMesh& mesh = *meshPtr;
 
-    if
-    (
-        mesh.foundObject<volSymmTensorField>("sigma")
-     || mesh.foundObject<volSymmTensorField>("sigmaCauchy")
-    )
+    if (mesh.foundObject<volSymmTensorField>("sigma"))
     {
         // Read the stress field
-        const volSymmTensorField* sigmaPtr = NULL;
-        if (mesh.foundObject<volSymmTensorField>("sigmaCauchy"))
-        {
-            sigmaPtr = &(mesh.lookupObject<volSymmTensorField>("sigmaCauchy"));
-        }
-        else
-        {
-            sigmaPtr = &(mesh.lookupObject<volSymmTensorField>("sigma"));
-        }
-        const volSymmTensorField& sigma = *sigmaPtr;
+        const volSymmTensorField& sigma =
+            mesh.lookupObject<volSymmTensorField>("sigma");
 
         // Create a point mesh
         pointMesh pMesh(mesh);
@@ -121,7 +109,7 @@ bool Foam::solidPointStress::writeData()
     else
     {
         InfoIn(this->name() + " function object constructor")
-            << "volSymmTensorField sigma (or sigmaCauchy) not found" << endl;
+            << "volSymmTensorField sigma not found" << endl;
     }
 
     return true;

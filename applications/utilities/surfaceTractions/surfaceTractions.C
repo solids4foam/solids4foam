@@ -27,7 +27,7 @@ Application
 
 Description
     Calculates and writes the surface tractions as a volVectorField, using
-    the sigma (or sigmaCauchy) volSymmTensorField.
+    the sigma volSymmTensorField.
 
 Author
     Philip Cardiff, UCD. All rights reserved.
@@ -70,16 +70,17 @@ int main(int argc, char *argv[])
             IOobject::MUST_READ
         );
 
-        // Check if sigmaCauchy field is found
-        IOobject sigmaCauchyHeader
+        // Check if the deformation gradient field is found
+        // This lets us know if it is a nonlinear geometry case
+        IOobject FHeader
         (
-            "sigmaCauchy",
+            "F",
             runTime.timeName(),
             mesh,
             IOobject::MUST_READ
         );
 
-        if (sigmaHeader.headerOk())
+        if (sigmaHeader.headerOk() && !FHeader.headerOk())
         {
             Info<< "    Detected a linear geometry case" << endl;
 
@@ -151,7 +152,7 @@ int main(int argc, char *argv[])
             Info<< "    Writing shearTraction field" << endl;
             shearTraction.write();
         }
-        else if (sigmaCauchyHeader.headerOk())
+        else if (sigmaHeader.headerOk() && FHeader.headerOk())
         {
             // Check if the increment of displacement field is found
             IOobject DDHeader
@@ -166,7 +167,7 @@ int main(int argc, char *argv[])
             {
                 Info<< "    Detected an updated Lagrangian case" << endl;
 
-                const volSymmTensorField sigma(sigmaCauchyHeader, mesh);
+                const volSymmTensorField sigma(sigmaHeader, mesh);
 
                 const volTensorField relF
                 (
@@ -258,7 +259,7 @@ int main(int argc, char *argv[])
             {
                 Info<< "    Detected a total Lagrangian case" << endl;
 
-                const volSymmTensorField sigma(sigmaCauchyHeader, mesh);
+                const volSymmTensorField sigma(sigmaHeader, mesh);
 
                 const volTensorField F
                 (

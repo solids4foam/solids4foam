@@ -45,19 +45,19 @@ timePrecision   6;
 
 runTimeModifiable no;
 
-// functions
-// {
-//     disp1
-//     {
-//         type          solidDisp;
-//         historyPatch  tracFree;
-//     }
-//     force1
-//     {
-//         type          solidForces;
-//         historyPatch  loading;
-//         stressName    sigmaCauchy;
-//     }
-// }
+functions
+{
+    disp1
+    {
+        type          solidDisp;
+        historyPatch  tracFree;
+    }
+    force1
+    {
+        type          solidForces;
+        historyPatch  loading;
+        stressName    sigma;
+    }
+}
 
 // ************************************************************************* //

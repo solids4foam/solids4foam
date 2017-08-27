@@ -45,14 +45,14 @@ timePrecision   6;
 
 runTimeModifiable no;
 
-// functions
-// {
-//     force2
-//     {
-//         type          solidForces;
-//         historyPatch  symmPlane;
-//         stressName    sigmaCauchy;
-//     }
-// }
+functions
+{
+    force2
+    {
+        type          solidForces;
+        historyPatch  symmPlane;
+        stressName    sigma;
+    }
+}
 
 // ************************************************************************* //

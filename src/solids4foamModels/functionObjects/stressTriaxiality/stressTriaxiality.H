@@ -27,10 +27,7 @@ Class
 
 Description
     FunctionObject that outputs the stress triaxiality field:
-    where:
-        stressTriaxiality = hydrostaticStress/equivalentStress;
-
-    It assumed that the stress tensor is called "sigma" or "sigmaCauchy".
+    where: stressTriaxiality = hydrostaticStress/equivalentStress;
 
     @verbatim
     stressTriaxiality1

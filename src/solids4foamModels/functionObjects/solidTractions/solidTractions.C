@@ -64,6 +64,10 @@ bool Foam::solidTractions::writeData()
         }
         const fvMesh& mesh = *meshPtr;
 
+        // Lookup the stress field
+        const volSymmTensorField& sigma =
+            mesh.lookupObject<volSymmTensorField>("sigma");
+
         if
         (
             mesh.foundObject<volVectorField>("DD")
@@ -72,10 +76,6 @@ bool Foam::solidTractions::writeData()
         {
             // Updated Lagrangian
             // The mesh has been moved to the deformed configuration
-
-            // Lookup the Cauchy stress
-            const volSymmTensorField& sigma =
-                mesh.lookupObject<volSymmTensorField>("sigmaCauchy");
 
             // Create the traction
             volVectorField traction
@@ -96,6 +96,7 @@ bool Foam::solidTractions::writeData()
             {
                 if (!traction.boundaryField()[patchI].coupled())
                 {
+                    // It is assumed that sigma is the true (Cauchy) stress
                     traction.boundaryField()[patchI] =
                         mesh.boundary()[patchI].nf()
                       & sigma.boundaryField()[patchI];
@@ -108,10 +109,6 @@ bool Foam::solidTractions::writeData()
         {
             // Total Lagrangian
             // The mesh is in its initial configuration
-
-            // Lookup the Cauchy stress
-            const volSymmTensorField& sigma =
-                mesh.lookupObject<volSymmTensorField>("sigmaCauchy");
 
             // Lookup the inverse deformation gradient
             const volTensorField& Finv =
@@ -141,7 +138,8 @@ bool Foam::solidTractions::writeData()
                       & mesh.boundary()[patchI].nf();
                     nCurrent /= mag(nCurrent);
 
-                    traction.boundaryField()[patchI] =
+                   // It is assumed that sigma is the true (Cauchy) stress
+                   traction.boundaryField()[patchI] =
                       nCurrent & sigma.boundaryField()[patchI];
                 }
             }
@@ -151,10 +149,6 @@ bool Foam::solidTractions::writeData()
         else
         {
             // Small strain approach
-
-            // Lookup the stress
-            const volSymmTensorField& sigma =
-                mesh.lookupObject<volSymmTensorField>("sigma");
 
             // Create the traction
             volVectorField traction

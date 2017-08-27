@@ -305,25 +305,8 @@ label simpleCohesiveZoneFvPatchVectorField::updateCrack()
     const word DDName = dimensionedInternalField().name();
 
     // Lookup sigma from the solver
-    // PC: we should considering changing the name of sigmaCauchy to be sigma
-    const fvPatchField<symmTensor>* curSigmaPtr = NULL;
-    if (patch().boundaryMesh().mesh().foundObject<volSymmTensorField>("sigma"))
-    {
-        curSigmaPtr =
-            &patch().lookupPatchField<volSymmTensorField, symmTensor>
-            (
-                "sigma"
-            );
-    }
-    else
-    {
-        curSigmaPtr =
-            &patch().lookupPatchField<volSymmTensorField, symmTensor>
-            (
-                "sigmaCauchy"
-            );
-    }
-    const fvPatchField<symmTensor>& curSigma = *curSigmaPtr;
+    const fvPatchField<symmTensor>& curSigma =
+        patch().lookupPatchField<volSymmTensorField, symmTensor>("sigma");
 
     // Patch normal
     const vectorField n = this->patch().nf();
@@ -513,25 +496,8 @@ void simpleCohesiveZoneFvPatchVectorField::updateCoeffs()
     }
 
     // Lookup sigma from the solver
-    // PC: we should considering changing the name of sigmaCauchy to be sigma
-    const fvPatchField<symmTensor>* curSigmaPtr = NULL;
-    if (patch().boundaryMesh().mesh().foundObject<volSymmTensorField>("sigma"))
-    {
-        curSigmaPtr =
-            &patch().lookupPatchField<volSymmTensorField, symmTensor>
-            (
-                "sigma"
-            );
-    }
-    else
-    {
-        curSigmaPtr =
-            &patch().lookupPatchField<volSymmTensorField, symmTensor>
-            (
-                "sigmaCauchy"
-            );
-    }
-    const fvPatchField<symmTensor>& curSigma = *curSigmaPtr;
+    const fvPatchField<symmTensor>& curSigma =
+        patch().lookupPatchField<volSymmTensorField, symmTensor>("sigma");
 
 
     // Calculate current patch displacement

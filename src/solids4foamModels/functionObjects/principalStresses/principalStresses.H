@@ -28,8 +28,7 @@ Class
 Description
     FunctionObject that outputs the principal stress fields.
 
-    Calculate and write principal stress fields. It assumed that the stress
-    tensor is called "sigma" or "sigmaCauchy".
+    Calculate and write principal stress fields.
 
     Three vector fields are created: sigmaMax, sigmaMid, sigmaMin.
     sigmaMax is the most positive/tensile principal stress multiplied by the

@@ -51,7 +51,7 @@ functions
     {
         type          solidStresses;
         historyPatch  inner;
-        stressName    sigmaCauchy;
+        stressName    sigma;
     }
 }
 

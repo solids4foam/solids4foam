@@ -175,7 +175,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
     (
         IOobject
         (
-            "sigmaCauchyf",
+            "sigmaf",
             runTime.timeName(),
             mesh(),
             IOobject::NO_READ,

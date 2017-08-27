@@ -45,26 +45,20 @@ timePrecision   6;
 
 runTimeModifiable no;
 
-// functions
-// {
-//     force
-//     {
-//         type          solidForces;
-//         historyPatch  pipeContact;
-//         stressName    sigmaCauchy;
-//     }
+functions
+{
+    force
+    {
+        type          solidForces;
+        historyPatch  pipeContact;
+        stressName    sigma;
+    }
 
-//     tractions
-//     {
-//         type          solidTractions;
-//         stressName    sigmaCauchy;
-
-//         // Write at same frequency as fields
-//         //outputControl   outputTime;
-//         // Write every time step
-//         //outputControl   timeStep;
-//         //outputInterval  1;
-//     }
-//}
+    tractions
+    {
+        type          solidTractions;
+        stressName    sigma;
+    }
+}
 
 // ************************************************************************* //

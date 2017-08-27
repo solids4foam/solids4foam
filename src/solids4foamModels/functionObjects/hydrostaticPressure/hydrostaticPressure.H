@@ -34,8 +34,6 @@ Description
         hydrostaticPressure = -tr(sigma)/3.0;
         sigma is the stress tensor field.
 
-    It assumed that the stress tensor is called "sigma" or "sigmaCauchy".
-
     @verbatim
     hydrostaticPressure1
     {

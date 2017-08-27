@@ -73,6 +73,13 @@ bool Foam::solidForces::writeData()
         vector force = vector::zero;
         scalar normalForce = 0.0;
 
+        // Lookup the stress field
+        const symmTensorField& sigma =
+            mesh.lookupObject<volSymmTensorField>
+            (
+                "sigma"
+            ).boundaryField()[historyPatchID_];
+
         // Check if it is a linear or nonlinear geometry case
         if
         (
@@ -96,19 +103,13 @@ bool Foam::solidForces::writeData()
                     "J"
                 ).boundaryField()[historyPatchID_];
 
-            // Lookup the Cauchy stress
-            const symmTensorField& sigma =
-                mesh.lookupObject<volSymmTensorField>
-                (
-                    "sigmaCauchy"
-                ).boundaryField()[historyPatchID_];
-
             // Calculate area vectors in the deformed configuration
             const vectorField patchDeformSf = (J*Finv.T() & patchSf);
 
             // Calculate unit area vectors in the deformed configuration
             const vectorField patchDeformNf = patchDeformSf/mag(patchDeformSf);
 
+            // It is assumed that sigma is the true (Cauchy) stress
             force = gSum(patchDeformSf & sigma);
 
             normalForce = gSum(patchDeformNf & (patchDeformSf & sigma));
@@ -121,15 +122,10 @@ bool Foam::solidForces::writeData()
         {
             // Updated Lagrangian
 
-            // Lookup the Cauchy stress
-            const symmTensorField& sigma =
-                mesh.lookupObject<volSymmTensorField>
-                (
-                    "sigmaCauchy"
-                ).boundaryField()[historyPatchID_];
-
             // The mesh will be in the deformed configuration at the end of
             // the time-step
+
+            // It is assumed that sigma is the true (Cauchy) stress
             force = gSum(patchSf & sigma);
 
             normalForce = gSum(patchNf & (patchSf & sigma));
@@ -137,13 +133,6 @@ bool Foam::solidForces::writeData()
         else
         {
             // Linear geometry
-
-            // Lookup the stress
-            const symmTensorField& sigma =
-                mesh.lookupObject<volSymmTensorField>
-                (
-                    "sigma"
-                ).boundaryField()[historyPatchID_];
 
             force = gSum(patchSf & sigma);
 

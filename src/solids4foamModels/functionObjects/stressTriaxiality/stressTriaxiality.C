@@ -52,16 +52,8 @@ bool Foam::stressTriaxiality::writeData()
     if (runTime_.outputTime())
     {
         // Lookup stress tensor
-        const volSymmTensorField* sigmaPtr = NULL;
-        if (mesh_.foundObject<volSymmTensorField>("sigma"))
-        {
-            sigmaPtr = &(mesh_.lookupObject<volSymmTensorField>("sigma"));
-        }
-        else if (mesh_.foundObject<volSymmTensorField>("sigmaCauchy"))
-        {
-            sigmaPtr = &(mesh_.lookupObject<volSymmTensorField>("sigmaCauchy"));
-        }
-        const volSymmTensorField& sigma = *sigmaPtr;;
+        const volSymmTensorField& sigma =
+            mesh_.lookupObject<volSymmTensorField>("sigma");
 
         // Calculate hydrostatic stress
         const volScalarField sigmaHyd = -tr(sigma)/3.0;

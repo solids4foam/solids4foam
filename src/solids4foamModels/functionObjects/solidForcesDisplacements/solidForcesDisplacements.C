@@ -74,6 +74,13 @@ bool Foam::solidForcesDisplacements::writeData()
     // Calculate the force as the intergal of the traction over the area
     vector force = vector::zero;
 
+    // Lookup the stress field
+    const symmTensorField& sigma =
+        mesh.lookupObject<volSymmTensorField>
+        (
+            "sigma"
+        ).boundaryField()[historyPatchID_];
+
     // Check if it is a linear or nonlinear geometry case
     if
     (
@@ -97,16 +104,10 @@ bool Foam::solidForcesDisplacements::writeData()
                 "J"
             ).boundaryField()[historyPatchID_];
 
-        // Lookup the Cauchy stress
-        const symmTensorField& sigma =
-            mesh.lookupObject<volSymmTensorField>
-            (
-                "sigmaCauchy"
-            ).boundaryField()[historyPatchID_];
-
         // Calculate area vectors in the deformed configuration
         const vectorField patchDeformSf = (J*Finv.T() & patchSf);
 
+        // It is assumed that sigma is the true (Cauchy) stress
         force = gSum(patchDeformSf & sigma);
     }
     else if
@@ -117,27 +118,15 @@ bool Foam::solidForcesDisplacements::writeData()
     {
         // Updated Lagrangian
 
-        // Lookup the Cauchy stress
-        const symmTensorField& sigma =
-            mesh.lookupObject<volSymmTensorField>
-            (
-                "sigmaCauchy"
-            ).boundaryField()[historyPatchID_];
-
         // The mesh will be in the deformed configuration at the end of
         // the time-step
+
+        // It is assumed that sigma is the true (Cauchy) stress
         force = gSum(patchSf & sigma);
     }
     else
     {
         // Linear geometry
-
-        // Lookup the stress
-        const symmTensorField& sigma =
-            mesh.lookupObject<volSymmTensorField>
-            (
-                "sigma"
-            ).boundaryField()[historyPatchID_];
 
         force = gSum(patchSf & sigma);
     }

@@ -163,16 +163,8 @@ bool Foam::principalStresses::writeData()
     if (runTime_.outputTime())
     {
         // Lookup stress tensor
-        const volSymmTensorField* sigmaPtr = NULL;
-        if (mesh_.foundObject<volSymmTensorField>("sigma"))
-        {
-            sigmaPtr = &(mesh_.lookupObject<volSymmTensorField>("sigma"));
-        }
-        else if (mesh_.foundObject<volSymmTensorField>("sigmaCauchy"))
-        {
-            sigmaPtr = &(mesh_.lookupObject<volSymmTensorField>("sigmaCauchy"));
-        }
-        const volSymmTensorField& sigma = *sigmaPtr;;
+        const volSymmTensorField& sigma =
+            mesh_.lookupObject<volSymmTensorField>("sigma");
 
         // Calculate principal stress vectors
 
