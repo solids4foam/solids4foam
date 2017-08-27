@@ -1,0 +1,99 @@
+#!/bin/sh
+#------------------------------------------------------------------------------
+# =========                 |
+# \\      /  F ield         | foam-extend: Open Source CFD
+#  \\    /   O peration     | Version:     3.2
+#   \\  /    A nd           | Web:         http://www.foam-extend.org
+#    \\/     M anipulation  | For copyright notice see file Copyright
+#------------------------------------------------------------------------------
+# License
+#     This file is part of foam-extend.
+#
+#     foam-extend is free software: you can redistribute it and/or modify it
+#     under the terms of the GNU General Public License as published by the
+#     Free Software Foundation, either version 3 of the License, or (at your
+#     option) any later version.
+#
+#     foam-extend is distributed in the hope that it will be useful, but
+#     WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+#     General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Script
+#     Alltest
+#
+# Description
+#
+#------------------------------------------------------------------------------
+
+# FUNCTIONS
+#
+printUsage () {
+cat <<EOF
+Usage: $0
+Tests a select number of tutorials cases fully to completion
+
+Options are:
+-h         help
+EOF
+}
+
+#
+# VARIABLE
+#
+TUTORIALS_DIR=.
+TEST_RUN_DIR=../tutorialsTestLong
+
+#
+# OPTIONS
+#
+OPTS=`getopt hd $*`
+if [ $? -ne 0 ] ; then
+    echo "Aborting due to invalid option"
+    printUsage
+    exit 1
+fi
+eval set -- "$OPTS"
+while [ $1 != -- ]; do
+    case $1 in
+        -h) printUsage; exit 1;;
+    esac
+    shift
+done
+shift
+
+#
+# MAIN
+#
+
+if [ -d "$TEST_RUN_DIR" ] ; then
+    rm -rf $TEST_RUN_DIR
+fi
+
+echo "Copying select tutorials"
+for caseName in \
+    "solids/linearElasticity/plateHole/plateHoleIncrDisp" \
+    "fluids/cylinderInChannel" \
+    ;
+do
+    echo "Copying " ${caseName}
+    mkdir -p ${TEST_RUN_DIR}/${caseName}
+    cp -r ${TUTORIALS_DIR}/${caseName}/* ${TEST_RUN_DIR}/${caseName}
+done
+
+# Copy Allrun script
+cp ${TUTORIALS_DIR}/Allrun ${TEST_RUN_DIR}/
+
+cd ${TEST_RUN_DIR}
+
+./Allrun
+
+echo "To-do: we will add some tests here to check the answers are as before!"
+
+echo "done"
+
+
+# ----------------------------------------------------------------- end-of-file
