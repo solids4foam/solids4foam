@@ -4,7 +4,6 @@ solidModels/solidModel/solidModel.C
 solidModels/coupledHybridLinGeomSolid/coupledHybridLinGeomSolid.C
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/coupledUnsLinGeomSolid/coupledUnsLinGeomSolid.C
-solidModels/freeVibrationSolid/freeVibrationSolid.C
 solidModels/linGeomSolid/linGeomSolid.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
