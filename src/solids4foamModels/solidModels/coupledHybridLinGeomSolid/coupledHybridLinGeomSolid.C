@@ -113,132 +113,141 @@ coupledHybridLinGeomSolid::coupledHybridLinGeomSolid
 
 bool coupledHybridLinGeomSolid::evolve()
 {
-    notImplemented("bool coupledHybridLinGeomSolid::evolve()");
+    Info<< "Evolving solid solver" << endl;
 
-//     Info<< "Evolving solid solver" << endl;
+    int iCorr = 0;
+    lduSolverPerformance solverPerfD;
+    lduSolverPerformance solverPerfp;
+    blockLduMatrix::debug = 0;
+    BlockLduMatrix<vector4>::debug = 0;
 
-//     int iCorr = 0;
-//     lduSolverPerformance solverPerfD;
-//     lduSolverPerformance solverPerfp;
-//     blockLduMatrix::debug = 0;
-//     BlockLduMatrix<vector4>::debug = 0;
+    Info<< "Solving the momentum equation for D and p using a coupled "
+        << "approach" << endl;
 
-//     Info<< "Solving the momentum equation for D and p using a coupled "
-//         << "approach" << endl;
+    // Momentum equation loop
+    do
+    {
+        // Store fields for under-relaxation and residual calculation
+        D().storePrevIter();
+        p_.storePrevIter();
 
-//     // Momentum equation loop
-//     do
-//     {
-//         // Store fields for under-relaxation and residual calculation
-//         D_.storePrevIter();
-//         p_.storePrevIter();
+        // Initialize the pD block system
+        fvBlockMatrix<vector4> pDEqn(pD_);
 
-//         // Initialize the pD block system
-//         fvBlockMatrix<vector4> pDEqn(pD_);
+        // Assemble and insert momentum equation with pressure
+        // term removed i.e. we add it back on
+        tmp<fvVectorMatrix> DEqn
+        (
+            rho()*fvm::d2dt2(D())
+         == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+          - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
+          + fvc::div(sigma(), "div(sigma)")
+          + gradp_
+          + rho()*g()
+          + mechanical().RhieChowCorrection(D(), gradD())
+        );
 
-//         // Assemble and insert momentum equation with pressure
-//         // term removed i.e. we add it back on
-//         tmp<fvVectorMatrix> DEqn
-//         (
-//             rho_*fvm::d2dt2(D_)
-//          == fvm::laplacian(impKf_, D_, "laplacian(DD,D)")
-//           - fvc::laplacian(impKf_, D_, "laplacian(DD,D)")
-//           + fvc::div(sigma_, "div(sigma)")
-//           + gradp_
-//           + rho_*g_
-//           + mechanical().RhieChowCorrection(D_, gradD_)
-//         );
+        // Under-relax the equation
+        DEqn().relax();
 
-//         // Under-relax the equation
-//         DEqn().relax();
+        // Inser the equation into the block system
+        pDEqn.insertEquation(0, DEqn());
 
-//         // Inser the equation into the block system
-//         pDEqn.insertEquation(0, DEqn());
+        // Assemble and insert pressure equation
 
-//         // Assemble and insert pressure equation
+        // Pressure parts of the continuity equation
+        const surfaceScalarField rUAf
+        (
+            "rUAf",
+            fvc::interpolate(1.0/(DEqn()).A())
+        );
 
-//         // Pressure parts of the continuity equation
-//         const surfaceScalarField rUAf
-//         (
-//             "rUAf",
-//             fvc::interpolate(1.0/(DEqn()).A())
-//         );
+        // Clear the DEqn to reduce memory overhead
+        DEqn.clear();
 
-//         // Clear the DEqn to reduce memory overhead
-//         DEqn.clear();
+        // Pressure equation where we allow for explicit skewness correction
+        // and Rhie-Chow corrections are also employed
+        fvScalarMatrix pEqn
+        (
+            fvm::Sp(rK_, p_)
+          - fvm::laplacian(rUAf, p_)
+          + fvc::div(rUAf*(fvc::interpolate(fvc::grad(p_)) & mesh().Sf()))
+          + fvc::div(D(), "skewCorrectedDiv(D)")
+          - fvc::div(D())
+        );
 
-//         // Pressure equation where we allow for explicit skewness correction
-//         // and Rhie-Chow corrections are also employed
-//         fvScalarMatrix pEqn
-//         (
-//             fvm::Sp(rK_, p_)
-//           - fvm::laplacian(rUAf, p_)
-//           + fvc::div(rUAf*(fvc::interpolate(fvc::grad(p_)) & mesh().Sf()))
-//           + fvc::div(D_, "skewCorrectedDiv(D)")
-//           - fvc::div(D_)
-//         );
+        // Under-relax the equation
+        pEqn.relax();
 
-//         // Under-relax the equation
-//         pEqn.relax();
+        // Insert the equation into the block system
+        pDEqn.insertEquation(3, pEqn);
 
-//         // Insert the equation into the block system
-//         pDEqn.insertEquation(3, pEqn);
+        // Assemble and insert coupling terms
 
-//         // Assemble and insert coupling terms
+        // Calculate grad p coupling matrix
+        BlockLduSystem<vector, vector> pInD(fvm::grad(p_));
 
-//         // Calculate grad p coupling matrix
-//         BlockLduSystem<vector, vector> pInD(fvm::grad(p_));
+        // Calculate div(D) coupling
+        BlockLduSystem<vector, scalar> DInp(fvm::UDiv(D()));
 
-//         // Calculate div(D) coupling
-//         BlockLduSystem<vector, scalar> DInp(fvm::UDiv(D_));
+        // Last argument in insertBlockCoupling says if the column direction
+        // should be incremented. This is needed for arbitrary positioning
+        // of D and p in the system
+        pDEqn.insertBlockCoupling(0, 3, pInD, true);
+        pDEqn.insertBlockCoupling(3, 0, DInp, false);
 
-//         // Last argument in insertBlockCoupling says if the column direction
-//         // should be incremented. This is needed for arbitrary positioning
-//         // of D and p in the system
-//         pDEqn.insertBlockCoupling(0, 3, pInD, true);
-//         pDEqn.insertBlockCoupling(3, 0, DInp, false);
+        // Solve the block matrix
+        BlockSolverPerformance<vector4> blockSolverPerf = pDEqn.solve();
 
-//         // Solve the block matrix
-//         BlockSolverPerformance<vector4> blockSolverPerf = pDEqn.solve();
+        // Store the residuals and iterations
+        solverPerfD.initialResidual() =
+            cmptMax(blockSolverPerf.initialResidual());
+        solverPerfD.nIterations() = blockSolverPerf.nIterations();
 
-//         // Store the residuals and iterations
-//         solverPerfD.initialResidual() =
-//             cmptMax(blockSolverPerf.initialResidual());
-//         solverPerfD.nIterations() = blockSolverPerf.nIterations();
+        // Retrieve solution
+        pDEqn.retrieveSolution(0, D().internalField());
+        pDEqn.retrieveSolution(3, p_.internalField());
 
-//         // Retrieve solution
-//         pDEqn.retrieveSolution(0, D_.internalField());
-//         pDEqn.retrieveSolution(3, p_.internalField());
+        D().correctBoundaryConditions();
+        p_.correctBoundaryConditions();
 
-//         D_.correctBoundaryConditions();
-//         p_.correctBoundaryConditions();
+        // Under-relax the field
+        D().relax();
 
-//         // Under-relax the field
-//         D_.relax();
+        // Update gradient of displacement
+        mechanical().grad(D(), gradD());
 
-//         // Update gradient of displacement
-//         mechanical().grad(D_, gradD_);
+        // Explicitly relax pressure for momentum corrector
+        p_.relax();
 
-//         // Explicitly relax pressure for momentum corrector
-//         p_.relax();
+        // Update gradient of pressure
+        gradp_ = fvc::grad(p_);
 
-//         // Update gradient of pressure
-//         gradp_ = fvc::grad(p_);
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigma());
+    }
+    while
+    (
+       !converged
+        (
+            iCorr,
+            solverPerfD.initialResidual(),
+            solverPerfD.nIterations(),
+            D()
+        ) && ++iCorr < nCorr()
+    );
 
-//         // Calculate the stress using run-time selectable mechanical law
-//         mechanical().correct(sigma_);
-//     }
-//     while
-//     (
-//         !converged(iCorr, solverPerfD.initialResidual(), D())
-//      && ++iCorr < nCorr_
-//     );
+    // Interpolate cell displacements to vertices
+    mechanical().interpolate(D(), pointD());
 
-//     // Interpolate cell displacements to vertices
-//     mechanical().interpolate(D_, pointD_);
+    // Increment of displacement
+    DD() = D() - D().oldTime();
 
-//     // Velocity
-//     U_ = fvc::ddt(D_);
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
+
+    // Velocity
+    U() = fvc::ddt(D());
 
     return true;
 }

@@ -1,5 +1,5 @@
 matrices/blockLduMatrix/BlockLduMatrix/vectorBlockLduMatrix.C
-/*matrices/blockLduMatrix/BlockLduSolvers/BlockBiCGStab/blockBiCGStabSolvers.C*/
+matrices/blockLduMatrix/BlockLduSolvers/BlockBiCGStab/blockBiCGStabSolvers.C
 
 myBlockCholeskyPrecon/scalarMyBlockCholeskyPrecon.C
 myBlockCholeskyPrecon/tensorMyBlockCholeskyPrecon.C
