@@ -429,13 +429,22 @@ void solidCohesiveFvPatchVectorField::updateCoeffs()
             relaxationFactorTrac_*traction_
           + (1.0 - relaxationFactorTrac_)*prevTraction;
 
-        // Set the patch tractions
+        // Lookup the solidModel
+        const polyMesh& mesh = patch().boundaryMesh().mesh();
+        const solidModel* solModPtr = NULL;
+        if (mesh.foundObject<solidModel>("solidProperties"))
+        {
+            solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
+        }
+        else
+        {
+            solModPtr =
+                &mesh.parent().lookupObject<solidModel>("solidProperties");
+        }
 
+        // Set the patch tractions
         gradient() =
-            patch().boundaryMesh().mesh().lookupObject<solidModel>
-            (
-                "solidProperties"
-            ).tractionBoundarySnGrad
+            solModPtr->tractionBoundarySnGrad
             (
                 traction_,
                 pressure_,

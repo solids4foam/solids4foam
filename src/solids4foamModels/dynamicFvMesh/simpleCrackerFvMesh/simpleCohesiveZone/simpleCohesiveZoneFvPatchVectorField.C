@@ -435,12 +435,22 @@ label simpleCohesiveZoneFvPatchVectorField::updateCrack()
             << endl;
     }
 
+    // Lookup the solidModel
+    const polyMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel* solModPtr = NULL;
+    if (mesh.foundObject<solidModel>("solidProperties"))
+    {
+        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
+    }
+    else
+    {
+        solModPtr =
+            &mesh.parent().lookupObject<solidModel>("solidProperties");
+    }
+
     // Set traction on the patch
     this->refGrad() =
-        patch().boundaryMesh().mesh().lookupObject<solidModel>
-        (
-            "solidProperties"
-        ).tractionBoundarySnGrad
+        solModPtr->tractionBoundarySnGrad
         (
             newTraction,
             scalarField(newTraction.size(), 0.0),
@@ -615,12 +625,22 @@ void simpleCohesiveZoneFvPatchVectorField::updateCoeffs()
         }
     }
 
-    // Set traction on patch
+    // Lookup the solidModel
+    const polyMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel* solModPtr = NULL;
+    if (mesh.foundObject<solidModel>("solidProperties"))
+    {
+        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
+    }
+    else
+    {
+        solModPtr =
+            &mesh.parent().lookupObject<solidModel>("solidProperties");
+    }
+
+    // Set traction on the patch
     this->refGrad() =
-        patch().boundaryMesh().mesh().lookupObject<solidModel>
-        (
-            "solidProperties"
-        ).tractionBoundarySnGrad
+        solModPtr->tractionBoundarySnGrad
         (
             newTraction,
             scalarField(newTraction.size(), 0.0),
