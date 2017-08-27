@@ -54,25 +54,11 @@ solvers
     }
 }
 
-PISO
-{
-    nOuterCorrectors 5;
-    nCorrectors 3;
-    nNonOrthogonalCorrectors 1;
-}
-
-PIMPLE
-{
-    nOuterCorrectors 5;
-    nCorrectors 3;
-    nNonOrthogonalCorrectors 1;
-}
-
 relaxationFactors
 {
-    U 0.7;
+    U    0.7;
     UFinal 0.7;
-    p 0.3;
+    p    0.3;
 }
 
 // ************************************************************************* //
