@@ -82,6 +82,7 @@ icoFluid::icoFluid
         mesh()
     ),
     gradp_(fvc::grad(p_)),
+    gradU_(fvc::grad(U_)),
     phi_
     (
         IOobject
@@ -375,6 +376,8 @@ bool icoFluid::evolve()
             U_ -= gradp_/aU;
         }
         U_.correctBoundaryConditions();
+
+        gradU_ = fvc::grad(U_);
     }
 
     return 0;

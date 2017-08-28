@@ -51,7 +51,6 @@ $(mechanicalLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
 
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
-$(solidFvPatchFields)/extrapolated/extrapolatedFvPatchFields.C
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
 $(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
@@ -69,6 +68,11 @@ $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
 $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
+
+$(solidFvPatchFields)/symmetryDisplacement/symmetryDisplacementFvPatchVectorField.C
+$(solidFvPatchFields)/convectiveFlux/convectiveFluxFvPatchScalarField.C
+$(solidFvPatchFields)/wedge/wedgeFvPatchFields.C
+$(solidFvPatchFields)/wedge/wedgeFvPatchScalarField.C
 
 pointPatchFields = solidModels/pointPatchFields
 $(pointPatchFields)/componentMixed/componentMixedPointPatchFields.C
@@ -88,9 +92,23 @@ $(frictionContactModels)/frictionLaws/frictionLaw/newFrictionLaw.C
 $(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C
 
 fluidFvPatchFields = fluidModels/fvPatchFields
-$(fluidFvPatchFields)/pulsedParabolicVelocity/pulsedParabolicVelocityFvPatchVectorField.C
-$(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/elasticSlipWallVelocity/elasticSlipWallVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/elasticWallPressure/elasticWallPressureFvPatchScalarField.C
+$(fluidFvPatchFields)/elasticWallVelocity/elasticWallVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/extrapolated/extrapolatedFvPatchFields.C
 $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarField.C
+$(fluidFvPatchFields)/freeSurfacePressure/freeSurfacePressureFvPatchScalarField.C
+$(fluidFvPatchFields)/freeSurfaceVelocity/freeSurfaceVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/fixedVelocityPressure/fixedVelocityPressureFvPatchScalarField.C
+$(fluidFvPatchFields)/movingWallPressure/movingWallPressureFvPatchScalarField.C
+$(fluidFvPatchFields)/movingWallVelocity/movingWallVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/normalInletVelocity/normalInletVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/outflowPressure/outflowPressureFvPatchScalarField.C
+$(fluidFvPatchFields)/pulsedParabolicVelocity/pulsedParabolicVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/robin/robinFvPatchFields.C
+$(fluidFvPatchFields)/skewCorrectedLinearDC/skewCorrectedLinearDC.C
+$(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
+
 
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/setInletVelocity/setInletVelocity.C

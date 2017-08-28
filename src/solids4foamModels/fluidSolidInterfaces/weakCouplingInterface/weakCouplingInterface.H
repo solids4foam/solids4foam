@@ -62,13 +62,13 @@ class weakCouplingInterface
     // Private data
 
         //- Solid zone traction (pressure + vicous)
-        vectorField solidZoneTraction_;
+        vectorIOField solidZoneTraction_;
 
         //- Solid zone traction (pressure + vicous)
         vectorField solidZoneTractionPrev_;
 
         //- Solid zone traction (pressure + vicous)
-        vectorField predictedSolidZoneTraction_;
+        vectorIOField predictedSolidZoneTraction_;
 
         //- Fixed under-relaxation factor
         const scalar relaxationFactor_;
@@ -116,7 +116,7 @@ public:
             virtual void initializeFields();
 
             //- Calculate interface displacement
-            virtual void updateWeakDisplacement();
+            virtual bool updateWeakDisplacement();
 
             //- Update interface traction
             virtual void updateWeakTraction();

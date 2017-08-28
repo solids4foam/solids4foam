@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
   =========                 |
   \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
+   \\    /   O peration     | Version:     4.0
+    \\  /    A nd           | Web:         http://www.foam-extend.org
+     \\/     M anipulation  | For copyright notice see file Copyright
 -------------------------------------------------------------------------------
 License
     This file is part of foam-extend.
@@ -23,10 +23,10 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef extrapolatedFvPatchFields_H
-#define extrapolatedFvPatchFields_H
+#ifndef extrapolatedFvPatchFieldsFwd_H
+#define extrapolatedFvPatchFieldsFwd_H
 
-#include "extrapolatedFvPatchField.H"
+#include "fvPatchField.H"
 #include "fieldTypes.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -35,6 +35,8 @@ namespace Foam
 {
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+template<class Type> class extrapolatedFvPatchField;
 
 makePatchTypeFieldTypedefs(extrapolated)
 

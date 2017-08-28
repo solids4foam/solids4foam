@@ -1218,6 +1218,159 @@ Foam::solidModel::faceZonePointDisplacementIncrement
 }
 
 
+Foam::tmp<Foam::vectorField> Foam::solidModel::faceZonePointDisplacement
+(
+    const label zoneID
+) const
+{
+    tmp<vectorField> tPointDisplacement
+    (
+        new vectorField
+        (
+            mesh().faceZones()[zoneID]().localPoints().size(),
+            vector::zero
+        )
+    );
+    vectorField& pointDisplacement = tPointDisplacement();
+
+    const vectorField& oldPointDI = pointD().oldTime().internalField();
+
+    label globalZoneIndex = findIndex(globalFaceZones(), zoneID);
+
+    if (globalZoneIndex != -1)
+    {
+        // global face zone
+
+        const labelList& curPointMap =
+            globalToLocalFaceZonePointMap()[globalZoneIndex];
+
+        const labelList& zoneMeshPoints =
+            mesh().faceZones()[zoneID]().meshPoints();
+
+        vectorField zonePointsDisplGlobal
+        (
+            zoneMeshPoints.size(),
+            vector::zero
+        );
+
+        // Inter-proc points are shared by multiple procs
+        // pointNumProc is the number of procs which a point lies on
+        scalarField pointNumProcs(zoneMeshPoints.size(), 0);
+
+        forAll(zonePointsDisplGlobal, globalPointI)
+        {
+            label localPoint = curPointMap[globalPointI];
+
+            if(zoneMeshPoints[localPoint] < mesh().nPoints())
+            {
+                label procPoint = zoneMeshPoints[localPoint];
+
+                zonePointsDisplGlobal[globalPointI] =
+                    oldPointDI[procPoint];
+
+                pointNumProcs[globalPointI] = 1;
+            }
+        }
+
+        if (Pstream::parRun())
+        {
+            reduce(zonePointsDisplGlobal, sumOp<vectorField>());
+            reduce(pointNumProcs, sumOp<scalarField>());
+
+            // Now average the displacement between all procs
+            zonePointsDisplGlobal /= pointNumProcs;
+        }
+
+        forAll(pointDisplacement, globalPointI)
+        {
+            label localPoint = curPointMap[globalPointI];
+
+            pointDisplacement[localPoint] = zonePointsDisplGlobal[globalPointI];
+        }
+    }
+    else
+    {
+        tPointDisplacement() =
+            vectorField
+            (
+                oldPointDI,
+                mesh().faceZones()[zoneID]().meshPoints()
+            );
+    }
+
+    return tPointDisplacement;
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
+(
+    const label zoneID,
+    const label patchID
+) const
+{
+    tmp<vectorField> tAcceleration
+    (
+        new vectorField
+        (
+            mesh().faceZones()[zoneID]().size(),
+            vector::zero
+        )
+    );
+    vectorField& acceleration = tAcceleration();
+
+    const volVectorField a = fvc::d2dt2(D());
+
+    vectorField patchAcceleration = a.boundaryField()[patchID];
+
+    const label patchStart = mesh().boundaryMesh()[patchID].start();
+
+    forAll(patchAcceleration, I)
+    {
+        acceleration[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
+            patchAcceleration[I];
+    }
+
+    // Parallel data exchange: collect pressure field on all processors
+    reduce(acceleration, sumOp<vectorField>());
+
+    return tAcceleration;
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneVelocity
+(
+    const label zoneID,
+    const label patchID
+) const
+{
+    tmp<vectorField> tVelocity
+    (
+        new vectorField
+        (
+            mesh().faceZones()[zoneID]().size(),
+            vector::zero
+        )
+    );
+    vectorField& velocity = tVelocity();
+
+    vectorField patchVelocity = U().boundaryField()[patchID];
+
+    const label patchStart =
+        mesh().boundaryMesh()[patchID].start();
+
+    forAll(patchVelocity, I)
+    {
+        velocity[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
+            patchVelocity[I];
+    }
+
+    // Parallel data exchange: collect pressure field on all processors
+    reduce(velocity, sumOp<vectorField>());
+
+    return tVelocity;
+}
+
+
 Foam::tmp<Foam::tensorField> Foam::solidModel::faceZoneSurfaceGradientOfVelocity
 (
     const label zoneID,

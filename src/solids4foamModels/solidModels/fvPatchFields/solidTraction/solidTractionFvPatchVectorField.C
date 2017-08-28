@@ -47,7 +47,9 @@ solidTractionFvPatchVectorField
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
-    pressureSeries_()
+    pressureSeries_(),
+    secondOrder_(false),
+    limitCoeff_(1.0)
 {
     fvPatchVectorField::operator=(patchInternalField());
     gradient() = vector::zero;
@@ -66,8 +68,12 @@ solidTractionFvPatchVectorField
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
-    pressureSeries_()
+    pressureSeries_(),
+    secondOrder_(dict.lookupOrDefault<Switch>("secondOrder", false)),
+    limitCoeff_(dict.lookupOrDefault<scalar>("limitCoeff", 1.0))
 {
+    Info<< "Creating " << type() << " boundary condition" << endl;
+
     if (dict.found("gradient"))
     {
         gradient() = vectorField("gradient", dict, p.size());
@@ -89,7 +95,7 @@ solidTractionFvPatchVectorField
     // Check if traction is time-varying
     if (dict.found("tractionSeries"))
     {
-        Info<< "traction is time-varying" << endl;
+        Info<< "    traction is time-varying" << endl;
         tractionSeries_ =
             interpolationTable<vector>(dict.subDict("tractionSeries"));
     }
@@ -101,13 +107,23 @@ solidTractionFvPatchVectorField
     // Check if pressure is time-varying
     if (dict.found("pressureSeries"))
     {
-        Info<< "pressure is time-varying" << endl;
+        Info<< "    pressure is time-varying" << endl;
         pressureSeries_ =
             interpolationTable<scalar>(dict.subDict("pressureSeries"));
     }
     else
     {
         pressure_ = scalarField("pressure", dict, p.size());
+    }
+
+    if (secondOrder_)
+    {
+        Info<< "    second order correction" << endl;
+    }
+
+    if (limitCoeff_)
+    {
+        Info<< "    limiter coefficient: " << limitCoeff_ << endl;
     }
 }
 
@@ -125,7 +141,9 @@ solidTractionFvPatchVectorField
     traction_(stpvf.traction_, mapper),
     pressure_(stpvf.pressure_, mapper),
     tractionSeries_(stpvf.tractionSeries_),
-    pressureSeries_(stpvf.pressureSeries_)
+    pressureSeries_(stpvf.pressureSeries_),
+    secondOrder_(stpvf.secondOrder_),
+    limitCoeff_(stpvf.limitCoeff_)
 {}
 
 
@@ -139,7 +157,9 @@ solidTractionFvPatchVectorField
     traction_(stpvf.traction_),
     pressure_(stpvf.pressure_),
     tractionSeries_(stpvf.tractionSeries_),
-    pressureSeries_(stpvf.pressureSeries_)
+    pressureSeries_(stpvf.pressureSeries_),
+    secondOrder_(stpvf.secondOrder_),
+    limitCoeff_(stpvf.limitCoeff_)
 {}
 
 
@@ -154,7 +174,9 @@ solidTractionFvPatchVectorField
     traction_(stpvf.traction_),
     pressure_(stpvf.pressure_),
     tractionSeries_(stpvf.tractionSeries_),
-    pressureSeries_(stpvf.pressureSeries_)
+    pressureSeries_(stpvf.pressureSeries_),
+    secondOrder_(stpvf.secondOrder_),
+    limitCoeff_(stpvf.limitCoeff_)
 {}
 
 
@@ -234,24 +256,44 @@ void solidTractionFvPatchVectorField::evaluate(const Pstream::commsTypes)
         this->updateCoeffs();
     }
 
+    // Lookup the gradient field
     const fvPatchField<tensor>& gradField =
         patch().lookupPatchField<volTensorField, tensor>
         (
             "grad(" + dimensionedInternalField().name() + ")"
         );
 
-    vectorField n = patch().nf();
-    vectorField delta = patch().delta();
+    // Face unit normal
+    const vectorField n = patch().nf();
 
-    //- non-orthogonal correction vectors
+    // Delta vectors
+    const vectorField delta = patch().delta();
+
+    // Non-orthogonal correction vectors
     vectorField k = delta - n*(n&delta);
 
-    Field<vector>::operator=
-    (
-        this->patchInternalField()
-      + (k&gradField.patchInternalField())
-      + gradient()/this->patch().deltaCoeffs()
-    );
+    if (secondOrder_)
+    {
+        const vectorField dUP = (k & gradField.patchInternalField());
+        const vectorField nGradUP = (n & gradField.patchInternalField());
+
+        Field<vector>::operator=
+        (
+            patchInternalField()
+          + dUP
+          + 0.5*(gradient() + nGradUP)/patch().deltaCoeffs()
+        );
+    }
+    else
+    {
+
+        Field<vector>::operator=
+        (
+            patchInternalField()
+          + (k & gradField.patchInternalField())
+          + gradient()/patch().deltaCoeffs()
+        );
+    }
 
     fvPatchField<vector>::evaluate();
 }
@@ -259,7 +301,6 @@ void solidTractionFvPatchVectorField::evaluate(const Pstream::commsTypes)
 // Write
 void solidTractionFvPatchVectorField::write(Ostream& os) const
 {
-    //fvPatchVectorField::write(os);
     fixedGradientFvPatchVectorField::write(os);
 
     if (tractionSeries_.size())
@@ -285,6 +326,10 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
     {
         pressure_.writeEntry("pressure", os);
     }
+    os.writeKeyword("secondOrder")
+        << secondOrder_ << token::END_STATEMENT << nl;
+    os.writeKeyword("limitCoeff")
+        << limitCoeff_ << token::END_STATEMENT << nl;
 
     writeEntry("value", os);
 }

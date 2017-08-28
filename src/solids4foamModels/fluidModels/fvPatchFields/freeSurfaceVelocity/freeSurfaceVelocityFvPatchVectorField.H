@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
   =========                 |
   \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
+   \\    /   O peration     | Version:     4.0
+    \\  /    A nd           | Web:         http://www.foam-extend.org
+     \\/     M anipulation  | For copyright notice see file Copyright
 -------------------------------------------------------------------------------
 License
     This file is part of foam-extend.
@@ -22,20 +22,23 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::extrapolatedFvPatchField
+    Foam::freeSurfaceVelocityFvPatchVectorField
 
 Description
-    Foam::extrapolatedFvPatchField
+    Velocity outlet boundary condition for patches where the pressure is
+    specified. The outflow velocity is obtained by "fixedGradient" and then
+    corrected from the flux.
 
 SourceFiles
-    extrapolatedFvPatchField.C
+    freeSurfaceVelocityFvPatchVectorField.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef extrapolatedFvPatchField_H
-#define extrapolatedFvPatchField_H
+#ifndef freeSurfaceVelocityFvPatchVectorField_H
+#define freeSurfaceVelocityFvPatchVectorField_H
 
-#include "fixedGradientFvPatchField.H"
+#include "fvPatchFields.H"
+#include "fixedGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -43,114 +46,99 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                    Class extrapolatedFvPatch Declaration
+                   Class freeSurfaceVelocityFvPatch Declaration
 \*---------------------------------------------------------------------------*/
 
-template<class Type>
-class extrapolatedFvPatchField
+class freeSurfaceVelocityFvPatchVectorField
 :
-    public fixedGradientFvPatchField<Type>
+    public fixedGradientFvPatchVectorField
 {
     // Private data
 
-    Switch zeroGradient_;
+        //- Name of flux field
+        word phiName_;
+
+        //- Name of density field
+        word rhoName_;
+
+        //- Current time index
+        label curTimeIndex_;
 
 public:
 
     //- Runtime type information
-    TypeName("extrapolated");
+    TypeName("freeSurfaceVelocity");
 
 
     // Constructors
 
         //- Construct from patch and internal field
-        extrapolatedFvPatchField
+        freeSurfaceVelocityFvPatchVectorField
         (
             const fvPatch&,
-            const DimensionedField<Type, volMesh>&
+            const DimensionedField<vector, volMesh>&
         );
 
         //- Construct from patch, internal field and dictionary
-        extrapolatedFvPatchField
+        freeSurfaceVelocityFvPatchVectorField
         (
             const fvPatch&,
-            const DimensionedField<Type, volMesh>&,
+            const DimensionedField<vector, volMesh>&,
             const dictionary&
         );
 
-        //- Construct by mapping the given extrapolatedFvPatchField
+        //- Construct by mapping given freeSurfaceVelocityFvPatchVectorField
         //  onto a new patch
-        extrapolatedFvPatchField
+        freeSurfaceVelocityFvPatchVectorField
         (
-            const extrapolatedFvPatchField<Type>&,
+            const freeSurfaceVelocityFvPatchVectorField&,
             const fvPatch&,
-            const DimensionedField<Type, volMesh>&,
+            const DimensionedField<vector, volMesh>&,
             const fvPatchFieldMapper&
         );
 
-        //- Construct as copy
-        extrapolatedFvPatchField
-        (
-            const extrapolatedFvPatchField<Type>&
-        );
-
         //- Construct and return a clone
-        virtual tmp<fvPatchField<Type> > clone() const
+        virtual tmp<fvPatchVectorField> clone() const
         {
-            return tmp<fvPatchField<Type> >
+            return tmp<fvPatchVectorField>
             (
-                new extrapolatedFvPatchField<Type>(*this)
+                new freeSurfaceVelocityFvPatchVectorField(*this)
             );
         }
 
         //- Construct as copy setting internal field reference
-        extrapolatedFvPatchField
+        freeSurfaceVelocityFvPatchVectorField
         (
-            const extrapolatedFvPatchField<Type>&,
-            const DimensionedField<Type, volMesh>&
+            const freeSurfaceVelocityFvPatchVectorField&,
+            const DimensionedField<vector, volMesh>&
         );
 
         //- Construct and return a clone setting internal field reference
-        virtual tmp<fvPatchField<Type> > clone
+        virtual tmp<fvPatchVectorField> clone
         (
-            const DimensionedField<Type, volMesh>& iF
+            const DimensionedField<vector, volMesh>& iF
         ) const
         {
-            return tmp<fvPatchField<Type> >
+            return tmp<fvPatchVectorField>
             (
-                new extrapolatedFvPatchField<Type>(*this, iF)
+                new freeSurfaceVelocityFvPatchVectorField(*this, iF)
             );
         }
 
 
     // Member functions
 
-        // Return defining fields
-
-
-        // Mapping functions
-
-            //- Map (and resize as needed) from self given a mapping object
-            virtual void autoMap
-            (
-                const fvPatchFieldMapper&
-            );
-
-            //- Reverse map the given fvPatchField onto this fvPatchField
-            virtual void rmap
-            (
-                const fvPatchField<Type>&,
-                const labelList&
-            );
-
-
         // Evaluation functions
+
+            //- Update the coefficients associated with the patch field
+            virtual void updateCoeffs();
 
             //- Evaluate the patch field
             virtual void evaluate
             (
                 const Pstream::commsTypes commsType=Pstream::blocking
             );
+
 
         //- Write
         virtual void write(Ostream&) const;
@@ -160,12 +148,6 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-#ifdef NoRepository
-#   include "extrapolatedFvPatchField.C"
-#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

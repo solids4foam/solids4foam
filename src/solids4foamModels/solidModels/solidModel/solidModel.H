@@ -453,6 +453,27 @@ public:
                  const label zoneID
             ) const;
 
+            //- Face zone point displacement increment
+            virtual tmp<vectorField> faceZonePointDisplacement
+            (
+                 const label zoneID
+            ) const;
+
+            //- Face zone velocity
+            virtual tmp<vectorField> faceZoneAcceleration
+            (
+                const label zoneID,
+                const label patchID
+            ) const;
+
+            //- Face zone velocity
+            virtual tmp<vectorField> faceZoneVelocity
+            (
+                const label zoneID,
+                const label patchID
+            ) const;
+
+            //- Face zone surface velocity gradient
             virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
             (
                 const label zoneID,

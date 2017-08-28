@@ -1,4 +1,11 @@
+c++WARN = \
+    -Wno-deprecated -Wall -Wextra -Wno-unused-parameter -Wnon-virtual-dtor \
+    -Werror -Wredundant-decls -Wcast-align \
+    -Wmissing-declarations  -Wswitch-enum -Winvalid-pch -Wredundant-decls \
+    -Wformat=2 -Wmissing-format-attribute -Wformat-nonliteral
+
 EXE_INC = \
+    -std=c++11 \
     -I../../ThirdParty/eigen3 \
     -I../blockCoupledSolidTools/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \

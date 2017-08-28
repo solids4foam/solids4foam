@@ -49,8 +49,10 @@ SourceFiles
 #include "fluidModel.H"
 #include "solidModel.H"
 #include "dynamicFvMesh.H"
-//#include "extendedGgiInterpolation.H"
-#include "newGgiInterpolation.H"
+#include "ggiInterpolation.H"
+#include "RBFInterpolation.H"
+
+using namespace rbf;
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -96,9 +98,14 @@ class fluidSolidInterface
         mutable PrimitivePatch<face, List, const pointField&>*
             currentSolidZonePatchPtr_;
 
+        //- Fluid zone to solid zone interpolator
+        mutable std::shared_ptr<RBFInterpolation> fluidToSolidPtr_;
+
         //- Ggi zone-to-zone interpolation
-        //mutable extendedGgiZoneInterpolation* ggiInterpolatorPtr_;
-        mutable newGgiZoneInterpolation* ggiInterpolatorPtr_;
+        mutable ggiZoneInterpolation* ggiInterpolatorPtr_;
+
+        //- Solid zone to fluid zone interpolator
+        mutable std::shared_ptr<RBFInterpolation> solidToFluidPtr_;
 
         //- Outer correction loop stoping tolerance
         scalar outerCorrTolerance_;
@@ -111,6 +118,12 @@ class fluidSolidInterface
 
         //- Optional: enable coupling after specified time
         const scalar couplingStartTime_;
+
+        //- Predictor on/off
+        Switch predictor_;
+
+        //- Use rbf interpolation
+        Switch rbfInterpolation_;
 
         //- Interface deformation limit
         scalar interfaceDeformationLimit_;
@@ -130,6 +143,12 @@ class fluidSolidInterface
         //- Solid zone ref. point displacement
         vectorField solidZonePointsDisplRef_;
 
+        //- Solid zone point displacement
+        vectorField interfacePointsDispl_;
+
+        //- Solid zone ref. point displacement
+        vectorField interfacePointsDisplPrev_;
+
         //- Solid zone pressure
         scalarField solidZonePressure_;
 
@@ -141,6 +160,9 @@ class fluidSolidInterface
 
         //- Maximal resudual norm
         scalar maxResidualNorm_;
+
+        //- Maximal interface displacement norm
+        scalar maxIntDisplNorm_;
 
         //- Outer corrector
         label outerCorr_;
@@ -165,8 +187,14 @@ class fluidSolidInterface
         //- Calculate current solid zone primitive patch
         void calcCurrentSolidZonePatch() const;
 
-        //- Calculate fluid to solid ggi interpolator
+        //- Calculate fluid to solid interpolator
+        void calcFluidToSolidInterpolator() const;
+
+        //- Calculate fluid-to-solid / solid-to-fluid ggi interpolator
         void calcGgiInterpolator() const;
+
+        //- Calculate fluid to solid interpolator
+        void calcSolidToFluidInterpolator() const;
 
         //- Accumulated fluid interface displacement
         void calcAccumulatedFluidInterfaceDisplacement() const;
@@ -331,8 +359,13 @@ public:
             currentSolidZonePatch() const;
 
             //- Return fluid to solid interpolator
-            //const extendedGgiZoneInterpolation& ggiInterpolator() const;
-            const newGgiZoneInterpolation& ggiInterpolator() const;
+            const std::shared_ptr<RBFInterpolation>& fluidToSolid() const;
+
+            //- Return fluid to solid interpolator
+            const ggiZoneInterpolation& ggiInterpolator() const;
+
+            //- Return fluid to solid interpolator
+            const std::shared_ptr<RBFInterpolation>& solidToFluid() const;
 
             //- Return outer corrector loop tolerance
             scalar outerCorrTolerance() const
@@ -394,6 +427,18 @@ public:
                 return solidZonePointsDisplRef_;
             }
 
+            //- Return solid zone point displacement
+            vectorField& interfacePointsDispl()
+            {
+                return interfacePointsDispl_;
+            }
+
+            //- Return solid zone ref. point displacement
+            vectorField& interfacePointsDisplPrev()
+            {
+                return interfacePointsDisplPrev_;
+            }
+
             //- Return solid zone pressure
             scalarField& solidZonePressure()
             {
@@ -418,11 +463,36 @@ public:
                 return outerCorr_;
             }
 
-            //- Return current outer iteration
+            //- Return const current outer iteration
             const label& outerCorr() const
             {
                 return outerCorr_;
             }
+
+            //- Return maximal resudual norm
+            scalar& maxResidualNorm()
+            {
+                return maxResidualNorm_;
+            }
+
+            //- Return const maximal resudual norm
+            const scalar& maxResidualNorm() const
+            {
+                return maxResidualNorm_;
+            }
+
+            //- Return interface displacement norm
+            scalar& maxIntDisplNorm()
+            {
+                return maxIntDisplNorm_;
+            }
+
+            //- Return const interface displacement norm
+            const scalar& maxIntDisplNorm() const
+            {
+                return maxIntDisplNorm_;
+            }
+
 
         // Edit
 

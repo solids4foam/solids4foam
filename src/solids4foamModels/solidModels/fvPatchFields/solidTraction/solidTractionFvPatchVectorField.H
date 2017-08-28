@@ -26,14 +26,11 @@ Class
     solidTractionFvPatchVectorField
 
 Description
-    Fixed traction boundary condition for solid foam solvers.
-    Suitable for for total strain or incremental strain total or
-    updated Lagrangian approaches.
-    Contains thermal-elastic, plastic, non-linear terms if required.
-    And non-orthogonal correction.
+    Fixed traction boundary condition for solid solvers.
 
 Author
-   Philip Cardiff
+    Philip Cardiff, UCD.
+    Zeljko Tukovic, FSB Zagreb.
 
 SourceFiles
     solidTractionFvPatchVectorField.C
@@ -75,6 +72,12 @@ class solidTractionFvPatchVectorField
 
         //- Pressure time series
         interpolationTable<scalar> pressureSeries_;
+
+        //- Second order accuracy correction
+        Switch secondOrder_;
+
+        //- Limiter coefficient for snGrad correction
+        scalar limitCoeff_;
 
 
 public:
