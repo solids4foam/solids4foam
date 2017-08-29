@@ -38,6 +38,7 @@ License
 #include "ggiInterpolation.H"
 #include "TPSFunction.H"
 #include "elasticWallPressureFvPatchScalarField.H"
+#include "movingWallPressureFvPatchScalarField.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -1570,6 +1571,156 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
     Info<< "Alternative fsi residual: " << residualNorm_2 << endl;
 
     return min(residualNorm_2, residualNorm);
+}
+
+
+void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
+{
+    if
+    (
+        isA<movingWallPressureFvPatchScalarField>
+        (
+            fluid().p().boundaryField()[fluidPatchIndex()]
+        )
+    )
+    {
+        Info<< "Setting acceleration at fluid side of the interface" << endl;
+
+        const vectorField solidZoneAcceleration =
+            solid().faceZoneAcceleration(solidZoneIndex(), solidPatchIndex());
+
+        const vectorField fluidZoneAcceleration =
+            ggiInterpolator().slaveToMaster(solidZoneAcceleration);
+
+        vectorField fluidPatchAcceleration
+        (
+            fluidMesh().boundary()[fluidPatchIndex()].size(),
+            vector::zero
+        );
+
+        const label patchStart =
+            fluidMesh().boundaryMesh()[fluidPatchIndex()].start();
+
+        forAll(fluidPatchAcceleration, I)
+        {
+            fluidPatchAcceleration[I] =
+                fluidZoneAcceleration
+                [
+                    fluidMesh().faceZones()[fluidZoneIndex()].whichFace
+                    (
+                        patchStart + I
+                    )
+                ];
+        }
+
+        const_cast<movingWallPressureFvPatchScalarField&>
+        (
+            refCast<const movingWallPressureFvPatchScalarField>
+            (
+                fluid().p().boundaryField()[fluidPatchIndex()]
+            )
+        ).prevAcceleration() = fluidPatchAcceleration;
+    }
+}
+
+
+void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
+{
+    // Set interface acceleration
+    if
+    (
+        isA<elasticWallPressureFvPatchScalarField>
+        (
+            fluid().p().boundaryField()[fluidPatchIndex()]
+        )
+    )
+    {
+        const vectorField solidZoneAcceleration =
+            solid().faceZoneAcceleration(solidZoneIndex(), solidPatchIndex());
+
+        const vectorField fluidZoneAcceleration =
+            ggiInterpolator().slaveToMaster(solidZoneAcceleration);
+
+        vectorField fluidPatchAcceleration
+        (
+            fluidMesh().boundary()[fluidPatchIndex()].size(),
+            vector::zero
+        );
+
+        const label patchStart =
+            fluidMesh().boundaryMesh()[fluidPatchIndex()].start();
+
+        forAll(fluidPatchAcceleration, I)
+        {
+            fluidPatchAcceleration[I] =
+                fluidZoneAcceleration
+                [
+                    fluidMesh().faceZones()[fluidZoneIndex()].whichFace
+                    (
+                        patchStart + I
+                    )
+                ];
+        }
+
+        const_cast<elasticWallPressureFvPatchScalarField&>
+        (
+            refCast<const elasticWallPressureFvPatchScalarField>
+            (
+                fluid().p().boundaryField()[fluidPatchIndex()]
+            )
+        ).prevAcceleration() = fluidPatchAcceleration;
+    }
+}
+
+
+void Foam::fluidSolidInterface::syncFluidZonePointsDispl
+(
+    vectorField& fluidZonePointsDispl
+)
+{
+    // Make sure that displacement on all processors is equal to one
+    // calculated on master processor
+    if (Pstream::parRun())
+    {
+        if (!Pstream::master())
+        {
+            fluidZonePointsDispl = vector::zero;
+        }
+
+        //- pass to all procs
+        reduce(fluidZonePointsDispl, sumOp<vectorField>());
+
+        const label globalFluidZoneIndex =
+            findIndex(fluid().globalFaceZones(), fluidZoneIndex());
+
+        if (globalFluidZoneIndex == -1)
+        {
+            FatalErrorIn
+            (
+                "void Foam::fluidSolidInterface::syncFluidZonePointsDispl\n"
+                "(\n"
+                "    vectorField& fluidZonePointsDispl\n"
+                ")"
+            )   << "global zone point map is not available"
+                << abort(FatalError);
+        }
+
+        const labelList& map =
+            fluid().globalToLocalFaceZonePointMap()[globalFluidZoneIndex];
+
+        if (!Pstream::master())
+        {
+            const vectorField fluidZonePointsDisplGlobal = fluidZonePointsDispl;
+
+            forAll(fluidZonePointsDisplGlobal, globalPointI)
+            {
+                const label localPoint = map[globalPointI];
+
+                fluidZonePointsDispl[localPoint] =
+                    fluidZonePointsDisplGlobal[globalPointI];
+            }
+        }
+    }
 }
 
 

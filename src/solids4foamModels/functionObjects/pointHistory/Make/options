@@ -1,0 +1,21 @@
+c++WARN     = -Wno-deprecated -Wall -Wextra -Wno-unused-parameter -Wnon-virtual-dtor -Wunused-local-typedefs -Werror -Wredundant-decls -Wcast-align -Wmissing-declarations  -Wswitch-enum -Winvalid-pch -Wredundant-decls -Wformat=2 -Wmissing-format-attribute -Wformat-nonliteral
+
+
+EXE_INC = -std=c++11 \
+    -I../../../fluidSolidInteraction/lnInclude \
+    -I../../../ThirdParty/eigen3 \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/finiteArea/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
+    -I$(LIB_SRC)/lagrangian/basic/lnInclude
+
+
+LIB_LIBS = \
+    -lfiniteVolume \
+    -lfiniteArea \
+    -ldynamicFvMesh \
+    -ldynamicMesh \
+    -lmeshTools \
+    -L$(FOAM_USER_LIBBIN) \
+    -lfluidSolidInteraction

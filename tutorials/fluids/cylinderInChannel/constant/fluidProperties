@@ -22,10 +22,9 @@ icoFluidCoeffs
 {
     nCorrectors     3;
     nNonOrthogonalCorrectors 1;
+    nOuterCorrectors 1;
     pRefCell        0;
     pRefValue       0;
-
-    consistencyByJasak no;
 }
 
 pisoFluidCoeffs

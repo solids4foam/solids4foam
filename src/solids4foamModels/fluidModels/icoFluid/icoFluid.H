@@ -86,9 +86,6 @@ class icoFluid
         //- Density
         dimensionedScalar rho_;
 
-        //- Consistency in time
-        const Switch consistencyByJasak_;
-
 
     // Private Member Functions
 
@@ -147,6 +144,12 @@ public:
             volVectorField& gradp()
             {
                 return gradp_;
+            }
+
+            //- Return velocity gradient
+            volTensorField& gradU()
+            {
+                return gradU_;
             }
 
             //- Return const reference to flux field

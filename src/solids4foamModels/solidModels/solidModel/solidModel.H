@@ -46,6 +46,7 @@ SourceFiles
 #include "IOdictionary.H"
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
+#include "thermalModel.H"
 #include "mechanicalModel.H"
 #include "nonLinearGeometry.H"
 #include "uniformDimensionedFields.H"
@@ -71,6 +72,9 @@ class solidModel
 
         //- Solid properties dictionary
         dictionary solidProperties_;
+
+        //- Thermal model
+        mutable autoPtr<thermalModel> thermalPtr_;
 
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
@@ -178,6 +182,9 @@ class solidModel
         //- Find global to local point addressing
         void calcGlobalToLocalFaceZonePointMap() const;
 
+        //- Make the thermal model
+        void makeThermalModel() const;
+
         //- Make the mechanical model
         void makeMechanicalModel() const;
 
@@ -212,11 +219,11 @@ protected:
             return solidProperties_;
         }
 
+        //- Return non-const reference to the thermal model
+        thermalModel& thermal();
+
         //- Return non-const reference to the mechanical model
         mechanicalModel& mechanical();
-
-        //- Return const reference to the mechanical model
-        const mechanicalModel& mechanical() const;
 
         //- Return const-reference to the density
         const volScalarField& rho() const;
@@ -347,6 +354,12 @@ public:
                 return solidProperties_;
             }
 
+            //- Return const reference to the thermal model
+            const thermalModel& thermal() const;
+
+            //- Return const reference to the mechanical model
+            const mechanicalModel& mechanical() const;
+
             //- Return non-const reference to D
             virtual volVectorField& D()
             {
@@ -406,6 +419,9 @@ public:
             {
                 return pointDD_;
             }
+
+            //- Return velocity at a point
+            virtual vector pointU(const label pointID) const;
 
             //- Return non-const reference to gradD
             virtual volTensorField& gradD()

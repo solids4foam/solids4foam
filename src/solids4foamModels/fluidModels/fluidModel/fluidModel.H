@@ -101,6 +101,15 @@ protected:
             return fluidProperties_;
         }
 
+        //- Update Robin boundary conditions, if found
+        void updateRobinFsiInterface
+        (
+            const volScalarField& p,
+            const volVectorField& U,
+            surfaceScalarField& phi,
+            surfaceScalarField& rAUf
+        );
+
 
 public:
 

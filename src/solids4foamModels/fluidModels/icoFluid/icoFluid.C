@@ -107,11 +107,7 @@ icoFluid::icoFluid
         )
     ),
     nu_(transportProperties_.lookup("nu")),
-    rho_(transportProperties_.lookup("rho")),
-    consistencyByJasak_
-    (
-        fluidProperties().lookupOrDefault<Switch>("consistencyByJasak", false)
-    )
+    rho_(transportProperties_.lookup("rho"))
 {}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -137,8 +133,9 @@ tmp<vectorField> icoFluid::patchViscousForce(const label patchID) const
 
     tvF() = rho_.value()*nu_.value()*U().boundaryField()[patchID].snGrad();
 
-//     vectorField n = mesh().boundary()[patchID].nf();
-//     tvF() -= n*(n&tvF());
+    const vectorField n = mesh().boundary()[patchID].nf();
+
+    tvF() -= n*(n&tvF());
 
     return tvF;
 }
@@ -239,150 +236,127 @@ tmp<scalarField> icoFluid::faceZoneMuEff
 
 bool icoFluid::evolve()
 {
-    if (consistencyByJasak_)
-    {
-        Info << "Evolving fluid model (consistency by Jasak)" << endl;
-    }
-    else
-    {
-        Info << "Evolving fluid model" << endl;
-    }
+    Info<< "Evolving fluid model: " << this->type() << endl;
 
     const fvMesh& mesh = this->mesh();
 
-    const int nCorr(readInt(fluidProperties().lookup("nCorrectors")));
+    const int nCorr = readInt(fluidProperties().lookup("nCorrectors"));
 
     const int nNonOrthCorr =
         readInt(fluidProperties().lookup("nNonOrthogonalCorrectors"));
+
+    const int nOutCorr =
+        readInt(fluidProperties().lookup("nOuterCorrectors"));
 
     // Prepare for the pressure solution
     label pRefCell = 0;
     scalar pRefValue = 0.0;
     setRefCell(p_, fluidProperties(), pRefCell, pRefValue);
 
-    if (mesh.moving())
+    for (int oCorr = 0; oCorr < nOutCorr; oCorr++)
     {
-        // Make the fluxes relative
-        phi_ -= fvc::meshPhi(U_);
-    }
-
-    // Calculate CourantNo
-    {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
-
-        if (mesh.nInternalFaces())
+        if (mesh.moving())
         {
-            surfaceScalarField SfUfbyDelta =
-                mesh.surfaceInterpolation::deltaCoeffs()*mag(phi_);
-
-            CoNum =
-                max(SfUfbyDelta/mesh.magSf()).value()
-               *runTime().deltaT().value();
-
-            meanCoNum =
-                (sum(SfUfbyDelta)/sum(mesh.magSf())).value()
-               *runTime().deltaT().value();
-
-            velMag = max(mag(phi_)/mesh.magSf()).value();
+            // Make the fluxes relative
+            phi_ -= fvc::meshPhi(U_);
         }
 
-        Info<< "Courant Number mean: " << meanCoNum
-            << " max: " << CoNum
-            << " velocity magnitude: " << velMag << endl;
-    }
-
-    // Construct momentum equation
-    // Convection-diffusion matrix
-    fvVectorMatrix HUEqn
-    (
-        fvm::div(phi_, U_)
-      - fvm::laplacian(nu_, U_)
-    );
-
-    // Time derivative matrix
-    fvVectorMatrix ddtUEqn(fvm::ddt(U_));
-
-    // Solve momentum equation
-    solve(ddtUEqn + HUEqn == -gradp_);
-
-    // --- PISO loop
-
-    volScalarField aU = HUEqn.A();
-
-    if (!consistencyByJasak_)
-    {
-        aU += ddtUEqn.A();
-    }
-
-    for (int corr = 0; corr < nCorr; corr++)
-    {
-        if (consistencyByJasak_)
+        // CourantNo
         {
-            U_ = HUEqn.H()/aU;
+          scalar CoNum = 0.0;
+          scalar meanCoNum = 0.0;
+          scalar velMag = 0.0;
+
+          if (mesh.nInternalFaces())
+          {
+              surfaceScalarField SfUfbyDelta =
+                  mesh.surfaceInterpolation::deltaCoeffs()*mag(phi_);
+
+              CoNum = max(SfUfbyDelta/mesh.magSf())
+                .value()*runTime().deltaT().value();
+
+              meanCoNum = (sum(SfUfbyDelta)/sum(mesh.magSf()))
+                .value()*runTime().deltaT().value();
+
+              velMag = max(mag(phi_)/mesh.magSf()).value();
+          }
+
+          Info<< "Courant Number mean: " << meanCoNum
+              << " max: " << CoNum
+              << " velocity magnitude: " << velMag << endl;
         }
-        else
+
+        fvVectorMatrix UEqn
+        (
+            fvm::ddt(U_)
+          + fvm::div(phi_, U_)
+          - fvm::laplacian(nu_, U_)
+        );
+
+        solve(UEqn == -gradp_);
+
+        // --- PISO loop
+
+        volScalarField rAU = 1.0/UEqn.A();
+        surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
+
+        for (int corr = 0; corr < nCorr; corr++)
         {
-            U_ = (ddtUEqn.H() + HUEqn.H())/aU;
-        }
-        phi_ = (fvc::interpolate(U_) & mesh.Sf());
+            U_ = rAU*UEqn.H();
+            phi_ = (fvc::interpolate(U_) & mesh.Sf());
+            //+ fvc::ddtPhiCorr(rUA, U_, phi_);
 
-        adjustPhi(phi_, U_, p_);
+            fluidModel::updateRobinFsiInterface(p_, U_, phi_, rAUf);
 
-        for (int nonOrth = 0; nonOrth <= nNonOrthCorr; nonOrth++)
-        {
-            // Construct pressure equation
-            fvScalarMatrix pEqn
-            (
-                fvm::laplacian(1/aU, p_) == fvc::div(phi_)
-            );
+            adjustPhi(phi_, U_, p_);
 
-            // Solve pressure equation
-            pEqn.setReference(pRefCell, pRefValue);
-            pEqn.solve();
-
-            if (nonOrth == nNonOrthCorr)
+            for (int nonOrth=0; nonOrth<=nNonOrthCorr; nonOrth++)
             {
-                phi_ -= pEqn.flux();
-            }
-        }
-
-        // Calculate continuity error
-        {
-            volScalarField contErr = fvc::div(phi_);
-
-            scalar sumLocalContErr = runTime().deltaT().value()*
-                mag(contErr)().weightedAverage(mesh.V()).value();
-
-            scalar globalContErr = runTime().deltaT().value()*
-                contErr.weightedAverage(mesh.V()).value();
-
-            Info<< "time step continuity errors : sum local = "
-                << sumLocalContErr << ", global = " << globalContErr << endl;
-        }
-
-        gradp_ = fvc::grad(p_);
-
-        if (consistencyByJasak_)
-        {
-            U_ = 1.0/(aU + ddtUEqn.A())*
+                fvScalarMatrix pEqn
                 (
-                    U_*aU - gradp_ + ddtUEqn.H()
+                    fvm::laplacian
+                    (
+                        rAUf, p_, "laplacian((1|A(U)),p)"
+                    )
+                 == fvc::div(phi_)
+                 // fvm::laplacian(rAUf, p_) == fvc::div(phi_)
                 );
-        }
-        else
-        {
-            U_ -= gradp_/aU;
-        }
-        U_.correctBoundaryConditions();
 
-        gradU_ = fvc::grad(U_);
+                pEqn.setReference(pRefCell, pRefValue);
+                pEqn.solve();
+
+                gradp_ = fvc::grad(p_);
+
+                if (nonOrth == nNonOrthCorr)
+                {
+                    phi_ -= pEqn.flux();
+                }
+            }
+
+            // Continuity error
+            {
+                volScalarField contErr = fvc::div(phi_);
+
+                scalar sumLocalContErr = runTime().deltaT().value()*
+                    mag(contErr)().weightedAverage(mesh.V()).value();
+
+                scalar globalContErr = runTime().deltaT().value()*
+                    contErr.weightedAverage(mesh.V()).value();
+
+                Info<< "time step continuity errors : sum local = "
+                    << sumLocalContErr << ", global = "
+                    << globalContErr << endl;
+            }
+
+            U_ -= rAU*gradp_;
+            U_.correctBoundaryConditions();
+
+            gradU_ = fvc::grad(U_);
+        }
     }
 
     return 0;
 }
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

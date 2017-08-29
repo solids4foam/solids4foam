@@ -388,6 +388,21 @@ void Foam::solidModel::updateGlobalFaceZoneNewPoints
 }
 
 
+void Foam::solidModel::makeThermalModel() const
+{
+    if (!thermalPtr_.empty())
+    {
+        FatalErrorIn("void Foam::solidModel::makeThermalModel() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    thermalPtr_.set
+    (
+        new thermalModel(mesh())
+    );
+}
+
+
 void Foam::solidModel::makeMechanicalModel() const
 {
     if (!mechanicalPtr_.empty())
@@ -439,18 +454,18 @@ const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
 
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
 
-Foam::mechanicalModel& Foam::solidModel::mechanical()
+Foam::thermalModel& Foam::solidModel::thermal()
 {
-    if (mechanicalPtr_.empty())
+    if (thermalPtr_.empty())
     {
-        makeMechanicalModel();
+        makeThermalModel();
     }
 
-    return mechanicalPtr_();
+    return thermalPtr_();
 }
 
 
-const Foam::mechanicalModel& Foam::solidModel::mechanical() const
+Foam::mechanicalModel& Foam::solidModel::mechanical()
 {
     if (mechanicalPtr_.empty())
     {
@@ -862,6 +877,7 @@ Foam::solidModel::solidModel
         )
     ),
     solidProperties_(subDict(type + "Coeffs")),
+    thermalPtr_(NULL),
     mechanicalPtr_(NULL),
     D_
     (
@@ -1104,6 +1120,7 @@ Foam::solidModel::solidModel
 
 Foam::solidModel::~solidModel()
 {
+    thermalPtr_.clear();
     mechanicalPtr_.clear();
     deleteDemandDrivenData(globalFaceZonesPtr_);
     deleteDemandDrivenData(globalToLocalFaceZonePointMapPtr_);
@@ -1111,6 +1128,28 @@ Foam::solidModel::~solidModel()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+const Foam::thermalModel& Foam::solidModel::thermal() const
+{
+    if (thermalPtr_.empty())
+    {
+        makeThermalModel();
+    }
+
+    return thermalPtr_();
+}
+
+
+const Foam::mechanicalModel& Foam::solidModel::mechanical() const
+{
+    if (mechanicalPtr_.empty())
+    {
+        makeMechanicalModel();
+    }
+
+    return mechanicalPtr_();
+}
 
 
 void Foam::solidModel::setTraction
@@ -1130,6 +1169,28 @@ void Foam::solidModel::setPressure
 )
 {
     solidModel::setPressure(solutionD().boundaryField()[patchID], pressure);
+}
+
+
+Foam::vector Foam::solidModel::pointU(const label pointID) const
+{
+    pointVectorField pointU
+    (
+        IOobject
+        (
+            "pointU",
+            runTime().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        pMesh_,
+        dimensionedVector("0", dimVelocity, vector::zero)
+    );
+
+    mechanical().volToPoint().interpolate(U(), pointU);
+
+    return pointU.internalField()[pointID];
 }
 
 

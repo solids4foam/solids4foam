@@ -82,10 +82,10 @@ bool AitkenCouplingInterface::evolve()
 
         solid().evolve();
 
-        residualNorm = 
+        residualNorm =
             updateResidual();
     }
-    
+
     do
     {
         outerCorr()++;
@@ -177,48 +177,12 @@ void AitkenCouplingInterface::updateDisplacement()
         fluidZonePointsDispl() += aitkenRelaxationFactor_*residual();
     }
 
+    // Update movingWallPressure boundary conditions, if found
+    fluidSolidInterface::updateMovingWallPressureAcceleration();
 
     // Make sure that displacement on all processors is equal to one
     // calculated on master processor
-    if (Pstream::parRun())
-    {
-        if (!Pstream::master())
-        {
-            fluidZonePointsDispl() = vector::zero;
-        }
-
-        //- pass to all procs
-        reduce(fluidZonePointsDispl(), sumOp<vectorField>());
-
-        label globalFluidZoneIndex =
-            findIndex(fluid().globalFaceZones(), fluidZoneIndex());
-
-        if (globalFluidZoneIndex == -1)
-        {
-            FatalErrorIn
-            (
-                "fluidSolidInterface::updateDisplacement()"
-            )   << "global zone point map is not availabel"
-                << abort(FatalError);
-        }
-
-        const labelList& map =
-            fluid().globalToLocalFaceZonePointMap()[globalFluidZoneIndex];
-
-        if (!Pstream::master())
-        {
-            vectorField fluidZonePointsDisplGlobal =
-                fluidZonePointsDispl();
-
-            forAll(fluidZonePointsDisplGlobal, globalPointI)
-            {
-                label localPoint = map[globalPointI];
-
-                fluidZonePointsDispl()[localPoint] =
-                    fluidZonePointsDisplGlobal[globalPointI];
-            }
-        }
-    }
+    fluidSolidInterface::syncFluidZonePointsDispl(fluidZonePointsDispl());
 }
 
 

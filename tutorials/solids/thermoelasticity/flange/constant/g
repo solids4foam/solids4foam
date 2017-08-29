@@ -9,38 +9,13 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    location    "0";
-    object      rhoC;
+    class       uniformDimensionedVectorField;
+    location    "constant";
+    object      g;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [1 -1 -2 -1 0 0 0];
-
-internalField   uniform 3766500;
-
-boundaryField
-{
-    symmx
-    {
-        type            symmetryPlane;
-    }
-    symmy
-    {
-        type            symmetryPlane;
-    }
-    symmz
-    {
-        type            symmetryPlane;
-    }
-    inside
-    {
-        type            zeroGradient;
-    }
-    outside
-    {
-        type            zeroGradient;
-    }
-}
+dimensions      [0 1 -2 0 0 0 0];
+value           ( 0 0 0 );
 
 // ************************************************************************* //

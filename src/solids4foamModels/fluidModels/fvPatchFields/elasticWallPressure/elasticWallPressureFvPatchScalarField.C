@@ -189,7 +189,6 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     FatalErrorIn("void elasticWallPressureFvPatchScalarField::updateCoeffs()")
         << "PC: work in prgress" << abort(FatalError);
 
-    /*
     // Looking up fsi solver
     const fluidSolidInterface& fsi =
         mesh.lookupObject<fluidSolidInterface>("fsiProperties");
@@ -199,15 +198,18 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     // It seems that ap is the speed of sound so we just need the stiffness, we
     // can lookup impK
     // Also, what happends if mu/lambda are varying...
-    scalar rhoSolid =
-        fsi.stress().rheology().rho()()[0];
-    scalar mu =
-        fsi.stress().rheology().mu()()[0];
-    scalar lambda =
-        fsi.stress().rheology().lambda()()[0];
+    const scalar rhoSolid =
+        fsi.solid().mechanical().rho()()[0];
+    // scalar mu =
+    //     fsi.solid().mechanical().mu()()[0];
+    // scalar lambda =
+    //     fsi.solid().mechanical().lambda()()[0];
+    const scalar impK =
+        fsi.solid().mechanical().impK()()[0];
 
-    scalar ap = sqrt((lambda+2*mu)/rhoSolid);
-    scalar hs = ap*mesh.time().deltaT().value();
+    //const scalar ap = sqrt((lambda+2*mu)/rhoSolid);
+    const scalar ap = sqrt(impK/rhoSolid);
+    const scalar hs = ap*mesh.time().deltaT().value();
 
     // Fluid properties
     IOdictionary transportProperties
@@ -215,19 +217,19 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         IOobject
         (
             "transportProperties",
-            mesh.time().constant(),
+            mesh.time().constant()/"fluid",
             mesh,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
     );
 
-    dimensionedScalar rhoFluid
+    const dimensionedScalar rhoFluid
     (
         transportProperties.lookup("rho")
     );
 
-    Info << "rhoSolid = " << rhoSolid << ", hs = " << hs
+    Info<< "rhoSolid = " << rhoSolid << ", hs = " << hs
         << ", rhoFluid = " << rhoFluid.value() << endl;
 
     // Update velocity and acceleration
@@ -248,7 +250,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     const scalarField& magSf = p.magSf();
     scalarField Un = phip/(magSf + VSMALL);
 
-    word ddtScheme
+    const word ddtScheme
     (
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
     );
@@ -279,7 +281,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     }
     else
     {
-        Info << "elasticWallPressureFvPatchScalarField::updateCoeffs()"
+        Info<< "elasticWallPressureFvPatchScalarField::updateCoeffs()"
             << endl;
     }
 
@@ -303,7 +305,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
 
 //     Info << ap << endl;
 
-    word fieldName = dimensionedInternalField().name();
+    const word fieldName = dimensionedInternalField().name();
 
     const volScalarField& pressure =
         mesh.lookupObject<volScalarField>(fieldName);
@@ -364,7 +366,6 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
 
 //     Info << "pcoeff " << max(this->coeff()+dn)
 //         << ", " << average(this->coeff()+dn) << endl;
-        */
 
     robinFvPatchField<scalar>::updateCoeffs();
 }

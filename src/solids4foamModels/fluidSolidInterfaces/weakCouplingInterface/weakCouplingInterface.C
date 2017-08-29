@@ -26,7 +26,6 @@ License
 
 #include "weakCouplingInterface.H"
 #include "addToRunTimeSelectionTable.H"
-#include "elasticWallPressureFvPatchScalarField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -188,95 +187,11 @@ bool weakCouplingInterface::updateWeakDisplacement()
 
     // Make sure that displacement on all processors is equal to one
     // calculated on master processor
-    if (Pstream::parRun())
-    {
-        if(!Pstream::master())
-        {
-            fluidZonePointsDispl() *= 0.0;
-        }
+    fluidSolidInterface::syncFluidZonePointsDispl(fluidZonePointsDispl());
 
-        //- pass to all procs
-        reduce(fluidZonePointsDispl(), sumOp<vectorField>());
 
-        label globalFluidZoneIndex =
-            findIndex(fluid().globalFaceZones(), fluidZoneIndex());
-
-        if (globalFluidZoneIndex == -1)
-        {
-            FatalErrorIn
-            (
-                "void weakCouplingInterface::updateWeakDisplacement()"
-            )   << "global zone point map is not available"
-                << abort(FatalError);
-        }
-
-        const labelList& map =
-            fluid().globalToLocalFaceZonePointMap()[globalFluidZoneIndex];
-
-        if (!Pstream::master())
-        {
-            vectorField fluidZonePointsDisplGlobal =
-                fluidZonePointsDispl();
-
-            forAll(fluidZonePointsDisplGlobal, globalPointI)
-            {
-                label localPoint = map[globalPointI];
-
-                fluidZonePointsDispl()[localPoint] =
-                    fluidZonePointsDisplGlobal[globalPointI];
-            }
-        }
-    }
-
-    // Set interface acceleration
-    if
-    (
-        isA<elasticWallPressureFvPatchScalarField>
-        (
-            fluid().p().boundaryField()[fluidPatchIndex()]
-        )
-    )
-    {
-        vectorField solidZoneAcceleration =
-            solid().faceZoneAcceleration
-            (
-                solidZoneIndex(),
-                solidPatchIndex()
-            );
-
-        vectorField fluidZoneAcceleration =
-            ggiInterpolator().slaveToMaster
-            (
-                solidZoneAcceleration
-            );
-
-        vectorField fluidPatchAcceleration
-        (
-            fluidMesh().boundary()[fluidPatchIndex()].size(),
-            vector::zero
-        );
-
-        const label patchStart =
-            fluidMesh().boundaryMesh()[fluidPatchIndex()].start();
-
-        forAll(fluidPatchAcceleration, i)
-        {
-            fluidPatchAcceleration[i] =
-                fluidZoneAcceleration
-                [
-                    fluidMesh().faceZones()[fluidZoneIndex()]
-                   .whichFace(patchStart + i)
-                ];
-        }
-
-        const_cast<elasticWallPressureFvPatchScalarField&>
-        (
-            refCast<const elasticWallPressureFvPatchScalarField>
-            (
-                fluid().p().boundaryField()[fluidPatchIndex()]
-            )
-        ).prevAcceleration() = fluidPatchAcceleration;
-    }
+    // Update elasticWallPressure boundary conditions, if found
+    fluidSolidInterface::updateElasticWallPressureAcceleration();
 
 
     // Calculate residual norm

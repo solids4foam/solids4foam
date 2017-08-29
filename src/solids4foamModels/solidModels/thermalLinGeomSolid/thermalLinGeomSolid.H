@@ -46,6 +46,7 @@ SourceFiles
 #define thermalLinGeomSolid_H
 
 #include "solidModel.H"
+#include "thermalModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -67,6 +68,24 @@ class thermalLinGeomSolid
 {
     // Private data
 
+        //- Thermal model
+        thermalModel thermal_;
+
+        //- The product of density and specific heat
+        volScalarField rhoC_;
+
+        //- Thermal conductivity
+        volScalarField k_;
+
+        //- Temperature
+        volScalarField T_;
+
+        //- Temperature gradient
+        volVectorField gradT_;
+
+        //- Absolute temperature tolerance (in degrees)
+        const scalar absTTol_;
+
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
@@ -79,24 +98,6 @@ class thermalLinGeomSolid
         //  We divide by impK every time tractionBoundarySnGrad is called so we
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
-
-        //- Temperature field
-        volScalarField T_;
-
-        //- Referemce stress-free temperature field
-        volScalarField T0_;
-
-        //- Cell temperature gradient
-        volVectorField gradT_;
-
-        //- The product of density and specific heat
-        volScalarField rhoC_;
-
-        //- Thermal conductivity
-        volScalarField k_;
-
-        //- Absolute temperature tolerance (in degrees)
-        const scalar absTTol_;
 
     // Private Member Functions
 

@@ -1,26 +1,25 @@
 /*---------------------------------------------------------------------------*\
   =========                 |
-  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
-   \\    /   O peration     |
-    \\  /    A nd           | Copyright held by original author
-     \\/     M anipulation  |
+  \\      /  F ield         | foam-extend: Open Source CFD
+   \\    /   O peration     | Version:     4.0
+    \\  /    A nd           | Web:         http://www.foam-extend.org
+     \\/     M anipulation  | For copyright notice see file Copyright
 -------------------------------------------------------------------------------
 License
-    This file is part of OpenFOAM.
+    This file is part of foam-extend.
 
-    OpenFOAM is free software; you can redistribute it and/or modify it
+    foam-extend is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the
-    Free Software Foundation; either version 2 of the License, or (at your
+    Free Software Foundation, either version 3 of the License, or (at your
     option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-    for more details.
+    foam-extend is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM; if not, write to the Free Software Foundation,
-    Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -30,8 +29,9 @@ License
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "ggiFvPatch.H"
+#include "wedgeFvPatch.H"
+#include "leastSquaresVolPointInterpolation.H"
 #include "fvc.H"
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -57,12 +57,15 @@ tmp
 > fGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const GeometricField<Type, pointPatchField, pointMesh>& pf
+    const GeometricField<Type, pointPatchField, pointMesh>& pf,
+    bool interpolate
 )
 {
     typedef typename outerProduct<vector, Type>::type GradType;
 
     const fvMesh& mesh = vf.mesh();
+
+    surfaceVectorField n = mesh.Sf()/mesh.magSf();
 
     tmp<GeometricField<GradType, fvsPatchField, surfaceMesh> > tGrad
     (
@@ -85,148 +88,23 @@ tmp
             )
         )
     );
-    Field<GradType>& gradI = tGrad().internalField();
 
-    const vectorField& points = mesh.points();
-    const faceList& faces = mesh.faces();
-
-    surfaceVectorField n = mesh.Sf()/mesh.magSf();
-    const vectorField& nI = n.internalField();
-
-    const Field<Type>& pfI = pf.internalField();
-
-    forAll(gradI, faceI)
+    if (interpolate)
     {
-        const face& curFace = faces[faceI];
-
-        vector Rf = curFace.centre(points);
-
-        scalar mag = curFace.mag(points);
-
-        const edgeList curFaceEdges = curFace.edges();
-
-        gradI[faceI] = pTraits<GradType>::zero;
-        scalar faceArea = 0;
-
-        forAll(curFaceEdges, edgeI)
-        {
-            const edge& curEdge = curFaceEdges[edgeI];
-
-            // Projected edge vector
-            vector e = curEdge.vec(points);
-            e -= nI[faceI]*(nI[faceI]&e);
-
-            // Edge length vector
-            vector Le = (e^nI[faceI]);
-            Le *= curFace.edgeDirection(curEdge);
-
-            // Edge-centre field value
-            Type fe =
-                0.5
-               *(
-                   pfI[curEdge.start()]
-                 + pfI[curEdge.end()]
-                );
-
-            // Gradient
-            gradI[faceI] += Le*fe;
-
-            // Area
-            vector Re = curEdge.centre(points) - Rf;
-            Re -= nI[faceI]*(nI[faceI]&Re);
-            faceArea += (Le&Re);
-        }
-
-        faceArea /= 2.0;
-
-        gradI[faceI] /= mag; // faceArea; // mag
+        const GeometricField<GradType, fvPatchField, volMesh>& gradVf =
+            mesh.lookupObject<GeometricField<GradType, fvPatchField, volMesh> >
+            (
+                "grad(" + vf.name() + ")"
+            );
+//         tGrad() = ((I - n*n) & linearInterpolate(gradVf));
+//         tGrad() += n*fvc::snGrad(vf);
+        tGrad() = linearInterpolate(gradVf);
     }
-
-    forAll(tGrad().boundaryField(), patchI)
+    else
     {
-        Field<GradType>& patchGrad = tGrad().boundaryField()[patchI];
-
-        const vectorField& patchN = n.boundaryField()[patchI];
-
-        forAll(patchGrad, faceI)
-        {
-            label globalFaceID = mesh.boundaryMesh()[patchI].start() + faceI;
-
-            const face& curFace = mesh.faces()[globalFaceID];
-
-            vector Rf = curFace.centre(points);
-
-            scalar mag = curFace.mag(points);
-
-            const edgeList curFaceEdges = curFace.edges();
-
-            patchGrad[faceI] = pTraits<GradType>::zero;
-            scalar faceArea = 0;
-
-            forAll(curFaceEdges, edgeI)
-            {
-                const edge& curEdge = curFaceEdges[edgeI];
-
-                // Projected edge vector
-                vector e = curEdge.vec(points);
-                e -= patchN[faceI]*(patchN[faceI]&e);
-
-                // Edge length vector
-                vector Le = (e^patchN[faceI]);
-                Le *= curFace.edgeDirection(curEdge);
-
-                // Edge-centre field value
-                Type fe =
-                    0.5
-                   *(
-                       pfI[curEdge.start()]
-                     + pfI[curEdge.end()]
-                    );
-
-                // Gradient
-                patchGrad[faceI] += Le*fe;
-
-                // Area
-                vector Re = curEdge.centre(points) - Rf;
-                Re -= patchN[faceI]*(patchN[faceI]&Re);
-                faceArea += (Le&Re);
-            }
-
-            faceArea /= 2.0;
-
-            patchGrad[faceI] /= mag; //faceArea; //mag
-        }
+        tGrad() = fsGrad(vf, pf);
+        tGrad() += n*fvc::snGrad(vf);
     }
-
-    forAll(mesh.boundary(), patchI)
-    {
-        if (mesh.boundary()[patchI].type() == ggiFvPatch::typeName)
-        {
-            const ggiFvPatch& ggiPatch =
-                refCast<const ggiFvPatch>(mesh.boundary()[patchI]);
-
-            if (!ggiPatch.master())
-            {
-                Field<GradType>& slaveGrad =
-                    tGrad().boundaryField()[patchI];
-                const Field<GradType>& masterGrad =
-                    tGrad().boundaryField()[ggiPatch.shadowIndex()];
-
-                slaveGrad = ggiPatch.interpolate(masterGrad);
-            }
-        }
-    }
-
-//     const GeometricField<GradType, fvPatchField, volMesh>& gradU =
-//         mesh.lookupObject<GeometricField<GradType, fvPatchField, volMesh> >
-//         (
-//             "grad(" + vf.name() + ")"
-//         );
-//     tGrad() = ((I - n*n)&fvc::interpolate(gradU));
-
-
-    // Add normal component of the gradient
-    tGrad() += n*fvc::snGrad(vf);
 
     return tGrad;
 }
@@ -272,74 +150,36 @@ tmp
             )
         )
     );
-    Field<GradType>& gradI = tGrad().internalField();
 
-    const vectorField& points = mesh.points();
-    const faceList& faces = mesh.faces();
-
-    surfaceVectorField n = mesh.Sf()/mesh.magSf();
-    const vectorField& nI = n.internalField();
-
-    const Field<Type>& pfI = pf.internalField();
-
-    forAll(gradI, faceI)
+    // Is it case axisymmetric?
+    bool axisymmetric = false;
+    forAll(mesh.boundaryMesh(), patchI)
     {
-        const face& curFace = faces[faceI];
-
-        vector Rf = curFace.centre(points);
-
-        scalar mag = curFace.mag(points);
-
-        const edgeList curFaceEdges = curFace.edges();
-
-        gradI[faceI] = pTraits<GradType>::zero;
-        scalar faceArea = 0;
-
-        forAll(curFaceEdges, edgeI)
+        if (isA<wedgeFvPatch>(mesh.boundary()[patchI]))
         {
-            const edge& curEdge = curFaceEdges[edgeI];
-
-            // Projected edge vector
-            vector e = curEdge.vec(points);
-            e -= nI[faceI]*(nI[faceI]&e);
-
-            // Edge length vector
-            vector Le = (e^nI[faceI]);
-            Le *= curFace.edgeDirection(curEdge);
-
-            // Edge-centre field value
-            Type fe =
-                0.5
-               *(
-                   pfI[curEdge.start()]
-                 + pfI[curEdge.end()]
-                );
-
-            // Gradient
-            gradI[faceI] += Le*fe;
-
-            // Area
-            vector Re = curEdge.centre(points) - Rf;
-            Re -= nI[faceI]*(nI[faceI]&Re);
-            faceArea += (Le&Re);
+            axisymmetric = true;
+            break;
         }
-
-        faceArea /= 2.0;
-
-        gradI[faceI] /= mag; // faceArea; // mag
     }
+    reduce(axisymmetric, orOp<bool>());
 
-    forAll(tGrad().boundaryField(), patchI)
+//     axisymmetric = false;
+
+    if (!axisymmetric)
     {
-        Field<GradType>& patchGrad = tGrad().boundaryField()[patchI];
+        Field<GradType>& gradI = tGrad().internalField();
 
-        const vectorField& patchN = n.boundaryField()[patchI];
+        const vectorField& points = mesh.points();
+        const faceList& faces = mesh.faces();
 
-        forAll(patchGrad, faceI)
+        surfaceVectorField n = mesh.Sf()/mesh.magSf();
+        const vectorField& nI = n.internalField();
+
+        const Field<Type>& pfI = pf.internalField();
+
+        forAll(gradI, faceI)
         {
-            label globalFaceID = mesh.boundaryMesh()[patchI].start() + faceI;
-
-            const face& curFace = mesh.faces()[globalFaceID];
+            const face& curFace = faces[faceI];
 
             vector Rf = curFace.centre(points);
 
@@ -347,7 +187,7 @@ tmp
 
             const edgeList curFaceEdges = curFace.edges();
 
-            patchGrad[faceI] = pTraits<GradType>::zero;
+            gradI[faceI] = pTraits<GradType>::zero;
             scalar faceArea = 0;
 
             forAll(curFaceEdges, edgeI)
@@ -356,10 +196,10 @@ tmp
 
                 // Projected edge vector
                 vector e = curEdge.vec(points);
-                e -= patchN[faceI]*(patchN[faceI]&e);
+                e -= nI[faceI]*(nI[faceI]&e);
 
                 // Edge length vector
-                vector Le = (e^patchN[faceI]);
+                vector Le = (e^nI[faceI]);
                 Le *= curFace.edgeDirection(curEdge);
 
                 // Edge-centre field value
@@ -371,38 +211,132 @@ tmp
                     );
 
                 // Gradient
-                patchGrad[faceI] += Le*fe;
+                gradI[faceI] += Le*fe;
 
                 // Area
                 vector Re = curEdge.centre(points) - Rf;
-                Re -= patchN[faceI]*(patchN[faceI]&Re);
+                Re -= nI[faceI]*(nI[faceI]&Re);
                 faceArea += (Le&Re);
             }
 
             faceArea /= 2.0;
 
-            patchGrad[faceI] /= mag; //faceArea; //mag
+            gradI[faceI] /= mag; // faceArea; // mag
         }
-    }
 
-    forAll(mesh.boundary(), patchI)
-    {
-        if (mesh.boundary()[patchI].type() == ggiFvPatch::typeName)
+        forAll(tGrad().boundaryField(), patchI)
         {
-            const ggiFvPatch& ggiPatch =
-                refCast<const ggiFvPatch>(mesh.boundary()[patchI]);
+            Field<GradType>& patchGrad = tGrad().boundaryField()[patchI];
 
-            if (!ggiPatch.master())
+            const vectorField& patchN = n.boundaryField()[patchI];
+
+            forAll(patchGrad, faceI)
             {
-                Field<GradType>& slaveGrad =
-                    tGrad().boundaryField()[patchI];
-                const Field<GradType>& masterGrad =
-                    tGrad().boundaryField()[ggiPatch.shadowIndex()];
+                label globalFaceID =
+                    mesh.boundaryMesh()[patchI].start() + faceI;
 
-                slaveGrad = ggiPatch.interpolate(masterGrad);
+                const face& curFace = mesh.faces()[globalFaceID];
+
+                vector Rf = curFace.centre(points);
+
+                scalar mag = curFace.mag(points);
+
+                const edgeList curFaceEdges = curFace.edges();
+
+                patchGrad[faceI] = pTraits<GradType>::zero;
+                scalar faceArea = 0;
+
+                forAll(curFaceEdges, edgeI)
+                {
+                    const edge& curEdge = curFaceEdges[edgeI];
+
+                    // Projected edge vector
+                    vector e = curEdge.vec(points);
+                    e -= patchN[faceI]*(patchN[faceI]&e);
+
+                    // Edge length vector
+                    vector Le = (e^patchN[faceI]);
+                    Le *= curFace.edgeDirection(curEdge);
+
+                    // Edge-centre field value
+                    Type fe =
+                        0.5
+                       *(
+                            pfI[curEdge.start()]
+                          + pfI[curEdge.end()]
+                        );
+
+                    // Gradient
+                    patchGrad[faceI] += Le*fe;
+
+                    // Area
+                    vector Re = curEdge.centre(points) - Rf;
+                    Re -= patchN[faceI]*(patchN[faceI]&Re);
+                    faceArea += (Le&Re);
+                }
+
+                faceArea /= 2.0;
+
+                patchGrad[faceI] /= mag; //faceArea; //mag
             }
         }
     }
+    else
+    {
+//         Info << "Axisymmetric mesh for field: " << vf.name() << endl;
+
+        const GeometricField<GradType, fvPatchField, volMesh>& gradVf =
+            mesh.lookupObject<GeometricField<GradType, fvPatchField, volMesh> >
+            (
+                "grad(" + vf.name() + ")"
+            );
+        surfaceVectorField n = mesh.Sf()/mesh.magSf();
+        tGrad() = ((I - n*n) & linearInterpolate(gradVf));
+
+        // Correct at ggi patch
+        forAll(mesh.boundary(), patchI)
+        {
+            if (mesh.boundary()[patchI].type() == ggiFvPatch::typeName)
+            {
+                Field<Type> ppf =
+                    pf.boundaryField()[patchI].patchInternalField();
+
+                tGrad().boundaryField()[patchI] ==
+                    fGrad(mesh.boundaryMesh()[patchI], ppf);
+            }
+        }
+    }
+
+//     // Tangential gradient mast be equal on
+//     // master and shadow ggi patch
+//     forAll(mesh.boundary(), patchI)
+//     {
+//         if (mesh.boundary()[patchI].type() == ggiFvPatch::typeName)
+//         {
+//             const ggiFvPatch& ggiPatch =
+//                 refCast<const ggiFvPatch>(mesh.boundary()[patchI]);
+
+//             if (ggiPatch.master())
+//             {
+//                 Field<GradType>& masterGrad =
+//                     tGrad().boundaryField()[patchI];
+//                 const Field<GradType>& slaveGrad =
+//                     tGrad().boundaryField()[ggiPatch.shadowIndex()];
+
+//                 masterGrad += ggiPatch.interpolate(slaveGrad);
+//                 masterGrad /= 2;
+//             }
+//             else
+//             {
+//                 Field<GradType>& slaveGrad =
+//                     tGrad().boundaryField()[patchI];
+//                 const Field<GradType>& masterGrad =
+//                     tGrad().boundaryField()[ggiPatch.shadowIndex()];
+
+//                 slaveGrad = ggiPatch.interpolate(masterGrad);
+//             }
+//         }
+//     }
 
     return tGrad;
 }
@@ -520,7 +454,8 @@ tmp
                 "0",
                 vf.dimensions()/dimLength,
                 pTraits<GradType>::zero
-            )
+            ),
+            zeroGradientFvPatchField<GradType>::typeName
         )
     );
 
@@ -616,6 +551,8 @@ tmp
         const unallocLabelList& pFaceCells =
             mesh.boundaryMesh()[patchI].faceCells();
 
+//         GradType test = pTraits<GradType>::zero;
+
         forAll(mesh.boundaryMesh()[patchI], faceI)
         {
             label globalFaceID =
@@ -623,9 +560,17 @@ tmp
 
             const face& curFace = faces[globalFaceID];
 
-            // If the face is a triangle, do a direct calculation
-            if (curFace.size() == 3)
+            if (isA<wedgeFvPatch>(mesh.boundary()[patchI]))
             {
+                iGrad[pFaceCells[faceI]] +=
+                    curFace.normal(points)*vf.boundaryField()[patchI][faceI];
+
+                V[pFaceCells[faceI]] +=
+                    (curFace.normal(points)&curFace.centre(points));
+            }
+            else if (curFace.size() == 3)
+            {
+                // If the face is a triangle, do a direct calculation
                 iGrad[pFaceCells[faceI]] +=
                     curFace.normal(points)*curFace.average(points, pfI);
 
@@ -659,6 +604,8 @@ tmp
                     );
                     ttcf /= 3.0;
 
+//                     ttcf = vf.boundaryField()[patchI][faceI];
+
                     // Calculate triangle area
                     vector St =
                         (
@@ -680,18 +627,31 @@ tmp
 
                     iGrad[pFaceCells[faceI]] += St*ttcf;
 
+//                     test += ttcf*St;
+
                     V[pFaceCells[faceI]] += (St&Ct);
                 }
             }
         }
+
+//         Info << mesh.boundaryMesh()[patchI].name() << ", "
+//             << test << endl;
     }
 
     V /= 3;
 
     iGrad /= V;
-//     iGrad /= mesh.V();
 
+//     GradType avgGrad = sum(iGrad*V);
+//     Info << "sumV: " << sum(V) << endl;
+//     Info << "avgGrad: " << avgGrad << endl;
+
+
+//     iGrad /= mesh.V();
 //     iGrad = fv::gaussGrad<vector>(mesh).grad(vf)().internalField();
+
+    // Extrapolate to boundary
+    tGrad().correctBoundaryConditions();
 
     // Calculate boundary gradient
     forAll(mesh.boundary(), patchI)
@@ -699,20 +659,82 @@ tmp
         if
         (
             mesh.boundary()[patchI].size()
-         && !vf.boundaryField()[patchI].coupled()
+        && !vf.boundaryField()[patchI].coupled()
+        && !isA<wedgeFvPatch>(mesh.boundary()[patchI])
         )
         {
-            Field<Type> ppf = pf.boundaryField()[patchI].patchInternalField();
+            Field<Type> ppf =
+                pf.boundaryField()[patchI].patchInternalField();
 
-            tGrad().boundaryField()[patchI] =
+            tGrad().boundaryField()[patchI] ==
+                fGrad(mesh.boundaryMesh()[patchI], ppf);
+        }
+        else if (isA<ggiFvPatch>(mesh.boundary()[patchI]))
+        {
+            Field<Type> ppf =
+                pf.boundaryField()[patchI].patchInternalField();
+
+            tGrad().boundaryField()[patchI] ==
                 fGrad(mesh.boundaryMesh()[patchI], ppf);
         }
     }
 
-//     tGrad().correctBoundaryConditions();
+//     // Tangential gradient mast be equal on
+//     // master and shadow ggi patch
+//     forAll(mesh.boundary(), patchI)
+//     {
+//         if (mesh.boundary()[patchI].type() == ggiFvPatch::typeName)
+//         {
+//             const ggiFvPatch& ggiPatch =
+//                 refCast<const ggiFvPatch>(mesh.boundary()[patchI]);
 
-    // Normal gradient
-    fv::gaussGrad<Type>(mesh).correctBoundaryConditions(vf, tGrad());
+//             if (ggiPatch.master())
+//             {
+//                 Field<GradType>& masterGrad =
+//                     tGrad().boundaryField()[patchI];
+//                 const Field<GradType>& slaveGrad =
+//                     tGrad().boundaryField()[ggiPatch.shadowIndex()];
+
+//                 masterGrad += ggiPatch.interpolate(slaveGrad);
+//                 masterGrad /= 2;
+//             }
+//             else
+//             {
+//                 Field<GradType>& slaveGrad =
+//                     tGrad().boundaryField()[patchI];
+//                 const Field<GradType>& masterGrad =
+//                     tGrad().boundaryField()[ggiPatch.shadowIndex()];
+
+//                 slaveGrad = ggiPatch.interpolate(masterGrad);
+//             }
+//         }
+//     }
+
+    // Add normal gradient
+//     fv::gaussGrad<Type>(mesh).correctBoundaryConditions(vf, tGrad());
+    forAll (vf.boundaryField(), patchi)
+    {
+        if (!vf.boundaryField()[patchi].coupled())
+        {
+            vectorField n = vf.mesh().boundary()[patchi].nf();
+
+            tGrad().boundaryField()[patchi] += n*
+            (
+                vf.boundaryField()[patchi].snGrad()
+              - (n & tGrad().boundaryField()[patchi])
+            );
+        }
+//         else if (isA<ggiFvPatch>(mesh.boundary()[patchi]))
+//         {
+//             vectorField n = vf.mesh().boundary()[patchi].nf();
+
+//             tGrad().boundaryField()[patchi] += n*
+//             (
+//                 vf.boundaryField()[patchi].snGrad()
+//               - (n & tGrad().boundaryField()[patchi])
+//             );
+//         }
+    }
 
     return tGrad;
 }

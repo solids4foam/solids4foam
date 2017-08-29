@@ -380,7 +380,7 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
         // Interpolate DD to pointDD
         mechanical().interpolate(DD(), pointDD(), false);
 
-        // Update gradient of displacement
+        // Update gradient of displacement increment
         mechanical().grad(DD(), pointDD(), gradDD());
         mechanical().grad(DD(), pointDD(), gradDDf_);
 

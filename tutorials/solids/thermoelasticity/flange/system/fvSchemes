@@ -1,0 +1,79 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+d2dt2Schemes
+{
+    default    none;
+    d2dt2(D)   Euler;
+    d2dt2(DD)  Euler;
+}
+
+ddtSchemes
+{
+    default    none;
+    ddt(D)     Euler;
+    ddt(DD)    Euler;
+    ddt(T)     Euler;
+    d2dt2(D_0)  Euler;
+}
+
+gradSchemes
+{
+    default    none;
+    grad(D)    leastSquares;
+    grad(DD)   leastSquares;
+    grad(U)    leastSquares;
+    grad(T)    leastSquares;
+    snGradCorr(T) leastSquares;
+}
+
+divSchemes
+{
+    default    none;
+    div(sigma) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default    none;
+    laplacian(DD,D) Gauss linear skewCorrected 1;
+    laplacian(DDD,DD) Gauss linear skewCorrected 1;
+    laplacian(k,T) Gauss linear skewCorrected 1;
+}
+
+snGradSchemes
+{
+    default none;
+    snGrad(D) skewCorrected 1;
+}
+
+interpolationSchemes
+{
+    default none;
+    interpolate(impK) linear;
+    interpolate(mu) linear;
+    interpolate(lambda) linear;
+    interpolate(threeK) linear;
+    interpolate(alpha) linear;
+    interpolate(DT) linear;
+    interpolate(rho) linear;
+    interpolate((threeK*rho)) linear;
+    interpolate(grad(D)) linear;
+    interpolate(grad(DD)) linear;
+}
+
+
+// ************************************************************************* //

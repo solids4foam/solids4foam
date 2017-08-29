@@ -52,18 +52,39 @@ Foam::thermoLinearElastic::thermoLinearElastic
 )
 :
     linearElastic(name, mesh, dict, nonLinGeom),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
-    lambda_
-    (
-        planeStress()
-      ? nu_*E_/((1.0 + nu_)*(1.0 - nu_))
-      : nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))
-    ),
-    mu_(E_/(2.0*(1.0 + nu_))),
-    K_(lambda_ + (2.0/3.0)*mu_),
-    alpha_(dict.lookup("alpha"))
-{}
+    alpha_(dict.lookup("alpha")),
+    T0_(dict.lookup("T0")),
+    TPtr_(NULL)
+{
+    // Check if the T field exists in memory
+    // THIS IS NOT CORRECT: of the mechanical model is created first then T will
+    // not exist yet
+    // One option would be to check again inside the correct function
+    // Anther problem is the T thermalConvection gives out looking for 'k' if we
+    // read T here
+    // if (!mesh.foundObject<volScalarField>("T"))
+    // {
+    //     Info<< type() << ": reading T field from " << mesh.time().timeName()
+    //         << endl;
+
+    //     // Read the temperature field from disk
+    //     TPtr_.set
+    //     (
+    //         new volScalarField
+    //         (
+    //             IOobject
+    //             (
+    //                 "T",
+    //                 mesh.time().timeName(),
+    //                 mesh,
+    //                 IOobject::MUST_READ,
+    //                 IOobject::AUTO_WRITE
+    //             ),
+    //             mesh
+    //         )
+    //     );
+    // }
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
@@ -80,28 +101,19 @@ void Foam::thermoLinearElastic::correct(volSymmTensorField& sigma)
     // Calculate linear elastic stress
     linearElastic::correct(sigma);
 
-    // Lookup the temperature field from the solver
-    const volScalarField T =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<scalar>("T", mesh());
+    if (TPtr_.valid())
+    {
+        // Add thermal stress component
+        sigma -= 3.0*K()*alpha_*(TPtr_() - T0_)*symmTensor(I);
+    }
+    else
+    {
+        // Lookup the temperature field from the solver
+        const volScalarField& T = mesh().lookupObject<volScalarField>("T");
 
-    // Lookup the stress-free reference temperature field from the solver
-    const volScalarField T0 =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<scalar>("T0", mesh());
-
-    // Add thermal stress component
-    sigma -= 3.0*K_*alpha_*(T - T0)*symmTensor(I);
+        // Add thermal stress component
+        sigma -= 3.0*K()*alpha_*(T - T0_)*symmTensor(I);
+    }
 }
 
 
@@ -110,32 +122,25 @@ void Foam::thermoLinearElastic::correct(surfaceSymmTensorField& sigma)
     // Calculate linear elastic stress
     linearElastic::correct(sigma);
 
-    // Lookup the temperature field from the solver
-    const volScalarField T =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<scalar>("T", mesh());
+    if (TPtr_.valid())
+    {
+        // Interpolate the volField temperature to the faces
+        const surfaceScalarField Tf = fvc::interpolate(TPtr_());
 
-    const surfaceScalarField& Tf = fvc::interpolate(T);
+        // Add thermal stress component
+        sigma -= 3.0*K()*alpha_*(Tf - T0_)*symmTensor(I);
+    }
+    else
+    {
+        // Lookup the temperature field from the solver
+        const volScalarField& T = mesh().lookupObject<volScalarField>("T");
 
-    // Lookup the stress-free reference temperature field from the solver
-    const volScalarField T0 =
-        mesh().db().lookupObject<fvMesh>
-        (
-            baseMeshRegionName()
-        ).lookupObject<mechanicalModel>
-        (
-            "mechanicalProperties"
-        ).lookupBaseMeshVolField<scalar>("T0", mesh());
+        // Interpolate the volField temperature to the faces
+        const surfaceScalarField Tf = fvc::interpolate(T);
 
-    const surfaceScalarField& T0f = fvc::interpolate(T0);
-
-    // Add thermal stress component
-    sigma -= 3.0*K_*alpha_*(Tf - T0f)*symmTensor(I);
+        // Add thermal stress component
+        sigma -= 3.0*K()*alpha_*(Tf - T0_)*symmTensor(I);
+    }
 }
 
 

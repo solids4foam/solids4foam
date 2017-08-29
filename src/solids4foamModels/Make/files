@@ -15,11 +15,28 @@ solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
+solidModels/finiteVolume/fvc/fvcCellLimitedGrad.C
+
 fluidModels/fluidModel/fluidModel.C
+fluidModels/consistentIcoFluid/consistentIcoFluid.C
 fluidModels/icoFluid/icoFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pisoFluid/pisoFluid.C
 fluidModels/transientSimpleFluid/transientSimpleFluid.C
+
+fluidModels/finiteVolume/ddtSchemes/EulerDdtScheme.C
+fluidModels/finiteVolume/ddtSchemes/backwardDdtScheme.C
+
+fluidModels/finiteVolume/RBFMeshMotionSolver/RBFInterpolation.C
+fluidModels/finiteVolume/RBFMeshMotionSolver/RBFCoarsening.C
+fluidModels/finiteVolume/RBFMeshMotionSolver/RBFMeshMotionSolver.C
+fluidModels/finiteVolume/RBFMeshMotionSolver/twoDPointCorrectorRBF.C
+fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/TPSFunction.C
+fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/WendlandC0Function.C
+fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/WendlandC2Function.C
+fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/WendlandC4Function.C
+fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/WendlandC6Function.C
+fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/LinearFunction.C
 
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
@@ -48,6 +65,11 @@ $(mechanicalLaws)/linearElasticFromFile/linearElasticFromFile.C
 $(mechanicalLaws)/linearElasticCt/linearElasticCt.C
 $(mechanicalLaws)/viscousHookeanElastic/viscousHookeanElastic.C
 $(mechanicalLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
+
+materialModels/thermalModel/thermalModel.C
+thermalLaws = materialModels/thermalModel/thermalLaws
+$(thermalLaws)/thermalLaw/thermalLaw.C
+$(thermalLaws)/constantThermal/constantThermal.C
 
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
@@ -123,6 +145,9 @@ functionObjects/hydrostaticPressure/hydrostaticPressure.C
 functionObjects/principalStresses/principalStresses.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
 functionObjects/solidTractions/solidTractions.C
+functionObjects/centrifugalBodyForce/centrifugalBodyForce.C
+functionObjects/patchAvgTractionHistory/patchAvgTractionHistory.C
+functionObjects/pointHistory/pointHistory.C
 
 dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
 dynamicFvMesh/crackerFvMesh/crackerFvMesh.C
@@ -164,7 +189,6 @@ $(cellRemovalLaws)/cellRemovalLaw/cellRemovalLaw.C
 $(cellRemovalLaws)/cellRemovalLaw/newCellRemovalLaw.C
 $(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 
-numerics/ddtSchemes/backwardDdtScheme.C
 numerics/newLeastSquaresVolPointInterpolation/newLeastSquaresVolPointInterpolation.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newSkewCorrectedSnGrad/newSkewCorrectedSnGrads.C

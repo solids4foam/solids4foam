@@ -379,9 +379,6 @@ public:
             //  This is the diffusivity for the Laplacian term
             tmp<surfaceScalarField> impKf() const;
 
-            //- Return bulk modulus
-            tmp<volScalarField> K() const;
-
             //- Return material residual i.e. a measured of how convergence of
             //  the material model
             scalar residual();

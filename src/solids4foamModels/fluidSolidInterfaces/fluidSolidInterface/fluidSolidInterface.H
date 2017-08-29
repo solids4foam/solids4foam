@@ -391,6 +391,12 @@ public:
                 return coupled_;
             }
 
+            //- Return predictor switch
+            const Switch& predictor() const
+            {
+                return predictor_;
+            }
+
             //- Return relaxation factor
             scalar interfaceDeformationLimit() const
             {
@@ -513,6 +519,20 @@ public:
 
             //- Update interface force
             virtual scalar updateResidual();
+
+            //- Update movingWallPressure boundary condition acceleration, if
+            //  found
+            virtual void updateMovingWallPressureAcceleration();
+
+            //- Update elasticWallPressure boundary condition acceleration, if
+            //  found
+            virtual void updateElasticWallPressureAcceleration();
+
+            //- Sync the fluidZonePointsDispl field across processors
+            virtual void syncFluidZonePointsDispl
+            (
+                vectorField& fluidZonePointsDispl
+            );
 };
 
 

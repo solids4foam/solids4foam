@@ -374,6 +374,12 @@ bool coupledUnsLinGeomSolid::evolve()
         gradD() = fvc::grad(D(), pointD());
         gradDf_ = fvc::fGrad(D(), pointD());
 
+        // Increment of displacement
+        DD() = D() - D().oldTime();
+
+        // Update gradient of displacement increment
+        gradDD() = gradD() - gradD().oldTime();
+
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigmaf_);
 
