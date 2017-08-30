@@ -26,7 +26,7 @@ Class
     transientSimpleFluid
 
 Description
-    transientSimpleFoam fluid model
+    transientSimpleFoam (pimple) fluid model
 
 Author
     Zeljko Tukovic, FSB Zagreb.  All rights reserved.

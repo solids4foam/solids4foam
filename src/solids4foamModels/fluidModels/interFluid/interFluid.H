@@ -23,27 +23,31 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    pisoFluid
+    interFluid
 
 Description
-    pisoFoam fluid model
+    interFoam fluid model
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
     Philip Cardiff, UCD. All rights reserved.
+    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
 
 SourceFiles
-    pisoFluid.C
+    interFluid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef pisoFluid_H
-#define pisoFluid_H
+#ifndef interFluid_H
+#define interFluid_H
 
 #include "fluidModel.H"
-#include "singlePhaseTransportModel.H"
+#include "MULES.H"
+#include "subCycle.H"
+#include "interfaceProperties.H"
+#include "twoPhaseMixture.H"
 #include "turbulenceModel.H"
+#include "pimpleControl.H"
+#include "fvm.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -54,43 +58,87 @@ namespace fluidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class pisoFluid Declaration
+                        Class interFluid Declaration
 \*---------------------------------------------------------------------------*/
 
-class pisoFluid
+class interFluid
 :
     public fluidModel
 {
     // Private data
 
+        //- pd
+        volScalarField pd_;
+
+        //- Volume fraction of phase 1
+        volScalarField alpha1_;
+
         //- Transport model
-        singlePhaseTransportModel laminarTransport_;
+        twoPhaseMixture twoPhaseProperties_;
+
+        //- Density of phase 1
+        const dimensionedScalar& rho1_;
+
+        //- Density of phase 2
+        const dimensionedScalar& rho2_;
+    
+        //- Average density field
+        volScalarField rho_;
+
+        //- Mass flux
+        surfaceScalarField rhoPhi_;
+
+        //- Gravitional acceleration
+        const uniformDimensionedVectorField g_;
+
+        //- Gravity by cell-centre field
+        volScalarField gh_;
+
+        //- Gravity by face-centre field
+        surfaceScalarField ghf_;
+
+        //- Interface
+        interfaceProperties interface_;
 
         //- Turbulence model
         autoPtr<incompressible::turbulenceModel> turbulence_;
 
-        //- Density
-        dimensionedScalar rho_;
-
-
     // Private Member Functions
 
+        //- Solve alpha equation with sub cycle
+        void solveAlphaEqnSubCycle(const pimpleControl& pimple);
+
+        //- Solve alpha equation
+        void solveAlphaEqn(const label nAlphaCorr);
+
+        //- Solve velocity equation
+        tmp<fvVectorMatrix> solveUEqn(pimpleControl& pimple);
+
+        //- Solve pressure equation
+        void solvePEqn
+        (
+            pimpleControl& pimple,
+            fvVectorMatrix& UEqn,
+            const label pdRefCell,
+            const scalar pdRefValue
+        );
+
         //- Disallow default bitwise copy construct
-        pisoFluid(const pisoFluid&);
+        interFluid(const interFluid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const pisoFluid&);
+        void operator=(const interFluid&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("pisoFluid");
+    TypeName("interFluid");
 
     // Constructors
 
         //- Construct from components
-        pisoFluid
+        interFluid
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -99,19 +147,13 @@ public:
 
     // Destructor
 
-        virtual ~pisoFluid()
+        virtual ~interFluid()
         {}
 
 
     // Member Functions
 
         // Access
-
-            //- Density
-            const dimensionedScalar& rho()
-            {
-                return rho_;
-            }
 
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce

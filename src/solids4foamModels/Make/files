@@ -20,6 +20,7 @@ solidModels/finiteVolume/fvc/fvcCellLimitedGrad.C
 fluidModels/fluidModel/fluidModel.C
 fluidModels/consistentIcoFluid/consistentIcoFluid.C
 fluidModels/icoFluid/icoFluid.C
+fluidModels/interFluid/interFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pisoFluid/pisoFluid.C
 fluidModels/transientSimpleFluid/transientSimpleFluid.C

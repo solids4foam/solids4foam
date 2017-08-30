@@ -13,6 +13,7 @@ EXE_LIBS = \
     -lblockCoupledSolidTools \
     -lsolids4FoamModels \
     -lfiniteVolume \
+    -linterfaceProperties \
     -lincompressibleTurbulenceModel \
     -lincompressibleRASModels \
     -lincompressibleLESModels \

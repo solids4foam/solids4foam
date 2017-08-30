@@ -23,8 +23,9 @@ EXE_INC = \
     -I$(LIB_SRC)/errorEstimation/lnInclude \
     -I$(LIB_SRC)/mesh/cfMesh/lnInclude \
     -I$(LIB_SRC)/turbulenceModels/incompressible/turbulenceModel \
+    -I$(LIB_SRC)/transportModels/interfaceProperties/lnInclude \
     -I$(LIB_SRC)/transportModels \
-    -I$(LIB_SRC)/transportModels/incompressible/singlePhaseTransportModel \
+    -I$(LIB_SRC)/transportModels/incompressible/lnInclude \
     -I$(LIB_SRC)/tetFiniteElement/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/meshMotion/fvMotionSolver/lnInclude
 

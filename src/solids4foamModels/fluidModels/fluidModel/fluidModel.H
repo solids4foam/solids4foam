@@ -93,7 +93,6 @@ class fluidModel
         //- Flux field
         surfaceScalarField phi_;
 
-
     // Private Member Functions
 
         //- Find global face zones
