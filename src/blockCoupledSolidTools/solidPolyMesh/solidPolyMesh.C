@@ -36,7 +36,7 @@ License
 #include "PackedList.H"
 #include "blockFixedDisplacementFvPatchVectorField.H"
 #include "blockFixedDisplacementZeroShearFvPatchVectorField.H"
-#include "solidSymmetryFvPatchVectorField.H"
+//#include "solidSymmetryFvPatchVectorField.H"
 #include "emptyFvPatchFields.H"
 //#include "blockGlobalPolyPatch.H"
 //#include "blockGlobalFvPatch.H"
@@ -1115,7 +1115,7 @@ void solidPolyMesh::calcPointFixed(const volVectorField& D) const
         else if
         (
             pType == blockFixedDisplacementZeroShearFvPatchVectorField::typeName
-         || pType == solidSymmetryFvPatchVectorField::typeName
+         || pType == (pType == "solidSymmetry" || pType == "symmetry")
         )
         {
             // WarningIn("solidPolyMesh.C")
