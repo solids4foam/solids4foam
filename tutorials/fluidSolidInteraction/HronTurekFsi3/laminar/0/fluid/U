@@ -22,7 +22,7 @@ boundaryField
 {
     plate
     {
-        type            movingWallVelocity;
+        type            newMovingWallVelocity;
         value           uniform (0 0 0);
     }
     outlet
