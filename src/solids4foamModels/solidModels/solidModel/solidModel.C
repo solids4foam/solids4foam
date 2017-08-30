@@ -821,6 +821,15 @@ bool Foam::solidModel::converged
             << ", " << materialResidual
             << ", " << solverPerfNIters << endl;
 
+        if (residualFilePtr_.valid())
+        {
+            residualFilePtr_()
+                << solverPerfInitRes << " "
+                << residualDD << " "
+                << materialResidual
+                << endl;
+        }
+
         if (converged)
         {
             Info<< endl;
@@ -1014,6 +1023,7 @@ Foam::solidModel::solidModel
     ),
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
     maxIterReached_(0),
+    residualFilePtr_(NULL),
     enforceLinear_(false),
     relaxationMethod_
     (
@@ -1112,6 +1122,19 @@ Foam::solidModel::solidModel
     if (relaxationMethod_ == "QuasiNewton")
     {
         Info<< "        restart frequency: " << QuasiNewtonRestartFreq_ << endl;
+    }
+
+    // If requested, create the residual file
+    if (solidProperties_.lookupOrDefault<Switch>("residualFile", false))
+    {
+        if (Pstream::master())
+        {
+            Info<< "Creating residual.dat" << endl;
+            residualFilePtr_.set
+            (
+                new OFstream(runTime.path()/"residual.dat")
+            );
+        }
     }
 }
 

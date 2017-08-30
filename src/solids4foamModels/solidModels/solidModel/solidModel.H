@@ -136,6 +136,9 @@ class solidModel
         //  momentum equation
         int maxIterReached_;
 
+        //- Residual file
+        autoPtr<OFstream> residualFilePtr_;
+
         //- Switch to enable/disable enforce linear to help convergence
         Switch enforceLinear_;
 
