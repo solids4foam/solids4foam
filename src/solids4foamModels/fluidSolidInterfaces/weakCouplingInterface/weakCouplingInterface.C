@@ -60,21 +60,46 @@ weakCouplingInterface::weakCouplingInterface
 )
 :
     fluidSolidInterface(typeName, runTime, region),
-    solidZoneTraction_(),
+    solidZoneTraction_
+    (
+        IOobject
+        (
+            "solidZoneTraction",
+            runTime.timeName(),
+            fluidMesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        vectorField()
+    ),
     solidZoneTractionPrev_(),
-    predictedSolidZoneTraction_(),
+    predictedSolidZoneTraction_
+    (
+        IOobject
+        (
+            "predictedSolidZoneTraction",
+            runTime.timeName(),
+            fluidMesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        vectorField()
+    ),
     relaxationFactor_
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
     )
 {
-    // Initialize zone traction fields
-    solidZoneTraction_ =
-        vectorField
-        (
-            solidMesh().faceZones()[solidZoneIndex()]().size(),
-            vector::zero
-        );
+    // Initialize solid zone traction fields
+    if (solidZoneTraction_.size() == 0)
+    {
+        solidZoneTraction_ =
+            vectorField
+            (
+                solidMesh().faceZones()[solidZoneIndex()]().size(),
+                vector::zero
+            );
+    }
 
     solidZoneTractionPrev_ =
         vectorField
@@ -82,6 +107,16 @@ weakCouplingInterface::weakCouplingInterface
             solidMesh().faceZones()[solidZoneIndex()]().size(),
             vector::zero
         );
+
+    if (predictedSolidZoneTraction_.size() == 0)
+    {
+        predictedSolidZoneTraction_ =
+            vectorField
+            (
+                solidMesh().faceZones()[solidZoneIndex()]().size(),
+                vector::zero
+            );
+    }
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -121,7 +156,7 @@ void weakCouplingInterface::initializeFields()
 }
 
 
-void weakCouplingInterface::updateWeakDisplacement()
+bool weakCouplingInterface::updateWeakDisplacement()
 {
     vectorField solidZonePointsDisplAtSolid =
         solid().faceZonePointDisplacementIncrement(solidZoneIndex());
@@ -131,6 +166,16 @@ void weakCouplingInterface::updateWeakDisplacement()
         (
             solidZonePointsDisplAtSolid
         );
+
+    vectorField solidZonePointsTotDisplAtSolid =
+        solid().faceZonePointDisplacement(solidZoneIndex());
+
+    vectorField solidZonePointsTotDispl =
+        ggiInterpolator().slaveToMasterPointInterpolate
+        (
+            solidZonePointsTotDisplAtSolid
+        );
+
 
     residualPrev() = residual();
 
@@ -142,53 +187,50 @@ void weakCouplingInterface::updateWeakDisplacement()
 
     // Make sure that displacement on all processors is equal to one
     // calculated on master processor
-    if (Pstream::parRun())
+    fluidSolidInterface::syncFluidZonePointsDispl(fluidZonePointsDispl());
+
+
+    // Update elasticWallPressure boundary conditions, if found
+    fluidSolidInterface::updateElasticWallPressureAcceleration();
+
+
+    // Calculate residual norm
+
+    scalar residualNorm = ::sqrt(gSum(magSqr(residual())));
+    scalar residualNorm_2 = residualNorm;
+
+    if (residualNorm > maxResidualNorm())
     {
-        if(!Pstream::master())
-        {
-            fluidZonePointsDispl() *= 0.0;
-        }
-
-        //- pass to all procs
-        reduce(fluidZonePointsDispl(), sumOp<vectorField>());
-
-        label globalFluidZoneIndex =
-            findIndex(fluid().globalFaceZones(), fluidZoneIndex());
-
-        if (globalFluidZoneIndex == -1)
-        {
-            FatalErrorIn
-            (
-                "void weakCouplingInterface::updateWeakDisplacement()"
-            )   << "global zone point map is not available"
-                << abort(FatalError);
-        }
-
-        const labelList& map =
-            fluid().globalToLocalFaceZonePointMap()[globalFluidZoneIndex];
-
-        if (!Pstream::master())
-        {
-            vectorField fluidZonePointsDisplGlobal =
-                fluidZonePointsDispl();
-
-            forAll(fluidZonePointsDisplGlobal, globalPointI)
-            {
-                label localPoint = map[globalPointI];
-
-                fluidZonePointsDispl()[localPoint] =
-                    fluidZonePointsDisplGlobal[globalPointI];
-            }
-        }
+        maxResidualNorm() = residualNorm;
     }
+
+    residualNorm /= maxResidualNorm() + SMALL;
+
+    Info<< "Current fsi relative residual norm: " << residualNorm << endl;
+
+    interfacePointsDisplPrev() = interfacePointsDispl();
+
+    interfacePointsDispl() = solidZonePointsDispl();
+
+    const vectorField intTotDispl =
+        interfacePointsDispl() + solidZonePointsTotDispl;
+    const scalar intTotDisplNorm = ::sqrt(gSum(magSqr(intTotDispl)));
+    if (intTotDisplNorm > maxIntDisplNorm())
+    {
+        maxIntDisplNorm() = intTotDisplNorm;
+    }
+
+    residualNorm_2 /= maxIntDisplNorm() + SMALL;
+
+    Info<< "Alternative fsi residual: " << residualNorm_2 << endl;
+
+    return min(residualNorm_2, residualNorm);
 }
 
 
 void weakCouplingInterface::updateWeakTraction()
 {
     Info<< "Update weak traction on solid patch" << endl;
-
-    solidZoneTractionPrev_ = solidZoneTraction_;
 
     // Calc fluid traction
 
@@ -218,17 +260,26 @@ void weakCouplingInterface::updateWeakTraction()
             -fluidZoneTraction
         );
 
+    const scalar beta_ = relaxationFactor_;
+
+    solidZoneTractionPrev_ = solidZoneTraction_;
+
     solidZoneTraction_ =
-        relaxationFactor_*fluidZoneTractionAtSolid
-      + (1.0 - relaxationFactor_)*predictedSolidZoneTraction_;
+        beta_*fluidZoneTractionAtSolid
+      + (1.0 - beta_)*predictedSolidZoneTraction_;
+
+    predictedSolidZoneTraction_ =
+        2.0*solidZoneTraction_ - solidZoneTractionPrev_;
 
     if (coupled())
     {
+        Info<< "Setting weak traction on solid patch" << endl;
+
         solid().setTraction
         (
             solidPatchIndex(),
             solidZoneIndex(),
-            solidZoneTraction_
+            predictedSolidZoneTraction_
         );
     }
 

@@ -74,6 +74,9 @@ class pisoFluid
         //- Pressure field
         volVectorField gradp_;
 
+        //- Velocity gradient
+        volTensorField gradU_;
+
         //- Flux field
         surfaceScalarField phi_;
 
@@ -85,9 +88,6 @@ class pisoFluid
 
         //- Density
         dimensionedScalar rho_;
-
-        //- Consistency in time
-        const Switch consistencyByJasak_;
 
 
     // Private Member Functions

@@ -82,6 +82,7 @@ transientSimpleFluid::transientSimpleFluid
         mesh()
     ),
     gradp_(fvc::grad(p_)),
+    gradU_(fvc::grad(U_)),
     phi_
     (
         IOobject
@@ -557,6 +558,8 @@ bool transientSimpleFluid::evolveConsistentByJasak()
                 U_*aU - gradp_ + ddtUEqn.H()
             );
         U_.correctBoundaryConditions();
+
+        gradU_ = fvc::grad(U_);
 
         turbulence_->correct();
 

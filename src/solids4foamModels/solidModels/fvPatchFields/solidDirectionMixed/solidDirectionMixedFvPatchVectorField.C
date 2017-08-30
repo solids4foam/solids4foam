@@ -22,15 +22,13 @@ License
     along with OpenFOAM; if not, write to the Free Software Foundation,
     Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
-Class
-    solidDirectionMixedFvPatchVectorField
-
 \*---------------------------------------------------------------------------*/
 
 #include "solidDirectionMixedFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
 #include "volFields.H"
+#include "solidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -49,8 +47,31 @@ solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
 )
 :
     directionMixedFvPatchVectorField(p, iF),
-    fieldName_(dimensionedInternalField().name())
-{}
+    limitCoeff_(1.0)
+{
+    // Lookup the solidModel object
+    const polyMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel* solModPtr = NULL;
+    if (mesh.foundObject<solidModel>("solidProperties"))
+    {
+        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
+    }
+    else
+    {
+        solModPtr = &mesh.parent().lookupObject<solidModel>("solidProperties");
+    }
+
+    if (solModPtr->solidProperties().found("snGradLimitCoeff"))
+    {
+        limitCoeff_ =
+            readScalar
+            (
+                solModPtr->solidProperties().lookup("snGradLimitCoeff")
+            );
+
+        Info<< "snGradLimitCoeff: " << limitCoeff_ << endl;
+    }
+}
 
 
 solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
@@ -62,7 +83,7 @@ solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
 )
 :
     directionMixedFvPatchVectorField(ptf, p, iF, mapper),
-    fieldName_(ptf.fieldName_)
+    limitCoeff_(ptf.limitCoeff_)
 {}
 
 
@@ -73,30 +94,36 @@ solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
     const dictionary& dict
 )
 :
-  directionMixedFvPatchVectorField(p, iF, dict),
-  fieldName_(dimensionedInternalField().name())
+    directionMixedFvPatchVectorField(p, iF, dict),
+    limitCoeff_(dict.lookupOrDefault<scalar>("limitCoeff", 1.0))
 {
-  Field<vector> normalValue = transform(valueFraction(), refValue());
+    Info<< "Creating " << type() << " boundary condition" << endl;
+    directionMixedFvPatchVectorField::evaluate();
 
-  Field<vector> gradValue =
-      this->patchInternalField() + refGrad()/this->patch().deltaCoeffs();
+    // Lookup the solidModel object
+    const polyMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel* solModPtr = NULL;
+    if (mesh.foundObject<solidModel>("solidProperties"))
+    {
+        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
+    }
+    else
+    {
+        solModPtr = &mesh.parent().lookupObject<solidModel>("solidProperties");
+    }
 
-  //- non-ortho corrected gradValue
-  //- gradField will not have been created so I must do this during updateCoeffs
-  /*const fvPatchField<tensor>& gradField =
-    patch().lookupPatchField<volTensorField, tensor>("grad(" +fieldName_ + ")");
-    vectorField n = patch().nf();
-    vectorField delta = patch().delta();
-    vectorField k = delta - n*(n&delta);
-    Field<vector> gradValue = this->patchInternalField()
-    + (k&gradField.patchInternalField())
-    + refGrad()/this->patch().deltaCoeffs();
-  */
+    if (solModPtr->solidProperties().found("snGradLimitCoeff"))
+    {
+        limitCoeff_ =
+            readScalar
+            (
+                solModPtr->solidProperties().lookup("snGradLimitCoeff")
+            );
 
-  Field<vector> transformGradValue =
-    transform(I - valueFraction(), gradValue);
+        Info<< "snGradLimitCoeff: " << limitCoeff_ << endl;
+    }
 
-  Field<vector>::operator=(normalValue + transformGradValue);
+    Info<< "Limiter coefficient: " << limitCoeff_ << endl;
 }
 
 solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
@@ -106,7 +133,7 @@ solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
 )
 :
     directionMixedFvPatchVectorField(ptf, iF),
-    fieldName_(ptf.fieldName_)
+    limitCoeff_(ptf.limitCoeff_)
 {}
 
 
@@ -145,71 +172,165 @@ void solidDirectionMixedFvPatchVectorField::evaluate(const Pstream::commsTypes)
         this->updateCoeffs();
     }
 
-    Field<vector> normalValue = transform(valueFraction(), refValue());
+    bool secondOrder_(false);
 
-    //- no correction
-    //Field<vector> gradValue =
-    //this->patchInternalField() + refGrad()/this->patch().deltaCoeffs();
-
-    //- non-ortho corrected gradValue
-    const fvPatchField<tensor>& gradField =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
-            "grad(" +fieldName_ + ")"
-        );
     vectorField n = patch().nf();
     vectorField delta = patch().delta();
     vectorField k = delta - n*(n&delta);
-    Field<vector> gradValue = this->patchInternalField()
-      + (k&gradField.patchInternalField())
-      + refGrad()/this->patch().deltaCoeffs();
+
+    const fvPatchField<tensor>& gradD =
+        patch().lookupPatchField<volTensorField, tensor>
+        (
+            "grad(" + dimensionedInternalField().name() + ")"
+        );
+
+
+    // Calc limited snGrad correction
+
+    vectorField snGradCorrection =
+      - (k & gradD.patchInternalField())*patch().deltaCoeffs();
+
+    if (limitCoeff_ < (1.0 - SMALL))
+    {
+        vectorField uncorrectedSnGrad =
+            (
+               *this
+              - patchInternalField()
+            )*patch().deltaCoeffs();
+
+        scalarField limiter =
+            (
+                min
+                (
+                    limitCoeff_*mag(uncorrectedSnGrad + snGradCorrection)
+                   /((1 - limitCoeff_)*mag(snGradCorrection) + SMALL),
+                    1.0
+                )
+            );
+
+        snGradCorrection *= limiter;
+    }
+
+    Field<vector> normalValue = transform(valueFraction(), refValue());
+
+    Field<vector> gradValue =
+        this->patchInternalField()
+      - snGradCorrection/patch().deltaCoeffs()
+        //+ (k & gradD.patchInternalField())
+      + refGrad()/patch().deltaCoeffs();
+
+    if (secondOrder_)
+    {
+        vectorField nGradDP = (n & gradD.patchInternalField());
+
+        gradValue =
+            patchInternalField()
+          + (k & gradD.patchInternalField())
+          + 0.5*(nGradDP + refGrad())/patch().deltaCoeffs();
+    }
 
     Field<vector> transformGradValue =
-      transform(I - valueFraction(), gradValue);
+        transform(I - valueFraction(), gradValue);
 
     Field<vector>::operator=(normalValue + transformGradValue);
 
     fvPatchField<vector>::evaluate();
 }
 
+
 Foam::tmp<Foam::Field<vector> >
 solidDirectionMixedFvPatchVectorField::snGrad() const
 {
+    const bool secondOrder_(false);
+
     Field<vector> pif = this->patchInternalField();
 
-    Field<vector> normalValue = transform(valueFraction(), refValue());
+    Field<vector> normalValue =
+        transform(this->valueFraction(), this->refValue());
 
-    const fvPatchField<tensor>& gradField =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
-            "grad(" +fieldName_ + ")"
-        );
     vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
-    //- correction vector
+    vectorField delta = patch().delta();
     vectorField k = delta - n*(n&delta);
 
+    const fvPatchField<tensor>& gradD =
+        patch().lookupPatchField<volTensorField, tensor>
+        (
+            "grad(" + this->dimensionedInternalField().name() + ")"
+        );
+
+    vectorField snGradCorrection =
+      - (k & gradD.patchInternalField())
+       *patch().deltaCoeffs();
+
+    if (limitCoeff_ < (1.0 - SMALL))
+    {
+        vectorField uncorrectedSnGrad =
+            (
+               *this
+              - patchInternalField()
+            )*patch().deltaCoeffs();
+
+        scalarField limiter =
+            (
+                min
+                (
+                    limitCoeff_*mag(uncorrectedSnGrad + snGradCorrection)
+                   /((1 - limitCoeff_)*mag(snGradCorrection) + SMALL),
+                    1.0
+                )
+            );
+
+        snGradCorrection *= limiter;
+    }
+
     Field<vector> gradValue =
-      (this->refGrad()/this->patch().deltaCoeffs())
-      + (pif)
-      + (k&gradField.patchInternalField());
+        pif
+      - snGradCorrection/patch().deltaCoeffs()
+      + refGrad()/patch().deltaCoeffs();
+
+    if (secondOrder_)
+    {
+        vectorField nGradDP = (n & gradD.patchInternalField());
+
+        gradValue =
+            patchInternalField()
+          + (k & gradD.patchInternalField())
+          + 0.5*(nGradDP + refGrad())/patch().deltaCoeffs();
+    }
 
     Field<vector> transformGradValue =
-      transform(I - (this->valueFraction()), gradValue);
+        transform(I - this->valueFraction(), gradValue);
 
-    Field<vector> patchValue = normalValue + transformGradValue;
+    if (secondOrder_)
+    {
+        vectorField nGradDP = (n&gradD.patchInternalField());
+
+        return
+            2.0
+           *(
+               normalValue + transformGradValue
+             - (pif + (k&gradD.patchInternalField()))
+           )*patch().deltaCoeffs()
+         - nGradDP;
+    }
 
     return
-      (
-       patchValue
-       - ((this->patchInternalField()) + (k&gradField.patchInternalField()))
-       )*this->patch().deltaCoeffs();
+    (
+        normalValue + transformGradValue
+      - (
+            pif
+          - snGradCorrection/this->patch().deltaCoeffs()
+          + (k & gradD.patchInternalField())
+        )
+    )*patch().deltaCoeffs();
 }
 
 // Write
 void solidDirectionMixedFvPatchVectorField::write(Ostream& os) const
 {
     directionMixedFvPatchVectorField::write(os);
+    os.writeKeyword("limitCoeff")
+        << limitCoeff_ << token::END_STATEMENT << nl;
 }
 
 

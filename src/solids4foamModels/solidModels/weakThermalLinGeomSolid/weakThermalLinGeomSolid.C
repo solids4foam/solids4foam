@@ -63,7 +63,9 @@ bool weakThermalLinGeomSolid::converged
     // We will check a number of different residuals for convergence
     bool converged = false;
 
-    // Calculate displacement residual
+    // Calculate relative residuals
+    const scalar absResidualT =
+        gMax(mag(T.internalField() - T.oldTime().internalField()));
     const scalar residualT =
         gMax
         (
@@ -80,7 +82,13 @@ bool weakThermalLinGeomSolid::converged
     // force at leaast 1 outer iteration and the material law must be converged
     if (iCorr > 1)
     {
-        if
+        if (absResidualT < absTTol_)
+        {
+            Info<< "    T has converged to within the " << absTTol_
+                << " degrees" << endl;
+            converged = true;
+        }
+        else if
         (
             solverPerfT.initialResidual() < solutionTol()
          && residualT < solutionTol()
@@ -147,8 +155,22 @@ weakThermalLinGeomSolid::weakThermalLinGeomSolid
     const word& region
 )
 :
-    linGeomSolid(runTime, region),
-    T_
+    linGeomTotalDispSolid(runTime, region),
+    thermal_(mesh()),
+    rhoC_
+    (
+        IOobject
+        (
+            "rhoC",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        thermal_.C()*mechanical().rho()
+    ),
+    k_(thermal_.k()),
+   T_
     (
         IOobject
         (
@@ -159,19 +181,6 @@ weakThermalLinGeomSolid::weakThermalLinGeomSolid
             IOobject::AUTO_WRITE
         ),
         mesh()
-    ),
-    T0_
-    (
-        IOobject
-        (
-            "T0",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedScalar("T0", dimTemperature, 0.0)
     ),
     gradT_
     (
@@ -186,29 +195,13 @@ weakThermalLinGeomSolid::weakThermalLinGeomSolid
         mesh(),
         dimensionedVector("0", dimTemperature/dimLength, vector::zero)
     ),
-    rhoC_
+    absTTol_
     (
-        IOobject
+        solidProperties().lookupOrDefault<scalar>
         (
-            "rhoC",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    k_
-    (
-        IOobject
-        (
-            "k",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
+            "absoluteTemperatureTolerance",
+            1e-06
+        )
     )
 {
     T_.oldTime();
@@ -256,12 +249,9 @@ bool weakThermalLinGeomSolid::evolve()
     while (!converged(iCorr, solverPerfT, T_) && ++iCorr < nCorr());
 
     // Now solve the momentum equation
-    // Note: a thermal elastic mechanical law should be chosen, if the effect of
-    // thermal stress is to be included in the momentum equation. In that case,
-    // the thermal stress term is included explicitly.
-    // We could add an additional loop over the TEqn and DEqn here but it is
-    // typically not needed.
-    linGeomSolid::evolve();
+    // Note: a thermal elastic mechanical law should be chosen if the effect of
+    // thermal stress is to be included in the momentum equation.
+    linGeomTotalDispSolid::evolve();
 
     return true;
 }
@@ -289,7 +279,7 @@ void weakThermalLinGeomSolid::writeFields(const Time& runTime)
     Info<< "Max magnitude of heat flux = " << max(mag(heatFlux)).value()
         << endl;
 
-    linGeomSolid::writeFields(runTime);
+    linGeomTotalDispSolid::writeFields(runTime);
 }
 
 

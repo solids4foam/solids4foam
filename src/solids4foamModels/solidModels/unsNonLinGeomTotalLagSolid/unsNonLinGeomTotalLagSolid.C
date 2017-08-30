@@ -283,6 +283,9 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         mechanical().grad(D(), pointD(), gradD());
         mechanical().grad(D(), pointD(), gradDf_);
 
+        // Update gradient of displacement increment
+        gradDD() = gradD() - gradD().oldTime();
+
         // Total deformation gradient
         Ff_ = I + gradDf_.T();
 

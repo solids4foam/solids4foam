@@ -20,7 +20,7 @@ icoFluidCoeffs
 {
     nCorrectors 3;
     nNonOrthogonalCorrectors 1;
-    consistencyByJasak false;
+    nOuterCorrectors 1;
 }
 
 // ************************************************************************* //

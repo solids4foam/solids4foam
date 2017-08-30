@@ -183,6 +183,9 @@ bool nonLinGeomUpdatedLagSolid::evolve()
         // Under-relax the DD field using fixed or adaptive under-relaxation
         relaxField(DD(), iCorr);
 
+        // Update the total displacement
+        D() = D().oldTime() + DD();
+
         // Update gradient of displacement increment
         mechanical().grad(DD(), gradDD());
 

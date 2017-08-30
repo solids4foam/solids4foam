@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       pointVectorField;
+    object      pointD;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    patch1
+    {
+        type         calculated;
+        value        uniform (0 0 0);
+    }
+    patch2
+    {
+        type         calculated;
+        value        uniform (0 0 0);
+    }
+    patch3
+    {
+        type         fixedValue;
+        value        uniform (0 0 0);
+    }
+    patch4
+    {
+        type         calculated;
+        value        uniform (0 0 0);
+    }
+}
+
+
+// ************************************************************************* //

@@ -15,19 +15,20 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// linearGeometry: assumes small strains and rotations
+//solidModel     weakThermalLinearGeometry;
 solidModel     thermalLinearGeometry;
+//solidModel     linearGeometryTotalDisplacement;
 
-thermalLinearGeometryCoeffs
+"linearGeometryCoeffs|thermalLinearGeometryCoeffs|weakThermalLinearGeometryCoeffs"
 {
     // Maximum number of correctors
-    nCorrectorsT    1000;
+    nCorrectors    1000;
 
     // Solution tolerance
-    solutionToleranceT 1e-06;
+    solutionTolerance 1e-06;
 
-    // Alternative solution toleranc
-    alternativeToleranceT 1e-07;
+    // Alternative solution tolerance
+    alternativeTolerance 1e-07;
 
     // Write frequency for the residuals
     infoFrequencyT  100;
@@ -36,7 +37,7 @@ thermalLinearGeometryCoeffs
 linearGeometryTotalDisplacementCoeffs
 {
     // Maximum number of correctors
-    nCorrectors     1000;
+    nCorrectors     10000;
 
     // Solution tolerance for displacement
     solutionTolerance 1e-06;

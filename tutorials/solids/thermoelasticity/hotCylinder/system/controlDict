@@ -15,10 +15,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     newStressedFoam;
+application     solids4Foam;
 
 startFrom       startTime;
-//startFrom       latestTime;
 
 startTime       0;
 
@@ -38,7 +37,7 @@ writeFormat     ascii;
 
 writePrecision  6;
 
-writeCompression compressed;
+writeCompression uncompressed;
 
 timeFormat      general;
 

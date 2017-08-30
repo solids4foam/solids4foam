@@ -30,6 +30,7 @@ Description
 
 Author
     Philip Cardiff, UCD. All rights reserved.
+    Zeljko Tukovic, FSB Zagreb. All rights reserved.
 
 SourceFiles
     solidDirectionMixedFvPatchVectorField.C
@@ -57,8 +58,8 @@ class solidDirectionMixedFvPatchVectorField
 {
     // Private data
 
-        //- Name of the displacement field
-        word fieldName_;
+        //- Limiter coefficient for snGrad correction
+        scalar limitCoeff_;
 
 
 public:
@@ -156,15 +157,6 @@ public:
 
             //- snGrad with non-orthogonal correction
             tmp<Foam::Field<vector> > snGrad() const;
-
-
-        //- Access
-
-            //- fieldName
-            word& fieldName()
-            {
-                return fieldName_;
-            }
 
 
         //- Write

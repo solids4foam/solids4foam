@@ -55,23 +55,17 @@ class thermoLinearElastic
 {
     // Private data
 
-        //- Modulus of elasticity
-        dimensionedScalar E_;
-
-        //- Poisson's ratio
-        dimensionedScalar nu_;
-
-        //- First Lame parameter
-        dimensionedScalar lambda_;
-
-        //- Second Lame parameter (shear modulus)
-        dimensionedScalar mu_;
-
-        //- Bulk modulus
-        dimensionedScalar K_;
-
         //- Coefficient of linear expansion
-        dimensionedScalar alpha_;
+        const dimensionedScalar alpha_;
+
+        //- Stress-free reference temperature
+        const dimensionedScalar T0_;
+
+        //- If the temperature field T is not found in the objectRegistry then
+        //  it is read from disk. This means that if the solidModel does not
+        //  solve a temperature equation, then the user must specify a constant
+        //  temperature field T
+        mutable autoPtr<volScalarField> TPtr_;
 
 
     // Private Member Functions

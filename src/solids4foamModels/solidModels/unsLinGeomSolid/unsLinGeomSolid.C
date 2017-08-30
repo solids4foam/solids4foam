@@ -131,11 +131,17 @@ bool unsLinGeomSolid::evolve()
         // Under-relax the field
         relaxField(D(), iCorr);
 
+        // Update increment of displacement
+        DD() = D() - D().oldTime();
+
         // Interpolate D to pointD
         mechanical().interpolate(D(), pointD(), false);
 
         // Update gradient of displacement
         mechanical().grad(D(), pointD(), gradD(), gradDf_);
+
+        // Update gradient of displacement increment
+        gradDD() = gradD() - gradD().oldTime();
 
         // Calculate the stress using run-time selectable mechanical law
         mechanical().correct(sigmaf_);
@@ -151,9 +157,6 @@ bool unsLinGeomSolid::evolve()
             D()
         ) && ++iCorr < nCorr()
     );
-
-    // Increment of displacement
-    DD() = D() - D().oldTime();
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();

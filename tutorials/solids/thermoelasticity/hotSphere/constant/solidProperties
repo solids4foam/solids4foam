@@ -15,6 +15,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+//solidModel     weakThermalLinearGeometry;
 solidModel     thermalLinearGeometry;
 //solidModel     linearGeometryTotalDisplacement;
 
@@ -22,16 +23,15 @@ solidModel     thermalLinearGeometry;
 {
     // Maximum number of correctors
     nCorrectors     10000;
-    nCorrectorsT    10000;
 
     // Solution tolerance
-    solutionToleranceT 1e-10;
+    solutionTolerance 1e-6;
 
     // Alternative solution toleranc
-    alternativeToleranceT 1e-10;
+    alternativeTolerance 1e-7;
 
     // Write frequency for the residuals
-    infoFrequencyT  100;
+    infoFrequency  100;
 }
 
 // ************************************************************************* //

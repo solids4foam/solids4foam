@@ -2156,8 +2156,6 @@ Foam::mechanicalModel::mechanicalModel
 {
     Info<< "Creating the mechanicalModel" << endl;
 
-    Info<< "    To-do: move planeStress switch to law" << endl;
-
     // Read the mechanical laws
     const PtrList<entry> lawEntries(lookup("mechanical"));
 
@@ -2448,59 +2446,6 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalModel::impKf() const
     }
 
     return fvc::interpolate(impK, interpName);
-}
-
-
-Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::K() const
-{
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
-    {
-        return laws[0].K();
-    }
-    else
-    {
-        // Accumulate data for all fields
-        tmp<volScalarField> tresult
-        (
-            new volScalarField
-            (
-                IOobject
-                (
-                    "K",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE
-                ),
-                mesh(),
-                dimensionedScalar("zero", dimForce/dimArea, 0),
-                calculatedFvPatchScalarField::typeName
-            )
-        );
-        volScalarField& result = tresult();
-
-        // Accumulated subMesh fields and then map to the base mesh
-        PtrList<volScalarField> Ks(laws.size());
-
-        forAll(laws, lawI)
-        {
-            Ks.set
-            (
-                lawI,
-                new volScalarField(laws[lawI].K())
-            );
-        }
-
-        // Map subMesh fields to the base mesh
-        mapSubMeshVolFields<scalar>(Ks, result);
-
-        // Clear subMesh fields
-        Ks.clear();
-
-        return tresult;
-    }
 }
 
 

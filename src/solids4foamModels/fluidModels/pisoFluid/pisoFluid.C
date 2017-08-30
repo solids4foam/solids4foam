@@ -82,6 +82,7 @@ pisoFluid::pisoFluid
         mesh()
     ),
     gradp_(fvc::grad(p_)),
+    gradU_(fvc::grad(U_)),
     phi_
     (
         IOobject
@@ -115,10 +116,6 @@ pisoFluid::pisoFluid
                 IOobject::NO_WRITE
             )
         ).lookup("rho")
-    ),
-    consistencyByJasak_
-    (
-        fluidProperties().lookupOrDefault<Switch>("consistencyByJasak", false)
     )
 {}
 
@@ -150,6 +147,7 @@ tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
           & turbulence_->devReff()().boundaryField()[patchID]
         );
 
+    // PC: why is this commented?
 //     vectorField n = mesh().boundary()[patchID].nf();
 //     tvF() -= n*(n&tvF());
 
@@ -264,14 +262,7 @@ tmp<scalarField> pisoFluid::faceZoneMuEff
 
 bool pisoFluid::evolve()
 {
-    if (consistencyByJasak_)
-    {
-        Info << "Evolving fluid model (consistency by Jasak)" << endl;
-    }
-    else
-    {
-        Info << "Evolving fluid model" << endl;
-    }
+    Info<< "Evolving fluid model: " << this->type() << endl;
 
     const fvMesh& mesh = fluidModel::mesh();
 
@@ -285,11 +276,14 @@ bool pisoFluid::evolve()
     scalar pRefValue = 0.0;
     setRefCell(p_, fluidProperties(), pRefCell, pRefValue);
 
-    if (mesh.moving())
-    {
-        // Make the fluxes relative
-        phi_ -= fvc::meshPhi(U_);
-    }
+    // if (mesh.moving())
+    // {
+    //     // Make the fluxes relative
+    //     phi_ -= fvc::meshPhi(U_);
+    // }
+
+    // Make the fluxes relative to the mesh motion
+    fvc::makeRelative(phi_, U_);
 
     // Calculate CourantNo
     {
@@ -319,51 +313,30 @@ bool pisoFluid::evolve()
     }
 
     // Construct momentum equation
-    // Convection-diffusion matrix
-    fvVectorMatrix HUEqn
+    fvVectorMatrix UEqn
     (
-        fvm::div(phi_, U_)
+        fvm::ddt(U_)
+      + fvm::div(phi_, U_)
       + turbulence_->divDevReff()
     );
 
-    // Time derivative matrix
-    fvVectorMatrix ddtUEqn(fvm::ddt(U_));
-
-    // Solve momentum equation
-    solve(ddtUEqn + HUEqn == -gradp_);
+    solve(UEqn == -gradp_);
 
     // --- PISO loop
 
-    volScalarField aU = HUEqn.A();
+    volScalarField rUA = 1.0/UEqn.A();
 
-    if (!consistencyByJasak_)
+    for (int corr=0; corr < nCorr; corr++)
     {
-        aU += ddtUEqn.A();
-    }
-
-    for (int corr = 0; corr < nCorr; corr++)
-    {
-        if (consistencyByJasak_)
-        {
-            U_ = HUEqn.H()/aU;
-        }
-        else
-        {
-            U_ = (ddtUEqn.H() + HUEqn.H())/aU;
-        }
+        U_ = rUA*UEqn.H();
         phi_ = (fvc::interpolate(U_) & mesh.Sf());
-
-#       include "adjustPhi.H"
 
         for (int nonOrth = 0; nonOrth <= nNonOrthCorr; nonOrth++)
         {
-            // Construct pressure equation
             fvScalarMatrix pEqn
             (
-                fvm::laplacian(1/aU, p_) == fvc::div(phi_)
+                fvm::laplacian(rUA, p_) == fvc::div(phi_)
             );
-
-            // Solve pressure equation
 
             pEqn.setReference(pRefCell, pRefValue);
 
@@ -386,39 +359,35 @@ bool pisoFluid::evolve()
             }
         }
 
-        // Calculate Continuity error
+        // Continuity error
         {
             volScalarField contErr = fvc::div(phi_);
 
-            scalar sumLocalContErr =
-                runTime().deltaT().value()
-               *mag(contErr)().weightedAverage(mesh.V()).value();
+            scalar sumLocalContErr = runTime().deltaT().value()*
+                mag(contErr)().weightedAverage(mesh.V()).value();
 
-            scalar globalContErr =
-                runTime().deltaT().value()
-               *contErr.weightedAverage(mesh.V()).value();
+            scalar globalContErr = runTime().deltaT().value()*
+                contErr.weightedAverage(mesh.V()).value();
 
             Info<< "time step continuity errors : sum local = "
                 << sumLocalContErr << ", global = " << globalContErr << endl;
         }
 
+        // Make the fluxes relative to the mesh motion
+        fvc::makeRelative(phi_, U_);
+
         gradp_ = fvc::grad(p_);
 
-        if (consistencyByJasak_)
-        {
-            U_ = 1.0/(aU + ddtUEqn.A())*
-                (
-                    U_*aU - gradp_ + ddtUEqn.H()
-                );
-        }
-        else
-        {
-            U_ -= gradp_/aU;
-        }
+        U_ -= rUA*gradp_;
         U_.correctBoundaryConditions();
+
+        gradU_ = fvc::grad(U_);
     }
 
     turbulence_->correct();
+
+    // Make the fluxes absolut to the mesh motion
+    fvc::makeAbsolute(phi_, U_);
 
     return 0;
 }

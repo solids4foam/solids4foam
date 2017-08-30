@@ -102,11 +102,14 @@ bool linGeomSolid::evolve()
         // Fixed or adaptive field under-relaxation
         relaxField(DD(), iCorr);
 
-        // Update gradient of displacement
-        mechanical().grad(DD(), gradDD());
-
         // Update the total displacement
         D() = D().oldTime() + DD();
+
+        // Update gradient of displacement increment
+        mechanical().grad(DD(), gradDD());
+
+        // Update gradient of total displacement
+        gradD() = gradD().oldTime() + gradDD();
 
         // Calculate the stress using run-time selectable mechanical law
         const volScalarField DDEqnA("DDEqnA", DDEqn.A());

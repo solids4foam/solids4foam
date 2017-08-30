@@ -320,11 +320,14 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     D().correctBoundaryConditions();
     gradD() = fvc::grad(D(), pointD());
 
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
-
     // Increment of displacement
     DD() = D() - D().oldTime();
+
+    // Update gradient of displacement increment
+    gradDD() = gradD() - gradD().oldTime();
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();

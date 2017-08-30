@@ -283,8 +283,14 @@ bool poroLinGeomSolid::evolve()
         // Under-relax the field
         relaxField(D(), iCorr);
 
+        // Update increment of displacement
+        DD() = D() - D().oldTime();
+
         // Update gradient of displacement
         mechanical().grad(D(), gradD());
+
+        // Update gradient of displacement increment
+        gradDD() = gradD() - gradD().oldTime();
 
         // Update velocity as it is used in the pEqn
         U() = fvc::ddt(D());
@@ -308,9 +314,6 @@ bool poroLinGeomSolid::evolve()
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), pointD());
-
-    // Increment of displacement
-    DD() = D() - D().oldTime();
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();

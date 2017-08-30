@@ -101,6 +101,15 @@ protected:
             return fluidProperties_;
         }
 
+        //- Update Robin boundary conditions, if found
+        void updateRobinFsiInterface
+        (
+            const volScalarField& p,
+            const volVectorField& U,
+            surfaceScalarField& phi,
+            surfaceScalarField& rAUf
+        );
+
 
 public:
 
@@ -168,10 +177,10 @@ public:
             }
 
             //- Return velocity field
-            //virtual const volVectorField& U() const = 0;
+            virtual const volVectorField& U() const = 0;
 
             //- Return pressure field
-            //virtual const volScalarField& p() const = 0;
+            virtual const volScalarField& p() const = 0;
 
             //- Return reference to flux field
             virtual const surfaceScalarField& phi() const = 0;

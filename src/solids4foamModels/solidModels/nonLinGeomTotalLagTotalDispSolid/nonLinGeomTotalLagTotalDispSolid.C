@@ -181,8 +181,14 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
         // Fixed or adaptive field under-relaxation
         relaxField(D(), iCorr);
 
+        // Increment of displacement
+        DD() = D() - D().oldTime();
+
         // Update gradient of displacement
         mechanical().grad(D(), gradD());
+
+        // Update gradient of displacement increment
+        gradDD() = gradD() - gradD().oldTime();
 
         // Total deformation gradient
         F_ = I + gradD().T();
@@ -214,9 +220,6 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), pointD());
-
-    // Increment of displacement
-    DD() = D() - D().oldTime();
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();

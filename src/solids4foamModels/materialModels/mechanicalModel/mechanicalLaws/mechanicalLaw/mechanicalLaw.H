@@ -212,18 +212,6 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<surfaceScalarField> impKf() const;
 
-        //- Bulk modulus
-        virtual tmp<volScalarField> K() const
-        {
-            notImplemented
-            (
-                type() + ": virtual tmp<volScalarField> impK() const"
-            );
-
-            // Keep compiler happy
-            return tmp<volScalarField>();
-        }
-
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma) = 0;
 

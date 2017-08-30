@@ -73,6 +73,9 @@ class transientSimpleFluid
         //- Pressure field
         volVectorField gradp_;
 
+        //- Velocity gradient
+        volTensorField gradU_;
+
         //- Flux field
         surfaceScalarField phi_;
 
