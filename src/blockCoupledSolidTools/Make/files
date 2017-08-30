@@ -1,3 +1,5 @@
+newLeastSquaresVolPointInterpolation/newLeastSquaresVolPointInterpolation.C
+
 matrices/blockLduMatrix/BlockLduMatrix/vectorBlockLduMatrix.C
 /*matrices/blockLduMatrix/BlockLduSolvers/BlockBiCGStab/blockBiCGStabSolvers.C*/
 
