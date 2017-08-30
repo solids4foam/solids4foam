@@ -23,7 +23,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "movingWallVelocityFvPatchVectorField.H"
+#include "newMovingWallVelocityFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "surfaceFields.H"
@@ -37,7 +37,7 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-movingWallVelocityFvPatchVectorField::movingWallVelocityFvPatchVectorField
+newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF
@@ -51,9 +51,9 @@ movingWallVelocityFvPatchVectorField::movingWallVelocityFvPatchVectorField
 {}
 
 
-movingWallVelocityFvPatchVectorField::movingWallVelocityFvPatchVectorField
+newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 (
-    const movingWallVelocityFvPatchVectorField& ptf,
+    const newMovingWallVelocityFvPatchVectorField& ptf,
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
     const fvPatchFieldMapper& mapper
@@ -67,7 +67,7 @@ movingWallVelocityFvPatchVectorField::movingWallVelocityFvPatchVectorField
 {}
 
 
-movingWallVelocityFvPatchVectorField::movingWallVelocityFvPatchVectorField
+newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
@@ -95,9 +95,9 @@ movingWallVelocityFvPatchVectorField::movingWallVelocityFvPatchVectorField
 }
 
 
-movingWallVelocityFvPatchVectorField::movingWallVelocityFvPatchVectorField
+newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 (
-    const movingWallVelocityFvPatchVectorField& pivpvf
+    const newMovingWallVelocityFvPatchVectorField& pivpvf
 )
 :
     fixedValueFvPatchVectorField(pivpvf),
@@ -108,9 +108,9 @@ movingWallVelocityFvPatchVectorField::movingWallVelocityFvPatchVectorField
 {}
 
 
-movingWallVelocityFvPatchVectorField::movingWallVelocityFvPatchVectorField
+newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 (
-    const movingWallVelocityFvPatchVectorField& pivpvf,
+    const newMovingWallVelocityFvPatchVectorField& pivpvf,
     const DimensionedField<vector, volMesh>& iF
 )
 :
@@ -124,9 +124,9 @@ movingWallVelocityFvPatchVectorField::movingWallVelocityFvPatchVectorField
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void movingWallVelocityFvPatchVectorField::updateCoeffs()
+void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 {
-//     Info << "movingWallVelocityFvPatchVectorField::updateCoeffs" << endl;
+//     Info << "newMovingWallVelocityFvPatchVectorField::updateCoeffs" << endl;
 
     if (updated())
     {
@@ -194,7 +194,7 @@ void movingWallVelocityFvPatchVectorField::updateCoeffs()
     }
     else // Euler
     {
-//         Info << "void movingWallVelocityFvPatchVectorField::updateCoeffs() - "
+//         Info << "void newMovingWallVelocityFvPatchVectorField::updateCoeffs() - "
 //             << "Euler"
 //             << endl;
 
@@ -232,7 +232,7 @@ void movingWallVelocityFvPatchVectorField::updateCoeffs()
 }
 
 
-Foam::tmp<Foam::Field<vector> > movingWallVelocityFvPatchVectorField::
+Foam::tmp<Foam::Field<vector> > newMovingWallVelocityFvPatchVectorField::
 snGrad() const
 {
     bool secondOrder_ = false;
@@ -308,7 +308,7 @@ snGrad() const
 }
 
 
-tmp<Field<vector> > movingWallVelocityFvPatchVectorField::
+tmp<Field<vector> > newMovingWallVelocityFvPatchVectorField::
 gradientBoundaryCoeffs() const
 {
     bool secondOrder_ = false;
@@ -384,7 +384,7 @@ gradientBoundaryCoeffs() const
 
 
 
-void movingWallVelocityFvPatchVectorField::write(Ostream& os) const
+void newMovingWallVelocityFvPatchVectorField::write(Ostream& os) const
 {
     fvPatchVectorField::write(os);
     writeEntry("value", os);
@@ -396,7 +396,7 @@ void movingWallVelocityFvPatchVectorField::write(Ostream& os) const
 makePatchTypeField
 (
     fvPatchVectorField,
-    movingWallVelocityFvPatchVectorField
+    newMovingWallVelocityFvPatchVectorField
 );
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

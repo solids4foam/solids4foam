@@ -23,7 +23,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "wedgeFvPatchFields.H"
+#include "newWedgeFvPatchFields.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 
@@ -34,12 +34,12 @@ namespace Foam
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-makePatchFields(wedge);
+makePatchFields(newWedge);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 template<>
-tmp<vectorField> wedgeFvPatchField<vector>::snGrad() const
+tmp<vectorField> newWedgeFvPatchField<vector>::snGrad() const
 {
     const fvMesh& mesh = patch().boundaryMesh().mesh();
 
@@ -58,25 +58,25 @@ tmp<vectorField> wedgeFvPatchField<vector>::snGrad() const
         // Philip Cardiff, UCD
         // Zeljko Tukovic, FSB Zagreb
 
-//         Info << "wedgeFvPatchField<vector>::snGrad(): " 
+//         Info << "newWedgeFvPatchField<vector>::snGrad(): " 
 //             << "Using stored gradient for field: " 
 //             << this->dimensionedInternalField().name()<< endl;
 
         // Method:
-        // We project the patch normal back to the wedge centrePlane and 
+        // We project the patch normal back to the newWedge centrePlane and 
         // find the intersection point. We then extrapolate U from 
         // the Cn to this intersection point (projC) using gradU 
         // looked up from the solver.
         // We can then calculate snGrad by getting the difference 
-        // between projU and transformed projU (i.e. across the wedge), 
+        // between projU and transformed projU (i.e. across the newWedge), 
         // and then dividing by the magnitude of the distance between them.
 
-        const wedgePolyPatch& wedgePatch =
+        const wedgePolyPatch& newWedgePatch =
             refCast<const wedgePolyPatch>(patch().patch());
 
         const vectorField& patchC = patch().patch().faceCentres();
         vectorField nHat = this->patch().nf();
-        const vector& centreN = wedgePatch.centreNormal();
+        const vector& centreN = newWedgePatch.centreNormal();
         scalarField d = ((patch().Cn() - patchC) & centreN)/(nHat & centreN);
         vectorField projC = d*nHat + patchC;
 
@@ -97,11 +97,11 @@ tmp<vectorField> wedgeFvPatchField<vector>::snGrad() const
         // Calculate delta coeffs from proj position on centre plane 
         // to transformed projected position
         scalarField projDeltaCoeff =
-            1.0/mag(transform(wedgePatch.cellT(), projC) - projC);
+            1.0/mag(transform(newWedgePatch.cellT(), projC) - projC);
 
         return
         (
-            transform(wedgePatch.cellT(), projU) - projU
+            transform(newWedgePatch.cellT(), projU) - projU
         )*projDeltaCoeff;
     }
 
@@ -114,7 +114,7 @@ tmp<vectorField> wedgeFvPatchField<vector>::snGrad() const
 
 
 template<>
-void wedgeFvPatchField<vector>::evaluate(const Pstream::commsTypes)
+void newWedgeFvPatchField<vector>::evaluate(const Pstream::commsTypes)
 {
     if (!updated())
     {
@@ -135,17 +135,17 @@ void wedgeFvPatchField<vector>::evaluate(const Pstream::commsTypes)
         // Philip Cardiff, UCD
         // Zeljko Tukovic, FSB Zagreb
 
-//         Info << "wedgeFvPatchField<vector>::evaluate(): " 
+//         Info << "newWedgeFvPatchField<vector>::evaluate(): " 
 //             << "Using stored gradient for field: "
 //             << this->dimensionedInternalField().name()<< endl;
 
-        const wedgeFvPatch& wedgePatch =
+        const wedgeFvPatch& newWedgePatch =
             refCast<const wedgeFvPatch>(this->patch());
 
         // Rotate patchC field back to centre plane to find 
         // transformed cell centres
         const vectorField& patchC = patch().patch().faceCentres();
-        vectorField transC = wedgePatch.faceT().T() & patchC;
+        vectorField transC = newWedgePatch.faceT().T() & patchC;
 
         // Calculate correction vector which connects actual cell centre 
         // to the transformed cell centre
@@ -162,7 +162,7 @@ void wedgeFvPatchField<vector>::evaluate(const Pstream::commsTypes)
 
         fvPatchVectorField::operator==
         (
-            transform(wedgePatch.faceT(), pif)
+            transform(newWedgePatch.faceT(), pif)
         );
     }
     else

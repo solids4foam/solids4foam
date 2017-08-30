@@ -22,18 +22,18 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::wedgeFvPatchField
+    Foam::newWedgeFvPatchField
 
 Description
-    Foam::wedgeFvPatchField
+    Foam::newWedgeFvPatchField
 
 SourceFiles
-    wedgeFvPatchField.C
+    newWedgeFvPatchField.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef wedgeFvPatchField_H
-#define wedgeFvPatchField_H
+#ifndef newWedgeFvPatchField_H
+#define newWedgeFvPatchField_H
 
 #include "transformFvPatchField.H"
 #include "wedgeFvPatch.H"
@@ -44,11 +44,11 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class wedgeFvPatch Declaration
+                         Class newWedgeFvPatch Declaration
 \*---------------------------------------------------------------------------*/
 
 template<class Type>
-class wedgeFvPatchField
+class newWedgeFvPatchField
 :
     public transformFvPatchField<Type>
 {
@@ -62,33 +62,33 @@ public:
     // Constructors
 
         //- Construct from patch and internal field
-        wedgeFvPatchField
+        newWedgeFvPatchField
         (
             const fvPatch&,
             const DimensionedField<Type, volMesh>&
         );
 
         //- Construct from patch, internal field and dictionary
-        wedgeFvPatchField
+        newWedgeFvPatchField
         (
             const fvPatch&,
             const DimensionedField<Type, volMesh>&,
             const dictionary&
         );
 
-        //- Construct by mapping given wedgeFvPatchField onto a new patch
-        wedgeFvPatchField
+        //- Construct by mapping given newWedgeFvPatchField onto a new patch
+        newWedgeFvPatchField
         (
-            const wedgeFvPatchField<Type>&,
+            const newWedgeFvPatchField<Type>&,
             const fvPatch&,
             const DimensionedField<Type, volMesh>&,
             const fvPatchFieldMapper&
         );
 
         //- Construct as copy
-        wedgeFvPatchField
+        newWedgeFvPatchField
         (
-            const wedgeFvPatchField<Type>&
+            const newWedgeFvPatchField<Type>&
         );
 
         //- Construct and return a clone
@@ -96,14 +96,14 @@ public:
         {
             return tmp<fvPatchField<Type> >
             (
-                new wedgeFvPatchField<Type>(*this)
+                new newWedgeFvPatchField<Type>(*this)
             );
         }
 
         //- Construct as copy setting internal field reference
-        wedgeFvPatchField
+        newWedgeFvPatchField
         (
-            const wedgeFvPatchField<Type>&,
+            const newWedgeFvPatchField<Type>&,
             const DimensionedField<Type, volMesh>&
         );
 
@@ -115,7 +115,7 @@ public:
         {
             return tmp<fvPatchField<Type> >
             (
-                new wedgeFvPatchField<Type>(*this, iF)
+                new newWedgeFvPatchField<Type>(*this, iF)
             );
         }
 
@@ -141,19 +141,19 @@ public:
 // * * * * * * * * * * * Template Specialisations  * * * * * * * * * * * * * //
 
 template<>
-tmp<scalarField > wedgeFvPatchField<scalar>::snGrad() const;
+tmp<scalarField > newWedgeFvPatchField<scalar>::snGrad() const;
 
 template<>
-void wedgeFvPatchField<scalar>::evaluate
+void newWedgeFvPatchField<scalar>::evaluate
 (
     const Pstream::commsTypes commsType
 );
 
 template<>
-tmp<vectorField > wedgeFvPatchField<vector>::snGrad() const;
+tmp<vectorField > newWedgeFvPatchField<vector>::snGrad() const;
 
 template<>
-void wedgeFvPatchField<vector>::evaluate
+void newWedgeFvPatchField<vector>::evaluate
 (
     const Pstream::commsTypes commsType
 );
@@ -165,7 +165,7 @@ void wedgeFvPatchField<vector>::evaluate
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #ifdef NoRepository
-#   include "wedgeFvPatchField.C"
+#   include "newWedgeFvPatchField.C"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

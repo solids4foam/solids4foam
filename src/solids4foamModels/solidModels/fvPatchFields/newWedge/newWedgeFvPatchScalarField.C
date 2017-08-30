@@ -23,7 +23,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "wedgeFvPatchField.H"
+#include "newWedgeFvPatchField.H"
 #include "volFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -34,14 +34,14 @@ namespace Foam
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 template<>
-tmp<scalarField> wedgeFvPatchField<scalar>::snGrad() const
+tmp<scalarField> newWedgeFvPatchField<scalar>::snGrad() const
 {
     return tmp<scalarField >(new scalarField(size(), 0.0));
 }
 
 
 template<>
-void wedgeFvPatchField<scalar>::evaluate(const Pstream::commsTypes)
+void newWedgeFvPatchField<scalar>::evaluate(const Pstream::commsTypes)
 {
     if (!updated())
     {
@@ -64,16 +64,16 @@ void wedgeFvPatchField<scalar>::evaluate(const Pstream::commsTypes)
         // Philip Cardiff, UCD
         // Zeljko Tukovic, FSB Zagreb
 
-//         Info << "wedgeFvPatchField<scalar>::evaluate(): "
+//         Info << "newWedgeFvPatchField<scalar>::evaluate(): "
 //             << "Using stored gradient" << endl;
 
-        const wedgeFvPatch& wedgePatch =
+        const wedgeFvPatch& newWedgePatch =
             refCast<const wedgeFvPatch>(this->patch());
 
         // Rotate patchC field back to centre plane to find 
         // transformed cell centres
         const vectorField& patchC = patch().patch().faceCentres();
-        vectorField transC = wedgePatch.faceT().T() & patchC;
+        vectorField transC = newWedgePatch.faceT().T() & patchC;
 
         // Calculate correction vector which connects actual cell centre 
         // to the transformed cell centre
@@ -90,7 +90,7 @@ void wedgeFvPatchField<scalar>::evaluate(const Pstream::commsTypes)
 
         fvPatchScalarField::operator==
         (
-            transform(wedgePatch.faceT(), pif)
+            transform(newWedgePatch.faceT(), pif)
         );
     }
     else

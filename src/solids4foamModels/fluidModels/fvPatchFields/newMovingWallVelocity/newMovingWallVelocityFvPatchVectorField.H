@@ -22,18 +22,18 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::movingWallVelocityFvPatchVectorField
+    Foam::newMovingWallVelocityFvPatchVectorField
 
 Description
-    Foam::movingWallVelocityFvPatchVectorField
+    Foam::newMovingWallVelocityFvPatchVectorField
 
 SourceFiles
-    movingWallVelocityFvPatchVectorField.C
+    newMovingWallVelocityFvPatchVectorField.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef movingWallVelocityFvPatchVectorField_H
-#define movingWallVelocityFvPatchVectorField_H
+#ifndef newMovingWallVelocityFvPatchVectorField_H
+#define newMovingWallVelocityFvPatchVectorField_H
 
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
@@ -44,10 +44,10 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                 Class movingWallVelocityFvPatch Declaration
+                 Class newMovingWallVelocityFvPatch Declaration
 \*---------------------------------------------------------------------------*/
 
-class movingWallVelocityFvPatchVectorField
+class newMovingWallVelocityFvPatchVectorField
 :
     public fixedValueFvPatchVectorField
 {
@@ -64,40 +64,40 @@ class movingWallVelocityFvPatchVectorField
 public:
 
     //- Runtime type information
-    TypeName("movingWallVelocity");
+    TypeName("newMovingWallVelocity");
 
 
     // Constructors
 
         //- Construct from patch and internal field
-        movingWallVelocityFvPatchVectorField
+        newMovingWallVelocityFvPatchVectorField
         (
             const fvPatch&,
             const DimensionedField<vector, volMesh>&
         );
 
         //- Construct from patch, internal field and dictionary
-        movingWallVelocityFvPatchVectorField
+        newMovingWallVelocityFvPatchVectorField
         (
             const fvPatch&,
             const DimensionedField<vector, volMesh>&,
             const dictionary&
         );
 
-        //- Construct by mapping given movingWallVelocityFvPatchVectorField
+        //- Construct by mapping given newMovingWallVelocityFvPatchVectorField
         //  onto a new patch
-        movingWallVelocityFvPatchVectorField
+        newMovingWallVelocityFvPatchVectorField
         (
-            const movingWallVelocityFvPatchVectorField&,
+            const newMovingWallVelocityFvPatchVectorField&,
             const fvPatch&,
             const DimensionedField<vector, volMesh>&,
             const fvPatchFieldMapper&
         );
 
         //- Construct as copy
-        movingWallVelocityFvPatchVectorField
+        newMovingWallVelocityFvPatchVectorField
         (
-            const movingWallVelocityFvPatchVectorField&
+            const newMovingWallVelocityFvPatchVectorField&
         );
 
         //- Construct and return a clone
@@ -105,14 +105,14 @@ public:
         {
             return tmp<fvPatchVectorField>
             (
-                new movingWallVelocityFvPatchVectorField(*this)
+                new newMovingWallVelocityFvPatchVectorField(*this)
             );
         }
 
         //- Construct as copy setting internal field reference
-        movingWallVelocityFvPatchVectorField
+        newMovingWallVelocityFvPatchVectorField
         (
-            const movingWallVelocityFvPatchVectorField&,
+            const newMovingWallVelocityFvPatchVectorField&,
             const DimensionedField<vector, volMesh>&
         );
 
@@ -124,7 +124,7 @@ public:
         {
             return tmp<fvPatchVectorField>
             (
-                new movingWallVelocityFvPatchVectorField(*this, iF)
+                new newMovingWallVelocityFvPatchVectorField(*this, iF)
             );
         }
 

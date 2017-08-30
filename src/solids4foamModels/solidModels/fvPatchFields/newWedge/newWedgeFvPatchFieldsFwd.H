@@ -23,8 +23,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef wedgeFvPatchFieldsFwd_H
-#define wedgeFvPatchFieldsFwd_H
+#ifndef newWedgeFvPatchFieldsFwd_H
+#define newWedgeFvPatchFieldsFwd_H
 
 #include "fvPatchField.H"
 #include "fieldTypes.H"
@@ -36,9 +36,9 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-template<class Type> class wedgeFvPatchField;
+template<class Type> class newWedgeFvPatchField;
 
-makePatchTypeFieldTypedefs(wedge)
+makePatchTypeFieldTypedefs(newWedge)
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
