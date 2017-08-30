@@ -488,6 +488,15 @@ const Foam::dimensionedScalar& Foam::linearElastic::lambda() const
 void Foam::linearElastic::correct(volSymmTensorField& sigma)
 {
     // Calculate total strain
+    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    {
+        // Lookup gradient of displacement increment
+        const volTensorField& gradDD =
+            mesh().lookupObject<volTensorField>("grad(DD)");
+
+        epsilon_ = epsilon_.oldTime() + symm(gradDD);
+    }
+    else
     {
         // Lookup gradient of displacement
         const volTensorField& gradD =
@@ -530,6 +539,15 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
 void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
 {
     // Calculate total strain
+    if (mesh().foundObject<volTensorField>("grad(DD)f"))
+    {
+        // Lookup gradient of displacement increment
+        const surfaceTensorField& gradDD =
+            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
+
+        epsilonf_ = epsilonf_.oldTime() + symm(gradDD);
+    }
+    else
     {
         // Lookup gradient of displacement
         const surfaceTensorField& gradD =
