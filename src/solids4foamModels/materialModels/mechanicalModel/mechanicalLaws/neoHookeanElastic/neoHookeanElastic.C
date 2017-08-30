@@ -192,7 +192,7 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 
 void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 {
-    if (mesh().foundObject<volTensorField>("relF"))
+    if (mesh().foundObject<volTensorField>("grad(DD)"))
     {
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
@@ -257,7 +257,7 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 
 void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 {
-    if (mesh().foundObject<volTensorField>("relFf"))
+    if (mesh().foundObject<volTensorField>("grad(DD)f"))
     {
         // Lookup gradient of displacement increment
         const surfaceTensorField& gradDD =
