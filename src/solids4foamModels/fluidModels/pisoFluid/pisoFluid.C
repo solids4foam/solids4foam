@@ -57,50 +57,12 @@ pisoFluid::pisoFluid
 )
 :
     fluidModel(typeName, runTime, region),
-    U_
-    (
-        IOobject
-        (
-            "U",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    p_
-    (
-        IOobject
-        (
-            "p",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    gradp_(fvc::grad(p_)),
-    gradU_(fvc::grad(U_)),
-    phi_
-    (
-        IOobject
-        (
-            "phi",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        fvc::interpolate(U_) & mesh().Sf()
-    ),
-    laminarTransport_(U_, phi_),
+    laminarTransport_(U(), phi()),
     turbulence_
     (
         incompressible::turbulenceModel::New
         (
-            U_, phi_, laminarTransport_
+            U(), phi(), laminarTransport_
         )
     ),
     rho_
@@ -121,18 +83,6 @@ pisoFluid::pisoFluid
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-const volVectorField& pisoFluid::U() const
-{
-    return U_;
-}
-
-
-const volScalarField& pisoFluid::p() const
-{
-    return p_;
-}
-
-
 tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
 {
     tmp<vectorField> tvF
@@ -148,8 +98,8 @@ tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
         );
 
     // PC: why is this commented?
-//     vectorField n = mesh().boundary()[patchID].nf();
-//     tvF() -= n*(n&tvF());
+    //vectorField n = mesh().boundary()[patchID].nf();
+    //tvF() -= n*(n & tvF());
 
     return tvF;
 }
@@ -163,67 +113,6 @@ tmp<scalarField> pisoFluid::patchPressureForce(const label patchID) const
     );
 
     tpF() = rho_.value()*p().boundaryField()[patchID];
-
-    return tpF;
-}
-
-
-tmp<vectorField> pisoFluid::faceZoneViscousForce
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    vectorField pVF = patchViscousForce(patchID);
-
-    tmp<vectorField> tvF
-    (
-        new vectorField(mesh().faceZones()[zoneID].size(), vector::zero)
-    );
-    vectorField& vF = tvF();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pVF, i)
-    {
-        vF[mesh().faceZones()[zoneID].whichFace(patchStart + i)] =
-            pVF[i];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(vF, sumOp<vectorField>());
-
-
-    return tvF;
-}
-
-
-tmp<scalarField> pisoFluid::faceZonePressureForce
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    scalarField pPF = patchPressureForce(patchID);
-
-    tmp<scalarField> tpF
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& pF = tpF();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pPF, i)
-    {
-        pF[mesh().faceZones()[zoneID].whichFace(patchStart + i)] =
-            pPF[i];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(pF, sumOp<scalarField>());
 
     return tpF;
 }
@@ -247,10 +136,10 @@ tmp<scalarField> pisoFluid::faceZoneMuEff
     const label patchStart =
         mesh().boundaryMesh()[patchID].start();
 
-    forAll(pMuEff, i)
+    forAll(pMuEff, I)
     {
-        muEff[mesh().faceZones()[zoneID].whichFace(patchStart + i)] =
-            pMuEff[i];
+        muEff[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
+            pMuEff[I];
     }
 
     // Parallel data exchange: collect pressure field on all processors
@@ -274,16 +163,16 @@ bool pisoFluid::evolve()
     // Prepare for the pressure solution
     label pRefCell = 0;
     scalar pRefValue = 0.0;
-    setRefCell(p_, fluidProperties(), pRefCell, pRefValue);
+    setRefCell(p(), fluidProperties(), pRefCell, pRefValue);
 
     // if (mesh.moving())
     // {
     //     // Make the fluxes relative
-    //     phi_ -= fvc::meshPhi(U_);
+    //     phi() -= fvc::meshPhi(U());
     // }
 
     // Make the fluxes relative to the mesh motion
-    fvc::makeRelative(phi_, U_);
+    fvc::makeRelative(phi(), U());
 
     // Calculate CourantNo
     {
@@ -294,7 +183,7 @@ bool pisoFluid::evolve()
         if (mesh.nInternalFaces())
         {
             surfaceScalarField SfUfbyDelta =
-                mesh.surfaceInterpolation::deltaCoeffs()*mag(phi_);
+                mesh.surfaceInterpolation::deltaCoeffs()*mag(phi());
 
             CoNum =
                 max(SfUfbyDelta/mesh.magSf()).value()
@@ -304,7 +193,7 @@ bool pisoFluid::evolve()
                 (sum(SfUfbyDelta)/sum(mesh.magSf())).value()
                *runTime().deltaT().value();
 
-            velMag = max(mag(phi_)/mesh.magSf()).value();
+            velMag = max(mag(phi())/mesh.magSf()).value();
         }
 
         Info<< "Courant Number mean: " << meanCoNum
@@ -315,12 +204,12 @@ bool pisoFluid::evolve()
     // Construct momentum equation
     fvVectorMatrix UEqn
     (
-        fvm::ddt(U_)
-      + fvm::div(phi_, U_)
+        fvm::ddt(U())
+      + fvm::div(phi(), U())
       + turbulence_->divDevReff()
     );
 
-    solve(UEqn == -gradp_);
+    solve(UEqn == -gradp());
 
     // --- PISO loop
 
@@ -328,14 +217,14 @@ bool pisoFluid::evolve()
 
     for (int corr=0; corr < nCorr; corr++)
     {
-        U_ = rUA*UEqn.H();
-        phi_ = (fvc::interpolate(U_) & mesh.Sf());
+        U() = rUA*UEqn.H();
+        phi() = (fvc::interpolate(U()) & mesh.Sf());
 
         for (int nonOrth = 0; nonOrth <= nNonOrthCorr; nonOrth++)
         {
             fvScalarMatrix pEqn
             (
-                fvm::laplacian(rUA, p_) == fvc::div(phi_)
+                fvm::laplacian(rUA, p()) == fvc::div(phi())
             );
 
             pEqn.setReference(pRefCell, pRefValue);
@@ -355,13 +244,13 @@ bool pisoFluid::evolve()
 
             if (nonOrth == nNonOrthCorr)
             {
-                phi_ -= pEqn.flux();
+                phi() -= pEqn.flux();
             }
         }
 
         // Continuity error
         {
-            volScalarField contErr = fvc::div(phi_);
+            volScalarField contErr = fvc::div(phi());
 
             scalar sumLocalContErr = runTime().deltaT().value()*
                 mag(contErr)().weightedAverage(mesh.V()).value();
@@ -374,20 +263,20 @@ bool pisoFluid::evolve()
         }
 
         // Make the fluxes relative to the mesh motion
-        fvc::makeRelative(phi_, U_);
+        fvc::makeRelative(phi(), U());
 
-        gradp_ = fvc::grad(p_);
+        gradp() = fvc::grad(p());
 
-        U_ -= rUA*gradp_;
-        U_.correctBoundaryConditions();
+        U() -= rUA*gradp();
+        U().correctBoundaryConditions();
 
-        gradU_ = fvc::grad(U_);
+        gradU() = fvc::grad(U());
     }
 
     turbulence_->correct();
 
     // Make the fluxes absolut to the mesh motion
-    fvc::makeAbsolute(phi_, U_);
+    fvc::makeAbsolute(phi(), U());
 
     return 0;
 }

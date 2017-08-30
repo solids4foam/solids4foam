@@ -49,22 +49,26 @@ materialModels/mechanicalModel/mechanicalModel.C
 mechanicalLaws = materialModels/mechanicalModel/mechanicalLaws
 $(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
 $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
-$(mechanicalLaws)/linearElastic/linearElastic.C
-$(mechanicalLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
-$(mechanicalLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
-$(mechanicalLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C
-$(mechanicalLaws)/poroLinearElastic/poroLinearElastic.C
-$(mechanicalLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
-$(mechanicalLaws)/neoHookeanElastic/neoHookeanElastic.C
-$(mechanicalLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
-$(mechanicalLaws)/neoHookeanElasticMisesPlasticRubin/neoHookeanElasticMisesPlasticRubin.C
-$(mechanicalLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
-$(mechanicalLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
-$(mechanicalLaws)/thermoLinearElastic/thermoLinearElastic.C
-$(mechanicalLaws)/linearElasticFromFile/linearElasticFromFile.C
-$(mechanicalLaws)/linearElasticCt/linearElasticCt.C
-$(mechanicalLaws)/viscousHookeanElastic/viscousHookeanElastic.C
-$(mechanicalLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
+
+linGeomLaws = $(mechanicalLaws)/linearGeometryLaws
+$(linGeomLaws)/linearElastic/linearElastic.C
+$(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
+$(linGeomLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
+$(linGeomLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C
+$(linGeomLaws)/poroLinearElastic/poroLinearElastic.C
+$(linGeomLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
+$(linGeomLaws)/thermoLinearElastic/thermoLinearElastic.C
+$(linGeomLaws)/linearElasticFromFile/linearElasticFromFile.C
+$(linGeomLaws)/linearElasticCt/linearElasticCt.C
+$(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
+
+nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
+$(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
+$(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
+$(nonLinGeomLaws)/neoHookeanElasticMisesPlasticRubin/neoHookeanElasticMisesPlasticRubin.C
+$(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
+$(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
+$(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
 
 materialModels/thermalModel/thermalModel.C
 thermalLaws = materialModels/thermalModel/thermalLaws

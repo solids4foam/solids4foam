@@ -57,50 +57,12 @@ transientSimpleFluid::transientSimpleFluid
 )
 :
     fluidModel(typeName, runTime, region),
-    U_
-    (
-        IOobject
-        (
-            "U",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    p_
-    (
-        IOobject
-        (
-            "p",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    gradp_(fvc::grad(p_)),
-    gradU_(fvc::grad(U_)),
-    phi_
-    (
-        IOobject
-        (
-            "phi",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        fvc::interpolate(U_) & mesh().Sf()
-    ),
-    laminarTransport_(U_, phi_),
+    laminarTransport_(U(), phi()),
     turbulence_
     (
         incompressible::turbulenceModel::New
         (
-            U_, phi_, laminarTransport_
+            U(), phi(), laminarTransport_
         )
     ),
     rho_
@@ -125,18 +87,6 @@ transientSimpleFluid::transientSimpleFluid
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-const volVectorField& transientSimpleFluid::U() const
-{
-    return U_;
-}
-
-
-const volScalarField& transientSimpleFluid::p() const
-{
-    return p_;
-}
-
-
 tmp<vectorField> transientSimpleFluid::patchViscousForce
 (
     const label patchID
@@ -154,8 +104,9 @@ tmp<vectorField> transientSimpleFluid::patchViscousForce
           & turbulence_->devReff()().boundaryField()[patchID]
         );
 
-//     vectorField n = mesh().boundary()[patchID].nf();
-//     tvF() -= n*(n&tvF());
+    // PC: why is this commented
+    //vectorField n = mesh().boundary()[patchID].nf();
+    //tvF() -= n*(n & tvF());
 
     return tvF;
 }
@@ -172,67 +123,6 @@ tmp<scalarField> transientSimpleFluid::patchPressureForce
     );
 
     tpF() = rho_.value()*p().boundaryField()[patchID];
-
-    return tpF;
-}
-
-
-tmp<vectorField> transientSimpleFluid::faceZoneViscousForce
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    vectorField pVF = patchViscousForce(patchID);
-
-    tmp<vectorField> tvF
-    (
-        new vectorField(mesh().faceZones()[zoneID].size(), vector::zero)
-    );
-    vectorField& vF = tvF();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pVF, i)
-    {
-        vF[mesh().faceZones()[zoneID].whichFace(patchStart + i)] =
-            pVF[i];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(vF, sumOp<vectorField>());
-
-
-    return tvF;
-}
-
-
-tmp<scalarField> transientSimpleFluid::faceZonePressureForce
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    scalarField pPF = patchPressureForce(patchID);
-
-    tmp<scalarField> tpF
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& pF = tpF();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pPF, i)
-    {
-        pF[mesh().faceZones()[zoneID].whichFace(patchStart + i)] =
-            pPF[i];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(pF, sumOp<scalarField>());
 
     return tpF;
 }
@@ -256,10 +146,10 @@ tmp<scalarField> transientSimpleFluid::faceZoneMuEff
     const label patchStart =
         mesh().boundaryMesh()[patchID].start();
 
-    forAll(pMuEff, i)
+    forAll(pMuEff, I)
     {
-        muEff[mesh().faceZones()[zoneID].whichFace(patchStart + i)] =
-            pMuEff[i];
+        muEff[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
+            pMuEff[I];
     }
 
     // Parallel data exchange: collect pressure field on all processors
@@ -300,19 +190,19 @@ bool transientSimpleFluid::evolveInconsistent()
     // Prepare for the pressure solution
     label pRefCell = 0;
     scalar pRefValue = 0.0;
-    setRefCell(p_, fluidProperties(), pRefCell, pRefValue);
+    setRefCell(p(), fluidProperties(), pRefCell, pRefValue);
 
-    phi_.oldTime();
+    phi().oldTime();
 
     for (int oCorr = 0; oCorr < nOuterCorr; oCorr++)
     {
         scalar eqnResidual = 1, maxResidual = 0;
-        p_.storePrevIter();
+        p().storePrevIter();
 
         if (mesh.moving())
         {
             // Make the fluxes relative
-            phi_ -= fvc::meshPhi(U_);
+            phi() -= fvc::meshPhi(U());
         }
 
         // Calculate CourantNo
@@ -324,7 +214,7 @@ bool transientSimpleFluid::evolveInconsistent()
             if (mesh.nInternalFaces())
             {
                 surfaceScalarField SfUfbyDelta =
-                    mesh.surfaceInterpolation::deltaCoeffs()*mag(phi_);
+                    mesh.surfaceInterpolation::deltaCoeffs()*mag(phi());
 
                 CoNum =
                     max(SfUfbyDelta/mesh.magSf()).value()
@@ -334,7 +224,7 @@ bool transientSimpleFluid::evolveInconsistent()
                     (sum(SfUfbyDelta)/sum(mesh.magSf())).value()
                    *runTime().deltaT().value();
 
-                velMag = max(mag(phi_)/mesh.magSf()).value();
+                velMag = max(mag(phi())/mesh.magSf()).value();
             }
 
             Info<< "Courant Number mean: " << meanCoNum
@@ -345,8 +235,8 @@ bool transientSimpleFluid::evolveInconsistent()
         // Construct momentum equation
         fvVectorMatrix UEqn
         (
-            fvm::ddt(U_)
-          + fvm::div(phi_, U_)
+            fvm::ddt(U())
+          + fvm::div(phi(), U())
           + turbulence_->divDevReff()
         );
 
@@ -354,13 +244,13 @@ bool transientSimpleFluid::evolveInconsistent()
 
         // Solve momentum equation
         eqnResidual =
-            solve(UEqn == -gradp_).initialResidual();
+            solve(UEqn == -gradp()).initialResidual();
         maxResidual = max(eqnResidual, maxResidual);
 
         volScalarField aU = UEqn.A();
 
-        U_ = UEqn.H()/aU;
-        phi_ = (fvc::interpolate(U_) & mesh.Sf());
+        U() = UEqn.H()/aU;
+        phi() = (fvc::interpolate(U()) & mesh.Sf());
 
 #       include "adjustPhi.H"
 
@@ -369,7 +259,7 @@ bool transientSimpleFluid::evolveInconsistent()
             // Construct pressure equation
             fvScalarMatrix pEqn
             (
-                fvm::laplacian(1/aU, p_) == fvc::div(phi_)
+                fvm::laplacian(1/aU, p()) == fvc::div(phi())
             );
 
             // Solve pressure equation
@@ -380,13 +270,13 @@ bool transientSimpleFluid::evolveInconsistent()
 
             if (nonOrth == nNonOrthCorr)
             {
-                phi_ -= pEqn.flux();
+                phi() -= pEqn.flux();
             }
         }
 
         // Calculate Continuity error
         {
-            volScalarField contErr = fvc::div(phi_);
+            volScalarField contErr = fvc::div(phi());
 
             scalar sumLocalContErr =
                 runTime().deltaT().value()
@@ -401,12 +291,12 @@ bool transientSimpleFluid::evolveInconsistent()
         }
 
         // Explicitly relax pressure for momentum corrector
-        p_.relax();
+        p().relax();
 
-        gradp_ = fvc::grad(p_);
+        gradp() = fvc::grad(p());
 
-        U_ -= gradp_/aU;
-        U_.correctBoundaryConditions();
+        U() -= gradp()/aU;
+        U().correctBoundaryConditions();
 
         turbulence_->correct();
 
@@ -441,19 +331,19 @@ bool transientSimpleFluid::evolveConsistentByJasak()
     // Prepare for the pressure solution
     label pRefCell = 0;
     scalar pRefValue = 0.0;
-    setRefCell(p_, fluidProperties(), pRefCell, pRefValue);
+    setRefCell(p(), fluidProperties(), pRefCell, pRefValue);
 
-    phi_.oldTime();
+    phi().oldTime();
 
     for (int oCorr = 0; oCorr < nOuterCorr; oCorr++)
     {
         scalar eqnResidual = 1, maxResidual = 0;
-        p_.storePrevIter();
+        p().storePrevIter();
 
         if (mesh.moving())
         {
             // Make the fluxes relative
-            phi_ -= fvc::meshPhi(U_);
+            phi() -= fvc::meshPhi(U());
         }
 
         // Calculate CourantNo
@@ -465,7 +355,7 @@ bool transientSimpleFluid::evolveConsistentByJasak()
             if (mesh.nInternalFaces())
             {
                 surfaceScalarField SfUfbyDelta =
-                    mesh.surfaceInterpolation::deltaCoeffs()*mag(phi_);
+                    mesh.surfaceInterpolation::deltaCoeffs()*mag(phi());
 
                 CoNum =
                     max(SfUfbyDelta/mesh.magSf()).value()
@@ -475,7 +365,7 @@ bool transientSimpleFluid::evolveConsistentByJasak()
                     (sum(SfUfbyDelta)/sum(mesh.magSf())).value()
                    *runTime().deltaT().value();
 
-                velMag = max(mag(phi_)/mesh.magSf()).value();
+                velMag = max(mag(phi())/mesh.magSf()).value();
             }
 
             Info<< "Courant Number mean: " << meanCoNum
@@ -487,12 +377,12 @@ bool transientSimpleFluid::evolveConsistentByJasak()
         // Convection-diffusion matrix
         fvVectorMatrix HUEqn
         (
-            fvm::div(phi_, U_)
+            fvm::div(phi(), U())
           + turbulence_->divDevReff()
         );
 
         // Time derivative matrix
-        fvVectorMatrix ddtUEqn(fvm::ddt(U_));
+        fvVectorMatrix ddtUEqn(fvm::ddt(U()));
 
         tmp<fvVectorMatrix> UEqn(ddtUEqn + HUEqn);
 
@@ -500,15 +390,15 @@ bool transientSimpleFluid::evolveConsistentByJasak()
 
         // Solve momentum equation
         eqnResidual =
-            solve(UEqn() == -gradp_).initialResidual();
+            solve(UEqn() == -gradp()).initialResidual();
         maxResidual = max(eqnResidual, maxResidual);
 
         UEqn.clear();
 
         volScalarField aU = HUEqn.A();
 
-        U_ = HUEqn.H()/aU;
-        phi_ = (fvc::interpolate(U_) & mesh.Sf());
+        U() = HUEqn.H()/aU;
+        phi() = (fvc::interpolate(U()) & mesh.Sf());
 
 #       include "adjustPhi.H"
 
@@ -517,7 +407,7 @@ bool transientSimpleFluid::evolveConsistentByJasak()
             // Construct pressure equation
             fvScalarMatrix pEqn
             (
-                fvm::laplacian(1/aU, p_) == fvc::div(phi_)
+                fvm::laplacian(1/aU, p()) == fvc::div(phi())
             );
 
             // Solve pressure equation
@@ -528,13 +418,13 @@ bool transientSimpleFluid::evolveConsistentByJasak()
 
             if (nonOrth == nNonOrthCorr)
             {
-                phi_ -= pEqn.flux();
+                phi() -= pEqn.flux();
             }
         }
 
         // Calculate Continuity error
         {
-            volScalarField contErr = fvc::div(phi_);
+            volScalarField contErr = fvc::div(phi());
 
             scalar sumLocalContErr =
                 runTime().deltaT().value()
@@ -549,17 +439,17 @@ bool transientSimpleFluid::evolveConsistentByJasak()
         }
 
         // Explicitly relax pressure for momentum corrector
-        p_.relax();
+        p().relax();
 
-        gradp_ = fvc::grad(p_);
+        gradp() = fvc::grad(p());
 
-        U_ = 1.0/(aU + ddtUEqn.A())*
+        U() = 1.0/(aU + ddtUEqn.A())*
             (
-                U_*aU - gradp_ + ddtUEqn.H()
+                U()*aU - gradp() + ddtUEqn.H()
             );
-        U_.correctBoundaryConditions();
+        U().correctBoundaryConditions();
 
-        gradU_ = fvc::grad(U_);
+        gradU() = fvc::grad(U());
 
         turbulence_->correct();
 

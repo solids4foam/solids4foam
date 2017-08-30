@@ -44,6 +44,8 @@ SourceFiles
 
 #include "physicsModel.H"
 #include "fvMesh.H"
+#include "volFields.H"
+#include "surfaceFields.H"
 #include "IOdictionary.H"
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
@@ -75,6 +77,22 @@ class fluidModel
 
         //- Global to local face zone point maping
         mutable labelListList* globalToLocalFaceZonePointMapPtr_;
+
+        //- Velocity field
+        volVectorField U_;
+
+        //- Pressure field
+        volScalarField p_;
+
+        //- Velocity gradient
+        volTensorField gradU_;
+
+        //- Pressure gradient
+        volVectorField gradp_;
+
+        //- Flux field
+        surfaceScalarField phi_;
+
 
     // Private Member Functions
 
@@ -176,14 +194,65 @@ public:
                 return meshPtr_().time();
             }
 
+            //- Return const velocity field
+            virtual const volVectorField& U() const
+            {
+                return U_;
+            }
+
             //- Return velocity field
-            virtual const volVectorField& U() const = 0;
+            virtual volVectorField& U()
+            {
+                return U_;
+            }
+
+            //- Return const pressure field
+            virtual const volScalarField& p() const
+            {
+                return p_;
+            }
 
             //- Return pressure field
-            virtual const volScalarField& p() const = 0;
+            virtual volScalarField& p()
+            {
+                return p_;
+            }
+
+            //- Return const velocity gradient field
+            virtual const volTensorField& gradU() const
+            {
+                return gradU_;
+            }
+
+            //- Return velocity gradient field
+            virtual volTensorField& gradU()
+            {
+                return gradU_;
+            }
+
+            //- Return const pressure gradient field
+            virtual const volVectorField& gradp() const
+            {
+                return gradp_;
+            }
+
+            //- Return pressure gradient field
+            virtual volVectorField& gradp()
+            {
+                return gradp_;
+            }
+
+            //- Return const reference to flux field
+            virtual const surfaceScalarField& phi() const
+            {
+                return phi_;
+            }
 
             //- Return reference to flux field
-            virtual const surfaceScalarField& phi() const = 0;
+            virtual surfaceScalarField& phi()
+            {
+                return phi_;
+            }
 
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce
@@ -202,14 +271,14 @@ public:
             (
                 const label zoneID,
                 const label patchID
-            ) const = 0;
+            ) const;
 
             //- Patch pressure force (N/m2)
             virtual tmp<scalarField> faceZonePressureForce
             (
                 const label zoneID,
                 const label patchID
-            ) const = 0;
+            ) const;
 
             // //- Face zone effective dynamic viscosity
             virtual tmp<scalarField> faceZoneMuEff

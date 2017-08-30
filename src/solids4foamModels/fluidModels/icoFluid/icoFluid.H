@@ -42,8 +42,6 @@ SourceFiles
 #define icoFluid_H
 
 #include "fluidModel.H"
-#include "volFields.H"
-#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -61,21 +59,6 @@ class icoFluid
     public fluidModel
 {
     // Private data
-
-        //- Velocity field
-        volVectorField U_;
-
-        //- Pressure field
-        volScalarField p_;
-
-        //- Gradient of pressure field
-        volVectorField gradp_;
-
-        //- Velocity gradient
-        volTensorField gradU_;
-
-        //- Flux field
-        surfaceScalarField phi_;
 
         // Transport properties dictionary
         IOdictionary transportProperties_;
@@ -122,48 +105,6 @@ public:
 
         // Access
 
-            //- Return velocity field
-            virtual const volVectorField& U() const;
-
-            //- Return velocity field
-            volVectorField& U()
-            {
-                return U_;
-            }
-
-            //- Return pressure field
-            virtual const volScalarField& p() const;
-
-            //- Return pressure field
-            volScalarField& p()
-            {
-                return p_;
-            }
-
-            //- Return pressure gradient
-            volVectorField& gradp()
-            {
-                return gradp_;
-            }
-
-            //- Return velocity gradient
-            volTensorField& gradU()
-            {
-                return gradU_;
-            }
-
-            //- Return const reference to flux field
-            virtual const surfaceScalarField& phi() const
-            {
-                return phi_;
-            }
-
-            //- Return reference to flux field
-            virtual surfaceScalarField& phi()
-            {
-                return phi_;
-            }
-
             //- Return kinematic viscosity
             const dimensionedScalar& nu() const
             {
@@ -185,20 +126,6 @@ public:
             //- Patch pressure force (N/m2)
             virtual tmp<scalarField> patchPressureForce
             (
-                const label patchID
-            ) const;
-
-            //- Patch viscous force (N/m2)
-            virtual tmp<vectorField> faceZoneViscousForce
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
-
-            //- Patch pressure force (N/m2)
-            virtual tmp<scalarField> faceZonePressureForce
-            (
-                const label zoneID,
                 const label patchID
             ) const;
 

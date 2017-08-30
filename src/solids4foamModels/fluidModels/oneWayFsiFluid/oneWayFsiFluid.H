@@ -62,15 +62,6 @@ class oneWayFsiFluid
 {
     // Private data
 
-        //- Velocity field
-        volVectorField U_;
-
-        //- Pressure field
-        volScalarField p_;
-
-        //- Flux field
-        surfaceScalarField phi_;
-
         // Transport properties dictionary
         IOdictionary transportProperties_;
 
@@ -116,15 +107,6 @@ public:
 
         // Access
 
-            //- Return velocity field
-            virtual const volVectorField& U() const;
-
-            //- Return pressure field
-            virtual const volScalarField& p() const;
-
-            //- Return const reference to phi
-            virtual const surfaceScalarField& phi() const;
-
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce
             (
@@ -134,20 +116,6 @@ public:
             //- Patch pressure force (N/m2)
             virtual tmp<scalarField> patchPressureForce
             (
-                const label patchID
-            ) const;
-
-            //- Patch viscous force (N/m2)
-            virtual tmp<vectorField> faceZoneViscousForce
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
-
-            //- Patch pressure force (N/m2)
-            virtual tmp<scalarField> faceZonePressureForce
-            (
-                const label zoneID,
                 const label patchID
             ) const;
 

@@ -27,6 +27,7 @@ License
 #include "fluidModel.H"
 #include "volFields.H"
 #include "fv.H"
+#include "fvc.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
@@ -366,7 +367,45 @@ Foam::fluidModel::fluidModel
     ),
     fluidProperties_(subDict(type + "Coeffs")),
     globalFaceZonesPtr_(NULL),
-    globalToLocalFaceZonePointMapPtr_(NULL)
+    globalToLocalFaceZonePointMapPtr_(NULL),
+    U_
+    (
+        IOobject
+        (
+            "U",
+            runTime.timeName(),
+            mesh(),
+            IOobject::MUST_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh()
+    ),
+    p_
+    (
+        IOobject
+        (
+            "p",
+            runTime.timeName(),
+            mesh(),
+            IOobject::MUST_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh()
+    ),
+    gradU_(fvc::grad(U_)),
+    gradp_(fvc::grad(p_)),
+    phi_
+    (
+        IOobject
+        (
+            "phi",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        fvc::interpolate(U_) & mesh().Sf()
+    )
 {}
 
 
@@ -380,6 +419,67 @@ Foam::fluidModel::~fluidModel()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce
+(
+    const label zoneID,
+    const label patchID
+) const
+{
+    vectorField pVF = patchViscousForce(patchID);
+
+    tmp<vectorField> tvF
+    (
+        new vectorField(mesh().faceZones()[zoneID].size(), vector::zero)
+    );
+    vectorField& vF = tvF();
+
+    const label patchStart =
+        mesh().boundaryMesh()[patchID].start();
+
+    forAll(pVF, I)
+    {
+        vF[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
+            pVF[I];
+    }
+
+    // Parallel data exchange: collect pressure field on all processors
+    reduce(vF, sumOp<vectorField>());
+
+
+    return tvF;
+}
+
+
+Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce
+(
+    const label zoneID,
+    const label patchID
+) const
+{
+    scalarField pPF = patchPressureForce(patchID);
+
+    tmp<scalarField> tpF
+    (
+        new scalarField(mesh().faceZones()[zoneID].size(), 0)
+    );
+    scalarField& pF = tpF();
+
+    const label patchStart =
+        mesh().boundaryMesh()[patchID].start();
+
+    forAll(pPF, I)
+    {
+        pF[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
+            pPF[I];
+    }
+
+    // Parallel data exchange: collect pressure field on all processors
+    reduce(pF, sumOp<scalarField>());
+
+    return tpF;
+}
+
 
 Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
 (

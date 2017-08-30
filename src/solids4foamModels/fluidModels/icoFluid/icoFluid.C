@@ -57,44 +57,6 @@ icoFluid::icoFluid
 )
 :
     fluidModel(typeName, runTime, region),
-    U_
-    (
-        IOobject
-        (
-            "U",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    p_
-    (
-        IOobject
-        (
-            "p",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh()
-    ),
-    gradp_(fvc::grad(p_)),
-    gradU_(fvc::grad(U_)),
-    phi_
-    (
-        IOobject
-        (
-            "phi",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        fvc::interpolate(U_) & mesh().Sf()
-    ),
     transportProperties_
     (
         IOobject
@@ -112,17 +74,6 @@ icoFluid::icoFluid
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-const volVectorField& icoFluid::U() const
-{
-    return U_;
-}
-
-
-const volScalarField& icoFluid::p() const
-{
-    return p_;
-}
-
 
 tmp<vectorField> icoFluid::patchViscousForce(const label patchID) const
 {
@@ -135,7 +86,7 @@ tmp<vectorField> icoFluid::patchViscousForce(const label patchID) const
 
     const vectorField n = mesh().boundary()[patchID].nf();
 
-    tvF() -= n*(n&tvF());
+    tvF() -= n*(n & tvF());
 
     return tvF;
 }
@@ -149,67 +100,6 @@ tmp<scalarField> icoFluid::patchPressureForce(const label patchID) const
     );
 
     tpF() = rho_.value()*p().boundaryField()[patchID];
-
-    return tpF;
-}
-
-
-tmp<vectorField> icoFluid::faceZoneViscousForce
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    vectorField pVF = patchViscousForce(patchID);
-
-    tmp<vectorField> tvF
-    (
-        new vectorField(mesh().faceZones()[zoneID].size(), vector::zero)
-    );
-    vectorField& vF = tvF();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pVF, i)
-    {
-        vF[mesh().faceZones()[zoneID].whichFace(patchStart + i)] =
-            pVF[i];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(vF, sumOp<vectorField>());
-
-
-    return tvF;
-}
-
-
-tmp<scalarField> icoFluid::faceZonePressureForce
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    scalarField pPF = patchPressureForce(patchID);
-
-    tmp<scalarField> tpF
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& pF = tpF();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pPF, i)
-    {
-        pF[mesh().faceZones()[zoneID].whichFace(patchStart + i)] =
-            pPF[i];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(pF, sumOp<scalarField>());
 
     return tpF;
 }
@@ -251,14 +141,14 @@ bool icoFluid::evolve()
     // Prepare for the pressure solution
     label pRefCell = 0;
     scalar pRefValue = 0.0;
-    setRefCell(p_, fluidProperties(), pRefCell, pRefValue);
+    setRefCell(p(), fluidProperties(), pRefCell, pRefValue);
 
     for (int oCorr = 0; oCorr < nOutCorr; oCorr++)
     {
         if (mesh.moving())
         {
             // Make the fluxes relative
-            phi_ -= fvc::meshPhi(U_);
+            phi() -= fvc::meshPhi(U());
         }
 
         // CourantNo
@@ -270,7 +160,7 @@ bool icoFluid::evolve()
           if (mesh.nInternalFaces())
           {
               surfaceScalarField SfUfbyDelta =
-                  mesh.surfaceInterpolation::deltaCoeffs()*mag(phi_);
+                  mesh.surfaceInterpolation::deltaCoeffs()*mag(phi());
 
               CoNum = max(SfUfbyDelta/mesh.magSf())
                 .value()*runTime().deltaT().value();
@@ -278,7 +168,7 @@ bool icoFluid::evolve()
               meanCoNum = (sum(SfUfbyDelta)/sum(mesh.magSf()))
                 .value()*runTime().deltaT().value();
 
-              velMag = max(mag(phi_)/mesh.magSf()).value();
+              velMag = max(mag(phi())/mesh.magSf()).value();
           }
 
           Info<< "Courant Number mean: " << meanCoNum
@@ -288,12 +178,12 @@ bool icoFluid::evolve()
 
         fvVectorMatrix UEqn
         (
-            fvm::ddt(U_)
-          + fvm::div(phi_, U_)
-          - fvm::laplacian(nu_, U_)
+            fvm::ddt(U())
+          + fvm::div(phi(), U())
+          - fvm::laplacian(nu_, U())
         );
 
-        solve(UEqn == -gradp_);
+        solve(UEqn == -gradp());
 
         // --- PISO loop
 
@@ -302,13 +192,13 @@ bool icoFluid::evolve()
 
         for (int corr = 0; corr < nCorr; corr++)
         {
-            U_ = rAU*UEqn.H();
-            phi_ = (fvc::interpolate(U_) & mesh.Sf());
-            //+ fvc::ddtPhiCorr(rUA, U_, phi_);
+            U() = rAU*UEqn.H();
+            phi() = (fvc::interpolate(U()) & mesh.Sf());
+            //+ fvc::ddtPhiCorr(rUA, U(), phi());
 
-            fluidModel::updateRobinFsiInterface(p_, U_, phi_, rAUf);
+            fluidModel::updateRobinFsiInterface(p(), U(), phi(), rAUf);
 
-            adjustPhi(phi_, U_, p_);
+            adjustPhi(phi(), U(), p());
 
             for (int nonOrth=0; nonOrth<=nNonOrthCorr; nonOrth++)
             {
@@ -316,26 +206,26 @@ bool icoFluid::evolve()
                 (
                     fvm::laplacian
                     (
-                        rAUf, p_, "laplacian((1|A(U)),p)"
+                        rAUf, p(), "laplacian((1|A(U)),p)"
                     )
-                 == fvc::div(phi_)
-                 // fvm::laplacian(rAUf, p_) == fvc::div(phi_)
+                 == fvc::div(phi())
+                 // fvm::laplacian(rAUf, p()) == fvc::div(phi())
                 );
 
                 pEqn.setReference(pRefCell, pRefValue);
                 pEqn.solve();
 
-                gradp_ = fvc::grad(p_);
+                gradp() = fvc::grad(p());
 
                 if (nonOrth == nNonOrthCorr)
                 {
-                    phi_ -= pEqn.flux();
+                    phi() -= pEqn.flux();
                 }
             }
 
             // Continuity error
             {
-                volScalarField contErr = fvc::div(phi_);
+                volScalarField contErr = fvc::div(phi());
 
                 scalar sumLocalContErr = runTime().deltaT().value()*
                     mag(contErr)().weightedAverage(mesh.V()).value();
@@ -348,10 +238,10 @@ bool icoFluid::evolve()
                     << globalContErr << endl;
             }
 
-            U_ -= rAU*gradp_;
-            U_.correctBoundaryConditions();
+            U() -= rAU*gradp();
+            U().correctBoundaryConditions();
 
-            gradU_ = fvc::grad(U_);
+            gradU() = fvc::grad(U());
         }
     }
 

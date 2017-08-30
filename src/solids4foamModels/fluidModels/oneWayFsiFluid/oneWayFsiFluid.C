@@ -53,43 +53,6 @@ oneWayFsiFluid::oneWayFsiFluid
 )
 :
     fluidModel(typeName, runTime, region),
-    U_
-    (
-        IOobject
-        (
-            "U",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh()
-    ),
-    p_
-    (
-        IOobject
-        (
-            "p",
-            runTime.timeName(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh()
-    ),
-    phi_
-    (
-        IOobject
-        (
-            "phi",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        mesh(),
-        dimensionedScalar("zero", dimVelocity, 0.0)
-    ),
     transportProperties_
     (
         IOobject
@@ -107,24 +70,6 @@ oneWayFsiFluid::oneWayFsiFluid
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-const volVectorField& oneWayFsiFluid::U() const
-{
-    return U_;
-}
-
-
-const volScalarField& oneWayFsiFluid::p() const
-{
-    return p_;
-}
-
-
-const surfaceScalarField& oneWayFsiFluid::phi() const
-{
-    return phi_;
-}
-
-
 tmp<vectorField> oneWayFsiFluid::patchViscousForce(const label patchID) const
 {
     tmp<vectorField> tvF
@@ -134,8 +79,8 @@ tmp<vectorField> oneWayFsiFluid::patchViscousForce(const label patchID) const
 
     tvF() = rho_.value()*nu_.value()*U().boundaryField()[patchID].snGrad();
 
-//     vectorField n = mesh().boundary()[patchID].nf();
-//     tvF() -= n*(n&tvF());
+    const vectorField n = mesh().boundary()[patchID].nf();
+    tvF() -= n*(n & tvF());
 
     return tvF;
 }
@@ -149,62 +94,6 @@ tmp<scalarField> oneWayFsiFluid::patchPressureForce(const label patchID) const
     );
 
     tpF() = rho_.value()*p().boundaryField()[patchID];
-
-    return tpF;
-}
-
-
-tmp<vectorField> oneWayFsiFluid::faceZoneViscousForce
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    vectorField pVF = patchViscousForce(patchID);
-
-    tmp<vectorField> tvF
-    (
-        new vectorField(mesh().faceZones()[zoneID].size(), vector::zero)
-    );
-    vectorField& vF = tvF();
-
-    const label patchStart = mesh().boundaryMesh()[patchID].start();
-
-    forAll(pVF, i)
-    {
-        vF[mesh().faceZones()[zoneID].whichFace(patchStart + i)] = pVF[i];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(vF, sumOp<vectorField>());
-
-    return tvF;
-}
-
-
-tmp<scalarField> oneWayFsiFluid::faceZonePressureForce
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    scalarField pPF = patchPressureForce(patchID);
-
-    tmp<scalarField> tpF
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& pF = tpF();
-
-    const label patchStart = mesh().boundaryMesh()[patchID].start();
-
-    forAll(pPF, i)
-    {
-        pF[mesh().faceZones()[zoneID].whichFace(patchStart + i)] = pPF[i];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(pF, sumOp<scalarField>());
 
     return tpF;
 }
@@ -256,9 +145,9 @@ bool oneWayFsiFluid::evolve()
 
     if (Uheader.headerOk() && pheader.headerOk())
     {
-        U_ = volVectorField(Uheader, mesh());
+        U() = volVectorField(Uheader, mesh());
 
-        p_ = volScalarField(pheader, mesh());
+        p() = volScalarField(pheader, mesh());
     }
 
     return 0;
