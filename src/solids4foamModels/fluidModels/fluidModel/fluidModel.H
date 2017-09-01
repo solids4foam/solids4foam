@@ -61,7 +61,7 @@ namespace Foam
 
 class fluidModel
 :
-    public physicsModel ,
+    public physicsModel,
     public IOdictionary
 {
     // Private data
@@ -92,6 +92,15 @@ class fluidModel
 
         //- Flux field
         surfaceScalarField phi_;
+
+        //- Adjustable time-step switch
+        const Switch adjustTimeStep_; 
+
+        //- For adjustable time-step, this is the maximum Courant number
+        const scalar maxCo_; 
+
+        //- For adjustable time-step, this is the maximum time-stpe
+        const scalar maxDeltaT_;
 
     // Private Member Functions
 
@@ -126,6 +135,12 @@ protected:
             surfaceScalarField& phi,
             surfaceScalarField& rAUf
         );
+
+        //- Calculate the Courant number
+        void CourantNo(scalar& CoNum, scalar& meanCoNum, scalar& velMag) const;
+
+        //- Continuity errors
+        void continuityErrs() const;
 
 
 public:
@@ -293,6 +308,9 @@ public:
             const labelListList& globalToLocalFaceZonePointMap() const;
 
         // Edit
+
+            //- Update the size of the time-step
+            virtual void setDeltaT(Time& runTime);
 
             //- Evolve the fluid model
             virtual bool evolve() = 0;

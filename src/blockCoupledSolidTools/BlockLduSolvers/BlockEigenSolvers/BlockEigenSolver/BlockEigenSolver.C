@@ -44,11 +44,20 @@ bool Foam::BlockEigenSolver::checkTwoD() const
     // Check if mesh is 2-D or 3-D
     // This should be OK for multi-region cases as all regions should be 2-D in
     // same direction
-    const Vector<label>& geomD =
-        matrix_.mesh().thisDb().parent().lookupObject<polyMesh>
-        (
-            "region0" // polyMesh::defaultRegion,
-        ).geometricD();
+    const polyMesh* meshPtr = NULL;
+    if (matrix_.mesh().thisDb().parent().foundObject<polyMesh>("solid"))
+    {
+        meshPtr =
+            &matrix_.mesh().thisDb().parent().lookupObject<polyMesh>("solid");
+    }
+    else
+    {
+        meshPtr =
+            &matrix_.mesh().thisDb().parent().lookupObject<polyMesh>("region0");
+    }
+    const polyMesh& mesh = *meshPtr;
+
+    const Vector<label>& geomD = mesh.geometricD();
 
     label nDir = 0;
     forAll(geomD, dirI)
@@ -62,14 +71,7 @@ bool Foam::BlockEigenSolver::checkTwoD() const
     bool twoD = false;
     if (nDir == 2)
     {
-        if
-        (
-            matrix_.mesh().thisDb().parent().lookupObject<polyMesh>
-            (
-                "region0" // polyMesh::defaultRegion,
-            ).solutionD()[vector::Z]
-          > -1
-        )
+        if (mesh.solutionD()[vector::Z] > -1)
         {
             FatalErrorIn
             (

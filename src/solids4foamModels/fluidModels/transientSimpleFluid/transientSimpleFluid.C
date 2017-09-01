@@ -210,26 +210,7 @@ bool transientSimpleFluid::evolveInconsistent()
             scalar CoNum = 0.0;
             scalar meanCoNum = 0.0;
             scalar velMag = 0.0;
-
-            if (mesh.nInternalFaces())
-            {
-                surfaceScalarField SfUfbyDelta =
-                    mesh.surfaceInterpolation::deltaCoeffs()*mag(phi());
-
-                CoNum =
-                    max(SfUfbyDelta/mesh.magSf()).value()
-                   *runTime().deltaT().value();
-
-                meanCoNum =
-                    (sum(SfUfbyDelta)/sum(mesh.magSf())).value()
-                   *runTime().deltaT().value();
-
-                velMag = max(mag(phi())/mesh.magSf()).value();
-            }
-
-            Info<< "Courant Number mean: " << meanCoNum
-                << " max: " << CoNum
-                << " velocity magnitude: " << velMag << endl;
+            fluidModel::CourantNo(CoNum, meanCoNum, velMag);
         }
 
         // Construct momentum equation
@@ -275,20 +256,7 @@ bool transientSimpleFluid::evolveInconsistent()
         }
 
         // Calculate Continuity error
-        {
-            volScalarField contErr = fvc::div(phi());
-
-            scalar sumLocalContErr =
-                runTime().deltaT().value()
-               *mag(contErr)().weightedAverage(mesh.V()).value();
-
-            scalar globalContErr =
-                runTime().deltaT().value()
-               *contErr.weightedAverage(mesh.V()).value();
-
-            Info<< "time step continuity errors : sum local = "
-                << sumLocalContErr << ", global = " << globalContErr << endl;
-        }
+        fluidModel::continuityErrs();
 
         // Explicitly relax pressure for momentum corrector
         p().relax();
@@ -351,26 +319,7 @@ bool transientSimpleFluid::evolveConsistentByJasak()
             scalar CoNum = 0.0;
             scalar meanCoNum = 0.0;
             scalar velMag = 0.0;
-
-            if (mesh.nInternalFaces())
-            {
-                surfaceScalarField SfUfbyDelta =
-                    mesh.surfaceInterpolation::deltaCoeffs()*mag(phi());
-
-                CoNum =
-                    max(SfUfbyDelta/mesh.magSf()).value()
-                   *runTime().deltaT().value();
-
-                meanCoNum =
-                    (sum(SfUfbyDelta)/sum(mesh.magSf())).value()
-                   *runTime().deltaT().value();
-
-                velMag = max(mag(phi())/mesh.magSf()).value();
-            }
-
-            Info<< "Courant Number mean: " << meanCoNum
-                << " max: " << CoNum
-                << " velocity magnitude: " << velMag << endl;
+            fluidModel::CourantNo(CoNum, meanCoNum, velMag);
         }
 
         // Construct momentum equation
@@ -423,20 +372,7 @@ bool transientSimpleFluid::evolveConsistentByJasak()
         }
 
         // Calculate Continuity error
-        {
-            volScalarField contErr = fvc::div(phi());
-
-            scalar sumLocalContErr =
-                runTime().deltaT().value()
-               *mag(contErr)().weightedAverage(mesh.V()).value();
-
-            scalar globalContErr =
-                runTime().deltaT().value()
-               *contErr.weightedAverage(mesh.V()).value();
-
-            Info<< "time step continuity errors : sum local = "
-                << sumLocalContErr << ", global = " << globalContErr << endl;
-        }
+        fluidModel::continuityErrs();
 
         // Explicitly relax pressure for momentum corrector
         p().relax();

@@ -326,6 +326,51 @@ void Foam::fluidModel::updateRobinFsiInterface
 }
 
 
+void Foam::fluidModel::CourantNo
+(
+    scalar& CoNum,
+    scalar& meanCoNum,
+    scalar& velMag
+) const
+{
+    if (mesh().nInternalFaces())
+    {
+        const surfaceScalarField magPhi = mag(phi());
+
+        const surfaceScalarField SfUfbyDelta =
+            mesh().surfaceInterpolation::deltaCoeffs()*magPhi;
+
+        const scalar deltaT = runTime().deltaT().value();
+
+        CoNum = max(SfUfbyDelta/mesh().magSf()).value()*deltaT;
+
+        meanCoNum = (sum(SfUfbyDelta)/sum(mesh().magSf())).value()*deltaT;
+
+        velMag = max(magPhi/mesh().magSf()).value();
+    }
+
+    Info<< "Courant Number mean: " << meanCoNum
+        << " max: " << CoNum
+        << " velocity magnitude: " << velMag
+        << endl;
+}
+
+
+void Foam::fluidModel::continuityErrs() const
+{
+    const volScalarField contErr = fvc::div(phi());
+
+    const scalar sumLocalContErr = runTime().deltaT().value()*
+        mag(contErr)().weightedAverage(mesh().V()).value();
+
+    const scalar globalContErr = runTime().deltaT().value()*
+        contErr.weightedAverage(mesh().V()).value();
+
+    Info<< "time step continuity errors : sum local = "
+        << sumLocalContErr << ", global = " << globalContErr << endl;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::fluidModel::fluidModel
@@ -405,6 +450,18 @@ Foam::fluidModel::fluidModel
             IOobject::AUTO_WRITE
         ),
         fvc::interpolate(U_) & mesh().Sf()
+    ),
+    adjustTimeStep_
+    (
+        runTime.controlDict().lookupOrDefault<Switch>("adjustTimeStep", false)
+    ),
+    maxCo_
+    (
+        runTime.controlDict().lookupOrDefault<scalar>("maxCo", 1.0)
+    ),
+    maxDeltaT_
+    (
+        runTime.controlDict().lookupOrDefault<scalar>("maxDeltaT", GREAT)
     )
 {}
 
@@ -478,6 +535,33 @@ Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce
     reduce(pF, sumOp<scalarField>());
 
     return tpF;
+}
+
+
+void Foam::fluidModel::setDeltaT(Time& runTime)
+{
+    if (adjustTimeStep_)
+    {
+        // Calculate the maximum Courant number
+        scalar CoNum = 0.0;
+        scalar meanCoNum = 0.0;
+        scalar velMag = 0.0;
+        CourantNo(CoNum, meanCoNum, velMag);
+
+        scalar maxDeltaTFact = maxCo_/(CoNum + SMALL);
+        scalar deltaTFact = min(min(maxDeltaTFact, 1.0 + 0.1*maxDeltaTFact), 1.2);
+
+        runTime.setDeltaT
+        (
+            min
+            (
+                deltaTFact*runTime.deltaT().value(),
+                maxDeltaT_
+            )
+        );
+
+        Info<< "deltaT = " <<  runTime.deltaT().value() << endl;
+    }
 }
 
 

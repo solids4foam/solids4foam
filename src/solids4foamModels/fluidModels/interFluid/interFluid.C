@@ -306,23 +306,21 @@ interFluid::interFluid
     )
 {
     // Reset p dimensions
-    Info<< "p dimensions: " << p().dimensions() << endl;
     Info<< "Resetting the dimensions of p" << endl;
     p().dimensions().reset(dimPressure);
-    Info<< "p dimensions: " << p().dimensions() << endl;
-    Info<< "pd dimensions: " << pd_.dimensions() << endl;
     p() = pd_ + rho_*gh_;
-    Info<< "after p assignment" << endl;
+
     rho_.oldTime();
 
     label pdRefCell = 0;
     scalar pdRefValue = 0.0;
     setRefCell(p(), fluidProperties(), pdRefCell, pdRefValue);
+    mesh().schemesDict().setFluxRequired(pd_.name());
+
+    // Create pimple control as it is needed to set the p reference
+    pimpleControl pimple(mesh());
 
     scalar pRefValue = 0.0;
-
-    // Create pimple control
-    pimpleControl pimple(mesh());
 
     if (pd_.needReference())
     {
@@ -409,11 +407,6 @@ bool interFluid::evolve()
 
     fvMesh& mesh = fluidModel::mesh();
 
-    //const int nCorr(readInt(fluidProperties().lookup("nCorrectors")));
-
-    //const int nNonOrthCorr =
-    //    readInt(fluidProperties().lookup("nNonOrthogonalCorrectors"));
-
     // Create pimple control
     pimpleControl pimple(mesh);
 
@@ -434,26 +427,7 @@ bool interFluid::evolve()
         scalar CoNum = 0.0;
         scalar meanCoNum = 0.0;
         scalar velMag = 0.0;
-
-        if (mesh.nInternalFaces())
-        {
-            surfaceScalarField SfUfbyDelta =
-                mesh.surfaceInterpolation::deltaCoeffs()*mag(phi());
-
-            CoNum =
-                max(SfUfbyDelta/mesh.magSf()).value()
-               *runTime().deltaT().value();
-
-            meanCoNum =
-                (sum(SfUfbyDelta)/sum(mesh.magSf())).value()
-               *runTime().deltaT().value();
-
-            velMag = max(mag(phi())/mesh.magSf()).value();
-        }
-
-        Info<< "Courant Number mean: " << meanCoNum
-            << " max: " << CoNum
-            << " velocity magnitude: " << velMag << endl;
+        CourantNo(CoNum, meanCoNum, velMag);
     }
 
     // Pressure-velocity corrector
@@ -471,20 +445,7 @@ bool interFluid::evolve()
             solvePEqn(pimple, UEqn, pdRefCell, pdRefValue);
         }
 
-        //#include "continuityErrs.H"
-        // Continuity error
-        {
-            volScalarField contErr = fvc::div(phi());
-
-            scalar sumLocalContErr = runTime().deltaT().value()*
-                mag(contErr)().weightedAverage(mesh.V()).value();
-
-            scalar globalContErr = runTime().deltaT().value()*
-                contErr.weightedAverage(mesh.V()).value();
-
-            Info<< "time step continuity errors : sum local = "
-                << sumLocalContErr << ", global = " << globalContErr << endl;
-        }
+        fluidModel::continuityErrs();
 
         p() = pd_ + rho_*gh_;
 

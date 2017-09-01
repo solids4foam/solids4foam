@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
     while (runTime.run())
     {
         // Update deltaT, if desired, before moving to the next step
-        physics().setDeltaT();
+        physics().setDeltaT(runTime);
         runTime++;
 
         Info<< "Time = " << runTime.timeName() << nl << endl;
