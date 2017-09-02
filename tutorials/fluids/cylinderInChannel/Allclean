@@ -5,7 +5,4 @@
 
 cleanCase
 \rm -rf processor*
-\rm -f *.ps
-\rm -rf history
-\rm -rf VTK
-\rm -rf forces
+\rm -f *.ps history VTK forces case.foam

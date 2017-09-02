@@ -102,7 +102,6 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New(Time& runTime)
 
     // Currently, the physicsModel can be: fluid, solid or fluidSolidInteraction
     // though more can be added in the future as needed
-
     if (physicsTypeName == "fluid")
     {
         // Read the fluidModel type

@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  1.5                                   |
+|   \\  /    A nd           | Web:      http://www.OpenFOAM.org               |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -14,26 +14,11 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+// Note: this decomposeParDict is not used but it must be present to keep
+// argList happy. Use instead the decomposeParDicts in system/fluid and
+// system/solid
+
 numberOfSubdomains 4;
 
-method          metis;
-
-globalFaceZones ( interface-zone );
-
-simpleCoeffs
-{
-    n               (2 2 2);
-    delta           0.001;
-}
-
-metisCoeffs
-{
-}
-
-distributed     no;
-
-roots
-(
-);
 
 // ************************************************************************* //

@@ -60,24 +60,7 @@ void Foam::solidModel::calcGlobalFaceZones() const
     {
         SLList<label> globalFaceZonesSet;
 
-        // Previous method
-        // const faceZoneMesh& faceZones = mesh().faceZones();
-        // forAll(faceZones, zoneI)
-        // {
-        //     const faceZone& curFaceZone = faceZones[zoneI];
-        //     forAll(curFaceZone, faceI)
-        //     {
-        //         // If unused face exist
-        //         if (curFaceZone[faceI] >= mesh().nFaces())
-        //         {
-        //             globalFaceZonesSet.insert(zoneI);
-        //             break;
-        //         }
-        //     }
-        // }
-
-        // New method: directly lookup globalFaceZones from decomposeParDict
-
+        // Lookup globalFaceZones from decomposeParDict
         // For FSI cases, we need to look in a different location for the dict
 
         word decompDictName = "system/decomposeParDict";
@@ -96,6 +79,7 @@ void Foam::solidModel::calcGlobalFaceZones() const
 
         Info<< "Reading decomposeParDict " << decompDictName << endl;
 
+    Info<< "line " << __LINE__ << endl;
         IOdictionary decompDict
         (
             IOobject
@@ -865,8 +849,8 @@ Foam::solidModel::solidModel
             // Otherwise, read from the region/sub-mesh directory e.g.
             // constant/fluid or constant/solid
             bool(region == dynamicFvMesh::defaultRegion)
-          ? fileName(runTime.constant())
-          : fileName(runTime.constant()/region),
+          ? fileName(runTime.caseConstant())
+          : fileName(runTime.caseConstant()/region),
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
@@ -1719,8 +1703,7 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
             IOobject
             (
                 "solidProperties",
-                //runTime.constant(),
-                fileName("constant"/region),
+                runTime.caseConstant()/region,
                 runTime,
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE

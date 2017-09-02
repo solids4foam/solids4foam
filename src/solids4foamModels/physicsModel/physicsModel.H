@@ -112,7 +112,7 @@ public:
             (runTime)
         );
 
-            declareRunTimeSelectionTable
+        declareRunTimeSelectionTable
         (
             autoPtr,
             physicsModel,

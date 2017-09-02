@@ -12,12 +12,14 @@ runApplication -l log.setSet.fluid setSet -region fluid -batch setBatch.fluid
 runApplication -l log.setsToZones.fluid setsToZones -region fluid -noFlipMap
 
 # Run serial
-runApplication solids4Foam
+#runApplication solids4Foam
 
 # Run parallel
-#runApplication decomposeParFsi
-#runApplication -l log.decomposeParFsi.solid decomposeParFsi -region solid
-#runParallel solids4Foam
+runApplication -l log.decomposeParFsi.fluid decomposeParFsi -region fluid
+runApplication -l log.decomposeParFsi.solid decomposeParFsi -region solid
+runParallel solids4Foam 4
+runApplication -l log.reconstructPar.fluid reconstructPar -region fluid
+runApplication -l log.reconstructPar.solid reconstructPar -region solid
 
 # ----------------------------------------------------------------- end-of-file
 
