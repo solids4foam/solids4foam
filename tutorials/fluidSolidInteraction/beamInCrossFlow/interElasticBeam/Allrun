@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Create solid mesh and zones
+runApplication -l log.blockMesh.solid blockMesh -region solid
+runApplication -l log.setSet.solid setSet -region solid -batch setBatch.solid
+runApplication -l log.setsToZones.solid setsToZones -region solid -noFlipMap
+
+# Create fluid mesh and zones
+runApplication -l log.blockMesh.fluid blockMesh -region fluid
+runApplication -l log.setSet.fluid setSet -region fluid -batch setBatch.fluid
+runApplication -l log.setsToZones.fluid setsToZones -region fluid -noFlipMap
+
+# Set fluid alpha field
+# Note: setFields does not have '-region' option so we will use a workaround
+\mv system/fluid/setFieldsDict system/
+\mv constant/fluid/polyMesh constant/
+\mv 0/fluid/alpha1 0/
+runApplication -l log.setFields.fluid setFields
+\mv 0/alpha1 0/fluid/
+\mv constant/polyMesh constant/fluid/
+\mv system/setFieldsDict system/fluid/
+
+# Run serial
+runApplication solids4Foam
+
+# Run parallel
+#runApplication decomposeParFsi
+#runApplication -l log.decomposeParFsi.solid decomposeParFsi -region solid
+#runParallel solids4Foam
+
+# ----------------------------------------------------------------- end-of-file
+
