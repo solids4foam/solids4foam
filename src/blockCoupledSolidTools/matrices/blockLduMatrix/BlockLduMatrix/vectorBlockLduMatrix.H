@@ -45,25 +45,25 @@ SourceFiles
 namespace Foam
 {
 
-template<>
-void BlockLduMatrix<vector>::sumDiag();
+// template<>
+// void BlockLduMatrix<vector>::sumDiag();
 
-template<>
-void BlockLduMatrix<vector>::negSumDiag();
+// template<>
+// void BlockLduMatrix<vector>::negSumDiag();
 
-template<>
-void BlockLduMatrix<vector>::check() const;
+// template<>
+// void BlockLduMatrix<vector>::check() const;
 
-template<>
-void BlockLduMatrix<vector>::relax
-(
-    const vectorField& x,
-    vectorField& b,
-    const scalar alpha
-);
+// template<>
+// void BlockLduMatrix<vector>::relax
+// (
+//     const vectorField& x,
+//     vectorField& b,
+//     const scalar alpha
+// );
 
-template<>
-void BlockLduMatrix<vector>::operator*=(const scalarField& sf);
+// template<>
+// void BlockLduMatrix<vector>::operator*=(const scalarField& sf);
 
 // template<>
 // void BlockLduMatrix<vector>::AmulCore
@@ -72,19 +72,19 @@ void BlockLduMatrix<vector>::operator*=(const scalarField& sf);
 //     const vectorField& x
 // ) const;
 
-template<>
-void BlockLduMatrix<vector>::TmulCore
-(
-    vectorField& mul,
-    const vectorField& x
-) const;
+// template<>
+// void BlockLduMatrix<vector>::TmulCore
+// (
+//     vectorField& mul,
+//     const vectorField& x
+// ) const;
 
-template<>
-void BlockLduMatrix<vector>::segregateB
-(
-    vectorField& mul,
-    const vectorField& x
-) const;
+// template<>
+// void BlockLduMatrix<vector>::segregateB
+// (
+//     vectorField& mul,
+//     const vectorField& x
+// ) const;
 
 
 template<>
@@ -95,19 +95,19 @@ void BlockLduMatrix<vector>::Amul
 ) const;
 
 
-template<>
-void BlockLduMatrix<vector>::Tmul
-(
-    Field<vector>& Ax,
-    const Field<vector>& x
-) const;
+// template<>
+// void BlockLduMatrix<vector>::Tmul
+// (
+//     Field<vector>& Ax,
+//     const Field<vector>& x
+// ) const;
 
 
-template<>
-tmp<vectorField> BlockLduMatrix<vector>::H(const vectorField& x) const;
+// template<>
+// tmp<vectorField> BlockLduMatrix<vector>::H(const vectorField& x) const;
 
-template<>
-tmp<vectorField> BlockLduMatrix<vector>::faceH(const vectorField& x) const;
+// template<>
+// tmp<vectorField> BlockLduMatrix<vector>::faceH(const vectorField& x) const;
 
 
 

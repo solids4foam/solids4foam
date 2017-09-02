@@ -34,64 +34,64 @@ License
 namespace Foam
 {
 
-template<>
-void Foam::BlockLduMatrix<Foam::vector>::sumDiag()
-{
-    FatalErrorIn("myfunc")
-        << abort(FatalError);
+// template<>
+// void Foam::BlockLduMatrix<Foam::vector>::sumDiag()
+// {
+//     FatalErrorIn("myfunc")
+//         << abort(FatalError);
 
-    // Decoupled version
-    this->decoupledSumDiag();
-}
-
-
-template<>
-void Foam::BlockLduMatrix<Foam::vector>::negSumDiag()
-{
-    FatalErrorIn("myfunc")
-        << abort(FatalError);
-
-    // Decoupled version
-    this->decoupledNegSumDiag();
-}
+//     // Decoupled version
+//     this->decoupledSumDiag();
+// }
 
 
-template<>
-void Foam::BlockLduMatrix<vector>::check() const
-{
-    FatalErrorIn("myfunc")
-        << abort(FatalError);
+// template<>
+// void Foam::BlockLduMatrix<Foam::vector>::negSumDiag()
+// {
+//     FatalErrorIn("myfunc")
+//         << abort(FatalError);
 
-    // Decoupled version
-    this->decoupledCheck();
-}
-
-
-template<>
-void Foam::BlockLduMatrix<Foam::vector>::relax
-(
-    const vectorField& x,
-    vectorField& b,
-    const scalar alpha
-)
-{
-    FatalErrorIn("myfunc")
-        << abort(FatalError);
-
-    // Decoupled version
-    this->decoupledRelax(x, b, alpha);
-}
+//     // Decoupled version
+//     this->decoupledNegSumDiag();
+// }
 
 
-template<>
-void Foam::BlockLduMatrix<Foam::vector>::operator*=(const scalarField& sf)
-{
-    FatalErrorIn("myfunc")
-        << abort(FatalError);
+// template<>
+// void Foam::BlockLduMatrix<vector>::check() const
+// {
+//     FatalErrorIn("myfunc")
+//         << abort(FatalError);
 
-    // Decoupled version
-    this->decoupledMultEqOp(sf);
-}
+//     // Decoupled version
+//     this->decoupledCheck();
+// }
+
+
+// template<>
+// void Foam::BlockLduMatrix<Foam::vector>::relax
+// (
+//     const vectorField& x,
+//     vectorField& b,
+//     const scalar alpha
+// )
+// {
+//     FatalErrorIn("myfunc")
+//         << abort(FatalError);
+
+//     // Decoupled version
+//     this->decoupledRelax(x, b, alpha);
+// }
+
+
+// template<>
+// void Foam::BlockLduMatrix<Foam::vector>::operator*=(const scalarField& sf)
+// {
+//     FatalErrorIn("myfunc")
+//         << abort(FatalError);
+
+//     // Decoupled version
+//     this->decoupledMultEqOp(sf);
+// }
 
 
 // template<>
@@ -108,65 +108,65 @@ void Foam::BlockLduMatrix<Foam::vector>::operator*=(const scalarField& sf)
 // }
 
 
-template<>
-void Foam::BlockLduMatrix<Foam::vector>::TmulCore
-(
-    vectorField& Tx,
-    const vectorField& x
-) const
-{
-    FatalErrorIn("myfunc")
-        << abort(FatalError);
+// template<>
+// void Foam::BlockLduMatrix<Foam::vector>::TmulCore
+// (
+//     vectorField& Tx,
+//     const vectorField& x
+// ) const
+// {
+//     FatalErrorIn("myfunc")
+//         << abort(FatalError);
 
-    // Decoupled version
-    //decoupledTmulCore(Tx, x);
-}
-
-
-template<>
-void Foam::BlockLduMatrix<Foam::vector>::segregateB
-(
-    vectorField&,
-    const vectorField&
-) const
-{
-    FatalErrorIn("myfunc")
-        << abort(FatalError);
-
-    FatalErrorIn
-    (
-        "void Foam::BlockLduMatrix<vector>::segregateB\n"
-        "(\n"
-        "    vectorField&,\n"
-        "    const vectorField&\n"
-        ") const"
-    )   << "Requested decoupling of vector matrix - never coupled"
-        << abort(FatalError);
-}
+//     // Decoupled version
+//     //decoupledTmulCore(Tx, x);
+// }
 
 
-template<>
-Foam::tmp<Foam::vectorField>
-Foam::BlockLduMatrix<Foam::vector>::H(const vectorField& x) const
-{
-    FatalErrorIn("myfunc")
-        << abort(FatalError);
+// template<>
+// void Foam::BlockLduMatrix<Foam::vector>::segregateB
+// (
+//     vectorField&,
+//     const vectorField&
+// ) const
+// {
+//     FatalErrorIn("myfunc")
+//         << abort(FatalError);
 
-    // Decoupled version
-    return decoupledH(x);
-}
+//     FatalErrorIn
+//     (
+//         "void Foam::BlockLduMatrix<vector>::segregateB\n"
+//         "(\n"
+//         "    vectorField&,\n"
+//         "    const vectorField&\n"
+//         ") const"
+//     )   << "Requested decoupling of vector matrix - never coupled"
+//         << abort(FatalError);
+// }
 
 
-template<>
-Foam::tmp<Foam::vectorField>
-Foam::BlockLduMatrix<Foam::vector>::faceH(const vectorField& x) const
-{
-    FatalErrorIn("myfunc")
-        << abort(FatalError);
+// template<>
+// Foam::tmp<Foam::vectorField>
+// Foam::BlockLduMatrix<Foam::vector>::H(const vectorField& x) const
+// {
+//     FatalErrorIn("myfunc")
+//         << abort(FatalError);
 
-    // Decoupled version
-    return decoupledFaceH(x);
-}
+//     // Decoupled version
+//     return decoupledH(x);
+// }
+
+
+// template<>
+// Foam::tmp<Foam::vectorField>
+// Foam::BlockLduMatrix<Foam::vector>::faceH(const vectorField& x) const
+// {
+//     FatalErrorIn("myfunc")
+//         << abort(FatalError);
+
+//     // Decoupled version
+//     return decoupledFaceH(x);
+// }
 
 template<>
 void Foam::BlockLduMatrix<Foam::vector>::Amul
@@ -199,21 +199,21 @@ void Foam::BlockLduMatrix<Foam::vector>::Amul
 }
 
 
-template<>
-void Foam::BlockLduMatrix<Foam::vector>::Tmul
-(
-    Field<vector>& Ax,
-    const Field<vector>& x
-) const
-{
-    FatalErrorIn("myfunc")
-        << abort(FatalError);
+// template<>
+// void Foam::BlockLduMatrix<Foam::vector>::Tmul
+// (
+//     Field<vector>& Ax,
+//     const Field<vector>& x
+// ) const
+// {
+//     FatalErrorIn("myfunc")
+//         << abort(FatalError);
 
-    FatalErrorIn
-    (
-        "void BlockLduMatrix<vector>::Tmul"
-    ) << "philipc: Tmul not implemented" << abort(FatalError);
-}
+//     FatalErrorIn
+//     (
+//         "void BlockLduMatrix<vector>::Tmul"
+//     ) << "philipc: Tmul not implemented" << abort(FatalError);
+// }
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
