@@ -23,6 +23,7 @@ fluidModels/icoFluid/icoFluid.C
 fluidModels/interFluid/interFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pisoFluid/pisoFluid.C
+fluidModels/pUCoupledFluid/pUCoupledFluid.C
 fluidModels/transientSimpleFluid/transientSimpleFluid.C
 
 fluidModels/finiteVolume/ddtSchemes/EulerDdtScheme.C

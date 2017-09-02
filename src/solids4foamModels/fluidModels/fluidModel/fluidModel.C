@@ -371,6 +371,45 @@ void Foam::fluidModel::continuityErrs() const
 }
 
 
+void Foam::fluidModel::boundPU
+(
+    volScalarField& p,
+    volVectorField& U
+) const
+{
+    // Bound the pressure
+    dimensionedScalar p1 = min(p);
+    dimensionedScalar p2 = max(p);
+
+    if (p1 < pMin_ || p2 > pMax_)
+    {
+        Info<< "p: " << p1.value() << " " << p2.value()
+            << ".  Bounding." << endl;
+
+        p.max(pMin_);
+        p.min(pMax_);
+        p.correctBoundaryConditions();
+    }
+
+    // Bound the velocity
+    volScalarField magU = mag(U);
+    dimensionedScalar U1 = max(magU);
+
+    if (U1 > UMax_)
+    {
+        Info<< "U: " << U1.value() << ".  Bounding." << endl;
+
+        volScalarField Ulimiter = pos(magU - UMax_)*UMax_/(magU + smallU_)
+            + neg(magU - UMax_);
+        Ulimiter.max(scalar(0));
+        Ulimiter.min(scalar(1));
+
+        U *= Ulimiter;
+        U.correctBoundaryConditions();
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::fluidModel::fluidModel
@@ -462,8 +501,21 @@ Foam::fluidModel::fluidModel
     maxDeltaT_
     (
         runTime.controlDict().lookupOrDefault<scalar>("maxDeltaT", GREAT)
-    )
-{}
+    ),
+    pMin_("pMin", p().dimensions(), 0),
+    pMax_("pMax", p().dimensions(), 0),
+    UMax_("UMax", U().dimensions(), 0),
+    smallU_("smallU", dimVelocity, 1e-10)
+{
+    if (mesh().solutionDict().found("fieldBounds"))
+    {
+        dictionary fieldBounds = mesh().solutionDict().subDict("fieldBounds");
+        fieldBounds.lookup(p().name())
+            >> pMin_.value() >> pMax_.value();
+        fieldBounds.lookup(U().name())
+            >> UMax_.value();
+    }
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //

@@ -102,6 +102,18 @@ class fluidModel
         //- For adjustable time-step, this is the maximum time-stpe
         const scalar maxDeltaT_;
 
+        //- Pressure minimum bound
+        dimensionedScalar pMin_;
+
+        //- Pressure maximum bound
+        dimensionedScalar pMax_;
+
+        //- Velocity bound
+        dimensionedScalar UMax_;
+
+        //- Small velocity for bounding
+        dimensionedScalar smallU_;
+
     // Private Member Functions
 
         //- Find global face zones
@@ -141,6 +153,13 @@ protected:
 
         //- Continuity errors
         void continuityErrs() const;
+
+        //- Bound the pressure and velocity fields
+        void boundPU
+        (
+            volScalarField& p,
+            volVectorField& U
+        ) const;
 
 
 public:
