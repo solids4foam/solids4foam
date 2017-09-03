@@ -44,6 +44,7 @@ int main(int argc, char *argv[])
 {
 #   include "setRootCase.H"
 #   include "createTime.H"
+#   include "solids4FoamWriteHeader.H"
 
     // Create the general physics class
     autoPtr<physicsModel> physics = physicsModel::New(runTime);

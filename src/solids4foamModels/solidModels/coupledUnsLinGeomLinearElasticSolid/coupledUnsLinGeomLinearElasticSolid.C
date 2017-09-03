@@ -59,6 +59,23 @@ addToRunTimeSelectionTable
 );
 
 
+// * * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * //
+
+void coupledUnsLinGeomLinearElasticSolid::writeBanner(messageStream& os) const
+{
+    os  << nl
+        << "/*---------------------------------------------------------------------------*\\\n"
+        << "|    For further information on this class, please see the following          |\n"
+        << "|    publication:                                                             |\n"
+        << "|                                                                             |\n"
+        << "|    P. Cardiff, Z. Tukovic, H, Jasak, A. Ivankovic: A block-coupled finite   |\n"
+        << "|    volume methodology for linear elasticity and unstructured meshes.        |\n"
+        << "|    Computers and Structures, 2016, 175 100-122,                             |\n"
+        << "|    DOI: 10.1016/-j.compstruc.2016.07.004.                                   |\n"
+        << "\\*---------------------------------------------------------------------------*/"
+        << nl << endl;
+}
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
@@ -108,6 +125,8 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         dimensionedScalar("0", dimPressure, 0.0)
     )
 {
+    writeBanner(Info);
+
     // We will directly read the linearElastic mechanicalLaw
     const PtrList<mechanicalLaw>& mechLaws = mechanical();
     if (mechLaws.size() != 1)

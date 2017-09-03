@@ -28,14 +28,19 @@ Emails: philip.cardiff@ucd.ie and zeljko.tukovic@fsb.hr
 
 A number of the tutorial cases are described in the following publications:
 
-P. Cardiff, A Karac, P. De Jaeger, H. Jasak, J. Nagy, A. Ivankovic, Ž. Tukovi:
+P. Cardiff, A Karac, P. De Jaeger, H. Jasak, J. Nagy, A. Ivankovic, Ž. Tukovc:
 An open-source finite volume toolbox for solid mechanics and fluid-solid
 interaction simulations. Computer Programs in Physics, Computer Physics
-Communications, 2017, Submitted for review.
+Communications, 2017, Under review.
 
 Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković: Parallel unstruct
 red finite-volume method for fluid-structure interaction in OpenFOAM. Transaction
 of FAMENA, 2016, Under review.
+
+P. Cardiff, A Karac, P. De Jaeger, H. Jasak, J. Nagy, A. Ivankovic, Z. Tukovic:
+Towards the Development of an Extendable Solid Mechanics and Fluid-Solid
+Interactions Toolbox for OpenFOAM. 12th OpenFOAM Workshop University of Exeter,
+Exeter, UK. 24th to 27th July 2017.
 
 P. Cardiff, Ž. Tuković, H. Jasak, A. Ivanković: A block-coupled finite vol
 me methodology for linear elasticity and unstructured meshes. Computers and

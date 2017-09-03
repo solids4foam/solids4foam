@@ -91,6 +91,9 @@ class coupledUnsLinGeomLinearElasticSolid
 
     // Private Member Functions
 
+        //- Write banner
+        void writeBanner(messageStream& os) const;
+
         //- Disallow default bitwise copy construct
         coupledUnsLinGeomLinearElasticSolid
         (
