@@ -103,7 +103,8 @@ pUCoupledFluid::pUCoupledFluid
     maxResidual_(0),
     convergenceCriterion_(0)
 {
-    mesh().schemesDict().setFluxRequired(p().name());
+    // This must be manually specified in the case in foam-extend-3.2
+    //mesh().schemesDict().setFluxRequired(p().name());
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -213,7 +214,7 @@ bool pUCoupledFluid::evolve()
         fvVectorMatrix UEqn
         (
             fvm::div(phi(), U())
-          + turbulence_->divDevReff()
+          + turbulence_->divDevReff(U())
         );
 
         rAU_ = 1.0/UEqn.A();
