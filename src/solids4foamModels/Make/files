@@ -18,6 +18,7 @@ solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 solidModels/finiteVolume/fvc/fvcCellLimitedGrad.C
 
 fluidModels/fluidModel/fluidModel.C
+fluidModels/buoyantBoussinesqPimpleFluid/buoyantBoussinesqPimpleFluid.C
 fluidModels/consistentIcoFluid/consistentIcoFluid.C
 fluidModels/icoFluid/icoFluid.C
 fluidModels/interFluid/interFluid.C
