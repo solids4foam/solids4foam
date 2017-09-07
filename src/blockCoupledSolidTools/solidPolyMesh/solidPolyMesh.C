@@ -1224,7 +1224,8 @@ solidPolyMesh::solidPolyMesh(fvMesh& fMesh)
     gPtNgbProcBndFaceCoeffsPtr_(NULL),
     gPtNgbProcCellCoeffsPtr_(NULL),
     pointFixedComponentPtr_(NULL),
-    pointFixedDirectionPtr_(NULL)
+    pointFixedDirectionPtr_(NULL),
+    comm_(Pstream::worldComm)
 {
     if (debug)
     {

@@ -157,6 +157,8 @@ class solidPolyMesh
         // Direction of fixed value point components
         mutable Map<symmTensor>* pointFixedDirectionPtr_;
 
+        //- Communicator used for parallel communication
+        label comm_;
 
     // Private Member Functions
 
@@ -357,6 +359,15 @@ public:
                 const surfaceScalarField& lambdaf,
                 const volVectorField& D
             ) const;
+
+
+            // Communication support
+
+                //- Return communicator used for parallel communication
+                label comm() const
+                {
+                    return comm_;
+                }
 
 
             // Parallel mesh analysis data
