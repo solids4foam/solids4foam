@@ -79,7 +79,9 @@ pisoFluid::pisoFluid
             )
         ).lookup("rho")
     )
-{}
+{
+    mesh().schemesDict().setFluxRequired(p().name());
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 

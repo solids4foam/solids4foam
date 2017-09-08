@@ -83,7 +83,9 @@ transientSimpleFluid::transientSimpleFluid
     (
         fluidProperties().lookupOrDefault<Switch>("consistencyByJasak", false)
     )
-{}
+{
+    mesh().schemesDict().setFluxRequired(p().name());
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 

@@ -70,7 +70,9 @@ icoFluid::icoFluid
     ),
     nu_(transportProperties_.lookup("nu")),
     rho_(transportProperties_.lookup("rho"))
-{}
+{
+    mesh().schemesDict().setFluxRequired(p().name());
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
