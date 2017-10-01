@@ -506,7 +506,7 @@ void Foam::mechanicalModel::calcSubMeshGradD() const
 
     // The subMeshD field can represent D or DD
     word gradDname = "grad(D)";
-    if (mesh().foundObject<volVectorField>("DD"))
+    if (incremental_)
     {
         gradDname = "grad(DD)";
     }
@@ -580,7 +580,7 @@ void Foam::mechanicalModel::calcSubMeshGradDf() const
 
     // The subMeshD field can represent D or DD
     word gradDname = "grad(D)f";
-    if (mesh().foundObject<volVectorField>("DD"))
+    if (incremental_)
     {
         gradDname = "grad(DD)f";
     }
@@ -2117,7 +2117,8 @@ void Foam::mechanicalModel::clearOut()
 Foam::mechanicalModel::mechanicalModel
 (
     const fvMesh& mesh,
-    const nonLinearGeometry::nonLinearType& nonLinGeom
+    const nonLinearGeometry::nonLinearType& nonLinGeom,
+    const bool incremental
 )
 :
     IOdictionary
@@ -2134,6 +2135,7 @@ Foam::mechanicalModel::mechanicalModel
     PtrList<mechanicalLaw>(),
     mesh_(mesh),
     planeStress_(lookup("planeStress")),
+    incremental_(incremental),
     cellZoneNames_(),
     subMeshes_(),
     volToPointPtr_(),

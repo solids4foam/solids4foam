@@ -79,6 +79,10 @@ class mechanicalModel
         //  Todo: this should be moved to actual mechanical law
         const Switch planeStress_;
 
+        //- Does the solidModel use an incremental approach?
+        //  i.e. does the solidModel solve for DD instead of D
+        const bool incremental_;
+
         //- Name of the cellZone for each material
         mutable wordList cellZoneNames_;
 
@@ -349,7 +353,8 @@ public:
         mechanicalModel
         (
             const fvMesh& mesh,
-            const nonLinearGeometry::nonLinearType& nonLinGeom
+            const nonLinearGeometry::nonLinearType& nonLinGeom,
+            const bool incremental = false
         );
 
 

@@ -55,6 +55,7 @@ interpolationSchemes
     interpolate(impK)  harmonic;
     //interpolate(impK)  linear;
     interpolate(grad(D)) linear;
+    interpolate(grad(DD)) linear;
     interpolate(sigma)  linear;
     interpolate(sigma0) linear;
     interpolate((grad(D)-grad(D)_0)) linear;

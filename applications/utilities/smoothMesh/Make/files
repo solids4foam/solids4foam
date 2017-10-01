@@ -1,0 +1,8 @@
+smoothMesh.C
+meshSmoothers/meshSmoother/meshSmoother.C
+meshSmoothers/meshSmoother/newMeshSmoother.C
+meshSmoothers/taubinSmoother/taubinSmoother.C
+meshSmoothers/laplacianSmoother/laplacianSmoother.C
+meshSmoothers/volumeSmoother/volumeSmoother.C
+
+EXE = $(FOAM_USER_APPBIN)/smoothMesh

@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -10,49 +10,50 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
+    location    "system";
     object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 d2dt2Schemes
 {
-    default            steadyState;
+    default     steadyState;
 }
 
 ddtSchemes
 {
-    default            steadyState;
+    default     steadyState;
 }
 
 gradSchemes
 {
-    default            extendedLeastSquares 0;
+     default                none;
 }
 
 divSchemes
 {
-    default            Gauss linear;
+    default                 none;
+    fvmDiv(sigma)           pointGaussLeastSquares;
 }
 
 laplacianSchemes
 {
-    default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
-    fvmBlockLaplacian(D) pointGaussLeastSquares;
+    default                 none;
+    fvmBlockLaplacian(D)    pointGaussLeastSquaresLaplacian;
+    fvmBlockLaplacianTranspose(D) pointGaussLeastSquaresLaplacianTranspose;
+    fvmBlockLaplacianTrace(D) pointGaussLeastSquaresLaplacianTrace;
 }
 
 snGradSchemes
 {
-    default            none;
-    snGrad(D)          newSkewCorrected 1;
-    snGrad(DD)         newSkewCorrected 1;
+    default                 none;
 }
 
 interpolationSchemes
 {
-    default            none;
-    interpolate(impK)  linear;
+    default                 none;
+    mu                      linear;
+    lambda                  linear;
 }
 
 // ************************************************************************* //

@@ -530,6 +530,14 @@ public:
                 return enforceLinear_;
             }
 
+            //- Does this model take an incremental approach?
+            //  i.e. does it solve for DD instead of D?
+            //  This defaults to false but can be overwritten
+            virtual bool incremental() const
+            {
+                return false;
+            }
+
         // Edit
 
             //- Update the points on global face zones when moving the mesh

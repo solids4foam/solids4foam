@@ -49,7 +49,7 @@ functions
 {
     disp1
     {
-        type          solidDisp;
+        type          solidDisplacements;
         historyPatch  tracFree;
     }
     force1

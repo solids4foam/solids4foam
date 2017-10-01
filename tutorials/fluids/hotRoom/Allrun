@@ -4,4 +4,4 @@
 
 runApplication blockMesh
 #runApplication setHotRoom
-runApplication soldis4Foam
+runApplication solids4Foam

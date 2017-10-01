@@ -788,11 +788,7 @@ Foam::fluidSolidInterface::~fluidSolidInterface()
 {
     deleteDemandDrivenData(currentSolidZonePointsPtr_);
     deleteDemandDrivenData(currentSolidZonePatchPtr_);
-    //deleteDemandDrivenData(fluidToSolidPtr_); // PC: why is this disabled?
     deleteDemandDrivenData(ggiInterpolatorPtr_);
-    // deleteDemandDrivenData(solidToFluidPtr_); // PC: why is this disabled?
-    WarningIn("Foam::fluidSolidInterface::~fluidSolidInterface()")
-        << "fluidToSolidPtr and solidToFluidPtr not freed" << endl;
     deleteDemandDrivenData(accumulatedFluidInterfaceDisplacementPtr_);
     deleteDemandDrivenData(minEdgeLengthPtr_);
 }

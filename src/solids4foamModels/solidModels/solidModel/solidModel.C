@@ -397,7 +397,7 @@ void Foam::solidModel::makeMechanicalModel() const
 
     mechanicalPtr_.set
     (
-        new mechanicalModel(mesh(), nonLinGeom())
+        new mechanicalModel(mesh(), nonLinGeom(), incremental())
     );
 }
 

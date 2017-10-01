@@ -181,7 +181,13 @@ public:
                 return DD();
             }
 
-        // Edit
+            //- This solid model solves for DD instead of D
+            virtual bool incremental() const
+            {
+                return true;
+            }
+
+    // Edit
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
