@@ -1,5 +1,5 @@
 EXE_INC = \
-    -I../../../src/blockCoupledSolidTools/lnInclude \
+    -I../../../src/blockCoupledSolids4FoamTools/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/finiteArea/lnInclude \
@@ -13,7 +13,7 @@ EXE_INC = \
 
 EXE_LIBS = \
     -L$(FOAM_USER_LIBBIN) \
-    -lblockCoupledSolidTools \
+    -lblockCoupledSolids4FoamTools \
     -lfiniteVolume \
     -lfiniteArea \
     -lmeshTools \

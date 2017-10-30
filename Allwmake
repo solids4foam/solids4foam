@@ -4,8 +4,8 @@ cd ${0%/*} || exit 1    # run from this directory
 (cd filesToReplaceInOF && ./Allcheck)
 (cd ThirdParty && ./Allwmake)
 
-wmake libso src/blockCoupledSolidTools
-wmake libso src/solids4foamModels
+wmake libso src/blockCoupledSolids4FoamTools
+wmake libso src/solids4FoamModels
 
 wmake all applications/utilities
 wmake all applications/solvers

@@ -3,8 +3,8 @@ set -x
 
 (cd ThirdParty && \rm -rf eigen3)
 
-wclean lib src/blockCoupledSolidTools
-wclean lib src/solids4foamModels
+wclean lib src/blockCoupledSolids4FoamTools
+wclean lib src/solids4FoamModels
 
 wclean applications/utilities/addPatch
 wclean applications/utilities/addTinyPatch

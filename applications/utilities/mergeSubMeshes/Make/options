@@ -1,6 +1,6 @@
 EXE_INC = \
-    -I../../../src/solids4foamModels/lnInclude \
-    -I../../../src/blockCoupledSolidTools/lnInclude \
+    -I../../../src/solids4FoamModels/lnInclude \
+    -I../../../src/blockCoupledSolids4FoamTools/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/dynamicMesh/lnInclude \
@@ -11,7 +11,7 @@ EXE_INC = \
 
 EXE_LIBS = \
     -L$(FOAM_USER_LIBBIN) \
-    -lblockCoupledSolidTools \
+    -lblockCoupledSolids4FoamTools \
     -lsolids4FoamModels \
     -lfiniteVolume \
     -linterfaceProperties \
