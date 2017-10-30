@@ -21,6 +21,7 @@ fluidModels/fluidModel/fluidModel.C
 fluidModels/buoyantBoussinesqPimpleFluid/buoyantBoussinesqPimpleFluid.C
 fluidModels/consistentIcoFluid/consistentIcoFluid.C
 fluidModels/icoFluid/icoFluid.C
+fluidModels/icoPcFluid/icoPcFluid.C
 fluidModels/interFluid/interFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pisoFluid/pisoFluid.C
