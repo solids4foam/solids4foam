@@ -76,7 +76,7 @@ blockSolidTractionFvPatchVectorField::blockSolidTractionFvPatchVectorField
     const dictionary& dict
 )
 :
-    fixedValueFvPatchVectorField(p, iF, dict),
+    fixedValueFvPatchVectorField(p, iF),
     blockFvPatchVectorField(),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
@@ -86,11 +86,13 @@ blockSolidTractionFvPatchVectorField::blockSolidTractionFvPatchVectorField
     Info<< "Patch " << patch().name()
         << "    Traction boundary field " << endl;
 
-    fvPatchVectorField::operator=(patchInternalField());
-
     if (dict.found("value"))
     {
         Field<vector>::operator=(vectorField("value", dict, p.size()));
+    }
+    else
+    {
+        fvPatchVectorField::operator=(patchInternalField());
     }
 
     // Check if traction is time-varying
