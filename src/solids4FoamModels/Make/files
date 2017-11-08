@@ -91,10 +91,11 @@ $(solidFvPatchFields)/normalDisplacement/normalDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/oscillateDisplacement/oscillateDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/rigidCylinderContact/rigidCylinderContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
-$(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
-$(solidFvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
+$(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
+$(solidFvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C
+$(solidFvPatchFields)/solidVelocity/solidVelocityFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
@@ -204,6 +205,7 @@ numerics/logExpVolFields/eig3Field.C
 numerics/logExpVolFields/expVolFields.C
 numerics/logExpVolFields/logVolFields.C
 numerics/fvMotionSolvers/velocityLaplacianFvMotionSolver.C
+numerics/globalPolyPatch/globalPolyPatch.C
 
 
 LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
