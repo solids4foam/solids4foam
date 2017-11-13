@@ -152,6 +152,8 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     dispSeries_(),
     interpPtr_(NULL)
 {
+    Info<< "Creating " << type() << " boundary condition" << endl;
+
     // Check if displacement is time-varying
     if (dict.found("displacementSeries"))
     {
