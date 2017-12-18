@@ -247,7 +247,7 @@ void simpleCohesiveZoneFvPatchVectorField::autoMap
     const fvPatchFieldMapper& m
 )
 {
-    if (cohesiveLawPtr_ == NULL)
+    if (cohesiveLawPtr_.empty())
     {
         FatalErrorIn("simpleCohesiveZoneFvPatchVectorField::autoMap")
             << "NULL cohesive law"
@@ -277,10 +277,9 @@ void simpleCohesiveZoneFvPatchVectorField::rmap
     const simpleCohesiveZoneFvPatchVectorField& dmptf =
         refCast<const simpleCohesiveZoneFvPatchVectorField>(ptf);
 
-    // No need to grab the cohesive zone pointer more than once
-    if (!cohesiveLawPtr_)
+    if (cohesiveLawPtr_.empty() && dmptf.cohesiveLawPtr_.valid())
     {
-        cohesiveLawPtr_ = dmptf.cohesiveLawPtr_->clone().ptr();
+        cohesiveLawPtr_.set(dmptf.cohesiveLawPtr_().clone().ptr());
     }
 
     totRefValue_.rmap(dmptf.totRefValue_, addr);

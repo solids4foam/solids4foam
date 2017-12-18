@@ -87,7 +87,7 @@ class standardPenalty
         scalarField areaInContact_;
 
         //- Penalty factor
-        mutable scalar* penaltyFactorPtr_;
+        mutable autoPtr<scalar> penaltyFactorPtr_;
 
         //- Penalty scale factor
         const scalar penaltyScale_;
@@ -105,7 +105,7 @@ class standardPenalty
         const int infoFreq_;
 
         //- Contact info file
-        OFstream* contactFilePtr_;
+        autoPtr<OFstream> contactFilePtr_;
 
 
     // Private Member Functions

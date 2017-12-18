@@ -74,7 +74,7 @@ class blockSolidVelocityFvPatchVectorField
         interpolationTable<vector> velocitySeries_;
 
         //- Patch interpolator to interpolate face values to the points
-        mutable primitivePatchInterpolation* interpPtr_;
+        mutable autoPtr<primitivePatchInterpolation> interpPtr_;
 
     // Private Functions
 

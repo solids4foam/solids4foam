@@ -42,7 +42,7 @@ namespace Foam
 
 void solidVelocityFvPatchVectorField::makeInterp() const
 {
-    if (interpPtr_)
+    if (interpPtr_.valid())
     {
         FatalErrorIn
         (
@@ -50,18 +50,18 @@ void solidVelocityFvPatchVectorField::makeInterp() const
         ) << "pointer already set" << abort(FatalError);
     }
 
-    interpPtr_ = new primitivePatchInterpolation(patch().patch());
+    interpPtr_.set(new primitivePatchInterpolation(patch().patch()));
 }
 
 
 primitivePatchInterpolation& solidVelocityFvPatchVectorField::interp()
 {
-    if (!interpPtr_)
+    if (interpPtr_.empty())
     {
         makeInterp();
     }
 
-    return *interpPtr_;
+    return interpPtr_();
 }
 
 

@@ -397,8 +397,8 @@ void Foam::BlockEigenILUTPrecon::calcPrecon
 
     // Create Eigen sparse matrix and set coeffs
     Info<< "Creating Eigen::SparseMatrix" << endl;
-    APtr_ = new Eigen::SparseMatrix<scalar>(m, m);
-    Eigen::SparseMatrix<scalar>& A = *APtr_;
+    APtr_.set(new Eigen::SparseMatrix<scalar>(m, m));
+    Eigen::SparseMatrix<scalar>& A = APtr_();
 
     Info<< "    setFromTriplets" << endl;
     A.setFromTriplets(coefficients.begin(), coefficients.end());
@@ -411,8 +411,8 @@ void Foam::BlockEigenILUTPrecon::calcPrecon
 
     // Create the preconditioner
     Info<< "    Creating Eigen::IncompleteLUT" << endl;
-    //preconPtr_ = new Eigen::IncompleteLUT<scalar>(A);
-    preconPtr_ = new Eigen::IncompleteLUT<scalar>(A, VSMALL, fillFactor_);
+    //preconPtr_.set(new Eigen::IncompleteLUT<scalar>(A));
+    preconPtr_.set(new Eigen::IncompleteLUT<scalar>(A, VSMALL, fillFactor_));
 
     Info<< "void Foam::BlockEigenILUTPrecon::calcPrecon(matrix) done" << endl;
 }
@@ -420,7 +420,7 @@ void Foam::BlockEigenILUTPrecon::calcPrecon
 
 const Eigen::SparseMatrix<Foam::scalar>& Foam::BlockEigenILUTPrecon::A() const
 {
-    if (!APtr_)
+    if (APtr_.empty())
     {
         FatalErrorIn
         (
@@ -429,14 +429,14 @@ const Eigen::SparseMatrix<Foam::scalar>& Foam::BlockEigenILUTPrecon::A() const
             << "construction" << abort(FatalError);
     }
 
-    return *APtr_;
+    return APtr_();
 }
 
 
 const Eigen::IncompleteLUT<Foam::scalar>&
 Foam::BlockEigenILUTPrecon::precon() const
 {
-    if (!preconPtr_)
+    if (preconPtr_.empty())
     {
         FatalErrorIn
         (
@@ -446,7 +446,7 @@ Foam::BlockEigenILUTPrecon::precon() const
             << "construction" << abort(FatalError);
     }
 
-    return *preconPtr_;
+    return preconPtr_();
 }
 
 

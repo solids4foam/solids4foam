@@ -209,7 +209,7 @@ void Foam::fv::blockFvmInsertCoeffsTang
                 scalar faceMu = 0.0;
                 scalar faceLambda = 0.0;
                 const vector* faceNPtr = NULL;
-                const vector* faceKPtr = NULL;
+                autoPtr<vector> faceKPtr(NULL);
 
                 if (intFace)
                 {
@@ -230,7 +230,8 @@ void Foam::fv::blockFvmInsertCoeffsTang
                     // Non-orthogonal correction vector
                     if (nonOrthogonalMesh)
                     {
-                        faceKPtr = &((*corrVecIPtr)[curFaceID]);
+                        //faceKPtr = &((*corrVecIPtr)[curFaceID]);
+                        faceKPtr.set(new vector((*corrVecIPtr)[curFaceID]));
                     }
                 }
                 else
@@ -252,21 +253,23 @@ void Foam::fv::blockFvmInsertCoeffsTang
                             boundaryDelta[patchID][patchFaceID];
                         const scalar faceDeltaCoeff =
                             boundaryDeltaCoeffs[patchID][patchFaceID];
-                        faceKPtr =
+                        faceKPtr.set
+                        (
                             new vector
                             (
                                 pos(faceN & faceDelta)
                                *(faceN - faceDelta*faceDeltaCoeff)
-                            );
+                            )
+                        );
                     }
                 }
+
                 const vector& faceN = *faceNPtr;
 
-                if (faceKPtr == NULL)
+                if (faceKPtr.empty())
                 {
-                    faceKPtr = new vector(0, 0, 0);
+                    faceKPtr.set(new vector(0, 0, 0));
                 }
-                const vector& faceK = *faceKPtr;
 
                 // Insert coefficients for this face
                 blockFvmInsertCoeffsTangForFace
@@ -287,7 +290,7 @@ void Foam::fv::blockFvmInsertCoeffsTang
                     faceMu,
                     faceLambda,
                     faceN,
-                    faceK,
+                    faceKPtr(),
                     points,
                     origins,
                     invMatrices,

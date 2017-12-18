@@ -523,6 +523,8 @@ void Foam::cohesiveZoneInitiation::clearOut()
     deleteDemandDrivenData(coupledFacesToBreakPtr_);
     deleteDemandDrivenData(facesToBreakTractionsPtr_);
     deleteDemandDrivenData(coupledFacesToBreakTractionsPtr_);
+    deleteDemandDrivenData(facesToBreakNormalsPtr_);
+    deleteDemandDrivenData(coupledFacesToBreakNormalsPtr_);
 }
 
 
@@ -544,6 +546,8 @@ Foam::cohesiveZoneInitiation::cohesiveZoneInitiation
     coupledFacesToBreakPtr_(NULL),
     facesToBreakTractionsPtr_(NULL),
     coupledFacesToBreakTractionsPtr_(NULL),
+    facesToBreakNormalsPtr_(NULL),
+    coupledFacesToBreakNormalsPtr_(NULL),
     pathLimiterPtr_(NULL)
 {
     if (!allowCoupledFaces_)

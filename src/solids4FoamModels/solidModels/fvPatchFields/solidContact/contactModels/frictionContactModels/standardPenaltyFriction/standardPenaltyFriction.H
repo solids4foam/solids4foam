@@ -63,7 +63,7 @@ class standardPenaltyFriction
         dictionary frictionContactModelDict_;
 
          //- Friction law
-        frictionLaw* frictionLawPtr_;
+        autoPtr<frictionLaw> frictionLawPtr_;
 
          //- Const reference to the mesh
         const fvMesh& mesh_;
@@ -81,7 +81,7 @@ class standardPenaltyFriction
         vectorField slip_;
 
         //- Frictional penalty factor and scaling factor
-        scalar* frictionPenaltyFactorPtr_;
+        autoPtr<scalar> frictionPenaltyFactorPtr_;
 
         //- Frictional penalty scaling factor
         scalar frictionPenaltyScale_;
@@ -96,7 +96,7 @@ class standardPenaltyFriction
         int infoFreq_;
 
         //- Contact info debug file
-        OFstream* contactFilePtr_;
+        autoPtr<OFstream> contactFilePtr_;
 
 
     // Private Member Functions
@@ -104,12 +104,12 @@ class standardPenaltyFriction
         //- Return penalty factor
         virtual scalar frictionPenaltyFactor()
         {
-            if (!frictionPenaltyFactorPtr_)
+            if (frictionPenaltyFactorPtr_.empty())
             {
                 calcFrictionPenaltyFactor();
             }
 
-            return *frictionPenaltyFactorPtr_;
+            return frictionPenaltyFactorPtr_();
         }
 
         //- Disallow default bitwise copy construct

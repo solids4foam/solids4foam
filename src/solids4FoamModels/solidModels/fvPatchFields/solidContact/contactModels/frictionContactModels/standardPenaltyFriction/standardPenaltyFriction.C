@@ -94,10 +94,12 @@ void Foam::standardPenaltyFriction::calcFrictionPenaltyFactor()
 
     // approximate penalty factor based on Hallquist et al.
     // we approximate penalty factor for traction instead of force
-    frictionPenaltyFactorPtr_ =
-        new scalar(frictionPenaltyScale_*modulus*faceArea/cellVolume);
+    frictionPenaltyFactorPtr_.set
+    (
+        new scalar(frictionPenaltyScale_*modulus*faceArea/cellVolume)
+    );
 
-    Info<< "    friction penalty factor: " << *frictionPenaltyFactorPtr_
+    Info<< "    friction penalty factor: " << frictionPenaltyFactorPtr_()
         << endl;
 }
 
@@ -160,13 +162,15 @@ Foam::standardPenaltyFriction::standardPenaltyFriction
     contactFilePtr_(NULL)
 {
     // Create friction law
-    frictionLawPtr_ =
+    frictionLawPtr_.set
+    (
         frictionLaw::New
         (
             frictionContactModelDict_.lookup("frictionLaw"),
             *this,
             frictionContactModelDict_
-        ).ptr();
+        ).ptr()
+    );
 
     // master proc open contact info file
     if (Pstream::master() && writeDebugFile_)
@@ -178,14 +182,16 @@ Foam::standardPenaltyFriction::standardPenaltyFriction
 
         mkDir(contactFileDir);
 
-        contactFilePtr_ =
+        contactFilePtr_.set
+        (
             new OFstream
             (
                 contactFileDir/
                 "frictionContact_" + masterName + "_" + slaveName + ".txt"
-            );
+            )
+        );
 
-        OFstream& contactFile = *contactFilePtr_;
+        OFstream& contactFile = contactFilePtr_();
 
         int width = 20;
         contactFile
@@ -233,14 +239,14 @@ Foam::standardPenaltyFriction::standardPenaltyFriction
     infoFreq_(fm.infoFreq_),
     contactFilePtr_(NULL)
 {
-    if (fm.frictionPenaltyFactorPtr_)
+    if (fm.frictionPenaltyFactorPtr_.valid())
     {
-        frictionPenaltyFactorPtr_ = new scalar(*fm.frictionPenaltyFactorPtr_);
+        frictionPenaltyFactorPtr_.set(new scalar(fm.frictionPenaltyFactorPtr_()));
     }
 
-    if (fm.contactFilePtr_)
+    if (fm.contactFilePtr_.valid())
     {
-        contactFilePtr_ = new OFstream(*fm.contactFilePtr_);
+        contactFilePtr_.set(new OFstream(fm.contactFilePtr_()));
     }
 }
 
@@ -299,7 +305,7 @@ void Foam::standardPenaltyFriction::correct
             // Note: the actual friction law is implemented through the run-time
             // selectable frictionLaw
             slipTraction[faceI] =
-                frictionLawPtr_->slipTraction
+                frictionLawPtr_().slipTraction
                 (
                     magSlavePressure[faceI],    // Contact pressure
                     slip_[faceI],               // Slip vector
@@ -365,7 +371,7 @@ void Foam::standardPenaltyFriction::correct
      && writeDebugFile_
     )
     {
-        OFstream& contactFile = *contactFilePtr_;
+        OFstream& contactFile = contactFilePtr_();
         int width = 20;
         contactFile
             << mesh.time().value();

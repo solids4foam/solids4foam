@@ -105,7 +105,9 @@ Foam::cellRemovalFvMesh::cellRemovalFvMesh
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::cellRemovalFvMesh::~cellRemovalFvMesh()
-{}
+{
+    deleteDemandDrivenData(meshModPtr_);
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

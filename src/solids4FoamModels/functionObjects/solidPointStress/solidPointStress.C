@@ -84,7 +84,7 @@ bool Foam::solidPointStress::writeData()
             dimensionedSymmTensor("zero", sigma.dimensions(), symmTensor::zero)
         );
 
-        interpPtr_->interpolate(sigma, pointSigma);
+        interpPtr_().interpolate(sigma, pointSigma);
 
         symmTensor pointSigmaValue = symmTensor::zero;
         if (pointID_ > -1)
@@ -192,7 +192,7 @@ Foam::solidPointStress::solidPointStress
         }
 
         // Create interpolator
-        interpPtr_ = new newLeastSquaresVolPointInterpolation(mesh);
+        interpPtr_.set(new newLeastSquaresVolPointInterpolation(mesh));
 
         // File update
         if (Pstream::master())

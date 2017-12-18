@@ -135,6 +135,14 @@ consistentIcoFluid::consistentIcoFluid
     updateSf();
 }
 
+
+// * * * * * * * * * * * * * * * *  Destructors  * * * * * * * * * * * * * * //
+
+consistentIcoFluid::~consistentIcoFluid()
+{
+    deleteDemandDrivenData(SfPtr_);
+}
+
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 

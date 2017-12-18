@@ -83,7 +83,7 @@ bool Foam::solidPointTemperature::writeData()
             dimensionedScalar("zero", T.dimensions(), 0.0)
         );
 
-        interpPtr_->interpolate(T, pointT);
+        interpPtr_().interpolate(T, pointT);
 
         scalar pointTValue = 0.0;
         if (pointID_ > -1)
@@ -185,7 +185,7 @@ Foam::solidPointTemperature::solidPointTemperature
         }
 
         // Create interpolator
-        interpPtr_ = new newLeastSquaresVolPointInterpolation(mesh);
+        interpPtr_.set(new newLeastSquaresVolPointInterpolation(mesh));
 
         // File update
         if (Pstream::master())

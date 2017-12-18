@@ -2207,7 +2207,7 @@ newLeastSquaresVolPointInterpolation::~newLeastSquaresVolPointInterpolation()
     deleteDemandDrivenData(pointProcFacesPtr_);
     deleteDemandDrivenData(axisEdgesPtr_);
     deleteDemandDrivenData(pointAxisEdgesPtr_);
-//     deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
+    //deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
     deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
     deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
     deleteDemandDrivenData(procBndFacesPtr_);
@@ -2219,7 +2219,7 @@ newLeastSquaresVolPointInterpolation::~newLeastSquaresVolPointInterpolation()
     deleteDemandDrivenData(weightsPtr_);
     deleteDemandDrivenData(originsPtr_);
     deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
-//     invLsMatrices_.clear();
+    //invLsMatrices_.clear();
 }
 
 

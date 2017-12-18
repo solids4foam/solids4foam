@@ -64,7 +64,7 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class coupledUnsLinGeomLinearElasticSolid Declaration
+               Class coupledUnsLinGeomLinearElasticSolid Declaration
 \*---------------------------------------------------------------------------*/
 
 class coupledUnsLinGeomLinearElasticSolid

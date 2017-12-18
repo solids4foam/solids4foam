@@ -83,7 +83,7 @@ bool Foam::solidPointDisplacement::writeData()
             dimensionedVector("zero", D.dimensions(), vector::zero)
         );
 
-        interpPtr_->interpolate(D, pointD);
+        interpPtr_().interpolate(D, pointD);
 
         vector pointDValue = vector::zero;
         if (pointID_ > -1)
@@ -189,7 +189,7 @@ Foam::solidPointDisplacement::solidPointDisplacement
         }
 
         // Create interpolator
-        interpPtr_ = new newLeastSquaresVolPointInterpolation(mesh);
+        interpPtr_.set(new newLeastSquaresVolPointInterpolation(mesh));
 
         // File update
         if (Pstream::master())

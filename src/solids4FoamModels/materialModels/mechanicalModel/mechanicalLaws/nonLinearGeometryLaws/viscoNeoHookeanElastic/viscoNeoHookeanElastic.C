@@ -515,7 +515,10 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::viscoNeoHookeanElastic::~viscoNeoHookeanElastic()
-{}
+{
+    deleteDemandDrivenData(FPtr_);
+    deleteDemandDrivenData(FfPtr_);
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

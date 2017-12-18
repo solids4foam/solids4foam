@@ -72,7 +72,7 @@ class simpleCohesiveZoneFvPatchVectorField
         vectorField totRefValue_;
 
         //- Cohesive law
-        simpleCohesiveZoneLaw* cohesiveLawPtr_;
+        autoPtr<simpleCohesiveZoneLaw> cohesiveLawPtr_;
 
         //- Crack indicator
         scalarField crackIndicator_;
@@ -182,7 +182,7 @@ public:
             //- Return cohesive law
             const simpleCohesiveZoneLaw& law() const
             {
-                return *cohesiveLawPtr_;
+                return cohesiveLawPtr_();
             }
 
             //- Return total displacement

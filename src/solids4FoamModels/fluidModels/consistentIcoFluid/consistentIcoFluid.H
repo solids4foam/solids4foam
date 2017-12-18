@@ -96,8 +96,7 @@ public:
 
     // Destructor
 
-        virtual ~consistentIcoFluid()
-        {}
+        virtual ~consistentIcoFluid();
 
 
     // Member Functions

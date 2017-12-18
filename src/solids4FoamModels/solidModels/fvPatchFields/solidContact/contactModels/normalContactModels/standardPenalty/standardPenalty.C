@@ -97,10 +97,12 @@ void standardPenalty::calcPenaltyFactor() const
 
     // Approximate penalty factor based on Hallquist et al.
     // we approximate penalty factor for traction instead of force
-    penaltyFactorPtr_ =
-        new scalar(penaltyScale_*bulkModulus*faceArea/cellVolume);
+    penaltyFactorPtr_.set
+    (
+        new scalar(penaltyScale_*bulkModulus*faceArea/cellVolume)
+    );
 
-    Info<< "    normal penalty factor: " << *penaltyFactorPtr_ << endl;
+    Info<< "    normal penalty factor: " << penaltyFactorPtr_() << endl;
 }
 
 
@@ -170,13 +172,15 @@ standardPenalty::standardPenalty
 
         mkDir(contactFileDir);
 
-        contactFilePtr_ =
+        contactFilePtr_.set
+        (
             new OFstream
             (
                 contactFileDir/"normalContact_"+masterName+"_"+slaveName+".txt"
-            );
+            )
+        );
 
-        OFstream& contactFile = *contactFilePtr_;
+        OFstream& contactFile = contactFilePtr_();
 
         int width = 20;
         contactFile
@@ -210,23 +214,13 @@ standardPenalty::standardPenalty(const standardPenalty& nm)
     globalSlavePointPenetration_(nm.globalSlavePointPenetration_),
     slavePointPenetration_(nm.slavePointPenetration_),
     areaInContact_(nm.areaInContact_),
-    penaltyFactorPtr_(NULL),
+    penaltyFactorPtr_(nm.penaltyFactorPtr_),
     penaltyScale_(nm.penaltyScale_),
     relaxFac_(nm.relaxFac_),
     contactIterNum_(nm.contactIterNum_),
     infoFreq_(nm.infoFreq_),
-    contactFilePtr_(NULL)
-{
-    if (nm.penaltyFactorPtr_)
-    {
-        penaltyFactorPtr_ = new scalar(*nm.penaltyFactorPtr_);
-    }
-
-    if (nm.contactFilePtr_)
-    {
-        contactFilePtr_ = new OFstream(*nm.contactFilePtr_);
-    }
-}
+    contactFilePtr_(nm.contactFilePtr_)
+{}
 
 
 // * * * * * * * * * * * * * * Member Functions * * * * * * * * * * * * * * * //
@@ -336,7 +330,7 @@ void standardPenalty::correct
         // Master processor writes file
         if (Pstream::master())
         {
-            OFstream& contactFile = *contactFilePtr_;
+            OFstream& contactFile = contactFilePtr_();
             const int width = 20;
             contactFile
                 << mesh.time().value();
@@ -362,12 +356,12 @@ void standardPenalty::correct
 
 scalar standardPenalty::penaltyFactor() const
 {
-    if (!penaltyFactorPtr_)
+    if (penaltyFactorPtr_.empty())
     {
         calcPenaltyFactor();
     }
 
-    return *penaltyFactorPtr_;
+    return penaltyFactorPtr_();
 }
 
 

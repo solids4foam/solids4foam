@@ -142,7 +142,10 @@ Foam::neoHookeanElastic::neoHookeanElastic
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::neoHookeanElastic::~neoHookeanElastic()
-{}
+{
+    deleteDemandDrivenData(FPtr_);
+    deleteDemandDrivenData(FfPtr_);
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

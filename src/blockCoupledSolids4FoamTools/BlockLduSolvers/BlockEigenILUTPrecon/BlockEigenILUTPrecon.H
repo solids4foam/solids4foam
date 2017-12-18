@@ -63,10 +63,10 @@ class BlockEigenILUTPrecon
         //mutable CoeffField<vector> preconDiag_;
 
         //- Spare matrix stored in the Eigen format
-        mutable Eigen::SparseMatrix<scalar>* APtr_;
+        mutable autoPtr< Eigen::SparseMatrix<scalar> > APtr_;
 
         //- Eigne incomplete LU preconditoner with dial thresholding
-        mutable Eigen::IncompleteLUT<scalar>* preconPtr_;
+        mutable autoPtr< Eigen::IncompleteLUT<scalar> > preconPtr_;
 
         //- Is the matrix for a 2-D problem
         bool twoD_;

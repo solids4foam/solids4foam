@@ -194,6 +194,15 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 {}
 
 
+// * * * * * * * * * * * * * * * *  Destructors  * * * * * * * * * * * * * * //
+
+
+fixedDisplacementFvPatchVectorField::~fixedDisplacementFvPatchVectorField()
+{
+    deleteDemandDrivenData(interpPtr_);
+}
+
+
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 // Map from self

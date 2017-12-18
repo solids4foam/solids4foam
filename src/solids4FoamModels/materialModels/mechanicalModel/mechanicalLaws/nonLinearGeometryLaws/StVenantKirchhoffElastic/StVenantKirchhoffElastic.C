@@ -137,16 +137,16 @@ Foam::StVenantKirchhoffElastic::StVenantKirchhoffElastic
     mu_(E_/(2.0*(1.0 + nu_))),
     FPtr_(NULL),
     FfPtr_(NULL)
-{
-    deleteDemandDrivenData(FPtr_);
-    deleteDemandDrivenData(FfPtr_);
-}
+{}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::StVenantKirchhoffElastic::~StVenantKirchhoffElastic()
-{}
+{
+    deleteDemandDrivenData(FPtr_);
+    deleteDemandDrivenData(FfPtr_);
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

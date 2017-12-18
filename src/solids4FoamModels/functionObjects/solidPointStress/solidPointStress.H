@@ -74,7 +74,7 @@ class solidPointStress
         label pointID_;
 
         //- Interpolator
-        newLeastSquaresVolPointInterpolation* interpPtr_;
+        autoPtr<newLeastSquaresVolPointInterpolation> interpPtr_;
 
         //- History file ptr
         autoPtr<OFstream> historyFilePtr_;
