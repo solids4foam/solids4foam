@@ -185,21 +185,18 @@ void interFluid::solvePEqn
 
     U() = rUA*UEqn.H();
 
-    surfaceScalarField phiU
-    (
-        "phiU",
-        (fvc::interpolate(U()) & mesh().Sf())
-      + fvc::ddtPhiCorr(rUA, rho_, U(), phi())
-    );
+    surfaceScalarField phiU("phiU", (fvc::interpolate(U()) & mesh().Sf()));
 
-    adjustPhi(phiU, U(), pd_);
+    if (pd_.needReference())
+    {
+        adjustPhi(phi(), U(), pd_);
+    }
 
     phi() = phiU +
         (
             fvc::interpolate(interface_.sigmaK())*fvc::snGrad(alpha1_)
           - ghf_*fvc::snGrad(rho_)
         )*rUAf*mesh().magSf();
-
 
     while (pimple.correctNonOrthogonal())
     {
@@ -223,6 +220,11 @@ void interFluid::solvePEqn
 
     U() += rUA*fvc::reconstruct((phi() - phiU)/rUAf);
     U().correctBoundaryConditions();
+
+    fluidModel::continuityErrs();
+
+    // Make the fluxes relative to the mesh motion
+    fvc::makeRelative(phi(), U());
 }
 
 
@@ -422,6 +424,9 @@ bool interFluid::evolve()
         pRefValue = readScalar(pimple.dict().lookup("pRefValue"));
     }
 
+    // Make the fluxes relative to the mesh motion
+    fvc::makeRelative(phi(), U());
+
     // Calculate CourantNo
     {
         scalar CoNum = 0.0;
@@ -429,6 +434,10 @@ bool interFluid::evolve()
         scalar velMag = 0.0;
         CourantNo(CoNum, meanCoNum, velMag);
     }
+
+    // Update gh fields as the mesh may have moved
+    gh_ = g_ & mesh.C();
+    ghf_ = g_ & mesh.Cf();
 
     // Pressure-velocity corrector
     while (pimple.loop())
@@ -459,6 +468,8 @@ bool interFluid::evolve()
                     pRefValue - getRefCellValue(p(), pdRefCell)
                 );
         }
+
+        gradp() = fvc::grad(p());
 
         gradU() = fvc::grad(U());
 

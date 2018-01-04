@@ -26,7 +26,8 @@ Class
     interFluid
 
 Description
-    interFoam fluid model
+    interFoam fluid model, allowing for a dynamic mesh.
+    This should be equivalent to interDyMFoam
 
 Author
     Philip Cardiff, UCD. All rights reserved.
