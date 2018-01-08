@@ -197,6 +197,7 @@ bool pisoFluid::evolve()
     // --- PISO loop
 
     volScalarField rUA = 1.0/UEqn.A();
+    surfaceScalarField rAUf("rAUf", fvc::interpolate(rUA));
 
     for (int corr=0; corr < nCorr; corr++)
     {
@@ -207,7 +208,7 @@ bool pisoFluid::evolve()
         {
             fvScalarMatrix pEqn
             (
-                fvm::laplacian(rUA, p()) == fvc::div(phi())
+                fvm::laplacian(rAUf, p()) == fvc::div(phi())
             );
 
             pEqn.setReference(pRefCell, pRefValue);
