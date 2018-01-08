@@ -49,6 +49,7 @@ SourceFiles
 #include "IOdictionary.H"
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
+#include "pimpleControl.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -72,6 +73,9 @@ class fluidModel
         //- Fluid properties dictionary
         dictionary fluidProperties_;
 
+        //- Pimple control
+        mutable autoPtr<pimpleControl> pimplePtr_;
+
         //- Global face zones
         mutable labelList* globalFaceZonesPtr_;
 
@@ -94,10 +98,10 @@ class fluidModel
         surfaceScalarField phi_;
 
         //- Adjustable time-step switch
-        const Switch adjustTimeStep_; 
+        const Switch adjustTimeStep_;
 
         //- For adjustable time-step, this is the maximum Courant number
-        const scalar maxCo_; 
+        const scalar maxCo_;
 
         //- For adjustable time-step, this is the maximum time-stpe
         const scalar maxDeltaT_;
@@ -114,7 +118,18 @@ class fluidModel
         //- Small velocity for bounding
         dimensionedScalar smallU_;
 
+        //- Flag to let the fluid model know that the fsi interface is in charge
+        //  of calling fluid mesh.update()
+        bool fsiMeshUpdate_;
+
+        //- Flag to let the fluid model if the mesh changed when the FSI
+        //  interface called mesh.updated()
+        bool fsiMeshUpdateChanged_;
+
     // Private Member Functions
+
+        //- Make the pimple control
+        void makePimpleControl() const;
 
         //- Find global face zones
         void calcGlobalFaceZones() const;
@@ -227,6 +242,9 @@ public:
                 return meshPtr_().time();
             }
 
+            //- Return non-const acess to the pimple control
+            pimpleControl& pimple();
+
             //- Return const velocity field
             virtual const volVectorField& U() const
             {
@@ -285,6 +303,18 @@ public:
             virtual surfaceScalarField& phi()
             {
                 return phi_;
+            }
+
+            //- Non-const access to the fsiMeshUpdate flag
+            virtual bool& fsiMeshUpdate()
+            {
+                return fsiMeshUpdate_;
+            }
+
+            //- Non-const access to the fsiMeshUpdateChanged flag
+            virtual bool& fsiMeshUpdateChanged()
+            {
+                return fsiMeshUpdateChanged_;
             }
 
             //- Patch viscous force (N/m2)

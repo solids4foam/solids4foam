@@ -82,7 +82,7 @@ class interFluid
 
         //- Density of phase 2
         const dimensionedScalar& rho2_;
-    
+
         //- Average density field
         volScalarField rho_;
 
@@ -101,10 +101,27 @@ class interFluid
         //- Interface
         interfaceProperties interface_;
 
+        //- pd reference cell index
+        label pdRefCell_;
+
+        //- pd reference value
+        scalar pdRefValue_;
+
+        //- p reference value
+        scalar pRefValue_;
+
         //- Turbulence model
         autoPtr<incompressible::turbulenceModel> turbulence_;
 
     // Private Member Functions
+
+        //- Correct phi field
+        void correctPhi
+        (
+            pimpleControl& pimple,
+            const label pdRefCell,
+            const scalar pdRefValue
+        );
 
         //- Solve alpha equation with sub cycle
         void solveAlphaEqnSubCycle(const pimpleControl& pimple);
