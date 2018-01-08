@@ -277,10 +277,10 @@ void interFluid::solvePEqn
     }
 
     phi() = phiU +
-        (
-            fvc::interpolate(interface_.sigmaK())*fvc::snGrad(alpha1_)
-          - ghf_*fvc::snGrad(rho_)
-        )*rUAf*mesh().magSf();
+    (
+        fvc::interpolate(interface_.sigmaK())*fvc::snGrad(alpha1_)
+      - ghf_*fvc::snGrad(rho_)
+    )*rUAf*mesh().magSf();
 
     while (pimple.correctNonOrthogonal())
     {
@@ -541,8 +541,6 @@ bool interFluid::evolve()
         {
             solvePEqn(pimple, UEqn, pdRefCell_, pdRefValue_);
         }
-
-        //fluidModel::continuityErrs();
 
         p() = pd_ + rho_*gh_;
 

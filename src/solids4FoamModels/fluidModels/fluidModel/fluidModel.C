@@ -377,7 +377,7 @@ void Foam::fluidModel::CourantNo
 }
 
 
-void Foam::fluidModel::continuityErrs() const
+void Foam::fluidModel::continuityErrs()
 {
     const volScalarField contErr = fvc::div(phi());
 
@@ -387,8 +387,12 @@ void Foam::fluidModel::continuityErrs() const
     const scalar globalContErr = runTime().deltaT().value()*
         contErr.weightedAverage(mesh().V()).value();
 
+    cumulativeContErr_ += globalContErr;
+
     Info<< "time step continuity errors : sum local = "
-        << sumLocalContErr << ", global = " << globalContErr << endl;
+        << sumLocalContErr << ", global = " << globalContErr
+        << ", cumulative = " << cumulativeContErr_
+        << endl;
 }
 
 
@@ -528,6 +532,7 @@ Foam::fluidModel::fluidModel
     pMax_("pMax", p().dimensions(), 0),
     UMax_("UMax", U().dimensions(), 0),
     smallU_("smallU", dimVelocity, 1e-10),
+    cumulativeContErr_(0.0),
     fsiMeshUpdate_(false),
     fsiMeshUpdateChanged_(false)
 {
@@ -630,13 +635,18 @@ void Foam::fluidModel::setDeltaT(Time& runTime)
     if (adjustTimeStep_)
     {
         // Calculate the maximum Courant number
+        // Careful to use the relative flux in the calculation
+        // We  have to be careufl when we call makeRelative and makeAbsolute
         scalar CoNum = 0.0;
         scalar meanCoNum = 0.0;
         scalar velMag = 0.0;
+        fvc::makeRelative(phi(), U());
         CourantNo(CoNum, meanCoNum, velMag);
+        fvc::makeAbsolute(phi(), U());
 
         scalar maxDeltaTFact = maxCo_/(CoNum + SMALL);
-        scalar deltaTFact = min(min(maxDeltaTFact, 1.0 + 0.1*maxDeltaTFact), 1.2);
+        scalar deltaTFact =
+            min(min(maxDeltaTFact, 1.0 + 0.1*maxDeltaTFact), 1.2);
 
         runTime.setDeltaT
         (
