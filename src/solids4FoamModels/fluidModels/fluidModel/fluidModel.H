@@ -118,6 +118,9 @@ class fluidModel
         //- Small velocity for bounding
         dimensionedScalar smallU_;
 
+        //- Cumulative continuity error
+        scalar cumulativeContErr_;
+
         //- Flag to let the fluid model know that the fsi interface is in charge
         //  of calling fluid mesh.update()
         bool fsiMeshUpdate_;
@@ -167,7 +170,7 @@ protected:
         void CourantNo(scalar& CoNum, scalar& meanCoNum, scalar& velMag) const;
 
         //- Continuity errors
-        void continuityErrs() const;
+        void continuityErrs();
 
         //- Bound the pressure and velocity fields
         void boundPU
