@@ -1184,7 +1184,10 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 << abort(FatalError);
         }
 
-        fluidMesh().update();
+        bool meshChanged = fluidMesh().update();
+        reduce(meshChanged, orOp<bool>());
+        fluid().fsiMeshUpdate() = true;
+        fluid().fsiMeshUpdateChanged() = meshChanged;
 
         accumulatedFluidInterfaceDisplacement() =
             vectorField

@@ -50,6 +50,90 @@ addToRunTimeSelectionTable(fluidModel, interFluid, dictionary);
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
 
+
+void interFluid::correctPhi
+(
+    pimpleControl& pimple,
+    const label pdRefCell,
+    const scalar pdRefValue
+)
+{
+    fluidModel::continuityErrs();
+
+    // Note: we should store pcorrTypes
+    wordList pcorrTypes
+    (
+        pd_.boundaryField().size(),
+        zeroGradientFvPatchScalarField::typeName
+    );
+
+    for (label i = 0; i < pd_.boundaryField().size(); i++)
+    {
+        if (pd_.boundaryField()[i].fixesValue())
+        {
+            pcorrTypes[i] = fixedValueFvPatchScalarField::typeName;
+        }
+    }
+
+    volScalarField pcorr
+    (
+        IOobject
+        (
+            "pcorr",
+            runTime().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("pcorr", pd_.dimensions(), 0.0),
+        pcorrTypes
+    );
+
+    dimensionedScalar rAUf
+    (
+        "(1|A(U))",
+        dimTime/rho_.dimensions(),
+        runTime().deltaT().value()
+    );
+
+    phi() = (fvc::interpolate(U()) & mesh().Sf());
+
+    adjustPhi(phi(), U(), pcorr);
+
+    mesh().schemesDict().setFluxRequired(pcorr.name());
+
+    while (pimple.correctNonOrthogonal())
+    {
+        fvScalarMatrix pcorrEqn
+        (
+            fvm::laplacian(rAUf, pcorr) == fvc::div(phi())
+        );
+
+        pcorrEqn.setReference(pdRefCell, pdRefValue);
+        pcorrEqn.solve();
+
+        if (pimple.finalNonOrthogonalIter())
+        {
+            phi() -= pcorrEqn.flux();
+        }
+    }
+
+    fluidModel::continuityErrs();
+
+    // Courant number
+    {
+        scalar CoNum = 0.0;
+        scalar meanCoNum = 0.0;
+        scalar velMag = 0.0;
+        fluidModel::CourantNo(CoNum, meanCoNum, velMag);
+    }
+
+    // Recalculate rhoPhi from rho
+    rhoPhi_ = fvc::interpolate(rho_)*phi();
+}
+
+
 void interFluid::solveAlphaEqnSubCycle(const pimpleControl& pimple)
 {
     const label nAlphaCorr
@@ -302,6 +386,9 @@ interFluid::interFluid
     gh_("gh", g_ & mesh().C()),
     ghf_("gh", g_ & mesh().Cf()),
     interface_(alpha1_, U(), twoPhaseProperties_),
+    pdRefCell_(0),
+    pdRefValue_(0.0),
+    pRefValue_(0.0),
     turbulence_
     (
         incompressible::turbulenceModel::New(U(), phi(), twoPhaseProperties_)
@@ -314,25 +401,18 @@ interFluid::interFluid
 
     rho_.oldTime();
 
-    label pdRefCell = 0;
-    scalar pdRefValue = 0.0;
-    setRefCell(p(), fluidProperties(), pdRefCell, pdRefValue);
+    setRefCell(p(), fluidProperties(), pdRefCell_, pdRefValue_);
     mesh().schemesDict().setFluxRequired(pd_.name());
-
-    // Create pimple control as it is needed to set the p reference
-    pimpleControl pimple(mesh());
-
-    scalar pRefValue = 0.0;
 
     if (pd_.needReference())
     {
-        pRefValue = readScalar(pimple.dict().lookup("pRefValue"));
+        pRefValue_ = readScalar(pimple().dict().lookup("pRefValue"));
 
         p() += dimensionedScalar
         (
             "p",
             p().dimensions(),
-            pRefValue - getRefCellValue(p(), pdRefCell)
+            pRefValue_ - getRefCellValue(p(), pdRefCell_)
         );
     }
 }
@@ -409,35 +489,43 @@ bool interFluid::evolve()
 
     fvMesh& mesh = fluidModel::mesh();
 
-    // Create pimple control
-    pimpleControl pimple(mesh);
+    // Take a reference to the pimple control
+    pimpleControl& pimple = fluidModel::pimple();
 
-    // Prepare for the pressure solution
-    label pdRefCell = 0;
-    scalar pdRefValue = 0.0;
-    setRefCell(p(), fluidProperties(), pdRefCell, pdRefValue);
-
-    scalar pRefValue = 0.0;
-
-    if (pd_.needReference())
+    bool meshChanged = false;
+    if (fluidModel::fsiMeshUpdate())
     {
-        pRefValue = readScalar(pimple.dict().lookup("pRefValue"));
+        // The FSI interface is in charge of calling mesh.update()
+        meshChanged = fluidModel::fsiMeshUpdateChanged();
+    }
+    else
+    {
+        meshChanged = refCast<dynamicFvMesh>(mesh).update();
+        reduce(meshChanged, orOp<bool>());
     }
 
-    // Make the fluxes relative to the mesh motion
-    fvc::makeRelative(phi(), U());
-
-    // Calculate CourantNo
     {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
-        CourantNo(CoNum, meanCoNum, velMag);
+        const Time& runTime = fluidModel::runTime();
+#       include "volContinuity.H"
     }
 
     // Update gh fields as the mesh may have moved
     gh_ = g_ & mesh.C();
     ghf_ = g_ & mesh.Cf();
+
+    //if (correctPhi && meshChanged)
+    if (meshChanged)
+    {
+        correctPhi(pimple, pdRefCell_, pdRefValue_);
+    }
+
+    // Make the fluxes relative to the mesh motion
+    fvc::makeRelative(phi(), U());
+
+    // if (checkMeshCourantNo)
+    // {
+    // #       include "meshCourantNo.H"
+    // }
 
     // Pressure-velocity corrector
     while (pimple.loop())
@@ -451,10 +539,10 @@ bool interFluid::evolve()
         // --- PISO loop
         while (pimple.correct())
         {
-            solvePEqn(pimple, UEqn, pdRefCell, pdRefValue);
+            solvePEqn(pimple, UEqn, pdRefCell_, pdRefValue_);
         }
 
-        fluidModel::continuityErrs();
+        //fluidModel::continuityErrs();
 
         p() = pd_ + rho_*gh_;
 
@@ -465,7 +553,7 @@ bool interFluid::evolve()
                 (
                     "p",
                     p().dimensions(),
-                    pRefValue - getRefCellValue(p(), pdRefCell)
+                    pRefValue_ - getRefCellValue(p(), pdRefCell_)
                 );
         }
 
@@ -475,6 +563,9 @@ bool interFluid::evolve()
 
         turbulence_->correct();
     }
+
+    // Make the fluxes absolute for when runTime++ is called
+    fvc::makeAbsolute(phi(), U());
 
     return 0;
 }

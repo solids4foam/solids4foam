@@ -45,6 +45,27 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
+void Foam::fluidModel::makePimpleControl() const
+{
+    if (!pimplePtr_.empty())
+    {
+        FatalErrorIn("void Foam::fluidModel::makePimpleControl() const")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    pimplePtr_.set
+    (
+        new pimpleControl
+        (
+            const_cast<fvMesh&>
+            (
+                refCast<const fvMesh>(mesh())
+            )
+        )
+    );
+}
+
+
 void Foam::fluidModel::calcGlobalFaceZones() const
 {
     // Find global face zones
@@ -450,6 +471,7 @@ Foam::fluidModel::fluidModel
         )
     ),
     fluidProperties_(subDict(type + "Coeffs")),
+    pimplePtr_(),
     globalFaceZonesPtr_(NULL),
     globalToLocalFaceZonePointMapPtr_(NULL),
     U_
@@ -505,7 +527,9 @@ Foam::fluidModel::fluidModel
     pMin_("pMin", p().dimensions(), 0),
     pMax_("pMax", p().dimensions(), 0),
     UMax_("UMax", U().dimensions(), 0),
-    smallU_("smallU", dimVelocity, 1e-10)
+    smallU_("smallU", dimVelocity, 1e-10),
+    fsiMeshUpdate_(false),
+    fsiMeshUpdateChanged_(false)
 {
     if (mesh().solutionDict().found("fieldBounds"))
     {
@@ -528,6 +552,17 @@ Foam::fluidModel::~fluidModel()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+Foam::pimpleControl& Foam::fluidModel::pimple()
+{
+    if (pimplePtr_.empty())
+    {
+        makePimpleControl();
+    }
+
+    return pimplePtr_();
+}
+
 
 Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce
 (
