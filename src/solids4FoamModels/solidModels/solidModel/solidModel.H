@@ -179,6 +179,10 @@ class solidModel
 
     // Private Member Functions
 
+        //- Disable solution in the out-of-plane direction for axisymmetric
+        //  cases
+        void checkWedges() const;
+
         //- Find global face zones
         void calcGlobalFaceZones() const;
 

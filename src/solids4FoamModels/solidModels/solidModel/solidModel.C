@@ -32,6 +32,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "blockSolidTractionFvPatchVectorField.H"
 #include "fvcGradf.H"
+#include "wedgePolyPatch.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -42,6 +43,134 @@ namespace Foam
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+void Foam::solidModel::checkWedges() const
+{
+    const fvMesh& mesh = this->mesh();
+
+    label nWedgePatches = 0;
+    vector wedgeDirVec = vector::zero;
+
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (isA<wedgePolyPatch>(mesh.boundaryMesh()[patchI]))
+        {
+            const wedgePolyPatch& wpp = refCast<const wedgePolyPatch>
+            (
+                mesh.boundaryMesh()[patchI]
+            );
+
+            nWedgePatches++;
+            wedgeDirVec += cmptMag(wpp.centreNormal());
+
+            // Make sure that solidWedge is used instead of wedge
+            if
+            (
+                DD_.boundaryField()[patchI].type() == "wedge"
+             && D_.boundaryField()[patchI].type() == "wedge"
+            )
+            {
+                FatalErrorIn("void Foam::solidModel::checkWedges() const")
+                    << "solidWedge should be used on displacement solution "
+                    << "field wedge patches as non-orthogonal corrections "
+                    << "are important!"
+                    << abort(FatalError);
+            }
+        }
+    }
+
+    reduce(nWedgePatches, maxOp<label>());
+
+    if (nWedgePatches)
+    {
+        if (nWedgePatches != 2)
+        {
+            FatalErrorIn("void Foam::solidModel::checkWedges() const")
+                << "For axisymmetric cases, there should be exactly two wedge "
+                << "patches!" << abort(FatalError);
+        }
+
+        Info<< nl << "Axisymmetric case: disabling the solution in the "
+            << "out-of-plane direction" << endl;
+
+        // We will use const_cast to disable the out-of-lane direction
+        Vector<label>& solD = const_cast<Vector<label>&>(mesh.solutionD());
+
+        reduce(wedgeDirVec, sumOp<vector>());
+
+        wedgeDirVec /= mag(wedgeDirVec);
+
+        for (direction cmpt=0; cmpt<vector::nComponents; cmpt++)
+        {
+            if (wedgeDirVec[cmpt] > 1e-6)
+            {
+                solD[cmpt] = -1;
+
+                wordList dirs(3);
+                dirs[0] = "x";
+                dirs[1] = "y";
+                dirs[2] = "z";
+                Info<< "    out-of-plane direction: " << dirs[cmpt] << nl
+                    << endl;
+            }
+            else
+            {
+                solD[cmpt] = 1;
+            }
+        }
+    }
+
+
+    // Check all the face normals are in the same direction on the wedge patches
+    // This is to avoid the case where a wedge patch is composed of two
+    // disconnected regions with one on the front and one on the back
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (isA<wedgePolyPatch>(mesh.boundaryMesh()[patchI]))
+        {
+            // Unit face normals on processor
+            const vectorField nf = mesh.boundaryMesh()[patchI].faceNormals();
+
+            if (nf.size() == 0)
+            {
+                FatalErrorIn("void Foam::solidModel::checkWedges() const")
+                    << "There are no faces on the wedge patch "
+                    << mesh.boundaryMesh()[patchI].name() << " on this processor:"
+                    << nl << "Every processor should have at least one face on "
+                    << "each wedge patch"
+                    << abort(FatalError);
+            }
+
+            // Check that all the wedge face normals point in the same direction
+
+            vector firstFaceNOnMasterProc = vector::zero;
+
+            if (Pstream::master())
+            {
+                firstFaceNOnMasterProc = nf[0];
+            }
+
+            // Sync in parallel so that all processors have the master vector
+            reduce(firstFaceNOnMasterProc, sumOp<vector>());
+
+            forAll(nf, faceI)
+            {
+                if ((nf[faceI] & firstFaceNOnMasterProc) < 0)
+                {
+                    FatalErrorIn("void Foam::solidModel::checkWedges() const")
+                        << "On wedge patch "
+                        << mesh.boundaryMesh()[patchI].name() << " there are at "
+                        << "least two faces with unit normals in the opposite "
+                        << "directions" << nl
+                        << "Please check that the wedge patches are correctly "
+                        << "defined"
+                        << abort(FatalError);
+                }
+            }
+        }
+    }
+}
+
 
 void Foam::solidModel::calcGlobalFaceZones() const
 {
@@ -1120,6 +1249,10 @@ Foam::solidModel::solidModel
             );
         }
     }
+
+    // If the case is axisymmetric, we will disable solving in the out-of-plane
+    // direction
+    checkWedges();
 }
 
 
@@ -1135,7 +1268,6 @@ Foam::solidModel::~solidModel()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
 
 const Foam::thermalModel& Foam::solidModel::thermal() const
 {

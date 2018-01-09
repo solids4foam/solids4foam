@@ -189,6 +189,10 @@ public:
             {
                 runTime.write();
             }
+
+            //- This function is called at the end of the simulation
+            virtual void end()
+            {}
 };
 
 

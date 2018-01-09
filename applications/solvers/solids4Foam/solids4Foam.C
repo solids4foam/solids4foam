@@ -53,6 +53,7 @@ int main(int argc, char *argv[])
     {
         // Update deltaT, if desired, before moving to the next step
         physics().setDeltaT(runTime);
+
         runTime++;
 
         Info<< "Time = " << runTime.timeName() << nl << endl;
@@ -73,7 +74,9 @@ int main(int argc, char *argv[])
             << nl << endl;
     }
 
-    Info<< "End\n" << endl;
+    physics().end();
+
+    Info<< nl << "End" << nl << endl;
 
     return(0);
 }
