@@ -186,20 +186,23 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
 
     const fvMesh& mesh = dimensionedInternalField().mesh();
 
-    FatalErrorIn("void elasticWallPressureFvPatchScalarField::updateCoeffs()")
-        << "PC: work in prgress" << abort(FatalError);
-
     // Looking up fsi solver
     const fluidSolidInterface& fsi =
-        mesh.lookupObject<fluidSolidInterface>("fsiProperties");
+        mesh.parent().lookupObject<fluidSolidInterface>("fsiProperties");
 
     // Solid properties
     // PC: hmnn what if the solidModel does not use mu and lambda...
     // It seems that ap is the speed of sound so we just need the stiffness, we
     // can lookup impK
     // Also, what happends if mu/lambda are varying...
-    const scalar rhoSolid =
-        fsi.solid().mechanical().rho()()[0];
+    const volScalarField rho = fsi.solid().mechanical().rho()();
+
+    if (rho.size() == 0)
+    {
+        return;
+    }
+
+    const scalar rhoSolid = rho[0];
     // scalar mu =
     //     fsi.solid().mechanical().mu()()[0];
     // scalar lambda =
@@ -217,7 +220,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         IOobject
         (
             "transportProperties",
-            mesh.time().constant()/"fluid",
+            mesh.time().constant(),
             mesh,
             IOobject::MUST_READ,
             IOobject::NO_WRITE

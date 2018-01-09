@@ -597,6 +597,10 @@ public:
             //- Check if solid model is diverging using the Jacobian field
             virtual Switch& checkEnforceLinear(const surfaceScalarField& J);
 
+            //- Update the size of the time-step
+            virtual void setDeltaT(Time& runTime)
+            {}
+
             //- Evolve the solid model
             virtual bool evolve() = 0;
 

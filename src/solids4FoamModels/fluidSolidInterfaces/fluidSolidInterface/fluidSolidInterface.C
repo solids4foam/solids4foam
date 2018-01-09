@@ -905,6 +905,13 @@ Foam::fluidSolidInterface::solidToFluid() const
 }
 
 
+void Foam::fluidSolidInterface::setDeltaT(Time& runTime)
+{
+    // For now, the fluid sets the time-step
+    fluid().setDeltaT(runTime);
+}
+
+
 void Foam::fluidSolidInterface::initializeFields()
 {
     fluidZonePointsDispl_ =
