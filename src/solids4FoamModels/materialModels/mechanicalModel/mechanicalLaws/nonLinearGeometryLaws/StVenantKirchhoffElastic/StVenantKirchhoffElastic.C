@@ -196,15 +196,18 @@ Foam::tmp<Foam::volScalarField> Foam::StVenantKirchhoffElastic::impK() const
 
 void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 {
-    // Update deformation gradient F
-    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    // Check if the mathematical model is in total or updated Lagrangian form
+    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
             mesh().lookupObject<volTensorField>("grad(DD)");
 
+        // Update the relative deformation gradient: not needed
+        const volTensorField relF = I + gradDD.T();
+
         // Update the total deformation gradient
-        F() = (I + gradDD.T()) & F().oldTime();
+        F() = relF & F().oldTime();
 
         if (enforceLinear())
         {
@@ -221,7 +224,7 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
             return;
         }
     }
-    else
+    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
         // Lookup gradient of displacement
         const volTensorField& gradD =
@@ -229,6 +232,9 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 
         // Update the total deformation gradient
         F() = I + gradD.T();
+
+        // Update the relative deformation gradient: not needed
+        //relF() = F() & inv(F().oldTime());
 
         if (enforceLinear())
         {
@@ -243,6 +249,14 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 
             return;
         }
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void Foam::StVenantKirchhoffElastic::"
+            "correct(volSymmTensorField& sigma)"
+        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
     }
 
     // Calculate the right Cauchy–Green deformation tensor
@@ -265,15 +279,18 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 
 void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Update deformation gradient F
-    if (mesh().foundObject<volTensorField>("grad(DD)f"))
+    // Check if the mathematical model is in total or updated Lagrangian form
+    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
         // Lookup gradient of displacement increment
         const surfaceTensorField& gradDD =
             mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
+        // Update the relative deformation gradient: not needed
+        const surfaceTensorField relF = I + gradDD.T();
+
         // Update the total deformation gradient
-        Ff() = (I + gradDD.T()) & Ff().oldTime();
+        Ff() = relF & Ff().oldTime();
 
         if (enforceLinear())
         {
@@ -290,7 +307,7 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
             return;
         }
     }
-    else
+    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
         // Lookup gradient of displacement
         const surfaceTensorField& gradD =
@@ -298,6 +315,9 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 
         // Update the total deformation gradient
         Ff() = I + gradD.T();
+
+        // Update the relative deformation gradient: not needed
+        //relF() = F() & inv(F().oldTime());
 
         if (enforceLinear())
         {
@@ -312,6 +332,14 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 
             return;
         }
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void Foam::StVenantKirchhoffElastic::"
+            "correct(surfaceSymmTensorField& sigma)"
+        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
     }
 
     // Calculate the right Cauchy–Green deformation tensor
