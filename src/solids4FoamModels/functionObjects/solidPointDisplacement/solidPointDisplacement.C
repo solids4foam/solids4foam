@@ -28,6 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "newLeastSquaresVolPointInterpolation.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -83,7 +84,10 @@ bool Foam::solidPointDisplacement::writeData()
             dimensionedVector("zero", D.dimensions(), vector::zero)
         );
 
-        interpPtr_().interpolate(D, pointD);
+        mesh.lookupObject<newLeastSquaresVolPointInterpolation>
+        (
+            "newLeastSquaresVolPointInterpolation"
+        ).interpolate(D, pointD);
 
         vector pointDValue = vector::zero;
         if (pointID_ > -1)
@@ -125,7 +129,6 @@ Foam::solidPointDisplacement::solidPointDisplacement
     name_(name),
     time_(t),
     pointID_(-1),
-    interpPtr_(NULL),
     historyFilePtr_(NULL)
 {
     Info<< "Creating " << this->name() << " function object" << endl;
@@ -188,9 +191,6 @@ Foam::solidPointDisplacement::solidPointDisplacement
                 << endl;
         }
 
-        // Create interpolator
-        interpPtr_.set(new newLeastSquaresVolPointInterpolation(mesh));
-
         // File update
         if (Pstream::master())
         {
@@ -237,7 +237,7 @@ Foam::solidPointDisplacement::solidPointDisplacement
 
 bool Foam::solidPointDisplacement::start()
 {
-    return writeData();
+    return false;
 }
 
 

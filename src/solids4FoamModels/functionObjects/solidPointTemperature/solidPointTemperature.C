@@ -28,6 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "newLeastSquaresVolPointInterpolation.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -83,7 +84,10 @@ bool Foam::solidPointTemperature::writeData()
             dimensionedScalar("zero", T.dimensions(), 0.0)
         );
 
-        interpPtr_().interpolate(T, pointT);
+        mesh.lookupObject<newLeastSquaresVolPointInterpolation>
+        (
+            "newLeastSquaresVolPointInterpolation"
+        ).interpolate(T, pointT);
 
         scalar pointTValue = 0.0;
         if (pointID_ > -1)
@@ -121,7 +125,6 @@ Foam::solidPointTemperature::solidPointTemperature
     name_(name),
     time_(t),
     pointID_(-1),
-    interpPtr_(NULL),
     historyFilePtr_(NULL)
 {
     Info<< "Creating " << this->name() << " function object" << endl;
@@ -184,9 +187,6 @@ Foam::solidPointTemperature::solidPointTemperature
                 << endl;
         }
 
-        // Create interpolator
-        interpPtr_.set(new newLeastSquaresVolPointInterpolation(mesh));
-
         // File update
         if (Pstream::master())
         {
@@ -233,7 +233,7 @@ Foam::solidPointTemperature::solidPointTemperature
 
 bool Foam::solidPointTemperature::start()
 {
-    return writeData();
+    return false;
 }
 
 

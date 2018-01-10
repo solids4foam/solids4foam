@@ -28,6 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "newLeastSquaresVolPointInterpolation.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -84,7 +85,10 @@ bool Foam::solidPointStress::writeData()
             dimensionedSymmTensor("zero", sigma.dimensions(), symmTensor::zero)
         );
 
-        interpPtr_().interpolate(sigma, pointSigma);
+        mesh.lookupObject<newLeastSquaresVolPointInterpolation>
+        (
+            "newLeastSquaresVolPointInterpolation"
+        ).interpolate(sigma, pointSigma);
 
         symmTensor pointSigmaValue = symmTensor::zero;
         if (pointID_ > -1)
@@ -128,7 +132,6 @@ Foam::solidPointStress::solidPointStress
     name_(name),
     time_(t),
     pointID_(-1),
-    interpPtr_(NULL),
     historyFilePtr_(NULL)
 {
     Info<< "Creating " << this->name() << " function object" << endl;
@@ -191,9 +194,6 @@ Foam::solidPointStress::solidPointStress
                 << endl;
         }
 
-        // Create interpolator
-        interpPtr_.set(new newLeastSquaresVolPointInterpolation(mesh));
-
         // File update
         if (Pstream::master())
         {
@@ -237,7 +237,7 @@ Foam::solidPointStress::solidPointStress
 
 bool Foam::solidPointStress::start()
 {
-    return writeData();
+    return false;
 }
 
 

@@ -47,7 +47,6 @@ SourceFiles
 #include "dictionary.H"
 #include "fvMesh.H"
 #include "OFstream.H"
-#include "newLeastSquaresVolPointInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -72,9 +71,6 @@ class solidPointDisplacement
 
         //- Point ID
         label pointID_;
-
-        //- Interpolator
-        autoPtr<newLeastSquaresVolPointInterpolation> interpPtr_;
 
         //- History file ptr
         autoPtr<OFstream> historyFilePtr_;

@@ -95,7 +95,7 @@ class newLeastSquaresVolPointInterpolation
 
         //- Locel boundary faces needed by neighbour processors
         mutable labelListList* procBndFacesPtr_;
-    
+
         //- Centres of boundary faces from neigbour processores
         mutable FieldField<Field, vector>* procBndFaceCentresPtr_;
 
@@ -220,11 +220,11 @@ public:
 //             //- Get point processor boundary face addressing
 //             const Map<Field<vector> >& pointNgbProcBndFaceCentres() const;
 
-            //- Get global point ngb processor boundary face centres 
-            const Map<Field<vector> >& 
+            //- Get global point ngb processor boundary face centres
+            const Map<Field<vector> >&
             globalPointNgbProcBndFaceCentres() const;
 
-            //- Get global point ngb processor cell centres 
+            //- Get global point ngb processor cell centres
             const Map<Field<vector> >& globalPointNgbProcCellCentres() const;
 
             //- Get list of boundary faces needed by neighbour processores
@@ -256,9 +256,9 @@ public:
             const PtrList<scalarRectangularMatrix>& invLsMatrices() const;
 
             //- Get mirror plane normals
-            const List<Tuple2<vector, tensor> >& 
+            const List<Tuple2<vector, tensor> >&
             mirrorPlaneTransformation() const;
-//             const Map<Tuple2<vector, tensor> >& 
+//             const Map<Tuple2<vector, tensor> >&
 //             mirrorPlaneTransformation() const;
 
         // Edit
