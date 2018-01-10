@@ -49,7 +49,8 @@ solidTractionFvPatchVectorField
     tractionSeries_(),
     pressureSeries_(),
     secondOrder_(false),
-    limitCoeff_(1.0)
+    limitCoeff_(1.0),
+    relaxFac_(1.0)
 {
     fvPatchVectorField::operator=(patchInternalField());
     gradient() = vector::zero;
@@ -70,7 +71,8 @@ solidTractionFvPatchVectorField
     tractionSeries_(),
     pressureSeries_(),
     secondOrder_(dict.lookupOrDefault<Switch>("secondOrder", false)),
-    limitCoeff_(dict.lookupOrDefault<scalar>("limitCoeff", 1.0))
+    limitCoeff_(dict.lookupOrDefault<scalar>("limitCoeff", 1.0)),
+    relaxFac_(dict.lookupOrDefault<scalar>("relaxationFactor", 1.0))
 {
     Info<< "Creating " << type() << " boundary condition" << endl;
 
@@ -125,6 +127,11 @@ solidTractionFvPatchVectorField
     {
         Info<< "    limiter coefficient: " << limitCoeff_ << endl;
     }
+
+    if (relaxFac_ < 1.0)
+    {
+        Info<< "    relaxation factor: " << relaxFac_ << endl;
+    }
 }
 
 
@@ -143,7 +150,8 @@ solidTractionFvPatchVectorField
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
     secondOrder_(stpvf.secondOrder_),
-    limitCoeff_(stpvf.limitCoeff_)
+    limitCoeff_(stpvf.limitCoeff_),
+    relaxFac_(stpvf.relaxFac_)
 {}
 
 
@@ -159,7 +167,8 @@ solidTractionFvPatchVectorField
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
     secondOrder_(stpvf.secondOrder_),
-    limitCoeff_(stpvf.limitCoeff_)
+    limitCoeff_(stpvf.limitCoeff_),
+    relaxFac_(stpvf.relaxFac_)
 {}
 
 
@@ -176,7 +185,8 @@ solidTractionFvPatchVectorField
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
     secondOrder_(stpvf.secondOrder_),
-    limitCoeff_(stpvf.limitCoeff_)
+    limitCoeff_(stpvf.limitCoeff_),
+    relaxFac_(stpvf.relaxFac_)
 {}
 
 
@@ -243,7 +253,11 @@ void solidTractionFvPatchVectorField::updateCoeffs()
     // Set surface-normal gradient on the patch corresponding to the desired
     // traction
     gradient() =
-        solModPtr->tractionBoundarySnGrad(traction_, pressure_, patch());
+        relaxFac_*solModPtr->tractionBoundarySnGrad
+        (
+            traction_, pressure_, patch()
+        )
+      + (1.0 - relaxFac_)*gradient();
 
     fixedGradientFvPatchVectorField::updateCoeffs();
 }
@@ -330,6 +344,8 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
         << secondOrder_ << token::END_STATEMENT << nl;
     os.writeKeyword("limitCoeff")
         << limitCoeff_ << token::END_STATEMENT << nl;
+    os.writeKeyword("relaxationFactor")
+        << relaxFac_ << token::END_STATEMENT << nl;
 
     writeEntry("value", os);
 }

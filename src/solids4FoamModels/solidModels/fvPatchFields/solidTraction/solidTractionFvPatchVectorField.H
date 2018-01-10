@@ -74,10 +74,13 @@ class solidTractionFvPatchVectorField
         interpolationTable<scalar> pressureSeries_;
 
         //- Second order accuracy correction
-        Switch secondOrder_;
+        const Switch secondOrder_;
 
         //- Limiter coefficient for snGrad correction
-        scalar limitCoeff_;
+        const scalar limitCoeff_;
+
+        //- Optional: under-relaxation factor
+        const scalar relaxFac_;
 
 
 public:
