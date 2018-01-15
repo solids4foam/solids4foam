@@ -900,6 +900,10 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     if (master_)
     {
         rigidMaster_ = Switch(dict.lookup("rigidMaster"));
+
+        Info<< "    quickReject: "
+            << extendedGgiInterpolation::quickRejectNames_[quickReject_]
+            << endl;
     }
 
     if (dict.found("gradient"))

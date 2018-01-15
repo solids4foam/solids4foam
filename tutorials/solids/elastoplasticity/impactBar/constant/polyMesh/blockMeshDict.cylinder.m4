@@ -27,8 +27,8 @@ define(PI, 3.14159265359)
 define(l, 32.4) // full cylinder height/length
 define(r, 3.2) // cylinder radius
 define(theta, 1) // angle of wedge in degrees
-define(dt, 1) // die thickness
-define(dw, 10) // die width
+define(dt, 1) // wall thickness
+define(dw, 10) // wall radius
 
 // calculated quantities
 define(thetaRad2, calc(0.5*theta*PI/180))
@@ -38,7 +38,7 @@ define(cost, calc(cos(thetaRad2)))
 // define mesh density
 define(ml, 60) // number of cells in axial direction
 define(mr, 6) // number of cells in radial direction
-define(mr2, 5) // rigid wall
+define(mr2, 1) // rigid wall
 
 // start of blockMeshDict
 

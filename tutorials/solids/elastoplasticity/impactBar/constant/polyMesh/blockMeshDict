@@ -27,8 +27,8 @@ FoamFile
  // full cylinder height/length
  // cylinder radius
  // angle of wedge in degrees
- // die thickness
- // die width
+ // wall thickness
+ // wall radius
 
 // calculated quantities
 
@@ -65,7 +65,7 @@ vertices
 blocks
 (
     hex (0 1 2 3 0 1 4 5) billet (60 6 1) simpleGrading (1 1 1)
-    hex (6 7 8 9 6 7 10 11) die (1 5 1) simpleGrading (1 1 1)
+    hex (6 7 8 9 6 7 10 11) die (1 1 1) simpleGrading (1 1 1)
 );
 
 edges

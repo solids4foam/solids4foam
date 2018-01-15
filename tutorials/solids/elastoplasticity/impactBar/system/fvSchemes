@@ -26,7 +26,7 @@ ddtSchemes
 
 gradSchemes
 {
-    default            extendedLeastSquares 0;
+    default            leastSquares;
 }
 
 divSchemes
@@ -37,8 +37,10 @@ divSchemes
 laplacianSchemes
 {
     default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
+    // laplacian(DD,D)    Gauss linear newSkewCorrected 1;
+    // laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
+    laplacian(DD,D)    Gauss linear corrected;
+    laplacian(DDD,DD)  Gauss linear corrected;
 }
 
 snGradSchemes
