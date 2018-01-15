@@ -214,7 +214,7 @@ bool pUCoupledFluid::evolve()
         fvVectorMatrix UEqn
         (
             fvm::div(phi(), U())
-          + turbulence_->divDevReff(U())
+          + turbulence_->divDevReff()
         );
 
         rAU_ = 1.0/UEqn.A();
