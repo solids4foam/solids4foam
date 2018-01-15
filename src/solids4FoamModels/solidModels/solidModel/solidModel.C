@@ -2132,6 +2132,14 @@ void Foam::solidModel::moveMesh
             const labelList& meshPoints =
                 mesh().boundaryMesh()[patchI].meshPoints();
 
+            if
+            (
+                returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
+            )
+            {
+                continue;
+            }
+
             const vector avgN =
                 gAverage(mesh().boundaryMesh()[patchI].pointNormals());
 
@@ -2165,6 +2173,14 @@ void Foam::solidModel::moveMesh
         {
             const labelList& meshPoints =
                 mesh().boundaryMesh()[patchI].meshPoints();
+
+            if
+            (
+                returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
+            )
+            {
+                continue;
+            }
 
             const vector avgN =
                 gAverage(mesh().boundaryMesh()[patchI].pointNormals());

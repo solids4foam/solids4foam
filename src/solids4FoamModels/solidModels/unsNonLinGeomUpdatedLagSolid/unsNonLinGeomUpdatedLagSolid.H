@@ -127,9 +127,6 @@ class unsNonLinGeomUpdatedLagSolid
 
     // Private Member Functions
 
-        //- Move the mesh to the deformed configuration
-        void moveMesh(const pointField& oldPoints);
-
         //- Disallow default bitwise copy construct
         unsNonLinGeomUpdatedLagSolid(const unsNonLinGeomUpdatedLagSolid&);
 
