@@ -1802,22 +1802,22 @@ void Foam::mechanicalModel::makeInterfaceShadowSigma() const
 
         if (patchID == -1)
         {
-            FatalErrorIn
-            (
-                "void Foam::mechanicalModel::makeInterfaceShadowSigmaGradD()"
-                "const"
-            )   << "Interface patch not found!" << abort(FatalError);
+            // Note: if patchID is still -1, it means that this subMesh does not
+            // have any faces on an bi-material interface
+            interfaceShadowSigma_.set(subMeshI, new symmTensorField(0));
         }
-
-        interfaceShadowSigma_.set
-        (
-            subMeshI,
-            new symmTensorField
+        else
+        {
+            interfaceShadowSigma_.set
             (
-                subMesh.boundaryMesh()[patchID].size(),
-                symmTensor::zero
-            )
-        );
+                subMeshI,
+                new symmTensorField
+                (
+                    subMesh.boundaryMesh()[patchID].size(),
+                    symmTensor::zero
+                )
+            );
+        }
     }
 }
 
@@ -1871,13 +1871,8 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
 
         if (patchID == -1)
         {
-            FatalErrorIn
-            (
-                "void Foam::updateInterfaceShadowSigma\n"
-                "(\n"
-                "    const bool useVolFieldSigma\n"
-                ")"
-            )   << "Interface patch not found!" << abort(FatalError);
+            // This sub mesh has not faces on a bi-material interface
+            continue;
         }
 
         symmTensorField& resultSigma = interfaceShadowSigma_[subMeshI];
@@ -2003,13 +1998,8 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
 
         if (patchID == -1)
         {
-            FatalErrorIn
-            (
-                "void Foam::updateInterfaceShadowSigma\n"
-                "(\n"
-                "    const bool useVolFieldSigma\n"
-                ")"
-            )   << "Interface patch not found!" << abort(FatalError);
+            // This sub mesh has not faces on a bi-material interface
+            continue;
         }
 
         symmTensorField& resultSigma = interfaceShadowSigma_[subMeshI];
@@ -2419,34 +2409,9 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::impK() const
 
 Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalModel::impKf() const
 {
-    // Check the interpolaiton scheme
-    // Harmonic interpolation should typically be used unless you know what you
-    // are doing!
-
+    // Linear interpolation actually seems to give the best convergence
     const volScalarField impK = this->impK();
     const word interpName = "interpolate(" + impK.name() + ')';
-
-    if (PtrList<mechanicalLaw>::size() > 1)
-    {
-        if
-        (
-            word(mesh().schemesDict().interpolationScheme(interpName))
-         != "harmonic"
-        )
-        {
-            WarningIn
-            (
-                "Foam::tmp<Foam::surfaceScalarField> "
-                "Foam::mechanicalModel::impKf() const"
-            )   << "The interpolation scheme for " << interpName << " is "
-                << " currently set to "
-                << word(mesh().schemesDict().interpolationScheme(interpName))
-                << "; however," << nl
-                << "    harmonic typically gives the best convergence,"
-                << " particularly for multi-material cases!" << endl;
-        }
-    }
-
     return fvc::interpolate(impK, interpName);
 }
 
