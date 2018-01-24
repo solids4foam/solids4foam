@@ -1517,11 +1517,11 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                         scalar db =
                             mag(n & (baseCI[baseNeiID] - patchCf[faceI]));
 
-                        // Lookup the stiffness wither side of the interface
+                        // Lookup the stiffness either side of the interface
                         scalar Ka = KI[baseOwnID];
                         scalar Kb = KI[baseNeiID];
 
-                        // The base own cell should be side a
+                        // The base own cell should be side-a
                         if (baseOwnID != cellMap[faceCells[faceI]])
                         {
                             n = -n;
