@@ -43,8 +43,8 @@ SourceFiles
 #ifndef ExtendedGGIInterpolation_H
 #define ExtendedGGIInterpolation_H
 
-#include "GGIInterpolationTemplate.H"
-//#include "newGGIInterpolationTemplate.H"
+//#include "GGIInterpolationTemplate.H"
+#include "newGGIInterpolationTemplate.H"
 #include "labelPair.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -59,8 +59,8 @@ namespace Foam
 template<class MasterPatch, class SlavePatch>
 class ExtendedGGIInterpolation
 :
-    public GGIInterpolation<MasterPatch, SlavePatch>
-    //public newGGIInterpolation<MasterPatch, SlavePatch>
+    //public GGIInterpolation<MasterPatch, SlavePatch>
+    public newGGIInterpolation<MasterPatch, SlavePatch>
 {
     // Private data
 
@@ -125,10 +125,10 @@ class ExtendedGGIInterpolation
             const scalar masterFaceNonOverlapFaceTol = 0,
             const scalar slaveFaceNonOverlapFaceTol = 0,
             const bool rescaleGGIWeightingFactors = true,
-            const GGIInterpolationName::quickReject reject =
-            GGIInterpolationName::AABB //,
-            //const newGGIInterpolationName::quickReject reject =
-            //    newGGIInterpolationName::AABB //,
+            //const GGIInterpolationName::quickReject reject =
+            //GGIInterpolationName::AABB //,
+            const newGGIInterpolationName::quickReject reject =
+                newGGIInterpolationName::AABB //,
             // const boundBox& regionOfInterest =
             //     boundBox(vector::min, vector::max)
         );

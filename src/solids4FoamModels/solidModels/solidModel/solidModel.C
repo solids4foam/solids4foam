@@ -1137,6 +1137,10 @@ Foam::solidModel::solidModel
     nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
     maxIterReached_(0),
     residualFilePtr_(NULL),
+    writeResidualField_
+    (
+        solidProperties().lookupOrDefault<Switch>("writeResidualField", false)
+    ),
     enforceLinear_(false),
     relaxationMethod_
     (
@@ -2087,6 +2091,25 @@ void Foam::solidModel::writeFields(const Time& runTime)
     );
 
     Info<< "Max sigmaEq = " << gMax(sigmaEq) << endl;
+
+    if (writeResidualField_)
+    {
+        const volVectorField& D = solutionD();
+        scalar denom = gMax(mag(D.internalField() - D.oldTime().internalField()));
+        if (denom < SMALL)
+        {
+            denom = max(gMax(mag(D.internalField())), SMALL);
+        }
+
+        const volVectorField residualD
+        (
+            "residualD",
+            (D - D.prevIter())/denom
+        );
+
+        Info<< "Writing residualD field" << endl;
+        residualD.write();
+    }
 
     runTime.write();
 }

@@ -139,6 +139,9 @@ class solidModel
         //- Residual file
         autoPtr<OFstream> residualFilePtr_;
 
+        //- Switch to write the residual field
+        const Switch writeResidualField_;
+
         //- Switch to enable/disable enforce linear to help convergence
         Switch enforceLinear_;
 
