@@ -214,13 +214,18 @@ standardPenalty::standardPenalty(const standardPenalty& nm)
     globalSlavePointPenetration_(nm.globalSlavePointPenetration_),
     slavePointPenetration_(nm.slavePointPenetration_),
     areaInContact_(nm.areaInContact_),
-    penaltyFactorPtr_(nm.penaltyFactorPtr_),
+    penaltyFactorPtr_(NULL),
     penaltyScale_(nm.penaltyScale_),
     relaxFac_(nm.relaxFac_),
     contactIterNum_(nm.contactIterNum_),
     infoFreq_(nm.infoFreq_),
     contactFilePtr_(nm.contactFilePtr_)
-{}
+{
+    if (nm.penaltyFactorPtr_.valid())
+    {
+        penaltyFactorPtr_.set(new scalar(nm.penaltyFactorPtr_()));
+    }
+}
 
 
 // * * * * * * * * * * * * * * Member Functions * * * * * * * * * * * * * * * //
