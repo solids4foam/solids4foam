@@ -62,16 +62,20 @@ void standardPenalty::calcPenaltyFactor() const
     const volScalarField& impK = mesh_.lookupObject<volScalarField>("impK");
 
     // Avarage contact patch bulk modulus
-    scalar masterK = gAverage(impK.boundaryField()[masterPatchIndex]);
-    scalar slaveK = gAverage(impK.boundaryField()[slavePatchIndex]);
-    scalar bulkModulus = 0.5*(masterK + slaveK);
+    const scalar masterK = gAverage(impK.boundaryField()[masterPatchIndex]);
+    const scalar slaveK = gAverage(impK.boundaryField()[slavePatchIndex]);
+
+    // Simple average
+    //const scalar bulkModulus = 0.5*(masterK + slaveK);
+    // Harmonic average
+    const scalar bulkModulus = 2.0*(masterK*slaveK)/(masterK + slaveK);
 
     // Average contact patch face area
-    scalar masterMagSf =
+    const scalar masterMagSf =
         gAverage(mesh_.magSf().boundaryField()[masterPatchIndex]);
-    scalar slaveMagSf =
+    const scalar slaveMagSf =
         gAverage(mesh_.magSf().boundaryField()[slavePatchIndex]);
-    scalar faceArea = 0.5*(masterMagSf + slaveMagSf);
+    const scalar faceArea = 0.5*(masterMagSf + slaveMagSf);
 
     // Average contact patch cell volume
     scalarField masterV(mesh_.boundary()[masterPatchIndex].size(), 0.0);
@@ -93,7 +97,7 @@ void standardPenalty::calcPenaltyFactor() const
             slaveV[facei] = V[faceCells[facei]];
         }
     }
-    scalar cellVolume = 0.5*(gAverage(masterV) + gAverage(slaveV));
+    const scalar cellVolume = 0.5*(gAverage(masterV) + gAverage(slaveV));
 
     // Approximate penalty factor based on Hallquist et al.
     // we approximate penalty factor for traction instead of force
