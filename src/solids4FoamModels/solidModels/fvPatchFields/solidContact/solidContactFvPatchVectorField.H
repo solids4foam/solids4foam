@@ -146,9 +146,6 @@ class solidContactFvPatchVectorField
         //- Is a nonlinear geometry (i.e. finite strain) approach being used
         bool nonLinearGeometry() const;
 
-        //- Move the master and slave zones to the deformed configuration
-        void moveZonesToDeformedConfiguration();
-
         //- Calculate the zone index
         void calcZoneIndex() const;
 
@@ -360,6 +357,9 @@ public:
 
 
         // Evaluation functions
+
+            //- Move the master and slave zones to the deformed configuration
+            void moveZonesToDeformedConfiguration();
 
             //- Update the coefficients associated with the patch field
             virtual void updateCoeffs();

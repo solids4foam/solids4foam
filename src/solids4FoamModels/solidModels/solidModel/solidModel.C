@@ -2076,6 +2076,24 @@ Foam::Switch& Foam::solidModel::checkEnforceLinear(const surfaceScalarField& J)
 
 void Foam::solidModel::writeFields(const Time& runTime)
 {
+    // Write strain fields
+    // Currently only defined for linear geometry
+    if (nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY)
+    {
+        // Total strain
+        volSymmTensorField epsilon("epsilon", symm(gradD()));
+        epsilon.write();
+
+        // Equivalent strain
+        volScalarField epsilonEq
+        (
+            "epsilonEq", sqrt((2.0/3.0)*magSqr(dev(epsilon)))
+        );
+        epsilonEq.write();
+
+        Info<< "Max epsilonEq = " << gMax(epsilonEq) << endl;
+    }
+
     // Calculaute equivalent (von Mises) stress
     volScalarField sigmaEq
     (
@@ -2092,10 +2110,12 @@ void Foam::solidModel::writeFields(const Time& runTime)
 
     Info<< "Max sigmaEq = " << gMax(sigmaEq) << endl;
 
+    // If asked, write the residual field
     if (writeResidualField_)
     {
         const volVectorField& D = solutionD();
-        scalar denom = gMax(mag(D.internalField() - D.oldTime().internalField()));
+        scalar denom =
+            gMax(mag(D.internalField() - D.oldTime().internalField()));
         if (denom < SMALL)
         {
             denom = max(gMax(mag(D.internalField())), SMALL);

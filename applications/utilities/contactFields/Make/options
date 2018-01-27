@@ -1,0 +1,26 @@
+EXE_INC = \
+    -g \
+    -I../../../src/solids4FoamModels/lnInclude \
+    -I../../../src/blockCoupledSolids4FoamTools/lnInclude \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
+    -I$(LIB_SRC)/finiteArea/lnInclude \
+    -I$(LIB_SRC)/lagrangian/basic/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I$(LIB_SRC)/tetFiniteElement/lnInclude
+
+EXE_LIBS = \
+    -L$(FOAM_USER_LIBBIN) \
+    -lblockCoupledSolids4FoamTools \
+    -lsolids4FoamModels \
+    -lfiniteVolume \
+    -linterfaceProperties \
+    -lincompressibleTurbulenceModel \
+    -lincompressibleRASModels \
+    -lincompressibleLESModels \
+    -lincompressibleTransportModels \
+    -ldynamicFvMesh \
+    -ldynamicMesh \
+    -lmeshTools \
+    -ltopoChangerFvMesh \
+    -llduSolvers
