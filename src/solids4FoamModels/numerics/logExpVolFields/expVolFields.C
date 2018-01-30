@@ -71,7 +71,11 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
     // it is fine for creation of post processing fields e.g calculate true
     // strain etc.
 
-    volDiagTensorField eigenVal
+    // Eigen value field
+    // We will store the eigen values in a vector instead of a diagTensor
+    // because the tranform function is not definite for diagTensors on a wedge
+    // boundary
+    volVectorField eigenVal
     (
         IOobject
         (
@@ -82,9 +86,11 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
             IOobject::NO_WRITE
         ),
         vf.mesh(),
-        dimensionedDiagTensor("zero", vf.dimensions(), diagTensor::zero)
+        dimensionedVector("zero", vf.dimensions(), vector::zero)
     );
 
+    // Eigen vectors will be store in the rows i.e. the first eigen vector
+    // is (eigenVec.xx() eigenVec.xy() eigenVec.xz())
     volTensorField eigenVec
     (
         IOobject
@@ -105,7 +111,7 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
     // Now we will calculate the exp of the eigenValues and then rotate the
     // tensor back to the physcial configuration
 
-    const diagTensorField& eigenValI = eigenVal.internalField();
+    const vectorField& eigenValI = eigenVal.internalField();
     const tensorField& eigenVecI = eigenVec.internalField();
     symmTensor expEigenVal = symmTensor::zero;
     symmTensorField& resultI = result.internalField();
@@ -114,11 +120,11 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
     {
         // Calculate exp
         expEigenVal[symmTensor::XX] =
-            Foam::exp(eigenValI[cellI][diagTensor::XX]);
+            Foam::exp(eigenValI[cellI][vector::X]);
         expEigenVal[symmTensor::YY] =
-            Foam::exp(eigenValI[cellI][diagTensor::YY]);
+            Foam::exp(eigenValI[cellI][vector::Y]);
         expEigenVal[symmTensor::ZZ] =
-            Foam::exp(eigenValI[cellI][diagTensor::ZZ]);
+            Foam::exp(eigenValI[cellI][vector::Z]);
 
         // Rotate back
         resultI[cellI] = transform(eigenVecI[cellI].T(), expEigenVal);
@@ -128,12 +134,11 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
     {
         if
         (
-            !vf.boundaryField()[patchI].coupled()
-         && vf.boundaryField()[patchI].type()
+            vf.boundaryField()[patchI].type()
          != emptyFvPatchField<symmTensor>::typeName
         )
         {
-            const diagTensorField& eigenValB = eigenVal.boundaryField()[patchI];
+            const vectorField& eigenValB = eigenVal.boundaryField()[patchI];
             const tensorField& eigenVecB = eigenVec.boundaryField()[patchI];
             symmTensorField& resultB = result.boundaryField()[patchI];
 
@@ -141,19 +146,17 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
             {
                 // Calculate exp
                 expEigenVal[symmTensor::XX] =
-                    Foam::exp(eigenValB[faceI][diagTensor::XX]);
+                    Foam::exp(eigenValB[faceI][vector::X]);
                 expEigenVal[symmTensor::YY] =
-                    Foam::exp(eigenValB[faceI][diagTensor::YY]);
+                    Foam::exp(eigenValB[faceI][vector::Y]);
                 expEigenVal[symmTensor::ZZ] =
-                    Foam::exp(eigenValB[faceI][diagTensor::ZZ]);
+                    Foam::exp(eigenValB[faceI][vector::Z]);
 
                 // Rotate back
                 resultB[faceI] = transform(eigenVecB[faceI].T(), expEigenVal);
             }
         }
     }
-
-    result.correctBoundaryConditions();
 
     return tresult;
 }

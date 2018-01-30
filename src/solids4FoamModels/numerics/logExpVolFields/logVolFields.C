@@ -44,22 +44,22 @@ namespace Foam
 
 tmp<volSymmTensorField> log(const volSymmTensorField& vf)
 {
+    // Prepare the result field
     tmp<volSymmTensorField> tresult
+    (
+        new volSymmTensorField
         (
-            new volSymmTensorField
+            IOobject
             (
-                IOobject
-                (
-                    "log("+vf.name()+")",
-                    vf.time().timeName(),
-                    vf.db(),
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE
-                    ),
-                vf
-                )
-            );
-
+                "log("+vf.name()+")",
+                vf.time().timeName(),
+                vf.db(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            vf
+        )
+    );
     volSymmTensorField& result = tresult();
 
     // Calculate eigen values and eigen vectors
@@ -69,20 +69,26 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
     // it is fine for creation of post processing fields e.g calculate true
     // strain
 
-    volDiagTensorField eigenVal
+    // Eigen value field
+    // We will store the eigen values in a vector instead of a diagTensor
+    // because the tranform function is not definite for diagTensors on a wedge
+    // boundary
+    volVectorField eigenVal
     (
         IOobject
         (
-            "eigenVal("+vf.name()+")",
+            "eigenVal(" + vf.name() + ")",
             vf.time().timeName(),
             vf.db(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
         vf.mesh(),
-        dimensionedDiagTensor("zero", vf.dimensions(), diagTensor::zero)
+        dimensionedVector("zero", vf.dimensions(), vector::zero)
     );
 
+    // Eigen vectors will be store in the rows i.e. the first eigen vector
+    // is (eigenVec.xx() eigenVec.xy() eigenVec.xz())
     volTensorField eigenVec
     (
         IOobject
@@ -97,39 +103,27 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
         dimensionedTensor("zero", dimless, tensor::zero)
     );
 
-    // Calculate eigen values and eigen vectors of vf
+    // Calculate eigen values and eigen vectors of vf and populate the eigenVec
+    // and eigenVal fields
     eig3Field(vf, eigenVec, eigenVal);
 
-    // Now we will calculate the log og the eigenValues and then rotate the
+    // Now we will calculate the log of the eigenValues and then rotate the
     // tensor back to the physcial configuration
 
-    const diagTensorField& eigenValI = eigenVal.internalField();
+    // Take references
+    const vectorField& eigenValI = eigenVal.internalField();
     const tensorField& eigenVecI = eigenVec.internalField();
     symmTensor logEigenVal = symmTensor::zero;
     symmTensorField& resultI = result.internalField();
 
     forAll(eigenValI, cellI)
     {
-        // We cannot have log of zeros
-        if
-        (
-            eigenValI[cellI][diagTensor::XX] < SMALL
-         || eigenValI[cellI][diagTensor::YY] < SMALL
-         || eigenValI[cellI][diagTensor::ZZ] < SMALL
-        )
-        {
-            FatalError
-                << "log of zero is not allowed"
-                << abort(FatalError);
-        }
-
-        // Calculate log
         logEigenVal[symmTensor::XX] =
-            Foam::log(eigenValI[cellI][diagTensor::XX]);
+            Foam::log(eigenValI[cellI][vector::X]);
         logEigenVal[symmTensor::YY] =
-            Foam::log(eigenValI[cellI][diagTensor::YY]);
+            Foam::log(eigenValI[cellI][vector::Y]);
         logEigenVal[symmTensor::ZZ] =
-            Foam::log(eigenValI[cellI][diagTensor::ZZ]);
+            Foam::log(eigenValI[cellI][vector::Z]);
 
         // Rotate back
         resultI[cellI] = transform(eigenVecI[cellI].T(), logEigenVal);
@@ -139,45 +133,30 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
     {
         if
         (
-            !vf.boundaryField()[patchI].coupled()
-         && vf.boundaryField()[patchI].type()
+            vf.boundaryField()[patchI].type()
          != emptyFvPatchField<symmTensor>::typeName
         )
         {
-            const diagTensorField& eigenValB = eigenVal.boundaryField()[patchI];
+            // Take references
+            const vectorField& eigenValB = eigenVal.boundaryField()[patchI];
             const tensorField& eigenVecB = eigenVec.boundaryField()[patchI];
             symmTensorField& resultB = result.boundaryField()[patchI];
 
             forAll(eigenValB, faceI)
             {
-                // We cannot have log of zeros
-                if
-                (
-                    eigenValB[faceI][diagTensor::XX] < SMALL
-                 || eigenValB[faceI][diagTensor::YY] < SMALL
-                 || eigenValB[faceI][diagTensor::ZZ] < SMALL
-                )
-                {
-                    FatalError
-                        << "log of zero is not allowed"
-                        << abort(FatalError);
-                }
-
                 // Calculate log
                 logEigenVal[symmTensor::XX] =
-                    Foam::log(eigenValB[faceI][diagTensor::XX]);
+                    Foam::log(eigenValB[faceI][vector::X]);
                 logEigenVal[symmTensor::YY] =
-                    Foam::log(eigenValB[faceI][diagTensor::YY]);
+                    Foam::log(eigenValB[faceI][vector::Y]);
                 logEigenVal[symmTensor::ZZ] =
-                    Foam::log(eigenValB[faceI][diagTensor::ZZ]);
+                    Foam::log(eigenValB[faceI][vector::Z]);
 
                 // Rotate back
                 resultB[faceI] = transform(eigenVecB[faceI].T(), logEigenVal);
             }
         }
     }
-
-    result.correctBoundaryConditions();
 
     return tresult;
 }

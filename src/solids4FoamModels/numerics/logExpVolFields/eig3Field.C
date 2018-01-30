@@ -58,11 +58,7 @@ void eig3Field
 
     forAll(A.boundaryField(), patchI)
     {
-        if
-        (
-            !A.boundaryField()[patchI].coupled()
-         && A.boundaryField()[patchI].type() != "empty"
-        )
+        if (A.boundaryField()[patchI].type() != "empty")
         {
             const tensorField& AB = A.boundaryField()[patchI];
             tensorField& VB = V.boundaryField()[patchI];
@@ -74,9 +70,6 @@ void eig3Field
             }
         }
     }
-
-    V.correctBoundaryConditions();
-    d.correctBoundaryConditions();
 }
 
 
@@ -96,11 +89,7 @@ void eig3Field
 
     forAll(A.boundaryField(), patchI)
     {
-        if
-        (
-            !A.boundaryField()[patchI].coupled()
-         && A.boundaryField()[patchI].type() != "empty"
-        )
+        if (A.boundaryField()[patchI].type() != "empty")
         {
             const symmTensorField& AB = A.boundaryField()[patchI];
             tensorField& VB = V.boundaryField()[patchI];
@@ -112,9 +101,6 @@ void eig3Field
             }
         }
     }
-
-    V.correctBoundaryConditions();
-    d.correctBoundaryConditions();
 }
 
 
@@ -134,11 +120,7 @@ void eig3Field
 
     forAll(A.boundaryField(), patchI)
     {
-        if
-        (
-            !A.boundaryField()[patchI].coupled()
-         && A.boundaryField()[patchI].type() != "empty"
-        )
+        if (A.boundaryField()[patchI].type() != "empty")
         {
             const symmTensorField& AB = A.boundaryField()[patchI];
             tensorField& VB = V.boundaryField()[patchI];
@@ -150,9 +132,6 @@ void eig3Field
             }
         }
     }
-
-    V.correctBoundaryConditions();
-    d.correctBoundaryConditions();
 }
 
 
