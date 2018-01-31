@@ -432,7 +432,7 @@ void Foam::mechanicalModel::calcSubMeshD() const
 
     // The subMeshD field can represent D or DD
     word Dname = "D";
-    if (mesh().foundObject<volVectorField>("DD"))
+    if (incremental_)
     {
         Dname = "DD";
     }
@@ -654,7 +654,7 @@ void Foam::mechanicalModel::calcSubMeshPointD() const
 
     // The subMeshD field can represent D or DD
     word pointDname = "pointD";
-    if (mesh().foundObject<volVectorField>("DD"))
+    if (incremental_)
     {
         pointDname = "pointDD";
     }
