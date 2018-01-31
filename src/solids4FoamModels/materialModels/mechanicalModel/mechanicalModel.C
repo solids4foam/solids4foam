@@ -31,6 +31,7 @@ License
 #include "twoDPointCorrector.H"
 
 #include "fixedGradientFvPatchFields.H"
+#include "wedgePolyPatch.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -1690,23 +1691,59 @@ void Foam::mechanicalModel::correctBoundarySnGrad
 
         forAll(subMeshGradD.boundaryField(), patchI)
         {
+            const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
+            const vectorField n = subMesh.boundary()[patchI].nf();
             tensorField& patchGradD = subMeshGradD.boundaryField()[patchI];
             const tensorField patchGradDif =
                 subMeshGradD.boundaryField()[patchI].patchInternalField();
-
             const vectorField& patchD = subMeshD.boundaryField()[patchI];
             const vectorField patchDif =
                 subMeshD.boundaryField()[patchI].patchInternalField();
 
-            const vectorField n = subMesh.boundary()[patchI].nf();
-            const vectorField delta = subMesh.boundary()[patchI].delta();
-            const vectorField k = delta - (sqr(n) & delta);
-            const scalarField& deltaCoeffs =
-                subMesh.boundary()[patchI].deltaCoeffs();
+            // Calculate the corrected snGrad
+            vectorField correctedSnGrad;
 
-            const vectorField correctedSnGrad =
-                (patchD - (patchDif + (k & patchGradDif)))*deltaCoeffs;
+            if (ppatch.type() == wedgePolyPatch::typeName)
+            {
+                // Take a reference to the wedge patch
+                const wedgePolyPatch& wedgePatch =
+                    refCast<const wedgePolyPatch>(ppatch);
 
+                const vectorField& patchC = ppatch.faceCentres();
+                const vector& centreN = wedgePatch.centreNormal();
+                const vectorField Cn = subMesh.boundary()[patchI].Cn();
+                const scalarField d = ((Cn - patchC) & centreN)/(n & centreN);
+                const vectorField projC = d*n + patchC;
+
+                // Calculate correction vector which connects actual cell
+                // centre to the transformed cell centre
+                const vectorField k = projC - Cn;
+
+                const Field<vector> projD = patchDif + (k & patchGradDif);
+
+                // Calculate delta coeffs from proj position on centre plane to
+                // transformed projected position
+                const scalarField projDeltaCoeff =
+                    1.0/mag(transform(wedgePatch.cellT(), projC) - projC);
+
+                // Calculate the patch snGrad
+                correctedSnGrad =
+                    (
+                        transform(wedgePatch.cellT(), projD) - projD
+                    )*projDeltaCoeff;
+            }
+            else
+            {
+                const vectorField delta = subMesh.boundary()[patchI].delta();
+                const vectorField k = delta - (sqr(n) & delta);
+                const scalarField& deltaCoeffs =
+                    subMesh.boundary()[patchI].deltaCoeffs();
+
+                correctedSnGrad =
+                    (patchD - (patchDif + (k & patchGradDif)))*deltaCoeffs;
+            }
+
+            // Update the patch snGrad
             patchGradD += n*(correctedSnGrad - (n & patchGradD));
         }
     }
@@ -1731,24 +1768,60 @@ void Foam::mechanicalModel::correctBoundarySnGradf
 
         forAll(subMeshGradDf.boundaryField(), patchI)
         {
+            const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
+            const vectorField n = subMesh.boundary()[patchI].nf();
             tensorField& patchGradDf =
                 subMeshGradDf.boundaryField()[patchI];
             const tensorField patchGradDif =
                 subMeshGradD.boundaryField()[patchI].patchInternalField();
-
             const vectorField& patchD = subMeshD.boundaryField()[patchI];
             const vectorField patchDif =
                 subMeshD.boundaryField()[patchI].patchInternalField();
 
-            const vectorField n = subMesh.boundary()[patchI].nf();
-            const vectorField delta = subMesh.boundary()[patchI].delta();
-            const vectorField k = delta - (sqr(n) & delta);
-            const scalarField& deltaCoeffs =
-                subMesh.boundary()[patchI].deltaCoeffs();
+            // Calculate the corrected snGrad
+            vectorField correctedSnGrad;
 
-            const vectorField correctedSnGrad =
-                (patchD - (patchDif + (k & patchGradDif)))*deltaCoeffs;
+            if (ppatch.type() == wedgePolyPatch::typeName)
+            {
+                // Take a reference to the wedge patch
+                const wedgePolyPatch& wedgePatch =
+                    refCast<const wedgePolyPatch>(ppatch);
 
+                const vectorField& patchC = ppatch.faceCentres();
+                const vector& centreN = wedgePatch.centreNormal();
+                const vectorField Cn = subMesh.boundary()[patchI].Cn();
+                const scalarField d = ((Cn - patchC) & centreN)/(n & centreN);
+                const vectorField projC = d*n + patchC;
+
+                // Calculate correction vector which connects actual cell
+                // centre to the transformed cell centre
+                const vectorField k = projC - Cn;
+
+                const Field<vector> projD = patchDif + (k & patchGradDif);
+
+                // Calculate delta coeffs from proj position on centre plane to
+                // transformed projected position
+                const scalarField projDeltaCoeff =
+                    1.0/mag(transform(wedgePatch.cellT(), projC) - projC);
+
+                // Calculate the patch snGrad
+                correctedSnGrad =
+                    (
+                        transform(wedgePatch.cellT(), projD) - projD
+                    )*projDeltaCoeff;
+            }
+            else
+            {
+                const vectorField delta = subMesh.boundary()[patchI].delta();
+                const vectorField k = delta - (sqr(n) & delta);
+                const scalarField& deltaCoeffs =
+                    subMesh.boundary()[patchI].deltaCoeffs();
+
+                correctedSnGrad =
+                    (patchD - (patchDif + (k & patchGradDif)))*deltaCoeffs;
+            }
+
+            // Update the patch snGrad
             patchGradDf += n*(correctedSnGrad - (n & patchGradDf));
         }
     }
