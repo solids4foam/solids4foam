@@ -43,6 +43,38 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
+void simpleCohesiveZoneFvPatchVectorField::makeSimpleCohesiveZoneLaw() const
+{
+    if (cohesiveLawPtr_.valid())
+    {
+        FatalErrorIn
+        (
+            "void simpleCohesiveZoneFvPatchVectorField::"
+            "makeSimpleCohesiveZoneLaw() const"
+        )   << "Pointer already set!" << abort(FatalError);
+    }
+
+    cohesiveLawPtr_.set
+    (
+        simpleCohesiveZoneLaw::New
+        (
+            dict_.lookup("simpleCohesiveZoneLaw"),
+            dict_
+        ).ptr()
+    );
+}
+
+
+const simpleCohesiveZoneLaw& simpleCohesiveZoneFvPatchVectorField::law() const
+{
+    if (cohesiveLawPtr_.empty())
+    {
+        makeSimpleCohesiveZoneLaw();
+    }
+
+    return cohesiveLawPtr_();
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -54,6 +86,7 @@ simpleCohesiveZoneFvPatchVectorField
 )
 :
     solidDirectionMixedFvPatchVectorField(p, iF),
+    dict_(),
     totRefValue_(p.size(), vector::zero),
     cohesiveLawPtr_(NULL),
     crackIndicator_(p.size(), 0.0),
@@ -79,6 +112,7 @@ simpleCohesiveZoneFvPatchVectorField
 )
 :
     solidDirectionMixedFvPatchVectorField(ptf, p, iF, mapper),
+    dict_(ptf.dict_),
     totRefValue_(ptf.totRefValue_),
     cohesiveLawPtr_(ptf.cohesiveLawPtr_),
     crackIndicator_(ptf.crackIndicator_),
@@ -103,15 +137,9 @@ simpleCohesiveZoneFvPatchVectorField
 )
 :
     solidDirectionMixedFvPatchVectorField(p, iF),
+    dict_(dict),
     totRefValue_(p.size(), vector::zero),
-    cohesiveLawPtr_
-    (
-        simpleCohesiveZoneLaw::New
-        (
-            dict.lookup("simpleCohesiveZoneLaw"),
-            dict
-        ).ptr()
-    ),
+    cohesiveLawPtr_(NULL),
     crackIndicator_(p.size(), 0.0),
     damageIndicator_(p.size(), 0.0),
     relaxationFactor_(readScalar(dict.lookup("relaxationFactor"))),
@@ -224,6 +252,7 @@ simpleCohesiveZoneFvPatchVectorField
 )
 :
     solidDirectionMixedFvPatchVectorField(ptf, iF),
+    dict_(ptf.dict_),
     totRefValue_(ptf.totRefValue_),
     cohesiveLawPtr_(ptf.cohesiveLawPtr_),
     crackIndicator_(ptf.crackIndicator_),

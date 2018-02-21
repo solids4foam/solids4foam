@@ -70,87 +70,93 @@ bool linGeomTotalDispSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
 
-    int iCorr = 0;
-    lduSolverPerformance solverPerfD;
-    blockLduMatrix::debug = 0;
-
-    Info<< "Solving the momentum equation for D" << endl;
-
-    // Stablisation viscosity
-    // const dimensionedScalar eta_ =
-    //    solidProperties().lookupOrDefault<dimensionedScalar>
-    //    (
-    //        "numericalViscosity",
-    //        dimensionedScalar("eta", dimless/dimTime, 0.0)
-    //    );
-
-    // Momentum equation loop
+    // Mesh update loop
     do
     {
-        // Store fields for under-relaxation and residual calculation
-        D().storePrevIter();
+        int iCorr = 0;
+        lduSolverPerformance solverPerfD;
+        blockLduMatrix::debug = 0;
 
-        // Linear momentum equation total displacement form
-        fvVectorMatrix DEqn
+        Info<< "Solving the momentum equation for D" << endl;
+
+        // Stablisation viscosity
+        // const dimensionedScalar eta_ =
+        //    solidProperties().lookupOrDefault<dimensionedScalar>
+        //    (
+        //        "numericalViscosity",
+        //        dimensionedScalar("eta", dimless/dimTime, 0.0)
+        //    );
+
+        // Momentum equation loop
+        do
+        {
+            // Store fields for under-relaxation and residual calculation
+            D().storePrevIter();
+
+            // Linear momentum equation total displacement form
+            fvVectorMatrix DEqn
+            (
+                rho()*fvm::d2dt2(D())
+                //+ eta_*rho_*fvm::ddt(D())
+             == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+              - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
+              + fvc::div(sigma(), "div(sigma)")
+              + rho()*g()
+              + mechanical().RhieChowCorrection(D(), gradD())
+            );
+
+            // Under-relaxation the linear system
+            DEqn.relax();
+
+            // Solve the linear system
+            solverPerfD = DEqn.solve();
+
+            // Fixed or adaptive field under-relaxation
+            relaxField(D(), iCorr);
+
+            // Update increment of displacement
+            DD() = D() - D().oldTime();
+
+            // Update gradient of displacement
+            mechanical().grad(D(), gradD());
+
+            // Update gradient of displacement increment
+            gradDD() = gradD() - gradD().oldTime();
+
+            // Calculate the stress using run-time selectable mechanical law
+            mechanical().correct(sigma());
+
+            // Update impKf to improve convergence
+            // Note: impK and rImpK are not updated as they are used for
+            // traction boundaries
+            //if (iCorr % 10 == 0)
+            //{
+            //    impKf_ = mechanical().impKf();
+            //}
+        }
+        while
         (
-            rho()*fvm::d2dt2(D())
-            //+ eta_*rho_*fvm::ddt(D())
-         == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
-          - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-          + fvc::div(sigma(), "div(sigma)")
-          + rho()*g()
-          + mechanical().RhieChowCorrection(D(), gradD())
+            !converged
+            (
+                iCorr,
+                solverPerfD.initialResidual(), solverPerfD.nIterations(), D()
+            )
+         && ++iCorr < nCorr()
         );
 
-        // Under-relaxation the linear system
-        DEqn.relax();
+        // Interpolate cell displacements to vertices
+        mechanical().interpolate(D(), pointD());
 
-        // Solve the linear system
-        solverPerfD = DEqn.solve();
-
-        // Fixed or adaptive field under-relaxation
-        relaxField(D(), iCorr);
-
-        // Update increment of displacement
+        // Increment of displacement
         DD() = D() - D().oldTime();
 
-        // Update gradient of displacement
-        mechanical().grad(D(), gradD());
+        // Increment of point displacement
+        pointDD() = pointD() - pointD().oldTime();
 
-        // Update gradient of displacement increment
-        gradDD() = gradD() - gradD().oldTime();
-
-        // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
-
-        // Update impKf to improve convergence
-        // Note: impK and rImpK are not updated as they are used for traction
-        // boundaries
-        //if (iCorr % 10 == 0)
-        //{
-        //    impKf_ = mechanical().impKf();
-        //}
+        // Velocity
+        U() = fvc::ddt(D());
     }
-    while
-    (
-        !converged
-        (
-            iCorr, solverPerfD.initialResidual(), solverPerfD.nIterations(), D()
-        )
-     && ++iCorr < nCorr()
-    );
-
-    // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
-
-    // Increment of displacement
-    DD() = D() - D().oldTime();
-
-    // Increment of point displacement
-    pointDD() = pointD() - pointD().oldTime();
-
-    // Velocity
-    U() = fvc::ddt(D());
+    while (mesh().update());
 
     return true;
 }

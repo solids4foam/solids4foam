@@ -37,8 +37,8 @@ namespace Foam
     defineTypeNameAndDebug(DugdaleSimpleCohesiveZoneLaw, 0);
     addToRunTimeSelectionTable
     (
-        simpleCohesiveZoneLaw, 
-        DugdaleSimpleCohesiveZoneLaw, 
+        simpleCohesiveZoneLaw,
+        DugdaleSimpleCohesiveZoneLaw,
         dictionary
     );
 }
@@ -66,7 +66,6 @@ Foam::DugdaleSimpleCohesiveZoneLaw::DugdaleSimpleCohesiveZoneLaw
     simpleCohesiveZoneLaw(dcl),
     deltaC_(dcl.deltaC_)
 {}
-
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 

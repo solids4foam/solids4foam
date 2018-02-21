@@ -68,11 +68,14 @@ class simpleCohesiveZoneFvPatchVectorField
 {
     // Private data
 
+        //- Copy of the input dictionary
+        const dictionary dict_;
+
         //- Accumulated displacement
         vectorField totRefValue_;
 
         //- Cohesive law
-        autoPtr<simpleCohesiveZoneLaw> cohesiveLawPtr_;
+        mutable autoPtr<simpleCohesiveZoneLaw> cohesiveLawPtr_;
 
         //- Crack indicator
         scalarField crackIndicator_;
@@ -104,7 +107,15 @@ class simpleCohesiveZoneFvPatchVectorField
         //- Break only one face per updateCrack
         Switch breakOnlyOneFace_;
 
-public:
+    //- Private Member Functions
+
+        //- Make the cohesive law
+        void makeSimpleCohesiveZoneLaw() const;
+
+        //- Return the cohesive law
+        const simpleCohesiveZoneLaw& law() const;
+
+    public:
 
     //- Runtime type information
     TypeName("simpleCohesiveZone");
@@ -177,12 +188,6 @@ public:
             virtual bool fixesValue() const
             {
                 return false;
-            }
-
-            //- Return cohesive law
-            const simpleCohesiveZoneLaw& law() const
-            {
-                return cohesiveLawPtr_();
             }
 
             //- Return total displacement

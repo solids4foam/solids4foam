@@ -64,7 +64,10 @@ Foam::autoPtr<Foam::simpleCohesiveZoneLaw> Foam::simpleCohesiveZoneLaw::New
             << exit(FatalError);
     }
 
-    return autoPtr<simpleCohesiveZoneLaw>(cstrIter()(simpleCohesiveZoneLawName, dict));
+    return autoPtr<simpleCohesiveZoneLaw>
+    (
+        cstrIter()(simpleCohesiveZoneLawName, dict)
+    );
 }
 
 
@@ -74,10 +77,13 @@ Foam::autoPtr<Foam::simpleCohesiveZoneLaw> Foam::simpleCohesiveZoneLaw::New
 Foam::simpleCohesiveZoneLaw::simpleCohesiveZoneLaw
 (
     const word& simpleCohesiveZoneLawName,
-    const dictionary& dict            
+    const dictionary& dict
 )
 :
-    simpleCohesiveZoneLawCoeffs_(dict.subDict(simpleCohesiveZoneLawName + "Coeffs")),
+    simpleCohesiveZoneLawCoeffs_
+    (
+        dict.subDict(simpleCohesiveZoneLawName + "Coeffs")
+    ),
     GIc_(simpleCohesiveZoneLawCoeffs_.lookup("GIc")),
     sigmaMax_(simpleCohesiveZoneLawCoeffs_.lookup("sigmaMax"))
 {}

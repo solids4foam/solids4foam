@@ -69,71 +69,76 @@ bool linGeomSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
 
-    int iCorr = 0;
-    lduSolverPerformance solverPerfDD;
-    blockLduMatrix::debug = 0;
-
-    Info<< "Solving the momentum equation for DD" << endl;
-
-    // Momentum equation loop
+    // Mesh update loop
     do
     {
-        // Store fields for under-relaxation and residual calculation
-        DD().storePrevIter();
+        int iCorr = 0;
+        lduSolverPerformance solverPerfDD;
+        blockLduMatrix::debug = 0;
 
-        // Linear momentum equation total displacement form
-        fvVectorMatrix DDEqn
-        (
-            rho()*fvm::d2dt2(DD())
-          + rho()*fvc::d2dt2(D().oldTime())
-         == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-          + fvc::div(sigma(), "div(sigma)")
-          + rho()*g()
-          + mechanical().RhieChowCorrection(DD(), gradDD())
-        );
+        Info<< "Solving the momentum equation for DD" << endl;
 
-        // Under-relaxation the linear system
-        DDEqn.relax();
+        // Momentum equation loop
+        do
+        {
+            // Store fields for under-relaxation and residual calculation
+            DD().storePrevIter();
 
-        // Solve the linear system
-        solverPerfDD = DDEqn.solve();
+            // Linear momentum equation total displacement form
+            fvVectorMatrix DDEqn
+                (
+                    rho()*fvm::d2dt2(DD())
+                    + rho()*fvc::d2dt2(D().oldTime())
+                    == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+                    - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+                    + fvc::div(sigma(), "div(sigma)")
+                    + rho()*g()
+                    + mechanical().RhieChowCorrection(DD(), gradDD())
+                );
 
-        // Fixed or adaptive field under-relaxation
-        relaxField(DD(), iCorr);
+            // Under-relaxation the linear system
+            DDEqn.relax();
 
-        // Update the total displacement
-        D() = D().oldTime() + DD();
+            // Solve the linear system
+            solverPerfDD = DDEqn.solve();
 
-        // Update gradient of displacement increment
-        mechanical().grad(DD(), gradDD());
+            // Fixed or adaptive field under-relaxation
+            relaxField(DD(), iCorr);
 
-        // Update gradient of total displacement
-        gradD() = gradD().oldTime() + gradDD();
+            // Update the total displacement
+            D() = D().oldTime() + DD();
 
-        // Calculate the stress using run-time selectable mechanical law
-        const volScalarField DDEqnA("DDEqnA", DDEqn.A());
-        mechanical().correct(sigma());
+            // Update gradient of displacement increment
+            mechanical().grad(DD(), gradDD());
+
+            // Update gradient of total displacement
+            gradD() = gradD().oldTime() + gradDD();
+
+            // Calculate the stress using run-time selectable mechanical law
+            const volScalarField DDEqnA("DDEqnA", DDEqn.A());
+            mechanical().correct(sigma());
+        }
+        while
+            (
+                !converged
+                (
+                    iCorr,
+                    solverPerfDD.initialResidual(),
+                    solverPerfDD.nIterations(),
+                    DD()
+                ) && ++iCorr < nCorr()
+            );
+
+        // Update point displacement increment
+        mechanical().interpolate(DD(), pointDD());
+
+        // Update point displacement
+        pointD() = pointD().oldTime() + pointDD();
+
+        // Update velocity
+        U() = fvc::ddt(D());
     }
-    while
-    (
-       !converged
-        (
-            iCorr,
-            solverPerfDD.initialResidual(),
-            solverPerfDD.nIterations(),
-            DD()
-        ) && ++iCorr < nCorr()
-    );
-
-    // Update point displacement increment
-    mechanical().interpolate(DD(), pointDD());
-
-    // Update point displacement
-    pointD() = pointD().oldTime() + pointDD();
-
-    // Update velocity
-    U() = fvc::ddt(D());
+    while (mesh().update());
 
     return true;
 }

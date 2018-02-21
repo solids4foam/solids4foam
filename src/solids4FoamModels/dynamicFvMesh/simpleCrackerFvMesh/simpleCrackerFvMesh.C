@@ -28,6 +28,7 @@ License
 #include "volMesh.H"
 #include "addToRunTimeSelectionTable.H"
 #include "simpleCohesiveZoneFvPatchVectorField.H"
+#include "solidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -62,7 +63,7 @@ bool Foam::simpleCrackerFvMesh::update()
 {
     // Lookup displacement field
     const volVectorField* DPtr = NULL;
-    if (foundObject<volVectorField>("DD"))
+    if (db().parent().lookupObject<solidModel>("solidProperties").incremental())
     {
         DPtr = &lookupObject<volVectorField>("DD");
     }
@@ -102,7 +103,7 @@ bool Foam::simpleCrackerFvMesh::update()
 
     Info<< nl << "Breaking " << nFacesToBreak << " faces" << nl << endl;
 
-    return nFacesToBreak;
+    return bool(nFacesToBreak > 0);
 }
 
 
