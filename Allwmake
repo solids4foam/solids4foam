@@ -2,6 +2,12 @@
 cd ${0%/*} || exit 1    # run from this directory
 
 (cd filesToReplaceInOF && ./Allcheck)
+if [ $? -eq 1 ]
+then
+    echo "Please fix the filesToReplaceInOF above!"
+    exit 1
+fi
+
 (cd ThirdParty && ./Allwmake)
 
 wmake libso src/blockCoupledSolids4FoamTools

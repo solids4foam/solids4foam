@@ -442,9 +442,9 @@ void Foam::solution::setSolverPerformance
         solverPerformance_.readIfPresent(name, perfs);
     }
 
-    // Only first iteration and current iteration residuals are required, so
-    // the current iteration residual replaces the previous one and only the
-    // first iteration is always present
+    // Only the first iteration and the current iteration residuals are
+    // required, so the current iteration residual replaces the previous one and
+    // only the first iteration is always present, VS 2017-11-27
     if (perfs.size() < 2)
     {
         // Append to list

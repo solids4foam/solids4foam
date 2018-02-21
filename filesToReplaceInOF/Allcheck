@@ -10,8 +10,13 @@ else
     echo
     echo "******** PLEASE FIX THIS ***********"
     echo "You should replace the file $FOAM_SRC/foam/matrices/solution/solution.C with filesToReplaceInOF/solution.C"
+    echo "Run the following commands:"
+    echo "    cp filesToReplaceInOF/solution.C $FOAM_SRC/foam/matrices/solution/"
+    echo "    wmake libso $FOAM_SRC/foam"
+    echo "Run the following commands:"
     echo "************************************"
     echo
+    exit 1
 fi
 
 if cmp --silent "./WedgePointPatchField.C" "$FOAM_SRC/foam/fields/PointPatchFieldTemplates/constraint/wedge/WedgePointPatchField.C"
@@ -21,6 +26,40 @@ else
     echo
     echo "******** PLEASE FIX THIS ***********"
     echo "You should replace the file $FOAM_SRC/foam/fields/PointPatchFieldTemplates/constraint/wedge/WedgePointPatchField.C with filesToReplaceInOF/WedgePointPatchField.C"
+    echo "Run the following commands:"
+    echo "    cp filesToReplaceInOF/WedgePointPatchField.C $FOAM_SRC/foam/fields/PointPatchFieldTemplates/constraint/wedge"
+    echo "    wmake libso $FOAM_SRC/foam"
     echo "************************************"
     echo
+    exit 1
+fi
+
+if cmp --silent "./tensor.C" "$FOAM_SRC/foam/primitives/Tensor/tensor/tensor.C"
+then
+    echo "tensor.C has already been replaced"
+else
+    echo
+    echo "******** PLEASE FIX THIS ***********"
+    echo "You should replace the file $FOAM_SRC/foam/primitives/Tensor/tensor/tensor.C with filesToReplaceInOF/tensor.C"
+    echo "Run the following commands:"
+    echo "    cp filesToReplaceInOF/tensor.C $FOAM_SRC/foam/primitives/Tensor/tensor/tensor.C"
+    echo "    wmake libso $FOAM_SRC/foam"
+    echo "************************************"
+    echo
+    exit 1
+fi
+
+if cmp --silent "./fvMesh.C" "$FOAM_SRC/finiteVolume/fvMesh/fvMesh.C"
+then
+    echo "fvMesh.C has already been replaced"
+else
+    echo
+    echo "******** PLEASE FIX THIS ***********"
+    echo "You should replace the file $FOAM_SRC/finiteVolume/fvMesh/fvMesh.C with filesToReplaceInOF/fvMesh.C"
+    echo "Run the following commands:"
+    echo "    cp filesToReplaceInOF/fvMesh.C $FOAM_SRC/finiteVolume/fvMesh"
+    echo "    wmake libso $FOAM_SRC/finiteVolume"
+    echo "************************************"
+    echo
+    exit 1
 fi
