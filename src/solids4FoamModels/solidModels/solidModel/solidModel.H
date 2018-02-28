@@ -352,6 +352,18 @@ public:
                 return meshPtr_();
             }
 
+            //- Return point mesh
+            const pointMesh& pMesh() const
+            {
+                return pMesh_;
+            }
+
+            //- Return non-const point mesh
+            pointMesh& pMesh()
+            {
+                return pMesh_;
+            }
+  
             //- Return time
             const Time& runTime() const
             {

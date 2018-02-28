@@ -320,7 +320,7 @@ solidDirectionMixedFvPatchVectorField::snGrad() const
       - (
             pif
           - snGradCorrection/this->patch().deltaCoeffs()
-          + (k & gradD.patchInternalField())
+          // + (k & gradD.patchInternalField()) // ZT, correction is applied two times
         )
     )*patch().deltaCoeffs();
 }
