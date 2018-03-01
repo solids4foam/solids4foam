@@ -14,7 +14,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 2 -2 0 0 0 0];
+dimensions      [1 -1 -2 0 0 0 0];
 
 internalField   uniform 0;
 
@@ -22,37 +22,37 @@ boundaryField
 {
     interface
     {
-        type extrapolatedPressure;
-        value uniform 0;
+        type        calculated;
+        value       uniform 0;
     }
     outlet
     {
-         type fixedValue;
-         value uniform 0;
+        type        calculated;
+        value       uniform 0;
     }
     inlet
     {
-        type extrapolatedPressure;
-        value uniform 0;
+        type        calculated;
+        value       uniform 0;
     }
     bottom
     {
-        type extrapolatedPressure;
-        value uniform 0;
+        type        calculated;
+        value       uniform 0;
     }
     top
     {
-        type extrapolatedPressure;
-        value uniform 0;
+        type        calculated;
+        value       uniform 0;
     }
     left
     {
-        type extrapolatedPressure;
-        value uniform 0;
+        type        calculated;
+        value       uniform 0;
     }
     symmetry
     {
-        type symmetryPlane;
+        type        symmetryPlane;
     }
 }
 
