@@ -28,6 +28,7 @@ License
 #include "crackerFvMesh.H"
 #include "solidCohesiveFvPatchVectorField.H"
 #include "cohesivePolyPatch.H"
+#include "solidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -95,8 +96,8 @@ Foam::cohesiveZoneInitiation::cohesiveZone() const
     // Const reference to the mesh
     const fvMesh& mesh = this->mesh();
 
-    // Lookup displacement field (DD or D)
-    if (mesh.foundObject<volVectorField>("DD"))
+    // Lookup displacement field
+    if (mesh.parent().lookupObject<solidModel>("solidProperties").incremental())
     {
         return
             refCast<const solidCohesiveFvPatchVectorField>
