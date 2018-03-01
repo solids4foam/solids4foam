@@ -185,7 +185,7 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New(Time& runTime)
     else if (physicsTypeName == "fluidSolidInteraction")
     {
         // Read the fluidSolidInteractionModel type
-        word fluidSolidInteractionTypeName;
+        word fsiTypeName;
         {
             // Read dictionary and ensure it is deleted before the model is
             // created otherwise the dictionary is entered in the database twice
@@ -202,13 +202,13 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New(Time& runTime)
             );
 
             fluidSolidInteractionProperties.lookup("fluidSolidInterface")
-                >> fluidSolidInteractionTypeName;
+                >> fsiTypeName;
         }
 
         fluidSolidInteractionConstructorTable::iterator cstrIter =
             fluidSolidInteractionConstructorTablePtr_->find
             (
-                fluidSolidInteractionTypeName
+                fsiTypeName
             );
 
         if (cstrIter == fluidSolidInteractionConstructorTablePtr_->end())
@@ -217,11 +217,24 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New(Time& runTime)
             (
                 "physicsModel::New(Time&)"
             )   << "Unknown fluidSolidInteractionModel type "
-                << fluidSolidInteractionTypeName
+                << fsiTypeName
                 << endl << endl
                 << "Valid fluidSolidInteractionModel types are :" << endl
                 << fluidSolidInteractionConstructorTablePtr_->toc()
                 << exit(FatalError);
+        }
+
+        // The oneWayCoupling FSI must start from the first step because it reads
+        // fields from the already run fluid case
+        if (fsiTypeName == "oneWayCoupling" && runTime.value() > 0.0)
+        {
+            WarningIn
+            (
+                "fluidSolidInterface::New(Time&, const word&)"
+            )   << "When using oneWayCoupling, you must start from Time = 0:"
+                << " resetting time" << endl;
+
+            runTime.setTime(0.0, 0);
         }
 
         return autoPtr<physicsModel>(cstrIter()(runTime));

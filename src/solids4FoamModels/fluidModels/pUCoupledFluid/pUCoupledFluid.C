@@ -103,8 +103,7 @@ pUCoupledFluid::pUCoupledFluid
     maxResidual_(0),
     convergenceCriterion_(0)
 {
-    // This must be manually specified in the case in foam-extend-3.2
-    //mesh().schemesDict().setFluxRequired(p().name());
+    mesh().schemesDict().setFluxRequired(p().name());
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
