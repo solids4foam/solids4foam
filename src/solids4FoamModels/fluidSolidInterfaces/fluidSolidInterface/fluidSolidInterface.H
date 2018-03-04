@@ -536,6 +536,9 @@ public:
             (
                 vectorField& fluidZonePointsDispl
             );
+
+            //- Write fields
+            virtual void writeFields(const Time& runTime);
 };
 
 

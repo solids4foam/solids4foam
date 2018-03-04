@@ -2108,7 +2108,7 @@ void Foam::solidModel::writeFields(const Time& runTime)
         sqrt((3.0/2.0)*magSqr(dev(sigma())))
     );
 
-    Info<< "Max sigmaEq = " << gMax(sigmaEq) << endl;
+    Info<< "Max sigmaEq (von Mises stress) = " << gMax(sigmaEq) << endl;
 
     // If asked, write the residual field
     if (writeResidualField_)

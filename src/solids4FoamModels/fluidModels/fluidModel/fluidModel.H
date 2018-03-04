@@ -369,6 +369,10 @@ public:
 
             //- Read fluidProperties dictionary
             virtual bool read();
+
+            //- Write fields
+            virtual void writeFields(const Time& runTime)
+            {}
 };
 
 
