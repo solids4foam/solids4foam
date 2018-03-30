@@ -55,36 +55,7 @@ Foam::thermoLinearElastic::thermoLinearElastic
     alpha_(dict.lookup("alpha")),
     T0_(dict.lookup("T0")),
     TPtr_(NULL)
-{
-    // Check if the T field exists in memory
-    // THIS IS NOT CORRECT: of the mechanical model is created first then T will
-    // not exist yet
-    // One option would be to check again inside the correct function
-    // Anther problem is the T thermalConvection gives out looking for 'k' if we
-    // read T here
-    // if (!mesh.foundObject<volScalarField>("T"))
-    // {
-    //     Info<< type() << ": reading T field from " << mesh.time().timeName()
-    //         << endl;
-
-    //     // Read the temperature field from disk
-    //     TPtr_.set
-    //     (
-    //         new volScalarField
-    //         (
-    //             IOobject
-    //             (
-    //                 "T",
-    //                 mesh.time().timeName(),
-    //                 mesh,
-    //                 IOobject::MUST_READ,
-    //                 IOobject::AUTO_WRITE
-    //             ),
-    //             mesh
-    //         )
-    //     );
-    // }
-}
+{}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //

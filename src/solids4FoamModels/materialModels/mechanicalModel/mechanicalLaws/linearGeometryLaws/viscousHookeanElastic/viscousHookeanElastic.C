@@ -398,7 +398,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscousHookeanElastic::K() const
 
 void Foam::viscousHookeanElastic::correct(volSymmTensorField& sigma)
 {
-    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    if (incremental())
     {
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
@@ -487,7 +487,7 @@ void Foam::viscousHookeanElastic::correct(volSymmTensorField& sigma)
 
 void Foam::viscousHookeanElastic::correct(surfaceSymmTensorField& sigma)
 {
-    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    if (incremental())
     {
         // Lookup gradient of displacement increment
         const surfaceTensorField& gradDD =

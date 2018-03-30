@@ -799,7 +799,7 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
 void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
 {
     // Calculate total strain
-    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    if (incremental())
     {
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
@@ -1017,7 +1017,7 @@ void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
 void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 {
     // Calculate total strain
-    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    if (incremental())
     {
         // Lookup gradient of displacement increment
         const surfaceTensorField& gradDD =

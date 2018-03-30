@@ -474,7 +474,7 @@ Foam::tmp<Foam::volScalarField> Foam::orthotropicLinearElastic::impK() const
 
 void Foam::orthotropicLinearElastic::correct(volSymmTensorField& sigma)
 {
-    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    if (incremental())
     {
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
@@ -497,7 +497,7 @@ void Foam::orthotropicLinearElastic::correct(volSymmTensorField& sigma)
 
 void Foam::orthotropicLinearElastic::correct(surfaceSymmTensorField& sigma)
 {
-    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    if (incremental())
     {
         // Lookup gradient of displacement increment
         const surfaceTensorField& gradDD =

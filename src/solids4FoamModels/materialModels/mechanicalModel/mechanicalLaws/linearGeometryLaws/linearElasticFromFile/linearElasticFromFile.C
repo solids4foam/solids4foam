@@ -161,8 +161,18 @@ Foam::tmp<Foam::volScalarField> Foam::linearElasticFromFile::impK() const
 
 void Foam::linearElasticFromFile::correct(volSymmTensorField& sigma)
 {
+    if (incremental())
+    {
+        FatalErrorIn
+        (
+            type() + "::correct(volSymmTensorField& sigma)"
+        )   << "Not implemented for incremental solid solver"
+            << abort(FatalError);
+    }
+
     // Lookup gradient of displacment from the solver
-    const volTensorField& gradD = mesh().lookupObject<volTensorField>("grad(D)");
+    const volTensorField& gradD =
+        mesh().lookupObject<volTensorField>("grad(D)");
 
     // Calculate stress
     sigma = mu_*twoSymm(gradD) + lambda_*tr(gradD)*I;
@@ -171,6 +181,15 @@ void Foam::linearElasticFromFile::correct(volSymmTensorField& sigma)
 
 void Foam::linearElasticFromFile::correct(surfaceSymmTensorField& sigma)
 {
+    if (incremental())
+    {
+        FatalErrorIn
+        (
+            type() + "::correct(surfaceSymmTensorField& sigma)"
+        )   << "Not implemented for incremental solid solver"
+            << abort(FatalError);
+    }
+
     // Lookup gradient of displacment from the solver
     const surfaceTensorField& gradD =
         mesh().lookupObject<surfaceTensorField>("grad(D)f");

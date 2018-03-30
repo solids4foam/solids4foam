@@ -644,7 +644,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     );
 
-    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    if (incremental())
     {
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
@@ -740,11 +740,11 @@ void Foam::linearElasticMohrCoulombPlastic::correct
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     );
 
-    if (mesh().foundObject<surfaceTensorField>("grad(DD)"))
+    if (incremental())
     {
         // Lookup gradient of displacement increment
         const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)");
+            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
         DEpsilon = symm(gradDD);
     }
@@ -752,7 +752,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     {
         // Lookup gradient of displacement
         const surfaceTensorField& gradD =
-            mesh().lookupObject<surfaceTensorField>("grad(D)");
+            mesh().lookupObject<surfaceTensorField>("grad(D)f");
 
         // Calculate gradient of displacement increment
         const surfaceTensorField gradDD = gradD - gradD.oldTime();
@@ -819,8 +819,8 @@ Foam::scalar Foam::linearElasticMohrCoulombPlastic::residual()
     // Calculate residual based on change in plastic strain increment
     if
     (
-        mesh().foundObject<surfaceVectorField>("grad(D)")
-     || mesh().foundObject<surfaceVectorField>("grad(DD)")
+        mesh().foundObject<surfaceVectorField>("grad(D)f")
+     || mesh().foundObject<surfaceVectorField>("grad(DD)f")
     )
     {
         return
@@ -871,7 +871,7 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     );
 
-    if (mesh().foundObject<volTensorField>("grad(DD)"))
+    if (incremental())
     {
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =

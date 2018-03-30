@@ -100,6 +100,23 @@ const Foam::Switch& Foam::mechanicalLaw::enforceLinear() const
 }
 
 
+bool Foam::mechanicalLaw::incremental() const
+{
+    if (mesh().foundObject<solidModel>("solidProperties"))
+    {
+       return mesh().lookupObject<solidModel>("solidProperties").incremental();
+    }
+    else
+    {
+        return
+            mesh().parent().lookupObject<solidModel>
+            (
+                "solidProperties"
+            ).incremental();
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::mechanicalLaw::mechanicalLaw
