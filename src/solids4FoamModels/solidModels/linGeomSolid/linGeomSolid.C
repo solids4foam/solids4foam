@@ -119,15 +119,15 @@ bool linGeomSolid::evolve()
             mechanical().correct(sigma());
         }
         while
+        (
+            !converged
             (
-                !converged
-                (
-                    iCorr,
-                    solverPerfDD.initialResidual(),
-                    solverPerfDD.nIterations(),
-                    DD()
-                ) && ++iCorr < nCorr()
-            );
+                iCorr,
+                solverPerfDD.initialResidual(),
+                solverPerfDD.nIterations(),
+                DD()
+            ) && ++iCorr < nCorr()
+        );
 
         // Update point displacement increment
         mechanical().interpolate(DD(), pointDD());
