@@ -29,9 +29,9 @@ License
 #include "fvcGradf.H"
 #include "gaussGrad.H"
 #include "twoDPointCorrector.H"
-
 #include "fixedGradientFvPatchFields.H"
 #include "wedgePolyPatch.H"
+#include "crackerFvMesh.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -2342,6 +2342,17 @@ Foam::mechanicalModel::mechanicalModel
                 subMeshes()[lawI].subMesh().write();
             }
         }
+    }
+
+    // Check: currently crackerFvMesh only works with a single material
+    // The challenge here is to update the subMesh and subMesh fields when a
+    // topo-change (crack) occurs in the babse mesh
+    if (isA<crackerFvMesh>(mesh) && laws.size() > 1)
+    {
+        FatalErrorIn(type() + "::" + type() + "(...)")
+            << "Currently the crackerFvMesh can only be used with a single "
+            << "material in mechanicalProperties"
+            << abort(FatalError);
     }
 }
 
