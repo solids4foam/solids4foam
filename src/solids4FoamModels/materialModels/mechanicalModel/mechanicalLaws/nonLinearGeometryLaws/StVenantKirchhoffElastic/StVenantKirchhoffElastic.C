@@ -199,6 +199,13 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
     // Check if the mathematical model is in total or updated Lagrangian form
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
+        if (!incremental())
+        {
+            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
+                << "Not implemented for non-incremental updated Lagrangian"
+                << abort(FatalError);
+        }
+
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
             mesh().lookupObject<volTensorField>("grad(DD)");
@@ -226,6 +233,13 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
     }
     else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
+        if (incremental())
+        {
+            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
+                << "Not implemented for incremental total Lagrangian"
+                << abort(FatalError);
+        }
+
         // Lookup gradient of displacement
         const volTensorField& gradD =
             mesh().lookupObject<volTensorField>("grad(D)");
@@ -282,6 +296,13 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
     // Check if the mathematical model is in total or updated Lagrangian form
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
+        if (!incremental())
+        {
+            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
+                << "Not implemented for non-incremental updated Lagrangian"
+                << abort(FatalError);
+        }
+
         // Lookup gradient of displacement increment
         const surfaceTensorField& gradDD =
             mesh().lookupObject<surfaceTensorField>("grad(DD)f");
@@ -309,6 +330,13 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
     }
     else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
+        if (incremental())
+        {
+            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
+                << "Not implemented for incremental total Lagrangian"
+                << abort(FatalError);
+        }
+
         // Lookup gradient of displacement
         const surfaceTensorField& gradD =
             mesh().lookupObject<surfaceTensorField>("grad(D)f");

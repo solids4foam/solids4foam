@@ -1164,6 +1164,13 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     // Check if the mathematical model is in total or updated Lagrangian form
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
+        if (!incremental())
+        {
+            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
+                << "Not implemented for non-incremental updated Lagrangian"
+                << abort(FatalError);
+        }
+
         // Lookup gradient of displacement increment
         const volTensorField& gradDD =
             mesh().lookupObject<volTensorField>("grad(DD)");
@@ -1176,6 +1183,13 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     }
     else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
+        if (incremental())
+        {
+            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
+                << "Not implemented for incremental total Lagrangian"
+                << abort(FatalError);
+        }
+
         // Lookup gradient of displacement
         const volTensorField& gradD =
             mesh().lookupObject<volTensorField>("grad(D)");
@@ -1190,8 +1204,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     {
         FatalErrorIn
         (
-            "void Foam::neoHookeanElasticMisesPlastic::"
-            "correct(volSymmTensorField& sigma)"
+            type() + "::correct(volSymmTensorField& sigma)"
         )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
     }
 
@@ -1445,17 +1458,35 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 
 void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 {
-    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    // Check if the mathematical model is in total or updated Lagrangian form
+    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
+        if (!incremental())
+        {
+            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
+                << "Not implemented for non-incremental updated Lagrangian"
+                << abort(FatalError);
+        }
+
         // Lookup gradient of displacement increment
         const surfaceTensorField& gradDD =
             mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
         // Update the relative deformation gradient
         relFf() = I + gradDD.T();
+
+        // Update the total deformation gradient
+        Ff() = relFf() & Ff().oldTime();
     }
-    else
+    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
+        if (incremental())
+        {
+            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
+                << "Not implemented for incremental total Lagrangian"
+                << abort(FatalError);
+        }
+
         // Lookup gradient of displacement
         const surfaceTensorField& gradD =
             mesh().lookupObject<surfaceTensorField>("grad(D)f");
@@ -1465,6 +1496,13 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 
         // Update the relative deformation gradient
         relFf() = Ff() & inv(Ff().oldTime());
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            type() + "::correct(surfaceSymmTensorField& sigma)"
+        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
     }
 
     // Update the Jacobian of the total deformation gradient
