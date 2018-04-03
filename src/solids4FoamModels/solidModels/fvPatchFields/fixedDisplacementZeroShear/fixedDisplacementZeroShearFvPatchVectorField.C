@@ -28,7 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
 #include "volFields.H"
-#include "solidModel.H"
+//#include "solidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -190,26 +190,8 @@ void fixedDisplacementZeroShearFvPatchVectorField::updateCoeffs()
     // Set displacement
     refValue() = disp;
 
-    // Lookup the solidModel object
-    const polyMesh& mesh = patch().boundaryMesh().mesh();
-    const solidModel* solModPtr = NULL;
-    if (mesh.foundObject<solidModel>("solidProperties"))
-    {
-        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
-    }
-    else
-    {
-        solModPtr = &mesh.parent().lookupObject<solidModel>("solidProperties");
-    }
-
-    // Set gradient to force zero shear traction
-    refGrad() =
-        solModPtr->tractionBoundarySnGrad
-        (
-            vectorField(patch().size(), vector::zero),
-            scalarField(patch().size(), 0.0),
-            patch()
-        );
+    // Set gradient to zero to force zero shear traction
+    refGrad() = vector::zero;
 
     solidDirectionMixedFvPatchVectorField::updateCoeffs();
 }
