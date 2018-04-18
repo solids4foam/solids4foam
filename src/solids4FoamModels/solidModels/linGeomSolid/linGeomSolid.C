@@ -86,15 +86,15 @@ bool linGeomSolid::evolve()
 
             // Linear momentum equation total displacement form
             fvVectorMatrix DDEqn
-                (
-                    rho()*fvm::d2dt2(DD())
-                    + rho()*fvc::d2dt2(D().oldTime())
-                    == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-                    - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
-                    + fvc::div(sigma(), "div(sigma)")
-                    + rho()*g()
-                    + mechanical().RhieChowCorrection(DD(), gradDD())
-                );
+            (
+                rho()*fvm::d2dt2(DD())
+              + rho()*fvc::d2dt2(D().oldTime())
+             == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+              - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
+              + fvc::div(sigma(), "div(sigma)")
+              + rho()*g()
+              + mechanical().RhieChowCorrection(DD(), gradDD())
+            );
 
             // Under-relaxation the linear system
             DDEqn.relax();
