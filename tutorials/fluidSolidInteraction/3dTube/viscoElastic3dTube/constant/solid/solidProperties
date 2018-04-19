@@ -1,0 +1,72 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel linearGeometryTotalDisplacement;
+//solidModel unsLinearGeometry;
+//solidModel unsTotalLagrangianSolid;
+//solidModel nonLinearGeometryTotalLagrangian;
+
+linearGeometryTotalDisplacementCoeffs
+{
+    // Maximum number of momentum correctors
+    nCorrectors     1000;
+
+    // Solution tolerance for displacement
+    solutionTolerance 1e-07;
+
+    // Alternative solution tolerance for displacement
+    alternativeTolerance 1e-07;
+
+    // Material law solution tolerance
+    materialTolerance 1e-05;
+
+    // Write frequency for the residuals
+    infoFrequency   100;
+}
+
+unsLinearGeometryCoeffs
+{
+    nCorrectors             1000;
+    convergenceTolerance    1e-7;
+    relConvergenceTolerance 1e-3;
+}
+
+nonLinearGeometryTotalLagrangianCoeffs
+{
+    nCorrectors             200;
+    convergenceTolerance    1e-7;
+    relConvergenceTolerance 1e-3;
+}
+
+unsTotalLagrangianSolidCoeffs
+{
+    nCorrectors             200;
+    convergenceTolerance    1e-7;
+    relConvergenceTolerance 1e-3;
+    nonLinear no;
+    debug no;
+}
+
+unsIncrTotalLagrangianSolidCoeffs
+{
+    nCorrectors             200;
+    convergenceTolerance    1e-7;
+    relConvergenceTolerance 1e-3;
+    nonLinear no;
+    debug no;
+}
+
+// ************************************************************************* //
