@@ -29,10 +29,10 @@ coupledUnsLinearGeometryLinearElasticCoeffs
 "linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
 {
     // Maximum number of momentum correctors
-    nCorrectors     10000;
+    nCorrectors     100000;
 
     // Solution tolerance for displacement
-    //solutionTolerance 1e-06;
+    solutionTolerance 1e-07;
 
     // Alternative solution tolerance for displacement
     //alternativeTolerance 1e-07;
