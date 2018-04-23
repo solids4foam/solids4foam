@@ -1928,7 +1928,7 @@ void Foam::solidModel::setTraction
             ")"
         )   << "Boundary condition "
             << tractionPatch.type()
-            << "for patch " << tractionPatch.patch().name()
+            << " for patch " << tractionPatch.patch().name()
             << " should instead be type "
             << solidTractionFvPatchVectorField::typeName
             << " or "
