@@ -16,11 +16,15 @@ FoamFile
 
 //solidModel    linearGeometryTotalDisplacement;
 //solidModel    unsLinearGeometry;
-solidModel    nonLinearGeometryTotalLagrangian;
+solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
+//solidModel    nonLinearGeometryTotalLagrangian;
 //solidModel    nonLinearGeometryUpdatedLagrangian;
 //solidModel    unsNonLinearGeometryTotalLagrangian;
 
 "linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+{}
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {}
 
 nonLinearGeometryTotalLagrangianCoeffs
