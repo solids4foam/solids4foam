@@ -2,33 +2,44 @@
 solids4foam - a finite volume toolbox for solid mechanics and fluid solid
 interaction simulations
 
+
 ### What is this repository for? ###
 
 solids4foam is toolbox for OpenFOAM with capabilities for solid mechanics and
 fluid solid interactions.
+
 
 ### How do I get set up? ###
 
 To get setup, you must first have foam-extend-4.0 installed, details of which
 can be found on the OpenFOAM Wiki at:
 https://openfoamwiki.net/index.php/Installation
+
 Once foam-extend-4.0 has been installed, download solids4Foam and change to
 the foam-extend-4.0 branch using the command:
-$> git checkout foam-extend-4.0
-then run the enclosed Allwmake script to compile soldis4Foam.
-Note: the master branch is for foam-extend-3.2 but is not up-to-date.
-Note2: the of30parFSIwip branch compiles with OpenFOAM-3.0.1 and includes
+
+    git checkout foam-extend-4.0
+
+then run the enclosed `Allwmake` script to compile solids4Foam.
+
+Notes:
+  1. the `master` branch is for foam-extend-3.2 but is not up-to-date.
+  2. the `of30parFSIwip` branch compiles with OpenFOAM-3.0.1 and includes
 some of the functionality.
+
 
 ### Contribution guidelines ###
 
 If you would like to contribute code and/or test cases to solids4foam, please
-email philip.cardiff@ucd.ie.
+email: philip.cardiff@ucd.ie
+
 
 ### Who do I talk to? ###
 
-solids4foam is developed by Philip Cardiff and Zeljko Tukovic
+solids4foam is developed by Philip Cardiff and Zeljko Tukovic.
+
 Emails: philip.cardiff@ucd.ie and zeljko.tukovic@fsb.hr
+
 
 ### Where can I find more information? ###
 
