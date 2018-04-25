@@ -23,6 +23,7 @@ the foam-extend-4.0 branch using the command:
 then run the enclosed `Allwmake` script to compile solids4Foam.
 
 Notes:
+
   1. the `master` branch is for foam-extend-3.2 but is not up-to-date.
   2. the `of30parFSIwip` branch compiles with OpenFOAM-3.0.1 and includes
 some of the functionality.
