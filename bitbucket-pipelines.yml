@@ -1,0 +1,9 @@
+# Specify foam-extend-4.0 docker image as the build environment
+image: philippic/foam-extend-4.0:latest
+
+pipelines:
+  default:
+    - step:
+        script:
+          # Compile repository
+          - ./Allwmake
