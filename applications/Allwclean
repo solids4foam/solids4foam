@@ -1,0 +1,9 @@
+#!/bin/bash
+cd ${0%/*} || exit 1    # run from this directory
+
+echo
+echo "Cleaning applications"
+echo
+
+wclean all solvers
+wclean all utilities

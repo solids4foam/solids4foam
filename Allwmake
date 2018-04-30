@@ -1,17 +1,24 @@
 #!/bin/bash
 cd ${0%/*} || exit 1    # run from this directory
 
+# Replace files in the main foam libraries
 (cd filesToReplaceInOF && ./Allcheck)
-if [ $? -eq 1 ]
+if [ $? -ne 0 ]
 then
     echo "Please fix the filesToReplaceInOF above!"
     exit 1
 fi
 
+# Download ThirdParty software
 (cd ThirdParty && ./Allwmake)
+if [ $? -ne 0 ]
+then
+    echo "Please fix the ThirdParty errors above!"
+    exit 1
+fi
 
-wmake libso src/blockCoupledSolids4FoamTools
-wmake libso src/solids4FoamModels
+# Compile libraries
+(cd src && ./Allwmake)
 
-wmake all applications/utilities
-wmake all applications/solvers
+# Compile applications
+(cd applications && ./Allwmake)

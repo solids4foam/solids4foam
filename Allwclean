@@ -1,19 +1,13 @@
 #!/bin/sh
 
-(cd ThirdParty && \rm -rf eigen3)
+# Clean ThirdParty
+(cd ThirdParty && ./Allwclean)
 
-wclean lib src/blockCoupledSolids4FoamTools
-wclean lib src/solids4FoamModels
+# Clean libraries
+(cd src && ./Allwclean)
 
-wclean applications/utilities/addPatch
-wclean applications/utilities/addTinyPatch
-wclean applications/utilities/flattenPatch
-wclean applications/utilities/projectPatchToSphere
-wclean applications/utilities/surfaceTractions
-wclean applications/utilities/volPointInterpolate
-wclean applications/utilities/mergeSubMeshes
-wclean applications/utilities/smoothMesh
+# Clean applications
+(cd applications && ./Allwclean)
 
-wclean applications/solvers/solids4Foam
-wclean all applications/solvers
-wclean all applications/utilities
+# Clean all tutorials
+(cd tutorials && ./Allclean)

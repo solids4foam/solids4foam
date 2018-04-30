@@ -1,5 +1,0 @@
-#!/bin/sh
-set -x
-
-# clean all tutorials
-(cd tutorials && foamCleanTutorials cases)
