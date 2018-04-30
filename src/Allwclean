@@ -6,4 +6,4 @@ echo "Cleaning src"
 echo
 
 wclean lib blockCoupledSolids4FoamTools
-wclean lib solidModelsBekaert
+wclean lib solids4FoamModels

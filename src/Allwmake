@@ -2,4 +2,4 @@
 cd ${0%/*} || exit 1    # run from this directory
 
 wmake libso blockCoupledSolids4FoamTools
-wmake libso solidModelsBekaert
+wmake libso solids4FoamModels
