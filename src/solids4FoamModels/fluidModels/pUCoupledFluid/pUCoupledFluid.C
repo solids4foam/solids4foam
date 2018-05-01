@@ -123,9 +123,6 @@ tmp<vectorField> pUCoupledFluid::patchViscousForce(const label patchID) const
           & turbulence_->devReff()().boundaryField()[patchID]
         );
 
-    const vectorField n = mesh().boundary()[patchID].nf();
-    tvF() -= (sqr(n) & tvF());
-
     return tvF;
 }
 
