@@ -2131,7 +2131,7 @@ void Foam::solidModel::writeFields(const Time& runTime)
         residualD.write();
     }
 
-    runTime.write();
+    physicsModel::writeFields(runTime);
 }
 
 

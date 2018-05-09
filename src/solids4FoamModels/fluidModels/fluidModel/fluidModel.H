@@ -372,7 +372,9 @@ public:
 
             //- Write fields
             virtual void writeFields(const Time& runTime)
-            {}
+            {
+                physicsModel::writeFields(runTime);
+            }
 };
 
 
