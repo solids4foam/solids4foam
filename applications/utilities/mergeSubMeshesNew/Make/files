@@ -1,0 +1,6 @@
+mergePolyMesh.C
+
+mergeSubMeshesNew.C
+
+EXE = $(FOAM_USER_APPBIN)/mergeSubMeshesNew
+

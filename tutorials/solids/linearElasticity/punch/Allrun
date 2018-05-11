@@ -19,7 +19,7 @@ mkdir constant/punch_bottom
 \mv constant/polyMesh constant/punch_bottom/
 
 # Merge sub meshes
-runApplication mergeSubMeshes punch_top punch_bottom
+runApplication mergeSubMeshesNew punch_top punch_bottom
 
 # Scale the geometry to metres
 echo "Running transformPoints"

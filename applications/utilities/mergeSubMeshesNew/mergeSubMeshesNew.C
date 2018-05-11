@@ -27,6 +27,8 @@ Description
 
     The mesh is overwritten.
 
+    A cellZone is created for each sub-region.
+
 Author
     Philip Cardiff, UCD. All rights reserved.
 
