@@ -69,9 +69,7 @@ class laplacianSmoother
 public:
 
     //- Runtime type information
-    TypeName("laplacianSmoother");
-
-    // Static data members
+    TypeName("laplacian");
 
 
     // Constructors
@@ -79,8 +77,8 @@ public:
         //- Construct from dictionary
         laplacianSmoother
         (
-            const word& name,
-            fvMesh& mesh
+            fvMesh& mesh,
+            const dictionary& dict
         );
 
 
@@ -90,10 +88,9 @@ public:
 
 
     // Member Functions
-        
-        //- Smoothing function
-        virtual scalar smooth(bool writeIters);
 
+        //- Smoothing function
+        virtual scalar smooth();
 };
 
 

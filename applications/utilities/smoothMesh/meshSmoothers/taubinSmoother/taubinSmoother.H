@@ -67,14 +67,6 @@ class taubinSmoother
 :
     public meshSmoother
 {
-    // Private data
-
-         //- friction law coefficientdict
-//        dictionary frictionLawDict_;
-
-        //- Coulomb friction coefficient
-//        scalar frictionCoeff_;
-
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -86,7 +78,7 @@ class taubinSmoother
 public:
 
     //- Runtime type information
-    TypeName("taubinSmoother");
+    TypeName("taubin");
 
     // Static data members
 
@@ -96,8 +88,8 @@ public:
         //- Construct from dictionary
         taubinSmoother
         (
-            const word& name,
-            fvMesh& mesh
+            fvMesh& mesh,
+            const dictionary& dict
         );
 
 
@@ -109,10 +101,10 @@ public:
     // Member Functions
 
         //- Evaluate different weighing options
-        scalar weight(word weighingFunctionName, vector d);
-        
+        scalar weight(const word& weighingFunctionName, const vector& d);
+
         //- Smoothing function
-        virtual scalar smooth(bool writeIters);
+        virtual scalar smooth();
 
 };
 

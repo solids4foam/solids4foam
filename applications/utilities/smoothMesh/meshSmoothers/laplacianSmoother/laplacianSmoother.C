@@ -47,13 +47,11 @@ namespace Foam
 // Construct from dictionary
 laplacianSmoother::laplacianSmoother
 (
-    const word& name,
-    fvMesh& mesh
+    fvMesh& mesh,
+    const dictionary& dict
 )
 :
-  meshSmoother(name, mesh)
-//  frictionLawDict_(dict.subDict("frictionLawDict")),
-//  frictionCoeff_(readScalar(frictionLawDict_.lookup("frictionCoeff")))
+    meshSmoother(mesh, dict)
 {}
 
 
@@ -66,7 +64,7 @@ laplacianSmoother::~laplacianSmoother()
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 // Smoothing function
-scalar laplacianSmoother::smooth(bool writeIters)
+scalar laplacianSmoother::smooth()
 {
     const scalar lambda(readScalar(dict().lookup("lambda")));
     const int nCorr(readInt(dict().lookup("nCorrectors")));
@@ -142,14 +140,17 @@ scalar laplacianSmoother::smooth(bool writeIters)
 
     forAll(mesh().boundaryMesh(), patchI)
     {
-        const labelList& meshPointsOfBoundaryPatch = mesh().boundaryMesh()[patchI].meshPoints();
+        const labelList& meshPointsOfBoundaryPatch =
+            mesh().boundaryMesh()[patchI].meshPoints();
+
         forAll(meshPointsOfBoundaryPatch, pointI)
         {
             boundaryPoints[meshPointsOfBoundaryPatch[pointI]] = true;
         }
     }
 
-    // Calculate point-point weights using inverse distances
+    // Calculate point-point weights using inverse distances OR as an arithmetic
+    // average
     // Note: these weights are divided by the sum of the weights during
     // smoothing
     const labelListList& pointPoints = mesh().pointPoints();
@@ -177,7 +178,8 @@ scalar laplacianSmoother::smooth(bool writeIters)
                 int ctr = 0;
                 forAll(pointPoints[pointI], ppI)
                 {
-                    vector d = oldPoints[pointPoints[pointI][ppI]] - oldPoints[pointI];
+                    const vector d =
+                        oldPoints[pointPoints[pointI][ppI]] - oldPoints[pointI];
 
                     curNewPoint += d;
                     ctr++;
@@ -200,9 +202,11 @@ scalar laplacianSmoother::smooth(bool writeIters)
         // Correct patch motion and optionally smooth independently
         forAll(mesh().boundaryMesh(), patchI)
         {
-            const labelList& meshPoints = mesh().boundaryMesh()[patchI].meshPoints();
+            const labelList& meshPoints =
+                mesh().boundaryMesh()[patchI].meshPoints();
 
-            const pointField& pointNormals = mesh().boundaryMesh()[patchI].pointNormals();
+            const pointField& pointNormals =
+                mesh().boundaryMesh()[patchI].pointNormals();
 
             forAll(meshPoints, pointI)
             {
@@ -356,8 +360,8 @@ scalar laplacianSmoother::smooth(bool writeIters)
             }
         }
 
-        Info<< "Iteration: " << counter << ", max displacement: "
-            << max(residual) << endl;
+        Info<< "Iteration: " << counter << ", average displacement: "
+            << average(residual) << endl;
 
         counter++;
     }

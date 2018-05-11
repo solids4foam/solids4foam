@@ -23,24 +23,33 @@ License
     Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 Class
-    volumeSmoother
+    explicitVolumeSmoother
 
 Description
     Volume smoothing, where each point is moved based on the neighbouring cell
     centres using weights based on the volumes of the cells.
 
+    The smoothing is performed explicitly.
+
+    The volFields can be advected using an explicit advection transport equation
+    where the mesh Courant number can be limited.
+
+    Current issue for parallel in 2-D: a processor may not have cells in the
+    subSet, causing it to give an error when calculating the empty directions.
+
 SourceFiles
-    volumeSmoother.C
+    explicitVolumeSmoother.C
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef volumeSmoother_H
-#define volumeSmoother_H
+#ifndef explicitVolumeSmoother_H
+#define explicitVolumeSmoother_H
 
 #include "meshSmoother.H"
+#include "newFvMeshSubset.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -48,31 +57,57 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class volumeSmoother Declaration
+                         Class explicitVolumeSmoother Declaration
 \*---------------------------------------------------------------------------*/
 
-class volumeSmoother
+class explicitVolumeSmoother
 :
     public meshSmoother
 {
+    // Private Data
+
+        //- Sub-mesh containing the cells to be smoothed
+        mutable autoPtr<newFvMeshSubset> subMeshToSmooth_;
+
+
     // Private Member Functions
 
+        //- Return a reference to the sub mesh to be smoothed
+        fvMesh& subMeshToSmooth();
+
+        //- Return a const reference to the sub mesh to be smoothed
+        const fvMesh& subMeshToSmooth() const;
+
+        //- Return a reference to the subset mesh to be smoothed
+        newFvMeshSubset& subsetMeshToSmooth();
+
+        //- Return a const reference to the subset mesh to be smoothed
+        const newFvMeshSubset& subsetMeshToSmooth() const;
+
+        //- Return a reference to the sub mesh to be smoothed
+        void makeSubMeshToSmooth() const;
+
+        //- Calculate mesh point motion using explicit point-based method
+        void calculatePointMotionExplicitly(pointVectorField& pointMotionD);
+
         //- Disallow default bitwise copy construct
-        volumeSmoother(const volumeSmoother&);
+        explicitVolumeSmoother(const explicitVolumeSmoother&);
 
         //- Disallow default bitwise assignment
-        void operator=(const volumeSmoother&);
+        void operator=(const explicitVolumeSmoother&);
 
 public:
 
     //- Runtime type information
-    TypeName("volume");
+    TypeName("explicitVolume");
+
+    // Static data members
 
 
     // Constructors
 
         //- Construct from dictionary
-        volumeSmoother
+        explicitVolumeSmoother
         (
             fvMesh& mesh,
             const dictionary& dict
@@ -81,10 +116,13 @@ public:
 
     // Destructor
 
-        virtual ~volumeSmoother();
+        virtual ~explicitVolumeSmoother();
 
 
     // Member Functions
+
+        //- Clear out demand driven data
+        virtual void clearOut();
 
         //- Smoothing function
         virtual scalar smooth();

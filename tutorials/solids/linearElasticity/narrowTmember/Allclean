@@ -6,3 +6,4 @@
 cleanCase
 \rm -rf constant/polyMesh/sets constant/polyMesh/*Zones*
 \rm -rf VTK case.foam history
+\rm -rf system/cellsToSmoothSubset

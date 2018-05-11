@@ -1,0 +1,65 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      meshSmootherDict;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Smoothing method
+type                  explicitVolume;
+
+// Smoother settings
+explicitVolumeCoeffs
+{
+    // Optional: cell zone(s) to smooth
+    // If this entry is not found then the entire mesh is smoothed
+    //cellZones             (wire);
+
+    // Relaxation/scale factor
+    lambda                0.5;
+
+    // Use simple arithmetric weights
+    simpleAverageWeights  no;
+
+    // Number of outer smoothing iterations
+    nCorrectors           100;
+
+    // Overwrite option
+    // no: writes to the next time-step
+    // yes: overwrites the mesh
+    overwrite             yes;
+
+    // Advect fields
+    advectFields no;
+
+    // If the angle between two faces is greater than this feature angle then
+    // this sharp edge is preserved 
+    correctFeatureEdges   no;
+    featureAngle          45;
+
+    // Patches that should stay flat
+    flatPatches
+    (
+        "symmz"
+        "front"
+        "symmx"
+        "loading"
+        "fixed"
+    );
+
+    // Faces of fixed patches do not move
+    fixedPatches
+    ();
+}
+
+// ************************************************************************* //

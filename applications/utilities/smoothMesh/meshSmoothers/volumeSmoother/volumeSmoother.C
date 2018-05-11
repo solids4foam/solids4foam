@@ -28,7 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvMesh.H"
 #include "twoDPointCorrector.H"
-
+#include "cellQuality.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -43,11 +43,11 @@ namespace Foam
 // Construct from dictionary
 volumeSmoother::volumeSmoother
 (
-    const word& name,
-    fvMesh& mesh
+    fvMesh& mesh,
+    const dictionary& dict
 )
 :
-    meshSmoother(name, mesh)
+    meshSmoother(mesh, dict)
 {}
 
 
@@ -61,10 +61,9 @@ volumeSmoother::~volumeSmoother()
 
 
 // Smoothing function
-scalar volumeSmoother::smooth(bool writeIters)
+scalar volumeSmoother::smooth()
 {
     const scalar lambda(readScalar(dict().lookup("lambda")));
-    const scalar mu(readScalar(dict().lookup("mu")));
     const int nCorr(readInt(dict().lookup("nCorrectors")));
 
     fvMesh& mesh = this->mesh();
@@ -88,6 +87,33 @@ scalar volumeSmoother::smooth(bool writeIters)
         (
             "cellZone",
             "All"
+        )
+    );
+
+    const Switch onlySmoothBoundary
+    (
+        dict().lookupOrDefault<Switch>
+        (
+            "onlySmoothBoundary",
+            false
+        )
+    );
+
+    const Switch onlySmoothInterior
+    (
+        dict().lookupOrDefault<Switch>
+        (
+            "onlySmoothInterior",
+            false
+        )
+    );
+
+    const Switch boundaryFaceAreaWeights
+    (
+        dict().lookupOrDefault<Switch>
+        (
+            "boundaryFaceAreaWeights",
+            false
         )
     );
 
@@ -121,30 +147,63 @@ scalar volumeSmoother::smooth(bool writeIters)
     }
     else
     {
-        Info<< "Smoothing all points" << endl;
+        Info<< "Smoothing all cells" << endl;
         cellZonePoints = true;
     }
 
-    // Designate boundary points
-    boolList boundaryPoints(mesh.nPoints(), false);
-
-    forAll(mesh.boundaryMesh(), patchI)
+    if (onlySmoothBoundary && cellZoneName != "All")
     {
-        const labelList& meshPointsOfBoundaryPatch =
-            mesh.boundaryMesh()[patchI].meshPoints();
+        FatalError
+            << "onlySmoothBoundary is only allowed when the cellZone is set "
+            << "to All" << abort(FatalError);
+    }
+    else if (onlySmoothBoundary)
+    {
+        Info<< "Only smoothing boundary points!" << endl;
 
-        forAll(meshPointsOfBoundaryPatch, pointI)
+        cellZonePoints = false;
+
+        // Allow all boundary points to move
+        forAll(mesh.boundaryMesh(), patchI)
         {
-            boundaryPoints[meshPointsOfBoundaryPatch[pointI]] = true;
+            const labelList& meshPointsOfBoundaryPatch =
+                mesh.boundaryMesh()[patchI].meshPoints();
+
+            forAll(meshPointsOfBoundaryPatch, pointI)
+            {
+                cellZonePoints[meshPointsOfBoundaryPatch[pointI]] = true;
+            }
         }
+    }
+    else if (onlySmoothInterior)
+    {
+        Info<< "Boundary points not smoothed!" << endl;
+
+        // Allow all boundary points to move
+        forAll(mesh.boundaryMesh(), patchI)
+        {
+            const labelList& meshPointsOfBoundaryPatch =
+                mesh.boundaryMesh()[patchI].meshPoints();
+
+            forAll(meshPointsOfBoundaryPatch, pointI)
+            {
+                cellZonePoints[meshPointsOfBoundaryPatch[pointI]] = false;
+            }
+        }
+    }
+    else
+    {
+        Info<< "Smoothing boundary and interior points" << endl;
     }
 
     const labelListList& pointCells = mesh.pointCells();
     const labelListList& pointFaces = mesh.pointFaces();
 
+    //const scalarField quality = cellQuality(mesh).nonOrthogonality();
+    //const scalarField quality = cellQuality(mesh).skewness();
+
     scalarField residual(mesh.nPoints(), 0);
     label counter = 0;
-    bool shrink = true;
     pointField oldPoints = mesh.points();
     volVectorField oldC = mesh.C();
     vectorField oldCI = mesh.C().internalField();
@@ -157,231 +216,267 @@ scalar volumeSmoother::smooth(bool writeIters)
         oldCI = mesh.C().internalField();
         oldV = mesh.V();
 
-        if (!shrink)
-        {
-            counter++;
-        }
+        counter++;
 
-        forAll(newPoints, pointI)
+        if (!onlySmoothBoundary)
         {
-            // Smooth points in cellZone
-            if (cellZonePoints[pointI])
+            forAll(newPoints, pointI)
             {
-                vector curNewPoint = vector::zero;
-
-                scalar sumW = 0;
-
-                const labelList& neiCells = pointCells[pointI];
-
-                // for all neighbour cell centres
-                forAll(neiCells, pcI)
+                // Smooth points in cellZone
+                if (cellZonePoints[pointI])
                 {
-                    const label neiCellID = neiCells[pcI];
+                    vector curNewPoint = vector::zero;
 
-                    vector d = oldCI[neiCellID] - oldPoints[pointI];
+                    scalar sumW = 0;
 
-                    // Weight based on volumes of adjacent cells
-                    scalar w = oldV[neiCellID];
+                    const labelList& neiCells = pointCells[pointI];
 
-                    curNewPoint += w*d;
+                    // for all neighbour cell centres
+                    forAll(neiCells, pcI)
+                    {
+                        const label neiCellID = neiCells[pcI];
 
-                    sumW += w;
-                }
+                        const vector d = oldCI[neiCellID] - oldPoints[pointI];
 
-                curNewPoint /= sumW;
+                        // Weight based on volumes of adjacent cells
+                        const scalar w = oldV[neiCellID];
+                        //const scalar w = magSqr(oldV[neiCellID]);
+                        //const scalar w = sqrt(oldV[neiCellID]);
+                        // const scalar w =
+                        //      magSqr(oldV[neiCellID])
+                        //     *magSqr(oldV[neiCellID])
+                        //     *magSqr(oldV[neiCellID]);
+                        //const scalar w = 1.0/quality[neiCellID];
 
-                curNewPoint += oldPoints[pointI];
+                        curNewPoint += w*d;
 
-                vector disp = curNewPoint - oldPoints[pointI];
+                        sumW += w;
+                    }
 
-                if (shrink)
-                {
+                    curNewPoint /= sumW;
+
+                    curNewPoint += oldPoints[pointI];
+
+                    vector disp = curNewPoint - oldPoints[pointI];
+
                     // Relaxed motion
                     newPoints[pointI] = oldPoints[pointI] + lambda*disp;
 
                     residual[pointI] = lambda*mag(disp);
                 }
-                else
-                {
-                    // inflate
-                    newPoints[pointI] = oldPoints[pointI] - mu*disp;
-
-                    residual[pointI] = mu*mag(disp);
-                }
             }
         }
 
-        // Correct patch motion to be slip beahviour
-        forAll(mesh.boundaryMesh(), patchI)
+        if (!onlySmoothInterior)
         {
-            const labelList& meshPoints =
-                mesh.boundaryMesh()[patchI].meshPoints();
-
-            const pointField& pointNormals =
-                mesh.boundaryMesh()[patchI].pointNormals();
-
-            // Smooth boundary points independently based on
-            // neighbouring boundary face areas
-            forAll(meshPoints, pI)
+            // Correct patch motion to be slip beahviour
+            forAll(mesh.boundaryMesh(), patchI)
             {
-                const label pointID = meshPoints[pI];
+                const labelList& meshPoints =
+                    mesh.boundaryMesh()[patchI].meshPoints();
 
-                if (cellZonePoints[pointID])
+                const pointField& pointNormals =
+                    mesh.boundaryMesh()[patchI].pointNormals();
+
+                // Smooth boundary points independently based on
+                // neighbouring boundary face areas
+                forAll(meshPoints, pI)
                 {
-                    // Calculate boundary points based on neighbouring boundary
-                    // face areas
-                    vector curNewPoint = vector::zero;
+                    const label pointID = meshPoints[pI];
 
-                    scalar sumW = 0;
-
-                    const labelList& neiFaces = pointFaces[pointID];
-
-                    // for all neighbour cell centres
-                    forAll(neiFaces, pfI)
+                    if (cellZonePoints[pointID] && boundaryFaceAreaWeights)
                     {
-                        const label neiFaceID = neiFaces[pfI];
+                        // This is overwriting the cell volume approach above
 
-                        if (!mesh.isInternalFace(neiFaceID))
+                        // Calculate boundary points based on neighbouring
+                        // boundary face areas
+                        vector curNewPoint = vector::zero;
+
+                        scalar sumW = 0;
+
+                        const labelList& neiFaces = pointFaces[pointID];
+
+                        // for all neighbour cell centres
+                        forAll(neiFaces, pfI)
                         {
-                            const label opID =
-                                mesh.boundaryMesh().whichPatch(neiFaceID);
+                            const label neiFaceID = neiFaces[pfI];
 
-                            if (mesh.boundaryMesh()[opID].type() != "empty")
+                            if (!mesh.isInternalFace(neiFaceID))
                             {
-                                const label start =
-                                    mesh.boundaryMesh()[opID].start();
+                                const label opID =
+                                    mesh.boundaryMesh().whichPatch(neiFaceID);
 
-                                vector d =
-                                    oldC.boundaryField()
-                                    [
-                                        opID
-                                    ][neiFaceID - start]
-                                  - oldPoints[pointID];
+                                if
+                                (
+                                   mesh.boundaryMesh()[opID].type()
+                                != "empty"
+                                )
+                                {
+                                    const label start =
+                                        mesh.boundaryMesh()[opID].start();
 
-                                // Weight based on volumes of adjacent cells
-                                scalar w =
-                                    oldMagSf.boundaryField()
-                                    [
-                                        opID
-                                    ][neiFaceID - start];
+                                    vector d =
+                                        oldC.boundaryField()
+                                        [
+                                            opID
+                                        ][neiFaceID - start]
+                                        - oldPoints[pointID];
 
-                                curNewPoint += w*d;
+                                    // Weight based on volumes of adjacent
+                                    // boundary faces
+                                    scalar w =
+                                        oldMagSf.boundaryField()
+                                        [
+                                            opID
+                                        ][neiFaceID - start];
 
-                                sumW += w;
+                                    curNewPoint += w*d;
+
+                                    sumW += w;
+                                }
                             }
                         }
-                    }
 
-                    vector disp = vector::zero;
+                        vector disp = vector::zero;
 
-                    if (sumW > SMALL)
-                    {
-                        curNewPoint /= sumW;
-
-                        curNewPoint += oldPoints[pointID];
-
-                        disp = curNewPoint - oldPoints[pointID];
-
-                        if (shrink)
+                        if (sumW > SMALL)
                         {
+                            curNewPoint /= sumW;
+
+                            curNewPoint += oldPoints[pointID];
+
+                            disp = curNewPoint - oldPoints[pointID];
+
                             // Relaxed motion
                             newPoints[pointID] =
                                 oldPoints[pointID] + lambda*disp;
 
                             residual[pointID] = lambda*mag(disp);
                         }
-                        else
-                        {
-                            // inflate
-                            newPoints[pointID] = oldPoints[pointID] - mu*disp;
-
-                            residual[pointID] = mu*mag(disp);
-                        }
                     }
 
+                    // Keep only motion in the patch plane i.e. remove
+                    // motion normal to the patch
 
-                    // Keep only motion in the patch plane i.e. remove motion
-                    // normal to the patch
-
-                    disp = newPoints[pointID] - oldPoints[pointID];
+                    const vector pointDisp =
+                        newPoints[pointID] - oldPoints[pointID];
 
                     newPoints[pointID] =
                         oldPoints[pointID]
                         + (
-                            (I - sqr(pointNormals[pI])) & disp
+                            (I - sqr(pointNormals[pI])) & pointDisp
                         );
 
-                    residual[pointID] = mag((I - sqr(pointNormals[pI])) & disp);
+                    residual[pointID] =
+                        mag((I - sqr(pointNormals[pI])) & pointDisp);
                 }
-            }
 
-            // Correct patch boundary edge motion
+                // Correct patch boundary edge motion
 
-            const labelListList& edgeLoops =
-                mesh.boundaryMesh()[patchI].edgeLoops();
+                const labelListList& edgeLoops =
+                    mesh.boundaryMesh()[patchI].edgeLoops();
 
-            forAll(edgeLoops, elI)
-            {
-                const labelList edgeLoopI = edgeLoops[elI];
-
-                forAll(edgeLoopI, i)
+                forAll(edgeLoops, elI)
                 {
-                    label prevPointID = -1;
-                    const label pointID = meshPoints[edgeLoopI[i]];
-                    label nextPointID = -1;
+                    const labelList edgeLoopI = edgeLoops[elI];
 
-                    if (i == 0)
+                    forAll(edgeLoopI, i)
                     {
-                        prevPointID =
-                            meshPoints[edgeLoopI[edgeLoopI.size() - 1]];
-                        nextPointID =
-                            meshPoints[edgeLoopI[1]];
-                    }
-                    else if (i == edgeLoopI.size() - 1)
-                    {
-                        prevPointID =
-                            meshPoints[edgeLoopI[i - 1]];
-                        nextPointID =
-                            meshPoints[edgeLoopI[0]];
-                    }
-                    else
-                    {
-                        prevPointID =
-                            meshPoints[edgeLoopI[i - 1]];
-                        nextPointID =
-                            meshPoints[edgeLoopI[i + 1]];
-                    }
+                        label prevPointID = -1;
+                        const label pointID = meshPoints[edgeLoopI[i]];
+                        label nextPointID = -1;
 
-                    const bool independentEdges = true;
-                    if (independentEdges && cellZonePoints[pointID])
-                    {
-                        vector d0 = oldPoints[prevPointID] - oldPoints[pointID];
+                        if (i == 0)
+                        {
+                            prevPointID =
+                                meshPoints[edgeLoopI[edgeLoopI.size() - 1]];
+                            nextPointID =
+                                meshPoints[edgeLoopI[1]];
+                        }
+                        else if (i == edgeLoopI.size() - 1)
+                        {
+                            prevPointID =
+                                meshPoints[edgeLoopI[i - 1]];
+                            nextPointID =
+                                meshPoints[edgeLoopI[0]];
+                        }
+                        else
+                        {
+                            prevPointID =
+                                meshPoints[edgeLoopI[i - 1]];
+                            nextPointID =
+                                meshPoints[edgeLoopI[i + 1]];
+                        }
 
-                        vector d1 = oldPoints[nextPointID] - oldPoints[pointID];
+                        const bool independentEdges = true;
+                        if (independentEdges && cellZonePoints[pointID])
+                        {
+                            vector d0 =
+                                oldPoints[prevPointID] - oldPoints[pointID];
 
-                        // Calculate inverse distance weights
-                        // scalar w0 = 1.0/mag(d0);
-                        // scalar w1 = 1.0/mag(d1);
-                        // Uniform weights
-                        scalar w0 = 1.0;
-                        scalar w1 = 1.0;
+                            vector d1 =
+                                oldPoints[nextPointID] - oldPoints[pointID];
 
-                        vector disp = w0*d0 + w1*d1;
+                            // Calculate inverse distance weights
+                            // scalar w0 = 1.0/mag(d0);
+                            // scalar w1 = 1.0/mag(d1);
+                            // Uniform weights
+                            scalar w0 = 1.0;
+                            scalar w1 = 1.0;
 
-                        scalar sumW = w0 + w1;
-                        disp /= sumW;
+                            vector disp = w0*d0 + w1*d1;
 
-                        // Keep disp component only in edge direction
-                        vector l =
-                            oldPoints[nextPointID] - oldPoints[prevPointID];
-                        l /= mag(l);
-                        disp = sqr(l) & disp;
+                            scalar sumW = w0 + w1;
+                            disp /= sumW;
+
+                            // Keep disp component only in edge direction
+                            vector l =
+                                oldPoints[nextPointID] - oldPoints[prevPointID];
+                            l /= mag(l);
+                            disp = sqr(l) & disp;
+
+                            // No smoothing if the angle between the two
+                            // adjoining edges is large
+                            vector e0 =
+                                oldPoints[pointID] - oldPoints[prevPointID];
+                            e0 /= mag(e0);
+                            vector e1 =
+                                oldPoints[nextPointID] - oldPoints[pointID];
+                            e1 /= mag(e1);
+
+                            if ((e0 & e1) < edgeAngleDot)
+                            {
+                                disp = vector::zero;
+                            }
+
+                            // Relaxed motion
+                            newPoints[pointID] =
+                                oldPoints[pointID] + lambda*disp;
+
+                            residual[pointID] = lambda*mag(disp);
+                        }
+
+                        // Just correct edge point motion
+                        vector disp = newPoints[pointID] - oldPoints[pointID];
 
                         // No smoothing if the angle between the two
                         // adjoining edges is large
                         vector e0 = oldPoints[pointID] - oldPoints[prevPointID];
+                        if (mag(e0) < SMALL)
+                        {
+                            FatalErrorIn("volumeSmoother")
+                                << "Two boundary points are coincident"
+                                    << exit(FatalError);
+                        }
                         e0 /= mag(e0);
+
                         vector e1 = oldPoints[nextPointID] - oldPoints[pointID];
+                        if (mag(e1) < SMALL)
+                        {
+                            FatalErrorIn("volumeSmoother")
+                                << "Two boundary points are coincident"
+                                    << exit(FatalError);
+                        }
                         e1 /= mag(e1);
 
                         if ((e0 & e1) < edgeAngleDot)
@@ -389,76 +484,22 @@ scalar volumeSmoother::smooth(bool writeIters)
                             disp = vector::zero;
                         }
 
-                        if (shrink)
-                        {
-                            // Relaxed motion
-                            newPoints[pointID] =
-                                oldPoints[pointID] + lambda*disp;
+                        // Keep only motion in the edge direction i.e. points on
+                        // an edge can only slide along that edge
+                        vector l =
+                            oldPoints[nextPointID] - oldPoints[prevPointID];
+                        l /= mag(l);
 
-                            residual[pointID] = lambda*mag(disp);
-                        }
-                        else
-                        {
-                            // Inflate
-                            //newPoints[pointID] -= mu*disp;
-                            // They may be smoothed more than once
-                            newPoints[pointID] = oldPoints[pointID] - mu*disp;
-
-                            residual[pointID] = mu*mag(disp);
-                        }
-                    }
-
-                    // Just correct edge point motion
-                    vector disp = newPoints[pointID] - oldPoints[pointID];
-
-                    // No smoothing if the angle between the two
-                    // adjoining edges is large
-                    vector e0 = oldPoints[pointID] - oldPoints[prevPointID];
-                    if (mag(e0) < SMALL)
-                    {
-                        FatalErrorIn("volumeSmoother")
-                            << "Two boundary points are coincident"
-                            << exit(FatalError);
-                    }
-                    e0 /= mag(e0);
-
-                    vector e1 = oldPoints[nextPointID] - oldPoints[pointID];
-                    if (mag(e1) < SMALL)
-                    {
-                        FatalErrorIn("volumeSmoother")
-                            << "Two boundary points are coincident"
-                            << exit(FatalError);
-                    }
-                    e1 /= mag(e1);
-
-                    if ((e0 & e1) < edgeAngleDot)
-                    {
-                        disp = vector::zero;
-                    }
-
-                    // Keep only motion in the edge direction i.e. points on
-                    // an edge can only slide along that edge
-                    vector l =
-                        oldPoints[nextPointID] - oldPoints[prevPointID];
-                    l /= mag(l);
-
-                    // We will increase the lambda parameter on edges to account
-                    // for the lower number of neighbours: factor found by
-                    // trial-and-error
-                    const scalar sFac = 1.0;
-                    if (shrink)
-                    {
+                        // We will increase the lambda parameter on edges to
+                        // account for the lower number of neighbours: factor
+                        // found by trial-and-error
+                        const scalar sFac = 1.0;
                         // Relaxed motion
                         newPoints[pointID] =
-                            oldPoints[pointID] + (sqr(l) & sFac*lambda*disp);
+                            oldPoints[pointID]
+                            + (sqr(l) & sFac*lambda*disp);
+
                         residual[pointID] = mag(sqr(l) & sFac*lambda*disp);
-                    }
-                    else
-                    {
-                        // inflate
-                        newPoints[pointID] =
-                            oldPoints[pointID] - (sqr(l) & sFac*mu*disp);
-                        residual[pointID] = mag(sqr(l) & sFac*mu*disp);
                     }
                 }
             }
@@ -477,15 +518,6 @@ scalar volumeSmoother::smooth(bool writeIters)
         mesh.moving(false);
         mesh.changing(false);
         mesh.setPhi().writeOpt() = IOobject::NO_WRITE;
-
-        if (shrink)
-        {
-            shrink = false;
-        }
-        else
-        {
-            shrink = true;
-        }
     }
     while (counter < nCorr);
 

@@ -30,10 +30,10 @@ Description
 
 SourceFiles
     meshSmoother.C
-    newMeshSmoother.C
+    meshSmootherTemplates.C
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
@@ -46,6 +46,8 @@ Author
 #include "volFields.H"
 #include "tmp.H"
 #include "autoPtr.H"
+//#include "conservativeMeshToMesh.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -65,13 +67,39 @@ class meshSmoother
         // Reference to the mesh
         fvMesh& mesh_;
 
-        // Mesh smoothing dict
-        IOdictionary meshSmootherDict_;
+        // Take a copy of the meshSmooth dict
+        const dictionary dict_;
 
         // Old points instance
         word oldInstance_;
 
+        //- Store a copy of the old mesh points
+        //  This is used by the mapFields function
+        pointField oldPoints_;
+
+        //- Flag to record if the advectFields function has been called
+        bool fieldsAdvected_;
+
+
     // Private Member Functions
+
+        //- Map vol fields
+        // template<class Type>
+        // void MapConservativeVolFields
+        // (
+        //     const conservativeMeshToMesh& meshToMeshInterp,
+        //     const label method
+        // );
+
+        //- Advect vol fields
+        template<class Type>
+        void AdvectVolFields
+        (
+            const surfaceScalarField& sweptVol,
+            const volScalarField& volOld,
+            const volScalarField& volNew,
+            const wordList& ignoreFields
+        );
 
         //- Disallow copy construct
         meshSmoother(const meshSmoother&);
@@ -80,42 +108,49 @@ class meshSmoother
         void operator=(const meshSmoother&);
 
 
+protected:
+
+        //- Correct boundary motion of given point motion field
+        void correctBoundaryMotion(pointVectorField& pointMotionD);
+
+
 public:
 
     //- Runtime type information
     TypeName("meshSmoother");
 
-    // Declare run-time constructor selection table
-    declareRunTimeSelectionTable
+
+        // Declare run-time constructor selection table
+        declareRunTimeSelectionTable
         (
             autoPtr,
             meshSmoother,
             dictionary,
             (
-                const word name,
-                fvMesh& mesh
+                fvMesh& mesh,
+                const dictionary& dict
             ),
-            (name, mesh)
+            (mesh, dict)
         );
 
 
     // Selectors
 
-        //- Return a reference to the selected smoother algorithm
+        //- Return a pointer to the new smoother
         static autoPtr<meshSmoother> New
         (
-            const word& name,
-                fvMesh& mesh
+            fvMesh& mesh,
+            const dictionary& dict
         );
 
 
     // Constructors
 
-        //- Construct from dictionary
+        //- Construct from mesh and dictionary
         meshSmoother
         (
-            const word& name,
-                fvMesh& mesh
+            fvMesh& mesh,
+            const dictionary& dict
         );
 
 
@@ -133,10 +168,16 @@ public:
             return mesh_;
         }
 
+        //- Return const reference to mesh
+        const fvMesh& mesh() const
+        {
+            return mesh_;
+        }
+
         //- Return reference to meshSmootherDict
         const dictionary& dict() const
         {
-            return meshSmootherDict_;
+            return dict_;
         }
 
         //- Return reference to mesh
@@ -145,11 +186,46 @@ public:
             return oldInstance_;
         }
 
-        //- The actual smoothing function
-        virtual scalar smooth(bool writeIters) = 0;
+        //- Should the mesh and field be overwritten
+        const Switch overwrite() const
+        {
+            return Switch(dict_.lookupOrDefault<Switch>("overwrite", false));
+        }
 
-        //- Mesh writting based on option specified in dictionary
-        virtual void writeSmoothedMesh(Time& runTime);
+        //- Clear out demand driven data
+        virtual void clearOut()
+        {}
+
+        //- Fields advected
+        bool fieldsAdvected() const
+        {
+            return fieldsAdvected_;
+        }
+
+        //- The actual smoothing function
+        virtual scalar smooth() = 0;
+
+        //- Store the old points before the smoothing is performed
+        virtual void storeOldPoints(const pointField& oldPoints);
+
+        //- Map all GeometricFields (e.g volFields, pointFields, surfaceFields)
+        //  associated with the mesh
+        virtual void mapFields()
+        {
+            notImplemented(type() + "::mapFields()");
+        }
+
+        //- Advect all the GeometricFields (e.g volFields, pointFields,
+        //  surfaceFields) using the suplied mesh flux
+        virtual void advectFields
+        (
+            const scalarField& sweptVol,
+            const scalarField& volOld,
+            const scalarField& volNew
+        );
+
+        //- Write the mesh
+        virtual void writeMesh();
 
 };
 
@@ -157,6 +233,12 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#ifdef NoRepository
+#   include "meshSmootherTemplates.C"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

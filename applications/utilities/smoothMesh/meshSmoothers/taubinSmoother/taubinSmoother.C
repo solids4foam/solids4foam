@@ -47,13 +47,11 @@ namespace Foam
 // Construct from dictionary
 taubinSmoother::taubinSmoother
 (
-    const word& name,
-    fvMesh& mesh
+    fvMesh& mesh,
+    const dictionary& dict
 )
 :
-  meshSmoother(name, mesh)
-//  frictionLawDict_(dict.subDict("frictionLawDict")),
-//  frictionCoeff_(readScalar(frictionLawDict_.lookup("frictionCoeff")))
+    meshSmoother(mesh, dict)
 {}
 
 
@@ -66,10 +64,15 @@ taubinSmoother::~taubinSmoother()
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 // Calculate weighing for given distance between two points
-scalar taubinSmoother::weight(word weighingFunctionName, vector d)
+scalar taubinSmoother::weight(const word& weighingFunctionName, const vector& d)
 {
     scalar w = 1.0;
-    if (weighingFunctionName == "inverseDistance")
+
+    if (weighingFunctionName == "arithmeticAverage")
+    {
+        w = 1.0;
+    }
+    else if (weighingFunctionName == "inverseDistance")
     {
         w = 1.0/mag(d);
     }
@@ -81,13 +84,22 @@ scalar taubinSmoother::weight(word weighingFunctionName, vector d)
     {
         w = 1.0/Foam::sqrt(mag(d));
     }
+    else
+    {
+        FatalErrorIn
+        (
+            "scalar taubinSmoother::weight"
+            "(const word& weighingFunctionName, const vector& d)"
+        )   << "weighingFunctionName " << weighingFunctionName
+            << " is not known!" << abort(FatalError);
+    }
 
     return w;
 }
 
 
 // Smoothing function
-scalar taubinSmoother::smooth(bool writeIters)
+scalar taubinSmoother::smooth()
 {
 
     const scalar lambda(readScalar(dict().lookup("lambda")));
@@ -131,9 +143,10 @@ scalar taubinSmoother::smooth(bool writeIters)
         dict().lookupOrDefault<word>
         (
             "weighingFunction",
-            "inverseDistance"
+            "arithmeticAverage"
         )
     );
+    Info<< "        weighingFunction: " << weighingFunctionName << endl;
 
     label cellZoneID = -1;
 

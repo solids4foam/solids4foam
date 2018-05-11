@@ -3,5 +3,5 @@
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
 runApplication blockMesh
-runApplication smoothMesh
+runApplication smoothMesh -noFields
 runApplication solids4Foam
