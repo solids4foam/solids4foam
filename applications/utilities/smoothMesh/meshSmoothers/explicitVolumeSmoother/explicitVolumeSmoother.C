@@ -185,9 +185,9 @@ void explicitVolumeSmoother::calculatePointMotionExplicitly
     vectorField& pointMotionDI = pointMotionD.internalField();
     const scalarField& oldV = subMesh.V();
     const labelListList& pointCells = subMesh.pointCells();
-    const labelListList& pointFaces = subMesh.pointFaces();
+    //const labelListList& pointFaces = subMesh.pointFaces();
     const pointField& oldPoints = subMesh.points();
-    const volVectorField& oldC = subMesh.C();
+    //const volVectorField& oldC = subMesh.C();
     const vectorField& oldCI = subMesh.C().internalField();
 
 

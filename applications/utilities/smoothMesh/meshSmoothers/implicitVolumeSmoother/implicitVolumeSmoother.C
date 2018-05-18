@@ -588,7 +588,7 @@ void implicitVolumeSmoother::calculatePointMotionImplicitly
     );
 
     // Take a reference to the interalFields for efficiency and convenience
-    vectorField& pointMotionDI = pointMotionD.internalField();
+    //vectorField& pointMotionDI = pointMotionD.internalField();
     vectorField& cellMotionDI = cellMotionD.internalField();
 
     // Calculate the diffusivity field for the smooth: this governs the
