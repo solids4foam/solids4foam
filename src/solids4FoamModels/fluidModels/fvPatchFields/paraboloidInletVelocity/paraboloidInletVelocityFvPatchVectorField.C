@@ -1,0 +1,300 @@
+/*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | foam-extend: Open Source CFD
+   \\    /   O peration     | Version:     4.0
+    \\  /    A nd           | Web:         http://www.foam-extend.org
+     \\/     M anipulation  | For copyright notice see file Copyright
+-------------------------------------------------------------------------------
+License
+    This file is part of foam-extend.
+
+    foam-extend is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    foam-extend is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+
+\*---------------------------------------------------------------------------*/
+
+#include "paraboloidInletVelocityFvPatchVectorField.H"
+#include "addToRunTimeSelectionTable.H"
+#include "volFields.H"
+#include "surfaceFields.H"
+#include "fvcMeshPhi.H"
+#include "backwardDdtScheme.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+paraboloidInletVelocityFvPatchVectorField::
+paraboloidInletVelocityFvPatchVectorField
+(
+    const fvPatch& p,
+    const DimensionedField<vector, volMesh>& iF
+)
+:
+    fixedValueFvPatchVectorField(p, iF),
+    Umax_(0.0),
+    yMax_(0.0),
+    zMax_(0.0),
+    timeVarying_(false),
+    timeAtMaxVelocity_(0.0)
+{}
+
+
+paraboloidInletVelocityFvPatchVectorField::
+paraboloidInletVelocityFvPatchVectorField
+(
+    const paraboloidInletVelocityFvPatchVectorField& ptf,
+    const fvPatch& p,
+    const DimensionedField<vector, volMesh>& iF,
+    const fvPatchFieldMapper& mapper
+)
+:
+    fixedValueFvPatchVectorField(ptf, p, iF, mapper),
+    Umax_(ptf.Umax_),
+    yMax_(ptf.yMax_),
+    zMax_(ptf.zMax_),
+    timeVarying_(ptf.timeVarying_),
+    timeAtMaxVelocity_(ptf.timeAtMaxVelocity_)
+{}
+
+
+paraboloidInletVelocityFvPatchVectorField::
+paraboloidInletVelocityFvPatchVectorField
+(
+    const fvPatch& p,
+    const DimensionedField<vector, volMesh>& iF,
+    const dictionary& dict
+)
+:
+    fixedValueFvPatchVectorField(p, iF, dict),
+    Umax_(readScalar(dict.lookup("maxVelocity"))),
+    yMax_(readScalar(dict.lookup("yWidth"))),
+    zMax_(readScalar(dict.lookup("zWidth"))),
+    timeVarying_(dict.lookup("timeVarying")),
+    timeAtMaxVelocity_
+    (
+        timeVarying_
+      ? readScalar(dict.lookup("timeAtMaxVelocity"))
+      : 0.0
+    )
+{}
+
+
+paraboloidInletVelocityFvPatchVectorField::
+paraboloidInletVelocityFvPatchVectorField
+(
+    const paraboloidInletVelocityFvPatchVectorField& pivpvf
+)
+:
+    fixedValueFvPatchVectorField(pivpvf),
+    Umax_(pivpvf.Umax_),
+    yMax_(pivpvf.yMax_),
+    zMax_(pivpvf.zMax_),
+    timeVarying_(pivpvf.timeVarying_),
+    timeAtMaxVelocity_(pivpvf.timeAtMaxVelocity_)
+{}
+
+
+paraboloidInletVelocityFvPatchVectorField::
+paraboloidInletVelocityFvPatchVectorField
+(
+    const paraboloidInletVelocityFvPatchVectorField& pivpvf,
+    const DimensionedField<vector, volMesh>& iF
+)
+:
+    fixedValueFvPatchVectorField(pivpvf, iF),
+    Umax_(pivpvf.Umax_),
+    yMax_(pivpvf.yMax_),
+    zMax_(pivpvf.zMax_),
+    timeVarying_(pivpvf.timeVarying_),
+    timeAtMaxVelocity_(pivpvf.timeAtMaxVelocity_)
+{}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void paraboloidInletVelocityFvPatchVectorField::updateCoeffs()
+{
+    if (updated())
+    {
+        return;
+    }
+
+    const fvMesh& mesh = dimensionedInternalField().mesh();
+    const vectorField::subField Cf = patch().patch().faceCentres();
+
+    // Calculate the max velocity for the current time
+    scalar curMaxU = Umax_;
+    if (timeVarying_)
+    {
+        curMaxU =
+            Umax_*(1.0 - cos(M_PI*db().time().value()/timeAtMaxVelocity_))/2.0;
+    }
+
+    // Info<< "curMaxU: " << curMaxU << endl;
+
+    // Calculate the patch velocity
+    vectorField patchU(patch().size(), vector::zero);
+    forAll(patchU, faceI)
+    {
+        const scalar y = Cf[faceI].y();
+        const scalar z = Cf[faceI].z();
+
+        patchU[faceI] =
+            curMaxU*y*(zMax_ - y)*(sqr(zMax_) - sqr(z))
+           *vector(1, 0, 0)/(sqr(yMax_)*sqr(zMax_));
+    }
+
+    fvPatchField<vector>::operator==(patchU);
+
+    fixedValueFvPatchVectorField::updateCoeffs();
+}
+
+
+Foam::tmp<Foam::Field<vector> > paraboloidInletVelocityFvPatchVectorField::
+snGrad() const
+{
+//     Info << "snGrad - in" << endl;
+
+    bool secondOrder_ = false;
+
+    word UName = this->dimensionedInternalField().name();
+
+    const fvPatchField<tensor>& gradU =
+        patch().lookupPatchField<volTensorField, tensor>
+        (
+            "grad(" + UName + ")"
+        );
+
+    vectorField n = this->patch().nf();
+    vectorField delta = this->patch().delta();
+    vectorField k = delta - n*(n&delta);
+
+    if (secondOrder_)
+    {
+        vectorField dUP = (k&gradU.patchInternalField());
+        vectorField nGradUP = (n&gradU.patchInternalField());
+
+        tmp<Field<vector> > tnGradU
+        (
+            new vectorField(this->patch().size(), vector::zero)
+        );
+
+        tnGradU() =
+            2
+           *(
+                *this
+              - (patchInternalField() + dUP)
+            )*this->patch().deltaCoeffs()
+          - nGradUP;
+
+        return tnGradU;
+    }
+
+    // First order
+    vectorField dUP = (k&gradU.patchInternalField());
+
+    tmp<Field<vector> > tnGradU
+    (
+        new vectorField(this->patch().size(), vector::zero)
+    );
+
+    tnGradU() =
+        (
+            *this
+          - (patchInternalField() + dUP)
+        )*this->patch().deltaCoeffs();
+
+    return tnGradU;
+}
+
+
+tmp<Field<vector> > paraboloidInletVelocityFvPatchVectorField::
+gradientBoundaryCoeffs() const
+{
+    bool secondOrder_ = false;
+
+    word UName = this->dimensionedInternalField().name();
+
+    const fvPatchField<tensor>& gradU =
+        patch().lookupPatchField<volTensorField, tensor>
+        (
+            "grad(" + UName + ")"
+        );
+
+    vectorField n = this->patch().nf();
+    vectorField delta = this->patch().delta();
+    vectorField k = delta - n*(n&delta);
+
+    if (secondOrder_)
+    {
+        vectorField dUP = (k&gradU.patchInternalField());
+        vectorField nGradUP = (n&gradU.patchInternalField());
+
+        return
+            this->patch().deltaCoeffs()
+           *(
+                2*(*this - dUP)
+              - patchInternalField()
+            )
+          - nGradUP;
+    }
+
+    // First order
+    vectorField dUP = (k&gradU.patchInternalField());
+
+    return
+        this->patch().deltaCoeffs()
+       *(
+           *this - dUP
+        );
+}
+
+
+void paraboloidInletVelocityFvPatchVectorField::write(Ostream& os) const
+{
+    os.writeKeyword("maxVelocity")
+        << Umax_ << token::END_STATEMENT << nl;
+
+    os.writeKeyword("yWidth")
+        << yMax_ << token::END_STATEMENT << nl;
+
+    os.writeKeyword("zWidth")
+        << zMax_ << token::END_STATEMENT << nl;
+
+    os.writeKeyword("timeVarying")
+        << timeVarying_ << token::END_STATEMENT << nl;
+
+    os.writeKeyword("timeAtMaxVelocity")
+        << timeAtMaxVelocity_ << token::END_STATEMENT << nl;
+
+    fixedValueFvPatchVectorField::write(os);
+}
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+makePatchTypeField
+(
+    fvPatchVectorField,
+    paraboloidInletVelocityFvPatchVectorField
+);
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// ************************************************************************* //

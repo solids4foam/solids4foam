@@ -138,6 +138,7 @@ $(fluidFvPatchFields)/newMovingWallVelocity/newMovingWallVelocityFvPatchVectorFi
 $(fluidFvPatchFields)/normalInletVelocity/normalInletVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/outflowPressure/outflowPressureFvPatchScalarField.C
 $(fluidFvPatchFields)/pulsedParabolicVelocity/pulsedParabolicVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/paraboloidInletVelocity/paraboloidInletVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/robin/robinFvPatchFields.C
 $(fluidFvPatchFields)/skewCorrectedLinearDC/skewCorrectedLinearDC.C
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
