@@ -7,3 +7,4 @@ cleanCase
 \rm -rf 0/cellToRegion history constant/polyMesh/boundary
 \rm case.foam
 \cp 0/org/* 0/
+\rm -rf system/*Subset

@@ -5,3 +5,4 @@
 
 cleanCase
 \rm -rf constant/polyMesh/boundary case.foam history
+\rm -rf system/*Subset

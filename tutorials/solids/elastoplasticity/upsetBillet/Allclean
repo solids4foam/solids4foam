@@ -5,3 +5,4 @@
 
 cleanCase
 \rm -rf case.foam contact history
+\rm -rf system/*Subset
