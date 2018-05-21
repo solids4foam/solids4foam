@@ -64,7 +64,7 @@ bool thermalLinGeomSolid::converged
 
     // Calculate relative residuals
     const scalar absResidualT =
-        gMax(mag(T.internalField() - T.oldTime().internalField()));
+        gMax(mag(T.internalField() - T.prevIter().internalField()));
     const scalar residualT =
         absResidualT
        /max
