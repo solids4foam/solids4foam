@@ -27,8 +27,8 @@ runApplication -l log.setFields.fluid setFields
 runApplication solids4Foam
 
 # Run parallel
-#runApplication decomposeParFsi
-#runApplication -l log.decomposeParFsi.solid decomposeParFsi -region solid
+#runApplication decomposePar
+#runApplication -l log.decomposePar.solid decomposePar -region solid
 #runParallel solids4Foam
 
 # ----------------------------------------------------------------- end-of-file

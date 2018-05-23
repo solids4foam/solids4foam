@@ -15,8 +15,8 @@ runApplication -l log.setsToZones.fluid setsToZones -region fluid -noFlipMap
 runApplication solids4Foam
 
 # Run parallel
-#runApplication -l log.decomposeParFsi.fluid decomposeParFsi -region fluid
-#runApplication -l log.decomposeParFsi.solid decomposeParFsi -region solid
+#runApplication -l log.decomposePar.fluid decomposePar -region fluid
+#runApplication -l log.decomposePar.solid decomposePar -region solid
 #runParallel solids4Foam 4
 #runApplication -l log.reconstructPar.fluid reconstructPar -region fluid
 #runApplication -l log.reconstructPar.solid reconstructPar -region solid
