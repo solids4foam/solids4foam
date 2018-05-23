@@ -1731,7 +1731,8 @@ void Foam::fluidSolidInterface::syncFluidZonePointsDispl
 
 void Foam::fluidSolidInterface::writeFields(const Time& runTime)
 {
-    fluid().writeFields(runTime);
+    // solid calls runTime.write() to write both solid and fluid fields
+    //fluid().writeFields(runTime);
     solid().writeFields(runTime);
 }
 

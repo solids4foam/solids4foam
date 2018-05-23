@@ -2094,7 +2094,7 @@ void Foam::solidModel::writeFields(const Time& runTime)
         Info<< "Max epsilonEq = " << gMax(epsilonEq) << endl;
     }
 
-    // Calculaute equivalent (von Mises) stress
+    // Calculate equivalent (von Mises) stress
     volScalarField sigmaEq
     (
         "sigmaEq", sqrt((3.0/2.0)*magSqr(dev(sigma())))
