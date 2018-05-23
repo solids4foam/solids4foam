@@ -733,6 +733,13 @@ Foam::fluidModel::globalToLocalFaceZonePointMap() const
     return *globalToLocalFaceZonePointMapPtr_;
 }
 
+
+void Foam::fluidModel::writeFields(const Time& runTime)
+{
+    physicsModel::writeFields(runTime);
+}
+
+
 bool Foam::fluidModel::read()
 {
     if (regIOobject::read())

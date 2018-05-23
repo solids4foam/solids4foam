@@ -2095,23 +2095,13 @@ void Foam::solidModel::writeFields(const Time& runTime)
     }
 
     // Calculaute equivalent (von Mises) stress
-    {
-        volScalarField sigmaEq
-        (
-            IOobject
-            (
-                "sigmaEq",
-                runTime.timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::AUTO_WRITE
-            ),
-            sqrt((3.0/2.0)*magSqr(dev(sigma())))
-        );
-        sigmaEq.write();
+    volScalarField sigmaEq
+    (
+        "sigmaEq", sqrt((3.0/2.0)*magSqr(dev(sigma())))
+    );
+    sigmaEq.write();
 
-        Info<< "Max sigmaEq (von Mises stress) = " << gMax(sigmaEq) << endl;
-    }
+    Info<< "Max sigmaEq (von Mises stress) = " << gMax(sigmaEq) << endl;
 
     // If asked, write the residual field
     if (writeResidualField_)

@@ -371,10 +371,7 @@ public:
             virtual bool read();
 
             //- Write fields
-            virtual void writeFields(const Time& runTime)
-            {
-                physicsModel::writeFields(runTime);
-            }
+            virtual void writeFields(const Time& runTime);
 };
 
 

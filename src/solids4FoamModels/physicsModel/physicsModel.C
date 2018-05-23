@@ -258,4 +258,10 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New(Time& runTime)
 }
 
 
+void Foam::physicsModel::writeFields(const Time& runTime)
+{
+    runTime.write();
+}
+
+
 // ************************************************************************* //

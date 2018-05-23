@@ -133,7 +133,6 @@ void paraboloidInletVelocityFvPatchVectorField::updateCoeffs()
         return;
     }
 
-    const fvMesh& mesh = dimensionedInternalField().mesh();
     const vectorField::subField Cf = patch().patch().faceCentres();
 
     // Calculate the max velocity for the current time

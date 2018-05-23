@@ -185,10 +185,7 @@ public:
             {}
 
             //- Write fields
-            virtual void writeFields(const Time& runTime)
-            {
-                runTime.write();
-            }
+            virtual void writeFields(const Time& runTime);
 
             //- This function is called at the end of the simulation
             virtual void end()
