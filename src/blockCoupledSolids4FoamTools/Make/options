@@ -1,8 +1,8 @@
-#if defined(__GNUC__)
+ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
     DISABLE_WARNING_FLAGS = -Wno-old-style-cast
-#else
+else
     DISABLE_WARNING_FLAGS =
-#endif
+endif
 
 EXE_INC = \
     $(DISABLE_WARNING_FLAGS) \
