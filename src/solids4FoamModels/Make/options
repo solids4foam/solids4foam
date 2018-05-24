@@ -1,4 +1,11 @@
+#if defined(__GNUC__)
+    DISABLE_WARNING_FLAGS = -Wno-old-style-cast
+#else
+    DISABLE_WARNING_FLAGS =
+#endif
+
 EXE_INC = \
+    $(DISABLE_WARNING_FLAGS) \
     -std=c++11 \
     -I../../ThirdParty/eigen3 \
     -I../blockCoupledSolids4FoamTools/lnInclude \
