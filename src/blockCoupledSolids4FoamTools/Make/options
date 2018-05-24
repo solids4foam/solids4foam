@@ -5,6 +5,7 @@
 #endif
 
 EXE_INC = \
+    $(DISABLE_WARNING_FLAGS) \
     -I../../ThirdParty/eigen3 \
     -I../solids4FoamModels/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
