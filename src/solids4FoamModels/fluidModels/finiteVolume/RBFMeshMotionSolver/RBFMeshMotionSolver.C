@@ -6,6 +6,8 @@
 
 #include "RBFMeshMotionSolver.H"
 #include <unordered_map>
+#include <memory>
+#include <vector>
 
 using namespace Foam;
 
@@ -32,7 +34,7 @@ RBFMeshMotionSolver::RBFMeshMotionSolver(
     fixedPatches( lookup( "fixedPatches" ) ),
     fixedPatchIDs( fixedPatches.size() ),
     newPoints( mesh.points().size(), vector::zero ),
-    rbf( false ),
+    rbf(), // PC, 28-May-18: there should be no argument
     nbGlobalFaceCenters( Pstream::nProcs(), 0 ),
     nbGlobalMovingFaceCenters( Pstream::nProcs(), 0 ),
     nbGlobalStaticFaceCenters( Pstream::nProcs(), 0 ),
