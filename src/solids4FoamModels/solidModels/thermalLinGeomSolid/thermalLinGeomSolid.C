@@ -233,7 +233,7 @@ thermalLinGeomSolid::thermalLinGeomSolid
 
 bool thermalLinGeomSolid::evolve()
 {
-    Info << "Evolving thermal solid solver" << endl;
+    Info<< "Evolving thermal solid solver" << endl;
 
     int iCorr = 0;
     lduSolverPerformance solverPerfD;
@@ -243,7 +243,7 @@ bool thermalLinGeomSolid::evolve()
     Info<< "Solving coupled energy and displacements equation for T and D"
         << endl;
 
-    // Energy equation non-orthogonality corrector loop
+    // Momentum-energy coupling outer loop
     do
     {
         // Store fields for under-relaxation and residual calculation
