@@ -215,7 +215,7 @@ bool nonLinGeomTotalLagSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
+    mechanical().interpolate(DD(), pointDD());
 
     // Increment of displacement
     D() = D().oldTime() + DD();

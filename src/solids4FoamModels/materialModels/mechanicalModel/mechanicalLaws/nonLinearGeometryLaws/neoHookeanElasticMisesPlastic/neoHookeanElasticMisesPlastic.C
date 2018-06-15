@@ -1188,17 +1188,30 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
             FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
                 << "Not implemented for incremental total Lagrangian"
                 << abort(FatalError);
+
+            // Lookup gradient of displacement increment
+            const volTensorField& gradDD =
+                mesh().lookupObject<volTensorField>("grad(DD)");
+
+            // Update the total deformation gradient
+            // Note: grad is wrt reference configuration
+            F() = F().oldTime() + gradDD.T();
+
+            // Update the relative deformation gradient
+            relF() = F() & inv(F().oldTime());
         }
+        else
+        {
+            // Lookup gradient of displacement
+            const volTensorField& gradD =
+                mesh().lookupObject<volTensorField>("grad(D)");
 
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
+            // Update the total deformation gradient
+            F() = I + gradD.T();
 
-        // Update the total deformation gradient
-        F() = I + gradD.T();
-
-        // Update the relative deformation gradient
-        relF() = F() & inv(F().oldTime());
+            // Update the relative deformation gradient
+            relF() = F() & inv(F().oldTime());
+        }
     }
     else
     {
@@ -1482,20 +1495,29 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     {
         if (incremental())
         {
-            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
+            // Lookup gradient of displacement increment
+            const surfaceTensorField& gradDD =
+                mesh().lookupObject<surfaceTensorField>("grad(DD)f");
+
+            // Update the total deformation gradient
+            // Note: grad is wrt reference configuration
+            Ff() = Ff().oldTime() + gradDD.T();
+
+            // Update the relative deformation gradient
+            relFf() = Ff() & inv(Ff().oldTime());
         }
+        else
+        {
+            // Lookup gradient of displacement
+            const surfaceTensorField& gradD =
+                mesh().lookupObject<surfaceTensorField>("grad(D)f");
 
-        // Lookup gradient of displacement
-        const surfaceTensorField& gradD =
-            mesh().lookupObject<surfaceTensorField>("grad(D)f");
+            // Update the total deformation gradient
+            Ff() = I + gradD.T();
 
-        // Update the total deformation gradient
-        Ff() = I + gradD.T();
-
-        // Update the relative deformation gradient
-        relFf() = Ff() & inv(Ff().oldTime());
+            // Update the relative deformation gradient
+            relFf() = Ff() & inv(Ff().oldTime());
+        }
     }
     else
     {

@@ -235,33 +235,58 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
     {
         if (incremental())
         {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
+            // Lookup gradient of displacement increment
+            const volTensorField& gradDD =
+                mesh().lookupObject<volTensorField>("grad(DD)");
+
+            // Update the total deformation gradient
+            // Note: grad is wrt reference configuration
+            F() = F().oldTime() + gradDD.T();
+
+            // Update the relative deformation gradient: not needed
+            //relF() = F() & inv(F().oldTime());
+
+            if (enforceLinear())
+            {
+                WarningIn
+                (
+                    "void Foam::neoHookeanElastic::"
+                    "correct(volSymmTensorField& sigma)"
+                )   << "Material linearity enforced for stability!" << endl;
+
+                // Calculate stress using Hooke's law
+                sigma =
+                    sigma.oldTime()
+                  + 2.0*mu_*dev(symm(gradDD)) + K_*tr(gradDD)*I;
+
+                return;
+            }
         }
-
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        // Update the total deformation gradient
-        F() = I + gradD.T();
-
-        // Update the relative deformation gradient: not needed
-        //relF() = F() & inv(F().oldTime());
-
-        if (enforceLinear())
+        else
         {
-            WarningIn
-            (
-                "void Foam::neoHookeanElastic::"
-                "correct(volSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
+            // Lookup gradient of displacement
+            const volTensorField& gradD =
+                mesh().lookupObject<volTensorField>("grad(D)");
 
-            // Calculate stress using Hooke's law
-            sigma = 2.0*mu_*dev(symm(gradD)) + K_*tr(gradD)*I;
+            // Update the total deformation gradient
+            F() = I + gradD.T();
 
-            return;
+            // Update the relative deformation gradient: not needed
+            //relF() = F() & inv(F().oldTime());
+
+            if (enforceLinear())
+            {
+                WarningIn
+                (
+                    "void Foam::neoHookeanElastic::"
+                    "correct(volSymmTensorField& sigma)"
+                )   << "Material linearity enforced for stability!" << endl;
+
+                // Calculate stress using Hooke's law
+                sigma = 2.0*mu_*dev(symm(gradD)) + K_*tr(gradD)*I;
+
+                return;
+            }
         }
     }
     else
@@ -328,33 +353,58 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     {
         if (incremental())
         {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
+            // Lookup gradient of displacement increment
+            const surfaceTensorField& gradDD =
+                mesh().lookupObject<surfaceTensorField>("grad(DD)f");
+
+            // Update the total deformation gradient
+            // Note: grad is wrt reference configuration
+            Ff() = Ff().oldTime() + gradDD.T();
+
+            // Update the relative deformation gradient: not needed
+            //relFf() = Ff() & inv(Ff().oldTime());
+
+            if (enforceLinear())
+            {
+                WarningIn
+                (
+                    "void Foam::neoHookeanElastic::"
+                    "correct(surfaceSymmTensorField& sigma)"
+                )   << "Material linearity enforced for stability!" << endl;
+
+                // Calculate stress using Hooke's law
+                sigma =
+                    sigma.oldTime()
+                  + 2.0*mu_*dev(symm(gradDD)) + K_*tr(gradDD)*I;
+
+                return;
+            }
         }
-
-        // Lookup gradient of displacement
-        const surfaceTensorField& gradD =
-            mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-        // Update the total deformation gradient
-        Ff() = I + gradD.T();
-
-        // Update the relative deformation gradient: not needed
-        //relF() = F() & inv(F().oldTime());
-
-        if (enforceLinear())
+        else
         {
-            WarningIn
-            (
-                "void Foam::neoHookeanElastic::"
-                "correct(surfaceSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
+            // Lookup gradient of displacement
+            const surfaceTensorField& gradD =
+                mesh().lookupObject<surfaceTensorField>("grad(D)f");
 
-            // Calculate stress using Hooke's law
-            sigma = 2.0*mu_*dev(symm(gradD)) + K_*tr(gradD)*I;
+            // Update the total deformation gradient
+            Ff() = I + gradD.T();
 
-            return;
+            // Update the relative deformation gradient: not needed
+            //relF() = F() & inv(F().oldTime());
+
+            if (enforceLinear())
+            {
+                WarningIn
+                (
+                    "void Foam::neoHookeanElastic::"
+                    "correct(surfaceSymmTensorField& sigma)"
+                )   << "Material linearity enforced for stability!" << endl;
+
+                // Calculate stress using Hooke's law
+                sigma = 2.0*mu_*dev(symm(gradD)) + K_*tr(gradD)*I;
+
+                return;
+            }
         }
     }
     else
