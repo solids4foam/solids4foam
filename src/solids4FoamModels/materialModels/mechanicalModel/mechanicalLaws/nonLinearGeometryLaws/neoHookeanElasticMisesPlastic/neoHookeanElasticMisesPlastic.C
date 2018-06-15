@@ -1185,10 +1185,6 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     {
         if (incremental())
         {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
-
             // Lookup gradient of displacement increment
             const volTensorField& gradDD =
                 mesh().lookupObject<volTensorField>("grad(DD)");
