@@ -968,6 +968,12 @@ bool Foam::solidModel::converged
 }
 
 
+Foam::dictionary& Foam::solidModel::solidModelDict()
+{
+    return solidProperties_.subDict(type_ + "Coeffs");
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::solidModel::solidModel
@@ -1020,6 +1026,7 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
+    type_(type),
     thermalPtr_(NULL),
     mechanicalPtr_(NULL),
     D_
@@ -2276,5 +2283,10 @@ void Foam::solidModel::moveMesh
     mechanical().moveSubMeshes();
 }
 
+
+const Foam::dictionary& Foam::solidModel::solidModelDict() const
+{
+    return solidProperties_.subDict(type_ + "Coeffs");
+}
 
 // ************************************************************************* //

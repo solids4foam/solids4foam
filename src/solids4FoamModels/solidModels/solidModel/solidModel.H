@@ -73,6 +73,9 @@ class solidModel
         //- Solid properties dictionary
         IOdictionary solidProperties_;
 
+        //- Derived solidModel type
+        const word type_;
+
         //- Thermal model
         mutable autoPtr<thermalModel> thermalPtr_;
 
@@ -230,10 +233,7 @@ protected:
         }
 
         //- Return non-const reference to solidModelCoeffs dictionary
-        dictionary& solidModelDict()
-        {
-            return solidProperties_.subDict(type() + "Coeffs");
-        }
+        dictionary& solidModelDict();
 
         //- Return non-const reference to the thermal model
         thermalModel& thermal();
@@ -386,10 +386,7 @@ public:
             }
 
             //- Return const reference to solidModelCoeffs dictionary
-            const dictionary& solidModelDict() const
-            {
-                return solidProperties_.subDict(type() + "Coeffs");
-            }
+            const dictionary& solidModelDict() const;
 
             //- Return const reference to the thermal model
             const thermalModel& thermal() const;
