@@ -30,7 +30,7 @@ InClass
 #include "volFields.H"
 #include "fvc.H"
 #include "IOdictionary.H"
-#include "solidModel.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -84,36 +84,19 @@ bool Foam::mechanicalLaw::planeStress() const
 
 const Foam::Switch& Foam::mechanicalLaw::enforceLinear() const
 {
-    if (mesh().foundObject<solidModel>("solidProperties"))
-    {
-       return
-           mesh().lookupObject<solidModel>("solidProperties").enforceLinear();
-    }
-    else
-    {
-        return
-            mesh().parent().lookupObject<solidModel>
-            (
-                "solidProperties"
-            ).enforceLinear();
-    }
+    // Lookup the solideModel
+    const solidModel& solMod = lookupSolidModel(mesh(), baseMeshRegionName_);
+
+    return solMod.enforceLinear();
 }
 
 
 bool Foam::mechanicalLaw::incremental() const
 {
-    if (mesh().foundObject<solidModel>("solidProperties"))
-    {
-       return mesh().lookupObject<solidModel>("solidProperties").incremental();
-    }
-    else
-    {
-        return
-            mesh().parent().lookupObject<solidModel>
-            (
-                "solidProperties"
-            ).incremental();
-    }
+    // Lookup the solideModel
+    const solidModel& solMod = lookupSolidModel(mesh(), baseMeshRegionName_);
+
+    return solMod.incremental();
 }
 
 

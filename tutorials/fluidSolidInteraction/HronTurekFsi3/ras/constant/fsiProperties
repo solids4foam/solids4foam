@@ -18,7 +18,7 @@ FoamFile
 //fluidSolidInterface    Aitken;
 fluidSolidInterface    IQNILS;
 
-"fixedRelaxationCoeffs|AitkenCoeffs|ISNILSCoeffs"
+"fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
 {
     // Solid interface patch and faceZone
     solidPatch           plate;

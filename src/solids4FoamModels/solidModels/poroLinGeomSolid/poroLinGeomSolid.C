@@ -197,11 +197,11 @@ poroLinGeomSolid::poroLinGeomSolid
         mesh(),
         dimensionedVector("0", dimPressure/dimLength, vector::zero)
     ),
-    hydraulicConductivity_(solidProperties().lookup("hydraulicConductivity")),
-    gammaWater_(solidProperties().lookup("waterSpecificWeight")),
-    porosity_(solidProperties().lookup("porosity")),
-    saturation_(solidProperties().lookup("degreeOfSaturation")),
-    KWater_(solidProperties().lookup("waterBulkModulus")),
+    hydraulicConductivity_(solidModelDict().lookup("hydraulicConductivity")),
+    gammaWater_(solidModelDict().lookup("waterSpecificWeight")),
+    porosity_(solidModelDict().lookup("porosity")),
+    saturation_(solidModelDict().lookup("degreeOfSaturation")),
+    KWater_(solidModelDict().lookup("waterBulkModulus")),
     rKprime_
     (
         (saturation_/KWater_)

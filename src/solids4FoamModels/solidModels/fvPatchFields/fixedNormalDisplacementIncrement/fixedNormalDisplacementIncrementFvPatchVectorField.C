@@ -82,15 +82,6 @@ fixedNormalDisplacementIncrementFvPatchVectorField
 {
     this->refValue() = vectorField("refValue", dict, p.size());
 
-//     if (dict.found("refValue"))
-//     {
-//         this->refValue() = vectorField("refValue", dict, p.size());
-//     }
-//     else
-//     {
-//         this->refValue() = vector::zero;
-//     }
-
     if (dict.found("refGradient"))
     {
         this->refGrad() = vectorField("refGradient", dict, p.size());
@@ -100,20 +91,8 @@ fixedNormalDisplacementIncrementFvPatchVectorField
         this->refGrad() = vector::zero;
     }
 
-    // Patch normal
-    vectorField n = patch().nf();
-
-    this->valueFraction() = sqr(n);
-
-//     if (dict.found("valueFraction"))
-//     {
-//         this->valueFraction() =
-//             symmTensorField("valueFraction", dict, p.size());
-//     }
-//     else
-//     {
-//         this->valueFraction() = sqr(n);
-//     }
+    // Set normal direction to fixed value
+    this->valueFraction() = sqr(patch().nf());
 
     if (dict.found("value"))
     {
@@ -166,8 +145,8 @@ void fixedNormalDisplacementIncrementFvPatchVectorField::rmap
 {
     directionMixedDisplacementFvPatchVectorField::rmap(ptf, addr);
 
-//     const fixedNormalDisplacementIncrementFvPatchVectorField& dmptf =
-//         refCast<const fixedNormalDisplacementIncrementFvPatchVectorField>(ptf);
+    // const fixedNormalDisplacementIncrementFvPatchVectorField& dmptf =
+    // refCast<const fixedNormalDisplacementIncrementFvPatchVectorField>(ptf);
 }
 
 
@@ -178,75 +157,8 @@ void fixedNormalDisplacementIncrementFvPatchVectorField::updateCoeffs()
         return;
     }
 
-
-    // Looking up solid solver
-    // const solidSolver& stress =
-    //     this->db().objectRegistry::lookupObject<solidSolver>
-    //     (
-    //         "solidProperties"
-    //     );
-
-//     Switch nonLinear
-//     (
-//         stress.solidProperties().lookup("nonLinear")
-//     );
-
-//     Switch enforceLinear
-//     (
-//         stress.solidProperties().lookup("enforceLinear")
-//     );
-
-    word DDName = this->dimensionedInternalField().name();
-
-    // const fvsPatchField<tensor>& gradDD =
-    //     patch().lookupPatchField<surfaceTensorField, tensor>
-    //     (
-    //         "grad" + DDName + "f"
-    //     );
-
-    // const fvsPatchField<scalar>& mu =
-    //     patch().lookupPatchField<surfaceScalarField, scalar>
-    //     (
-    //         "muf"
-    //     );
-
-    // const fvsPatchField<scalar>& lambda =
-    //     patch().lookupPatchField<surfaceScalarField, scalar>
-    //     (
-    //         "lambdaf"
-    //     );
-
-//     // Second Piola-Kirchhoff traction
-//     vectorField tSPC(patch().size(), vector::zero);
-
-    // Normal
-    vectorField n = patch().nf();
-
-//     // Second Piola-Kirchhoff traction increment
-//     vectorField DTraction = tSPC - (n&sigma);
-
+    // Set tangential grdaient to zzero
     refGrad() = vector::zero;
-
-//     refGrad() =
-//         DTraction
-//       - (n & (mu*gradDD.T() - (mu + lambda)*gradDD))
-//       - n*lambda*tr(gradDD);
-
-//     if(nonLinear && !enforceLinear)
-//     {
-//         refGrad() -=
-//             (n & (mu*(gradDD & gradDD.T())))
-//           + (n & (mu*(gradDD & gradD.T())))
-//           + (n & (mu*(gradD & gradDD.T())))
-//           + 0.5*n*lambda*tr(gradDD & gradDD.T())
-//           + 0.5*n*lambda*tr(gradDD & gradD.T())
-//           + 0.5*n*lambda*tr(gradD & gradDD.T());
-//     }
-
-//     refGrad() /= (2.0*mu + lambda);
-
-
-
 
     directionMixedDisplacementFvPatchVectorField::updateCoeffs();
 }

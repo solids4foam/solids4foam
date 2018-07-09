@@ -26,7 +26,7 @@ License
 #include "solidCohesiveFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
-#include "solidModel.H"
+#include "lookupSolidModel.H"
 #include "crackerFvMesh.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -429,22 +429,13 @@ void solidCohesiveFvPatchVectorField::updateCoeffs()
             relaxationFactorTrac_*traction_
           + (1.0 - relaxationFactorTrac_)*prevTraction;
 
-        // Lookup the solidModel
-        const polyMesh& mesh = patch().boundaryMesh().mesh();
-        const solidModel* solModPtr = NULL;
-        if (mesh.foundObject<solidModel>("solidProperties"))
-        {
-            solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
-        }
-        else
-        {
-            solModPtr =
-                &mesh.parent().lookupObject<solidModel>("solidProperties");
-        }
+        // Lookup the solidModel object
+        const solidModel& solMod =
+            lookupSolidModel(patch().boundaryMesh().mesh());
 
         // Set the patch tractions
         gradient() =
-            solModPtr->tractionBoundarySnGrad
+            solMod.tractionBoundarySnGrad
             (
                 traction_,
                 pressure_,

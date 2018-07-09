@@ -81,7 +81,7 @@ bool linGeomTotalDispSolid::evolve()
 
         // Stablisation viscosity
         // const dimensionedScalar eta_ =
-        //    solidProperties().lookupOrDefault<dimensionedScalar>
+        //    solidModelDict().lookupOrDefault<dimensionedScalar>
         //    (
         //        "numericalViscosity",
         //        dimensionedScalar("eta", dimless/dimTime, 0.0)

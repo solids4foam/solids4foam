@@ -1,6 +1,7 @@
 physicsModel/physicsModel.C
 
 solidModels/solidModel/solidModel.C
+solidModels/solidModel/lookupSolidModel.C
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/coupledUnsLinGeomSolid/coupledUnsLinGeomSolid.C
 solidModels/linGeomSolid/linGeomSolid.C
