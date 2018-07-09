@@ -28,7 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
 #include "volFields.H"
-#include "solidModel.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -50,23 +50,14 @@ solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
     limitCoeff_(1.0)
 {
     // Lookup the solidModel object
-    const polyMesh& mesh = patch().boundaryMesh().mesh();
-    const solidModel* solModPtr = NULL;
-    if (mesh.foundObject<solidModel>("solidProperties"))
-    {
-        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
-    }
-    else
-    {
-        solModPtr = &mesh.parent().lookupObject<solidModel>("solidProperties");
-    }
+    const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
 
-    if (solModPtr->solidProperties().found("snGradLimitCoeff"))
+    if (solMod.solidModelDict().found("snGradLimitCoeff"))
     {
         limitCoeff_ =
             readScalar
             (
-                solModPtr->solidProperties().lookup("snGradLimitCoeff")
+                solMod.solidModelDict().lookup("snGradLimitCoeff")
             );
 
         Info<< "snGradLimitCoeff: " << limitCoeff_ << endl;
@@ -101,23 +92,14 @@ solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
     directionMixedFvPatchVectorField::evaluate();
 
     // Lookup the solidModel object
-    const polyMesh& mesh = patch().boundaryMesh().mesh();
-    const solidModel* solModPtr = NULL;
-    if (mesh.foundObject<solidModel>("solidProperties"))
-    {
-        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
-    }
-    else
-    {
-        solModPtr = &mesh.parent().lookupObject<solidModel>("solidProperties");
-    }
+    const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
 
-    if (solModPtr->solidProperties().found("snGradLimitCoeff"))
+    if (solMod.solidModelDict().found("snGradLimitCoeff"))
     {
         limitCoeff_ =
             readScalar
             (
-                solModPtr->solidProperties().lookup("snGradLimitCoeff")
+                solMod.solidModelDict().lookup("snGradLimitCoeff")
             );
 
         Info<< "snGradLimitCoeff: " << limitCoeff_ << endl;
@@ -174,16 +156,20 @@ void solidDirectionMixedFvPatchVectorField::evaluate(const Pstream::commsTypes)
 
     bool secondOrder_(false);
 
-    vectorField n = patch().nf();
-    vectorField delta = patch().delta();
-    vectorField k = delta - n*(n&delta);
+    // Unit normals
+    const vectorField n = patch().nf();
+
+    // Delta vectors
+    const vectorField delta = patch().delta();
+
+    // Correction vcetors
+    const vectorField k = ((I - sqr(n)) & delta);
 
     const fvPatchField<tensor>& gradD =
         patch().lookupPatchField<volTensorField, tensor>
         (
             "grad(" + dimensionedInternalField().name() + ")"
         );
-
 
     // Calc limited snGrad correction
 
@@ -248,9 +234,14 @@ solidDirectionMixedFvPatchVectorField::snGrad() const
     Field<vector> normalValue =
         transform(this->valueFraction(), this->refValue());
 
-    vectorField n = this->patch().nf();
-    vectorField delta = patch().delta();
-    vectorField k = delta - n*(n&delta);
+    // Unit normals
+    const vectorField n = patch().nf();
+
+    // Delta vectors
+    const vectorField delta = patch().delta();
+
+    // Correction vcetors
+    const vectorField k = ((I - sqr(n)) & delta);
 
     const fvPatchField<tensor>& gradD =
         patch().lookupPatchField<volTensorField, tensor>
@@ -320,7 +311,6 @@ solidDirectionMixedFvPatchVectorField::snGrad() const
       - (
             pif
           - snGradCorrection/this->patch().deltaCoeffs()
-          // + (k & gradD.patchInternalField()) // ZT, correction is applied two times
         )
     )*patch().deltaCoeffs();
 }

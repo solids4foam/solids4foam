@@ -184,11 +184,11 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    nonLinear_(solidProperties().lookupOrDefault<Switch>("nonLinear", true)),
-    debug_(solidProperties().lookupOrDefault<Switch>("debug", false)),
+    nonLinear_(solidModelDict().lookupOrDefault<Switch>("nonLinear", true)),
+    debug_(solidModelDict().lookupOrDefault<Switch>("debug", false)),
     K_
     (
-        solidProperties().lookupOrDefault<dimensionedScalar>
+        solidModelDict().lookupOrDefault<dimensionedScalar>
         (
             "K",
             dimensionedScalar("K", dimless/dimTime, 0)
@@ -196,7 +196,7 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
     ),
     relativeTol_
     (
-        solidProperties().lookupOrDefault<scalar>
+        solidModelDict().lookupOrDefault<scalar>
         (
             "solutionTolerance",
             solutionTol()

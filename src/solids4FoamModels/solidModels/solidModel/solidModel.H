@@ -63,7 +63,7 @@ namespace Foam
 class solidModel
 :
     public physicsModel,
-    public IOdictionary
+    public regIOobject
 {
     // Private data
 
@@ -71,7 +71,7 @@ class solidModel
         autoPtr<dynamicFvMesh> meshPtr_;
 
         //- Solid properties dictionary
-        dictionary solidProperties_;
+        IOdictionary solidProperties_;
 
         //- Thermal model
         mutable autoPtr<thermalModel> thermalPtr_;
@@ -223,10 +223,16 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
 
-        //- Return solid properties dictionary
-        dictionary& solidProperties()
+        //- Return non-const reference to solid properties dictionary
+        IOdictionary& solidProperties()
         {
             return solidProperties_;
+        }
+
+        //- Return non-const reference to solidModelCoeffs dictionary
+        dictionary& solidModelDict()
+        {
+            return solidProperties_.subDict(type() + "Coeffs");
         }
 
         //- Return non-const reference to the thermal model
@@ -237,6 +243,9 @@ protected:
 
         //- Return const-reference to the density
         const volScalarField& rho() const;
+
+        //- Return non-const reference to the density
+        volScalarField& rho();
 
         //- Apply fixed or Aitken's adaptive under-relaxation to the field
         void relaxField(volVectorField& D, int iCorr);
@@ -363,7 +372,7 @@ public:
             {
                 return pMesh_;
             }
-  
+
             //- Return time
             const Time& runTime() const
             {
@@ -374,6 +383,12 @@ public:
             const dictionary& solidProperties() const
             {
                 return solidProperties_;
+            }
+
+            //- Return const reference to solidModelCoeffs dictionary
+            const dictionary& solidModelDict() const
+            {
+                return solidProperties_.subDict(type() + "Coeffs");
             }
 
             //- Return const reference to the thermal model
@@ -655,8 +670,11 @@ public:
             //- End of the program
             virtual void end();
 
-            //- Read solidProperties dictionary
-            virtual bool read();
+            //- Write function must be defined for regIOobjects
+            virtual bool writeData(Ostream&) const
+            {
+                return false;
+            }
 };
 
 

@@ -224,8 +224,8 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New(Time& runTime)
                 << exit(FatalError);
         }
 
-        // The oneWayCoupling FSI must start from the first step because it reads
-        // fields from the already run fluid case
+        // The oneWayCoupling FSI must start from the first step because it
+        // reads fields from the already run fluid case
         if (fsiTypeName == "oneWayCoupling" && runTime.value() > 0.0)
         {
             WarningIn

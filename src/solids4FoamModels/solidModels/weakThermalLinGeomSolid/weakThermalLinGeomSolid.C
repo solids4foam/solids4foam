@@ -197,7 +197,7 @@ weakThermalLinGeomSolid::weakThermalLinGeomSolid
     ),
     absTTol_
     (
-        solidProperties().lookupOrDefault<scalar>
+        solidModelDict().lookupOrDefault<scalar>
         (
             "absoluteTemperatureTolerance",
             1e-06

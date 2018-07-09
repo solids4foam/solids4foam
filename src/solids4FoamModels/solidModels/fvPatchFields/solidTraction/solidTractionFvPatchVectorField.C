@@ -27,7 +27,7 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
-#include "solidModel.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -239,21 +239,12 @@ void solidTractionFvPatchVectorField::updateCoeffs()
     }
 
     // Lookup the solidModel object
-    const polyMesh& mesh = patch().boundaryMesh().mesh();
-    const solidModel* solModPtr = NULL;
-    if (mesh.foundObject<solidModel>("solidProperties"))
-    {
-        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
-    }
-    else
-    {
-        solModPtr = &mesh.parent().lookupObject<solidModel>("solidProperties");
-    }
+    const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
 
     // Set surface-normal gradient on the patch corresponding to the desired
     // traction
     gradient() =
-        relaxFac_*solModPtr->tractionBoundarySnGrad
+        relaxFac_*solMod.tractionBoundarySnGrad
         (
             traction_, pressure_, patch()
         )
@@ -277,14 +268,14 @@ void solidTractionFvPatchVectorField::evaluate(const Pstream::commsTypes)
             "grad(" + dimensionedInternalField().name() + ")"
         );
 
-    // Face unit normal
+    // Face unit normals
     const vectorField n = patch().nf();
 
     // Delta vectors
     const vectorField delta = patch().delta();
 
     // Non-orthogonal correction vectors
-    vectorField k = delta - n*(n&delta);
+    const vectorField k = ((I - sqr(n)) & delta);
 
     if (secondOrder_)
     {
@@ -312,7 +303,7 @@ void solidTractionFvPatchVectorField::evaluate(const Pstream::commsTypes)
     fvPatchField<vector>::evaluate();
 }
 
-// Write
+
 void solidTractionFvPatchVectorField::write(Ostream& os) const
 {
     fixedGradientFvPatchVectorField::write(os);

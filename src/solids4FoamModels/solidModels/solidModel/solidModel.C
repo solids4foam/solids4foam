@@ -208,7 +208,6 @@ void Foam::solidModel::calcGlobalFaceZones() const
 
         Info<< "Reading decomposeParDict " << decompDictName << endl;
 
-    Info<< "line " << __LINE__ << endl;
         IOdictionary decompDict
         (
             IOobject
@@ -600,6 +599,16 @@ const Foam::volScalarField& Foam::solidModel::rho() const
 }
 
 
+Foam::volScalarField& Foam::solidModel::rho()
+{
+    if (rhoPtr_.empty())
+    {
+        makeRho();
+    }
+
+    return rhoPtr_();
+}
+
 void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 {
     if (relaxationMethod_ == "fixed")
@@ -969,14 +978,11 @@ Foam::solidModel::solidModel
 )
 :
     physicsModel(type, runTime),
-    IOdictionary
+    regIOobject // ZT, Jul18: allow for multiple solid regions
     (
         IOobject
         (
-            "solidProperties",
-            // If region == "region0" then read from the main case
-            // Otherwise, read from the region/sub-mesh directory e.g.
-            // constant/fluid or constant/solid
+            "solidModel_" + region,
             bool(region == dynamicFvMesh::defaultRegion)
           ? fileName(runTime.caseConstant())
           : fileName(runTime.caseConstant()/region),
@@ -998,7 +1004,22 @@ Foam::solidModel::solidModel
             )
         )
     ),
-    solidProperties_(subDict(type + "Coeffs")),
+    solidProperties_
+    (
+        IOobject
+        (
+            "solidProperties",
+            // If region == "region0" then read from the main case
+            // Otherwise, read from the region/sub-mesh directory e.g.
+            // constant/fluid or constant/solid
+            bool(region == dynamicFvMesh::defaultRegion)
+          ? fileName(runTime.caseConstant())
+          : fileName(runTime.caseConstant()/region),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+    ),
     thermalPtr_(NULL),
     mechanicalPtr_(NULL),
     D_
@@ -1120,31 +1141,31 @@ Foam::solidModel::solidModel
     ),
     solutionTol_
     (
-        solidProperties().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
+        solidModelDict().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
     ),
     alternativeTol_
     (
-        solidProperties().lookupOrDefault<scalar>("alternativeTolerance", 1e-07)
+        solidModelDict().lookupOrDefault<scalar>("alternativeTolerance", 1e-07)
     ),
     materialTol_
     (
-        solidProperties().lookupOrDefault<scalar>("materialTolerance", 1e-05)
+        solidModelDict().lookupOrDefault<scalar>("materialTolerance", 1e-05)
     ),
     infoFrequency_
     (
-        solidProperties().lookupOrDefault<int>("infoFrequency", 100)
+        solidModelDict().lookupOrDefault<int>("infoFrequency", 100)
     ),
-    nCorr_(solidProperties().lookupOrDefault<int>("nCorrectors", 10000)),
+    nCorr_(solidModelDict().lookupOrDefault<int>("nCorrectors", 10000)),
     maxIterReached_(0),
     residualFilePtr_(NULL),
     writeResidualField_
     (
-        solidProperties().lookupOrDefault<Switch>("writeResidualField", false)
+        solidModelDict().lookupOrDefault<Switch>("writeResidualField", false)
     ),
     enforceLinear_(false),
     relaxationMethod_
     (
-        solidProperties_.lookupOrDefault<word>("relaxationMethod", "fixed")
+        solidModelDict().lookupOrDefault<word>("relaxationMethod", "fixed")
     ),
     aitkenAlpha_
     (
@@ -1174,7 +1195,7 @@ Foam::solidModel::solidModel
     ),
     QuasiNewtonRestartFreq_
     (
-        solidProperties_.lookupOrDefault<int>("QuasiNewtonRestartFrequency", 25)
+        solidModelDict().lookupOrDefault<int>("QuasiNewtonRestartFrequency", 25)
     ),
     QuasiNewtonV_(QuasiNewtonRestartFreq_ + 2),
     QuasiNewtonW_(QuasiNewtonRestartFreq_ + 2),
@@ -1242,7 +1263,7 @@ Foam::solidModel::solidModel
     }
 
     // If requested, create the residual file
-    if (solidProperties_.lookupOrDefault<Switch>("residualFile", false))
+    if (solidModelDict().lookupOrDefault<Switch>("residualFile", false))
     {
         if (Pstream::master())
         {
@@ -1831,7 +1852,7 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     word solidModelTypeName;
 
     // Enclose the creation of the dictionary to ensure it is
-    // deleted before the flow is created otherwise the dictionary
+    // deleted before the fluid model is created, otherwise the dictionary
     // is entered in the database twice
     {
         IOdictionary solidProperties
@@ -2253,21 +2274,6 @@ void Foam::solidModel::moveMesh
 
     // Tell the mechanical model to move the subMeshes, if they exist
     mechanical().moveSubMeshes();
-}
-
-
-bool Foam::solidModel::read()
-{
-    if (regIOobject::read())
-    {
-        solidProperties_ = subDict(type() + "Coeffs");
-
-        return true;
-    }
-    else
-    {
-        return false;
-    }
 }
 
 

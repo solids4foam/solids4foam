@@ -229,7 +229,10 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    stabilisePressure_(lookupOrDefault<Switch>("stabilisePressure", false))
+    stabilisePressure_
+    (
+        solidModelDict().lookupOrDefault<Switch>("stabilisePressure", false)
+    )
 {}
 
 

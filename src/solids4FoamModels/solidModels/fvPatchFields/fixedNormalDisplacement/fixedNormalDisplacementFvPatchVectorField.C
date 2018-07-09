@@ -178,63 +178,13 @@ void fixedNormalDisplacementFvPatchVectorField::updateCoeffs()
         return;
     }
 
-//     // Looking up solid solver
-//     const solidSolver& stress =
-//         this->db().objectRegistry::lookupObject<solidSolver>
-//         (
-//             "solidProperties"
-//         );
+    // Patch unit normals
+    const vectorField n = patch().nf();
 
-//     Switch nonLinear
-//     (
-//         stress.solidProperties().lookup("nonLinear")
-//     );
+    // Set normal component to fixedValue
+    valueFraction() = sqr(n);
 
-//     word DName = this->dimensionedInternalField().name();
-
-//     const fvsPatchField<tensor>& gradD =
-//         patch().lookupPatchField<surfaceTensorField, tensor>
-//         (
-//             "grad" + DName + "f"
-//         );
-
-//     const fvsPatchField<scalar>& mu =
-//         patch().lookupPatchField<surfaceScalarField, scalar>
-//         (
-//             "muf"
-//         );
-
-//     const fvsPatchField<scalar>& lambda =
-//         patch().lookupPatchField<surfaceScalarField, scalar>
-//         (
-//             "lambdaf"
-//         );
-
-//     // Normal
-//     vectorField n = patch().nf();
-
-//     // Second Piola-Kirchhoff traction
-//     vectorField tSPC(patch().size(), vector::zero);
-
-//     refGrad() =
-//         tSPC
-//       - (n & (mu*gradD.T() - (mu + lambda)*gradD))
-//       - n*lambda*tr(gradD);
-
-//     if(nonLinear)
-//     {
-//         refGrad() -=
-//             (n & (mu*(gradD & gradD.T())))
-//           + 0.5*n*lambda*tr(gradD & gradD.T());
-//     }
-
-//     refGrad() /= (2.0*mu + lambda);
-
-    // Patch normal
-    vectorField n = patch().nf();
-
-    this->valueFraction() = sqr(n);
-
+    // Set tangential gradient to zero
     refGrad() = vector::zero;
 
     directionMixedDisplacementFvPatchVectorField::updateCoeffs();

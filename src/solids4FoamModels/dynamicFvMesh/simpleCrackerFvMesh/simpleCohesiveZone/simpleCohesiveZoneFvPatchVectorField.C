@@ -33,7 +33,7 @@ InClass
 #include "volFields.H"
 #include "pointFields.H"
 #include "wallFvPatch.H"
-#include "solidModel.H"
+#include "lookupSolidModel.H"
 #include "simpleCrackerFvMesh.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -463,22 +463,12 @@ label simpleCohesiveZoneFvPatchVectorField::updateCrack()
             << endl;
     }
 
-    // Lookup the solidModel
-    const polyMesh& mesh = patch().boundaryMesh().mesh();
-    const solidModel* solModPtr = NULL;
-    if (mesh.foundObject<solidModel>("solidProperties"))
-    {
-        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
-    }
-    else
-    {
-        solModPtr =
-            &mesh.parent().lookupObject<solidModel>("solidProperties");
-    }
+    // Lookup the solidModel object
+    const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
 
     // Set traction on the patch
-    this->refGrad() =
-        solModPtr->tractionBoundarySnGrad
+    refGrad() =
+        solMod.tractionBoundarySnGrad
         (
             newTraction,
             scalarField(newTraction.size(), 0.0),
@@ -653,22 +643,12 @@ void simpleCohesiveZoneFvPatchVectorField::updateCoeffs()
         }
     }
 
-    // Lookup the solidModel
-    const polyMesh& mesh = patch().boundaryMesh().mesh();
-    const solidModel* solModPtr = NULL;
-    if (mesh.foundObject<solidModel>("solidProperties"))
-    {
-        solModPtr = &mesh.lookupObject<solidModel>("solidProperties");
-    }
-    else
-    {
-        solModPtr =
-            &mesh.parent().lookupObject<solidModel>("solidProperties");
-    }
+    // Lookup the solidModel object
+    const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
 
     // Set traction on the patch
-    this->refGrad() =
-        solModPtr->tractionBoundarySnGrad
+    refGrad() =
+        solMod.tractionBoundarySnGrad
         (
             newTraction,
             scalarField(newTraction.size(), 0.0),
