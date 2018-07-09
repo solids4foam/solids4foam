@@ -62,7 +62,7 @@ Foam::simpleCrackerFvMesh::~simpleCrackerFvMesh()
 bool Foam::simpleCrackerFvMesh::update()
 {
     // Lookup the solidModel object
-    const solidModel& solMod = lookupSolidModel(db());
+    const solidModel& solMod = lookupSolidModel(*this);
 
     // Lookup displacement field
     const volVectorField* DPtr = NULL;

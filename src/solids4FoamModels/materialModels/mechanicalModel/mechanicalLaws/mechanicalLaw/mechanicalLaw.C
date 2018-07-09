@@ -85,7 +85,7 @@ bool Foam::mechanicalLaw::planeStress() const
 const Foam::Switch& Foam::mechanicalLaw::enforceLinear() const
 {
     // Lookup the solideModel
-    const solidModel& solMod = lookupSolidModel(mesh());
+    const solidModel& solMod = lookupSolidModel(mesh(), baseMeshRegionName_);
 
     return solMod.enforceLinear();
 }
@@ -94,7 +94,7 @@ const Foam::Switch& Foam::mechanicalLaw::enforceLinear() const
 bool Foam::mechanicalLaw::incremental() const
 {
     // Lookup the solideModel
-    const solidModel& solMod = lookupSolidModel(mesh());
+    const solidModel& solMod = lookupSolidModel(mesh(), baseMeshRegionName_);
 
     return solMod.incremental();
 }

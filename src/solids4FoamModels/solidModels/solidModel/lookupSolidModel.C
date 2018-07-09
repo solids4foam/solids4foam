@@ -35,15 +35,42 @@ namespace Foam
 
 const solidModel& lookupSolidModel(const objectRegistry& obReg)
 {
-    if (obReg.foundObject<solidModel>("solidModel_" + obReg.name()))
+    return lookupSolidModel(obReg, obReg.name());
+}
+
+
+const solidModel& lookupSolidModel
+(
+    const objectRegistry& obReg,
+    const word& obName
+)
+{
+    if (obReg.foundObject<solidModel>("solidModel_" + obName))
     {
-        return obReg.lookupObject<solidModel>("solidModel_" + obReg.name());
+        return obReg.lookupObject<solidModel>
+        (
+            "solidModel_" + obName
+        );
+    }
+    else if (obReg.parent().foundObject<solidModel>("solidModel_" + obName))
+    {
+        return obReg.parent().lookupObject<solidModel>
+        (
+            "solidModel_" + obName
+        );
     }
 
-    return obReg.parent().lookupObject<solidModel>
+    FatalErrorIn
     (
-        "solidModel_" + obReg.name()
-    );
+        "const solidModel& lookupSolidModel(const objectRegistry& obReg)"
+    )   << "Could not find " << word("solidModel_" + obName) << nl << nl
+        << "solidModels in the objectRegistry: "
+        << obReg.names<solidModel>() << nl << nl
+        << "solidModels in the parent objectRegistry:"
+        << obReg.parent().names<solidModel>() << abort(FatalError);
+
+    // Keep the compiler happy
+    return obReg.lookupObject<solidModel>("none");
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

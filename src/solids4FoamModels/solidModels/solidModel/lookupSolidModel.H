@@ -54,6 +54,12 @@ namespace Foam
 
 const solidModel& lookupSolidModel(const objectRegistry& obReg);
 
+const solidModel& lookupSolidModel
+(
+    const objectRegistry& obReg,
+    const word& obName
+);
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
