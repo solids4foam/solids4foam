@@ -145,7 +145,7 @@ Foam::tmp<Foam::volScalarField> Foam::linearElasticFromFile::impK() const
         (
             IOobject
             (
-                "impKcopy",
+                "impK",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
