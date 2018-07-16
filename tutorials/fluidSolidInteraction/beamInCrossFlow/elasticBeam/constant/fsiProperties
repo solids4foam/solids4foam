@@ -46,8 +46,8 @@ fluidSolidInterface    Aitken;
     // Enable/disable coupling from the start
     coupled yes;
 
-    // Optional: if coupled is set to "no", then the couplingStartTime also you
-    // to enable coupling at specified time
+    // Optional: if coupled is set to "no", then the couplingStartTime allows
+    // you to enable coupling at a specified time
     // Defaults to 0.0
     // couplingStartTime    2.0;
 
@@ -59,7 +59,7 @@ fluidSolidInterface    Aitken;
     // Optional: if any point on the fluid interface moves greater than the
     // interfaceDeformationLimit then the entire fluid mesh is updated; if not
     // then only the interface points are moved and the remaining fluid mesh is
-    // not. Note than interfaceDeformationLimit is a relative motion: it is the
+    // not. Note that interfaceDeformationLimit is a relative motion: it is the
     // point displacement normalised with respect to the local cell size (delta
     // coeffs are used)
     // Defaults to 0.0 i.e. the fluid mesh is always updated
@@ -71,6 +71,8 @@ fluidSolidInterface    Aitken;
     // every 10 time-steps
     // Defaults to 0
     // interpolatorUpdateFrequency 0;
+
 }
+    rbfInterpolation true;
 
 // ************************************************************************* //
