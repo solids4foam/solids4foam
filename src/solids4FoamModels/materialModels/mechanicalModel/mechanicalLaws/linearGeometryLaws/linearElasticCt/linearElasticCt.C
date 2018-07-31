@@ -186,7 +186,18 @@ void Foam::linearElasticCt::setYoungsModulusFromCt()
         scalarField& E_I = E_.internalField();
         scalarField& HuI = Hu.internalField();
         scalarField& relRhoI = relRho.internalField();
-        const vectorField& CI = mesh().C().internalField();
+
+        // Take a copy of the cell centres field as we may rotate them
+        vectorField CI = mesh().C().internalField();
+
+        if (useRotationMatrix_)
+        {
+            Info<< "    Rotating mesh coordinates before looking up CT values"
+                << endl;
+            CI =
+                (rotationMatrix_ & (CI - centreOfRotation_))
+              + centreOfRotation_;
+        }
 
         forAll(E_I, cellI)
         {
@@ -428,8 +439,42 @@ Foam::linearElasticCt::linearElasticCt
         E_*nu_/((1.0 + nu_)*(1.0 - 2.0*nu_))
     ),
     muf_(fvc::interpolate(mu_)),
-    lambdaf_(fvc::interpolate(lambda_))
+    lambdaf_(fvc::interpolate(lambda_)),
+    useRotationMatrix_
+    (
+        dict.lookupOrDefault<Switch>("useRotationMatrix", false)
+    ),
+    rotationMatrix_(I),
+    centreOfRotation_(vector::zero)
 {
+    if (useRotationMatrix_)
+    {
+        // Calculate rotation matrix using two vectors
+
+        vector vectorBeforeRotation(dict.lookup("vectorBeforeRotation"));
+        if (mag(vectorBeforeRotation) < SMALL)
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "mag(vectorBeforeRotation) < SMALL!" << abort(FatalError);
+        }
+        vectorBeforeRotation /= mag(vectorBeforeRotation);
+
+        vector vectorAfterRotation(dict.lookup("vectorAfterRotation"));
+        if (mag(vectorAfterRotation) < SMALL)
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "mag(vectorAfterRotation) < SMALL!" << abort(FatalError);
+        }
+        vectorAfterRotation /= mag(vectorAfterRotation);
+
+        rotationMatrix_ =
+            rotationTensor(vectorBeforeRotation, vectorAfterRotation);
+
+        // Read centre of rotation
+        centreOfRotation_ = vector(dict.lookup("centreOfRotation"));
+    }
+
+    // Set E field
     setYoungsModulusFromCt();
 
     // Reset mechanical fields after E has been updated

@@ -33,6 +33,7 @@ SourceFiles
 
 Author
     Karen Fitzgerald, UCD.
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 
@@ -76,6 +77,15 @@ class linearElasticCt
 
         //- 1st Lame parameter surface field
         surfaceScalarField lambdaf_;
+
+        //- Rotation mesh coordinates before looking CT values
+        const Switch useRotationMatrix_;
+
+        //- Rotation matrix to rotate current mesh back to CT reference frame
+        tensor rotationMatrix_;
+
+        //- Centre of rotation for transformation
+        vector centreOfRotation_;
 
     // Private Member Functions
 
