@@ -39,6 +39,8 @@ Author
 
 #include "fvCFD.H"
 #include "argList.H"
+#include "pointMesh.H"
+#include "pointFields.H"
 
 using namespace Foam;
 
@@ -104,6 +106,26 @@ int main(int argc, char *argv[])
         )
     );
 
+    // Create pointMesh so we can create a pointVectorField for visualisation
+    pointMesh pMesh(mesh);
+
+    // Create pointVectorField to visualise the mesh motion
+    pointVectorField pointMotion
+    (
+        IOobject
+        (
+            "pointMotion",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh,
+        dimensionedVector("zero", dimLength, vector::zero)
+    );
+    vectorField& pointMotionI = pointMotion.internalField();
+
+
     Info<< "Reading points field from " << points.path() << nl << endl;
 
     // Calculate point motion field
@@ -141,7 +163,11 @@ int main(int argc, char *argv[])
         // Scale point to the correct radius
         points[pointID] = origin + radius*(r/magR);
 
-        maxDisp = max(maxDisp, mag(points[pointID] - oldPoint));
+        // Store motion
+        pointMotionI[pointID] = points[pointID] - oldPoint;
+
+        // Store max motion
+        maxDisp = max(maxDisp, mag(pointMotionI[pointID]));
     }
 
     Info<< "Maximum point displacement: " << maxDisp << nl << endl;
@@ -152,6 +178,10 @@ int main(int argc, char *argv[])
     // Write the points
     Info<< "Writing the new points to " << points.path() << endl;
     points.write();
+
+    Info<< "Writing the " << pointMotion.name() << " field to "
+        << runTime.timeName() << endl;
+    pointMotion.write();
 
     Info << "End\n" << endl;
 
