@@ -468,7 +468,7 @@ Foam::linearElasticCt::linearElasticCt
         vectorAfterRotation /= mag(vectorAfterRotation);
 
         rotationMatrix_ =
-            rotationTensor(vectorBeforeRotation, vectorAfterRotation);
+            rotationTensor(vectorAfterRotation, vectorBeforeRotation);
 
         // Read centre of rotation
         centreOfRotation_ = vector(dict.lookup("centreOfRotation"));
