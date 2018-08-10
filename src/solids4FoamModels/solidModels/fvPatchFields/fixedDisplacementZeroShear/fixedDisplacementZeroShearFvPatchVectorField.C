@@ -28,7 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
 #include "volFields.H"
-//#include "solidModel.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -49,7 +49,8 @@ fixedDisplacementZeroShearFvPatchVectorField
 :
     solidDirectionMixedFvPatchVectorField(p, iF),
     totalDisp_(p.size(), vector::zero),
-    dispSeries_()
+    dispSeries_(),
+    forceZeroShearGrad_(false)
 {}
 
 
@@ -64,7 +65,8 @@ fixedDisplacementZeroShearFvPatchVectorField
 :
     solidDirectionMixedFvPatchVectorField(ptf, p, iF, mapper),
     totalDisp_(ptf.totalDisp_, mapper),
-    dispSeries_(ptf.dispSeries_)
+    dispSeries_(ptf.dispSeries_),
+    forceZeroShearGrad_(ptf.forceZeroShearGrad_)
 {}
 
 
@@ -78,7 +80,11 @@ fixedDisplacementZeroShearFvPatchVectorField
 :
     solidDirectionMixedFvPatchVectorField(p, iF),
     totalDisp_("value", dict, p.size()),
-    dispSeries_()
+    dispSeries_(),
+    forceZeroShearGrad_
+    (
+        dict.lookupOrDefault<Switch>("forceZeroShearGrad", false)
+    )
 {
     // Check if displacement is time-varying
     if (dict.found("displacementSeries"))
@@ -128,7 +134,8 @@ fixedDisplacementZeroShearFvPatchVectorField
 :
     solidDirectionMixedFvPatchVectorField(ptf, iF),
     totalDisp_(ptf.totalDisp_),
-    dispSeries_(ptf.dispSeries_)
+    dispSeries_(ptf.dispSeries_),
+    forceZeroShearGrad_(ptf.forceZeroShearGrad_)
 {}
 
 
@@ -191,7 +198,27 @@ void fixedDisplacementZeroShearFvPatchVectorField::updateCoeffs()
     refValue() = disp;
 
     // Set gradient to zero to force zero shear traction
-    refGrad() = vector::zero;
+    if (forceZeroShearGrad_)
+    {
+        refGrad() = vector::zero;
+    }
+    else
+    {
+        // Calculate the shear gradient such that the shear traction is zero
+
+        // Lookup the solidModel object
+        const solidModel& solMod =
+            lookupSolidModel(patch().boundaryMesh().mesh());
+
+        // Set gradient to force zero shear traction
+        refGrad() =
+            solMod.tractionBoundarySnGrad
+            (
+                vectorField(patch().size(), vector::zero),
+                scalarField(patch().size(), 0.0),
+                patch()
+            );
+    }
 
     solidDirectionMixedFvPatchVectorField::updateCoeffs();
 }
@@ -207,6 +234,9 @@ void fixedDisplacementZeroShearFvPatchVectorField::write(Ostream& os) const
         dispSeries_.write(os);
         os << token::END_BLOCK << nl;
     }
+
+    os.writeKeyword("forceZeroShearGrad")
+        << forceZeroShearGrad_ << token::END_STATEMENT << nl;
 
     solidDirectionMixedFvPatchVectorField::write(os);
 }
