@@ -446,7 +446,7 @@ tmp<scalarField> interFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-    tpF() = pd_.boundaryField()[patchID];
+    tpF() = p().boundaryField()[patchID];
 
     return tpF;
 }
