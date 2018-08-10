@@ -88,7 +88,7 @@ simpleCohesiveZoneFvPatchVectorField
     solidDirectionMixedFvPatchVectorField(p, iF),
     dict_(),
     totRefValue_(p.size(), vector::zero),
-    cohesiveLawPtr_(NULL),
+    cohesiveLawPtr_(),
     crackIndicator_(p.size(), 0.0),
     damageIndicator_(p.size(), 0.0),
     relaxationFactor_(1.0),
@@ -139,7 +139,7 @@ simpleCohesiveZoneFvPatchVectorField
     solidDirectionMixedFvPatchVectorField(p, iF),
     dict_(dict),
     totRefValue_(p.size(), vector::zero),
-    cohesiveLawPtr_(NULL),
+    cohesiveLawPtr_(),
     crackIndicator_(p.size(), 0.0),
     damageIndicator_(p.size(), 0.0),
     relaxationFactor_(readScalar(dict.lookup("relaxationFactor"))),
@@ -546,10 +546,10 @@ void simpleCohesiveZoneFvPatchVectorField::updateCoeffs()
     }
 
     // Patch normal
-    vectorField n = this->patch().nf();
+    const vectorField n = this->patch().nf();
 
     // Current normal traction
-    scalarField curNormalTraction = (n & (n & curSigma));
+    const scalarField curNormalTraction = (n & (n & curSigma));
 
     // New traction to be set
     vectorField newTraction(patch().size(), vector::zero);

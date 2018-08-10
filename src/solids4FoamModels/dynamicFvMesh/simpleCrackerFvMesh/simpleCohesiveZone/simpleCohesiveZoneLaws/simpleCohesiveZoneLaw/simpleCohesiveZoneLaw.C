@@ -46,7 +46,10 @@ Foam::autoPtr<Foam::simpleCohesiveZoneLaw> Foam::simpleCohesiveZoneLaw::New
     const dictionary& dict
 )
 {
-    Info << "Selecting cohesive law: " << simpleCohesiveZoneLawName << endl;
+    if (debug)
+    {
+        Info << "Selecting cohesive law: " << simpleCohesiveZoneLawName << endl;
+    }
 
     dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_->find(simpleCohesiveZoneLawName);
@@ -99,7 +102,6 @@ Foam::simpleCohesiveZoneLaw::simpleCohesiveZoneLaw
     GIc_(cl.GIc_),
     sigmaMax_(cl.sigmaMax_)
 {}
-
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
