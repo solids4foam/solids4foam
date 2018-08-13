@@ -1115,7 +1115,8 @@ void solidPolyMesh::calcPointFixed(const volVectorField& D) const
         else if
         (
             pType == blockFixedDisplacementZeroShearFvPatchVectorField::typeName
-         || pType == (pType == "solidSymmetry" || pType == "symmetry")
+         || pType == "solidSymmetry"
+         || pType == "symmetry"
         )
         {
             // WarningIn("solidPolyMesh.C")
