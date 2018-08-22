@@ -39,6 +39,7 @@ License
 #include "TPSFunction.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
+#include "newSubsetMotionSolverFvMesh.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -1183,6 +1184,50 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                     fluidPatchPointsDispl
                   - fluidPatchPointsDisplPrev
                 )/fluid().runTime().deltaT().value();
+        }
+        else if (isA<newSubsetMotionSolverFvMesh>(fluidMesh()))
+        {
+            newSubsetMotionSolverFvMesh& dynMesh =
+                refCast<newSubsetMotionSolverFvMesh>
+                (
+                    fluidMesh()
+                );
+
+            const fvMesh& subMesh = dynMesh.subsetMesh().subMesh();
+            
+            const bool fvMotionSolver =
+                subMesh.foundObject<pointVectorField>("pointMotionU");
+
+            // Info << subMesh.boundaryMesh() << endl;
+            
+            if (fvMotionSolver)
+            {
+                pointVectorField& motionU =
+                    const_cast<pointVectorField&>
+                    (
+                        subMesh.objectRegistry::
+                        lookupObject<pointVectorField>
+                        (
+                            "pointMotionU"
+                        )
+                    );
+
+                fixedValuePointPatchVectorField& motionUFluidPatch =
+                    refCast<fixedValuePointPatchVectorField>
+                    (
+                        motionU.boundaryField()[fluidPatchIndex()]
+                    );
+
+                motionUFluidPatch ==
+                (
+                    fluidPatchPointsDispl
+                  - fluidPatchPointsDisplPrev
+                )/fluid().runTime().deltaT().value();
+
+                // FatalErrorIn("fluidSolidInterface::moveFluidMesh()")
+                //   << "subset fvMotionSolver"
+                //   << abort(FatalError);
+            }
         }
         else
         {

@@ -21,11 +21,9 @@ runApplication -l log.createPatch.solid createPatch -overwrite -region solid
 
 # Scale from microns to metres
 echo "Running transformPoints on the fluid"
-transformPoints -scale "(1e-6 1e-6 1e-6)" -region fluid \
-    >& log.transformPoints.fluid
+transformPoints -scale "(1e-6 1e-6 1e-6)" -region fluid > log.transformPoints.fluid
 echo "Running transformPoints on the solid"
-transformPoints -scale "(1e-6 1e-6 1e-6)" -region solid \
-    >& log.transformPoints.solid
+transformPoints -scale "(1e-6 1e-6 1e-6)" -region solid > log.transformPoints.solid
 
 # Create face zones for FSI interfaces
 runApplication -l log.setSet.fluid setSet -region fluid -batch setBatch.fluid

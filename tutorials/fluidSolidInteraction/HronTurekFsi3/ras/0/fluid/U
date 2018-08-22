@@ -16,7 +16,7 @@ FoamFile
 
 dimensions      [0 1 -1 0 0 0 0];
 
-internalField   uniform (0 0 0);
+internalField   uniform (3 0 0);
 
 boundaryField
 {
@@ -31,15 +31,8 @@ boundaryField
     }
     inlet
     {
-        type            transitionalParabolicVelocity;
-//         type            parabolicVelocity;
-        maxValue        3;
-        n               ( 1 0 0 );
-        y               ( 0 1 0 );
-        transitionPeriod 0;
-        boundBoxMin     ( 0 0 -0.025334 );
-        boundBoxMax     ( 0 0.41 0.025334 );
-        value           uniform (0 0 0);
+        type            fixedValue;
+        value           uniform (3 0 0);
     }
     cylinder
     {

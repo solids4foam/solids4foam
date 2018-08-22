@@ -224,7 +224,7 @@ bool Foam::solidDisplacements::start()
 }
 
 
-bool Foam::solidDisplacements::execute()
+bool Foam::solidDisplacements::execute(const bool forceWrite)
 {
     return writeData();
 }

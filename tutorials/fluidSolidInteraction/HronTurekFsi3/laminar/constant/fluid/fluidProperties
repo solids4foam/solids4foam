@@ -18,9 +18,9 @@ fluidModel    icoFluid;
 
 icoFluidCoeffs
 {
-    nCorrectors 3;
-    nNonOrthogonalCorrectors 1;
-    nOuterCorrectors 1;
+    // nCorrectors 3;
+    // nNonOrthogonalCorrectors 1;
+    // nOuterCorrectors 1;
 }
 
 // ************************************************************************* //

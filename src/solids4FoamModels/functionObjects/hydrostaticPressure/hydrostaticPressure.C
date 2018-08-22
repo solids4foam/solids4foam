@@ -119,7 +119,7 @@ bool Foam::hydrostaticPressure::start()
 }
 
 
-bool Foam::hydrostaticPressure::execute()
+bool Foam::hydrostaticPressure::execute(const bool forceWrite)
 {
     if (time_.outputTime())
     {

@@ -262,7 +262,7 @@ bool Foam::solidForcesDisplacements::start()
 }
 
 
-bool Foam::solidForcesDisplacements::execute()
+bool Foam::solidForcesDisplacements::execute(const bool forceWrite)
 {
     return writeData();
 }

@@ -71,9 +71,6 @@ class transientSimpleFluid
         //- Density
         dimensionedScalar rho_;
 
-        //- Consistency in time
-        const Switch consistencyByJasak_;
-
 
     // Private Member Functions
 
@@ -82,12 +79,6 @@ class transientSimpleFluid
 
         //- Disallow default bitwise assignment
         void operator=(const transientSimpleFluid&);
-
-        //- Evolve the fluid model
-        bool evolveInconsistent();
-
-        //- Evolve the fluid model
-        bool evolveConsistentByJasak();
 
 public:
 

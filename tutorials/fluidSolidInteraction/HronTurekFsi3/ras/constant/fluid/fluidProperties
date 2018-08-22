@@ -16,14 +16,11 @@ FoamFile
 
 // fluidModel    icoFluid;
 // fluidModel    pisoFluid;
-fluidModel    transientSimpleFluid;
+fluidModel    pimpleFluid;
+// fluidModel    transientSimpleFluid;
 
-"icoFluidCoeffs|pisoFluidCoeffs"
-{
-    nCorrectors 3;
-    nNonOrthogonalCorrectors 1;
-    nOuterCorrectors 1;
-}
+"icoFluidCoeffs|pisoFluidCoeffs|pimpleFluidCoeffs"
+{}
 
 transientSimpleFluidCoeffs
 {

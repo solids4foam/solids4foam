@@ -116,7 +116,7 @@ bool Foam::stressTriaxiality::start()
 }
 
 
-bool Foam::stressTriaxiality::execute()
+bool Foam::stressTriaxiality::execute(const bool forceWrite)
 {
     if (runTime_.outputTime())
     {

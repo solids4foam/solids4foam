@@ -16,7 +16,7 @@ FoamFile
 
 solvers
 {
-    p
+    "p|pFinal"
     {
         solver          GAMG;
         tolerance       1e-06;
@@ -58,10 +58,22 @@ solvers
     {
         solver          PBiCG;
         preconditioner  DILU;
-        tolerance       1e-06;
+        tolerance       1e-08;
         relTol          0;
         minIter         1;
     }
 }
+
+PISO
+{
+    nCorrectors 3;
+    nNonOrthogonalCorrectors 1;
+}
+
+// relaxationFactors
+// {
+//   U 1;
+//   p 0.9;
+// }
 
 // ************************************************************************* //

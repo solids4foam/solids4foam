@@ -101,7 +101,7 @@ bool Foam::centrifugalBodyForce::start()
 }
 
 
-bool Foam::centrifugalBodyForce::execute()
+bool Foam::centrifugalBodyForce::execute(const bool forceWrite)
 {
     return setBodyForce();
 }

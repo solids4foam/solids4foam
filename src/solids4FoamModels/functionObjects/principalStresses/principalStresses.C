@@ -304,7 +304,7 @@ bool Foam::principalStresses::start()
 }
 
 
-bool Foam::principalStresses::execute()
+bool Foam::principalStresses::execute(const bool forceWrite)
 {
     if (runTime_.outputTime())
     {

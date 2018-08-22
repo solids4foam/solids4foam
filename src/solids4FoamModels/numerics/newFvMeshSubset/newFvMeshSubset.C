@@ -38,6 +38,7 @@ Description
 #include "emptyPolyPatch.H"
 #include "demandDrivenData.H"
 #include "cyclicPolyPatch.H"
+#include "oversetPolyPatch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -1343,14 +1344,28 @@ void Foam::newFvMeshSubset::setLargeCellSubset
     {
         label newSize = boundaryPatchSizes[globalPatchMap[oldPatchI]];
 
-        // Clone (even if 0 size)
-        newBoundary[nNewPatches] = oldPatches[oldPatchI].clone
-        (
-            newFvMeshSubsetPtr_->boundaryMesh(),
-            nNewPatches,
-            newSize,
-            patchStart
-        ).ptr();
+        if (isA<oversetPolyPatch>(oldPatches[oldPatchI]))
+        {
+            newBoundary[nNewPatches] = new polyPatch
+            (
+                oldPatches[oldPatchI].name(),
+                newSize, //boundaryPatchSizes[oldInternalPatchID],
+                patchStart,
+                nNewPatches,
+                newFvMeshSubsetPtr_->boundaryMesh()
+            );
+        }
+        else
+        {
+            // Clone (even if 0 size)
+            newBoundary[nNewPatches] = oldPatches[oldPatchI].clone
+            (
+                newFvMeshSubsetPtr_->boundaryMesh(),
+                nNewPatches,
+                newSize,
+                patchStart
+            ).ptr();
+        }
 
         patchStart += newSize;
         patchMap_[nNewPatches] = oldPatchI;    // compact patchMap
@@ -1419,11 +1434,9 @@ void Foam::newFvMeshSubset::setLargeCellSubset
         nNewPatches++;
     }
 
-
     // Reset the patch lists
     newBoundary.setSize(nNewPatches);
     patchMap_.setSize(nNewPatches);
-
 
     // Add the fvPatches
     newFvMeshSubsetPtr_->addFvPatches(newBoundary, syncPar);

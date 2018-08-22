@@ -279,7 +279,7 @@ bool Foam::pointHistory::start()
 }
 
 
-bool Foam::pointHistory::execute()
+bool Foam::pointHistory::execute(const bool forceWrite)
 {
     return writeData();
 }

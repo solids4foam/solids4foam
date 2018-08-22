@@ -207,7 +207,7 @@ bool Foam::solidTractions::start()
 }
 
 
-bool Foam::solidTractions::execute()
+bool Foam::solidTractions::execute(const bool forceWrite)
 {
     return writeData();
 }

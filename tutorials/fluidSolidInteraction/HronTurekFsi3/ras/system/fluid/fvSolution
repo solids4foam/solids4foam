@@ -20,7 +20,7 @@ solvers
     {
         solver          GAMG;
         tolerance       1e-06;
-        relTol          0.01;
+        relTol          0;
         minIter         1;
         maxIter         1000;
         smoother        GaussSeidel;
@@ -39,7 +39,7 @@ solvers
     {
         solver          GAMG;
         tolerance       1e-06;
-        relTol          0.01;
+        relTol          0;
         minIter         1;
         maxIter         1000;
         smoother        GaussSeidel;
@@ -77,29 +77,64 @@ solvers
     {
         solver          PBiCG;
         preconditioner  DILU;
-        tolerance       1e-06;
+        tolerance       1e-07;
         relTol          0;
         minIter         1;
     }
 
-    "epsilon|k"
+    "epsilon|k|omega"
     {
         solver           PBiCG;
         preconditioner   DILU;
 
         minIter          1;
         maxIter          500;
-        tolerance        1e-05;
-        relTol           0.01;
+        tolerance        1e-06;
+        relTol           0;
     };
+}
+
+
+PISO
+{
+    momentumPredictor yes;
+
+    nCorrectors     3;
+    nNonOrthogonalCorrectors 1;
+
+    pRefCell        0;
+    pRefValue       0;
+}
+
+
+PIMPLE
+{
+    momentumPredictor yes;
+
+    nOuterCorrectors 5;    
+    nCorrectors     1;
+    nNonOrthogonalCorrectors 0;
+
+    pRefCell        0;
+    pRefValue       0;
+
+    // residualControl
+    // {
+    //     U
+    //     {
+    //         relTol    0;
+    //         tolerance 1e-6;
+    //     }
+    // }
 }
 
 relaxationFactors
 {
-    U 0.7;
-    p 0.4;
-    k 0.5;
-    epsilon 0.5;
+    U 1;
+    p 0.9;
+    k 0.9;
+    omega 0.9;
+    // epsilon 0.9;
 }
 
 

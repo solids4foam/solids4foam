@@ -209,7 +209,7 @@ bool Foam::hotCylinderAnalyticalSolution::start()
 }
 
 
-bool Foam::hotCylinderAnalyticalSolution::execute()
+bool Foam::hotCylinderAnalyticalSolution::execute(const bool forceWrite)
 {
     return writeData();
 }

@@ -22,4 +22,6 @@ EXE_LIBS = \
     -ldynamicMesh \
     -lmeshTools \
     -ltopoChangerFvMesh \
-    -llduSolvers
+    -llduSolvers \
+    -loversetMesh \
+    -loversetDynamicFvMesh

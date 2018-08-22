@@ -32,6 +32,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "findRefCell.H"
 #include "adjustPhi.H"
+#include "pisoControl.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -69,8 +70,11 @@ icoFluid::icoFluid
         )
     ),
     nu_(transportProperties_.lookup("nu")),
-    rho_(transportProperties_.lookup("rho"))
+    rho_(transportProperties_.lookup("rho")),
+    pRefCell_(0),
+    pRefValue_(0)
 {
+    setRefCell(p(), piso().dict(), pRefCell_, pRefValue_);
     mesh().schemesDict().setFluxRequired(p().name());
 }
 
@@ -130,93 +134,103 @@ bool icoFluid::evolve()
 {
     Info<< "Evolving fluid model: " << this->type() << endl;
 
-    const fvMesh& mesh = this->mesh();
+    fvMesh& mesh = this->mesh();
 
-    const int nCorr = readInt(fluidProperties().lookup("nCorrectors"));
-
-    const int nNonOrthCorr =
-        readInt(fluidProperties().lookup("nNonOrthogonalCorrectors"));
-
-    const int nOutCorr =
-        readInt(fluidProperties().lookup("nOuterCorrectors"));
-
-    // Prepare for the pressure solution
-    label pRefCell = 0;
-    scalar pRefValue = 0.0;
-    setRefCell(p(), fluidProperties(), pRefCell, pRefValue);
-
-    for (int oCorr = 0; oCorr < nOutCorr; oCorr++)
+    bool meshChanged = false;
+    if (fluidModel::fsiMeshUpdate())
     {
-        if (mesh.moving())
-        {
-            // Make the fluxes relative
-            phi() -= fvc::meshPhi(U());
-        }
-
-        // CourantNo
-        {
-          scalar CoNum = 0.0;
-          scalar meanCoNum = 0.0;
-          scalar velMag = 0.0;
-          fluidModel::CourantNo(CoNum, meanCoNum, velMag);
-        }
-
-        fvVectorMatrix UEqn
-        (
-            fvm::ddt(U())
-          + fvm::div(phi(), U())
-          - fvm::laplacian(nu_, U())
-        );
-
-        solve(UEqn == -gradp());
-
-        // --- PISO loop
-
-        volScalarField rAU = 1.0/UEqn.A();
-        surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
-
-        for (int corr = 0; corr < nCorr; corr++)
-        {
-            U() = rAU*UEqn.H();
-            phi() = (fvc::interpolate(U()) & mesh.Sf());
-            //+ fvc::ddtPhiCorr(rUA, U(), phi());
-
-            fluidModel::updateRobinFsiInterface(p(), U(), phi(), rAUf);
-
-            adjustPhi(phi(), U(), p());
-
-            for (int nonOrth=0; nonOrth<=nNonOrthCorr; nonOrth++)
-            {
-                fvScalarMatrix pEqn
-                (
-                    fvm::laplacian
-                    (
-                        rAUf, p(), "laplacian((1|A(U)),p)"
-                    )
-                 == fvc::div(phi())
-                 // fvm::laplacian(rAUf, p()) == fvc::div(phi())
-                );
-
-                pEqn.setReference(pRefCell, pRefValue);
-                pEqn.solve();
-
-                gradp() = fvc::grad(p());
-
-                if (nonOrth == nNonOrthCorr)
-                {
-                    phi() -= pEqn.flux();
-                }
-            }
-
-            fluidModel::continuityErrs();
-
-            U() -= rAU*gradp();
-            U().correctBoundaryConditions();
-
-            gradU() = fvc::grad(U());
-        }
+        // The FSI interface is in charge of calling mesh.update()
+        meshChanged = fluidModel::fsiMeshUpdateChanged();
+    }
+    else
+    {
+        meshChanged = refCast<dynamicFvMesh>(mesh).update();
+        reduce(meshChanged, orOp<bool>());
     }
 
+    if (meshChanged)
+    {
+        const Time& runTime = fluidModel::runTime();
+#       include "volContinuity.H"
+    }
+    
+    // Make the fluxes relative to the mesh motion
+    fvc::makeRelative(phi(), U());
+
+    // CourantNo
+    {
+        scalar CoNum = 0.0;
+        scalar meanCoNum = 0.0;
+        scalar velMag = 0.0;
+        fluidModel::CourantNo(CoNum, meanCoNum, velMag);
+    }
+
+    // Time-derivative matrix
+    fvVectorMatrix ddtUEqn(fvm::ddt(U()));
+
+    // Convection-diffusion matrix
+    fvVectorMatrix HUEqn
+    (
+        fvm::div(phi(), U())
+      - fvm::laplacian(nu_, U())
+    );
+
+    if (piso().momentumPredictor())
+    {
+        solve(ddtUEqn + HUEqn == -fvc::grad(p()));
+    }
+
+    // --- PISO loop
+
+    // Prepare clean 1/a_p without time derivative contribution
+    volScalarField rAU = 1.0/HUEqn.A();
+
+    while (piso().correct())
+    {
+        // Calculate U from convection-diffusion matrix
+        U() = rAU*HUEqn.H();
+
+        // Consistently calculate flux
+        piso().calcTransientConsistentFlux(phi(), U(), rAU, ddtUEqn);
+
+        adjustPhi(phi(), U(), p());
+
+        // Non-orthogonal pressure corrector loop
+        while (piso().correctNonOrthogonal())
+        {
+            fvScalarMatrix pEqn
+            (
+                fvm::laplacian
+                (
+                    fvc::interpolate(rAU)/piso().aCoeff(U().name()),
+                    p(),
+                    "laplacian(rAU," + p().name() + ')'
+                )
+             == fvc::div(phi())
+            );
+
+            pEqn.setReference(pRefCell_, pRefValue_);
+            pEqn.solve
+            (
+                mesh.solutionDict().solver(p().select(piso().finalInnerIter()))
+            );
+
+            if (piso().finalNonOrthogonalIter())
+            {
+                phi() -= pEqn.flux();
+            }
+        }
+
+        fluidModel::continuityErrs();
+
+        // Consistently reconstruct velocity after pressure equation.
+        // Note: flux is made relative inside the function
+        piso().reconstructTransientVelocity(U(), phi(), ddtUEqn, rAU, p());
+    }
+
+    // Make the fluxes absolut to the mesh motion
+    fvc::makeAbsolute(phi(), U());
+    
     return 0;
 }
 

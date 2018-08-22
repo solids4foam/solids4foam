@@ -223,7 +223,7 @@ bool Foam::patchAvgTractionHistory::start()
 }
 
 
-bool Foam::patchAvgTractionHistory::execute()
+bool Foam::patchAvgTractionHistory::execute(const bool forceWrite)
 {
     return writeData();
 }

@@ -105,6 +105,10 @@ public:
             Field<vector>& x,
             const Field<vector>& b
         );
+  
+        //- Re-initialise solver after matrix coefficient update
+        virtual void initMatrix()
+        {}
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

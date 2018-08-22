@@ -1,7 +1,7 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     4.0                                |
+|  \\    /   O peration     | Version:     4.1                                |
 |   \\  /    A nd           | Web:         http://www.foam-extend.org         |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
@@ -33,7 +33,7 @@ boundaryField
     }
     upperWall
     {
-        type            nutWallFunction;
+        type            nutkWallFunction;
         Cmu             0.09;
         kappa           0.41;
         E               9.8;
@@ -41,7 +41,7 @@ boundaryField
     }
     lowerWall
     {
-        type            nutWallFunction;
+        type            nutkWallFunction;
         Cmu             0.09;
         kappa           0.41;
         E               9.8;

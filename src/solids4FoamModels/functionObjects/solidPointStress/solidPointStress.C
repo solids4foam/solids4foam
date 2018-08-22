@@ -241,7 +241,7 @@ bool Foam::solidPointStress::start()
 }
 
 
-bool Foam::solidPointStress::execute()
+bool Foam::solidPointStress::execute(const bool forceWrite)
 {
     return writeData();
 }

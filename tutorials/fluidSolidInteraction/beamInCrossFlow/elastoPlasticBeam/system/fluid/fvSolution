@@ -16,7 +16,7 @@ FoamFile
 
 solvers
 {
-    p
+    "p|pFinal"
     {
         solver          GAMG;
         tolerance       1e-06;
@@ -62,6 +62,12 @@ solvers
         relTol          0;
         minIter         1;
     }
+}
+
+PISO
+{
+    nCorrectors 3;
+    nNonOrthogonalCorrectors 1;
 }
 
 // ************************************************************************* //

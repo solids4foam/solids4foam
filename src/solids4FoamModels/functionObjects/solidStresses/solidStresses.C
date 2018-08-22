@@ -210,7 +210,7 @@ bool Foam::solidStresses::start()
 }
 
 
-bool Foam::solidStresses::execute()
+bool Foam::solidStresses::execute(const bool forceWrite)
 {
     return writeData();
 }

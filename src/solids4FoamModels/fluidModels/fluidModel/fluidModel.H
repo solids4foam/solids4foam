@@ -50,6 +50,10 @@ SourceFiles
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
 #include "pimpleControl.H"
+#include "pisoControl.H"
+#include "oversetMesh.H"
+
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -72,6 +76,9 @@ class fluidModel
 
         //- Fluid properties dictionary
         dictionary fluidProperties_;
+
+        //- Piso control
+        mutable autoPtr<pisoControl> pisoPtr_;
 
         //- Pimple control
         mutable autoPtr<pimpleControl> pimplePtr_;
@@ -132,6 +139,9 @@ class fluidModel
     // Private Member Functions
 
         //- Make the pimple control
+        void makePisoControl() const;
+  
+        //- Make the pimple control
         void makePimpleControl() const;
 
         //- Find global face zones
@@ -169,9 +179,18 @@ protected:
         //- Calculate the Courant number
         void CourantNo(scalar& CoNum, scalar& meanCoNum, scalar& velMag) const;
 
+        //- Calculate the Courant number
+        void oversetCourantNo
+        (
+            scalar& CoNum, scalar& meanCoNum, scalar& velMag
+        ) const;
+  
         //- Continuity errors
         void continuityErrs();
 
+        //- Continuity errors
+        void oversetContinuityErrs();
+  
         //- Bound the pressure and velocity fields
         void boundPU
         (
@@ -246,8 +265,14 @@ public:
             }
 
             //- Return non-const acess to the pimple control
+            pisoControl& piso();
+  
+            //- Return non-const acess to the pimple control
             pimpleControl& pimple();
 
+            //- Return non-const acess to the overset mesh
+            const oversetMesh& osMesh() const;
+  
             //- Return const velocity field
             virtual const volVectorField& U() const
             {

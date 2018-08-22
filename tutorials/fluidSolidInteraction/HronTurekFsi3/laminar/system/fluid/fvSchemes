@@ -27,7 +27,7 @@ gradSchemes
 divSchemes
 {
     default none;
-    div(phi,U)   Gauss linearUpwind cellLimited leastSquares 1;
+    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
 }
 
 laplacianSchemes
@@ -36,6 +36,8 @@ laplacianSchemes
     laplacian(nu,U) Gauss linear newSkewCorrected 1;
     laplacian((1|A(U)),p) Gauss linear newSkewCorrected 1;
     laplacian(diffusivity,cellMotionU) Gauss linear newSkewCorrected 1;
+
+    laplacian(rAU,p) Gauss linear newSkewCorrected 1;
 }
 
 interpolationSchemes

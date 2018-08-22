@@ -264,7 +264,7 @@ bool Foam::solidForces::start()
 }
 
 
-bool Foam::solidForces::execute()
+bool Foam::solidForces::execute(const bool forceWrite)
 {
     return writeData();
 }

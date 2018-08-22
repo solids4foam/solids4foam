@@ -236,12 +236,10 @@ bool Foam::solidPointTemperature::start()
     return false;
 }
 
-
-bool Foam::solidPointTemperature::execute()
+bool Foam::solidPointTemperature::execute(const bool forceWrite)
 {
     return writeData();
 }
-
 
 bool Foam::solidPointTemperature::read(const dictionary& dict)
 {

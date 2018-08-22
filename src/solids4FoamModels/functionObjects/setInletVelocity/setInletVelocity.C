@@ -145,7 +145,7 @@ bool Foam::setInletVelocity::start()
 }
 
 
-bool Foam::setInletVelocity::execute()
+bool Foam::setInletVelocity::execute(const bool forceWrite)
 {
     return setVelocity();
 }

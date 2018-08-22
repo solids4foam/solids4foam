@@ -134,6 +134,10 @@ public:
             Field<vector>& xT,
             const Field<vector>& bT
         ) const;
+  
+        //- Re-initialise preconditioner after matrix coefficient update
+        virtual void initMatrix()
+        {}
 };
 
 
