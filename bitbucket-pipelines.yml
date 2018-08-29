@@ -4,9 +4,10 @@ image: philippic/foam-extend-4.0:latest
 # Increase memory as gcc seems to run out of and give an internal error
 options:
   size: 2x
-  
+
 pipelines:
-  default:
+  branches:
+  '{foam-extend-4.0, development}':
     - step:
         script:
           # Compile repository
