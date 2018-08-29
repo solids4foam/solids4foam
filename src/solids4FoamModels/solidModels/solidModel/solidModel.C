@@ -1284,7 +1284,9 @@ Foam::solidModel::solidModel
 
     // If the case is axisymmetric, we will disable solving in the out-of-plane
     // direction
-    checkWedges();
+    // PC, 12-Nov-18: disabling the 3rd direction slows down convergence a lot
+    // in some elastic cases: disabled for now
+    //checkWedges();
 }
 
 

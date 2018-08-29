@@ -157,7 +157,7 @@ void Foam::fv::blockFvmInsertCoeffsTang
         solidMesh.gPtNgbProcCellCoeffs();
 
     // Fixed points: value and direction
-    const bool enforcePointConstraints = false;
+    const bool enforcePointConstraints = true;
     const Map<vector>& pointFixedComp = solidMesh.pointFixedComponent(vf);
     const Map<symmTensor>& pointFixedDir = solidMesh.pointFixedDirection(vf);
 
@@ -1004,8 +1004,8 @@ void Foam::fv::blockFvmCalculateCoeff
     // Check if the point has a fixed component
     if (pointHasFixedComp)
     {
-        FatalErrorIn("void Foam::fv::blockFvmCalculateCoeff(...)")
-            << "Enforcing fixed points is disabled!" << abort(FatalError);
+        //FatalErrorIn("void Foam::fv::blockFvmCalculateCoeff(...)")
+        //    << "Enforcing fixed points is disabled!" << abort(FatalError);
 
         // Add explicitly to the source
         blockB -= pointFixedComp & coeff;

@@ -268,6 +268,9 @@ void weakCouplingInterface::updateWeakTraction()
         beta_*fluidZoneTractionAtSolid
       + (1.0 - beta_)*predictedSolidZoneTraction_;
 
+    FatalError
+        << "Check beta here!" << abort(FatalError);
+
     predictedSolidZoneTraction_ =
         2.0*solidZoneTraction_ - solidZoneTractionPrev_;
 

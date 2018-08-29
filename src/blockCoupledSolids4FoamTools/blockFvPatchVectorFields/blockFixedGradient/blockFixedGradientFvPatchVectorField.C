@@ -237,6 +237,9 @@ void blockFixedGradientFvPatchVectorField::insertBlockCoeffs
 
         d[varI] -= coeff;
 
+        // Source contribution
+        blockB[varI] -= gradient()[faceI]*faceMagSf;
+
         // Contribution to the lower from owner cell
 
         // Find which implicit bond connects cellI to
