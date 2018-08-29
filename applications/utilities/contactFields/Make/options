@@ -1,5 +1,4 @@
 EXE_INC = \
-    -g \
     -I../../../src/solids4FoamModels/lnInclude \
     -I../../../src/blockCoupledSolids4FoamTools/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
@@ -23,4 +22,6 @@ EXE_LIBS = \
     -ldynamicMesh \
     -lmeshTools \
     -ltopoChangerFvMesh \
-    -llduSolvers
+    -llduSolvers \
+    -loversetMesh \
+    -loversetDynamicFvMesh
