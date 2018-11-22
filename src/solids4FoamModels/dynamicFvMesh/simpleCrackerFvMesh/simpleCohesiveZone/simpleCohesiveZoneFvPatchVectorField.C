@@ -578,7 +578,7 @@ void simpleCohesiveZoneFvPatchVectorField::updateCoeffs()
     }
 
     // Check if the separation has become unreasonable
-    if (max(mag(separationDistance_)) > Foam::sqrt(sum(patch().magSf())))
+    if (max(mag(separationDistance_)) > 1e6*Foam::sqrt(sum(patch().magSf())))
     {
         FatalErrorIn("simpleCohesiveFvPatchVectorField::updateCoeffs()")
             << "The separation distance has become very large!"
