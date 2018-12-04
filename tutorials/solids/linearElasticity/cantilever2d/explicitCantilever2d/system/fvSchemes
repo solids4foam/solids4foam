@@ -53,6 +53,8 @@ interpolationSchemes
     default            none;
     interpolate(impK)  linear;
     interpolate(grad(D)) linear;
+    interpolate(sqrt((impK|rho))) linear;
+    interpolate((rho*ddt(epsilonVol))) linear;
 }
 
 // ************************************************************************* //

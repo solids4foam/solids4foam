@@ -48,6 +48,72 @@ defineTypeNameAndDebug(explicitLinGeomTotalDispSolid, 0);
 addToRunTimeSelectionTable(physicsModel, explicitLinGeomTotalDispSolid, solid);
 addToRunTimeSelectionTable(solidModel, explicitLinGeomTotalDispSolid, dictionary);
 
+// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+void explicitLinGeomTotalDispSolid::checkEnergies()
+{
+    // Calculate kinetic energy
+    const scalar kineticEnergy =
+        gSum(0.5*rho().internalField()*mesh().V()*(U() & U()));
+
+    // Calculate external work energy
+    scalar externalWork = 0.0;
+    forAll(externalWorkField_.boundaryField(), patchI)
+    {
+        if (!externalWorkField_.boundaryField()[patchI].coupled())
+        {
+            externalWorkField_.boundaryField()[patchI] =
+                externalWorkField_.oldTime().boundaryField()[patchI]
+              + (
+                    (
+                        mesh().Sf().boundaryField()[patchI]
+                      & sigma().boundaryField()[patchI]
+                    )
+                  & DD().boundaryField()[patchI]
+                );
+
+            externalWork += sum(externalWorkField_.boundaryField()[patchI]);
+        }
+    }
+
+    // Sync in parallel
+    reduce(externalWork, sumOp<scalar>());
+
+    // Calculate internal energy
+    internalEnergyField_.internalField() =
+        internalEnergyField_.oldTime().internalField()
+      + (sigma() && symm(gradDD()))*mesh().V();
+
+    const scalar internalEnergy = gSum(internalEnergyField_.internalField());
+
+    // Calculate the net energy
+    // This should stay less than 1% of the max energy component
+    const scalar netEnergy = externalWork - internalEnergy - kineticEnergy;
+    const scalar netEnergyPercent =
+        100.0*mag(netEnergy)/max
+        (
+            SMALL, max(externalWork, max(internalEnergy, kineticEnergy))
+        );
+
+    Info<< "External work = " << externalWork << " J" << nl
+        << "Internal energy = " << internalEnergy << " J" << nl
+        << "Kinetic energy = " << kineticEnergy << " J" << nl
+        << "Net energy = " << netEnergy << " J" << nl
+        << "Net energy (% of max) = " << netEnergyPercent << " %" << endl;
+
+//     if (netEnergyPercent > 50)
+//     {
+//         FatalErrorIn(type() + "::checkEnergies()")
+//             << "The energy imbalance is greater than 50%" << abort(FatalError);
+//     }
+
+    if (netEnergyPercent > 10)
+    {
+        WarningIn(type() + "::checkEnergies()")
+            << "The energy imbalance is greater than 10%" << endl;
+    }
+}
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
@@ -59,8 +125,70 @@ explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
     solidModel(typeName, runTime, region),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_)
-{}
+    rImpK_(1.0/impK_),
+    linearBulkViscosityCoeff_
+    (
+        solidModelDict().lookupOrDefault<scalar>
+        (
+            "linearBulkViscosityCoeff", 0.06
+        )
+    ),
+    waveSpeed_
+    (
+        IOobject
+        (
+            "waveSpeed",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        fvc::interpolate(Foam::sqrt(impK_/rho()))
+    ),
+    epsilonVol_
+    (
+        IOobject
+        (
+            "epsilonVol",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("zero", dimless, 0.0)
+    ),
+    externalWorkField_
+    (
+        IOobject
+        (
+            "externalWorkField",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("zero", dimEnergy, 0.0)
+    ),
+    internalEnergyField_
+    (
+        IOobject
+        (
+            "internalEnergyField",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("zero", dimEnergy, 0.0)
+    )
+{
+    epsilonVol_.oldTime();
+    externalWorkField_.oldTime();
+    internalEnergyField_.oldTime();
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -68,62 +196,20 @@ explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
 
 void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
 {
-    // For now, only the linearElastic material law is allowed
-    const PtrList<mechanicalLaw>& mechLaws = mechanical();
-    if (mechLaws.size() != 1)
-    {
-        FatalErrorIn(type() + "::" + type())
-            << type() << " can currently only be used with a single material"
-            << "\nConsider using one of the other solidModels."
-            << abort(FatalError);
-    }
-    else if (!isA<linearElastic>(mechLaws[0]))
-    {
-        FatalErrorIn(type() + "::" + type())
-            << type() << " can only be used with the linearElastic "
-            << "mechanicalLaw" << nl
-            << abort(FatalError);
-    }
-
-    // Cast the mechanical law to a linearElastic mechanicalLaw
-    const linearElastic& mech = refCast<const linearElastic>(mechLaws[0]);
-
-    // Calculate the speed of sound
-    const scalar waveVelocity  =
-        Foam::sqrt
-        (
-            mech.E()*(1 - mech.nu())
-           /(mech.rhoScalar()*(1 + mech.nu())*(1 - 2*mech.nu()))
-        ).value();
-
-    // Courant number
-    const scalarField Co =
-        waveVelocity*runTime.deltaT().value()
-        *mesh().surfaceInterpolation::deltaCoeffs().internalField();
-
-    // Calculate required time-step for a Courant number of 1.0
     const scalar requiredDeltaT =
         1.0/
-        gMax
+        gMin
         (
             mesh().surfaceInterpolation::deltaCoeffs().internalField()
-           *waveVelocity
+           *waveSpeed_.internalField()
         );
 
-    //const scalar averageCo = gAverage(Co);
-    //const scalar maxCo = gMax(Co);
-    //const scalar averageWaveVel = waveVelocity;
-    //const scalar maxWaveVel = waveVelocity;
+    // Lookup the desired Courant number
+    const scalar maxCo =
+        runTime.controlDict().lookupOrDefault<scalar>("maxCo", 0.7);
 
-    const scalar newDeltaT =
-        readScalar(runTime.controlDict().lookup("maxCo"))*requiredDeltaT;
+    const scalar newDeltaT = maxCo*requiredDeltaT;
 
-//     Info<< "Courant Number\n\tmean: " << averageCo
-//         << "\n\tmax: " << maxCo << nl
-//         << "Wave velocity magnitude\n\tmean " << averageWaveVel
-//         << "\n\tmax: " << maxWaveVel << nl
-//         << "deltaT for a maximum Courant number of 1.0: "
-//         << requiredDeltaT << nl;
     Info<< "Setting deltaT to " << requiredDeltaT << nl << endl;
 
     runTime.setDeltaT(newDeltaT);
@@ -149,6 +235,21 @@ bool explicitLinGeomTotalDispSolid::evolve()
                 dimensionedScalar("eta", dimless/dimTime, 0.0)
             );
 
+        // Calculate linear bulk damping e.g. as used by Abaqus/explicit
+        epsilonVol_ = tr(gradD())/3.0;
+        const surfaceScalarField viscousPressure =
+            linearBulkViscosityCoeff_*fvc::interpolate
+            (
+                rho()*fvc::ddt(epsilonVol_)
+            )*waveSpeed_/mesh().deltaCoeffs();
+
+        // Scale factor for Rhie-Chow smoothing term
+        const scalar RhieChowScale =
+            solidModelDict().lookupOrDefault<scalar>
+            (
+                "RhieChowScale", 0.0
+            );
+
         // Store fields for under-relaxation and residual calculation
         D().storePrevIter();
 
@@ -159,7 +260,8 @@ bool explicitLinGeomTotalDispSolid::evolve()
           + eta*rho()*fvm::ddt(D())
          == fvc::div(sigma(), "div(sigma)")
           + rho()*g()
-          + mechanical().RhieChowCorrection(D(), gradD())
+          + RhieChowScale*mechanical().RhieChowCorrection(D(), gradD())
+          + fvc::div(viscousPressure*mesh().Sf())
         );
 
         // Under-relaxation the linear system
@@ -167,14 +269,6 @@ bool explicitLinGeomTotalDispSolid::evolve()
 
         // Solve the linear system
         DEqn.solve();
-
-        // Print out damping
-        Info<< "Max inertia: "
-            << gMax(mag(rho()*fvc::d2dt2(D())().internalField()))
-            << nl
-            << "Max viscous damping: "
-            << gMax(mag(rho()*eta*fvc::ddt(D())().internalField()))
-            << endl;
 
         // Update increment of displacement
         DD() = D() - D().oldTime();
@@ -199,6 +293,9 @@ bool explicitLinGeomTotalDispSolid::evolve()
 
         // Velocity
         U() = fvc::ddt(D());
+
+        // Check energies
+        checkEnergies();
     }
     while (mesh().update());
 

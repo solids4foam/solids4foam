@@ -22,15 +22,15 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         1e-3;
+endTime         1e-03;
 
-deltaT          1e-6;
+deltaT          1e-06;
 
-maxCo           0.5;
+maxCo           0.7;
 
-writeControl    timeStep;
+writeControl    adjustableRunTime;
 
-writeInterval   1;
+writeInterval   1e-05;
 
 cycleWrite      0;
 

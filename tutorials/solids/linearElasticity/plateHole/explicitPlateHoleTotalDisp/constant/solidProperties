@@ -20,11 +20,15 @@ solidModel     explicitLinearGeometryTotalDisplacement;
 
 explicitLinearGeometryTotalDisplacementCoeffs
 {
-    // Maximum number of momentum correctors
-    nCorrectors     0;
+    // Linear bulk viscosity coefficient to kill high frequency oscillations
+    // Defaults to 0.06
+    linearBulkViscosityCoeff 0.06;
 
-    // Write frequency for the residuals
-    infoFrequency   0;
+    // Scale factor for Rhie-Chow smoothing term
+    RhieChowScale   0.0;
+
+    // Numerical viscosity for 1st temporal derivative term
+    numericalViscosity    eta [ 0 0 -1 0 0 0 0 ] 0;
 }
 
 

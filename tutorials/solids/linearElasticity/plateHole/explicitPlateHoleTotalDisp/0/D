@@ -31,11 +31,11 @@ boundaryField
         type            solidTraction;
         //tractionSeries
         //{
-        //    fileName    "$FOAM_CASE/constant/timeVsTraction";
-        //    outOfBounds clamp;
+        //   fileName    "$FOAM_CASE/constant/timeVsTraction";
+        //   outOfBounds clamp;
         //}
-        traction        uniform (0 0 0);
-        pressure        uniform -1e6;
+        traction        uniform (1e+06 0 0);
+        pressure        uniform 0;
         value           uniform (0 0 0);
     }
     down
