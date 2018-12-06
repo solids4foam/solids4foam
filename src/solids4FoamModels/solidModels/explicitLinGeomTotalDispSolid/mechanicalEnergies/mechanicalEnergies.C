@@ -230,6 +230,9 @@ void mechanicalEnergies::checkEnergies
     // To-do
     //eta*rho()*fvm::ddt(D())
 
+    // Calculate energy generated due to gravity forces
+    // To-do
+
     // Calculate the energy imbalance
     // This should stay less than 1% of the max energy component
     const scalar energyImbalance =

@@ -23,28 +23,24 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    explicitLinGeomTotalDispSolid
+    explicitNonLinGeomTotalLagTotalDispSolid
 
 Description
-    Version of the linGeomTotalDispSolid solid model, where a fully explicit
-    solution algorithm is used.
+    Version of the nonLinGeomTotalLagTotalDispSolid solver, where a fully
+    explicit solution algorithm is used.
 
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
-    explicitLinGeomTotalDispSolid.C
+    explicitNonLinGeomTotalLagTotalDispSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef explicitLinGeomTotalDispSolid_H
-#define explicitLinGeomTotalDispSolid_H
+#ifndef explicitNonLinGeomTotalLagTotalDispSolid_H
+#define explicitNonLinGeomTotalLagTotalDispSolid_H
 
 #include "solidModel.H"
-#include "volFields.H"
-#include "surfaceFields.H"
-#include "pointFields.H"
-#include "uniformDimensionedFields.H"
 #include "mechanicalEnergies.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -58,14 +54,23 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class explicitLinGeomTotalDispSolid Declaration
+          Class explicitNonLinGeomTotalLagTotalDispSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class explicitLinGeomTotalDispSolid
+class explicitNonLinGeomTotalLagTotalDispSolid
 :
     public solidModel
 {
     // Private data
+
+        //- Total deformation gradient
+        volTensorField F_;
+
+        //- Inverse of the total deformation gradient
+        volTensorField Finv_;
+
+        //- Jacobian of total deformation gradient
+        volScalarField J_;
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
@@ -73,7 +78,7 @@ class explicitLinGeomTotalDispSolid
         const volScalarField impK_;
 
         //- Implicit stiffness surface field
-        surfaceScalarField impKf_;
+        const surfaceScalarField impKf_;
 
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
@@ -95,10 +100,13 @@ class explicitLinGeomTotalDispSolid
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        explicitLinGeomTotalDispSolid(const explicitLinGeomTotalDispSolid&);
+        explicitNonLinGeomTotalLagTotalDispSolid
+        (
+            const explicitNonLinGeomTotalLagTotalDispSolid&
+        );
 
         //- Disallow default bitwise assignment
-        void operator=(const explicitLinGeomTotalDispSolid&);
+        void operator=(const explicitNonLinGeomTotalLagTotalDispSolid&);
 
 
 protected:
@@ -108,27 +116,28 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            return nonLinearGeometry::LINEAR_GEOMETRY;
+            return nonLinearGeometry::TOTAL_LAGRANGIAN;
         }
 
 
 public:
 
     //- Runtime type information
-    TypeName("explicitLinearGeometryTotalDisplacement");
+    TypeName("explicitNonLinearGeometryTotalLagrangianTotalDisplacement");
 
     // Constructors
 
         //- Construct from components
-        explicitLinGeomTotalDispSolid
+        explicitNonLinGeomTotalLagTotalDispSolid
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
         );
 
+
     // Destructor
 
-        virtual ~explicitLinGeomTotalDispSolid()
+        virtual ~explicitNonLinGeomTotalLagTotalDispSolid()
         {}
 
 

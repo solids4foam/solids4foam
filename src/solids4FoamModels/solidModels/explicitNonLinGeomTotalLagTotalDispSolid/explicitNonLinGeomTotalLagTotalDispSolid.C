@@ -24,7 +24,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "explicitLinGeomTotalDispSolid.H"
+#include "explicitNonLinGeomTotalLagTotalDispSolid.H"
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
@@ -43,22 +43,64 @@ namespace solidModels
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(explicitLinGeomTotalDispSolid, 0);
-addToRunTimeSelectionTable(physicsModel, explicitLinGeomTotalDispSolid, solid);
+defineTypeNameAndDebug(explicitNonLinGeomTotalLagTotalDispSolid, 0);
 addToRunTimeSelectionTable
 (
-    solidModel, explicitLinGeomTotalDispSolid, dictionary
+    physicsModel, explicitNonLinGeomTotalLagTotalDispSolid, solid
 );
+addToRunTimeSelectionTable
+(
+    solidModel, explicitNonLinGeomTotalLagTotalDispSolid, dictionary
+);
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
+explicitNonLinGeomTotalLagTotalDispSolid::
+explicitNonLinGeomTotalLagTotalDispSolid
 (
     Time& runTime,
     const word& region
 )
 :
     solidModel(typeName, runTime, region),
+    F_
+    (
+        IOobject
+        (
+            "F",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedTensor("I", dimless, I)
+    ),
+    Finv_
+    (
+        IOobject
+        (
+            "Finv",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        inv(F_)
+    ),
+    J_
+    (
+        IOobject
+        (
+            "J",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        det(F_)
+    ),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
@@ -95,7 +137,7 @@ explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
+void explicitNonLinGeomTotalLagTotalDispSolid::setDeltaT(Time& runTime)
 {
     const scalar requiredDeltaT =
         1.0/
@@ -117,72 +159,78 @@ void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
 }
 
 
-bool explicitLinGeomTotalDispSolid::evolve()
+    bool explicitNonLinGeomTotalLagTotalDispSolid::evolve()
 {
-    Info<< "Evolving solid solver" << endl;
+    blockLduMatrix::debug = 0;
 
-    // Mesh update loop
-    do
-    {
-        blockLduMatrix::debug = 0;
+    Info<< "Solving the total Lagrangian form of the momentum equation for D"
+        << endl;
 
-        Info<< "Solving the momentum equation for D" << endl;
-
-        // Linear momentum equation total displacement form
-        fvVectorMatrix DEqn
+    // Momentum equation total displacement total Lagrangian form
+    // To-do: check viscousPressure is correct for finite strain
+    fvVectorMatrix DEqn
+    (
+        rho()*fvm::d2dt2(D())
+      - eta_*rho()*fvm::ddt(D())
+     == fvc::div(J_*Finv_ & sigma(), "div(sigma)")
+      + rho()*g()
+      + RhieChowScaleFactor_*mechanical().RhieChowCorrection(D(), gradD())
+      + fvc::div
         (
-            rho()*fvm::d2dt2(D())
-          - eta_*rho()*fvm::ddt(D())
-         == fvc::div(sigma(), "div(sigma)")
-          + rho()*g()
-          + RhieChowScaleFactor_*mechanical().RhieChowCorrection(D(), gradD())
-          + fvc::div
-            (
-                energies_.viscousPressure(rho(), waveSpeed_, gradD())
-               *mesh().Sf()
-            )
-        );
+            energies_.viscousPressure(rho(), waveSpeed_, gradD())*mesh().Sf()
+        )
+    );
 
-        // Solve the linear system
-        DEqn.solve();
+    // Solve the linear system
+    DEqn.solve();
 
-        // Update increment of displacement
-        DD() = D() - D().oldTime();
+    // Increment of displacement
+    DD() = D() - D().oldTime();
 
-        // Update gradient of displacement
-        mechanical().grad(D(), gradD());
+    // Update gradient of displacement
+    mechanical().grad(D(), gradD());
 
-        // Update gradient of displacement increment
-        gradDD() = gradD() - gradD().oldTime();
+    // Update gradient of displacement increment
+    gradDD() = gradD() - gradD().oldTime();
 
-        // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+    // Total deformation gradient
+    F_ = I + gradD().T();
 
-        // Interpolate cell displacements to vertices
-        mechanical().interpolate(D(), pointD());
+    // Inverse of the deformation gradient
+    Finv_ = inv(F_);
 
-        // Increment of displacement
-        DD() = D() - D().oldTime();
+    // Jacobian of the deformation gradient
+    J_ = det(F_);
 
-        // Increment of point displacement
-        pointDD() = pointD() - pointD().oldTime();
+    // Update the momentum equation inverse diagonal field
+    // This may be used by the mechanical law when calculating the
+    // hydrostatic pressure
+    const volScalarField DEqnA("DEqnA", DEqn.A());
 
-        // Velocity
-        U() = fvc::ddt(D());
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
 
-        // Check energies
-        energies_.checkEnergies
-        (
-            rho(), U(), DD(), sigma(), gradD(), gradDD(), waveSpeed_
-        );
-    }
-    while (mesh().update());
+    // Interpolate cell displacements to vertices
+    mechanical().interpolate(D(), pointD());
+
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
+
+    // Velocity
+    U() = fvc::ddt(D());
+
+    // Check energies
+    energies_.checkEnergies
+    (
+        rho(), U(), DD(), sigma(), gradD(), gradDD(), waveSpeed_
+    );
 
     return true;
 }
 
 
-tmp<vectorField> explicitLinGeomTotalDispSolid::tractionBoundarySnGrad
+tmp<vectorField> explicitNonLinGeomTotalLagTotalDispSolid::
+tractionBoundarySnGrad
 (
     const vectorField& traction,
     const scalarField& pressure,
@@ -192,7 +240,7 @@ tmp<vectorField> explicitLinGeomTotalDispSolid::tractionBoundarySnGrad
     // Patch index
     const label patchID = patch.index();
 
-    // Patch mechanical property
+    // Patch implicit stiffness field
     const scalarField& impK = impK_.boundaryField()[patchID];
 
     // Patch reciprocal implicit stiffness field
@@ -201,11 +249,18 @@ tmp<vectorField> explicitLinGeomTotalDispSolid::tractionBoundarySnGrad
     // Patch gradient
     const tensorField& pGradD = gradD().boundaryField()[patchID];
 
-    // Patch stress
+    // Patch Cauchy stress
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
-    // Patch unit normals
+    // Patch total deformation gradient inverse
+    const tensorField& Finv = Finv_.boundaryField()[patchID];
+
+    // Patch unit normals (initial configuration)
     const vectorField n = patch.nf();
+
+    // Patch unit normals (deformed configuration)
+    vectorField nCurrent = Finv.T() & n;
+    nCurrent /= mag(nCurrent);
 
     // Return patch snGrad
     return tmp<vectorField>
@@ -213,8 +268,9 @@ tmp<vectorField> explicitLinGeomTotalDispSolid::tractionBoundarySnGrad
         new vectorField
         (
             (
-                (traction - n*pressure)
-              - (n & (pSigma - impK*pGradD))
+                (traction - nCurrent*pressure)
+              - (nCurrent & pSigma)
+              + impK*(n & pGradD)
             )*rImpK
         )
     );
