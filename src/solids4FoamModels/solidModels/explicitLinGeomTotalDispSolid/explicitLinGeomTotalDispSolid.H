@@ -48,6 +48,7 @@ SourceFiles
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
+#include "mechanicalEnergies.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -82,26 +83,19 @@ class explicitLinGeomTotalDispSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- Linear bulk viscosity coefficient
-        //  Defaults to 0.06, as in Abaqus
-        const scalar linearBulkViscosityCoeff_;
+        //- Scale factor for Rhie-Chow smoothing term
+        const scalar RhieChowScaleFactor_;
+
+        // Damping viscosity coefficient
+        const dimensionedScalar eta_;
 
         //- Wave speed field
         surfaceScalarField waveSpeed_;
 
-        //- Volumetric strain. This is used to apply linear bulk damping
-        volScalarField epsilonVol_;
-
-        //- External work field used to store the integral of the boundary work
-        volScalarField externalWorkField_;
-
-        //- Internal energy field used to store the integral of the internal energy
-        volScalarField internalEnergyField_;
+        //- Energy calculation
+        mechanicalEnergies energies_;
 
     // Private Member Functions
-
-        //- Check global energy conservation
-        void checkEnergies();
 
         //- Disallow default bitwise copy construct
         explicitLinGeomTotalDispSolid(const explicitLinGeomTotalDispSolid&);

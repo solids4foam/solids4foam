@@ -55,6 +55,8 @@ interpolationSchemes
     interpolate(grad(D)) linear;
     interpolate(sqrt((impK|rho))) linear;
     interpolate((rho*ddt(epsilonVol))) linear;
+    interpolate(DD) linear;
+    interpolate(sigma) linear;
 }
 
 // ************************************************************************* //
