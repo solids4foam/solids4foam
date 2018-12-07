@@ -226,6 +226,13 @@ void mechanicalEnergies::checkEnergies
     const scalar bulkViscosityEnergy =
         gSum(bulkViscosityEnergyField_.internalField());
 
+    // Calculate energy due to Rhie-Chow smoothing traction
+    // Calculate internal energy
+    // internalEnergyField_.internalField() =
+    //     internalEnergyField_.oldTime().internalField()
+    //   + (sigma && symm(gradDD))*mesh_.V();
+    // scale*fvc::div(impK*mesh.Sf()*(snGrad(D) - fvc::interpolate(gradD)))
+
     // Calculate energy dissipated due to velocity damping term
     // To-do
     //eta*rho()*fvm::ddt(D())
@@ -256,7 +263,7 @@ void mechanicalEnergies::checkEnergies
        WarningIn(type() + "::checkEnergies()")
            << "The energy imbalance is greater than 10%" << endl;
        // FatalErrorIn(type() + "::checkEnergies()")
-       //     << "The energy imbalance is greater than 50%"
+       //     << "The energy imbalance is greater than 10%"
        //     << abort(FatalError);
     }
 }
