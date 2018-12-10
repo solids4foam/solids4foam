@@ -67,8 +67,18 @@ class thermoLinearElastic
         //  temperature field T
         mutable autoPtr<volScalarField> TPtr_;
 
+        //- Flag to indicate the T field has be read from disk at least once
+        bool TFieldWasReadFromDisk_;
+
+        //- Store the current time index so we know the start of a new time-step
+        label curTimeIndex_;
+
 
     // Private Member Functions
+
+        //- Read the temperature field from disk
+        //  Return true if the T field has ever been read from disk
+        bool readTField();
 
         //- Disallow default bitwise copy construct
         thermoLinearElastic(const thermoLinearElastic&);
