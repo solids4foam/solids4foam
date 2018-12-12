@@ -1,0 +1,77 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant/polyMesh";
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+convertToMeters 1;
+
+vertices
+(
+    (0 0.5 0)
+    (0.5 0 0)
+    (0.7 0 0)
+    (0 0.7 0)
+    (0 0.5 0.1)
+    (0.5 0 0.1)
+    (0.7 0 0.1)
+    (0 0.7 0.1)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (60 10 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+    arc 0 1 (0.353553 0.353553 0)
+    arc 4 5 (0.353553 0.353553 0.1)
+    arc 3 2 (0.4949 0.4949 0)
+    arc 7 6 (0.4949 0.4949 0.1)
+);
+
+patches
+(
+    symmetryPlane left
+    (
+        (4 7 3 0)
+    )
+    symmetryPlane bottom
+    (
+        (1 2 6 5)
+    )
+    patch inside
+    (
+        (0 1 5 4)
+    )
+    patch outside
+    (
+        (7 6 2 3)
+    )
+    empty back
+    (
+        (3 2 1 0)
+    )
+    empty front
+    (
+        (4 5 6 7)
+    )
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

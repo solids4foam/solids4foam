@@ -1,0 +1,5 @@
+cellSet aluminium new cylinderToCell (0 0 0) (0 0 1) 0.6
+cellSet aluminium invert
+cellSet aluminium_old remove
+cellSet steel new cylinderToCell (0 0 0) (0 0 1) 0.6
+quit

@@ -99,10 +99,19 @@ protected:
         //- If the case is plane stress
         bool planeStress() const;
 
-        //- Return the bse mesh region name
+        //- Return the base mesh region name
         const word& baseMeshRegionName() const
         {
             return baseMeshRegionName_;
+        }
+
+        //- Return const access to the base mesh
+        const fvMesh& baseMesh() const
+        {
+            return mesh().db().lookupObject<fvMesh>
+            (
+                baseMeshRegionName()
+            );
         }
 
         //- Lookup the enforceLinear Switch in the solidModel

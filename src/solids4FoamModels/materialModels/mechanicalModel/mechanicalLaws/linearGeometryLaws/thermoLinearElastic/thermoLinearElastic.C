@@ -65,17 +65,58 @@ bool Foam::thermoLinearElastic::readTField()
 
         if (Theader.headerOk())
         {
-            Info<< nl << "Reading T field from time = " << mesh().time().timeName()
-                << nl << endl;
+            Info<< nl << "Reading T field from time = "
+                << mesh().time().timeName() << nl << endl;
 
             TPtr_.clear();
             TPtr_.set(new volScalarField(Theader, mesh()));
 
             TFieldWasReadFromDisk_ = true;
 
-            // Set the T field to write to disk: this allows a restart where the T
-            // field was only specified in the first time-step
+            // Set the T field to write to disk: this allows a restart where
+            // the T field was only specified in the first time-step
             TPtr_().writeOpt() = IOobject::AUTO_WRITE;
+        }
+        else
+        {
+            // In multi-material cases, the T field may be given for the base
+            // mesh, so we will read this base mesh T field and then extract the
+            // T sub-field corresponding to the current material sub-mesh
+
+            // Try to read the T field from the baseMesh
+            IOobject baseTheader
+            (
+                "T",
+                baseMesh().time().timeName(),
+                baseMesh(),
+                IOobject::MUST_READ
+            );
+
+            if (baseTheader.headerOk())
+            {
+                Info<< nl << "Reading base mesh T field from time = "
+                    << baseMesh().time().timeName() << nl << endl;
+
+                // Read T field for the baseMesh
+                volScalarField baseT(baseTheader, baseMesh());
+
+                // Map baseT to T
+                // Note: there is a cleaner way to do this but it is fine for
+                // now
+                TPtr_.clear();
+                TPtr_.set
+                (
+                    new volScalarField
+                    (
+                        baseMesh().lookupObject<mechanicalModel>
+                        (
+                            "mechanicalProperties"
+                        ).lookupBaseMeshVolField<scalar>("T", mesh())()
+                    )
+                );
+
+                TFieldWasReadFromDisk_ = true;
+            }
         }
     }
 
