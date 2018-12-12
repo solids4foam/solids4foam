@@ -73,7 +73,7 @@ void Foam::neoHookeanElasticMisesPlastic::makeRelF()
         (
             IOobject
             (
-                "lawRelF",
+                "relF",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -109,7 +109,7 @@ void Foam::neoHookeanElasticMisesPlastic::makeRelFf()
         (
             IOobject
             (
-                "lawRelFf",
+                "relFf",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -1105,7 +1105,7 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlastic::rho() const
         (
             IOobject
             (
-                "lawRho",
+                "rho",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,

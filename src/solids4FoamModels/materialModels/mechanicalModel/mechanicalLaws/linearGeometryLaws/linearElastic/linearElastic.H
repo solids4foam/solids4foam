@@ -160,6 +160,9 @@ public:
         //- Return density
         virtual tmp<volScalarField> rho() const;
 
+        //- Return density scale
+        virtual const dimensionedScalar& rhoScalar() const;
+
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
