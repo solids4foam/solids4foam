@@ -83,7 +83,7 @@ class explicitUnsLinGeomSolid
         const volScalarField rImpK_;
 
         //- Scale factor for Rhie-Chow smoothing term
-        //const scalar RhieChowScaleFactor_;
+        const scalar RhieChowScaleFactor_;
 
         // Damping viscosity coefficient
         const dimensionedScalar eta_;

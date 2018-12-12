@@ -137,11 +137,12 @@ bool explicitLinGeomTotalDispSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
 
+    // Do not write default linear solver residuals
+    blockLduMatrix::debug = 0;
+
     // Mesh update loop
     do
     {
-        blockLduMatrix::debug = 0;
-
         Info<< "Solving the momentum equation for D" << endl;
 
         // Linear momentum equation total displacement form
@@ -193,6 +194,8 @@ bool explicitLinGeomTotalDispSolid::evolve()
         );
     }
     while (mesh().update());
+
+    blockLduMatrix::debug = 1;
 
     return true;
 }

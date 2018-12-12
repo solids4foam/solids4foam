@@ -86,13 +86,13 @@ explicitUnsLinGeomSolid::explicitUnsLinGeomSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    // RhieChowScaleFactor_
-    // (
-    //     solidModelDict().lookupOrDefault<scalar>
-    //     (
-    //         "RhieChowScale", 0.0
-    //     )
-    // ),
+    RhieChowScaleFactor_
+    (
+        solidModelDict().lookupOrDefault<scalar>
+        (
+            "RhieChowScale", 0.0
+        )
+    ),
     eta_
     (
         solidModelDict().lookupOrDefault<dimensionedScalar>
@@ -166,50 +166,61 @@ bool explicitUnsLinGeomSolid::evolve()
 {
     Info<< "Solving the momentum equation for D" << endl;
 
-    // Linear momentum equation total displacement form
-    fvVectorMatrix DEqn
-    (
-        rho()*fvm::d2dt2(D())
-      - eta_*rho()*fvm::ddt(D())
-     == fvc::div(mesh().Sf() & sigmaf_)
-      + rho()*g()
-      + fvc::div
+    // Do not write default linear solver residuals
+    blockLduMatrix::debug = 0;
+
+    // Mesh update loop
+    do
+    {
+        // Linear momentum equation total displacement form
+        fvVectorMatrix DEqn
         (
-            energies_.viscousPressure(rho(), waveSpeed_, gradD())
-            *mesh().Sf()
-        )
-    );
+            rho()*fvm::d2dt2(D())
+          - eta_*rho()*fvm::ddt(D())
+         == fvc::div(mesh().Sf() & sigmaf_)
+          + rho()*g()
+          + RhieChowScaleFactor_*mechanical().RhieChowCorrection(D(), gradD())
+          + fvc::div
+            (
+                energies_.viscousPressure(rho(), waveSpeed_, gradD())
+                *mesh().Sf()
+            )
+        );
 
-    // Solve the linear system
-    DEqn.solve();
+        // Solve the linear system
+        DEqn.solve();
 
-    // Update increment of displacement
-    DD() = D() - D().oldTime();
+        // Update increment of displacement
+        DD() = D() - D().oldTime();
 
-    // Interpolate D to pointD
-    mechanical().interpolate(D(), pointD(), false);
+        // Interpolate D to pointD
+        mechanical().interpolate(D(), pointD(), false);
 
-    // Update gradient of displacement
-    mechanical().grad(D(), pointD(), gradD(), gradDf_);
+        // Update gradient of displacement
+        mechanical().grad(D(), pointD(), gradD(), gradDf_);
 
-    // Update gradient of displacement increment
-    gradDD() = gradD() - gradD().oldTime();
+        // Update gradient of displacement increment
+        gradDD() = gradD() - gradD().oldTime();
 
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigmaf_);
-    mechanical().correct(sigma());
+        // Calculate the stress using run-time selectable mechanical law
+        mechanical().correct(sigmaf_);
+        mechanical().correct(sigma());
 
-    // Increment of point displacement
-    pointDD() = pointD() - pointD().oldTime();
+        // Increment of point displacement
+        pointDD() = pointD() - pointD().oldTime();
 
-    // Velocity
-    U() = fvc::ddt(D());
+        // Velocity
+        U() = fvc::ddt(D());
 
-    // Check energies
-    energies_.checkEnergies
-    (
-        rho(), U(), DD(), sigma(), gradD(), gradDD(), waveSpeed_
-    );
+        // Check energies
+        energies_.checkEnergies
+        (
+            rho(), U(), DD(), sigma(), gradD(), gradDD(), waveSpeed_
+        );
+    }
+    while (mesh().update());
+
+    blockLduMatrix::debug = 1;
 
     return true;
 }
