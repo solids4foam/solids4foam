@@ -223,6 +223,8 @@ thermalLinGeomSolid::thermalLinGeomSolid
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_)
 {
+    DisRequired();
+
     // Store T old time
     T_.oldTime();
 }

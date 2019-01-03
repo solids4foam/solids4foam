@@ -133,7 +133,9 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
     predict_(solidModelDict().lookupOrDefault<Switch>("predict", false))
-{}
+{
+    DisRequired();
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

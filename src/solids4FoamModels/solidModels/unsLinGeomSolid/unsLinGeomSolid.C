@@ -87,6 +87,8 @@ unsLinGeomSolid::unsLinGeomSolid
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_)
 {
+    DisRequired();
+
     // Store old times
     gradDf_.oldTime();
     sigmaf_.oldTime();

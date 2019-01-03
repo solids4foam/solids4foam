@@ -233,7 +233,9 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
     (
         solidModelDict().lookupOrDefault<Switch>("stabilisePressure", false)
     )
-{}
+{
+    DDisRequired();
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

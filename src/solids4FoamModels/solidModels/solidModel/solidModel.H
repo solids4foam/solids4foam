@@ -82,6 +82,12 @@ class solidModel
         //- Mechanical model
         mutable autoPtr<mechanicalModel> mechanicalPtr_;
 
+        //- Total displacement field header
+        IOobject Dheader_;
+
+        //- Increment of displacement field header
+        IOobject DDheader_;
+
         //- Total displacement field
         volVectorField D_;
 
@@ -568,6 +574,12 @@ public:
             {
                 return false;
             }
+
+            //- This function will check that the D field was read from disk
+            virtual void DisRequired();
+
+            //- This function will check that the DD field was read from disk
+            virtual void DDisRequired();
 
         // Edit
 

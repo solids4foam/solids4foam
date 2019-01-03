@@ -202,7 +202,9 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
             solutionTol()
         )
     )
-{}
+{
+    DisRequired();
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
