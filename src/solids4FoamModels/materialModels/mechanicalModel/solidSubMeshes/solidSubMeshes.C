@@ -23,67 +23,25 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "mechanicalModel.H"
+#include "solidSubMeshes.H"
 #include "ZoneID.H"
-#include "fvc.H"
-#include "fvcGradf.H"
-#include "gaussGrad.H"
 #include "twoDPointCorrector.H"
-#include "fixedGradientFvPatchFields.H"
 #include "wedgePolyPatch.H"
-#include "crackerFvMesh.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 
-void Foam::mechanicalModel::makeSolSubMeshes() const
-{
-    if (!solidSubMeshes_.empty())
-    {
-        FatalErrorIn("void Foam::mechanicalModel::makeSolidSubMeshes() const")
-            << "solid sub-meshes already exist" << abort(FatalError);
-    }
-
-    notImplemented("WIP");
-}
-
-
-const Foam::PtrList<Foam::solidSubMeshes>&
-Foam::mechanicalModel::solSubMeshes() const
-{
-    if (solidSubMeshes_.empty())
-    {
-        makeSolSubMeshes();
-    }
-
-    return solidSubMeshes_;
-}
-
-
-Foam::PtrList<Foam::solidSubMeshes>& Foam::mechanicalModel::solSubMeshes()
-{
-    if (solidSubMeshes_.empty())
-    {
-        makeSolSubMeshes();
-    }
-
-    return solidSubMeshes_;
-}
-
-
-void Foam::mechanicalModel::makeSubMeshes() const
+void Foam::solidSubMeshes::makeSubMeshes() const
 {
     if (!subMeshes_.empty())
     {
-        FatalErrorIn("void Foam::mechanicalModel::makeSubMeshes() const")
+        FatalErrorIn("void Foam::solidSubMeshes::makeSubMeshes() const")
             << "sub-meshes already exist" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
+    if (cellZoneNames_.size() == 1)
     {
-        FatalErrorIn("void Foam::mechanicalModel::makeSubMeshes() const")
+        FatalErrorIn("void Foam::solidSubMeshes::makeSubMeshes() const")
             << "There should be no need for subMeshes when there is only one "
             << "material" << abort(FatalError);
     }
@@ -91,29 +49,29 @@ void Foam::mechanicalModel::makeSubMeshes() const
     // Check that each cell is in exactly one cellZone
     checkCellZones();
 
-    labelList region(mesh().nCells(), -1);
+    labelList region(baseMesh().nCells(), -1);
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
         const ZoneID<cellZone> cellZoneID =
-            ZoneID<cellZone>(cellZoneNames_[lawI], mesh().cellZones());
+            ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
 
         if (!cellZoneID.active())
         {
-            FatalErrorIn("void Foam::mechanicalModel::makeSubMeshes() const")
-                << "cellZone not found for material " << laws[lawI].name()
+            FatalErrorIn("void Foam::solidSubMeshes::makeSubMeshes() const")
+                << "cellZone not found for material " << cellZoneNames_[matI]
                 << abort(FatalError);
         }
 
-        const labelList& curCellZone = mesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone = baseMesh().cellZones()[cellZoneID.index()];
 
         forAll(curCellZone, cI)
         {
-            region[curCellZone[cI]] = lawI;
+            region[curCellZone[cI]] = matI;
         }
     }
 
-    subMeshes_.setSize(laws.size());
+    subMeshes_.setSize(cellZoneNames_.size());
 
     forAll(subMeshes_, matI)
     {
@@ -134,12 +92,12 @@ void Foam::mechanicalModel::makeSubMeshes() const
                 IOobject
                 (
                     subMeshName,
-                    mesh().time().constant(),
-                    mesh(),
+                    baseMesh().time().constant(),
+                    baseMesh(),
                     IOobject::NO_READ,
                     IOobject::NO_WRITE
                 ),
-                mesh()
+                baseMesh()
             )
         );
 
@@ -148,7 +106,7 @@ void Foam::mechanicalModel::makeSubMeshes() const
 }
 
 const Foam::PtrList<Foam::newFvMeshSubset>&
-Foam::mechanicalModel::subMeshes() const
+Foam::solidSubMeshes::subMeshes() const
 {
     if (subMeshes_.empty())
     {
@@ -159,7 +117,7 @@ Foam::mechanicalModel::subMeshes() const
 }
 
 
-Foam::PtrList<Foam::newFvMeshSubset>& Foam::mechanicalModel::subMeshes()
+Foam::PtrList<Foam::newFvMeshSubset>& Foam::solidSubMeshes::subMeshes()
 {
     if (subMeshes_.empty())
     {
@@ -170,51 +128,35 @@ Foam::PtrList<Foam::newFvMeshSubset>& Foam::mechanicalModel::subMeshes()
 }
 
 
-void Foam::mechanicalModel::makeVolToPoint() const
-{
-    if (volToPointPtr_)
-    {
-        FatalErrorIn
-        (
-            "void Foam::mechanicalModel::makeVolToPoint() const"
-        )   << "pointer already set" << abort(FatalError);
-    }
-
-    volToPointPtr_ = new newLeastSquaresVolPointInterpolation(mesh());
-}
-
-
-void Foam::mechanicalModel::makeSubMeshVolToPoint() const
+void Foam::solidSubMeshes::makeSubMeshVolToPoint() const
 {
     if (!subMeshVolToPoint_.empty())
     {
         FatalErrorIn
         (
-            "void Foam::mechanicalModel::makeSubMeshVolToPoint() const"
+            "void Foam::solidSubMeshes::makeSubMeshVolToPoint() const"
         )   << "sub-meshes already exist" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
+    if (cellZoneNames_.size() == 1)
     {
         FatalErrorIn
         (
-            "void Foam::mechanicalModel::makeSubMeshVolToPoint() const"
+            "void Foam::solidSubMeshes::makeSubMeshVolToPoint() const"
         )   << "There should be no need for subMeshes when there is only one "
             << "material" << abort(FatalError);
     }
 
-    subMeshVolToPoint_.setSize(laws.size());
+    subMeshVolToPoint_.setSize(cellZoneNames_.size());
 
-    forAll(subMeshVolToPoint_, lawI)
+    forAll(subMeshVolToPoint_, matI)
     {
         subMeshVolToPoint_.set
         (
-            lawI,
+            matI,
             new newLeastSquaresVolPointInterpolation
             (
-                subMeshes()[lawI].subMesh()
+                subMeshes()[matI].subMesh()
             )
         );
     }
@@ -222,7 +164,7 @@ void Foam::mechanicalModel::makeSubMeshVolToPoint() const
 
 
 const Foam::PtrList<Foam::newLeastSquaresVolPointInterpolation>&
-Foam::mechanicalModel::subMeshVolToPoint() const
+Foam::solidSubMeshes::subMeshVolToPoint() const
 {
     if (subMeshVolToPoint_.empty())
     {
@@ -233,11 +175,9 @@ Foam::mechanicalModel::subMeshVolToPoint() const
 }
 
 
-void Foam::mechanicalModel::checkCellZones() const
+void Foam::solidSubMeshes::checkCellZones() const
 {
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
+    if (cellZoneNames_.size() == 1)
     {
         // Cell zones need not be defined if there is only one material
         return;
@@ -249,31 +189,31 @@ void Foam::mechanicalModel::checkCellZones() const
         IOobject
         (
             "nCellZones",
-            mesh().time().timeName(),
-            mesh(),
+            baseMesh().time().timeName(),
+            baseMesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh(),
+        baseMesh(),
         dimensionedScalar("zero", dimless, 0.0)
     );
 
     scalarField& nCellZonesI = nCellZones.internalField();
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
         const ZoneID<cellZone> cellZoneID =
-            ZoneID<cellZone>(cellZoneNames_[lawI], mesh().cellZones());
+            ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
 
         if (!cellZoneID.active())
         {
-            FatalErrorIn("void Foam::mechanicalModel::checkCellZones()")
-                << "cellZone " << cellZoneNames_[lawI]
-                << " not found for material " << cellZoneNames_[lawI]
+            FatalErrorIn("void Foam::solidSubMeshes::checkCellZones()")
+                << "cellZone " << cellZoneNames_[matI]
+                << " not found for material " << cellZoneNames_[matI]
                 << abort(FatalError);
         }
 
-        const labelList& curCellZone = mesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone = baseMesh().cellZones()[cellZoneID.index()];
 
         forAll(curCellZone, cI)
         {
@@ -284,58 +224,56 @@ void Foam::mechanicalModel::checkCellZones() const
 
     if (mag(gMin(nCellZonesI)) < SMALL)
     {
-        FatalErrorIn("void Foam::mechanicalModel::checkCellZones()")
+        FatalErrorIn("void Foam::solidSubMeshes::checkCellZones()")
             << "There are cells that are not in a material cellZone!"
             << abort(FatalError);
     }
 
     if (mag(gMax(nCellZonesI) - 1) > SMALL)
     {
-        FatalErrorIn("void Foam::mechanicalModel::checkCellZones()")
+        FatalErrorIn("void Foam::solidSubMeshes::checkCellZones()")
             << "There are cells that are in more than one material cellZone!"
             << abort(FatalError);
     }
 }
 
 
-void Foam::mechanicalModel::calcSubMeshSigma() const
+void Foam::solidSubMeshes::calcSubMeshSigma() const
 {
     if (!subMeshSigma_.empty())
     {
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshSigma() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshSigma() const")
             << "pointer list already set" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
+    if (cellZoneNames_.size() == 1)
     {
         // Sub-meshes should not be defined if there is only one material
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshSigma() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshSigma() const")
             << "There should be no need for subMeshes when there is only one "
             << "material" << abort(FatalError);
     }
 
-    subMeshSigma_.setSize(laws.size());
+    subMeshSigma_.setSize(cellZoneNames_.size());
 
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
         subMeshSigma_.set
         (
-            lawI,
+            matI,
             new volSymmTensorField
             (
                 IOobject
                 (
                     "sigma",
-                    subMeshes[lawI].subMesh().time().timeName(),
-                    subMeshes[lawI].subMesh(),
+                    subMeshes[matI].subMesh().time().timeName(),
+                    subMeshes[matI].subMesh(),
                     IOobject::NO_READ,
                     IOobject::NO_WRITE
                 ),
-                subMeshes[lawI].subMesh(),
+                subMeshes[matI].subMesh(),
                 dimensionedSymmTensor
                 (
                     "zero",
@@ -348,7 +286,7 @@ void Foam::mechanicalModel::calcSubMeshSigma() const
 }
 
 
-Foam::PtrList<Foam::volSymmTensorField>& Foam::mechanicalModel::subMeshSigma()
+Foam::PtrList<Foam::volSymmTensorField>& Foam::solidSubMeshes::subMeshSigma()
 {
     if (subMeshSigma_.empty())
     {
@@ -360,7 +298,7 @@ Foam::PtrList<Foam::volSymmTensorField>& Foam::mechanicalModel::subMeshSigma()
 
 
 const Foam::PtrList<Foam::volSymmTensorField>&
-Foam::mechanicalModel::subMeshSigma() const
+Foam::solidSubMeshes::subMeshSigma() const
 {
     if (subMeshSigma_.empty())
     {
@@ -371,44 +309,42 @@ Foam::mechanicalModel::subMeshSigma() const
 }
 
 
-void Foam::mechanicalModel::calcSubMeshSigmaf() const
+void Foam::solidSubMeshes::calcSubMeshSigmaf() const
 {
     if (!subMeshSigmaf_.empty())
     {
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshSigmaf() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshSigmaf() const")
             << "pointer list already set" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
+    if (cellZoneNames_.size() == 1)
     {
         // Sub-meshes should not be defined if there is only one material
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshSigmaf() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshSigmaf() const")
             << "There should be no need for subMeshes when there is only one "
             << "material" << abort(FatalError);
     }
 
-    subMeshSigmaf_.setSize(laws.size());
+    subMeshSigmaf_.setSize(cellZoneNames_.size());
 
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
         subMeshSigmaf_.set
         (
-            lawI,
+            matI,
             new surfaceSymmTensorField
             (
                 IOobject
                 (
                     "sigmaf",
-                    subMeshes[lawI].subMesh().time().timeName(),
-                    subMeshes[lawI].subMesh(),
+                    subMeshes[matI].subMesh().time().timeName(),
+                    subMeshes[matI].subMesh(),
                     IOobject::NO_READ,
                     IOobject::NO_WRITE
                 ),
-                subMeshes[lawI].subMesh(),
+                subMeshes[matI].subMesh(),
                 dimensionedSymmTensor
                 (
                     "zero",
@@ -422,7 +358,7 @@ void Foam::mechanicalModel::calcSubMeshSigmaf() const
 
 
 Foam::PtrList<Foam::surfaceSymmTensorField>&
-Foam::mechanicalModel::subMeshSigmaf()
+Foam::solidSubMeshes::subMeshSigmaf()
 {
     if (subMeshSigmaf_.empty())
     {
@@ -434,7 +370,7 @@ Foam::mechanicalModel::subMeshSigmaf()
 
 
 const Foam::PtrList<Foam::surfaceSymmTensorField>&
-Foam::mechanicalModel::subMeshSigmaf() const
+Foam::solidSubMeshes::subMeshSigmaf() const
 {
     if (subMeshSigmaf_.empty())
     {
@@ -445,24 +381,22 @@ Foam::mechanicalModel::subMeshSigmaf() const
 }
 
 
-void Foam::mechanicalModel::calcSubMeshD() const
+void Foam::solidSubMeshes::calcSubMeshD() const
 {
     if (!subMeshD_.empty())
     {
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshD() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshD() const")
             << "pointer list already set" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
+    if (cellZoneNames_.size() == 1)
     {
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshD() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshD() const")
             << "There should be no need for subMeshes when there is only one "
             << "material" << abort(FatalError);
     }
 
-    subMeshD_.setSize(laws.size());
+    subMeshD_.setSize(cellZoneNames_.size());
 
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
@@ -473,22 +407,22 @@ void Foam::mechanicalModel::calcSubMeshD() const
         Dname = "DD";
     }
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
         subMeshD_.set
         (
-            lawI,
+            matI,
             new volVectorField
             (
                 IOobject
                 (
                     Dname,
-                    subMeshes[lawI].subMesh().time().timeName(),
-                    subMeshes[lawI].subMesh(),
+                    subMeshes[matI].subMesh().time().timeName(),
+                    subMeshes[matI].subMesh(),
                     IOobject::NO_READ,
                     IOobject::NO_WRITE
                 ),
-                subMeshes[lawI].subMesh(),
+                subMeshes[matI].subMesh(),
                 dimensionedVector("zero", dimLength, vector::zero)
             )
         );
@@ -496,7 +430,7 @@ void Foam::mechanicalModel::calcSubMeshD() const
 }
 
 
-Foam::PtrList<Foam::volVectorField>& Foam::mechanicalModel::subMeshD()
+Foam::PtrList<Foam::volVectorField>& Foam::solidSubMeshes::subMeshD()
 {
     if (subMeshD_.empty())
     {
@@ -508,7 +442,7 @@ Foam::PtrList<Foam::volVectorField>& Foam::mechanicalModel::subMeshD()
 
 
 const Foam::PtrList<Foam::volVectorField>&
-Foam::mechanicalModel::subMeshD() const
+Foam::solidSubMeshes::subMeshD() const
 {
     if (subMeshD_.empty())
     {
@@ -519,24 +453,22 @@ Foam::mechanicalModel::subMeshD() const
 }
 
 
-void Foam::mechanicalModel::calcSubMeshGradD() const
+void Foam::solidSubMeshes::calcSubMeshGradD() const
 {
     if (!subMeshGradD_.empty())
     {
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshGradD() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshGradD() const")
             << "pointer list already set" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
+    if (cellZoneNames_.size() == 1)
     {
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshGradD() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshGradD() const")
             << "There should be no need for subMeshes when there is only one "
             << "material" << abort(FatalError);
     }
 
-    subMeshGradD_.setSize(laws.size());
+    subMeshGradD_.setSize(cellZoneNames_.size());
 
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
@@ -547,22 +479,22 @@ void Foam::mechanicalModel::calcSubMeshGradD() const
         gradDname = "grad(DD)";
     }
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
         subMeshGradD_.set
         (
-            lawI,
+            matI,
             new volTensorField
             (
                 IOobject
                 (
                     gradDname,
-                    subMeshes[lawI].subMesh().time().timeName(),
-                    subMeshes[lawI].subMesh(),
+                    subMeshes[matI].subMesh().time().timeName(),
+                    subMeshes[matI].subMesh(),
                     IOobject::NO_READ,
                     IOobject::NO_WRITE
                 ),
-                subMeshes[lawI].subMesh(),
+                subMeshes[matI].subMesh(),
                 dimensionedTensor("zero", dimless, tensor::zero)
             )
         );
@@ -570,7 +502,7 @@ void Foam::mechanicalModel::calcSubMeshGradD() const
 }
 
 
-Foam::PtrList<Foam::volTensorField>& Foam::mechanicalModel::subMeshGradD()
+Foam::PtrList<Foam::volTensorField>& Foam::solidSubMeshes::subMeshGradD()
 {
     if (subMeshGradD_.empty())
     {
@@ -582,7 +514,7 @@ Foam::PtrList<Foam::volTensorField>& Foam::mechanicalModel::subMeshGradD()
 
 
 const Foam::PtrList<Foam::volTensorField>&
-Foam::mechanicalModel::subMeshGradD() const
+Foam::solidSubMeshes::subMeshGradD() const
 {
     if (subMeshGradD_.empty())
     {
@@ -593,24 +525,22 @@ Foam::mechanicalModel::subMeshGradD() const
 }
 
 
-void Foam::mechanicalModel::calcSubMeshGradDf() const
+void Foam::solidSubMeshes::calcSubMeshGradDf() const
 {
     if (!subMeshGradDf_.empty())
     {
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshGradDf() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshGradDf() const")
             << "pointer list already set" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
+    if (cellZoneNames_.size() == 1)
     {
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshGradDf() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshGradDf() const")
             << "There should be no need for subMeshes when there is only one "
             << "material" << abort(FatalError);
     }
 
-    subMeshGradDf_.setSize(laws.size());
+    subMeshGradDf_.setSize(cellZoneNames_.size());
 
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
@@ -621,22 +551,22 @@ void Foam::mechanicalModel::calcSubMeshGradDf() const
         gradDname = "grad(DD)f";
     }
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
         subMeshGradDf_.set
         (
-            lawI,
+            matI,
             new surfaceTensorField
             (
                 IOobject
                 (
                     gradDname,
-                    subMeshes[lawI].subMesh().time().timeName(),
-                    subMeshes[lawI].subMesh(),
+                    subMeshes[matI].subMesh().time().timeName(),
+                    subMeshes[matI].subMesh(),
                     IOobject::NO_READ,
                     IOobject::NO_WRITE
                 ),
-                subMeshes[lawI].subMesh(),
+                subMeshes[matI].subMesh(),
                 dimensionedTensor("zero", dimless, tensor::zero)
             )
         );
@@ -644,7 +574,7 @@ void Foam::mechanicalModel::calcSubMeshGradDf() const
 }
 
 
-Foam::PtrList<Foam::surfaceTensorField>& Foam::mechanicalModel::subMeshGradDf()
+Foam::PtrList<Foam::surfaceTensorField>& Foam::solidSubMeshes::subMeshGradDf()
 {
     if (subMeshGradDf_.empty())
     {
@@ -656,7 +586,7 @@ Foam::PtrList<Foam::surfaceTensorField>& Foam::mechanicalModel::subMeshGradDf()
 
 
 const Foam::PtrList<Foam::surfaceTensorField>&
-Foam::mechanicalModel::subMeshGradDf() const
+Foam::solidSubMeshes::subMeshGradDf() const
 {
     if (subMeshGradDf_.empty())
     {
@@ -667,24 +597,22 @@ Foam::mechanicalModel::subMeshGradDf() const
 }
 
 
-void Foam::mechanicalModel::calcSubMeshPointD() const
+void Foam::solidSubMeshes::calcSubMeshPointD() const
 {
     if (!subMeshPointD_.empty())
     {
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshPointD() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshPointD() const")
             << "pointer list already set" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
+    if (cellZoneNames_.size() == 1)
     {
-        FatalErrorIn("void Foam::mechanicalModel::calcSubMeshPointD() const")
+        FatalErrorIn("void Foam::solidSubMeshes::calcSubMeshPointD() const")
             << "There should be no need for subMeshes when there is only one "
             << "material" << abort(FatalError);
     }
 
-    subMeshPointD_.setSize(laws.size());
+    subMeshPointD_.setSize(cellZoneNames_.size());
 
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
@@ -695,22 +623,22 @@ void Foam::mechanicalModel::calcSubMeshPointD() const
         pointDname = "pointDD";
     }
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
         subMeshPointD_.set
         (
-            lawI,
+            matI,
             new pointVectorField
             (
                 IOobject
                 (
                     pointDname,
-                    subMeshes[lawI].subMesh().time().timeName(),
-                    subMeshes[lawI].subMesh(),
+                    subMeshes[matI].subMesh().time().timeName(),
+                    subMeshes[matI].subMesh(),
                     IOobject::NO_READ,
                     IOobject::NO_WRITE
                 ),
-                subMeshes[lawI].subPointMesh(),
+                subMeshes[matI].subPointMesh(),
                 dimensionedVector("zero", dimLength, vector::zero)
             )
         );
@@ -718,7 +646,7 @@ void Foam::mechanicalModel::calcSubMeshPointD() const
 }
 
 
-Foam::PtrList<Foam::pointVectorField>& Foam::mechanicalModel::subMeshPointD()
+Foam::PtrList<Foam::pointVectorField>& Foam::solidSubMeshes::subMeshPointD()
 {
     if (subMeshPointD_.empty())
     {
@@ -730,7 +658,7 @@ Foam::PtrList<Foam::pointVectorField>& Foam::mechanicalModel::subMeshPointD()
 
 
 const Foam::PtrList<Foam::pointVectorField>&
-Foam::mechanicalModel::subMeshPointD() const
+Foam::solidSubMeshes::subMeshPointD() const
 {
     if (subMeshPointD_.empty())
     {
@@ -741,7 +669,7 @@ Foam::mechanicalModel::subMeshPointD() const
 }
 
 
-void Foam::mechanicalModel::calcInterfaceShadowIDs() const
+void Foam::solidSubMeshes::calcInterfaceShadowIDs() const
 {
     if
     (
@@ -752,27 +680,25 @@ void Foam::mechanicalModel::calcInterfaceShadowIDs() const
     {
         FatalErrorIn
         (
-            "void Foam::mechanicalModel::calcInterfaceShadowIDs() const"
+            "void Foam::solidSubMeshes::calcInterfaceShadowIDs() const"
         )   << "pointer already set" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    interfaceShadowSubMeshID_.setSize(laws.size());
-    interfaceShadowPatchID_.setSize(laws.size());
-    interfaceShadowFaceID_.setSize(laws.size());
+    interfaceShadowSubMeshID_.setSize(cellZoneNames_.size());
+    interfaceShadowPatchID_.setSize(cellZoneNames_.size());
+    interfaceShadowFaceID_.setSize(cellZoneNames_.size());
 
     // Reverse maps for the interface faces
-    labelList baseMeshShadSubMeshID = labelList(mesh().nInternalFaces(), -1);
-    labelList baseMeshShadPatchID = labelList(mesh().nInternalFaces(), -1);
-    labelList baseMeshShadFaceID = labelList(mesh().nInternalFaces(), -1);
+    labelList baseMeshShadSubMeshID = labelList(baseMesh().nInternalFaces(), -1);
+    labelList baseMeshShadPatchID = labelList(baseMesh().nInternalFaces(), -1);
+    labelList baseMeshShadFaceID = labelList(baseMesh().nInternalFaces(), -1);
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
-        const fvMesh& subMesh = subMeshes()[lawI].subMesh();
+        const fvMesh& subMesh = subMeshes()[matI].subMesh();
 
-        const labelList& patchMap = subMeshes()[lawI].patchMap();
-        const labelList& faceMap = subMeshes()[lawI].faceMap();
+        const labelList& patchMap = subMeshes()[matI].patchMap();
+        const labelList& faceMap = subMeshes()[matI].faceMap();
 
         bool uniquePatchFound = false;
 
@@ -784,7 +710,7 @@ void Foam::mechanicalModel::calcInterfaceShadowIDs() const
                 {
                     FatalErrorIn
                     (
-                        "void Foam::mechanicalModel::"
+                        "void Foam::solidSubMeshes::"
                         "calcInterfaceShadowIDs() const"
                     )   << "There are more than one interface patches!"
                         << abort(FatalError);
@@ -794,25 +720,25 @@ void Foam::mechanicalModel::calcInterfaceShadowIDs() const
 
                 interfaceShadowSubMeshID_.set
                 (
-                    lawI,
+                    matI,
                     new labelList(subMesh.boundaryMesh()[patchI].size(), -1)
                 );
 
                 interfaceShadowPatchID_.set
                 (
-                    lawI,
+                    matI,
                     new labelList(subMesh.boundaryMesh()[patchI].size(), -1)
                 );
 
                 interfaceShadowFaceID_.set
                 (
-                    lawI,
+                    matI,
                     new labelList(subMesh.boundaryMesh()[patchI].size(), -1)
                 );
 
-                labelList& shadSubMeshID = interfaceShadowSubMeshID_[lawI];
-                labelList& shadPatchID = interfaceShadowPatchID_[lawI];
-                labelList& shadFaceID = interfaceShadowFaceID_[lawI];
+                labelList& shadSubMeshID = interfaceShadowSubMeshID_[matI];
+                labelList& shadPatchID = interfaceShadowPatchID_[matI];
+                labelList& shadFaceID = interfaceShadowFaceID_[matI];
 
                 const label start = subMesh.boundaryMesh()[patchI].start();
 
@@ -820,13 +746,13 @@ void Foam::mechanicalModel::calcInterfaceShadowIDs() const
                 {
                     const label baseFaceID = faceMap[start + faceI];
 
-                    if (mesh().isInternalFace(baseFaceID))
+                    if (baseMesh().isInternalFace(baseFaceID))
                     {
                         // Check if the face has been set in the baseMesh lists
                         if (baseMeshShadSubMeshID[baseFaceID] == -1)
                         {
                             // Store the local IDs in the baseMesh lists
-                            baseMeshShadSubMeshID[baseFaceID] = lawI;
+                            baseMeshShadSubMeshID[baseFaceID] = matI;
                             baseMeshShadPatchID[baseFaceID] = patchI;
                             baseMeshShadFaceID[baseFaceID] = faceI;
                         }
@@ -851,7 +777,7 @@ void Foam::mechanicalModel::calcInterfaceShadowIDs() const
                             interfaceShadowSubMeshID_
                             [
                                 shadSubMeshID
-                            ][shadFaceID] = lawI;
+                            ][shadFaceID] = matI;
                             interfaceShadowPatchID_[shadSubMeshID][shadFaceID] =
                                 patchI;
                             interfaceShadowFaceID_[shadSubMeshID][shadFaceID] =
@@ -871,7 +797,7 @@ void Foam::mechanicalModel::calcInterfaceShadowIDs() const
 
 
 const Foam::PtrList<Foam::labelList>&
-Foam::mechanicalModel::interfaceShadowSubMeshID() const
+Foam::solidSubMeshes::interfaceShadowSubMeshID() const
 {
     if (interfaceShadowSubMeshID_.empty())
     {
@@ -883,7 +809,7 @@ Foam::mechanicalModel::interfaceShadowSubMeshID() const
 
 
 const Foam::PtrList<Foam::labelList>&
-Foam::mechanicalModel::interfaceShadowPatchID() const
+Foam::solidSubMeshes::interfaceShadowPatchID() const
 {
     if (interfaceShadowPatchID_.empty())
     {
@@ -895,7 +821,7 @@ Foam::mechanicalModel::interfaceShadowPatchID() const
 
 
 const Foam::PtrList<Foam::labelList>&
-Foam::mechanicalModel::interfaceShadowFaceID() const
+Foam::solidSubMeshes::interfaceShadowFaceID() const
 {
     if (interfaceShadowFaceID_.empty())
     {
@@ -906,110 +832,17 @@ Foam::mechanicalModel::interfaceShadowFaceID() const
 }
 
 
-void Foam::mechanicalModel::calcImpKfcorr() const
-{
-    if (impKfcorrPtr_)
-    {
-        FatalErrorIn
-        (
-            "const Foam::volScalarField& "
-            "Foam::mechanicalModel::calcImpKfcorr() const"
-        )   << "pointer already set" << abort(FatalError);
-    }
-
-    impKfcorrPtr_ =
-        new surfaceScalarField
-        (
-            IOobject
-            (
-                "impKfcorr",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            impKf()
-        );
-
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() > 1)
-    {
-        // To disable Rhie-Chow correction on bi-material interface, we will set
-        // impKfcorr to zero on bi-material interface faces
-
-        surfaceScalarField& impKfcorr = *impKfcorrPtr_;
-        scalarField& impKfcorrI = impKfcorrPtr_->internalField();
-
-        forAll(laws, lawI)
-        {
-            const fvMesh& subMesh = subMeshes()[lawI].subMesh();
-            const labelList& patchMap = subMeshes()[lawI].patchMap();
-            const labelList& faceMap = subMeshes()[lawI].faceMap();
-
-            forAll(subMesh.boundaryMesh(), patchI)
-            {
-                if (patchMap[patchI] == -1)
-                {
-                    const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
-                    const label start = ppatch.start();
-
-                    forAll(ppatch, faceI)
-                    {
-                        const label baseFaceID = faceMap[start + faceI];
-
-                        if (mesh().isInternalFace(baseFaceID))
-                        {
-                            impKfcorrI[baseFaceID] = 0.0;
-                        }
-                        else
-                        {
-                            // Face is on a coupled patch
-                            const label patchID =
-                                mesh().boundaryMesh().whichPatch(baseFaceID);
-
-                            const label basePatchStart =
-                                mesh().boundaryMesh()[patchID].start();
-
-                            impKfcorr.boundaryField()
-                            [
-                                patchID
-                            ][baseFaceID - basePatchStart] = 0.0;
-                        }
-                    }
-                }
-            }
-        }
-
-        impKfcorrPtr_->correctBoundaryConditions();
-    }
-}
-
-
-const Foam::surfaceScalarField& Foam::mechanicalModel::impKfcorr() const
-{
-    if (!impKfcorrPtr_)
-    {
-        calcImpKfcorr();
-    }
-
-    return *impKfcorrPtr_;
-}
-
-
-void Foam::mechanicalModel::makeInterfaceBaseFaces() const
+void Foam::solidSubMeshes::makeInterfaceBaseFaces() const
 {
     if (interfaceBaseFacesPtr_)
     {
         FatalErrorIn
         (
-            "void Foam::mechanicalModel::makeInterfaceBaseFaces() const"
+            "void Foam::solidSubMeshes::makeInterfaceBaseFaces() const"
         )   << "pointer already set" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() > 1)
+    if (cellZoneNames_.size() > 1)
     {
         // Create material index field from cellZones
 
@@ -1018,47 +851,47 @@ void Foam::mechanicalModel::makeInterfaceBaseFaces() const
             IOobject
             (
                 "materials",
-                mesh().time().timeName(),
-                mesh(),
+                baseMesh().time().timeName(),
+                baseMesh(),
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            mesh(),
+            baseMesh(),
             dimensionedScalar("0", dimless, 0)
         );
 
         scalarField& materialsI = materials.internalField();
 
-        forAll(laws, lawI)
+        forAll(cellZoneNames_, matI)
         {
             const ZoneID<cellZone> cellZoneID =
-                ZoneID<cellZone>(cellZoneNames_[lawI], mesh().cellZones());
+                ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
 
             if (!cellZoneID.active())
             {
                 FatalErrorIn
                 (
-                    "void Foam::mechanicalModel::makeInterfaceBaseFaces() const"
-                )   << "cellZone " << cellZoneNames_[lawI]
-                    << " not found for material " << cellZoneNames_[lawI]
+                    "void Foam::solidSubMeshes::makeInterfaceBaseFaces() const"
+                )   << "cellZone " << cellZoneNames_[matI]
+                    << " not found for material " << cellZoneNames_[matI]
                     << abort(FatalError);
             }
 
             const labelList& curCellZone =
-                mesh().cellZones()[cellZoneID.index()];
+                baseMesh().cellZones()[cellZoneID.index()];
 
             forAll(curCellZone, cI)
             {
                 const label cellID = curCellZone[cI];
-                materialsI[cellID] = lawI;
+                materialsI[cellID] = matI;
             }
         }
 
         // Sync coupled boundaries
         materials.correctBoundaryConditions();
 
-        const unallocLabelList& owner = mesh().owner();
-        const unallocLabelList& neighbour = mesh().neighbour();
+        const unallocLabelList& owner = baseMesh().owner();
+        const unallocLabelList& neighbour = baseMesh().neighbour();
 
         labelHashSet interFacesSet;
 
@@ -1076,7 +909,7 @@ void Foam::mechanicalModel::makeInterfaceBaseFaces() const
 
         forAll(materials.boundaryField(), patchI)
         {
-            if (mesh().boundary()[patchI].type() == processorFvPatch::typeName)
+            if (baseMesh().boundary()[patchI].type() == processorFvPatch::typeName)
             {
                 const scalarField ownMat =
                     materials.boundaryField()[patchI].patchInternalField();
@@ -1089,7 +922,7 @@ void Foam::mechanicalModel::makeInterfaceBaseFaces() const
                     if (mag(ownMat[faceI] - ngbMat[faceI]) > SMALL)
                     {
                         const label globalFaceID =
-                            mesh().boundaryMesh()[patchI].start() + faceI;
+                            baseMesh().boundaryMesh()[patchI].start() + faceI;
 
                         interFacesSet.insert(globalFaceID);
                     }
@@ -1106,7 +939,7 @@ void Foam::mechanicalModel::makeInterfaceBaseFaces() const
 }
 
 
-const Foam::labelList& Foam::mechanicalModel::interfaceBaseFaces() const
+const Foam::labelList& Foam::solidSubMeshes::interfaceBaseFaces() const
 {
     if (!interfaceBaseFacesPtr_)
     {
@@ -1117,51 +950,49 @@ const Foam::labelList& Foam::mechanicalModel::interfaceBaseFaces() const
 }
 
 
-void Foam::mechanicalModel::makePointNumOfMaterials() const
+void Foam::solidSubMeshes::makePointNumOfMaterials() const
 {
     if (pointNumOfMaterialsPtr_)
     {
         FatalErrorIn
         (
-            "void Foam::mechanicalModel::makePointNumOfMaterials() const"
+            "void Foam::solidSubMeshes::makePointNumOfMaterials() const"
         )   << "Pointer already set" << abort(FatalError);
     }
 
-    pointNumOfMaterialsPtr_ = new labelList(mesh().nPoints(), 0);
+    pointNumOfMaterialsPtr_ = new labelList(baseMesh().nPoints(), 0);
     labelList& pointNumOfMaterials = *pointNumOfMaterialsPtr_;
-
-    const PtrList<mechanicalLaw>& laws = *this;
 
     // Create material index field from cellZones
 
-    scalarField materialsI(mesh().nCells(), 0);
+    scalarField materialsI(baseMesh().nCells(), 0);
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
         const ZoneID<cellZone> cellZoneID =
-            ZoneID<cellZone>(cellZoneNames_[lawI], mesh().cellZones());
+            ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
 
         if (!cellZoneID.active())
         {
             FatalErrorIn
             (
-                "void Foam::mechanicalModel::"
+                "void Foam::solidSubMeshes::"
                 "makeIsolatedInterfacePoints() const"
-            )   << "cellZone " << cellZoneNames_[lawI]
-                << " not found for material " << cellZoneNames_[lawI]
+            )   << "cellZone " << cellZoneNames_[matI]
+                << " not found for material " << cellZoneNames_[matI]
                 << abort(FatalError);
         }
 
-        const labelList& curCellZone = mesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone = baseMesh().cellZones()[cellZoneID.index()];
 
         forAll(curCellZone, cI)
         {
             const label cellID = curCellZone[cI];
-            materialsI[cellID] = lawI;
+            materialsI[cellID] = matI;
         }
     }
 
-    const labelListList& pointCells = mesh().pointCells();
+    const labelListList& pointCells = baseMesh().pointCells();
 
     forAll(pointNumOfMaterials, pointI)
     {
@@ -1183,7 +1014,7 @@ void Foam::mechanicalModel::makePointNumOfMaterials() const
 }
 
 
-const Foam::labelList& Foam::mechanicalModel::pointNumOfMaterials() const
+const Foam::labelList& Foam::solidSubMeshes::pointNumOfMaterials() const
 {
     if (!pointNumOfMaterialsPtr_)
     {
@@ -1194,56 +1025,54 @@ const Foam::labelList& Foam::mechanicalModel::pointNumOfMaterials() const
 }
 
 
-void Foam::mechanicalModel::makeIsolatedInterfacePoints() const
+void Foam::solidSubMeshes::makeIsolatedInterfacePoints() const
 {
     if (isolatedInterfacePointsPtr_)
     {
         FatalErrorIn
         (
-            "void Foam::mechanicalModel::makeIsolatedInterfacePoints() const"
+            "void Foam::solidSubMeshes::makeIsolatedInterfacePoints() const"
         )   << "pointer already set" << abort(FatalError);
     }
 
-    const PtrList<mechanicalLaw>& laws = *this;
-
     // Create material index field from cellZones
 
-    scalarField materialsI(mesh().nCells(), 0);
+    scalarField materialsI(baseMesh().nCells(), 0);
 
-    forAll(laws, lawI)
+    forAll(cellZoneNames_, matI)
     {
         const ZoneID<cellZone> cellZoneID =
-            ZoneID<cellZone>(cellZoneNames_[lawI], mesh().cellZones());
+            ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
 
         if (!cellZoneID.active())
         {
             FatalErrorIn
             (
-                "void Foam::mechanicalModel::"
+                "void Foam::solidSubMeshes::"
                 "makeIsolatedInterfacePoints() const"
-            )   << "cellZone " << cellZoneNames_[lawI]
-                << " not found for material " << cellZoneNames_[lawI]
+            )   << "cellZone " << cellZoneNames_[matI]
+                << " not found for material " << cellZoneNames_[matI]
                 << abort(FatalError);
         }
 
-        const labelList& curCellZone = mesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone = baseMesh().cellZones()[cellZoneID.index()];
 
         forAll(curCellZone, cI)
         {
             const label cellID = curCellZone[cI];
-            materialsI[cellID] = lawI;
+            materialsI[cellID] = matI;
         }
     }
 
-    pointMesh pMesh(mesh());
+    pointMesh pMesh(baseMesh());
 
     pointScalarField pointMaterials
     (
         IOobject
         (
             "pointMaterials",
-            mesh().time().timeName(),
-            mesh(),
+            baseMesh().time().timeName(),
+            baseMesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
@@ -1252,7 +1081,7 @@ void Foam::mechanicalModel::makeIsolatedInterfacePoints() const
     );
     scalarField& pointMaterialsI = pointMaterials.internalField();
 
-    const labelListList& pointCells = mesh().pointCells();
+    const labelListList& pointCells = baseMesh().pointCells();
 
     forAll(pointMaterialsI, pointI)
     {
@@ -1290,9 +1119,9 @@ void Foam::mechanicalModel::makeIsolatedInterfacePoints() const
     const labelList& noMat = pointNumOfMaterials();
 
     const labelList& spLabels =
-        mesh().globalData().sharedPointLabels();
+        baseMesh().globalData().sharedPointLabels();
 
-    const labelListList& pointFaces = mesh().pointFaces();
+    const labelListList& pointFaces = baseMesh().pointFaces();
     forAll(matInter, pointI)
     {
         if (matInter[pointI] && (noMat[pointI] == 1))
@@ -1308,7 +1137,7 @@ void Foam::mechanicalModel::makeIsolatedInterfacePoints() const
                 {
                     label faceID = curPointFaces[faceI];
                     label patchID =
-                        mesh().boundaryMesh().whichPatch(faceID);
+                        baseMesh().boundaryMesh().whichPatch(faceID);
 
                     if (patchID != -1)
                     {
@@ -1316,7 +1145,7 @@ void Foam::mechanicalModel::makeIsolatedInterfacePoints() const
                         (
                             isA<processorPolyPatch>
                             (
-                                mesh().boundaryMesh()[patchID]
+                                baseMesh().boundaryMesh()[patchID]
                             )
                         )
                         {
@@ -1341,7 +1170,7 @@ void Foam::mechanicalModel::makeIsolatedInterfacePoints() const
 }
 
 
-const Foam::labelList& Foam::mechanicalModel::isolatedInterfacePoints() const
+const Foam::labelList& Foam::solidSubMeshes::isolatedInterfacePoints() const
 {
     if (!isolatedInterfacePointsPtr_)
     {
@@ -1352,7 +1181,7 @@ const Foam::labelList& Foam::mechanicalModel::isolatedInterfacePoints() const
 }
 
 
-void Foam::mechanicalModel::interpolateDtoSubMeshD
+void Foam::solidSubMeshes::interpolateDtoSubMeshD
 (
     const volVectorField& D,
     const bool useVolFieldSigma
@@ -1363,29 +1192,29 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
     if (!biMaterialInterfaceActive())
     {
         // No need for any corrections if there are no bi-material interfaces
-        forAll(subMeshes, lawI)
+        forAll(subMeshes, matI)
         {
-            subMeshD()[lawI] = subMeshes[lawI].interpolate(D);
+            subMeshD()[matI] = subMeshes[matI].interpolate(D);
         }
 
         return;
     }
 
-    const fvMesh& mesh = this->mesh();
+    const fvMesh& mesh = this->baseMesh();
 
     // Update the interface shadow sigma fields
     // This can require parallel communication
     updateInterfaceShadowSigma(useVolFieldSigma);
 
-    forAll(subMeshes, lawI)
+    forAll(subMeshes, matI)
     {
-        volVectorField& subMeshD = this->subMeshD()[lawI];
+        volVectorField& subMeshD = this->subMeshD()[matI];
 
-        const fvMesh& subMesh = subMeshes[lawI].subMesh();
+        const fvMesh& subMesh = subMeshes[matI].subMesh();
 
-        const labelList& faceMap = subMeshes[lawI].faceMap();
-        const labelList& patchMap = subMeshes[lawI].patchMap();
-        const labelList& cellMap = subMeshes[lawI].cellMap();
+        const labelList& faceMap = subMeshes[matI].faceMap();
+        const labelList& patchMap = subMeshes[matI].patchMap();
+        const labelList& cellMap = subMeshes[matI].cellMap();
 
         // Store interface field as it is overwritten with the interpolated
         // value by the interpolate function
@@ -1400,7 +1229,7 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
 
         // Map the base displacement field to the subMesh; this overwrites
         // the interface with the interpolated values
-        subMeshD = subMeshes[lawI].interpolate(D);
+        subMeshD = subMeshes[matI].interpolate(D);
 
         // Check if a large strain procedure is being used, if so we must
         // calculate the deformed normals
@@ -1479,12 +1308,12 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                 if (useVolFieldSigma)
                 {
                     sigmaPatchPtr =
-                        &(subMeshSigma()[lawI].boundaryField()[patchI]);
+                        &(subMeshSigma()[matI].boundaryField()[patchI]);
                 }
                 else
                 {
                     sigmaPatchPtr =
-                        &(subMeshSigmaf()[lawI].boundaryField()[patchI]);
+                        &(subMeshSigmaf()[matI].boundaryField()[patchI]);
                 }
                 const symmTensorField& sigmaPatch = *sigmaPatchPtr;
 
@@ -1495,7 +1324,7 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
                 // calculated from the other side of the interface (in the
                 // subMesh on the other side)
                 const symmTensorField& interfaceShadSigma =
-                    interfaceShadowSigma()[lawI];
+                    interfaceShadowSigma()[matI];
 
                 // Calculate the interface displacements
                 forAll(Dinterface, faceI)
@@ -1710,7 +1539,7 @@ void Foam::mechanicalModel::interpolateDtoSubMeshD
 }
 
 
-void Foam::mechanicalModel::correctBoundarySnGrad
+void Foam::solidSubMeshes::correctBoundarySnGrad
 (
     PtrList<volVectorField>& subMeshDList,
     PtrList<volTensorField>& subMeshGradDList
@@ -1718,11 +1547,11 @@ void Foam::mechanicalModel::correctBoundarySnGrad
 {
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
-    forAll(subMeshes, lawI)
+    forAll(subMeshes, matI)
     {
-        const volVectorField& subMeshD = subMeshDList[lawI];
-        volTensorField& subMeshGradD = subMeshGradDList[lawI];
-        const fvMesh& subMesh = subMeshes[lawI].subMesh();
+        const volVectorField& subMeshD = subMeshDList[matI];
+        volTensorField& subMeshGradD = subMeshGradDList[matI];
+        const fvMesh& subMesh = subMeshes[matI].subMesh();
 
         forAll(subMeshGradD.boundaryField(), patchI)
         {
@@ -1785,7 +1614,7 @@ void Foam::mechanicalModel::correctBoundarySnGrad
 }
 
 
-void Foam::mechanicalModel::correctBoundarySnGradf
+void Foam::solidSubMeshes::correctBoundarySnGradf
 (
     PtrList<volVectorField>& subMeshDList,
     PtrList<surfaceTensorField>& subMeshGradDfList,
@@ -1794,12 +1623,12 @@ void Foam::mechanicalModel::correctBoundarySnGradf
 {
     const PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
-    forAll(subMeshes, lawI)
+    forAll(subMeshes, matI)
     {
-        const volVectorField& subMeshD = subMeshDList[lawI];
-        surfaceTensorField& subMeshGradDf = subMeshGradDfList[lawI];
-        const volTensorField& subMeshGradD = subMeshGradDList[lawI];
-        const fvMesh& subMesh = subMeshes[lawI].subMesh();
+        const volVectorField& subMeshD = subMeshDList[matI];
+        surfaceTensorField& subMeshGradDf = subMeshGradDfList[matI];
+        const volTensorField& subMeshGradD = subMeshGradDList[matI];
+        const fvMesh& subMesh = subMeshes[matI].subMesh();
 
         forAll(subMeshGradDf.boundaryField(), patchI)
         {
@@ -1864,7 +1693,7 @@ void Foam::mechanicalModel::correctBoundarySnGradf
 
 
 const Foam::PtrList<Foam::symmTensorField>&
-Foam::mechanicalModel::interfaceShadowSigma() const
+Foam::solidSubMeshes::interfaceShadowSigma() const
 {
     if (interfaceShadowSigma_.empty())
     {
@@ -1875,13 +1704,13 @@ Foam::mechanicalModel::interfaceShadowSigma() const
 }
 
 
-void Foam::mechanicalModel::makeInterfaceShadowSigma() const
+void Foam::solidSubMeshes::makeInterfaceShadowSigma() const
 {
     if (!interfaceShadowSigma_.empty())
     {
         FatalErrorIn
         (
-            "void Foam::mechanicalModel::makeInterfaceShadowSigma() const"
+            "void Foam::solidSubMeshes::makeInterfaceShadowSigma() const"
         ) << "pointer already set" << abort(FatalError);
     }
 
@@ -1930,7 +1759,7 @@ void Foam::mechanicalModel::makeInterfaceShadowSigma() const
 }
 
 
-void Foam::mechanicalModel::updateInterfaceShadowSigma
+void Foam::solidSubMeshes::updateInterfaceShadowSigma
 (
     const bool useVolFieldSigma
 )
@@ -1946,12 +1775,12 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
         IOobject
         (
             "baseSigmaForSyncing",
-            mesh().time().timeName(),
-            mesh(),
+            baseMesh().time().timeName(),
+            baseMesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh(),
+        baseMesh(),
         dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
     );
 
@@ -2037,18 +1866,18 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
 
                 // Base mesh patch ID
                 const label basePatchID =
-                    mesh().boundaryMesh().whichPatch(baseFaceID);
+                    baseMesh().boundaryMesh().whichPatch(baseFaceID);
 
                 // Base patch start
                 const label basePatchStart =
-                    mesh().boundaryMesh()[basePatchID].start();
+                    baseMesh().boundaryMesh()[basePatchID].start();
 
                 // Base mesh patch local face ID
                 const label baseLocalFaceID = baseFaceID - basePatchStart;
 
                 // Base mesh patch faceCells
                 const unallocLabelList& faceCells =
-                    mesh().boundaryMesh()[basePatchID].faceCells();
+                    baseMesh().boundaryMesh()[basePatchID].faceCells();
 
                 // Store local stress on the baseMesh proc patch in the patch
                 // internal field
@@ -2131,11 +1960,11 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
 
                 // Base mesh patch ID
                 const label basePatchID =
-                    mesh().boundaryMesh().whichPatch(baseFaceID);
+                    baseMesh().boundaryMesh().whichPatch(baseFaceID);
 
                 // Base patch start
                 const label basePatchStart =
-                    mesh().boundaryMesh()[basePatchID].start();
+                    baseMesh().boundaryMesh()[basePatchID].start();
 
                 // Base mesh patch local face ID
                 const label baseLocalFaceID = baseFaceID - basePatchStart;
@@ -2152,7 +1981,7 @@ void Foam::mechanicalModel::updateInterfaceShadowSigma
 }
 
 
-bool Foam::mechanicalModel::biMaterialInterfaceActive() const
+bool Foam::solidSubMeshes::biMaterialInterfaceActive() const
 {
     if (!biMaterialInterfaceActivePtr_)
     {
@@ -2163,13 +1992,13 @@ bool Foam::mechanicalModel::biMaterialInterfaceActive() const
 }
 
 
-void Foam::mechanicalModel::calcBiMaterialInterfaceActive() const
+void Foam::solidSubMeshes::calcBiMaterialInterfaceActive() const
 {
     if (biMaterialInterfaceActivePtr_)
     {
         FatalErrorIn
         (
-            "void Foam::mechanicalModel::calcBiMaterialInterfaceActive() const"
+            "void Foam::solidSubMeshes::calcBiMaterialInterfaceActive() const"
         ) << "pointer already set" << abort(FatalError);
     }
 
@@ -2178,9 +2007,8 @@ void Foam::mechanicalModel::calcBiMaterialInterfaceActive() const
 }
 
 
-void Foam::mechanicalModel::clearOut()
+void Foam::solidSubMeshes::clearOut()
 {
-    deleteDemandDrivenData(volToPointPtr_);
     subMeshVolToPoint_.clear();
     subMeshSigma_.clear();
     subMeshSigmaf_.clear();
@@ -2194,15 +2022,8 @@ void Foam::mechanicalModel::clearOut()
     interfaceShadowPatchID_.clear();
     interfaceShadowFaceID_.clear();
     interfaceShadowSigma_.clear();
-    deleteDemandDrivenData(impKfcorrPtr_);
     deleteDemandDrivenData(pointNumOfMaterialsPtr_);
     deleteDemandDrivenData(isolatedInterfacePointsPtr_);
-
-    // Clear the list of mechanical laws
-    // Note: we should do this before clearing the subMeshes, as the mechanical
-    // laws can store geometricFields that must be deleted before deleting
-    // mesh
-    PtrList<mechanicalLaw>::clear();
 
     // Make sure to clear the subMeshes after (not before) clearing the subMesh
     // fields
@@ -2212,32 +2033,19 @@ void Foam::mechanicalModel::clearOut()
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::mechanicalModel::mechanicalModel
+Foam::solidSubMeshes::solidSubMeshes
 (
-    const fvMesh& mesh,
-    const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const bool incremental
+    const fvMesh& baseMesh,
+    const wordList& cellZoneNames,
+    const bool incremental,
+    const bool writeSubMeshes
 )
 :
-    IOdictionary
-    (
-        IOobject
-        (
-            "mechanicalProperties",
-            mesh.time().constant(),
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        )
-    ),
-    PtrList<mechanicalLaw>(),
-    mesh_(mesh),
-    planeStress_(lookup("planeStress")),
+    baseMesh_(baseMesh),
+    cellZoneNames_(cellZoneNames),
     incremental_(incremental),
-    cellZoneNames_(),
-    solidSubMeshes_(),
+    writeSubMeshes_(writeSubMeshes),
     subMeshes_(),
-    volToPointPtr_(),
     subMeshVolToPoint_(),
     subMeshSigma_(),
     subMeshSigmaf_(),
@@ -2251,151 +2059,29 @@ Foam::mechanicalModel::mechanicalModel
     interfaceShadowPatchID_(),
     interfaceShadowFaceID_(),
     interfaceShadowSigma_(),
-    impKfcorrPtr_(NULL),
     pointNumOfMaterialsPtr_(NULL),
     isolatedInterfacePointsPtr_(NULL)
 {
-    Info<< "Creating the mechanicalModel" << endl;
+    // Construct the sub-meshes
+    PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
 
-    // Read the mechanical laws
-    const PtrList<entry> lawEntries(lookup("mechanical"));
-
-    PtrList<mechanicalLaw>& laws = *this;
-    laws.setSize(lawEntries.size());
-
-    if (laws.size() == 1)
+    // Optional: write the sub-meshes to the constant directory
+    if (writeSubMeshes_)
     {
-        if (nonLinGeom == nonLinearGeometry::LINEAR_GEOMETRY)
+        forAll(subMeshes, matI)
         {
-            laws.set
-            (
-                0,
-                mechanicalLaw::NewLinGeomMechLaw
-                (
-                    lawEntries[0].keyword(),
-                    mesh,
-                    lawEntries[0].dict(),
-                    nonLinGeom
-                )
-            );
+            Info<< "Writing subMeshes "
+                << subMeshes[matI].subMesh().name() << endl;
+            subMeshes[matI].subMesh().setInstance("constant");
+            subMeshes[matI].subMesh().write();
         }
-        else if
-        (
-            nonLinGeom == nonLinearGeometry::UPDATED_LAGRANGIAN
-         || nonLinGeom == nonLinearGeometry::TOTAL_LAGRANGIAN
-        )
-        {
-            laws.set
-            (
-                0,
-                mechanicalLaw::NewNonLinGeomMechLaw
-                (
-                    lawEntries[0].keyword(),
-                    mesh,
-                    lawEntries[0].dict(),
-                    nonLinGeom
-                )
-            );
-        }
-        else
-        {
-            FatalErrorIn
-            (
-                "Foam::mechanicalModel::mechanicalModel\n"
-                "(\n"
-                "    const fvMesh& mesh,\n"
-                "    const nonLinearGeometry::nonLinearType& nonLinGeom\n"
-                ")"
-            )   << "It is not clear what type of mechanical law should be "
-                << "created for a solidModel with nonLinGeom = " << nonLinGeom
-                << abort(FatalError);
-        }
-    }
-    else
-    {
-        // We must create the list of cellZones names before creating the
-        // subMeshes as they are used during the construction of the subMeshes
-        cellZoneNames_.setSize(laws.size());
-
-        forAll(laws, lawI)
-        {
-            cellZoneNames_[lawI] = lawEntries[lawI].keyword();
-        }
-
-        forAll(laws, lawI)
-        {
-            if (nonLinGeom == nonLinearGeometry::LINEAR_GEOMETRY)
-            {
-                laws.set
-                (
-                    lawI,
-                    mechanicalLaw::NewLinGeomMechLaw
-                    (
-                        lawEntries[lawI].keyword(),
-                        subMeshes()[lawI].subMesh(),
-                        lawEntries[lawI].dict(),
-                        nonLinGeom
-                    )
-                );
-            }
-            else if
-            (
-                nonLinGeom == nonLinearGeometry::UPDATED_LAGRANGIAN
-             || nonLinGeom == nonLinearGeometry::TOTAL_LAGRANGIAN
-            )
-            {
-                laws.set
-                (
-                    lawI,
-                    mechanicalLaw::NewNonLinGeomMechLaw
-                    (
-                        lawEntries[lawI].keyword(),
-                        subMeshes()[lawI].subMesh(),
-                        lawEntries[lawI].dict(),
-                        nonLinGeom
-                    )
-                );
-            }
-            else
-            {
-                FatalErrorIn
-                (
-                    "Foam::mechanicalModel::mechanicalModel\n"
-                    "(\n"
-                    "    const fvMesh& mesh,\n"
-                    "    const nonLinearGeometry::nonLinearType& nonLinGeom\n"
-                    ")"
-                )   << "It is not clear what type of mechanical law should be "
-                    << "created for a solidModel with nonLinGeom = "
-                    << nonLinGeom << abort(FatalError);
-            }
-
-            if (lookupOrDefault<Switch>("writeSubMeshes",  false))
-            {
-                Info<< "Writing subMeshes "
-                    << subMeshes()[lawI].subMesh().name() << endl;
-                subMeshes()[lawI].subMesh().setInstance("constant");
-                subMeshes()[lawI].subMesh().write();
-            }
-        }
-    }
-
-    // Check: currently crackerFvMesh only works with a single material
-    // The challenge here is to update the subMesh and subMesh fields when a
-    // topo-change (crack) occurs in the babse mesh
-    if (isA<crackerFvMesh>(mesh) && laws.size() > 1)
-    {
-        FatalErrorIn(type() + "::" + type() + "(...)")
-            << "Currently the crackerFvMesh can only be used with a single "
-            << "material in mechanicalProperties"
-            << abort(FatalError);
     }
 }
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
-Foam::mechanicalModel::~mechanicalModel()
+Foam::solidSubMeshes::~solidSubMeshes()
 {
     clearOut();
 }
@@ -2403,543 +2089,44 @@ Foam::mechanicalModel::~mechanicalModel()
 
 // * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
 
-const Foam::fvMesh& Foam::mechanicalModel::mesh() const
+const Foam::fvMesh& Foam::solidSubMeshes::baseMesh() const
 {
-    return mesh_;
+    return baseMesh_;
 }
 
 
-const Foam::newLeastSquaresVolPointInterpolation&
-Foam::mechanicalModel::volToPoint() const
+void Foam::solidSubMeshes::moveSubMeshes()
 {
-    if (!volToPointPtr_)
-    {
-        makeVolToPoint();
-    }
-
-    return *volToPointPtr_;
-}
-
-
-Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::rho() const
-{
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
-    {
-        return laws[0].rho();
-    }
-    else
-    {
-        // Accumulate data for all fields
-        tmp<volScalarField> tresult
-        (
-            new volScalarField
-            (
-                IOobject
-                (
-                    "rhoLaw",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::NO_READ,
-                    IOobject::AUTO_WRITE
-                ),
-                mesh(),
-                dimensionedScalar("zero", dimDensity, 0),
-                calculatedFvPatchScalarField::typeName
-            )
-        );
-        volScalarField& result = tresult();
-
-        // Accumulated subMesh fields and then map to the base mesh
-        PtrList<volScalarField> rhos(laws.size());
-
-        forAll(laws, lawI)
-        {
-            rhos.set
-            (
-                lawI,
-                new volScalarField(laws[lawI].rho())
-            );
-        }
-
-        // Map subMesh fields to the base mesh
-        mapSubMeshVolFields<scalar>(rhos, result);
-
-        // Clear subMesh fields
-        rhos.clear();
-
-        return tresult;
-    }
-}
-
-
-Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::impK() const
-{
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
-    {
-        return laws[0].impK();
-    }
-    else
-    {
-        // Accumulate data for all fields
-        tmp<volScalarField> tresult
-        (
-            new volScalarField
-            (
-                IOobject
-                (
-                    "impK",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE
-                ),
-                mesh(),
-                dimensionedScalar("zero", dimForce/dimArea, 0),
-                calculatedFvPatchScalarField::typeName
-            )
-        );
-        volScalarField& result = tresult();
-
-        // Accumulated subMesh fields and then map to the base mesh
-        PtrList<volScalarField> impKs(laws.size());
-
-        forAll(laws, lawI)
-        {
-            impKs.set
-            (
-                lawI,
-                new volScalarField(laws[lawI].impK())
-            );
-        }
-
-        // Map subMesh fields to the base mesh
-        mapSubMeshVolFields<scalar>(impKs, result);
-
-        // Clear subMesh fields
-        impKs.clear();
-
-        return tresult;
-    }
-}
-
-
-Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalModel::impKf() const
-{
-    // Linear interpolation actually seems to give the best convergence
-    const volScalarField impK = this->impK();
-    const word interpName = "interpolate(" + impK.name() + ')';
-    return fvc::interpolate(impK, interpName);
-}
-
-
-void Foam::mechanicalModel::correct(volSymmTensorField& sigma)
-{
-    PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
-    {
-        laws[0].correct(sigma);
-    }
-    else
-    {
-        // Accumulate data for all fields
-        forAll(laws, lawI)
-        {
-            laws[lawI].correct(subMeshSigma()[lawI]);
-        }
-
-        // Map subMesh fields to the base field
-        mapSubMeshVolFields<symmTensor>
-        (
-            subMeshSigma(), sigma
-        );
-    }
-}
-
-
-void Foam::mechanicalModel::correct(surfaceSymmTensorField& sigma)
-{
-    PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
-    {
-        laws[0].correct(sigma);
-    }
-    else
-    {
-        // Reset sigma before performing the accumulatation as interface values
-        // will be added for each material
-        // This is not necessary for volFields as they store no value on the
-        // interface
-        sigma = dimensionedSymmTensor("zero", dimPressure, symmTensor::zero);
-
-        // Accumulate data for all fields
-        forAll(laws, lawI)
-        {
-            laws[lawI].correct(subMeshSigmaf()[lawI]);
-        }
-
-        // Map subMesh fields to the base field
-        mapSubMeshSurfaceFields<symmTensor>
-        (
-            subMeshSigmaf(), sigma
-        );
-    }
-}
-
-
-void Foam::mechanicalModel::grad
-(
-    const volVectorField& D,
-    volTensorField& gradD
-)
-{
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
-    {
-        gradD = fvc::grad(D);
-    }
-    else
-    {
-        // Interpolate the base D to the subMesh D
-        // If necessary, corrections are applied on bi-material interfaces
-        interpolateDtoSubMeshD(D, true);
-
-        // Accumulate data for all fields
-        forAll(laws, lawI)
-        {
-            // Calculate gradient on subMesh
-            // This will use the values at the interface
-            volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
-            subMeshGradD = fvc::grad(subMeshD()[lawI]);
-        }
-
-        // Map subMesh gradD to the base gradD
-        correctBoundarySnGrad(subMeshD(), subMeshGradD());
-
-        mapSubMeshVolFields<tensor>(subMeshGradD(), gradD);
-
-        // Correct boundary snGrad
-        fv::gaussGrad<vector>
-        (
-            mesh()
-        ).correctBoundaryConditions(D, gradD);
-    }
-}
-
-
-void Foam::mechanicalModel::grad
-(
-    const volVectorField& D,
-    const pointVectorField& pointD,
-    volTensorField& gradD
-)
-{
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
-    {
-        gradD = fvc::grad(D, pointD);
-    }
-    else
-    {
-        // Calculate subMesh gradient fields
-        forAll(laws, lawI)
-        {
-            volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
-            subMeshGradD = fvc::grad(subMeshD()[lawI], subMeshPointD()[lawI]);
-        }
-
-        // Correct snGrad on boundaries because the default calculated
-        // boundaries disable non-orthogonal correction
-        correctBoundarySnGrad(subMeshD(), subMeshGradD());
-
-        // Map subMesh gradD fields to the base gradD field
-        mapSubMeshVolFields<tensor>(subMeshGradD(), gradD);
-
-        // Correct boundary snGrad
-        fv::gaussGrad<vector>
-        (
-            mesh()
-        ).correctBoundaryConditions(D, gradD);
-    }
-}
-
-
-void Foam::mechanicalModel::grad
-(
-    const volVectorField& D,
-    const pointVectorField& pointD,
-    surfaceTensorField& gradDf
-)
-{
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
-    {
-        gradDf = fvc::fGrad(D, pointD);
-    }
-    else
-    {
-        // Calculate subMesh gradient fields
-        forAll(laws, lawI)
-        {
-            surfaceTensorField& subMeshGradDf = this->subMeshGradDf()[lawI];
-            subMeshGradDf = fvc::fGrad(subMeshD()[lawI], subMeshPointD()[lawI]);
-        }
-
-        // Correct snGrad on boundaries because the default calculated
-        // boundaries disable non-orthogonal correction
-        correctBoundarySnGradf(subMeshD(), subMeshGradDf(), subMeshGradD());
-
-        // Map subMesh gradDf fields to the base gradDf field
-        mapSubMeshSurfaceFields<tensor>(subMeshGradDf(), gradDf);
-
-        // Replace normal component
-        // If we don't do this then we don't get convergence in many cases
-        const surfaceVectorField n = mesh().Sf()/mesh().magSf();
-        gradDf += n*fvc::snGrad(D) - (sqr(n) & gradDf);
-    }
-}
-
-
-void Foam::mechanicalModel::grad
-(
-    const volVectorField& D,
-    const pointVectorField& pointD,
-    volTensorField& gradD,
-    surfaceTensorField& gradDf
-)
-{
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
-    {
-        gradD = fvc::grad(D, pointD);
-        gradDf = fvc::fGrad(D, pointD);
-    }
-    else
-    {
-        // Calculate subMesh gradient fields
-        forAll(laws, lawI)
-        {
-            volTensorField& subMeshGradD = this->subMeshGradD()[lawI];
-            subMeshGradD = fvc::grad(subMeshD()[lawI], subMeshPointD()[lawI]);
-
-            surfaceTensorField& subMeshGradDf = this->subMeshGradDf()[lawI];
-            subMeshGradDf = fvc::fGrad(subMeshD()[lawI], subMeshPointD()[lawI]);
-        }
-
-        // Correct snGrad on boundaries because the default calculated
-        // boundaries disable non-orthogonal correction
-        correctBoundarySnGrad(subMeshD(), subMeshGradD());
-        correctBoundarySnGradf(subMeshD(), subMeshGradDf(), subMeshGradD());
-
-        // Map subMesh fields to the base field
-
-        mapSubMeshVolFields<tensor>(subMeshGradD(), gradD);
-        mapSubMeshSurfaceFields<tensor>(subMeshGradDf(), gradDf);
-
-        // Correct boundary snGrad of gradD
-        fv::gaussGrad<vector>
-        (
-            mesh()
-        ).correctBoundaryConditions(D, gradD);
-
-        // Correct snGrad component of gradDf
-        const surfaceVectorField n = mesh().Sf()/mesh().magSf();
-        gradDf += n*fvc::snGrad(D) - (sqr(n) & gradDf);
-    }
-}
-
-
-void Foam::mechanicalModel::interpolate
-(
-    const volVectorField& D,
-    pointVectorField& pointD,
-    const bool useVolFieldSigma
-)
-{
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() == 1)
-    {
-        volToPoint().interpolate(D, pointD);
-    }
-    else
-    {
-        // Interpolate the base D to the subMesh D
-        // If necessary, corrections are applied on bi-material interfaces
-        interpolateDtoSubMeshD(D, useVolFieldSigma);
-
-        // Accumulate data for all fields
-        forAll(laws, lawI)
-        {
-            // Interpolate the subMeshD to the subMeshPointD
-            subMeshVolToPoint()[lawI].interpolate
-            (
-                subMeshD()[lawI],
-                subMeshPointD()[lawI]
-            );
-        }
-
-        // Map subMesh pointD fields back to the base pointD field
-        mapSubMeshPointFields<vector>
-        (
-            subMeshPointD(), pointD
-        );
-    }
-}
-
-
-Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
-(
-    const volVectorField& D,
-    const volTensorField& gradD,
-    const surfaceScalarField& gamma
-) const
-{
-    // Mathematically "div(grad(phi))" is equivalent to "laplacian(phi)";
-    // however, numerically "div(grad(phi))" uses a larger stencil than the
-    // "laplacian(phi)"; the difference between these two approximations is
-    // a small amount of numerical diffusion that quells oscillations
-    //if (D.name() == "DD" || biMaterialInterfaceActive())
-    if (true)
-    {
-        return
-        (
-            fvc::laplacian
-            (
-                gamma,
-                D,
-                "laplacian(D" + D.name() + ',' + D.name() + ')'
-            )
-          - fvc::div(gamma*mesh().Sf() & fvc::interpolate(gradD))
-        );
-    }
-    else
-    {
-        // We will calculate this numerical diffusion based on the increment of
-        // displacement, as it may become large of we base it on the total
-        // displacement
-        // Issue: The increment field "D - D.oldTime()" will be incorrect on
-        // non-orthogonal meshes as the grad(D - D.oldTime()) field would not be
-        // stored... we can/should fix this
-        return
-        (
-            fvc::laplacian
-            (
-                gamma,
-                D - D.oldTime(),
-                "laplacian(D" + D.name() + ',' + D.name() + ')'
-            )
-          - fvc::div
-            (
-                gamma*mesh().Sf()
-              & fvc::interpolate(gradD - gradD.oldTime())
-            )
-        );
-    }
-}
-
-
-Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
-(
-    const volVectorField& D,
-    const volTensorField& gradD
-) const
-{
-    return RhieChowCorrection(D, gradD, impKfcorr());
-}
-
-
-Foam::scalar Foam::mechanicalModel::residual()
-{
-    PtrList<mechanicalLaw>& laws = *this;
-
-    scalar maxResidual = 0.0;
-
-    forAll(laws, lawI)
-    {
-        maxResidual = max(maxResidual, laws[lawI].residual());
-    }
-
-    return maxResidual;
-}
-
-
-void Foam::mechanicalModel::updateTotalFields()
-{
-    PtrList<mechanicalLaw>& laws = *this;
-
-    forAll(laws, lawI)
-    {
-        laws[lawI].updateTotalFields();
-    }
-}
-
-
-Foam::scalar Foam::mechanicalModel::newDeltaT()
-{
-    // Find the minimum time-step of all the mechanical laws
-    PtrList<mechanicalLaw>& laws = *this;
-
-    // Initial set deltaT to as large as possible and then check
-    // if any mechanical law wants a smaller time-step
-    scalar newDeltaT = mesh().time().endTime().value();
-
-    forAll(laws, lawI)
-    {
-        newDeltaT = min(newDeltaT, laws[lawI].newDeltaT());
-    }
-
-    return newDeltaT;
-}
-
-
-void Foam::mechanicalModel::moveSubMeshes()
-{
-    PtrList<mechanicalLaw>& laws = *this;
-
     // Sub-meshes only exist when there is more than one material law
-    if (laws.size() > 1)
+    if (cellZoneNames_.size() > 1)
     {
-        forAll(subMeshes(), lawI)
+        forAll(subMeshes(), matI)
         {
-            Info<< "    Moving subMesh " << subMeshes()[lawI].subMesh().name()
+            Info<< "    Moving subMesh " << subMeshes()[matI].subMesh().name()
                 << endl;
 
-            twoDPointCorrector twoDCorrector(subMeshes()[lawI].subMesh());
+            twoDPointCorrector twoDCorrector(subMeshes()[matI].subMesh());
             pointField newPoints =
-                subMeshes()[lawI].subMesh().points() + subMeshPointD()[lawI];
+                subMeshes()[matI].subMesh().points() + subMeshPointD()[matI];
             twoDCorrector.correctPoints(newPoints);
 
-            subMeshes()[lawI].subMesh().movePoints(newPoints);
-            subMeshes()[lawI].subMesh().V00();
-            subMeshes()[lawI].subMesh().moving(false);
-            subMeshes()[lawI].subMesh().changing(false);
-            subMeshes()[lawI].subMesh().setPhi().writeOpt() =
+            subMeshes()[matI].subMesh().movePoints(newPoints);
+            subMeshes()[matI].subMesh().V00();
+            subMeshes()[matI].subMesh().moving(false);
+            subMeshes()[matI].subMesh().changing(false);
+            subMeshes()[matI].subMesh().setPhi().writeOpt() =
                 IOobject::NO_WRITE;
 
-            if
-            (
-                mesh().time().outputTime()
-             && lookupOrDefault<Switch>("writeSubMeshes",  false)
-            )
+            if (baseMesh().time().outputTime() && writeSubMeshes_)
             {
                 Info<< "    Writing subMesh "
-                    << subMeshes()[lawI].subMesh().name() << endl;
-                subMeshes()[lawI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
-                subMeshes()[lawI].subMesh().setInstance
+                    << subMeshes()[matI].subMesh().name() << endl;
+                subMeshes()[matI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
+                subMeshes()[matI].subMesh().setInstance
                 (
-                    mesh().time().timeName()
+                    baseMesh().time().timeName()
                 );
-                subMeshes()[lawI].subMesh().write();
+                subMeshes()[matI].subMesh().write();
             }
         }
     }

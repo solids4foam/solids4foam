@@ -22,108 +22,90 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::mechanicalModel
+    Foam::solidSubMeshes
 
 Description
-    The mechanical model class takes care of reading the mechanical properties
-    and creating mechanical laws.
+    Class in charge of multiple sub-meshes, where each sub-mesh corresponds to
+    a different material. An independent mechanical law can then be defined
+    for each sub-mesh.
 
-    If there are multiple mechanical laws then cellZones are read, and
-    corrections are applied at bi-material interfaces to ensure continuity of
+    Corrections are applied at bi-material interfaces to ensure continuity of
     stress.
 
-    Multiple mechanical laws are treated by defining a separate sub-mesh for
-    each mechanical law region (cellZone).
+    The sub-meshes are constructed from the cellZones of a given base mesh.
 
 SourceFiles
-    mechanicalModel.C
-    mechanicalModelTemplates.C
+    solidSubMeshes.C
 
 Author
     Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef mechanicalModel_H
-#define mechanicalModel_H
+#ifndef solidSubMeshes_H
+#define solidSubMeshes_H
 
-#include "IOdictionary.H"
 #include "fvMesh.H"
-#include "mechanicalLaw.H"
-#include "Switch.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "newFvMeshSubset.H"
 #include "newLeastSquaresVolPointInterpolation.H"
-#include "nonLinearGeometry.H"
-#include "solidSubMeshes.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 /*---------------------------------------------------------------------------*\
-                        Class mechanicalModel Declaration
+                        Class solidSubMeshes Declaration
 \*---------------------------------------------------------------------------*/
 
-class mechanicalModel
-:
-    public IOdictionary,
-    public PtrList<mechanicalLaw>
+class solidSubMeshes
 {
     // Private data
 
-        //- Const reference to the mesh
-        const fvMesh& mesh_;
+        //- Const reference to the base (global) mesh
+        const fvMesh& baseMesh_;
 
-        //- Is the current case plane stress or plain strain/3-D
-        //  Todo: this should be moved to actual mechanical law
-        const Switch planeStress_;
+        //- Name of the cellZone for each sub-mesh
+        mutable wordList cellZoneNames_;
 
         //- Does the solidModel use an incremental approach?
         //  i.e. does the solidModel solve for DD instead of D
         const bool incremental_;
 
-        //- Name of the cellZone for each material
-        mutable wordList cellZoneNames_;
+        //- Write sub-meshes
+        const bool writeSubMeshes_;
 
-        //- Sub-meshes for each mechanicalLaw
-        mutable PtrList<solidSubMeshes> solidSubMeshes_;
-
-        //- Sub-mesh for each material
-        //  Not used if there is only one material
+        //- Sub-meshes
         mutable PtrList<newFvMeshSubset> subMeshes_;
 
-        //- Volume field to point field interpolator for the base mesh
-        mutable newLeastSquaresVolPointInterpolation* volToPointPtr_;
-
-        //- Volume field to point field interpolator for each mechanical law
+        //- Volume field to point field interpolator for each sub-mesh
         mutable PtrList<newLeastSquaresVolPointInterpolation>
             subMeshVolToPoint_;
 
-        //- Stress volField for each mechanical law
+        //- Stress volField for each sub-mesh
         mutable PtrList<volSymmTensorField> subMeshSigma_;
 
-        //- Stress surfaceField for each mechanical law
+        //- Stress surfaceField for each sub-mesh
         mutable PtrList<surfaceSymmTensorField> subMeshSigmaf_;
 
         //- Displacement (or displacement increment) volField for each
-        //  mechanical
+        //  sub-mesh
         mutable PtrList<volVectorField> subMeshD_;
 
         //- Displacement  (or displacement increment) gradient volField for each
-        //  mechanical law
+        //  sub-mesh
         mutable PtrList<volTensorField> subMeshGradD_;
 
         //- Displacement  (or displacement increment) gradient surfaceField for
-        //  each mechanical law
+        //  each sub-mesh
         mutable PtrList<surfaceTensorField> subMeshGradDf_;
 
         //- Displacement (or displacement increment) pointField for each
-        //  mechanical law
+        //  sub-mesh
         mutable PtrList<pointVectorField> subMeshPointD_;
 
-        //- Are there any bi-material interface faces
+        //- Flag to indicate if there are any bi-material interface faces
         mutable bool* biMaterialInterfaceActivePtr_;
 
         //- List of faces in the base mesh that are on a bi-material interface
@@ -143,9 +125,6 @@ class mechanicalModel
         //  faces
         mutable PtrList<symmTensorField> interfaceShadowSigma_;
 
-        //- The implicit stiffness surface field for Rhie-Chow correction
-        mutable surfaceScalarField* impKfcorrPtr_;
-
         //- Number of materials adjacent to each point in the base mesh
         mutable labelList* pointNumOfMaterialsPtr_;
 
@@ -156,15 +135,6 @@ class mechanicalModel
     // Private Member Functions
 
         //- Make material sub-meshes
-        void makeSolSubMeshes() const;
-
-        //- Return a const reference to the solidSubMeshes
-        const PtrList<solidSubMeshes>& solSubMeshes() const;
-
-        //- Return a const reference to the solidSubMeshes
-        PtrList<solidSubMeshes>& solSubMeshes();
-
-        //- Make material sub-meshes
         void makeSubMeshes() const;
 
         //- Return a const reference to the subMeshes
@@ -173,9 +143,6 @@ class mechanicalModel
         //- Return a const reference to the subMeshes
         PtrList<newFvMeshSubset>& subMeshes();
 
-        //- Make base mesh vol-to-point interpolator
-        void makeVolToPoint() const;
-
         //- Make subMesh vol-to-point interpolators
         void makeSubMeshVolToPoint() const;
 
@@ -183,7 +150,7 @@ class mechanicalModel
         const PtrList<newLeastSquaresVolPointInterpolation>&
             subMeshVolToPoint() const;
 
-        //- Check the cell zones are defined for each material
+        //- Check the cell zones are defined for each sub-mesh
         void checkCellZones() const;
 
         //- Calculate the subMesh sigma fields
@@ -260,10 +227,6 @@ class mechanicalModel
         //- Return the interface shadow face indices
         const PtrList<labelList>& interfaceShadowFaceID() const;
 
-        //- Calculate the impKf field for Rhie-Chow correction
-        //  This field is zero on bi-material interfaces
-        void calcImpKfcorr() const;
-
         //- Make materials number for points
         void makePointNumOfMaterials() const;
 
@@ -300,9 +263,6 @@ class mechanicalModel
             PtrList<surfaceTensorField>& subMeshGradDfList,
             PtrList<volTensorField>& subMeshGradDList
         );
-
-        //- Return the implicit stiffness surface field for Rhie-Chow correction
-        const surfaceScalarField& impKfcorr() const;
 
         //- Map a volField from the subMesh to the base mesh
         template<class Type>
@@ -352,10 +312,10 @@ class mechanicalModel
         void clearOut();
 
         //- Disallow default bitwise copy construct
-        mechanicalModel(const mechanicalModel&);
+        solidSubMeshes(const solidSubMeshes&);
 
         //- Disallow default bitwise assignment
-        void operator=(const mechanicalModel&);
+        void operator=(const solidSubMeshes&);
 
 
 public:
@@ -363,134 +323,30 @@ public:
     // Constructors
 
         //- Construct from an fvMesh
-        mechanicalModel
+        solidSubMeshes
         (
-            const fvMesh& mesh,
-            const nonLinearGeometry::nonLinearType& nonLinGeom,
-            const bool incremental = false
+            const fvMesh& baseMesh,
+            const wordList& cellZoneNames,
+            const bool incremental,
+            const bool writeSubMeshes = false
         );
 
 
     //- Destructor
-    ~mechanicalModel();
+    ~solidSubMeshes();
 
 
     // Member Functions
 
         // Access
 
-            //- Return const access to the mesh
-            const fvMesh& mesh() const;
-
-            //- Return a const reference to the vol-to-point base mesh
-            //  interpolator
-            const newLeastSquaresVolPointInterpolation& volToPoint() const;
-
-            //- Return initial density
-            tmp<volScalarField> rho() const;
-
-            //- Return the implicit stiffness
-            //  This is the diffusivity for the Laplacian term
-            tmp<volScalarField> impK() const;
-
-            //- Return the implicit stiffness surface field
-            //  This is the diffusivity for the Laplacian term
-            tmp<surfaceScalarField> impKf() const;
-
-            //- Return material residual i.e. a measured of how convergence of
-            //  the material model
-            scalar residual();
+            //- Return const access to the base mesh
+            const fvMesh& baseMesh() const;
 
         // Edit
 
-            //- Calculate the stress volField
-            void correct(volSymmTensorField& sigma);
-
-            //- Calculate the stress surfaceField
-            void correct(surfaceSymmTensorField& sigma);
-
-            //- Update the gradient of displacement vol field
-            void grad
-            (
-                const volVectorField& D,
-                volTensorField& gradD
-            );
-
-            //- Update the gradient of displacement vol field using pointD
-            void grad
-            (
-                const volVectorField& D,
-                const pointVectorField& pointD,
-                volTensorField& gradD
-            );
-
-            //- Update the gradient of displacement surface field using pointD
-            void grad
-            (
-                const volVectorField& D,
-                const pointVectorField& pointD,
-                surfaceTensorField& gradDf
-            );
-
-            //- Update the gradient of displacement vol and surface field using
-            //  pointD
-            void grad
-            (
-                const volVectorField& D,
-                const pointVectorField& pointD,
-                volTensorField& gradD,
-                surfaceTensorField& gradDf
-            );
-
-            //- Interpolate D to pointD
-            void interpolate
-            (
-                const volVectorField& D,
-                pointVectorField& pointD,
-                const bool useVolFieldSigma = true
-            );
-
-            //- Return explicit Rhie-Chow correction field to quell oscillations
-            tmp<volVectorField> RhieChowCorrection
-            (
-                const volVectorField& D,
-                const volTensorField& gradD,
-                const surfaceScalarField& gamma
-            ) const;
-
-            //- Return explicit Rhie-Chow correction field to quell oscillations
-            tmp<volVectorField> RhieChowCorrection
-            (
-                const volVectorField& D,
-                const volTensorField& gradD
-            ) const;
-
-            //- Update total accumulated fields
-            void updateTotalFields();
-
-            //- Return the desired new time-step size
-            scalar newDeltaT();
-
             //- Move subMeshes
             void moveSubMeshes();
-
-            //- Lookup a field from the base mesh and interpolate it the subMesh
-            template<class Type>
-            tmp< GeometricField<Type, fvPatchField, volMesh> >
-            lookupBaseMeshVolField
-            (
-                const word& fieldName,
-                const fvMesh& subMesh
-            ) const;
-
-            //- Lookup a field from the base mesh and interpolate it the subMesh
-            template<class Type>
-            tmp< GeometricField<Type, fvsPatchField, surfaceMesh> >
-            lookupBaseMeshSurfaceField
-            (
-                const word& fieldName,
-                const fvMesh& subMesh
-            ) const;
 };
 
 
@@ -499,7 +355,7 @@ public:
 } // End namespace Foam
 
 #ifdef NoRepository
-#   include "mechanicalModelTemplates.C"
+#   include "solidSubMeshesTemplates.C"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
