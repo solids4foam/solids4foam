@@ -137,18 +137,8 @@ class solidSubMeshes
         //- Make material sub-meshes
         void makeSubMeshes() const;
 
-        //- Return a const reference to the subMeshes
-        const PtrList<newFvMeshSubset>& subMeshes() const;
-
-        //- Return a const reference to the subMeshes
-        PtrList<newFvMeshSubset>& subMeshes();
-
         //- Make subMesh vol-to-point interpolators
         void makeSubMeshVolToPoint() const;
-
-        //- Return a const reference to the vol-to-point interpolators
-        const PtrList<newLeastSquaresVolPointInterpolation>&
-            subMeshVolToPoint() const;
 
         //- Check the cell zones are defined for each sub-mesh
         void checkCellZones() const;
@@ -156,56 +146,20 @@ class solidSubMeshes
         //- Calculate the subMesh sigma fields
         void calcSubMeshSigma() const;
 
-        //- Return the subMesh sigma volFields
-        PtrList<volSymmTensorField>& subMeshSigma();
-
-        //- Return the subMesh sigma volFields
-        const PtrList<volSymmTensorField>& subMeshSigma() const;
-
         //- Calculate the subMesh sigmaf fields
         void calcSubMeshSigmaf() const;
-
-        //- Return the subMesh sigma surfaceFields
-        PtrList<surfaceSymmTensorField>& subMeshSigmaf();
-
-        //- Return the subMesh sigma surfaceFields
-        const PtrList<surfaceSymmTensorField>& subMeshSigmaf() const;
 
         //- Calculate the subMesh D fields
         void calcSubMeshD() const;
 
-        //- Return the subMesh D volFields
-        PtrList<volVectorField>& subMeshD();
-
-        //- Return the subMesh D volFields
-        const PtrList<volVectorField>& subMeshD() const;
-
         //- Calculate the subMesh gradD fields
         void calcSubMeshGradD() const;
-
-        //- Return the subMesh gradD volFields
-        PtrList<volTensorField>& subMeshGradD();
-
-        //- Return the subMesh gradD volFields
-        const PtrList<volTensorField>& subMeshGradD() const;
 
         //- Calculate the subMesh gradDf fields
         void calcSubMeshGradDf() const;
 
-        //- Return the subMesh gradDf volFields
-        PtrList<surfaceTensorField>& subMeshGradDf();
-
-        //- Return the subMesh gradDf volFields
-        const PtrList<surfaceTensorField>& subMeshGradDf() const;
-
         //- Calculate the subMesh pointD fields
         void calcSubMeshPointD() const;
-
-        //- Return the subMesh pointD volFields
-        PtrList<pointVectorField>& subMeshPointD();
-
-        //- Return the subMesh pointD volFields
-        const PtrList<pointVectorField>& subMeshPointD() const;
 
         //- Make the interface base faces
         void makeInterfaceBaseFaces() const;
@@ -238,58 +192,6 @@ class solidSubMeshes
 
         //- Return isolated interface points
         const labelList& isolatedInterfacePoints() const;
-
-        //- Interpolate the base D to the subMesh D, where we apply corrections
-        //  on bi-material interfaces
-        void interpolateDtoSubMeshD
-        (
-            const volVectorField& D,
-            const bool useVolFieldSigma
-        );
-
-        //- Correct snGrad on subMeshGradD fields because the default calculated
-        //  patches do not account for non-orthogonality
-        void correctBoundarySnGrad
-        (
-            PtrList<volVectorField>& subMeshDList,
-            PtrList<volTensorField>& subMeshGradDList
-        );
-
-        //- Correct snGrad on subMeshGradD fields because the default calculated
-        //  patches do not account for non-orthogonality
-        void correctBoundarySnGradf
-        (
-            PtrList<volVectorField>& subMeshDList,
-            PtrList<surfaceTensorField>& subMeshGradDfList,
-            PtrList<volTensorField>& subMeshGradDList
-        );
-
-        //- Map a volField from the subMesh to the base mesh
-        template<class Type>
-        void mapSubMeshVolFields
-        (
-            const PtrList<GeometricField<Type, fvPatchField, volMesh> >&
-                subMeshFields,
-            GeometricField<Type, fvPatchField, volMesh>& baseMeshField
-        ) const;
-
-        //- Map a surfaceField from the subMesh to the base mesh
-        template<class Type>
-        void mapSubMeshSurfaceFields
-        (
-            const PtrList<GeometricField<Type, fvsPatchField, surfaceMesh> >&
-                subMeshFields,
-            GeometricField<Type, fvsPatchField, surfaceMesh>& baseMeshField
-        ) const;
-
-        //- Map pointFields from the subMesh to the base mesh
-        template<class Type>
-        void mapSubMeshPointFields
-        (
-            const PtrList<GeometricField<Type, pointPatchField, pointMesh> >&
-                subMshFields,
-            GeometricField<Type, pointPatchField, pointMesh>& baseMeshField
-        ) const;
 
         //- Return interfaceShadowSigma
         const PtrList<symmTensorField>& interfaceShadowSigma() const;
@@ -343,7 +245,127 @@ public:
             //- Return const access to the base mesh
             const fvMesh& baseMesh() const;
 
+            //- Return a const reference to the subMeshes
+            const PtrList<newFvMeshSubset>& subMeshes() const;
+
+            //- Return a non-const reference to the subMeshes
+            PtrList<newFvMeshSubset>& subMeshes();
+
+            //- Return a const reference to the vol-to-point interpolators
+            const PtrList<newLeastSquaresVolPointInterpolation>&
+                subMeshVolToPoint() const;
+
+            //- Return the subMesh sigma volFields
+            PtrList<volSymmTensorField>& subMeshSigma();
+
+            //- Return the subMesh sigma volFields
+            const PtrList<volSymmTensorField>& subMeshSigma() const;
+
+            //- Return the subMesh sigma surfaceFields
+            PtrList<surfaceSymmTensorField>& subMeshSigmaf();
+
+            //- Return the subMesh sigma surfaceFields
+            const PtrList<surfaceSymmTensorField>& subMeshSigmaf() const;
+
+            //- Return the subMesh D volFields
+            PtrList<volVectorField>& subMeshD();
+
+            //- Return the subMesh D volFields
+            const PtrList<volVectorField>& subMeshD() const;
+
+            //- Return the subMesh gradD volFields
+            PtrList<volTensorField>& subMeshGradD();
+
+            //- Return the subMesh gradD volFields
+            const PtrList<volTensorField>& subMeshGradD() const;
+
+            //- Return the subMesh gradDf volFields
+            PtrList<surfaceTensorField>& subMeshGradDf();
+
+            //- Return the subMesh gradDf volFields
+            const PtrList<surfaceTensorField>& subMeshGradDf() const;
+
+            //- Return the subMesh pointD volFields
+            PtrList<pointVectorField>& subMeshPointD();
+
+            //- Return the subMesh pointD volFields
+            const PtrList<pointVectorField>& subMeshPointD() const;
+
+            //- Lookup a field from the base mesh and interpolate it the subMesh
+            template<class Type>
+            tmp< GeometricField<Type, fvPatchField, volMesh> >
+            lookupBaseMeshVolField
+            (
+                const word& fieldName,
+                const fvMesh& subMesh
+            ) const;
+
+            //- Lookup a field from the base mesh and interpolate it the subMesh
+            template<class Type>
+            tmp< GeometricField<Type, fvsPatchField, surfaceMesh> >
+            lookupBaseMeshSurfaceField
+            (
+                const word& fieldName,
+                const fvMesh& subMesh
+            ) const;
+
         // Edit
+
+            //- Interpolate the base D to the subMesh D, where we apply
+            //  corrections on bi-material interfaces
+            void interpolateDtoSubMeshD
+            (
+                const volVectorField& D,
+                const bool useVolFieldSigma
+            );
+
+            //- Correct snGrad on subMeshGradD fields because the default
+            //  calculated patches do not account for non-orthogonality
+            void correctBoundarySnGrad
+            (
+                PtrList<volVectorField>& subMeshDList,
+                PtrList<volTensorField>& subMeshGradDList
+            );
+
+            //- Correct snGrad on subMeshGradD fields because the default
+            //  calculated patches do not account for non-orthogonality
+            void correctBoundarySnGradf
+            (
+                PtrList<volVectorField>& subMeshDList,
+                PtrList<surfaceTensorField>& subMeshGradDfList,
+                PtrList<volTensorField>& subMeshGradDList
+            );
+
+            //- Map a volField from the subMesh to the base mesh
+            template<class Type>
+            void mapSubMeshVolFields
+            (
+                const PtrList<GeometricField<Type, fvPatchField, volMesh> >&
+                    subMeshFields,
+                GeometricField<Type, fvPatchField, volMesh>& baseMeshField
+            ) const;
+
+            //- Map a surfaceField from the subMesh to the base mesh
+            template<class Type>
+            void mapSubMeshSurfaceFields
+            (
+                const PtrList
+                <
+                    GeometricField<Type, fvsPatchField, surfaceMesh>
+                >& subMeshFields,
+                GeometricField<Type, fvsPatchField, surfaceMesh>& baseMeshField
+            ) const;
+
+            //- Map pointFields from the subMesh to the base mesh
+            template<class Type>
+            void mapSubMeshPointFields
+            (
+                const PtrList
+                <
+                GeometricField<Type, pointPatchField, pointMesh>
+                >& subMshFields,
+                GeometricField<Type, pointPatchField, pointMesh>& baseMeshField
+            ) const;
 
             //- Move subMeshes
             void moveSubMeshes();

@@ -81,7 +81,7 @@ void Foam::poroLinearElasticMohrCoulombPlastic::correct
         ).lookupObject<mechanicalModel>
         (
             "mechanicalProperties"
-        ).lookupBaseMeshVolField<scalar>("p", mesh());
+        ).solSubMeshes().lookupBaseMeshVolField<scalar>("p", mesh());
 
 
     // The total stress is equal to the sum of the effective stress and
@@ -106,7 +106,7 @@ void Foam::poroLinearElasticMohrCoulombPlastic::correct
         ).lookupObject<mechanicalModel>
         (
             "mechanicalProperties"
-        ).lookupBaseMeshVolField<scalar>("p", mesh());
+        ).solSubMeshes().lookupBaseMeshVolField<scalar>("p", mesh());
 
     const surfaceScalarField pf = fvc::interpolate(p);
 

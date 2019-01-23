@@ -111,7 +111,7 @@ bool Foam::thermoLinearElastic::readTField()
                         baseMesh().lookupObject<mechanicalModel>
                         (
                             "mechanicalProperties"
-                        ).lookupBaseMeshVolField<scalar>("T", mesh())()
+                        ).solSubMeshes().lookupBaseMeshVolField<scalar>("T", mesh())()
                     )
                 );
 

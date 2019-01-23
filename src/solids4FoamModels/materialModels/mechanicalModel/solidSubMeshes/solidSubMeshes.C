@@ -63,7 +63,8 @@ void Foam::solidSubMeshes::makeSubMeshes() const
                 << abort(FatalError);
         }
 
-        const labelList& curCellZone = baseMesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone =
+            baseMesh().cellZones()[cellZoneID.index()];
 
         forAll(curCellZone, cI)
         {
@@ -105,28 +106,6 @@ void Foam::solidSubMeshes::makeSubMeshes() const
     }
 }
 
-const Foam::PtrList<Foam::newFvMeshSubset>&
-Foam::solidSubMeshes::subMeshes() const
-{
-    if (subMeshes_.empty())
-    {
-        makeSubMeshes();
-    }
-
-    return subMeshes_;
-}
-
-
-Foam::PtrList<Foam::newFvMeshSubset>& Foam::solidSubMeshes::subMeshes()
-{
-    if (subMeshes_.empty())
-    {
-        makeSubMeshes();
-    }
-
-    return subMeshes_;
-}
-
 
 void Foam::solidSubMeshes::makeSubMeshVolToPoint() const
 {
@@ -160,18 +139,6 @@ void Foam::solidSubMeshes::makeSubMeshVolToPoint() const
             )
         );
     }
-}
-
-
-const Foam::PtrList<Foam::newLeastSquaresVolPointInterpolation>&
-Foam::solidSubMeshes::subMeshVolToPoint() const
-{
-    if (subMeshVolToPoint_.empty())
-    {
-        makeSubMeshVolToPoint();
-    }
-
-    return subMeshVolToPoint_;
 }
 
 
@@ -213,7 +180,8 @@ void Foam::solidSubMeshes::checkCellZones() const
                 << abort(FatalError);
         }
 
-        const labelList& curCellZone = baseMesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone =
+            baseMesh().cellZones()[cellZoneID.index()];
 
         forAll(curCellZone, cI)
         {
@@ -286,29 +254,6 @@ void Foam::solidSubMeshes::calcSubMeshSigma() const
 }
 
 
-Foam::PtrList<Foam::volSymmTensorField>& Foam::solidSubMeshes::subMeshSigma()
-{
-    if (subMeshSigma_.empty())
-    {
-        calcSubMeshSigma();
-    }
-
-    return subMeshSigma_;
-}
-
-
-const Foam::PtrList<Foam::volSymmTensorField>&
-Foam::solidSubMeshes::subMeshSigma() const
-{
-    if (subMeshSigma_.empty())
-    {
-        calcSubMeshSigma();
-    }
-
-    return subMeshSigma_;
-}
-
-
 void Foam::solidSubMeshes::calcSubMeshSigmaf() const
 {
     if (!subMeshSigmaf_.empty())
@@ -354,30 +299,6 @@ void Foam::solidSubMeshes::calcSubMeshSigmaf() const
             )
         );
     }
-}
-
-
-Foam::PtrList<Foam::surfaceSymmTensorField>&
-Foam::solidSubMeshes::subMeshSigmaf()
-{
-    if (subMeshSigmaf_.empty())
-    {
-        calcSubMeshSigmaf();
-    }
-
-    return subMeshSigmaf_;
-}
-
-
-const Foam::PtrList<Foam::surfaceSymmTensorField>&
-Foam::solidSubMeshes::subMeshSigmaf() const
-{
-    if (subMeshSigmaf_.empty())
-    {
-        calcSubMeshSigmaf();
-    }
-
-    return subMeshSigmaf_;
 }
 
 
@@ -430,29 +351,6 @@ void Foam::solidSubMeshes::calcSubMeshD() const
 }
 
 
-Foam::PtrList<Foam::volVectorField>& Foam::solidSubMeshes::subMeshD()
-{
-    if (subMeshD_.empty())
-    {
-        calcSubMeshD();
-    }
-
-    return subMeshD_;
-}
-
-
-const Foam::PtrList<Foam::volVectorField>&
-Foam::solidSubMeshes::subMeshD() const
-{
-    if (subMeshD_.empty())
-    {
-        calcSubMeshD();
-    }
-
-    return subMeshD_;
-}
-
-
 void Foam::solidSubMeshes::calcSubMeshGradD() const
 {
     if (!subMeshGradD_.empty())
@@ -499,29 +397,6 @@ void Foam::solidSubMeshes::calcSubMeshGradD() const
             )
         );
     }
-}
-
-
-Foam::PtrList<Foam::volTensorField>& Foam::solidSubMeshes::subMeshGradD()
-{
-    if (subMeshGradD_.empty())
-    {
-        calcSubMeshGradD();
-    }
-
-    return subMeshGradD_;
-}
-
-
-const Foam::PtrList<Foam::volTensorField>&
-Foam::solidSubMeshes::subMeshGradD() const
-{
-    if (subMeshGradD_.empty())
-    {
-        calcSubMeshGradD();
-    }
-
-    return subMeshGradD_;
 }
 
 
@@ -574,29 +449,6 @@ void Foam::solidSubMeshes::calcSubMeshGradDf() const
 }
 
 
-Foam::PtrList<Foam::surfaceTensorField>& Foam::solidSubMeshes::subMeshGradDf()
-{
-    if (subMeshGradDf_.empty())
-    {
-        calcSubMeshGradDf();
-    }
-
-    return subMeshGradDf_;
-}
-
-
-const Foam::PtrList<Foam::surfaceTensorField>&
-Foam::solidSubMeshes::subMeshGradDf() const
-{
-    if (subMeshGradDf_.empty())
-    {
-        calcSubMeshGradDf();
-    }
-
-    return subMeshGradDf_;
-}
-
-
 void Foam::solidSubMeshes::calcSubMeshPointD() const
 {
     if (!subMeshPointD_.empty())
@@ -643,29 +495,6 @@ void Foam::solidSubMeshes::calcSubMeshPointD() const
             )
         );
     }
-}
-
-
-Foam::PtrList<Foam::pointVectorField>& Foam::solidSubMeshes::subMeshPointD()
-{
-    if (subMeshPointD_.empty())
-    {
-        calcSubMeshPointD();
-    }
-
-    return subMeshPointD_;
-}
-
-
-const Foam::PtrList<Foam::pointVectorField>&
-Foam::solidSubMeshes::subMeshPointD() const
-{
-    if (subMeshPointD_.empty())
-    {
-        calcSubMeshPointD();
-    }
-
-    return subMeshPointD_;
 }
 
 
@@ -909,7 +738,11 @@ void Foam::solidSubMeshes::makeInterfaceBaseFaces() const
 
         forAll(materials.boundaryField(), patchI)
         {
-            if (baseMesh().boundary()[patchI].type() == processorFvPatch::typeName)
+            if
+            (
+                baseMesh().boundary()[patchI].type()
+             == processorFvPatch::typeName
+            )
             {
                 const scalarField ownMat =
                     materials.boundaryField()[patchI].patchInternalField();
@@ -983,7 +816,8 @@ void Foam::solidSubMeshes::makePointNumOfMaterials() const
                 << abort(FatalError);
         }
 
-        const labelList& curCellZone = baseMesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone =
+            baseMesh().cellZones()[cellZoneID.index()];
 
         forAll(curCellZone, cI)
         {
@@ -1055,7 +889,8 @@ void Foam::solidSubMeshes::makeIsolatedInterfacePoints() const
                 << abort(FatalError);
         }
 
-        const labelList& curCellZone = baseMesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone =
+            baseMesh().cellZones()[cellZoneID.index()];
 
         forAll(curCellZone, cI)
         {
@@ -1178,6 +1013,583 @@ const Foam::labelList& Foam::solidSubMeshes::isolatedInterfacePoints() const
     }
 
     return *isolatedInterfacePointsPtr_;
+}
+
+
+const Foam::PtrList<Foam::symmTensorField>&
+Foam::solidSubMeshes::interfaceShadowSigma() const
+{
+    if (interfaceShadowSigma_.empty())
+    {
+        makeInterfaceShadowSigma();
+    }
+
+    return interfaceShadowSigma_;
+}
+
+
+void Foam::solidSubMeshes::makeInterfaceShadowSigma() const
+{
+    if (!interfaceShadowSigma_.empty())
+    {
+        FatalErrorIn
+        (
+            "void Foam::solidSubMeshes::makeInterfaceShadowSigma() const"
+        ) << "pointer already set" << abort(FatalError);
+    }
+
+    interfaceShadowSigma_.setSize(subMeshes().size());
+
+    // Set values for each subMesh
+    forAll(subMeshes(), subMeshI)
+    {
+        const newFvMeshSubset& subsetMesh = subMeshes()[subMeshI];
+        const fvMesh& subMesh = subsetMesh.subMesh();
+        const labelList& patchMap = subsetMesh.patchMap();
+
+        // Find the interface patch for the current subMesh
+        // we should store this!
+
+        label patchID = -1;
+
+        forAll(subMesh.boundaryMesh(), pI)
+        {
+            if (patchMap[pI] == -1)
+            {
+                patchID = pI;
+                break;
+            }
+        }
+
+        if (patchID == -1)
+        {
+            // Note: if patchID is still -1, it means that this subMesh does not
+            // have any faces on an bi-material interface
+            interfaceShadowSigma_.set(subMeshI, new symmTensorField(0));
+        }
+        else
+        {
+            interfaceShadowSigma_.set
+            (
+                subMeshI,
+                new symmTensorField
+                (
+                    subMesh.boundaryMesh()[patchID].size(),
+                    symmTensor::zero
+                )
+            );
+        }
+    }
+}
+
+
+void Foam::solidSubMeshes::updateInterfaceShadowSigma
+(
+    const bool useVolFieldSigma
+)
+{
+    if (interfaceShadowSigma_.empty())
+    {
+        makeInterfaceShadowSigma();
+    }
+
+    // Field used for syncing the processor patch values
+    volSymmTensorField baseSigmaForSyncing
+    (
+        IOobject
+        (
+            "baseSigmaForSyncing",
+            baseMesh().time().timeName(),
+            baseMesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        baseMesh(),
+        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+    );
+
+    // Set values for each subMesh
+    forAll(subMeshes(), subMeshI)
+    {
+        const newFvMeshSubset& subsetMesh = subMeshes()[subMeshI];
+        const fvMesh& subMesh = subsetMesh.subMesh();
+        const labelList& patchMap = subsetMesh.patchMap();
+        const labelList& faceMap = subsetMesh.faceMap();
+
+        // Find the interface patch for the current subMesh
+        // we should store this!
+
+        label patchID = -1;
+
+        forAll(subMesh.boundaryMesh(), pI)
+        {
+            if (patchMap[pI] == -1)
+            {
+                patchID = pI;
+                break;
+            }
+        }
+
+        if (patchID == -1)
+        {
+            // This sub mesh has not faces on a bi-material interface
+            continue;
+        }
+
+        symmTensorField& resultSigma = interfaceShadowSigma_[subMeshI];
+
+        const labelList& interfaceShadowSubMeshID =
+            this->interfaceShadowSubMeshID()[subMeshI];
+        const labelList& interfaceShadowPatchID =
+            this->interfaceShadowPatchID()[subMeshI];
+        const labelList& interfaceShadowFaceID =
+            this->interfaceShadowFaceID()[subMeshI];
+
+        // Assemble the shadow stress for each face
+        forAll(resultSigma, faceI)
+        {
+            // Check if the face is not on a processor
+            if (interfaceShadowSubMeshID[faceI] != -1)
+            {
+                // ID of the subMesh on the other side of interface
+                const label shadowSubMeshID = interfaceShadowSubMeshID[faceI];
+
+                // ID of the subMesh patch on the other side of interface
+                const label shadowPatchID = interfaceShadowPatchID[faceI];
+
+                // ID of the subMesh patch face on the other side of interface
+                const label shadowFaceID = interfaceShadowFaceID[faceI];
+
+                // Stress calculated at the other side of the interface
+                if (useVolFieldSigma)
+                {
+                    resultSigma[faceI] =
+                        subMeshSigma()
+                        [
+                            shadowSubMeshID
+                        ].boundaryField()[shadowPatchID][shadowFaceID];
+                }
+                else
+                {
+                    resultSigma[faceI] =
+                        subMeshSigmaf()
+                        [
+                            shadowSubMeshID
+                        ].boundaryField()[shadowPatchID][shadowFaceID];
+                }
+            }
+            else
+            {
+                // Base face is on a processor boundary
+
+                // Local patch start
+                const label start = subMesh.boundaryMesh()[patchID].start();
+
+                // Base mesh face ID
+                const label baseFaceID = faceMap[start + faceI];
+
+                // Base mesh patch ID
+                const label basePatchID =
+                    baseMesh().boundaryMesh().whichPatch(baseFaceID);
+
+                // Base patch start
+                const label basePatchStart =
+                    baseMesh().boundaryMesh()[basePatchID].start();
+
+                // Base mesh patch local face ID
+                const label baseLocalFaceID = baseFaceID - basePatchStart;
+
+                // Base mesh patch faceCells
+                const unallocLabelList& faceCells =
+                    baseMesh().boundaryMesh()[basePatchID].faceCells();
+
+                // Store local stress on the baseMesh proc patch in the patch
+                // internal field
+                if (useVolFieldSigma)
+                {
+                    baseSigmaForSyncing.internalField()
+                        [
+                            faceCells[baseLocalFaceID]
+                        ]
+                      = subMeshSigma()
+                        [
+                            subMeshI
+                        ].boundaryField()[patchID][faceI];
+                }
+                else
+                {
+                    baseSigmaForSyncing.internalField()
+                        [
+                            faceCells[baseLocalFaceID]
+                        ] = subMeshSigmaf()
+                        [
+                            subMeshI
+                        ].boundaryField()[patchID][faceI];
+                }
+            }
+        }
+    }
+
+    // Sync base mesh processor patches
+    // This will pass the patch internal field and store it on the neighbour
+    // patch
+    baseSigmaForSyncing.correctBoundaryConditions();
+
+    // Assemble processor values that have been synced
+    forAll(subMeshes(), subMeshI)
+    {
+        const newFvMeshSubset& subsetMesh = subMeshes()[subMeshI];
+        const fvMesh& subMesh = subsetMesh.subMesh();
+        const labelList& patchMap = subsetMesh.patchMap();
+        const labelList& faceMap = subsetMesh.faceMap();
+
+        // Find the interface patch for the current subMesh
+        // we should store this!
+
+        label patchID = -1;
+
+        forAll(subMesh.boundaryMesh(), pI)
+        {
+            if (patchMap[pI] == -1)
+            {
+                patchID = pI;
+                break;
+            }
+        }
+
+        if (patchID == -1)
+        {
+            // This sub mesh has not faces on a bi-material interface
+            continue;
+        }
+
+        symmTensorField& resultSigma = interfaceShadowSigma_[subMeshI];
+
+        const labelList& interfaceShadowSubMeshID =
+            this->interfaceShadowSubMeshID()[subMeshI];
+
+        forAll(resultSigma, faceI)
+        {
+            // Check if the face is on a processor
+            if (interfaceShadowSubMeshID[faceI] == -1)
+            {
+                // The base mesh field will now have the patchNeighbourField
+                // values stored on the patch
+
+                // Local patch start
+                const label start = subMesh.boundaryMesh()[patchID].start();
+
+                // Base mesh face ID
+                const label baseFaceID = faceMap[start + faceI];
+
+                // Base mesh patch ID
+                const label basePatchID =
+                    baseMesh().boundaryMesh().whichPatch(baseFaceID);
+
+                // Base patch start
+                const label basePatchStart =
+                    baseMesh().boundaryMesh()[basePatchID].start();
+
+                // Base mesh patch local face ID
+                const label baseLocalFaceID = baseFaceID - basePatchStart;
+
+                // Copy patch neighbour field values into the result field
+                resultSigma[faceI] =
+                    baseSigmaForSyncing.boundaryField()
+                    [
+                        basePatchID
+                    ][baseLocalFaceID];
+            }
+        }
+    }
+}
+
+
+bool Foam::solidSubMeshes::biMaterialInterfaceActive() const
+{
+    if (!biMaterialInterfaceActivePtr_)
+    {
+        calcBiMaterialInterfaceActive();
+    }
+
+    return *biMaterialInterfaceActivePtr_;
+}
+
+
+void Foam::solidSubMeshes::calcBiMaterialInterfaceActive() const
+{
+    if (biMaterialInterfaceActivePtr_)
+    {
+        FatalErrorIn
+        (
+            "void Foam::solidSubMeshes::calcBiMaterialInterfaceActive() const"
+        ) << "pointer already set" << abort(FatalError);
+    }
+
+    biMaterialInterfaceActivePtr_ =
+        new bool(returnReduce(interfaceBaseFaces().size(), maxOp<int>()));
+}
+
+
+void Foam::solidSubMeshes::clearOut()
+{
+    subMeshVolToPoint_.clear();
+    subMeshSigma_.clear();
+    subMeshSigmaf_.clear();
+    subMeshD_.clear();
+    subMeshGradD_.clear();
+    subMeshGradDf_.clear();
+    subMeshPointD_.clear();
+    deleteDemandDrivenData(biMaterialInterfaceActivePtr_);
+    deleteDemandDrivenData(interfaceBaseFacesPtr_);
+    interfaceShadowSubMeshID_.clear();
+    interfaceShadowPatchID_.clear();
+    interfaceShadowFaceID_.clear();
+    interfaceShadowSigma_.clear();
+    deleteDemandDrivenData(pointNumOfMaterialsPtr_);
+    deleteDemandDrivenData(isolatedInterfacePointsPtr_);
+
+    // Make sure to clear the subMeshes after (not before) clearing the subMesh
+    // fields
+    subMeshes_.clear();
+}
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+Foam::solidSubMeshes::solidSubMeshes
+(
+    const fvMesh& baseMesh,
+    const wordList& cellZoneNames,
+    const bool incremental,
+    const bool writeSubMeshes
+)
+:
+    baseMesh_(baseMesh),
+    cellZoneNames_(cellZoneNames),
+    incremental_(incremental),
+    writeSubMeshes_(writeSubMeshes),
+    subMeshes_(),
+    subMeshVolToPoint_(),
+    subMeshSigma_(),
+    subMeshSigmaf_(),
+    subMeshD_(),
+    subMeshGradD_(),
+    subMeshGradDf_(),
+    subMeshPointD_(),
+    biMaterialInterfaceActivePtr_(NULL),
+    interfaceBaseFacesPtr_(NULL),
+    interfaceShadowSubMeshID_(),
+    interfaceShadowPatchID_(),
+    interfaceShadowFaceID_(),
+    interfaceShadowSigma_(),
+    pointNumOfMaterialsPtr_(NULL),
+    isolatedInterfacePointsPtr_(NULL)
+{
+    // Construct the sub-meshes
+    PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
+
+    // Optional: write the sub-meshes to the constant directory
+    if (writeSubMeshes_)
+    {
+        forAll(subMeshes, matI)
+        {
+            Info<< "Writing subMeshes "
+                << subMeshes[matI].subMesh().name() << endl;
+            subMeshes[matI].subMesh().setInstance("constant");
+            subMeshes[matI].subMesh().write();
+        }
+    }
+}
+
+
+// * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
+
+Foam::solidSubMeshes::~solidSubMeshes()
+{
+    clearOut();
+}
+
+
+// * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
+
+const Foam::fvMesh& Foam::solidSubMeshes::baseMesh() const
+{
+    return baseMesh_;
+}
+
+
+const Foam::PtrList<Foam::newFvMeshSubset>&
+Foam::solidSubMeshes::subMeshes() const
+{
+    if (subMeshes_.empty())
+    {
+        makeSubMeshes();
+    }
+
+    return subMeshes_;
+}
+
+
+Foam::PtrList<Foam::newFvMeshSubset>& Foam::solidSubMeshes::subMeshes()
+{
+    if (subMeshes_.empty())
+    {
+        makeSubMeshes();
+    }
+
+    return subMeshes_;
+}
+
+
+const Foam::PtrList<Foam::newLeastSquaresVolPointInterpolation>&
+Foam::solidSubMeshes::subMeshVolToPoint() const
+{
+    if (subMeshVolToPoint_.empty())
+    {
+        makeSubMeshVolToPoint();
+    }
+
+    return subMeshVolToPoint_;
+}
+
+
+Foam::PtrList<Foam::volSymmTensorField>& Foam::solidSubMeshes::subMeshSigma()
+{
+    if (subMeshSigma_.empty())
+    {
+        calcSubMeshSigma();
+    }
+
+    return subMeshSigma_;
+}
+
+
+const Foam::PtrList<Foam::volSymmTensorField>&
+Foam::solidSubMeshes::subMeshSigma() const
+{
+    if (subMeshSigma_.empty())
+    {
+        calcSubMeshSigma();
+    }
+
+    return subMeshSigma_;
+}
+
+
+Foam::PtrList<Foam::surfaceSymmTensorField>&
+Foam::solidSubMeshes::subMeshSigmaf()
+{
+    if (subMeshSigmaf_.empty())
+    {
+        calcSubMeshSigmaf();
+    }
+
+    return subMeshSigmaf_;
+}
+
+
+const Foam::PtrList<Foam::surfaceSymmTensorField>&
+Foam::solidSubMeshes::subMeshSigmaf() const
+{
+    if (subMeshSigmaf_.empty())
+    {
+        calcSubMeshSigmaf();
+    }
+
+    return subMeshSigmaf_;
+}
+
+
+Foam::PtrList<Foam::volVectorField>& Foam::solidSubMeshes::subMeshD()
+{
+    if (subMeshD_.empty())
+    {
+        calcSubMeshD();
+    }
+
+    return subMeshD_;
+}
+
+
+const Foam::PtrList<Foam::volVectorField>&
+Foam::solidSubMeshes::subMeshD() const
+{
+    if (subMeshD_.empty())
+    {
+        calcSubMeshD();
+    }
+
+    return subMeshD_;
+}
+
+
+Foam::PtrList<Foam::volTensorField>& Foam::solidSubMeshes::subMeshGradD()
+{
+    if (subMeshGradD_.empty())
+    {
+        calcSubMeshGradD();
+    }
+
+    return subMeshGradD_;
+}
+
+
+const Foam::PtrList<Foam::volTensorField>&
+Foam::solidSubMeshes::subMeshGradD() const
+{
+    if (subMeshGradD_.empty())
+    {
+        calcSubMeshGradD();
+    }
+
+    return subMeshGradD_;
+}
+
+
+Foam::PtrList<Foam::surfaceTensorField>& Foam::solidSubMeshes::subMeshGradDf()
+{
+    if (subMeshGradDf_.empty())
+    {
+        calcSubMeshGradDf();
+    }
+
+    return subMeshGradDf_;
+}
+
+
+const Foam::PtrList<Foam::surfaceTensorField>&
+Foam::solidSubMeshes::subMeshGradDf() const
+{
+    if (subMeshGradDf_.empty())
+    {
+        calcSubMeshGradDf();
+    }
+
+    return subMeshGradDf_;
+}
+
+
+Foam::PtrList<Foam::pointVectorField>& Foam::solidSubMeshes::subMeshPointD()
+{
+    if (subMeshPointD_.empty())
+    {
+        calcSubMeshPointD();
+    }
+
+    return subMeshPointD_;
+}
+
+
+const Foam::PtrList<Foam::pointVectorField>&
+Foam::solidSubMeshes::subMeshPointD() const
+{
+    if (subMeshPointD_.empty())
+    {
+        calcSubMeshPointD();
+    }
+
+    return subMeshPointD_;
 }
 
 
@@ -1689,409 +2101,6 @@ void Foam::solidSubMeshes::correctBoundarySnGradf
             patchGradDf += n*(correctedSnGrad - (n & patchGradDf));
         }
     }
-}
-
-
-const Foam::PtrList<Foam::symmTensorField>&
-Foam::solidSubMeshes::interfaceShadowSigma() const
-{
-    if (interfaceShadowSigma_.empty())
-    {
-        makeInterfaceShadowSigma();
-    }
-
-    return interfaceShadowSigma_;
-}
-
-
-void Foam::solidSubMeshes::makeInterfaceShadowSigma() const
-{
-    if (!interfaceShadowSigma_.empty())
-    {
-        FatalErrorIn
-        (
-            "void Foam::solidSubMeshes::makeInterfaceShadowSigma() const"
-        ) << "pointer already set" << abort(FatalError);
-    }
-
-    interfaceShadowSigma_.setSize(subMeshes().size());
-
-    // Set values for each subMesh
-    forAll(subMeshes(), subMeshI)
-    {
-        const newFvMeshSubset& subsetMesh = subMeshes()[subMeshI];
-        const fvMesh& subMesh = subsetMesh.subMesh();
-        const labelList& patchMap = subsetMesh.patchMap();
-
-        // Find the interface patch for the current subMesh
-        // we should store this!
-
-        label patchID = -1;
-
-        forAll(subMesh.boundaryMesh(), pI)
-        {
-            if (patchMap[pI] == -1)
-            {
-                patchID = pI;
-                break;
-            }
-        }
-
-        if (patchID == -1)
-        {
-            // Note: if patchID is still -1, it means that this subMesh does not
-            // have any faces on an bi-material interface
-            interfaceShadowSigma_.set(subMeshI, new symmTensorField(0));
-        }
-        else
-        {
-            interfaceShadowSigma_.set
-            (
-                subMeshI,
-                new symmTensorField
-                (
-                    subMesh.boundaryMesh()[patchID].size(),
-                    symmTensor::zero
-                )
-            );
-        }
-    }
-}
-
-
-void Foam::solidSubMeshes::updateInterfaceShadowSigma
-(
-    const bool useVolFieldSigma
-)
-{
-    if (interfaceShadowSigma_.empty())
-    {
-        makeInterfaceShadowSigma();
-    }
-
-    // Field used for syncing the processor patch values
-    volSymmTensorField baseSigmaForSyncing
-    (
-        IOobject
-        (
-            "baseSigmaForSyncing",
-            baseMesh().time().timeName(),
-            baseMesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        baseMesh(),
-        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
-    );
-
-    // Set values for each subMesh
-    forAll(subMeshes(), subMeshI)
-    {
-        const newFvMeshSubset& subsetMesh = subMeshes()[subMeshI];
-        const fvMesh& subMesh = subsetMesh.subMesh();
-        const labelList& patchMap = subsetMesh.patchMap();
-        const labelList& faceMap = subsetMesh.faceMap();
-
-        // Find the interface patch for the current subMesh
-        // we should store this!
-
-        label patchID = -1;
-
-        forAll(subMesh.boundaryMesh(), pI)
-        {
-            if (patchMap[pI] == -1)
-            {
-                patchID = pI;
-                break;
-            }
-        }
-
-        if (patchID == -1)
-        {
-            // This sub mesh has not faces on a bi-material interface
-            continue;
-        }
-
-        symmTensorField& resultSigma = interfaceShadowSigma_[subMeshI];
-
-        const labelList& interfaceShadowSubMeshID =
-            this->interfaceShadowSubMeshID()[subMeshI];
-        const labelList& interfaceShadowPatchID =
-            this->interfaceShadowPatchID()[subMeshI];
-        const labelList& interfaceShadowFaceID =
-            this->interfaceShadowFaceID()[subMeshI];
-
-        // Assemble the shadow stress for each face
-        forAll(resultSigma, faceI)
-        {
-            // Check if the face is not on a processor
-            if (interfaceShadowSubMeshID[faceI] != -1)
-            {
-                // ID of the subMesh on the other side of interface
-                const label shadowSubMeshID = interfaceShadowSubMeshID[faceI];
-
-                // ID of the subMesh patch on the other side of interface
-                const label shadowPatchID = interfaceShadowPatchID[faceI];
-
-                // ID of the subMesh patch face on the other side of interface
-                const label shadowFaceID = interfaceShadowFaceID[faceI];
-
-                // Stress calculated at the other side of the interface
-                if (useVolFieldSigma)
-                {
-                    resultSigma[faceI] =
-                        subMeshSigma()
-                        [
-                            shadowSubMeshID
-                        ].boundaryField()[shadowPatchID][shadowFaceID];
-                }
-                else
-                {
-                    resultSigma[faceI] =
-                        subMeshSigmaf()
-                        [
-                            shadowSubMeshID
-                        ].boundaryField()[shadowPatchID][shadowFaceID];
-                }
-            }
-            else
-            {
-                // Base face is on a processor boundary
-
-                // Local patch start
-                const label start = subMesh.boundaryMesh()[patchID].start();
-
-                // Base mesh face ID
-                const label baseFaceID = faceMap[start + faceI];
-
-                // Base mesh patch ID
-                const label basePatchID =
-                    baseMesh().boundaryMesh().whichPatch(baseFaceID);
-
-                // Base patch start
-                const label basePatchStart =
-                    baseMesh().boundaryMesh()[basePatchID].start();
-
-                // Base mesh patch local face ID
-                const label baseLocalFaceID = baseFaceID - basePatchStart;
-
-                // Base mesh patch faceCells
-                const unallocLabelList& faceCells =
-                    baseMesh().boundaryMesh()[basePatchID].faceCells();
-
-                // Store local stress on the baseMesh proc patch in the patch
-                // internal field
-                if (useVolFieldSigma)
-                {
-                    baseSigmaForSyncing.internalField()
-                        [
-                            faceCells[baseLocalFaceID]
-                        ]
-                      = subMeshSigma()
-                        [
-                            subMeshI
-                        ].boundaryField()[patchID][faceI];
-                }
-                else
-                {
-                    baseSigmaForSyncing.internalField()
-                        [
-                            faceCells[baseLocalFaceID]
-                        ] = subMeshSigmaf()
-                        [
-                            subMeshI
-                        ].boundaryField()[patchID][faceI];
-                }
-            }
-        }
-    }
-
-    // Sync base mesh processor patches
-    // This will pass the patch internal field and store it on the neighbour
-    // patch
-    baseSigmaForSyncing.correctBoundaryConditions();
-
-    // Assemble processor values that have been synced
-    forAll(subMeshes(), subMeshI)
-    {
-        const newFvMeshSubset& subsetMesh = subMeshes()[subMeshI];
-        const fvMesh& subMesh = subsetMesh.subMesh();
-        const labelList& patchMap = subsetMesh.patchMap();
-        const labelList& faceMap = subsetMesh.faceMap();
-
-        // Find the interface patch for the current subMesh
-        // we should store this!
-
-        label patchID = -1;
-
-        forAll(subMesh.boundaryMesh(), pI)
-        {
-            if (patchMap[pI] == -1)
-            {
-                patchID = pI;
-                break;
-            }
-        }
-
-        if (patchID == -1)
-        {
-            // This sub mesh has not faces on a bi-material interface
-            continue;
-        }
-
-        symmTensorField& resultSigma = interfaceShadowSigma_[subMeshI];
-
-        const labelList& interfaceShadowSubMeshID =
-            this->interfaceShadowSubMeshID()[subMeshI];
-
-        forAll(resultSigma, faceI)
-        {
-            // Check if the face is on a processor
-            if (interfaceShadowSubMeshID[faceI] == -1)
-            {
-                // The base mesh field will now have the patchNeighbourField
-                // values stored on the patch
-
-                // Local patch start
-                const label start = subMesh.boundaryMesh()[patchID].start();
-
-                // Base mesh face ID
-                const label baseFaceID = faceMap[start + faceI];
-
-                // Base mesh patch ID
-                const label basePatchID =
-                    baseMesh().boundaryMesh().whichPatch(baseFaceID);
-
-                // Base patch start
-                const label basePatchStart =
-                    baseMesh().boundaryMesh()[basePatchID].start();
-
-                // Base mesh patch local face ID
-                const label baseLocalFaceID = baseFaceID - basePatchStart;
-
-                // Copy patch neighbour field values into the result field
-                resultSigma[faceI] =
-                    baseSigmaForSyncing.boundaryField()
-                    [
-                        basePatchID
-                    ][baseLocalFaceID];
-            }
-        }
-    }
-}
-
-
-bool Foam::solidSubMeshes::biMaterialInterfaceActive() const
-{
-    if (!biMaterialInterfaceActivePtr_)
-    {
-        calcBiMaterialInterfaceActive();
-    }
-
-    return *biMaterialInterfaceActivePtr_;
-}
-
-
-void Foam::solidSubMeshes::calcBiMaterialInterfaceActive() const
-{
-    if (biMaterialInterfaceActivePtr_)
-    {
-        FatalErrorIn
-        (
-            "void Foam::solidSubMeshes::calcBiMaterialInterfaceActive() const"
-        ) << "pointer already set" << abort(FatalError);
-    }
-
-    biMaterialInterfaceActivePtr_ =
-        new bool(returnReduce(interfaceBaseFaces().size(), maxOp<int>()));
-}
-
-
-void Foam::solidSubMeshes::clearOut()
-{
-    subMeshVolToPoint_.clear();
-    subMeshSigma_.clear();
-    subMeshSigmaf_.clear();
-    subMeshD_.clear();
-    subMeshGradD_.clear();
-    subMeshGradDf_.clear();
-    subMeshPointD_.clear();
-    deleteDemandDrivenData(biMaterialInterfaceActivePtr_);
-    deleteDemandDrivenData(interfaceBaseFacesPtr_);
-    interfaceShadowSubMeshID_.clear();
-    interfaceShadowPatchID_.clear();
-    interfaceShadowFaceID_.clear();
-    interfaceShadowSigma_.clear();
-    deleteDemandDrivenData(pointNumOfMaterialsPtr_);
-    deleteDemandDrivenData(isolatedInterfacePointsPtr_);
-
-    // Make sure to clear the subMeshes after (not before) clearing the subMesh
-    // fields
-    subMeshes_.clear();
-}
-
-
-// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
-
-Foam::solidSubMeshes::solidSubMeshes
-(
-    const fvMesh& baseMesh,
-    const wordList& cellZoneNames,
-    const bool incremental,
-    const bool writeSubMeshes
-)
-:
-    baseMesh_(baseMesh),
-    cellZoneNames_(cellZoneNames),
-    incremental_(incremental),
-    writeSubMeshes_(writeSubMeshes),
-    subMeshes_(),
-    subMeshVolToPoint_(),
-    subMeshSigma_(),
-    subMeshSigmaf_(),
-    subMeshD_(),
-    subMeshGradD_(),
-    subMeshGradDf_(),
-    subMeshPointD_(),
-    biMaterialInterfaceActivePtr_(NULL),
-    interfaceBaseFacesPtr_(NULL),
-    interfaceShadowSubMeshID_(),
-    interfaceShadowPatchID_(),
-    interfaceShadowFaceID_(),
-    interfaceShadowSigma_(),
-    pointNumOfMaterialsPtr_(NULL),
-    isolatedInterfacePointsPtr_(NULL)
-{
-    // Construct the sub-meshes
-    PtrList<newFvMeshSubset>& subMeshes = this->subMeshes();
-
-    // Optional: write the sub-meshes to the constant directory
-    if (writeSubMeshes_)
-    {
-        forAll(subMeshes, matI)
-        {
-            Info<< "Writing subMeshes "
-                << subMeshes[matI].subMesh().name() << endl;
-            subMeshes[matI].subMesh().setInstance("constant");
-            subMeshes[matI].subMesh().write();
-        }
-    }
-}
-
-
-// * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
-
-Foam::solidSubMeshes::~solidSubMeshes()
-{
-    clearOut();
-}
-
-
-// * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
-
-const Foam::fvMesh& Foam::solidSubMeshes::baseMesh() const
-{
-    return baseMesh_;
 }
 
 

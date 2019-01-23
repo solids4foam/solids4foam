@@ -492,4 +492,135 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
     }
 }
 
+
+// * * * * * * * * * * * * * Public Member Functions * * * * * * * * * * * * //
+
+
+template<class Type>
+Foam::tmp< Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh> >
+Foam::solidSubMeshes::lookupBaseMeshVolField
+(
+    const word& fieldName,
+    const fvMesh& subMesh
+) const
+{
+    // Lookup the field from the base mesh
+    const GeometricField<Type, fvPatchField, volMesh>& baseField =
+        baseMesh().lookupObject< GeometricField<Type, fvPatchField, volMesh> >
+        (
+            fieldName
+        );
+
+    if (baseMesh().name() == subMesh.name())
+    {
+        // If the subMesh is the baseMesh then return the baseField
+        return
+            tmp< GeometricField<Type, fvPatchField, volMesh> >
+            (
+                new GeometricField<Type, fvPatchField, volMesh>
+                (
+                    fieldName + "_copy", baseField
+                )
+            );
+    }
+    else
+    {
+        // Find the fvMeshSubset corresponding to subMesh
+        label curSubMeshID = -1;
+        forAll(subMeshes(), meshI)
+        {
+            if (subMeshes()[meshI].subMesh().name() == subMesh.name())
+            {
+                curSubMeshID = meshI;
+                break;
+            }
+        }
+
+        if (curSubMeshID == -1)
+        {
+            FatalErrorIn
+                (
+                    "template<class Type>\n"
+                    "Foam::tmp< Foam::GeometricField"
+                    "<Type, Foam::fvPatchField, Foam::volMesh> >\n"
+                    "Foam::solidSubMeshes::lookupBaseMeshVolField\n"
+                    "(\n"
+                    "    const word& fieldName,\n"
+                    "    const fvMesh& subMesh\n"
+                    ") const"
+                )   << "SubMesh not found when looking for a field in the base "
+                    << "mesh" << abort(FatalError);
+        }
+
+        // Return the baseField interpolated to the subMesh
+        return subMeshes()[curSubMeshID].interpolate(baseField);
+    }
+}
+
+
+template<class Type>
+Foam::tmp< Foam::GeometricField<Type, Foam::fvsPatchField, Foam::surfaceMesh> >
+Foam::solidSubMeshes::lookupBaseMeshSurfaceField
+(
+    const word& fieldName,
+    const fvMesh& subMesh
+) const
+{
+    // Lookup the field from the base mesh
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& baseField =
+        baseMesh().lookupObject
+        <
+            GeometricField<Type, fvsPatchField, surfaceMesh>
+        >
+        (
+            fieldName
+        );
+
+    if (baseMesh().name() == subMesh.name())
+    {
+        // If the subMesh is the baseMesh then return the baseField
+        return
+            tmp< GeometricField<Type, fvsPatchField, surfaceMesh> >
+            (
+                new GeometricField<Type, fvsPatchField, surfaceMesh>
+                (
+                    fieldName + "_copy", baseField
+                )
+            );
+    }
+    else
+    {
+        // Find the fvMeshSubset corresponding to subMesh
+        label curSubMeshID = -1;
+        forAll(subMeshes(), meshI)
+        {
+            if (subMeshes()[meshI].subMesh().name() == subMesh.name())
+            {
+                curSubMeshID = meshI;
+                break;
+            }
+        }
+
+        if (curSubMeshID == -1)
+        {
+            FatalErrorIn
+                (
+                    "template<class Type>\n"
+                    "Foam::tmp< Foam::GeometricField"
+                    "<Type, Foam::fvsPatchField, Foam::surfaceMesh> >\n"
+                    "Foam::solidSubMeshes::lookupBaseMeshSurfaceField\n"
+                    "(\n"
+                    "    const word& fieldName,\n"
+                    "    const fvMesh& subMesh\n"
+                    ") const"
+                )   << "SubMesh not found when looking for a field in the base "
+                    << "mesh" << abort(FatalError);
+        }
+
+        // Return the baseField interpolated to the subMesh
+        return subMeshes()[curSubMeshID].interpolate(baseField);
+    }
+}
+
+
 // ************************************************************************* //
