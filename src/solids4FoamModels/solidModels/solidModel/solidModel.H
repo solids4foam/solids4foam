@@ -253,6 +253,10 @@ protected:
         //- Return non-const reference to the density
         volScalarField& rho();
 
+        //- Optional: cells can be forced to a specified displacement in the
+        //  linear system
+        void setCellDisplacements(fvVectorMatrix& DEqn);
+
         //- Apply fixed or Aitken's adaptive under-relaxation to the field
         void relaxField(volVectorField& D, int iCorr);
 
