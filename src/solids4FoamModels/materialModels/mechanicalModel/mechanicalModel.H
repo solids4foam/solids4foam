@@ -87,10 +87,6 @@ class mechanicalModel
         //- Sub-meshes for each mechanicalLaw
         mutable autoPtr<solidSubMeshes> solSubMeshes_;
 
-        // //- Sub-mesh for each material
-        // //  Not used if there is only one material
-        // mutable PtrList<newFvMeshSubset> subMeshes_;
-
         //- Volume field to point field interpolator for the base mesh
         mutable newLeastSquaresVolPointInterpolation* volToPointPtr_;
 
