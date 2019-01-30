@@ -1,0 +1,125 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  1.5                                   |
+|   \\  /    A nd           | Web:      http://www.OpenFOAM.org               |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+/*    pcorr PCG
+    {
+        preconditioner   DIC;
+        tolerance        1e-10;
+        relTol           0;
+    };
+    pd PCG
+    {
+        preconditioner   DIC;
+        tolerance        1e-7;
+        relTol           0.001;
+    };
+    pdFinal PCG
+    {
+        preconditioner   DIC;
+        tolerance        1e-7;
+        relTol           0;
+    };*/
+
+    pcorr GAMG
+    {
+        tolerance        1e-7;
+        relTol           0.0;
+
+        smoother         DIC;//GaussSeidel;
+        nPreSweeps       0;
+        nPostSweeps      2;
+        nFinestSweeps    2;
+
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 10;
+        agglomerator     faceAreaPair;
+        mergeLevels      1;
+    };
+
+    pd GAMG
+    {
+        tolerance        1e-7;
+        relTol           0.0;
+
+        smoother         DIC;//GaussSeidel;
+        nPreSweeps       0;
+        nPostSweeps      2;
+        nFinestSweeps    2;
+
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 10;
+        agglomerator     faceAreaPair;
+        mergeLevels      1;
+    };
+
+    pdFinal GAMG
+    {
+        tolerance        1e-8;
+        relTol           0.0;
+
+        smoother         DIC;//GaussSeidel;
+        nPreSweeps       0;
+        nPostSweeps      2;
+        nFinestSweeps    2;
+
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 10;
+        agglomerator     faceAreaPair;
+        mergeLevels      1;
+    };
+
+    U PBiCG
+    {
+        preconditioner   DILU;
+        tolerance        1e-09;
+        relTol           0;
+    };
+
+    UFinal PBiCG
+    {
+        preconditioner   DILU;
+        tolerance        1e-09;
+        relTol           0;
+    };
+
+    gamma PBiCG
+    {
+        preconditioner   DILU;
+        tolerance        1e-07;
+        relTol           0;
+    };
+}
+
+PISO
+{
+    cAlpha          1;
+}
+
+PIMPLE
+{
+    pdRefCell 0;
+    pdRefValue 0;
+    momentumPredictor yes;
+    nOuterCorrectors 1; 
+    nCorrectors     3;
+    nNonOrthogonalCorrectors 1;
+    nAlphaCorr      1;
+    nAlphaSubCycles 1;
+}
+
+// ************************************************************************* //
