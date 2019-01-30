@@ -1,0 +1,55 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       pointVectorField;
+    object      pointMotionU;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    interface
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    inlet
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    right
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    bottom
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    atmosphere
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    defaultFaces
+    {
+        type            empty;
+    }
+}
+
+
+// ************************************************************************* //
