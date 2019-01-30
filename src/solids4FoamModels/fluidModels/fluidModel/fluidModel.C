@@ -452,16 +452,19 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
         "g", mesh().time().constant(), mesh(), IOobject::MUST_READ
     );
 
+    if (wavePropertiesHeader.headerOk() && !gHeader.headerOk())
+    {
+        FatalErrorIn(type() + "::readG() const")
+            << "g field not found in the constant directory: the g field "
+            << "must be specified when the waveProperties dictionary is "
+            << "present!" << abort(FatalError);
+    }
+
+    // The if-else-if structure is broken to keep the compiler happy with the
+    // lack of a return statement above
+
     if (wavePropertiesHeader.headerOk() || gHeader.headerOk())
     {
-        if (!gHeader.headerOk())
-        {
-            FatalErrorIn(type() + "::readG() const")
-                << "g field not found in the constant directory: the g field "
-                << "must be specified when the waveProperties dictionary is "
-                << "present!" << abort(FatalError);
-        }
-
         Info<< "Reading g from constant directory" << endl;
         return uniformDimensionedVectorField
         (
