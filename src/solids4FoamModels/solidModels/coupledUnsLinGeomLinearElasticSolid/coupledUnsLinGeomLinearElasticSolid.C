@@ -127,6 +127,8 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
 {
     writeBanner(Info);
 
+    DisRequired();
+
     // We will directly read the linearElastic mechanicalLaw
     const PtrList<mechanicalLaw>& mechLaws = mechanical();
     if (mechLaws.size() != 1)

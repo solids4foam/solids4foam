@@ -106,7 +106,9 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid
     rImpK_(1.0/impK_),
     muf_("muf", impKf_/3.5), // assuming a Poisson's ratio of 0.3
     lambdaf_("lambdaf", 1.5*muf_)
-{}
+{
+    DisRequired();
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

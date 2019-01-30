@@ -106,7 +106,9 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_)
-{}
+{
+    DDisRequired();
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

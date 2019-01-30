@@ -421,6 +421,28 @@ void Foam::solidModel::calcGlobalToLocalFaceZonePointMap() const
 }
 
 
+void Foam::solidModel::DisRequired()
+{
+    if (!Dheader_.headerOk())
+    {
+        FatalErrorIn(type() + "::DisRequired()")
+            << "This solidModel requires the 'D' field to be specified!"
+            << abort(FatalError);
+    }
+}
+
+
+void Foam::solidModel::DDisRequired()
+{
+    if (!DDheader_.headerOk())
+    {
+        FatalErrorIn(type() + "::DDisRequired()")
+            << "This solidModel requires the 'DD' field to be specified!"
+            << abort(FatalError);
+    }
+}
+
+
 void Foam::solidModel::updateGlobalFaceZoneNewPoints
 (
     const pointField& pointDDI,
@@ -608,6 +630,7 @@ Foam::volScalarField& Foam::solidModel::rho()
 
     return rhoPtr_();
 }
+
 
 void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 {
@@ -1029,6 +1052,8 @@ Foam::solidModel::solidModel
     type_(type),
     thermalPtr_(NULL),
     mechanicalPtr_(NULL),
+    Dheader_("D", runTime.timeName(), mesh(), IOobject::MUST_READ),
+    DDheader_("DD", runTime.timeName(), mesh(), IOobject::MUST_READ),
     D_
     (
         IOobject
@@ -1244,23 +1269,6 @@ Foam::solidModel::solidModel
     gradD_.oldTime();
     gradDD_.oldTime();
     sigma_.oldTime();
-
-    // Check that at least one of D or DD were read from file
-    if
-    (
-       !IOobject
-        (
-            "D", runTime.timeName(), mesh(), IOobject::MUST_READ
-        ).headerOk()
-    && !IOobject
-        (
-            "DD", runTime.timeName(), mesh(), IOobject::MUST_READ
-        ).headerOk()
-    )
-    {
-        FatalErrorIn("solidModel::solidModel(...)")
-            << "Either D or DD should be specified!" << abort(FatalError);
-    }
 
     // Print out the relaxation factor
     Info<< "    under-relaxation method: " << relaxationMethod_ << endl;

@@ -23,7 +23,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "mechanicalModel.H"
+#include "solidSubMeshes.H"
 #include "processorFvsPatchField.H"
 #include "processorPointPatchFields.H"
 #include "componentMixedPointPatchFields.H"
@@ -31,7 +31,7 @@ License
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 template<class Type>
-void Foam::mechanicalModel::mapSubMeshVolFields
+void Foam::solidSubMeshes::mapSubMeshVolFields
 (
     const PtrList<GeometricField<Type, fvPatchField, volMesh> >& subMeshFields,
     GeometricField<Type, fvPatchField, volMesh>& baseMeshField
@@ -77,7 +77,7 @@ void Foam::mechanicalModel::mapSubMeshVolFields
 
                         const label curGlobalMeshPatchFace =
                             globalGlobalMeshFace
-                          - mesh().boundaryMesh()[patchMap[patchI]].start();
+                          - baseMesh().boundaryMesh()[patchMap[patchI]].start();
 
                         baseMeshFieldP[curGlobalMeshPatchFace] =
                             subMeshFieldP[faceI];
@@ -92,7 +92,7 @@ void Foam::mechanicalModel::mapSubMeshVolFields
 
 
 template<class Type>
-void Foam::mechanicalModel::mapSubMeshSurfaceFields
+void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 (
     const PtrList<GeometricField<Type, fvsPatchField, surfaceMesh> >&
         subMeshFields,
@@ -144,7 +144,7 @@ void Foam::mechanicalModel::mapSubMeshSurfaceFields
 
                     const label curGlobalMeshPatchFace =
                         globalGlobalMeshFace
-                        - mesh().boundaryMesh()[patchMap[patchI]].start();
+                        - baseMesh().boundaryMesh()[patchMap[patchI]].start();
 
                     baseMeshFieldP[curGlobalMeshPatchFace] =
                         subMeshFieldP[faceI];
@@ -156,7 +156,7 @@ void Foam::mechanicalModel::mapSubMeshSurfaceFields
                 {
                     const label globalGlobalMeshFace = faceMap[start + faceI];
 
-                    if (globalGlobalMeshFace < mesh().nInternalFaces())
+                    if (globalGlobalMeshFace < baseMesh().nInternalFaces())
                     {
                         // Face value will be the average from both sides
                         baseMeshField[globalGlobalMeshFace] +=
@@ -165,14 +165,14 @@ void Foam::mechanicalModel::mapSubMeshSurfaceFields
                     else
                     {
                         const label curPatch =
-                            mesh().boundaryMesh().whichPatch
+                            baseMesh().boundaryMesh().whichPatch
                             (
                                 globalGlobalMeshFace
                             );
 
                         const label curPatchFace =
                             globalGlobalMeshFace
-                            - mesh().boundaryMesh()[curPatch].start();
+                            - baseMesh().boundaryMesh()[curPatch].start();
 
                         baseMeshField.boundaryField()[curPatch][curPatchFace] =
                             subMeshFieldP[faceI];
@@ -197,7 +197,7 @@ void Foam::mechanicalModel::mapSubMeshSurfaceFields
             const processorPolyPatch& procPatch =
                 refCast<const processorPolyPatch>
                 (
-                    mesh().boundaryMesh()[patchI]
+                    baseMesh().boundaryMesh()[patchI]
                 );
 
             OPstream::write
@@ -220,7 +220,7 @@ void Foam::mechanicalModel::mapSubMeshSurfaceFields
             const processorPolyPatch& procPatch =
                 refCast<const processorPolyPatch>
                 (
-                    mesh().boundaryMesh()[patchI]
+                    baseMesh().boundaryMesh()[patchI]
                 );
 
             Field<Type> ngbPatchField(procPatch.size(), pTraits<Type>::zero);
@@ -242,7 +242,7 @@ void Foam::mechanicalModel::mapSubMeshSurfaceFields
 
 
 template<class Type>
-void Foam::mechanicalModel::mapSubMeshPointFields
+void Foam::solidSubMeshes::mapSubMeshPointFields
 (
     const PtrList<GeometricField<Type, pointPatchField, pointMesh> >&
         subMeshFields,
@@ -261,9 +261,9 @@ void Foam::mechanicalModel::mapSubMeshPointFields
 
     // Global point addressing
     const labelList& spLabels =
-        mesh().globalData().sharedPointLabels();
+        baseMesh().globalData().sharedPointLabels();
     const labelList& spAddressing =
-        mesh().globalData().sharedPointAddr();
+        baseMesh().globalData().sharedPointAddr();
 
     // Global point data
     List< List< Map<vector> > > glData(Pstream::nProcs());
@@ -272,7 +272,7 @@ void Foam::mechanicalModel::mapSubMeshPointFields
         glData[procI] =
             List< Map<vector> >
             (
-                mesh().globalData().nGlobalPoints(),
+                baseMesh().globalData().nGlobalPoints(),
                 Map<vector>()
             );
     }
@@ -309,7 +309,7 @@ void Foam::mechanicalModel::mapSubMeshPointFields
     Pstream::gatherList(glData);
     Pstream::scatterList(glData);
 
-    const int nGlobalPoints = mesh().globalData().nGlobalPoints();
+    const int nGlobalPoints = baseMesh().globalData().nGlobalPoints();
 
     if (nGlobalPoints)
     {
@@ -384,7 +384,7 @@ void Foam::mechanicalModel::mapSubMeshPointFields
                     const processorPolyPatch& procPatch =
                         refCast<const processorPolyPatch>
                         (
-                            mesh().boundaryMesh()[patchI]
+                            baseMesh().boundaryMesh()[patchI]
                         );
 
                     vectorField pif =
@@ -423,7 +423,7 @@ void Foam::mechanicalModel::mapSubMeshPointFields
                     const processorPolyPatch& procPatch =
                         refCast<const processorPolyPatch>
                         (
-                            mesh().boundaryMesh()[patchI]
+                            baseMesh().boundaryMesh()[patchI]
                         );
 
                     tmp<vectorField> tNgbProcPatchDispl
@@ -442,7 +442,7 @@ void Foam::mechanicalModel::mapSubMeshPointFields
 
                     const labelList& isoInterfacePoints =
                         isolatedInterfacePoints();
-                    const labelListList& pointFaces = mesh().pointFaces();
+                    const labelListList& pointFaces = baseMesh().pointFaces();
 
                     forAll(isoInterfacePoints, pI)
                     {
@@ -454,12 +454,12 @@ void Foam::mechanicalModel::mapSubMeshPointFields
                         {
                             const label faceID = curPointFaces[fI];
                             const label patchID =
-                                mesh().boundaryMesh().whichPatch(faceID);
+                                baseMesh().boundaryMesh().whichPatch(faceID);
 
                             if (patchID == patchI)
                             {
                                 const label curPatchPoint =
-                                    mesh().boundaryMesh()
+                                    baseMesh().boundaryMesh()
                                     [
                                         patchI
                                     ].meshPointMap()[curPoint];
@@ -495,9 +495,10 @@ void Foam::mechanicalModel::mapSubMeshPointFields
 
 // * * * * * * * * * * * * * Public Member Functions * * * * * * * * * * * * //
 
+
 template<class Type>
 Foam::tmp< Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh> >
-Foam::mechanicalModel::lookupBaseMeshVolField
+Foam::solidSubMeshes::lookupBaseMeshVolField
 (
     const word& fieldName,
     const fvMesh& subMesh
@@ -505,12 +506,12 @@ Foam::mechanicalModel::lookupBaseMeshVolField
 {
     // Lookup the field from the base mesh
     const GeometricField<Type, fvPatchField, volMesh>& baseField =
-        mesh().lookupObject< GeometricField<Type, fvPatchField, volMesh> >
+        baseMesh().lookupObject< GeometricField<Type, fvPatchField, volMesh> >
         (
             fieldName
         );
 
-    if (mesh().name() == subMesh.name())
+    if (baseMesh().name() == subMesh.name())
     {
         // If the subMesh is the baseMesh then return the baseField
         return
@@ -542,7 +543,7 @@ Foam::mechanicalModel::lookupBaseMeshVolField
                     "template<class Type>\n"
                     "Foam::tmp< Foam::GeometricField"
                     "<Type, Foam::fvPatchField, Foam::volMesh> >\n"
-                    "Foam::mechanicalModel::lookupBaseMeshVolField\n"
+                    "Foam::solidSubMeshes::lookupBaseMeshVolField\n"
                     "(\n"
                     "    const word& fieldName,\n"
                     "    const fvMesh& subMesh\n"
@@ -559,7 +560,7 @@ Foam::mechanicalModel::lookupBaseMeshVolField
 
 template<class Type>
 Foam::tmp< Foam::GeometricField<Type, Foam::fvsPatchField, Foam::surfaceMesh> >
-Foam::mechanicalModel::lookupBaseMeshSurfaceField
+Foam::solidSubMeshes::lookupBaseMeshSurfaceField
 (
     const word& fieldName,
     const fvMesh& subMesh
@@ -567,12 +568,15 @@ Foam::mechanicalModel::lookupBaseMeshSurfaceField
 {
     // Lookup the field from the base mesh
     const GeometricField<Type, fvsPatchField, surfaceMesh>& baseField =
-        mesh().lookupObject< GeometricField<Type, fvsPatchField, surfaceMesh> >
+        baseMesh().lookupObject
+        <
+            GeometricField<Type, fvsPatchField, surfaceMesh>
+        >
         (
             fieldName
         );
 
-    if (mesh().name() == subMesh.name())
+    if (baseMesh().name() == subMesh.name())
     {
         // If the subMesh is the baseMesh then return the baseField
         return
@@ -604,7 +608,7 @@ Foam::mechanicalModel::lookupBaseMeshSurfaceField
                     "template<class Type>\n"
                     "Foam::tmp< Foam::GeometricField"
                     "<Type, Foam::fvsPatchField, Foam::surfaceMesh> >\n"
-                    "Foam::mechanicalModel::lookupBaseMeshSurfaceField\n"
+                    "Foam::solidSubMeshes::lookupBaseMeshSurfaceField\n"
                     "(\n"
                     "    const word& fieldName,\n"
                     "    const fvMesh& subMesh\n"
