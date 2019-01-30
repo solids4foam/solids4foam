@@ -434,6 +434,66 @@ void Foam::fluidModel::boundPU
     }
 }
 
+Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
+{
+    // Note: READ_IF_PRESENT is incorreclty implemented within the
+    // uniformDimensionedField constructor so we will use a work-around here
+
+    // Check if waveProperties was read from disk; if so, then g must be read
+    // from disk
+    IOobject wavePropertiesHeader
+    (
+        "waveProperties", mesh().time().constant(), mesh(), IOobject::MUST_READ
+    );
+
+    // Check if g exists on disk
+    IOobject gHeader
+    (
+        "g", mesh().time().constant(), mesh(), IOobject::MUST_READ
+    );
+
+    if (wavePropertiesHeader.headerOk() || gHeader.headerOk())
+    {
+        if (!gHeader.headerOk())
+        {
+            FatalErrorIn(type() + "::readG() const")
+                << "g field not found in the constant directory: the g field "
+                << "must be specified when the waveProperties dictionary is "
+                << "present!" << abort(FatalError);
+        }
+
+        Info<< "Reading g from constant directory" << endl;
+        return uniformDimensionedVectorField
+        (
+            IOobject
+            (
+                "g",
+                mesh().time().constant(),
+                mesh(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+    }
+    else
+    {
+        Info<< "g field not found in constant directory: initialising to zero"
+            << endl;
+        return uniformDimensionedVectorField
+        (
+            IOobject
+            (
+                "g",
+                mesh().time().constant(),
+                mesh(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            ),
+            dimensionedVector("zero", dimAcceleration, vector::zero)
+        );
+    }
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -478,6 +538,20 @@ Foam::fluidModel::fluidModel
     pimplePtr_(),
     globalFaceZonesPtr_(NULL),
     globalToLocalFaceZonePointMapPtr_(NULL),
+    waveProperties_
+    (
+        IOobject
+        (
+            "waveProperties",
+            runTime.constant(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        )
+    ),
+    g_(readG()),
+    Uheader_("U", runTime.timeName(), mesh(), IOobject::MUST_READ),
+    pheader_("p", runTime.timeName(), mesh(), IOobject::MUST_READ),
     U_
     (
         IOobject
@@ -485,10 +559,11 @@ Foam::fluidModel::fluidModel
             "U",
             runTime.timeName(),
             mesh(),
-            IOobject::MUST_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh()
+        mesh(),
+        dimensionedVector("zero", dimVelocity, vector::zero)
     ),
     p_
     (
@@ -497,10 +572,11 @@ Foam::fluidModel::fluidModel
             "p",
             runTime.timeName(),
             mesh(),
-            IOobject::MUST_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh()
+        mesh(),
+        dimensionedScalar("zero", dimPressure, 0.0)
     ),
     gradU_(fvc::grad(U_)),
     gradp_(fvc::grad(p_)),
@@ -528,9 +604,9 @@ Foam::fluidModel::fluidModel
     (
         runTime.controlDict().lookupOrDefault<scalar>("maxDeltaT", GREAT)
     ),
-    pMin_("pMin", p().dimensions(), 0),
-    pMax_("pMax", p().dimensions(), 0),
-    UMax_("UMax", U().dimensions(), 0),
+    pMin_("pMin", p_.dimensions(), 0),
+    pMax_("pMax", p_.dimensions(), 0),
+    UMax_("UMax", U_.dimensions(), 0),
     smallU_("smallU", dimVelocity, 1e-10),
     cumulativeContErr_(0.0),
     fsiMeshUpdate_(false),
@@ -627,6 +703,28 @@ Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce
     reduce(pF, sumOp<scalarField>());
 
     return tpF;
+}
+
+
+void Foam::fluidModel::UisRequired()
+{
+    if (!Uheader_.headerOk())
+    {
+        FatalErrorIn(type() + "::UisRequired()")
+            << "This fluidModel requires the 'U' field to be specified!"
+            << abort(FatalError);
+    }
+}
+
+
+void Foam::fluidModel::pisRequired()
+{
+    if (!pheader_.headerOk())
+    {
+        FatalErrorIn(type() + "::pisRequired()")
+            << "This fluidModel requires the 'p' field to be specified!"
+            << abort(FatalError);
+    }
 }
 
 

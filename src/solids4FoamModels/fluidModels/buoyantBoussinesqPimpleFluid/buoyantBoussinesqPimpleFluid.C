@@ -208,6 +208,9 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
         1.0 - beta_*(T_ - TRef_)
     )
 {
+    UisRequired();
+    pisRequired();
+
     // Create pimple control as it is needed to set the p reference
     pimpleControl pimple(mesh());
 

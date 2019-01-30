@@ -372,19 +372,8 @@ interFluid::interFluid
         ),
         rho1_*phi()
     ),
-    g_
-    (
-        IOobject
-        (
-            "g",
-            runTime.constant(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        )
-    ),
-    gh_("gh", g_ & mesh().C()),
-    ghf_("gh", g_ & mesh().Cf()),
+    gh_("gh", g() & mesh().C()),
+    ghf_("gh", g() & mesh().Cf()),
     interface_(alpha1_, U(), twoPhaseProperties_),
     pdRefCell_(0),
     pdRefValue_(0.0),
@@ -394,6 +383,8 @@ interFluid::interFluid
         incompressible::turbulenceModel::New(U(), phi(), twoPhaseProperties_)
     )
 {
+    UisRequired();
+
     // Reset p dimensions
     Info<< "Resetting the dimensions of p" << endl;
     p().dimensions().reset(dimPressure);
@@ -510,8 +501,8 @@ bool interFluid::evolve()
     }
 
     // Update gh fields as the mesh may have moved
-    gh_ = g_ & mesh.C();
-    ghf_ = g_ & mesh.Cf();
+    gh_ = g() & mesh.C();
+    ghf_ = g() & mesh.Cf();
 
     //if (correctPhi && meshChanged)
     if (meshChanged)

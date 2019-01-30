@@ -84,6 +84,9 @@ transientSimpleFluid::transientSimpleFluid
         fluidProperties().lookupOrDefault<Switch>("consistencyByJasak", false)
     )
 {
+    UisRequired();
+    pisRequired();
+
     mesh().schemesDict().setFluxRequired(p().name());
 }
 

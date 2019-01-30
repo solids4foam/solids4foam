@@ -80,6 +80,9 @@ pisoFluid::pisoFluid
         ).lookup("rho")
     )
 {
+    UisRequired();
+    pisRequired();
+
     mesh().schemesDict().setFluxRequired(p().name());
 }
 

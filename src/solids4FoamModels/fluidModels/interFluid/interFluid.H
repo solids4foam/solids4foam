@@ -89,9 +89,6 @@ class interFluid
         //- Mass flux
         surfaceScalarField rhoPhi_;
 
-        //- Gravitional acceleration
-        const uniformDimensionedVectorField g_;
-
         //- Gravity by cell-centre field
         volScalarField gh_;
 
