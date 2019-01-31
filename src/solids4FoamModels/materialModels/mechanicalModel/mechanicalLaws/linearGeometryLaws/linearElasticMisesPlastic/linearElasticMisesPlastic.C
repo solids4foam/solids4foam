@@ -674,7 +674,7 @@ Foam::tmp<Foam::volScalarField> Foam::linearElasticMisesPlastic::rho() const
         (
             IOobject
             (
-                "lawRho",
+                "rho",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,

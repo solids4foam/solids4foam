@@ -411,6 +411,12 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::rho() const
 }
 
 
+const Foam::dimensionedScalar& Foam::linearElastic::rhoScalar() const
+{
+    return rho_;
+}
+
+
 Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 {
     if (nu_.value() == 0.5)
