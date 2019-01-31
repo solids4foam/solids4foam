@@ -935,7 +935,10 @@ Foam::scalar Foam::mechanicalModel::newDeltaT()
 
 void Foam::mechanicalModel::moveSubMeshes()
 {
-    solSubMeshes().moveSubMeshes();
+    if (solSubMeshes_.valid())
+    {
+        solSubMeshes().moveSubMeshes();
+    }
 }
 
 // ************************************************************************* //
