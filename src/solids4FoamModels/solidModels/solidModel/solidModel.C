@@ -1171,6 +1171,14 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
+    RhieChowScale_
+    (
+        solidModelDict().lookupOrDefault<scalar>("RhieChowScale", 1.0)
+    ),
+    JameSchimTurkScale_
+    (
+        solidModelDict().lookupOrDefault<scalar>("JameSchimTurkScale", 0.0)
+    ),
     solutionTol_
     (
         solidModelDict().lookupOrDefault<scalar>("solutionTolerance", 1e-06)

@@ -126,6 +126,12 @@ class solidModel
         //- Gravitational acceleration
         const uniformDimensionedVectorField g_;
 
+        //- Scale factor for Rhie-Chow stabilisation term
+        const scalar RhieChowScale_;
+
+        //- Scale factor for Jameson-Schmidt-Turkel stabilisation term
+        const scalar JameSchimTurkScale_;
+
         //- Solution standard tolerance
         const scalar solutionTol_;
 
@@ -269,6 +275,18 @@ protected:
         const uniformDimensionedVectorField& g() const
         {
             return g_;
+        }
+
+        //- Return Rhie-Chow scale factor
+        scalar RhieChowScale() const
+        {
+            return RhieChowScale_;
+        }
+
+        //- Return JST scale factor
+        scalar JameSchimTurkScale() const
+        {
+            return JameSchimTurkScale_;
         }
 
         //- Return solution standard tolerance

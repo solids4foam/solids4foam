@@ -104,7 +104,13 @@ bool linGeomTotalDispSolid::evolve()
               - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
               + fvc::div(sigma(), "div(sigma)")
               + rho()*g()
-              + mechanical().RhieChowCorrection(D(), gradD())
+              + RhieChowScale()*mechanical().RhieChowCorrection(D(), gradD())
+              - JameSchimTurkScale()*fvc::laplacian
+                (
+                    mesh().magSf(),
+                    fvc::laplacian(impKf_, D(), "laplacian(DD,D)"),
+                    "laplacian(DD,D)"
+                )
             );
 
             // Under-relaxation the linear system
