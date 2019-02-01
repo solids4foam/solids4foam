@@ -42,6 +42,109 @@ namespace Foam
 
 // * * * * * * * * * * * * *  Private Data Members * * * * * * * * * * * * * //
 
+void Foam::thermoLinearElastic::makeTrunTime()
+{
+    if (TrunTimePtr_.valid())
+    {
+        FatalErrorIn(type() + "::makeTrunTime()")
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    const fileName Tpath = fileName(mesh().time().caseName()/TcaseDir_);
+
+    Info<< "Creating time for T case = " << Tpath << endl;
+
+    TrunTimePtr_.set
+    (
+        new Time
+        (
+            Time::controlDictName,
+            mesh().time().rootPath(),
+            Tpath,
+            "system",
+            "constant",
+            true
+        )
+    );
+
+    // Set time to be the same as the main case
+    TrunTimePtr_().setTime(mesh().time());
+}
+
+Foam::Time& Foam::thermoLinearElastic::TrunTime()
+{
+    if (TrunTimePtr_.empty())
+    {
+        makeTrunTime();
+    }
+
+    return TrunTimePtr_();
+}
+
+
+void Foam::thermoLinearElastic::makeTmesh()
+{
+    if (TmeshPtr_.valid())
+    {
+        FatalErrorIn(type() + "::makeTmesh()")
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    Info<< "Read mesh for T case" << endl;
+
+    TmeshPtr_.set
+    (
+        new fvMesh
+        (
+            IOobject
+            (
+                fvMesh::defaultRegion,
+                TrunTime().timeName(),
+                TrunTime(),
+                IOobject::MUST_READ
+            )
+        )
+    );
+
+    // Check the Tmesh is the same as the mesh (or baseMesh for multi-material
+    // cases), in terms of points, faces and cells
+    // Note: baseMesh returns mesh in the case of single material cases
+    if
+    (
+        baseMesh().nPoints() != TmeshPtr_().nPoints()
+     || baseMesh().nFaces() != TmeshPtr_().nFaces()
+     || baseMesh().nCells() != TmeshPtr_().nCells()
+    )
+    {
+        FatalErrorIn(type() + "::readTField()")
+            << "The mesh for the T field has a different number of points, "
+            << "faces and/or cells than that of the main mesh!"
+            << abort(FatalError);
+    }
+    else if
+    (
+        gMax(mag(baseMesh().points() - TmeshPtr_().points())) > SMALL
+    )
+    {
+        FatalErrorIn(type() + "::readTField()")
+            << "The points in the mesh for the T field are different number "
+            << "than those in the main mesh!"
+            << abort(FatalError);
+    }
+}
+
+
+Foam::fvMesh& Foam::thermoLinearElastic::Tmesh()
+{
+    if (TmeshPtr_.empty())
+    {
+        makeTmesh();
+    }
+
+    return TmeshPtr_();
+}
+
+
 bool Foam::thermoLinearElastic::readTField()
 {
     if (debug)
@@ -55,54 +158,82 @@ bool Foam::thermoLinearElastic::readTField()
     {
         curTimeIndex_ = mesh().time().timeIndex();
 
+        // Set TrunTime to be the same as the main case
+        TrunTime().setTime(mesh().time());
+
         IOobject Theader
         (
             "T",
-            mesh().time().timeName(),
-            mesh(),
+            TrunTime().timeName(),
+            Tmesh(),
             IOobject::MUST_READ
         );
 
         if (Theader.headerOk())
         {
             Info<< nl << "Reading T field from time = "
-                << mesh().time().timeName() << nl << endl;
+                << Tmesh().time().timePath() << nl << endl;
 
-            TPtr_.clear();
-            TPtr_.set(new volScalarField(Theader, mesh()));
+            // Read T field from T case
+            const volScalarField TField(Theader, Tmesh());
 
-            TFieldWasReadFromDisk_ = true;
-
-            // Set the T field to write to disk: this allows a restart where
-            // the T field was only specified in the first time-step
-            TPtr_().writeOpt() = IOobject::AUTO_WRITE;
-        }
-        else
-        {
-            // In multi-material cases, the T field may be given for the base
-            // mesh, so we will read this base mesh T field and then extract the
-            // T sub-field corresponding to the current material sub-mesh
-
-            // Try to read the T field from the baseMesh
-            IOobject baseTheader
-            (
-                "T",
-                baseMesh().time().timeName(),
-                baseMesh(),
-                IOobject::MUST_READ
-            );
-
-            if (baseTheader.headerOk())
+            // Check if a single
+            if (mesh() == baseMesh())
             {
-                Info<< nl << "Reading base mesh T field from time = "
-                    << baseMesh().time().timeName() << nl << endl;
+                // Copy T field (defined on T mesh) to TPtr_ (defined on mechanical
+                // law mesh)
+                TPtr_.clear();
+                TPtr_.set
+                (
+                    new volScalarField
+                    (
+                        IOobject
+                        (
+                            "T",
+                            mesh().time().timeName(),
+                            mesh(),
+                            IOobject::NO_READ,
+                            IOobject::NO_WRITE
+                        ),
+                        mesh(),
+                        dimensionedScalar("zero", dimTemperature, 0.0)
+                    )
+                );
 
-                // Read T field for the baseMesh
-                volScalarField baseT(baseTheader, baseMesh());
+                // Copy internal and boundary fields
+                TPtr_().internalField() = TField.internalField();
+                forAll(TField.boundaryField(), patchI)
+                {
+                    TPtr_().boundaryField()[patchI] =
+                        scalarField(TField.boundaryField()[patchI]);
+                }
+            }
+            else
+            {
+                // Copy TField to a T field on the baseMesh
+                volScalarField TbaseMesh
+                (
+                    IOobject
+                    (
+                        "TbaseMesh",
+                        baseMesh().time().timeName(),
+                        baseMesh(),
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    baseMesh(),
+                    dimensionedScalar("zero", dimTemperature, 0.0)
+                );
 
-                // Map baseT to T
-                // Note: there is a cleaner way to do this but it is fine for
-                // now
+                // Copy internal and boundary fields
+                TbaseMesh.internalField() = TField.internalField();
+                forAll(TField.boundaryField(), patchI)
+                {
+                    TbaseMesh.boundaryField()[patchI] =
+                        scalarField(TField.boundaryField()[patchI]);
+                }
+
+                // Map TbaseMesh to T on the current material mesh
                 TPtr_.clear();
                 TPtr_.set
                 (
@@ -111,12 +242,20 @@ bool Foam::thermoLinearElastic::readTField()
                         baseMesh().lookupObject<mechanicalModel>
                         (
                             "mechanicalProperties"
-                        ).solSubMeshes().lookupBaseMeshVolField<scalar>("T", mesh())()
+                        ).solSubMeshes().lookupBaseMeshVolField<scalar>
+                        (
+                            "TbaseMesh", mesh()
+                        )()
                     )
                 );
-
-                TFieldWasReadFromDisk_ = true;
             }
+
+            TFieldWasReadFromDisk_ = true;
+
+            // Set the T field to write to disk: this allows a restart where
+            // the T field was only specified in the first time-step
+            // Also, it is convenient to see the field
+            TPtr_().writeOpt() = IOobject::AUTO_WRITE;
         }
     }
 
@@ -140,6 +279,9 @@ Foam::thermoLinearElastic::thermoLinearElastic
     T0_(dict.lookup("T0")),
     TPtr_(),
     TFieldWasReadFromDisk_(false),
+    TcaseDir_(dict.lookupOrDefault<fileName>("TcaseDirectory", ".")),
+    TrunTimePtr_(),
+    TmeshPtr_(),
     curTimeIndex_(-1)
 {
     // Check if the T field needs to be read from disk

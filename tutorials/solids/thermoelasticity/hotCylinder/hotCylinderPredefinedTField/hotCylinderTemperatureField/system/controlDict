@@ -9,43 +9,14 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    location    "0";
-    object      T;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 0 0 1 0 0 0];
+deltaT          1;
 
-internalField   uniform 80;
-
-boundaryField
-{
-    left
-    {
-        type            symmetryPlane;
-    }
-    bottom
-    {
-        type            symmetryPlane;
-    }
-
-    inside
-    {
-        type            zeroGradient;
-    }
-    outside
-    {
-        type            zeroGradient;
-    }
-    front
-    {
-        type            empty;
-    }
-    back
-    {
-        type            empty;
-    }
-}
+writeInterval   1;
 
 // ************************************************************************* //

@@ -7,6 +7,3 @@ cleanCase
 \rm -rf constant/polyMesh/sets constant/polyMesh/*Zones*
 \rm -rf VTK case.foam history
 \rm -rf system/*Subset
-
-echo "Resetting T fields in time = 1, 2, 3 and 4"
-\cp -r 0/org/[1-4] .
