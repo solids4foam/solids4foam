@@ -9,45 +9,45 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       polyBoundaryMesh;
-    location    "constant/polyMesh";
-    object      boundary;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-5
-(
-    symmPlane
-    {
-        type            symmetryPlane;
-        nFaces          20;
-        startFace       9;
-    }
-    inner
-    {
-        type            patch;
-        nFaces          1;
-        startFace       29;
-    }
-    outer
-    {
-        type            patch;
-        nFaces          1;
-        startFace       30;
-    }
-    back
-    {
-        type            wedge;
-        nFaces          10;
-        startFace       31;
-    }
-    front
-    {
-        type            wedge;
-        nFaces          10;
-        startFace       41;
-    }
-)
+ddtSchemes
+{
+    default         Euler;
+}
+
+gradSchemes
+{
+    default         Gauss linear;
+    grad(U)         Gauss linear;
+    grad(alpha1)    Gauss linear;
+}
+
+divSchemes
+{
+    div(rho*phi,U)  Gauss limitedLinearV 1;
+    div(phi,alpha)  Gauss vanLeer01;
+    div(phirb,alpha) Gauss interfaceCompression;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear corrected;
+}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+snGradSchemes
+{
+    default         corrected;
+}
 
 
 // ************************************************************************* //

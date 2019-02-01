@@ -72,7 +72,10 @@ stokesFluid::stokesFluid
             )
         ).lookup("rho")
     )
-{}
+{
+    UisRequired();
+    pisRequired();
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 

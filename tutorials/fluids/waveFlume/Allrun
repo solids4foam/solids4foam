@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Create the mesh
+runApplication blockMesh
+
+# Compute the wave parameters
+runApplication setWaveParameters
+
+# Set the wave field
+runApplication setWaveField
+
+# Run the solver
+runApplication solids4Foam
+
+# ----------------------------------------------------------------- end-of-file
+

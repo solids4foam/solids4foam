@@ -50,6 +50,7 @@ SourceFiles
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
 #include "pimpleControl.H"
+#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -81,6 +82,18 @@ class fluidModel
 
         //- Global to local face zone point maping
         mutable labelListList* globalToLocalFaceZonePointMapPtr_;
+
+        //- Wave properties needed to use waves2Foam
+        const IOdictionary waveProperties_;
+
+        //- Gravitional acceleration
+        const uniformDimensionedVectorField g_;
+
+        //- Velocity field header
+        IOobject Uheader_;
+
+        //- Pressure field header
+        IOobject pheader_;
 
         //- Velocity field
         volVectorField U_;
@@ -137,8 +150,11 @@ class fluidModel
         //- Find global face zones
         void calcGlobalFaceZones() const;
 
-        // //- Calculate global to local point addressing
+        //- Calculate global to local point addressing
         void calcGlobalToLocalFaceZonePointMap() const;
+
+        //- Read g field from disk, if it exists, otherwise return zero field
+        uniformDimensionedVectorField readG() const;
 
         //- Disallow default bitwise copy construct
         fluidModel(const fluidModel&);
@@ -215,7 +231,10 @@ public:
     // Selectors
 
         //- Select constructed from mesh
-        static autoPtr<fluidModel> New(Time& runTime, const word& region);
+        static autoPtr<fluidModel> New
+        (
+            Time& runTime, const word& region = "region0"
+        );
 
 
     // Destructor
@@ -247,6 +266,12 @@ public:
 
             //- Return non-const acess to the pimple control
             pimpleControl& pimple();
+
+            //- Return const gravity field
+            virtual const uniformDimensionedVectorField& g() const
+            {
+                return g_;
+            }
 
             //- Return const velocity field
             virtual const volVectorField& U() const
@@ -358,6 +383,12 @@ public:
 
             //- Get global to local face zone point addressing
             const labelListList& globalToLocalFaceZonePointMap() const;
+
+            //- This function will check that the U field was read from disk
+            virtual void UisRequired();
+
+            //- This function will check that the p field was read from disk
+            virtual void pisRequired();
 
         // Edit
 

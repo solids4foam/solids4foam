@@ -103,6 +103,9 @@ pUCoupledFluid::pUCoupledFluid
     maxResidual_(0),
     convergenceCriterion_(0)
 {
+    UisRequired();
+    pisRequired();
+
     mesh().schemesDict().setFluxRequired(p().name());
 }
 

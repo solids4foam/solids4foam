@@ -72,7 +72,10 @@ icoPcFluid::icoPcFluid
             )
         ).lookup("rho")
     )
-{}
+{
+    UisRequired();
+    pisRequired();
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 

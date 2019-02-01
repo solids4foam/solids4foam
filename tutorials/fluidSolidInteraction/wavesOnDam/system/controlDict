@@ -9,45 +9,49 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       polyBoundaryMesh;
-    location    "constant/polyMesh";
-    object      boundary;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-5
-(
-    symmPlane
-    {
-        type            symmetryPlane;
-        nFaces          20;
-        startFace       9;
-    }
-    inner
-    {
-        type            patch;
-        nFaces          1;
-        startFace       29;
-    }
-    outer
-    {
-        type            patch;
-        nFaces          1;
-        startFace       30;
-    }
-    back
-    {
-        type            wedge;
-        nFaces          10;
-        startFace       31;
-    }
-    front
-    {
-        type            wedge;
-        nFaces          10;
-        startFace       41;
-    }
-)
+libs            ("libwaves2Foam.so");
+
+application     solids4Foam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         1;
+
+deltaT          0.001;
+
+writeControl    adjustableRunTime;
+
+writeInterval   0.005;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  yes;
+
+maxCo           0.5;
+
+maxDeltaT       1;
 
 
 // ************************************************************************* //

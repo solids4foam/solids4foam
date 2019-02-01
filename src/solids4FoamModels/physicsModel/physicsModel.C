@@ -125,6 +125,8 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New(Time& runTime)
                 >> fluidTypeName;
         }
 
+        Info<< nl << "Selecting fluidModel " << fluidTypeName << endl;
+
         fluidConstructorTable::iterator cstrIter =
             fluidConstructorTablePtr_->find(fluidTypeName);
 
@@ -165,6 +167,8 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New(Time& runTime)
                 >> solidTypeName;
         }
 
+        Info<< nl << "Selecting solidModel " << solidTypeName << endl;
+
         solidConstructorTable::iterator cstrIter =
             solidConstructorTablePtr_->find(solidTypeName);
 
@@ -204,6 +208,9 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New(Time& runTime)
             fluidSolidInteractionProperties.lookup("fluidSolidInterface")
                 >> fsiTypeName;
         }
+
+        Info<< nl << "Selecting fluidSolidInterface method "
+            << fsiTypeName << endl;
 
         fluidSolidInteractionConstructorTable::iterator cstrIter =
             fluidSolidInteractionConstructorTablePtr_->find

@@ -9,45 +9,13 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       polyBoundaryMesh;
-    location    "constant/polyMesh";
-    object      boundary;
+    class       dictionary;
+    location    "constant";
+    object      turbulenceProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-5
-(
-    symmPlane
-    {
-        type            symmetryPlane;
-        nFaces          20;
-        startFace       9;
-    }
-    inner
-    {
-        type            patch;
-        nFaces          1;
-        startFace       29;
-    }
-    outer
-    {
-        type            patch;
-        nFaces          1;
-        startFace       30;
-    }
-    back
-    {
-        type            wedge;
-        nFaces          10;
-        startFace       31;
-    }
-    front
-    {
-        type            wedge;
-        nFaces          10;
-        startFace       41;
-    }
-)
+simulationType  laminar;
 
 
 // ************************************************************************* //

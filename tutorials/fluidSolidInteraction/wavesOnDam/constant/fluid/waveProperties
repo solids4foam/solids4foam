@@ -1,0 +1,51 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version	2.0;
+    format	ascii;
+    class	dictionary;
+    object	waveProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+seaLevel            0.08;
+
+seaLevelAsReference 1;
+
+relaxationNames     ( inlet );
+
+initializationName  inlet;
+
+inletCoeffs
+{
+    waveType            stokesFirst;
+    Tsoft               0.2;
+    depth               0.08;
+    period              0.2;
+    direction           ( 1 0 0 );
+    phi                 0;
+    height              0.02;
+    waveNumber          (100.608 0 0);
+    omega               31.4159;
+
+    relaxationZone
+    {
+        relaxationScheme    Spatial;
+        relaxationShape     Rectangular;
+        beachType           Empty;
+        relaxType           INLET;
+        startX              ( 0 0 -1 );
+        endX                ( 0.05 0 1 );
+        orientation         ( 1 0 0 );
+    }
+}
+
+
+
+// ************************************************************************* //

@@ -71,6 +71,9 @@ icoFluid::icoFluid
     nu_(transportProperties_.lookup("nu")),
     rho_(transportProperties_.lookup("rho"))
 {
+    UisRequired();
+    pisRequired();
+
     mesh().schemesDict().setFluxRequired(p().name());
 }
 
