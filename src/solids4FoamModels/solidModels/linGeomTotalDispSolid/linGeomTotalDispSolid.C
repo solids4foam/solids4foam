@@ -29,6 +29,7 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
+#include "momentumStabilisation.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -104,13 +105,7 @@ bool linGeomTotalDispSolid::evolve()
               - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
               + fvc::div(sigma(), "div(sigma)")
               + rho()*g()
-              + RhieChowScale()*mechanical().RhieChowCorrection(D(), gradD())
-              - JameSchimTurkScale()*fvc::laplacian
-                (
-                    mesh().magSf(),
-                    fvc::laplacian(impKf_, D(), "laplacian(DD,D)"),
-                    "laplacian(DD,D)"
-                )
+                + stabilisation().stabilisation(D(), gradD(), impK_)
             );
 
             // Under-relaxation the linear system

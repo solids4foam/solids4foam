@@ -1171,14 +1171,7 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
-    RhieChowScale_
-    (
-        solidModelDict().lookupOrDefault<scalar>("RhieChowScale", 1.0)
-    ),
-    JameSchimTurkScale_
-    (
-        solidModelDict().lookupOrDefault<scalar>("JameSchimTurkScale", 0.0)
-    ),
+    stabilisationPtr_(),
     solutionTol_
     (
         solidModelDict().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
@@ -1297,6 +1290,26 @@ Foam::solidModel::solidModel
             );
         }
     }
+
+    // Create stabilisation object
+
+    if (!solidModelDict().found("stabilisation"))
+    {
+        // If the stabilisation sub-dict is not found, we will add it with
+        // default settings
+        dictionary stabDict;
+        stabDict.add("type", "RhieChow");
+        stabDict.add("scaleFactor", 0.1);
+        solidModelDict().add("stabilisation", stabDict);
+    }
+
+    stabilisationPtr_.set
+    (
+        new momentumStabilisation
+        (
+            solidModelDict().subDict("stabilisation")
+        )
+    );
 
     // If the case is axisymmetric, we will disable solving in the out-of-plane
     // direction
