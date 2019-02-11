@@ -71,7 +71,7 @@ bool fixedRelaxationCouplingInterface::evolve()
 {
     initializeFields();
 
-    updateInterpolator();
+    updateInterpolatorAndGlobalPatches();
 
     scalar residualNorm = 0;
 

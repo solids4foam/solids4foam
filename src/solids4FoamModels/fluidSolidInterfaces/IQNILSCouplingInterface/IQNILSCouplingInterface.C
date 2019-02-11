@@ -83,7 +83,7 @@ bool IQNILSCouplingInterface::evolve()
 {
     initializeFields();
 
-    updateInterpolator();
+    updateInterpolatorAndGlobalPatches();
 
     scalar residualNorm = 0;
 

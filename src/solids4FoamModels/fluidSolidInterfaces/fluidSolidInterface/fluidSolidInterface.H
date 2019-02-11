@@ -82,14 +82,8 @@ class fluidSolidInterface
         //- Solid interface patch index
         label solidPatchIndex_;
 
-        //- Solid interface face zone index
-        label solidZoneIndex_;
-
         //- Fluid interface patch index
         label fluidPatchIndex_;
-
-        //- Fluid interface face zone index
-        label fluidZoneIndex_;
 
         //- Solid face zone current points
         mutable vectorField* currentSolidZonePointsPtr_;
@@ -102,7 +96,12 @@ class fluidSolidInterface
         mutable std::shared_ptr<RBFInterpolation> fluidToSolidPtr_;
 
         //- Ggi zone-to-zone interpolation
-        mutable ggiZoneInterpolation* ggiInterpolatorPtr_;
+        //mutable ggiZoneInterpolation* ggiInterpolatorPtr_;
+        mutable GGIInterpolation
+        <
+            standAlonePatch,
+            standAlonePatch
+        >* ggiInterpolatorPtr_;
 
         //- Solid zone to fluid zone interpolator
         mutable std::shared_ptr<RBFInterpolation> solidToFluidPtr_;
@@ -333,22 +332,10 @@ public:
                 return solidPatchIndex_;
             }
 
-            //- Return solid face zone index
-            label solidZoneIndex() const
-            {
-                return solidZoneIndex_;
-            }
-
             //- Return fluid patch index
             label fluidPatchIndex() const
             {
                 return fluidPatchIndex_;
-            }
-
-            //- Return fluid face zone index
-            label fluidZoneIndex() const
-            {
-                return fluidZoneIndex_;
             }
 
             //- Return current solid zone points
@@ -362,7 +349,10 @@ public:
             const std::shared_ptr<RBFInterpolation>& fluidToSolid() const;
 
             //- Return fluid to solid interpolator
-            const ggiZoneInterpolation& ggiInterpolator() const;
+            const GGIInterpolation
+            <
+                standAlonePatch, standAlonePatch
+            >& ggiInterpolator() const;
 
             //- Return fluid to solid interpolator
             const std::shared_ptr<RBFInterpolation>& solidToFluid() const;
@@ -512,7 +502,7 @@ public:
             virtual void initializeFields();
 
             //- Update interpolator
-            virtual void updateInterpolator();
+            virtual void updateInterpolatorAndGlobalPatches();
 
             //- Move fluid mesh
             virtual void moveFluidMesh();

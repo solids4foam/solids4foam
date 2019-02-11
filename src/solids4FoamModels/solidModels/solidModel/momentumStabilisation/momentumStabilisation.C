@@ -84,7 +84,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     {
         result = scaleFactor
        *(
-           fvc::laplacian(gamma, vf) - fvc::div(gamma*gradVf)
+           fvc::laplacian(gamma, vf, "laplacian(DD,D)") - fvc::div(gamma*gradVf)
         );
     }
     else if (method == "JamesonSchmidtTurkel")
