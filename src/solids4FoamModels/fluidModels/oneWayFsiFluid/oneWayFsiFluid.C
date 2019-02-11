@@ -99,25 +99,6 @@ tmp<scalarField> oneWayFsiFluid::patchPressureForce(const label patchID) const
 }
 
 
-tmp<scalarField> oneWayFsiFluid::faceZoneMuEff
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<scalarField> tMuEff
-    (
-        new scalarField
-        (
-            mesh().faceZones()[zoneID].size(),
-            rho_.value()*nu_.value()
-        )
-    );
-
-    return tMuEff;
-}
-
-
 bool oneWayFsiFluid::evolve()
 {
     Info << "Evolving fluid model" << endl;

@@ -372,11 +372,11 @@ public:
             ) const;
 
             // //- Face zone effective dynamic viscosity
-            virtual tmp<scalarField> faceZoneMuEff
-            (
-                const label zoneID,
-                const label patchID
-            ) const = 0;
+            // virtual tmp<scalarField> faceZoneMuEff
+            // (
+            //     const label zoneID,
+            //     const label patchID
+            // ) const;
 
             //- Get global face zones list
             const labelList& globalFaceZones() const;

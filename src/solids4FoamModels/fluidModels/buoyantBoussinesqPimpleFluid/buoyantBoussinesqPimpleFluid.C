@@ -243,7 +243,10 @@ tmp<vectorField> buoyantBoussinesqPimpleFluid::patchViscousForce(const label pat
 }
 
 
-tmp<scalarField> buoyantBoussinesqPimpleFluid::patchPressureForce(const label patchID) const
+tmp<scalarField> buoyantBoussinesqPimpleFluid::patchPressureForce
+(
+    const label patchID
+) const
 {
     tmp<scalarField> tpF
     (
@@ -253,37 +256,6 @@ tmp<scalarField> buoyantBoussinesqPimpleFluid::patchPressureForce(const label pa
     tpF() = rho_.value()*p().boundaryField()[patchID];
 
     return tpF;
-}
-
-
-tmp<scalarField> buoyantBoussinesqPimpleFluid::faceZoneMuEff
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    scalarField pMuEff =
-        rho_.value()*turbulence_->nuEff()().boundaryField()[patchID];
-
-    tmp<scalarField> tMuEff
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& muEff = tMuEff();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pMuEff, I)
-    {
-        muEff[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
-            pMuEff[I];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(muEff, sumOp<scalarField>());
-
-    return tMuEff;
 }
 
 

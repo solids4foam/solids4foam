@@ -49,9 +49,6 @@ addToRunTimeSelectionTable
 );
 
 
-// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface

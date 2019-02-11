@@ -110,25 +110,6 @@ tmp<scalarField> icoFluid::patchPressureForce(const label patchID) const
 }
 
 
-tmp<scalarField> icoFluid::faceZoneMuEff
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<scalarField> tMuEff
-    (
-        new scalarField
-        (
-            mesh().faceZones()[zoneID].size(),
-            rho_.value()*nu_.value()
-        )
-    );
-
-    return tMuEff;
-}
-
-
 bool icoFluid::evolve()
 {
     Info<< "Evolving fluid model: " << this->type() << endl;
