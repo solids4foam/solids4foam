@@ -83,6 +83,22 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
 {
     DisRequired();
+
+    if (predictor_)
+    {
+        // Check ddt scheme for D is not steadyState
+        const word ddtDScheme
+        (
+            mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
+        );
+
+        if (ddtDScheme == "steadyState")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "If predictor is turned on, then the ddt(" << D().name()
+                << ") scheme should not be 'steadyState'!" << abort(FatalError);
+        }
+    }
 }
 
 
