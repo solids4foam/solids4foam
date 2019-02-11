@@ -49,6 +49,25 @@ addToRunTimeSelectionTable(physicsModel, linGeomTotalDispSolid, solid);
 addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 
 
+// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+
+void linGeomTotalDispSolid::predict()
+{
+    Info<< "Linear predictor using DD" << endl;
+
+    // Predict D using the increment of displacement field from the previous
+    // time-step
+    D() = D().oldTime() + U()*runTime().deltaT();
+
+    // Update gradient of displacement
+    mechanical().grad(D(), gradD());
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 linGeomTotalDispSolid::linGeomTotalDispSolid
@@ -60,7 +79,8 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     solidModel(typeName, runTime, region),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_)
+    rImpK_(1.0/impK_),
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
 {
     DisRequired();
 }
@@ -72,6 +92,11 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 bool linGeomTotalDispSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
+
+    if (predictor_)
+    {
+        predict();
+    }
 
     // Mesh update loop
     do
@@ -105,7 +130,7 @@ bool linGeomTotalDispSolid::evolve()
               - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
               + fvc::div(sigma(), "div(sigma)")
               + rho()*g()
-                + stabilisation().stabilisation(D(), gradD(), impK_)
+              + stabilisation().stabilisation(D(), gradD(), impK_)
             );
 
             // Under-relaxation the linear system
