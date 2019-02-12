@@ -71,8 +71,10 @@ class paraboloidInletVelocityFvPatchVectorField
         //- Max z coordinate of paraboloid
         const scalar zMax_;
 
-        //- Switch to enable time-varying velocity (following sine wave)
-        const Switch timeVarying_;
+        //- Time at which time-varying velocity ends
+        //  Set to zero for steady-state velocity
+        //  Set to timeAtMaxVelocity for smooth ramp to max velocity
+        const scalar timeVaryingEndTime_;
 
         //- Time that the maximum velocity is reached
         const scalar timeAtMaxVelocity_;
