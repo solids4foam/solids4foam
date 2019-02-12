@@ -150,6 +150,8 @@ $(fluidFvPatchFields)/robin/robinFvPatchFields.C
 $(fluidFvPatchFields)/skewCorrectedLinearDC/skewCorrectedLinearDC.C
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
 
+fluidModels/pointPatchFields/timeVaryingVelocity/timeVaryingVelocityPointPatchVectorField.C
+
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/setInletVelocity/setInletVelocity.C
 functionObjects/solidForces/solidForces.C
