@@ -355,7 +355,8 @@ interFluid::interFluid
             "rho",
             runTime.timeName(),
             mesh(),
-            IOobject::READ_IF_PRESENT
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
         ),
         alpha1_*rho1_ + (scalar(1) - alpha1_)*rho2_,
         alpha1_.boundaryField().types()

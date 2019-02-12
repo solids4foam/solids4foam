@@ -35,7 +35,6 @@ License
 #include "tetFemMatrices.H"
 #include "fixedValuePointPatchFields.H"
 #include "ZoneIDs.H"
-#include "ggiInterpolation.H"
 #include "TPSFunction.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
@@ -899,8 +898,14 @@ void Foam::fluidSolidInterface::updateInterpolatorAndGlobalPatches()
             deleteDemandDrivenData(ggiInterpolatorPtr_);
             fluid().clearGlobalPatch();
             solid().clearGlobalPatch();
-            fluid().makeGlobalPatch(fluidPatchIndex_);
-            solid().makeGlobalPatch(solidPatchIndex_);
+            fluid().makeGlobalPatch
+            (
+                fluidMesh().boundaryMesh()[fluidPatchIndex_].name()
+            );
+            solid().makeGlobalPatch
+            (
+                solidMesh().boundaryMesh()[solidPatchIndex_].name()
+            );
             ggiInterpolator();
         }
     }

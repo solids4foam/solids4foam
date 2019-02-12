@@ -286,7 +286,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
                 "g",
                 mesh().time().constant(),
                 mesh(),
-                IOobject::MUST_READ,
+                IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
             dimensionedVector("zero", dimAcceleration, vector::zero)

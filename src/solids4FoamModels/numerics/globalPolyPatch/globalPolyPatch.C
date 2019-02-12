@@ -425,6 +425,7 @@ void Foam::globalPolyPatch::clearOut() const
     deleteDemandDrivenData(globalPatchPtr_);
     deleteDemandDrivenData(pointToGlobalAddrPtr_);
     deleteDemandDrivenData(faceToGlobalAddrPtr_);
+    deleteDemandDrivenData(globalMasterToCurrentProcPointAddrPtr_);
     deleteDemandDrivenData(interpPtr_);
 }
 
@@ -444,6 +445,7 @@ Foam::globalPolyPatch::globalPolyPatch
     globalPatchPtr_(NULL),
     pointToGlobalAddrPtr_(NULL),
     faceToGlobalAddrPtr_(NULL),
+    globalMasterToCurrentProcPointAddrPtr_(NULL),
     interpPtr_(NULL)
 {
     check();
@@ -463,6 +465,7 @@ Foam::globalPolyPatch::globalPolyPatch
     globalPatchPtr_(NULL),
     pointToGlobalAddrPtr_(NULL),
     faceToGlobalAddrPtr_(NULL),
+    globalMasterToCurrentProcPointAddrPtr_(NULL),
     interpPtr_(NULL)
 {
     check();

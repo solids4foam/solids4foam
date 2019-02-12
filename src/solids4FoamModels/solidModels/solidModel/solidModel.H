@@ -530,12 +530,6 @@ public:
             //- Face zone primitive patch in current configuration
             virtual tmp<vectorField> currentFaceZonePoints() const;
 
-            //- Get global face zones list
-            //const labelList& globalFaceZones() const;
-
-            //- Get global to local face zone point addressing
-            // const labelListList& globalToLocalFaceZonePointMap() const;
-
             //- Return enforceLinear switch
             const Switch& enforceLinear() const
             {
