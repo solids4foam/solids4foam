@@ -51,12 +51,6 @@ maxCo           0.2;
 
 functions
 (
-    setInletVelocity
-    {
-        type                setInletVelocity;
-        region              fluid;
-    }
-
     forces
     {
         type                forces;

@@ -31,7 +31,12 @@ boundaryField
     }
     inlet
     {
-        type            fixedValue;
+        type            paraboloidInletVelocity;
+        maxVelocity     0.2;
+        yWidth          0.2;
+        zWidth          0.4;
+        timeVaryingEndTime 1.0;
+        timeAtMaxVelocity 1.0;
         value           uniform (0 0 0);
     }
     bottom

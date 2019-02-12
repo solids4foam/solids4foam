@@ -22,11 +22,9 @@ fluidSolidInterface    Aitken;
 {
     // Solid interface patch and faceZone
     solidPatch interface;
-    solidZone interface-zone;
 
     // Fluid interface patch and faceZone
     fluidPatch interface;
-    fluidZone interface-zone;
 
     // Under-relaxation factor for passing the solid interface
     // displacement/velocity to the fluid interface
