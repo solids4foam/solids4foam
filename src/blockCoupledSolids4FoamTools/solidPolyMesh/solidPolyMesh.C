@@ -554,9 +554,12 @@ void solidPolyMesh::calcImplicitBonds() const
     {
         FatalErrorIn("solidPolyMesh::calcImplicitBonds()")
             << "implicit bonds not set correctly" << nl
+            << "minID < 0 or maxID >= nVariables" << nl
             << "minID: " << minID << nl
             << "maxID: " << maxID << nl
+            << "nVariables: " << nVariables() << nl
             << "implicitBonds: " << implicitBonds << nl
+            << "If you have empty patches, make sure they are at the end!"
             << abort(FatalError);
     }
 
