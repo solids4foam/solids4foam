@@ -589,8 +589,11 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrDefault<scalar>("couplingStartTime", -1.0)
     ),
-    predictor_(lookupOrDefault<Switch>("predictor", false)),
-    rbfInterpolation_(lookupOrDefault<Switch>("rbfInterpolation", false)),
+    predictor_(fsiProperties_.lookupOrDefault<Switch>("predictor", false)),
+    rbfInterpolation_
+    (
+        fsiProperties_.lookupOrDefault<Switch>("rbfInterpolation", false)
+    ),
     interfaceDeformationLimit_
     (
         fsiProperties_.lookupOrDefault<scalar>("interfaceDeformationLimit", 0.0)
