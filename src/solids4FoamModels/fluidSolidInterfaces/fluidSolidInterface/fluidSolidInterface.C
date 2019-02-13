@@ -865,13 +865,6 @@ void Foam::fluidSolidInterface::initializeFields()
 
     outerCorr_ = 0;
 
-    nOuterCorr_ = fsiProperties_.lookupOrDefault<int>("nOuterCorr", 30);
-
-    outerCorrTolerance_ =
-        fsiProperties_.lookupOrDefault<scalar>("outerCorrTolerance", 1e-6);
-
-    coupled_ = fsiProperties_.lookupOrDefault<Switch>("coupled", true);
-
     interfacePointsDispl_ =
         vectorField
         (
