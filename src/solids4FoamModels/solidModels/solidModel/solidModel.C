@@ -1344,13 +1344,13 @@ Foam::tmp<Foam::vectorField>
 Foam::solidModel::faceZonePointDisplacementOld() const
 {
     // Create patch point field
-    const vectorField patchPointDispIncr
+    const vectorField patchPointDispOld
     (
         pointD().oldTime().internalField(), globalPatch().patch().meshPoints()
     );
 
     // Return the global patch field
-    return globalPatch().patchPointToGlobal(patchPointDispIncr);
+    return globalPatch().patchPointToGlobal(patchPointDispOld);
 }
 
 
