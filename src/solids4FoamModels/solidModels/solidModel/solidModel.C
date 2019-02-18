@@ -586,6 +586,44 @@ const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
 }
 
 
+void Foam::solidModel::makeSetCellDisps() const
+{
+    if (setCellDispsPtr_.valid())
+    {
+        FatalErrorIn(type() + "::makeSetCellDisps() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    if (solidModelDict().found("cellDisplacements"))
+    {
+        setCellDispsPtr_.set
+        (
+            new setCellDisplacements
+            (
+                mesh(), solidModelDict().subDict("cellDisplacements")
+            )
+        );
+    }
+    else
+    {
+        dictionary dict;
+        dict.add("cellDisplacements", dictionary());
+        setCellDispsPtr_.set(new setCellDisplacements(mesh(), dict));
+    }
+}
+
+
+const Foam::setCellDisplacements& Foam::solidModel::setCellDisps() const
+{
+    if (setCellDispsPtr_.empty())
+    {
+        makeSetCellDisps();
+    }
+
+    return setCellDispsPtr_();
+}
+
+
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
 
 Foam::thermalModel& Foam::solidModel::thermal()
@@ -632,69 +670,12 @@ Foam::volScalarField& Foam::solidModel::rho()
 }
 
 
-void Foam::solidModel::setCellDisplacements(fvVectorMatrix& DEqn)
+void Foam::solidModel::setCellDisps(fvVectorMatrix& DEqn)
 {
-    FatalError
-        << "WIP: add sub-class to store this data" << abort(FatalError);
-
-    vectorField coords(0);
-    vectorField disps(0);
-    labelList cellIDs(0);
-
-    if (solidModelDict().found("cellDisplacements"))
+    if (setCellDisps().cellIDs().size() > 0)
     {
-        const dictionary& cellDispDict
-        (
-            solidModelDict().subDict("fixedCellDisplacements")
-        );
-
-        coords = vectorField(cellDispDict.lookup("coordinates"));
-        disps = vectorField(cellDispDict.lookup("displacements"));
-
-        // Find the closest cells in the mesh
-        cellIDs = labelList(coords.size(), -1);
-        const vectorField& C = mesh().C();
-        forAll(cellIDs, coordI)
-        {
-            const vector& curCoord = coords[coordI];
-            scalar dist = GREAT;
-
-            forAll(C, cellI)
-            {
-                const scalar newDist = mag(C[cellI] - curCoord);
-
-                if (newDist < dist)
-                {
-                    dist = newDist;
-                    cellIDs[coordI] = cellI;
-                }
-            }
-
-            // Find the closest cell globally
-            scalar minDist = returnReduce(dist, minOp<scalar>());
-            label procID = int(GREAT);
-            if (mag(minDist - dist) > SMALL)
-            {
-                // -1 signifies that the current proc does not have the closest
-                // cell
-                cellIDs[coordI] = -1;
-            }
-            else
-            {
-                procID = Pstream::myProcNo();
-            }
-
-            // If there is more than one processor with the closest cell then
-            // we will take the processor with the lowest proc number
-            if (Pstream::myProcNo() != returnReduce(procID, minOp<int>()))
-            {
-                cellIDs[coordI] = -1;
-            }
-        }
+        DEqn.setValues(setCellDisps().cellIDs(), setCellDisps().cellDisps());
     }
-
-    // Force cell displacements
-    DEqn.setValues(cellIDs, disps);
 }
 
 

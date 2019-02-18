@@ -50,6 +50,7 @@ SourceFiles
 #include "mechanicalModel.H"
 #include "nonLinearGeometry.H"
 #include "uniformDimensionedFields.H"
+#include "setCellDisplacements.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -188,6 +189,9 @@ class solidModel
         //- Global to local face zone point mapping
         mutable labelListList* globalToLocalFaceZonePointMapPtr_;
 
+        //- Optional: set displacement at internal cells
+        mutable autoPtr<setCellDisplacements> setCellDispsPtr_;
+
 
     // Private Member Functions
 
@@ -217,6 +221,12 @@ class solidModel
         //  Lagrangian approaches, we need the pointD field. This function will
         //  check which field to return
         const pointVectorField& pointDorPointDD() const;
+
+        //- Make setCellDisplacements
+        void makeSetCellDisps() const;
+
+        //- Return a reference to setCellDisplacements
+        const setCellDisplacements& setCellDisps() const;
 
         //- Disallow default bitwise copy construct
         solidModel(const solidModel&);
@@ -255,7 +265,7 @@ protected:
 
         //- Optional: cells can be forced to a specified displacement in the
         //  linear system
-        void setCellDisplacements(fvVectorMatrix& DEqn);
+        void setCellDisps(fvVectorMatrix& DEqn);
 
         //- Apply fixed or Aitken's adaptive under-relaxation to the field
         void relaxField(volVectorField& D, int iCorr);
