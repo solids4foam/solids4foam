@@ -486,6 +486,44 @@ const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
 }
 
 
+void Foam::solidModel::makeSetCellDisps() const
+{
+    if (setCellDispsPtr_.valid())
+    {
+        FatalErrorIn(type() + "::makeSetCellDisps() const")
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    if (solidModelDict().found("cellDisplacements"))
+    {
+        setCellDispsPtr_.set
+        (
+            new setCellDisplacements
+            (
+                mesh(), solidModelDict().subDict("cellDisplacements")
+            )
+        );
+    }
+    else
+    {
+        dictionary dict;
+        dict.add("cellDisplacements", dictionary());
+        setCellDispsPtr_.set(new setCellDisplacements(mesh(), dict));
+    }
+}
+
+
+const Foam::setCellDisplacements& Foam::solidModel::setCellDisps() const
+{
+    if (setCellDispsPtr_.empty())
+    {
+        makeSetCellDisps();
+    }
+
+    return setCellDispsPtr_();
+}
+
+
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
 
 Foam::thermalModel& Foam::solidModel::thermal()
@@ -529,6 +567,15 @@ Foam::volScalarField& Foam::solidModel::rho()
     }
 
     return rhoPtr_();
+}
+
+
+void Foam::solidModel::setCellDisps(fvVectorMatrix& DEqn)
+{
+    if (setCellDisps().cellIDs().size() > 0)
+    {
+        DEqn.setValues(setCellDisps().cellIDs(), setCellDisps().cellDisps());
+    }
 }
 
 

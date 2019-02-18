@@ -152,6 +152,9 @@ bool linGeomTotalDispSolid::evolve()
             // Under-relaxation the linear system
             DEqn.relax();
 
+            // Enforce any cell displacements
+            solidModel::setCellDisps(DEqn);
+
             // Solve the linear system
             solverPerfD = DEqn.solve();
 
