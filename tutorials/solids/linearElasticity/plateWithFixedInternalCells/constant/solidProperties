@@ -54,6 +54,7 @@ linearGeometryTotalDisplacementCoeffs
             {
                 fileName "$FOAM_CASE/constant/timeVsCellDisp3";
                 outOfBounds clamp;
+            }
         }
     }
 }
