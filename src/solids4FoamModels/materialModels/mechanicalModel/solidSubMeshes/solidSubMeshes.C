@@ -1397,11 +1397,18 @@ Foam::solidSubMeshes::solidSubMeshes
             Info<< "Writing subMeshes "
                 << subMeshes[matI].subMesh().name() << endl;
             subMeshes[matI].subMesh().setInstance("constant");
+            subMeshes[matI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
             subMeshes[matI].subMesh().write();
         }
     }
+    else
+    {
+        forAll(subMeshes, matI)
+        {
+            subMeshes[matI].subMesh().writeOpt() = IOobject::NO_WRITE;
+        }
+    }
 }
-
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 

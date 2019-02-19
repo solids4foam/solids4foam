@@ -27,6 +27,7 @@ mechanical
         nu              nu [0 0 0 0 0 0 0] 0.3;
         alpha           alpha [0 0 0 -1 0 0 0] 1e-05;
         T0              T0 [0 0 0 1 0 0 0] 0;
+        TcaseDirectory  "hotCylinderTemperatureField";
     }
 );
 

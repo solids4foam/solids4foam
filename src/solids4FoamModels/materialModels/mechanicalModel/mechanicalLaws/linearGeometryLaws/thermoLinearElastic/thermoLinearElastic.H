@@ -70,11 +70,32 @@ class thermoLinearElastic
         //- Flag to indicate the T field has be read from disk at least once
         bool TFieldWasReadFromDisk_;
 
+        //- Relative address of the temperature case
+        const fileName TcaseDir_;
+
+        //- Time object for the temperature case
+        mutable autoPtr<Time> TrunTimePtr_;
+
+        //- fvMesh object for the temperature case
+        mutable autoPtr<fvMesh> TmeshPtr_;
+
         //- Store the current time index so we know the start of a new time-step
         label curTimeIndex_;
 
 
     // Private Member Functions
+
+        //- Make the TrunTime object
+        void makeTrunTime();
+
+        //- Return a reference to TrunTime
+        Time& TrunTime();
+
+        //- Make the Tmesh object
+        void makeTmesh();
+
+        //- Return a reference to Tmesh
+        fvMesh& Tmesh();
 
         //- Read the temperature field from disk
         //  Return true if the T field has ever been read from disk
