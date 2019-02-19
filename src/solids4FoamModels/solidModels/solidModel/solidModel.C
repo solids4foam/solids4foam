@@ -507,7 +507,6 @@ void Foam::solidModel::makeSetCellDisps() const
     else
     {
         dictionary dict;
-        dict.add("cellDisplacements", dictionary());
         setCellDispsPtr_.set(new setCellDisplacements(mesh(), dict));
     }
 }
