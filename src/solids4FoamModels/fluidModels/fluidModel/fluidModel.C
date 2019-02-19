@@ -66,209 +66,6 @@ void Foam::fluidModel::makePimpleControl() const
 }
 
 
-void Foam::fluidModel::calcGlobalFaceZones() const
-{
-    // Find global face zones
-    if (globalFaceZonesPtr_)
-    {
-        FatalErrorIn
-        (
-            "void fluidModel::calcGlobalFaceZones() const"
-        )   << "Global face zones already fonud"
-            << abort(FatalError);
-    }
-
-    SLList<label> globalFaceZonesSet;
-
-    const faceZoneMesh& faceZones = mesh().faceZones();
-
-    forAll(faceZones, zoneI)
-    {
-        const faceZone& curFaceZone = faceZones[zoneI];
-
-        bool globalFaceZone = false;
-
-        forAll(curFaceZone, faceI)
-        {
-            // If unused face exist, then this must be a global face zone
-            if (curFaceZone[faceI] >= mesh().nFaces())
-            {
-                globalFaceZonesSet.insert(zoneI);
-                break;
-            }
-        }
-
-        reduce(globalFaceZone, orOp<bool>());
-
-        if (globalFaceZone)
-        {
-            globalFaceZonesSet.insert(zoneI);
-        }
-    }
-
-    globalFaceZonesPtr_ = new labelList(globalFaceZonesSet);
-}
-
-
-void Foam::fluidModel::calcGlobalToLocalFaceZonePointMap() const
-{
-    // Find global face zones
-    if (globalToLocalFaceZonePointMapPtr_)
-    {
-        FatalErrorIn
-        (
-            "void fluidModel::calcGlobalToLocalFaceZonePointMap() const"
-        )   << "Global to local face zones point map already exists"
-            << abort(FatalError);
-    }
-
-    globalToLocalFaceZonePointMapPtr_ =
-        new labelListList(globalFaceZones().size());
-
-    labelListList& globalToLocalFaceZonePointMap =
-        *globalToLocalFaceZonePointMapPtr_;
-
-    forAll(globalFaceZones(), zoneI)
-    {
-        label curZoneID = globalFaceZones()[zoneI];
-
-        labelList curMap(mesh().faceZones()[curZoneID]().nPoints(), -1);
-
-        vectorField fzGlobalPoints =
-            mesh().faceZones()[curZoneID]().localPoints();
-
-        //- set all slave points to zero because only the master order is used
-        if(!Pstream::master())
-        {
-            fzGlobalPoints = vector::zero;
-        }
-
-        //- pass points to all procs
-        reduce(fzGlobalPoints, sumOp<vectorField>());
-
-        //- now every proc has the master's list of FZ points
-        //- every proc must now find the mapping from their local FZ points to
-        //- the global FZ points
-
-        const vectorField& fzLocalPoints =
-            mesh().faceZones()[curZoneID]().localPoints();
-
-        const edgeList& fzLocalEdges =
-            mesh().faceZones()[curZoneID]().edges();
-
-        const labelListList& fzPointEdges =
-            mesh().faceZones()[curZoneID]().pointEdges();
-
-        scalarField minEdgeLength(fzLocalPoints.size(), GREAT);
-
-        forAll(minEdgeLength, pI)
-        {
-            const labelList& curPointEdges = fzPointEdges[pI];
-
-            forAll(curPointEdges, eI)
-            {
-                scalar Le = fzLocalEdges[curPointEdges[eI]].mag(fzLocalPoints);
-                if (Le < minEdgeLength[pI])
-                {
-                    minEdgeLength[pI] = Le;
-                }
-            }
-        }
-
-        forAll(fzGlobalPoints, globalPointI)
-        {
-            boolList visited(fzLocalPoints.size(), false);
-
-            forAll(fzLocalPoints, procPointI)
-            {
-                if (!visited[procPointI])
-                {
-                    visited[procPointI] = true;
-
-                    label nextPoint = procPointI;
-
-                    scalar curDist =
-                        mag
-                        (
-                            fzLocalPoints[nextPoint]
-                          - fzGlobalPoints[globalPointI]
-                        );
-
-                    if (curDist < 1e-4*minEdgeLength[nextPoint])
-                    {
-                        curMap[globalPointI] = nextPoint;
-                        break;
-                    }
-
-                    label found = false;
-
-                    while (nextPoint != -1)
-                    {
-                        const labelList& nextPointEdges =
-                            fzPointEdges[nextPoint];
-
-                        scalar minDist = GREAT;
-                        label index = -1;
-                        forAll(nextPointEdges, edgeI)
-                        {
-                            label curNgbPoint =
-                                fzLocalEdges[nextPointEdges[edgeI]]
-                               .otherVertex(nextPoint);
-
-                            if (!visited[curNgbPoint])
-                            {
-                                visited[curNgbPoint] = true;
-
-                                scalar curDist =
-                                    mag
-                                    (
-                                        fzLocalPoints[curNgbPoint]
-                                      - fzGlobalPoints[globalPointI]
-                                    );
-
-                                if (curDist < 1e-4*minEdgeLength[curNgbPoint])
-                                {
-                                    curMap[globalPointI] = curNgbPoint;
-                                    found = true;
-                                    break;
-                                }
-                                else if (curDist < minDist)
-                                {
-                                    minDist = curDist;
-                                    index = curNgbPoint;
-                                }
-                            }
-                        }
-
-                        nextPoint = index;
-                    }
-
-                    if (found)
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-
-        forAll(curMap, globalPointI)
-        {
-            if (curMap[globalPointI] == -1)
-            {
-                FatalErrorIn
-                (
-                    "fluidModel::calcGlobalToLocalFaceZonePointMap()"
-                )
-                    << "local to global face zone point map is not correct"
-                        << abort(FatalError);
-            }
-        }
-
-        globalToLocalFaceZonePointMap[zoneI] = curMap;
-    }
-}
-
-
 // * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * * //
 
 void Foam::fluidModel::updateRobinFsiInterface
@@ -489,7 +286,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
                 "g",
                 mesh().time().constant(),
                 mesh(),
-                IOobject::MUST_READ,
+                IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
             dimensionedVector("zero", dimAcceleration, vector::zero)
@@ -539,8 +336,6 @@ Foam::fluidModel::fluidModel
     ),
     fluidProperties_(subDict(type + "Coeffs")),
     pimplePtr_(),
-    globalFaceZonesPtr_(NULL),
-    globalToLocalFaceZonePointMapPtr_(NULL),
     waveProperties_
     (
         IOobject
@@ -613,7 +408,8 @@ Foam::fluidModel::fluidModel
     smallU_("smallU", dimVelocity, 1e-10),
     cumulativeContErr_(0.0),
     fsiMeshUpdate_(false),
-    fsiMeshUpdateChanged_(false)
+    fsiMeshUpdateChanged_(false),
+    globalPatchPtr_()
 {
     if (mesh().solutionDict().found("fieldBounds"))
     {
@@ -629,10 +425,7 @@ Foam::fluidModel::fluidModel
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::fluidModel::~fluidModel()
-{
-    deleteDemandDrivenData(globalFaceZonesPtr_);
-    deleteDemandDrivenData(globalToLocalFaceZonePointMapPtr_);
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -648,64 +441,21 @@ Foam::pimpleControl& Foam::fluidModel::pimple()
 }
 
 
-Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce
-(
-    const label zoneID,
-    const label patchID
-) const
+Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce() const
 {
-    vectorField pVF = patchViscousForce(patchID);
+    const vectorField patchVF =
+        patchViscousForce(globalPatch().patch().index());
 
-    tmp<vectorField> tvF
-    (
-        new vectorField(mesh().faceZones()[zoneID].size(), vector::zero)
-    );
-    vectorField& vF = tvF();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pVF, I)
-    {
-        vF[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
-            pVF[I];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(vF, sumOp<vectorField>());
-
-
-    return tvF;
+    return globalPatch().patchFaceToGlobal(patchVF);
 }
 
 
-Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce
-(
-    const label zoneID,
-    const label patchID
-) const
+Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce() const
 {
-    scalarField pPF = patchPressureForce(patchID);
+    const scalarField patchPF =
+        patchPressureForce(globalPatch().patch().index());
 
-    tmp<scalarField> tpF
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& pF = tpF();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pPF, I)
-    {
-        pF[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
-            pPF[I];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(pF, sumOp<scalarField>());
-
-    return tpF;
+    return globalPatch().patchFaceToGlobal(patchPF);
 }
 
 
@@ -728,6 +478,37 @@ void Foam::fluidModel::pisRequired()
             << "This fluidModel requires the 'p' field to be specified!"
             << abort(FatalError);
     }
+}
+
+
+void Foam::fluidModel::makeGlobalPatch(const word& patchName) const
+{
+    if (globalPatchPtr_.valid())
+    {
+        FatalErrorIn(type() + "::makeGlobalPatch() const")
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    globalPatchPtr_.set(new globalPolyPatch(patchName, mesh()));
+}
+
+
+const Foam::globalPolyPatch& Foam::fluidModel::globalPatch() const
+{
+    if (globalPatchPtr_.empty())
+    {
+        FatalErrorIn(type() + "::makeGlobalPatch() const")
+            << "makeGlobalPatch(...) must be called before globalPatch can be"
+            << " called!" << abort(FatalError);
+    }
+
+    return globalPatchPtr_();
+}
+
+
+void Foam::fluidModel::clearGlobalPatch() const
+{
+    globalPatchPtr_.clear();
 }
 
 
@@ -809,29 +590,6 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
     }
 
     return autoPtr<fluidModel>(cstrIter()(runTime, region));
-}
-
-
-const Foam::labelList& Foam::fluidModel::globalFaceZones() const
-{
-    if (!globalFaceZonesPtr_)
-    {
-        calcGlobalFaceZones();
-    }
-
-    return *globalFaceZonesPtr_;
-}
-
-
-const Foam::labelListList&
-Foam::fluidModel::globalToLocalFaceZonePointMap() const
-{
-    if (!globalToLocalFaceZonePointMapPtr_)
-    {
-        calcGlobalToLocalFaceZonePointMap();
-    }
-
-    return *globalToLocalFaceZonePointMapPtr_;
 }
 
 

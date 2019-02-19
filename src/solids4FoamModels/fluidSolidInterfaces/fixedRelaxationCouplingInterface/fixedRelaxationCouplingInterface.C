@@ -49,9 +49,6 @@ addToRunTimeSelectionTable
 );
 
 
-// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface
@@ -74,7 +71,7 @@ bool fixedRelaxationCouplingInterface::evolve()
 {
     initializeFields();
 
-    updateInterpolator();
+    updateInterpolatorAndGlobalPatches();
 
     scalar residualNorm = 0;
 

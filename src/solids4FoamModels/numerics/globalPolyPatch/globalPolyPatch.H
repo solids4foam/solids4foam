@@ -30,6 +30,7 @@ Description
 
 Author
     Hrvoje Jasak, Wikki Ltd.  All rights reserved
+    Modifications/additions by Philip Cardiff, UCD.  All rights reserved
 
 SourceFiles
     globalPolyPatch.C
@@ -43,6 +44,7 @@ SourceFiles
 #include "dictionary.H"
 #include "standAlonePatch.H"
 #include "polyMesh.H"
+#include "PrimitivePatchInterpolationTemplate.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -77,6 +79,13 @@ class globalPolyPatch
             //- Patch face to zone addressing
             mutable labelList* faceToGlobalAddrPtr_;
 
+            //- Addressing into master processor global patch from current
+            //  processor global patch
+            mutable labelList* globalMasterToCurrentProcPointAddrPtr_;
+
+            //- Patch interpolator
+            mutable PrimitivePatchInterpolation<standAlonePatch>* interpPtr_;
+
 
     // Private Member Functions
 
@@ -86,9 +95,14 @@ class globalPolyPatch
         //- Disallow default bitwise assignment
         void operator=(const globalPolyPatch&);
 
-
         //- Build global primitive patch
         void calcGlobalPatch() const;
+
+        // Make globalMasterToCurrentProcPointAddr
+        void calcGlobalMasterToCurrentProcPointAddr() const;
+
+        //- Make the interpolator
+        void calcInterp() const;
 
         //- Check
         void check() const;
@@ -149,15 +163,19 @@ public:
         //- Return reference to global patch
         const standAlonePatch& globalPatch() const;
 
+        //- Return reference to the interpolator
+        const PrimitivePatchInterpolation<standAlonePatch>&
+        interpolator() const;
 
-        // Addressing into global patch
+        //- Return patch point to global point addressing
+        const labelList& pointToGlobalAddr() const;
 
-            //- Return patch point to global point addressing
-            const labelList& pointToGlobalAddr() const;
+        //- Return patch face to global face addressing
+        const labelList& faceToGlobalAddr() const;
 
-            //- Return patch face to global face addressing
-            const labelList& faceToGlobalAddr() const;
-
+        // Addressing into master processor global patch from current processor
+        // global patch
+        const labelList& globalMasterToCurrentProcPointAddr() const;
 
         // Interpolation
 

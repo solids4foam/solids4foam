@@ -178,13 +178,6 @@ public:
                 const label patchID
             ) const;
 
-            //- Face zone effective dynamic viscosity
-            virtual tmp<scalarField> faceZoneMuEff
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
-
         // Edit
 
             //- Evolve the fluid model

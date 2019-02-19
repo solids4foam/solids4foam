@@ -13,7 +13,18 @@ runApplication setWaveParameters
 runApplication setWaveField
 
 # Run the solver
-runApplication solids4Foam
+if [[ "$1" == "parallel" ]]; then
+    # Issue with waves2Foam boundary conditions looking for waveProperties when
+    # libwaves2Foam.so is loaded. A workaround is to temporarily comment it and
+    # then uncomment it to run the solver
+    \sed -i 's|libs            ("libwaves2Foam.so");|//libs            ("libwaves2Foam.so");|g' system/controlDict
+    runApplication decomposePar
+    \sed -i 's|//libs            ("libwaves2Foam.so");|libs            ("libwaves2Foam.so");|g' system/controlDict
+    runParallel solids4Foam 2
+    runApplication reconstructPar
+else
+    runApplication solids4Foam
+fi
 
 # ----------------------------------------------------------------- end-of-file
 

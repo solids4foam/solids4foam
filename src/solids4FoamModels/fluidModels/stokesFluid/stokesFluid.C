@@ -90,10 +90,6 @@ tmp<vectorField> stokesFluid::patchViscousForce(const label patchID) const
         rho_.value()*laminarTransport_.nu().boundaryField()[patchID]
        *U().boundaryField()[patchID].snGrad();
 
-    const vectorField n = mesh().boundary()[patchID].nf();
-
-    tvF() -= n*(n & tvF());
-
     return tvF;
 }
 
@@ -108,37 +104,6 @@ tmp<scalarField> stokesFluid::patchPressureForce(const label patchID) const
     tpF() = rho_.value()*p().boundaryField()[patchID];
 
     return tpF;
-}
-
-
-tmp<scalarField> stokesFluid::faceZoneMuEff
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    scalarField pMuEff =
-        rho_.value()*laminarTransport_.nu().boundaryField()[patchID];
-
-    tmp<scalarField> tMuEff
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& muEff = tMuEff();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pMuEff, I)
-    {
-        muEff[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
-            pMuEff[I];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(muEff, sumOp<scalarField>());
-
-    return tMuEff;
 }
 
 

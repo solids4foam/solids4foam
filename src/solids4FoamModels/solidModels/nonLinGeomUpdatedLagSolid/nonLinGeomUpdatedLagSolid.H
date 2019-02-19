@@ -102,9 +102,6 @@ class nonLinGeomUpdatedLagSolid
 
     // Private Member Functions
 
-        //- Create global face zone point maps
-        void findGlobalFaceZones();
-
         //- Disallow default bitwise copy construct
         nonLinGeomUpdatedLagSolid(const nonLinGeomUpdatedLagSolid&);
 

@@ -59,7 +59,7 @@ addToRunTimeSelectionTable
 
 void nonLinGeomTotalLagTotalDispSolid::predict()
 {
-    Info << "Predicting solid model" << endl;
+    Info<< "Linear predictor" << endl;
 
     // Predict D using the velocity field
     // Note: the case may be steady-state but U can still be calculated using a
@@ -132,9 +132,25 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    predict_(solidModelDict().lookupOrDefault<Switch>("predict", false))
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
 {
     DisRequired();
+
+    if (predictor_)
+    {
+        // Check ddt scheme for D is not steadyState
+        const word ddtDScheme
+        (
+            mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
+        );
+
+        if (ddtDScheme == "steadyState")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "If predictor is turned on, then the ddt(" << D().name()
+                << ") scheme should not be 'steadyState'!" << abort(FatalError);
+        }
+    }
 }
 
 
@@ -145,7 +161,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
 
-    if (predict_)
+    if (predictor_)
     {
         predict();
     }

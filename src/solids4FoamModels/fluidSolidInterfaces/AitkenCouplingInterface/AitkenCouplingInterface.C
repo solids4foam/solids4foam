@@ -72,7 +72,7 @@ bool AitkenCouplingInterface::evolve()
 {
     initializeFields();
 
-    updateInterpolator();
+    updateInterpolatorAndGlobalPatches();
 
     scalar residualNorm = 0;
 
@@ -123,7 +123,7 @@ void AitkenCouplingInterface::updateDisplacement()
 
     if (outerCorr() < 3)
     {
-        Info<< "Current fsi under-relaxation factor: "
+        Info<< "Current fsi under-relaxation factor (fixed): "
             << relaxationFactor_ << endl;
 
         fluidZonePointsDisplPrev() = fluidZonePointsDispl();
@@ -166,7 +166,8 @@ void AitkenCouplingInterface::updateDisplacement()
         {
             // PC: in this case, would 1.0 be a better option?
             // Of course, the current option is more more stable
-            aitkenRelaxationFactor_ = relaxationFactor_;
+            //aitkenRelaxationFactor_ = relaxationFactor_;
+            aitkenRelaxationFactor_ = 1.0;
         }
 
         Info<< "Current fsi under-relaxation factor (Aitken): "

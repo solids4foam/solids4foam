@@ -29,6 +29,7 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
+#include "momentumStabilisation.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -48,6 +49,25 @@ addToRunTimeSelectionTable(physicsModel, linGeomTotalDispSolid, solid);
 addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 
 
+// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+
+void linGeomTotalDispSolid::predict()
+{
+    Info<< "Linear predictor using DD" << endl;
+
+    // Predict D using the increment of displacement field from the previous
+    // time-step
+    D() = D().oldTime() + U()*runTime().deltaT();
+
+    // Update gradient of displacement
+    mechanical().grad(D(), gradD());
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 linGeomTotalDispSolid::linGeomTotalDispSolid
@@ -59,9 +79,26 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     solidModel(typeName, runTime, region),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_)
+    rImpK_(1.0/impK_),
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
 {
     DisRequired();
+
+    if (predictor_)
+    {
+        // Check ddt scheme for D is not steadyState
+        const word ddtDScheme
+        (
+            mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
+        );
+
+        if (ddtDScheme == "steadyState")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "If predictor is turned on, then the ddt(" << D().name()
+                << ") scheme should not be 'steadyState'!" << abort(FatalError);
+        }
+    }
 }
 
 
@@ -71,6 +108,11 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 bool linGeomTotalDispSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
+
+    if (predictor_)
+    {
+        predict();
+    }
 
     // Mesh update loop
     do
@@ -104,17 +146,14 @@ bool linGeomTotalDispSolid::evolve()
               - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
               + fvc::div(sigma(), "div(sigma)")
               + rho()*g()
-              + RhieChowScale()*mechanical().RhieChowCorrection(D(), gradD())
-              - JameSchimTurkScale()*fvc::laplacian
-                (
-                    mesh().magSf(),
-                    fvc::laplacian(impKf_, D(), "laplacian(DD,D)"),
-                    "laplacian(DD,D)"
-                )
+              + stabilisation().stabilisation(D(), gradD(), impK_)
             );
 
             // Under-relaxation the linear system
             DEqn.relax();
+
+            // Enforce any cell displacements
+            solidModel::setCellDisps(DEqn);
 
             // Solve the linear system
             solverPerfD = DEqn.solve();

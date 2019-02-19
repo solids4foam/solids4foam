@@ -82,7 +82,15 @@ class linGeomTotalDispSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Predict new time-step fields using the velocity field
+        const Switch predictor_;
+
+
     // Private Member Functions
+
+        //- Predict the fields for the next time-step based on the
+        //  previous time-steps
+        void predict();
 
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);

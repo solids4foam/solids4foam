@@ -106,12 +106,8 @@ tmp<vectorField> transientSimpleFluid::patchViscousForce
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
-          & turbulence_->devReff()().boundaryField()[patchID]
+          & (-turbulence_->devReff()().boundaryField()[patchID])
         );
-
-    // PC: why is this commented
-    //vectorField n = mesh().boundary()[patchID].nf();
-    //tvF() -= n*(n & tvF());
 
     return tvF;
 }
@@ -130,37 +126,6 @@ tmp<scalarField> transientSimpleFluid::patchPressureForce
     tpF() = rho_.value()*p().boundaryField()[patchID];
 
     return tpF;
-}
-
-
-tmp<scalarField> transientSimpleFluid::faceZoneMuEff
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    scalarField pMuEff =
-        rho_.value()*turbulence_->nuEff()().boundaryField()[patchID];
-
-    tmp<scalarField> tMuEff
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& muEff = tMuEff();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pMuEff, I)
-    {
-        muEff[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
-            pMuEff[I];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(muEff, sumOp<scalarField>());
-
-    return tMuEff;
 }
 
 

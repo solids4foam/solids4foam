@@ -92,7 +92,7 @@ class nonLinGeomTotalLagTotalDispSolid
         const volScalarField rImpK_;
 
         //- Predict new time-step fields using the velocity field
-        const Switch predict_;
+        const Switch predictor_;
 
     // Private Member Functions
 

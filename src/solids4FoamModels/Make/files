@@ -2,6 +2,8 @@ physicsModel/physicsModel.C
 
 solidModels/solidModel/solidModel.C
 solidModels/solidModel/lookupSolidModel.C
+solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
+solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/coupledUnsLinGeomSolid/coupledUnsLinGeomSolid.C
 solidModels/explicitLinGeomTotalDispSolid/explicitLinGeomTotalDispSolid.C
@@ -148,6 +150,8 @@ $(fluidFvPatchFields)/paraboloidInletVelocity/paraboloidInletVelocityFvPatchVect
 $(fluidFvPatchFields)/robin/robinFvPatchFields.C
 $(fluidFvPatchFields)/skewCorrectedLinearDC/skewCorrectedLinearDC.C
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
+
+fluidModels/pointPatchFields/timeVaryingVelocity/timeVaryingVelocityPointPatchVectorField.C
 
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/setInletVelocity/setInletVelocity.C

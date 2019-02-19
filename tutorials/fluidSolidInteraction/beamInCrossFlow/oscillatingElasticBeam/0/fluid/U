@@ -36,7 +36,7 @@ boundaryField
         maxVelocity     0.2;
         yWidth          0.2;
         zWidth          0.4;
-        timeVarying     yes;
+        timeVaryingEndTime 100.0;
         timeAtMaxVelocity 1.0;
         value           uniform (0 0 0);
     }

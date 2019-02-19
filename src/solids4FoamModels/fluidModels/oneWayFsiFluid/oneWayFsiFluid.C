@@ -79,9 +79,6 @@ tmp<vectorField> oneWayFsiFluid::patchViscousForce(const label patchID) const
 
     tvF() = rho_.value()*nu_.value()*U().boundaryField()[patchID].snGrad();
 
-    const vectorField n = mesh().boundary()[patchID].nf();
-    tvF() -= n*(n & tvF());
-
     return tvF;
 }
 
@@ -96,25 +93,6 @@ tmp<scalarField> oneWayFsiFluid::patchPressureForce(const label patchID) const
     tpF() = rho_.value()*p().boundaryField()[patchID];
 
     return tpF;
-}
-
-
-tmp<scalarField> oneWayFsiFluid::faceZoneMuEff
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    tmp<scalarField> tMuEff
-    (
-        new scalarField
-        (
-            mesh().faceZones()[zoneID].size(),
-            rho_.value()*nu_.value()
-        )
-    );
-
-    return tMuEff;
 }
 
 

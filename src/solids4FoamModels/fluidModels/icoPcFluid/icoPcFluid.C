@@ -90,9 +90,8 @@ tmp<vectorField> icoPcFluid::patchViscousForce(const label patchID) const
         rho_.value()*laminarTransport_.nu().boundaryField()[patchID]
        *U().boundaryField()[patchID].snGrad();
 
-    const vectorField n = mesh().boundary()[patchID].nf();
-
-    tvF() -= n*(n & tvF());
+    //const vectorField n = mesh().boundary()[patchID].nf();
+    //tvF() -= n*(n & tvF());
 
     return tvF;
 }
@@ -108,37 +107,6 @@ tmp<scalarField> icoPcFluid::patchPressureForce(const label patchID) const
     tpF() = rho_.value()*p().boundaryField()[patchID];
 
     return tpF;
-}
-
-
-tmp<scalarField> icoPcFluid::faceZoneMuEff
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    scalarField pMuEff =
-        rho_.value()*laminarTransport_.nu().boundaryField()[patchID];
-
-    tmp<scalarField> tMuEff
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& muEff = tMuEff();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pMuEff, I)
-    {
-        muEff[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
-            pMuEff[I];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(muEff, sumOp<scalarField>());
-
-    return tMuEff;
 }
 
 
@@ -173,7 +141,7 @@ bool icoPcFluid::evolve()
 
         scalar eqnResidual = 1;
         scalar maxResidual = 0;
-    
+
         // Calculate CourantNo
         {
             scalar CoNum = 0.0;
@@ -191,7 +159,7 @@ bool icoPcFluid::evolve()
         volScalarField rUA = 1.0/UEqn.A();
 
         UEqn += fvm::ddt(U());
-        
+
         UEqn.relax();
 
         eqnResidual = solve(UEqn == -gradp()).initialResidual();
@@ -207,15 +175,15 @@ bool icoPcFluid::evolve()
             {
                 if (p().boundaryField()[patchI].fixesValue())
                 {
-                    avgU.boundaryField()[patchI] = 
+                    avgU.boundaryField()[patchI] =
                         U().boundaryField()[patchI].patchInternalField();
-                    avgGradp.boundaryField()[patchI] = 
+                    avgGradp.boundaryField()[patchI] =
                         gradp().boundaryField()[patchI].patchInternalField();
                 }
             }
 
             phi() =
-                (avgU & mesh.Sf()) 
+                (avgU & mesh.Sf())
               + fvc::interpolate(rUA)*(mesh.Sf() & avgGradp);
 
             U() += rUA*gradp();
@@ -227,7 +195,7 @@ bool icoPcFluid::evolve()
 
             forAll(p().boundaryField(), patchI)
             {
-                if 
+                if
                 (
                     !p().boundaryField()[patchI].fixesValue()
                  && isA<zeroGradientFvPatchVectorField>
@@ -278,7 +246,7 @@ bool icoPcFluid::evolve()
 
         if (maxResidual < convergenceCriterion)
         {
-            Info<< "Reached convergence criterion: " 
+            Info<< "Reached convergence criterion: "
                 << convergenceCriterion << endl
                 << "Number of iterations: " << oCorr << endl;
             break;

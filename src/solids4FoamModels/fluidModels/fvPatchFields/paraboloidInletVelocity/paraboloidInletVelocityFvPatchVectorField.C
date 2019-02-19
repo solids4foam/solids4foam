@@ -48,7 +48,7 @@ paraboloidInletVelocityFvPatchVectorField
     Umax_(0.0),
     yMax_(0.0),
     zMax_(0.0),
-    timeVarying_(false),
+    timeVaryingEndTime_(0.0),
     timeAtMaxVelocity_(0.0)
 {}
 
@@ -66,7 +66,7 @@ paraboloidInletVelocityFvPatchVectorField
     Umax_(ptf.Umax_),
     yMax_(ptf.yMax_),
     zMax_(ptf.zMax_),
-    timeVarying_(ptf.timeVarying_),
+    timeVaryingEndTime_(ptf.timeVaryingEndTime_),
     timeAtMaxVelocity_(ptf.timeAtMaxVelocity_)
 {}
 
@@ -83,10 +83,10 @@ paraboloidInletVelocityFvPatchVectorField
     Umax_(readScalar(dict.lookup("maxVelocity"))),
     yMax_(readScalar(dict.lookup("yWidth"))),
     zMax_(readScalar(dict.lookup("zWidth"))),
-    timeVarying_(dict.lookup("timeVarying")),
+    timeVaryingEndTime_(readScalar(dict.lookup("timeVaryingEndTime"))),
     timeAtMaxVelocity_
     (
-        timeVarying_
+        bool(timeVaryingEndTime_ > 0.0)
       ? readScalar(dict.lookup("timeAtMaxVelocity"))
       : 0.0
     )
@@ -103,7 +103,7 @@ paraboloidInletVelocityFvPatchVectorField
     Umax_(pivpvf.Umax_),
     yMax_(pivpvf.yMax_),
     zMax_(pivpvf.zMax_),
-    timeVarying_(pivpvf.timeVarying_),
+    timeVaryingEndTime_(pivpvf.timeVaryingEndTime_),
     timeAtMaxVelocity_(pivpvf.timeAtMaxVelocity_)
 {}
 
@@ -119,7 +119,7 @@ paraboloidInletVelocityFvPatchVectorField
     Umax_(pivpvf.Umax_),
     yMax_(pivpvf.yMax_),
     zMax_(pivpvf.zMax_),
-    timeVarying_(pivpvf.timeVarying_),
+    timeVaryingEndTime_(pivpvf.timeVaryingEndTime_),
     timeAtMaxVelocity_(pivpvf.timeAtMaxVelocity_)
 {}
 
@@ -137,13 +137,11 @@ void paraboloidInletVelocityFvPatchVectorField::updateCoeffs()
 
     // Calculate the max velocity for the current time
     scalar curMaxU = Umax_;
-    if (timeVarying_)
+    if (db().time().value() < timeVaryingEndTime_)
     {
         curMaxU =
             Umax_*(1.0 - cos(M_PI*db().time().value()/timeAtMaxVelocity_))/2.0;
     }
-
-    // Info<< "curMaxU: " << curMaxU << endl;
 
     // Calculate the patch velocity
     vectorField patchU(patch().size(), vector::zero);
@@ -170,7 +168,7 @@ snGrad() const
 
     bool secondOrder_ = false;
 
-    word UName = this->dimensionedInternalField().name();
+    const word& UName = dimensionedInternalField().name();
 
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>
@@ -184,8 +182,8 @@ snGrad() const
 
     if (secondOrder_)
     {
-        vectorField dUP = (k&gradU.patchInternalField());
-        vectorField nGradUP = (n&gradU.patchInternalField());
+        const vectorField dUP = (k & gradU.patchInternalField());
+        const vectorField nGradUP = (n & gradU.patchInternalField());
 
         tmp<Field<vector> > tnGradU
         (
@@ -204,18 +202,18 @@ snGrad() const
     }
 
     // First order
-    vectorField dUP = (k&gradU.patchInternalField());
+    const vectorField dUP = (k & gradU.patchInternalField());
 
     tmp<Field<vector> > tnGradU
     (
         new vectorField(this->patch().size(), vector::zero)
     );
 
-    tnGradU() =
+     tnGradU() =
         (
             *this
           - (patchInternalField() + dUP)
-        )*this->patch().deltaCoeffs();
+        )*patch().deltaCoeffs();
 
     return tnGradU;
 }
@@ -226,7 +224,7 @@ gradientBoundaryCoeffs() const
 {
     bool secondOrder_ = false;
 
-    word UName = this->dimensionedInternalField().name();
+    const word& UName = dimensionedInternalField().name();
 
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>
@@ -274,8 +272,8 @@ void paraboloidInletVelocityFvPatchVectorField::write(Ostream& os) const
     os.writeKeyword("zWidth")
         << zMax_ << token::END_STATEMENT << nl;
 
-    os.writeKeyword("timeVarying")
-        << timeVarying_ << token::END_STATEMENT << nl;
+    os.writeKeyword("timeVaryingEndTime")
+        << timeVaryingEndTime_ << token::END_STATEMENT << nl;
 
     os.writeKeyword("timeAtMaxVelocity")
         << timeAtMaxVelocity_ << token::END_STATEMENT << nl;

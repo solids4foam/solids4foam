@@ -51,6 +51,7 @@ SourceFiles
 #include "runTimeSelectionTables.H"
 #include "pimpleControl.H"
 #include "uniformDimensionedFields.H"
+#include "globalPolyPatch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -76,12 +77,6 @@ class fluidModel
 
         //- Pimple control
         mutable autoPtr<pimpleControl> pimplePtr_;
-
-        //- Global face zones
-        mutable labelList* globalFaceZonesPtr_;
-
-        //- Global to local face zone point maping
-        mutable labelListList* globalToLocalFaceZonePointMapPtr_;
 
         //- Wave properties needed to use waves2Foam
         const IOdictionary waveProperties_;
@@ -142,16 +137,18 @@ class fluidModel
         //  interface called mesh.updated()
         bool fsiMeshUpdateChanged_;
 
+        //- Global poly patch
+        //  This is a copy of a patch which is reconstructed in full on each
+        //  processor. This is convenient for interpolating between two patches
+        //  in parallel, as used, for example, in the fluid-solid interaction
+        //  procedure
+        mutable autoPtr<globalPolyPatch> globalPatchPtr_;
+
+
     // Private Member Functions
 
         //- Make the pimple control
         void makePimpleControl() const;
-
-        //- Find global face zones
-        void calcGlobalFaceZones() const;
-
-        //- Calculate global to local point addressing
-        void calcGlobalToLocalFaceZonePointMap() const;
 
         //- Read g field from disk, if it exists, otherwise return zero field
         uniformDimensionedVectorField readG() const;
@@ -358,37 +355,25 @@ public:
             ) const = 0;
 
             //- Patch viscous force (N/m2)
-            virtual tmp<vectorField> faceZoneViscousForce
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
+            virtual tmp<vectorField> faceZoneViscousForce() const;
 
             //- Patch pressure force (N/m2)
-            virtual tmp<scalarField> faceZonePressureForce
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
-
-            // //- Face zone effective dynamic viscosity
-            virtual tmp<scalarField> faceZoneMuEff
-            (
-                const label zoneID,
-                const label patchID
-            ) const = 0;
-
-            //- Get global face zones list
-            const labelList& globalFaceZones() const;
-
-            //- Get global to local face zone point addressing
-            const labelListList& globalToLocalFaceZonePointMap() const;
+            virtual tmp<scalarField> faceZonePressureForce() const;
 
             //- This function will check that the U field was read from disk
             virtual void UisRequired();
 
             //- This function will check that the p field was read from disk
             virtual void pisRequired();
+
+            //- Make the global poly patch
+            void makeGlobalPatch(const word& patchName) const;
+
+            //- Return const-access to the global poly patch
+            const globalPolyPatch& globalPatch() const;
+
+            //- Clear global poly patch
+            void clearGlobalPatch() const;
 
         // Edit
 

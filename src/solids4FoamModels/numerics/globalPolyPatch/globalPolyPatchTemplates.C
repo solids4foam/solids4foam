@@ -55,15 +55,25 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::patchPointToGlobal
 
     if (Pstream::parRun())
     {
+        // PC, 16/12/17
+        // We have removed duplicate points so multiple local processor points
+        // may map to the same global point, which we will account for using
+        // the nPoints field
+        scalarField nPoints(gField.size(), 0.0);
+
         const labelList& addr = pointToGlobalAddr();
 
-        forAll (addr, i)
+        forAll(addr, i)
         {
-            gField[addr[i]] = pField[i];
+            const label globalPointID = addr[i];
+            gField[globalPointID] = pField[i];
+            nPoints[globalPointID] += 1.0;
         }
 
         // Global comm
         reduce(gField, sumOp<Field<Type> >());
+        reduce(nPoints, sumOp<Field<scalar> >());
+        gField /= nPoints;
     }
     else
     {

@@ -50,6 +50,9 @@ SourceFiles
 #include "mechanicalModel.H"
 #include "nonLinearGeometry.H"
 #include "uniformDimensionedFields.H"
+#include "momentumStabilisation.H"
+#include "globalPolyPatch.H"
+#include "setCellDisplacements.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -126,11 +129,8 @@ class solidModel
         //- Gravitational acceleration
         const uniformDimensionedVectorField g_;
 
-        //- Scale factor for Rhie-Chow stabilisation term
-        const scalar RhieChowScale_;
-
-        //- Scale factor for Jameson-Schmidt-Turkel stabilisation term
-        const scalar JameSchimTurkScale_;
+        //- Stabilisation term for momentum equation
+        autoPtr<momentumStabilisation> stabilisationPtr_;
 
         //- Solution standard tolerance
         const scalar solutionTol_;
@@ -188,11 +188,15 @@ class solidModel
         //- Reference D (without relaxation) field used for Quasi-Newton method
         volVectorField unrelaxedDRef_;
 
-        //- Global face zones
-        mutable labelList* globalFaceZonesPtr_;
+        //- Global poly patch
+        //  This is a copy of a patch which is reconstructed in full on each
+        //  processor. This is convenient for interpolating between two patches
+        //  in parallel, as used, for example, in the fluid-solid interaction
+        //  procedure
+        mutable autoPtr<globalPolyPatch> globalPatchPtr_;
 
-        //- Global to local face zone point mapping
-        mutable labelListList* globalToLocalFaceZonePointMapPtr_;
+        //- Optional: set displacement at internal cells
+        mutable autoPtr<setCellDisplacements> setCellDispsPtr_;
 
 
     // Private Member Functions
@@ -200,12 +204,6 @@ class solidModel
         //- Disable solution in the out-of-plane direction for axisymmetric
         //  cases
         void checkWedges() const;
-
-        //- Find global face zones
-        void calcGlobalFaceZones() const;
-
-        //- Find global to local point addressing
-        void calcGlobalToLocalFaceZonePointMap() const;
 
         //- Make the thermal model
         void makeThermalModel() const;
@@ -223,6 +221,12 @@ class solidModel
         //  Lagrangian approaches, we need the pointD field. This function will
         //  check which field to return
         const pointVectorField& pointDorPointDD() const;
+
+        //- Make setCellDisplacements
+        void makeSetCellDisps() const;
+
+        //- Return a reference to setCellDisplacements
+        const setCellDisplacements& setCellDisps() const;
 
         //- Disallow default bitwise copy construct
         solidModel(const solidModel&);
@@ -259,6 +263,10 @@ protected:
         //- Return non-const reference to the density
         volScalarField& rho();
 
+        //- Optional: cells can be forced to a specified displacement in the
+        //  linear system
+        void setCellDisps(fvVectorMatrix& DEqn);
+
         //- Apply fixed or Aitken's adaptive under-relaxation to the field
         void relaxField(volVectorField& D, int iCorr);
 
@@ -275,18 +283,6 @@ protected:
         const uniformDimensionedVectorField& g() const
         {
             return g_;
-        }
-
-        //- Return Rhie-Chow scale factor
-        scalar RhieChowScale() const
-        {
-            return RhieChowScale_;
-        }
-
-        //- Return JST scale factor
-        scalar JameSchimTurkScale() const
-        {
-            return JameSchimTurkScale_;
         }
 
         //- Return solution standard tolerance
@@ -323,6 +319,12 @@ protected:
         int& maxIterReached()
         {
             return maxIterReached_;
+        }
+
+        //- Return const reference to stabilisation
+        const momentumStabilisation& stabilisation() const
+        {
+            return stabilisationPtr_();
         }
 
 
@@ -522,56 +524,25 @@ public:
             virtual volVectorField& solutionD() = 0;
 
             //- Face zone point displacement increment
-            virtual tmp<vectorField> faceZonePointDisplacementIncrement
-            (
-                 const label zoneID
-            ) const;
+            virtual tmp<vectorField> faceZonePointDisplacementIncrement() const;
 
             //- Face zone point displacement increment
-            virtual tmp<vectorField> faceZonePointDisplacement
-            (
-                 const label zoneID
-            ) const;
+            virtual tmp<vectorField> faceZonePointDisplacementOld() const;
 
             //- Face zone velocity
-            virtual tmp<vectorField> faceZoneAcceleration
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
+            virtual tmp<vectorField> faceZoneAcceleration() const;
 
             //- Face zone velocity
-            virtual tmp<vectorField> faceZoneVelocity
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
+            virtual tmp<vectorField> faceZoneVelocity() const;
 
             //- Face zone surface velocity gradient
-            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
+            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity() const;
 
             //- Face zone current normal
-            virtual tmp<vectorField> faceZoneNormal
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
+            virtual tmp<vectorField> faceZoneNormal() const;
 
             //- Face zone primitive patch in current configuration
-            virtual tmp<vectorField> currentFaceZonePoints
-            (
-                const label zoneID
-            ) const;
-
-            //- Get global face zones list
-            const labelList& globalFaceZones() const;
-
-            //- Get global to local face zone point addressing
-            const labelListList& globalToLocalFaceZonePointMap() const;
+            virtual tmp<vectorField> currentFaceZonePoints() const;
 
             //- Return enforceLinear switch
             const Switch& enforceLinear() const
@@ -599,28 +570,16 @@ public:
             //- This function will check that the DD field was read from disk
             virtual void DDisRequired();
 
+            //- Make the global poly patch
+            void makeGlobalPatch(const word& patchName) const;
+
+            //- Return const-access to the global poly patch
+            const globalPolyPatch& globalPatch() const;
+
+            //- Clear global poly patch
+            void clearGlobalPatch() const;
+
         // Edit
-
-            //- Update the points on global face zones when moving the mesh
-            void updateGlobalFaceZoneNewPoints
-            (
-                const pointField& pointDDI,
-                pointField& newPoints
-            );
-
-            //- Set traction at specified patch
-            virtual void setTraction
-            (
-                const label patchID,
-                const vectorField& traction
-            );
-
-            //- Set traction at specified patch
-            virtual void setPressure
-            (
-                const label patchID,
-                const scalarField& pressure
-            );
 
             //- Set traction at specified patch
             virtual void setTraction
@@ -640,7 +599,6 @@ public:
             virtual void setTraction
             (
                 const label patchID,
-                const label zoneID,
                 const vectorField& faceZoneTraction
             );
 
@@ -648,7 +606,6 @@ public:
             virtual void setPressure
             (
                 const label patchID,
-                const label zoneID,
                 const scalarField& faceZonePressure
             );
 

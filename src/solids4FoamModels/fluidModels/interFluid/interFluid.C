@@ -355,7 +355,8 @@ interFluid::interFluid
             "rho",
             runTime.timeName(),
             mesh(),
-            IOobject::READ_IF_PRESENT
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
         ),
         alpha1_*rho1_ + (scalar(1) - alpha1_)*rho2_,
         alpha1_.boundaryField().types()
@@ -420,11 +421,8 @@ tmp<vectorField> interFluid::patchViscousForce(const label patchID) const
     tvF() =
         (
             mesh().boundary()[patchID].nf()
-          & turbulence_->devReff()().boundaryField()[patchID]
+          & (-turbulence_->devReff()().boundaryField()[patchID])
         );
-
-    vectorField n = mesh().boundary()[patchID].nf();
-    tvF() -= (sqr(n) & tvF());
 
     return tvF;
 }
@@ -440,37 +438,6 @@ tmp<scalarField> interFluid::patchPressureForce(const label patchID) const
     tpF() = p().boundaryField()[patchID];
 
     return tpF;
-}
-
-
-tmp<scalarField> interFluid::faceZoneMuEff
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    scalarField pMuEff =
-       turbulence_->nuEff()().boundaryField()[patchID];
-
-    tmp<scalarField> tMuEff
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& muEff = tMuEff();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pMuEff, I)
-    {
-        muEff[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
-            pMuEff[I];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(muEff, sumOp<scalarField>());
-
-    return tMuEff;
 }
 
 
