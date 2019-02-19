@@ -421,11 +421,8 @@ tmp<vectorField> interFluid::patchViscousForce(const label patchID) const
     tvF() =
         (
             mesh().boundary()[patchID].nf()
-          & turbulence_->devReff()().boundaryField()[patchID]
+          & (-turbulence_->devReff()().boundaryField()[patchID])
         );
-
-    vectorField n = mesh().boundary()[patchID].nf();
-    tvF() -= (sqr(n) & tvF());
 
     return tvF;
 }

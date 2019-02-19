@@ -90,9 +90,8 @@ tmp<vectorField> icoPcFluid::patchViscousForce(const label patchID) const
         rho_.value()*laminarTransport_.nu().boundaryField()[patchID]
        *U().boundaryField()[patchID].snGrad();
 
-    const vectorField n = mesh().boundary()[patchID].nf();
-
-    tvF() -= n*(n & tvF());
+    //const vectorField n = mesh().boundary()[patchID].nf();
+    //tvF() -= n*(n & tvF());
 
     return tvF;
 }

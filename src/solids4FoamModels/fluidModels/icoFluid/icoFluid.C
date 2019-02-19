@@ -89,10 +89,6 @@ tmp<vectorField> icoFluid::patchViscousForce(const label patchID) const
 
     tvF() = rho_.value()*nu_.value()*U().boundaryField()[patchID].snGrad();
 
-    const vectorField n = mesh().boundary()[patchID].nf();
-
-    tvF() -= n*(n & tvF());
-
     return tvF;
 }
 

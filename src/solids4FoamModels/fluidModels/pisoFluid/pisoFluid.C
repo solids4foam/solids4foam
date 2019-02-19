@@ -99,12 +99,8 @@ tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
-          & turbulence_->devReff()().boundaryField()[patchID]
+          & (-turbulence_->devReff()().boundaryField()[patchID])
         );
-
-    // PC: why is this commented?
-    //vectorField n = mesh().boundary()[patchID].nf();
-    //tvF() -= n*(n & tvF());
 
     return tvF;
 }

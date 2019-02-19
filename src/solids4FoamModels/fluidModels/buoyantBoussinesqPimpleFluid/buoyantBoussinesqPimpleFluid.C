@@ -233,11 +233,8 @@ tmp<vectorField> buoyantBoussinesqPimpleFluid::patchViscousForce(const label pat
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
-          & turbulence_->devReff()().boundaryField()[patchID]
+          & (-turbulence_->devReff()().boundaryField()[patchID])
         );
-
-    const vectorField n = mesh().boundary()[patchID].nf();
-    tvF() -= (sqr(n) & tvF());
 
     return tvF;
 }
