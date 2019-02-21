@@ -54,6 +54,17 @@ solvers
     }
 }
 
+PISO
+{
+    momentumPredictor yes;
+
+    nCorrectors     3;
+    nNonOrthogonalCorrectors 1;
+
+    pRefCell        0;
+    pRefValue       0;
+}
+
 relaxationFactors
 {
     U    0.7;

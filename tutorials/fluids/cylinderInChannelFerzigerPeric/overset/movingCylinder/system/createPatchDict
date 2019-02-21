@@ -1,0 +1,98 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      createPatchDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// This application/dictionary controls:
+// - optional: create new patches from boundary faces (either given as
+//   a set of patches or as a faceSet)
+// - always: order faces on coupled patches such that they are opposite. This
+//   is done for all coupled faces, not just for any patches created.
+// - optional: synchronise points on coupled patches.
+
+// 1. Create cyclic:
+// - specify where the faces should come from
+// - specify the type of cyclic. If a rotational specify the rotationAxis
+//   and centre to make matching easier
+// - pointSync true to guarantee points to line up.
+
+// 2. Correct incorrect cyclic:
+// This will usually fail upon loading:
+//  "face 0 area does not match neighbour 2 by 0.0100005%"
+//  " -- possible face ordering problem."
+// - change patch type from 'cyclic' to 'patch' in the polyMesh/boundary file.
+// - loosen match tolerance to get case to load
+// - regenerate cyclic as above
+
+// Tolerance used in matching faces. Absolute tolerance is span of
+// face times this factor. To load incorrectly matches meshes set this
+// to a higher value.
+matchTolerance 1e-3;
+
+// Do a synchronisation of coupled points after creation of any patches.
+// Note: this does not work with points that are on multiple coupled patches
+//       with transformations.
+pointSync true;
+
+// Patches to create.
+patchInfo
+(
+    // {
+    //     // Name of new patch
+    //     name sidePatches;
+
+    //     // Type of new patch
+    //     dictionary
+    //     {
+    //         type cyclic;
+
+    //         // Optional: explicitly set transformation tensor.
+    //         // Used when matching and synchronising points.
+    //         //transform translational;
+    //         //separationVector (-2289 0 0);
+    //         transform rotational;
+    //         rotationAxis (1 0 0);
+    //         rotationCentre (0 0 0);
+    //     }
+
+    //     // How to construct: either from 'patches' or 'set'
+    //     constructFrom patches;
+
+    //     // If constructFrom = patches : names of patches. Wildcards allowed.
+    //     patches ("periodic.*");
+
+    //     // If constructFrom = set : name of faceSet
+    //     set f0;
+    // }
+
+    {
+        name frontAndBackPlanes_l;
+
+        // Type of new patch
+        dictionary
+        {
+            type empty;
+        }
+
+        constructFrom patches;
+
+        patches (frontAndBackPlanes);
+
+        set bottomFaces;
+    }
+
+);
+
+
+// ************************************************************************* //

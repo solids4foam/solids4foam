@@ -49,7 +49,7 @@ fluidSolidInterface    IQNILS;
     // Optional: if coupled is set to "no", then the couplingStartTime also you
     // to enable coupling at specified time
     // Defaults to 0.0
-    couplingStartTime     0.5;
+    couplingStartTime     2;
 
     // Optional (only for IQNILS): re-use modes from previous time-steps.
     // The number of modes to be re-used is specified

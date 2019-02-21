@@ -50,8 +50,11 @@ SourceFiles
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
 #include "pimpleControl.H"
-#include "uniformDimensionedFields.H"
-#include "globalPolyPatch.H"
+#include "pisoControl.H"
+#if FOAMEXTEND > 40
+    #include "oversetMesh.H"
+#endif
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -74,6 +77,9 @@ class fluidModel
 
         //- Fluid properties dictionary
         dictionary fluidProperties_;
+
+        //- Piso control
+        mutable autoPtr<pisoControl> pisoPtr_;
 
         //- Pimple control
         mutable autoPtr<pimpleControl> pimplePtr_;
@@ -148,6 +154,9 @@ class fluidModel
     // Private Member Functions
 
         //- Make the pimple control
+        void makePisoControl() const;
+  
+        //- Make the pimple control
         void makePimpleControl() const;
 
         //- Read g field from disk, if it exists, otherwise return zero field
@@ -182,8 +191,21 @@ protected:
         //- Calculate the Courant number
         void CourantNo(scalar& CoNum, scalar& meanCoNum, scalar& velMag) const;
 
+#if FOAMEXTEND > 40
+        //- Calculate the Courant number
+        void oversetCourantNo
+        (
+            scalar& CoNum, scalar& meanCoNum, scalar& velMag
+        ) const;
+#endif
+
         //- Continuity errors
         void continuityErrs();
+
+#if FOAMEXTEND > 40
+        //- Continuity errors
+        void oversetContinuityErrs();
+#endif
 
         //- Bound the pressure and velocity fields
         void boundPU
@@ -262,7 +284,15 @@ public:
             }
 
             //- Return non-const acess to the pimple control
+            pisoControl& piso();
+  
+            //- Return non-const acess to the pimple control
             pimpleControl& pimple();
+
+#if FOAMEXTEND > 40
+            //- Return non-const acess to the overset mesh
+            const oversetMesh& osMesh() const;
+#endif
 
             //- Return const gravity field
             virtual const uniformDimensionedVectorField& g() const

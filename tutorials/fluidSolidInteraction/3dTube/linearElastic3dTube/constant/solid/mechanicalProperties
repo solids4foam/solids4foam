@@ -21,6 +21,7 @@ mechanical
     pipe
     {
         type            linearElastic;
+        // type            neoHookeanElastic;
         rho             rho [1 -3 0 0 0 0 0]  1200;
         E               E   [1 -1 -2 0 0 0 0] 3e5;
         nu              nu  [0 0 0 0 0 0 0]   0.3;

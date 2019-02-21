@@ -1,0 +1,148 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      cellSetDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Name of set to operate on
+name front;
+
+// One of clear/new/invert/add/delete|subset/list
+action new;
+
+// Actions to apply to cellSet. These are all the topoSetSource's ending
+// in ..ToCell (see the meshTools library).
+
+topoSetSources
+(
+    // // Select by explicitly providing cell labels
+    // labelToCell
+    // {
+    //     value (12 13 56);   // labels of cells
+    // }
+
+    // // Copy elements from cellSet
+    // cellToCell
+    // {
+    //     set c1;
+    // }
+
+    // Cells in cell zone
+    zoneToCell
+    {
+        name "front";      // Name of cellZone, regular expressions allowed
+    }
+
+    // // Cells on master or slave side of faceZone
+    // faceZoneToCell
+    // {
+    //     name ".*Zone";      // Name of faceZone, regular expressions allowed
+    //     option master;      // master/slave
+    // }
+
+    // // Select based on faceSet
+    // faceToCell
+    // {
+    //     set f0;             // Name of faceSet
+
+    //     //option neighbour; // cell with neighbour in faceSet
+    //     //option owner;     //  ,,       owner
+    //     option any;         // cell with any face in faceSet
+    //     //option all;       // cell with all faces in faceSet
+    // }
+
+    // // Select based on pointSet
+    // pointToCell
+    // {
+    //     set p0;
+    //     option any;         // cell with any point in pointSet
+    //     //option all;       // cell with all points in pointSet
+    // }
+
+    // // Select based on cellShape
+    // shapeToCell
+    // {
+    //     type hex;           // hex/wedge/prism/pyr/tet/tetWedge/splitHex
+    // }
+
+    // // Cells with cell centre within box
+    // boxToCell
+    // {
+    //    box   (0 0 0) (1 1 1);
+    // }
+
+    // // Cells with cell centre within box
+    // // Is skewed, rotated box. Given as origin and three spanning vectors.
+    // rotatedBoxToCell
+    // {
+    //    origin   (0.2 0.2 -10);
+    //    i        (0.2 0.2 0);
+    //    j        (-0.2 0.2 0);
+    //    k        (10 10 10);
+    // }
+
+    // // Cells with centre within cylinder
+    // cylinderToCell
+    // {
+    //    p1       (0.2 0.2 -10); // start point on cylinder axis
+    //    p2       (0.2 0.2 0);   // end point on cylinder axis
+    //    radius   5.0;
+    // }
+
+    // // Cells with centre within sphere
+    // sphereToCell
+    // {
+    //    centre   (0.2 0.2 -10);
+    //    radius   5.0;
+    // }
+
+    // // Cells with cellCentre nearest to coordinates
+    // nearestToCell
+    // {
+    //    points ((0 0 0) (1 1 1)(2 2 2));
+    // }
+
+    // // Select based on surface
+    // surfaceToCell
+    // {
+    //     file            "www.avl.com-geometry.stl";
+    //     outsidePoints   ((-99 -99 -59));    // definition of outside
+    //     includeCut      false;              // cells cut by surface
+    //     includeInside   false;              // cells not on outside of surf
+    //     includeOutside  false;              // cells on outside of surf
+    //     nearDistance    -1;                 // cells with centre near surf
+    //                                         // (set to -1 if not used)
+    //     curvature       0.9;                // cells within nearDistance
+    //                                         // and near surf curvature
+    //                                         // (set to -100 if not used)
+    // }
+
+    // // values of field within certain range
+    // fieldToCell
+    // {
+    //     fieldName   U;      // Note: uses mag(U) since volVectorField
+    //     min         0.1;
+    //     max         0.5;
+    // }
+
+    // // Mesh region (non-face connected part of (subset of)mesh)
+    // regionToCell
+    // {
+    //     set         c0;         // name of cellSet giving mesh subset
+    //     insidePoint (1 2 3);    // point inside region to select
+    // }
+
+);
+
+
+// ************************************************************************* //

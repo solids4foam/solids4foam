@@ -166,6 +166,8 @@ bool unsLinGeomSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
+    blockLduMatrix::debug = 1;
+    
     return true;
 }
 

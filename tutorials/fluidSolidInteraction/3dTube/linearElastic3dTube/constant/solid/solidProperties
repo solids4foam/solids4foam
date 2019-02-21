@@ -14,10 +14,10 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel linearGeometryTotalDisplacement;
+// solidModel linearGeometryTotalDisplacement;
 solidModel unsLinearGeometry;
-//solidModel unsTotalLagrangianSolid;
-//solidModel nonLinearGeometryTotalLagrangian;
+// solidModel unsNonLinearGeometryTotalLagrangian;
+// solidModel nonLinearGeometryTotalLagrangian;
 
 "linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
 {
@@ -26,29 +26,29 @@ solidModel unsLinearGeometry;
     relConvergenceTolerance 1e-3;
 }
 
-nonLinearGeometryTotalLagrangianCoeffs
-{
-    nCorrectors             200;
-    convergenceTolerance    1e-7;
-    relConvergenceTolerance 1e-3;
-}
+// nonLinearGeometryTotalLagrangianCoeffs
+// {
+//     nCorrectors             200;
+//     convergenceTolerance    1e-7;
+//     relConvergenceTolerance 1e-3;
+// }
 
-unsTotalLagrangianSolidCoeffs
-{
-    nCorrectors             200;
-    convergenceTolerance    1e-7;
-    relConvergenceTolerance 1e-3;
-    nonLinear no;
-    debug no;
-}
+// unsNonLinearGeometryTotalLagrangianCoeffs
+// {
+//     nCorrectors             200;
+//     convergenceTolerance    1e-7;
+//     relConvergenceTolerance 1e-3;
+//     // nonLinear no;
+//     // debug no;
+// }
 
-unsIncrTotalLagrangianSolidCoeffs
-{
-    nCorrectors             200;
-    convergenceTolerance    1e-7;
-    relConvergenceTolerance 1e-3;
-    nonLinear no;
-    debug no;
-}
+// unsIncrTotalLagrangianSolidCoeffs
+// {
+//     nCorrectors             200;
+//     convergenceTolerance    1e-7;
+//     relConvergenceTolerance 1e-3;
+//     nonLinear no;
+//     debug no;
+// }
 
 // ************************************************************************* //

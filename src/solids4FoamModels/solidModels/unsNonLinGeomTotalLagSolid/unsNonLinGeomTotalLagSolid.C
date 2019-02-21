@@ -369,7 +369,8 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         << ", Relative residual = " << res
         << ", enforceLinear = " << enforceLinear() << endl;
 
-    lduMatrix::debug = 1;
+    blockLduMatrix::debug = 1;
+    // lduMatrix::debug = 1;
 
     if (nonLinear_ && enforceLinear())
     {

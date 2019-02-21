@@ -1,0 +1,85 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    oversetFaces
+    {
+        type overset;
+        value uniform 0;
+        coupledFringe yes;
+        
+        conservativeCorrection yes;
+        
+        setHoleCellValue  yes;
+        holeCellValue     0;
+    }
+    interface
+    {
+        type zeroGradient;
+        value uniform 0;
+    }
+    outlet
+    {
+         type fixedValue;
+         value uniform 0;
+    }
+    inlet
+    {
+        type extrapolatedPressure;
+        value uniform 0;
+    }
+    bottom
+    {
+        type zeroGradient;
+        value uniform 0;
+    }
+    top
+    {
+        type zeroGradient;
+        value uniform 0;
+    }
+    left
+    {
+        type zeroGradient;
+        value uniform 0;
+    }
+    symmetry
+    {
+        type symmetryPlane;
+    }
+    outer_front
+    {
+        type zeroGradient;
+        value uniform 0;
+    }
+    symmetry_front
+    {
+        type symmetryPlane;
+    }
+    bottom_front
+    {
+        type zeroGradient;
+        value uniform 0;
+    }
+}
+
+
+// ************************************************************************* //

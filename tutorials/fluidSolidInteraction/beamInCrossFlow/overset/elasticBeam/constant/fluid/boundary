@@ -1,0 +1,89 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       polyBoundaryMesh;
+    location    "constant/polyMesh";
+    object      boundary;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+11
+(
+    oversetFaces
+    {
+        type            overset;
+        nFaces          0;
+        startFace       47824;
+    }
+    outer_front
+    {
+        type            patch;
+        nFaces          576;
+        startFace       47824;
+    }
+    symmetry_front
+    {
+        type            symmetryPlane;
+        nFaces          112;
+        startFace       48400;
+    }
+    bottom_front
+    {
+        type            wall;
+        nFaces          112;
+        startFace       48512;
+    }
+    interface
+    {
+        type            wall;
+        nFaces          192;
+        startFace       48624;
+    }
+    outlet
+    {
+        type            patch;
+        nFaces          256;
+        startFace       48816;
+    }
+    inlet
+    {
+        type            patch;
+        nFaces          256;
+        startFace       49072;
+    }
+    symmetry
+    {
+        type            symmetryPlane;
+        nFaces          960;
+        startFace       49328;
+    }
+    left
+    {
+        type            wall;
+        nFaces          960;
+        startFace       50288;
+    }
+    bottom
+    {
+        type            wall;
+        nFaces          960;
+        startFace       51248;
+    }
+    top
+    {
+        type            wall;
+        nFaces          960;
+        startFace       52208;
+    }
+)
+
+
+// ************************************************************************* //

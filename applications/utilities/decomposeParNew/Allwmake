@@ -1,0 +1,14 @@
+#!/bin/bash
+cd ${0%/*} || exit 1    # run from this directory
+
+if [ "$WM_PROJECT" = "foam" ]
+then
+    var=$(awk 'BEGIN{ print "'$WM_PROJECT_VERSION'"<"'4.0'" }')
+    if [ "$var" -eq 1 ]
+    then
+        wmake
+        exit 0
+    fi
+fi
+
+echo "decomposeParNew not compiled for this version"

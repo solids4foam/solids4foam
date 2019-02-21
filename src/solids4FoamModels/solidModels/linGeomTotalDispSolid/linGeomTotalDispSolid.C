@@ -205,6 +205,8 @@ bool linGeomTotalDispSolid::evolve()
     }
     while (mesh().update());
 
+    blockLduMatrix::debug = 1;
+        
     return true;
 }
 

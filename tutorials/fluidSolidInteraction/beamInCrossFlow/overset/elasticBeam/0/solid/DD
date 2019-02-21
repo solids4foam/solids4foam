@@ -1,0 +1,44 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      DD;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    interface
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    bottom
+    {
+       type            fixedDisplacement;
+       value           uniform (0 0 0);
+    }
+    symmetry
+    {
+       type            solidSymmetry;
+       patchType       symmetryPlane;
+       value           uniform (0 0 0);
+    }
+}
+
+
+// ************************************************************************* //

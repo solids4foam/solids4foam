@@ -17,11 +17,6 @@ FoamFile
 fluidModel pUCoupledFluid;
 
 pUCoupledFluidCoeffs
-{
-    //nCorrectors     2;
-    //nNonOrthogonalCorrectors 0;
-    //pRefCell        0;
-    //pRefValue       0;
-}
+{}
 
 // ************************************************************************* //

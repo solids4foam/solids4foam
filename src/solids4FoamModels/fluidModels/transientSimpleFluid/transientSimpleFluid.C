@@ -78,10 +78,6 @@ transientSimpleFluid::transientSimpleFluid
                 IOobject::NO_WRITE
             )
         ).lookup("rho")
-    ),
-    consistencyByJasak_
-    (
-        fluidProperties().lookupOrDefault<Switch>("consistencyByJasak", false)
     )
 {
     UisRequired();
@@ -131,23 +127,28 @@ tmp<scalarField> transientSimpleFluid::patchPressureForce
 
 bool transientSimpleFluid::evolve()
 {
-    if (consistencyByJasak_)
+    Info<< "Evolving fluid model" << endl;
+
+    fvMesh& mesh = fluidModel::mesh();
+
+    bool meshChanged = false;
+    if (fluidModel::fsiMeshUpdate())
     {
-        return evolveConsistentByJasak();
+        // The FSI interface is in charge of calling mesh.update()
+        meshChanged = fluidModel::fsiMeshUpdateChanged();
     }
     else
     {
-        return evolveInconsistent();
+        meshChanged = refCast<dynamicFvMesh>(mesh).update();
+        reduce(meshChanged, orOp<bool>());
     }
-}
 
-
-bool transientSimpleFluid::evolveInconsistent()
-{
-    Info<< "Evolving fluid model" << endl;
-
-    const fvMesh& mesh = fluidModel::mesh();
-
+    if (meshChanged)
+    {
+        const Time& runTime = fluidModel::runTime();
+#       include "volContinuity.H"
+    }
+    
     const int nNonOrthCorr =
         readInt(fluidProperties().lookup("nNonOrthogonalCorrectors"));
 
@@ -164,16 +165,16 @@ bool transientSimpleFluid::evolveInconsistent()
 
     phi().oldTime();
 
+    if (mesh.moving())
+    {
+        // Make the fluxes relative
+        phi() -= fvc::meshPhi(U());
+    }
+        
     for (int oCorr = 0; oCorr < nOuterCorr; oCorr++)
     {
         scalar eqnResidual = 1, maxResidual = 0;
         p().storePrevIter();
-
-        if (mesh.moving())
-        {
-            // Make the fluxes relative
-            phi() -= fvc::meshPhi(U());
-        }
 
         // Calculate CourantNo
         {
@@ -236,129 +237,14 @@ bool transientSimpleFluid::evolveInconsistent()
         U() -= gradp()/aU;
         U().correctBoundaryConditions();
 
-        turbulence_->correct();
-
-        if (maxResidual < convergenceCriterion)
-        {
-            Info<< "reached convergence criterion: "
-                << convergenceCriterion << endl;
-            Info<< "Number of iterations: " << oCorr << endl;
-            break;
-        }
-    }
-
-    return 0;
-}
-
-
-bool transientSimpleFluid::evolveConsistentByJasak()
-{
-    Info<< "Evolving fluid model (consistency by Jasak)" << endl;
-
-    const fvMesh& mesh = fluidModel::mesh();
-
-    const int nNonOrthCorr =
-        readInt(fluidProperties().lookup("nNonOrthogonalCorrectors"));
-
-    const int nOuterCorr =
-        readInt(fluidProperties().lookup("nOuterCorrectors"));
-
-    scalar convergenceCriterion = 0;
-    fluidProperties().readIfPresent("convergence", convergenceCriterion);
-
-    // Prepare for the pressure solution
-    label pRefCell = 0;
-    scalar pRefValue = 0.0;
-    setRefCell(p(), fluidProperties(), pRefCell, pRefValue);
-
-    phi().oldTime();
-
-    for (int oCorr = 0; oCorr < nOuterCorr; oCorr++)
-    {
-        scalar eqnResidual = 1, maxResidual = 0;
-        p().storePrevIter();
-
         if (mesh.moving())
         {
             // Make the fluxes relative
             phi() -= fvc::meshPhi(U());
         }
 
-        // Calculate CourantNo
-        {
-            scalar CoNum = 0.0;
-            scalar meanCoNum = 0.0;
-            scalar velMag = 0.0;
-            fluidModel::CourantNo(CoNum, meanCoNum, velMag);
-        }
-
-        // Construct momentum equation
-        // Convection-diffusion matrix
-        fvVectorMatrix HUEqn
-        (
-            fvm::div(phi(), U())
-          + turbulence_->divDevReff()
-        );
-
-        // Time derivative matrix
-        fvVectorMatrix ddtUEqn(fvm::ddt(U()));
-
-        tmp<fvVectorMatrix> UEqn(ddtUEqn + HUEqn);
-
-        UEqn().relax();
-
-        // Solve momentum equation
-        eqnResidual =
-            solve(UEqn() == -gradp()).initialResidual();
-        maxResidual = max(eqnResidual, maxResidual);
-
-        UEqn.clear();
-
-        volScalarField aU = HUEqn.A();
-
-        U() = HUEqn.H()/aU;
-        phi() = (fvc::interpolate(U()) & mesh.Sf());
-
-#       include "adjustPhi.H"
-
-        for (int nonOrth = 0; nonOrth <= nNonOrthCorr; nonOrth++)
-        {
-            // Construct pressure equation
-            fvScalarMatrix pEqn
-            (
-                fvm::laplacian(1/aU, p()) == fvc::div(phi())
-            );
-
-            // Solve pressure equation
-
-            pEqn.setReference(pRefCell, pRefValue);
-
-            pEqn.solve();
-
-            if (nonOrth == nNonOrthCorr)
-            {
-                phi() -= pEqn.flux();
-            }
-        }
-
-        // Calculate Continuity error
-        fluidModel::continuityErrs();
-
-        // Explicitly relax pressure for momentum corrector
-        p().relax();
-
-        gradp() = fvc::grad(p());
-
-        U() = 1.0/(aU + ddtUEqn.A())*
-            (
-                U()*aU - gradp() + ddtUEqn.H()
-            );
-        U().correctBoundaryConditions();
-
-        gradU() = fvc::grad(U());
-
         turbulence_->correct();
-
+        
         if (maxResidual < convergenceCriterion)
         {
             Info<< "reached convergence criterion: "
@@ -368,6 +254,12 @@ bool transientSimpleFluid::evolveConsistentByJasak()
         }
     }
 
+    if (mesh.moving())
+    {
+        // Make the fluxes absolut
+        phi() += fvc::meshPhi(U());
+    }
+    
     return 0;
 }
 

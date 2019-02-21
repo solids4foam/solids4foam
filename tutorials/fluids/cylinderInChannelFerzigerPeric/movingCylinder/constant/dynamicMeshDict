@@ -1,0 +1,39 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      dynamicMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dynamicFvMesh newDynamicBodyFvMesh;
+// dynamicFvMesh      staticFvMesh;
+
+solver totalVelocityLaplacian;
+diffusivity quadratic inverseDistance 1( CylinderWall );
+nNonOrthogonalCorrectors 2;
+
+newDynamicBodyFvMeshCoeffs
+{
+    bodyPatchName CylinderWall;
+  
+    translationDirection (0 1 0);
+    translationAmplitude 0.25;
+    translationFrequency 0.3;
+
+    initialRotationOrigin (0 0 0);
+    rotationAxis (0 0 1);
+    rotationAmplitude 0;
+    rotationFrequency 0;
+}
+
+
+// ************************************************************************* //

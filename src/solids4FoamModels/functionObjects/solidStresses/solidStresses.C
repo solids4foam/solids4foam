@@ -210,7 +210,11 @@ bool Foam::solidStresses::start()
 }
 
 
+#if FOAMEXTEND > 40
+bool Foam::solidStresses::execute(const bool forceWrite)
+#else
 bool Foam::solidStresses::execute()
+#endif
 {
     return writeData();
 }

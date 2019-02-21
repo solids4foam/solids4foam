@@ -6,14 +6,24 @@ c++WARN = \
     -Wno-ignored-attributes -Wno-misleading-indentation
 
 ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
-    DISABLE_WARNING_FLAGS = -Wno-old-style-cast
+    DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-deprecated-declarations
 else
     DISABLE_WARNING_FLAGS =
 endif
 
+ifeq ($(WM_PROJECT), foam)
+    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
+    ifeq ($(VER), 1)
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
+    else
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
+    endif
+endif
+
 EXE_INC = \
-    $(DISABLE_WARNING_FLAGS) \
     -std=c++11 \
+    $(DISABLE_WARNING_FLAGS) \
+    $(VERSION_SPECIFIC_INC) \
     -I../../ThirdParty/eigen3 \
     -I../blockCoupledSolids4FoamTools/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
@@ -37,6 +47,8 @@ EXE_INC = \
     -I$(LIB_SRC)/transportModels \
     -I$(LIB_SRC)/transportModels/incompressible/lnInclude \
     -I$(LIB_SRC)/tetFiniteElement/lnInclude \
-    -I$(LIB_SRC)/dynamicMesh/meshMotion/fvMotionSolver/lnInclude
+    -I$(LIB_SRC)/dynamicMesh/meshMotion/fvMotionSolver/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/meshMotion/tetMotionSolver/lnInclude  \
+    -I$(LIB_SRC)/overset/oversetMesh/lnInclude
 
 EXE_LIBS =

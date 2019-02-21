@@ -45,6 +45,27 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
+void Foam::fluidModel::makePisoControl() const
+{
+    if (!pisoPtr_.empty())
+    {
+        FatalErrorIn("void Foam::fluidModel::makePisoControl() const")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    pisoPtr_.set
+    (
+        new pisoControl
+        (
+            const_cast<fvMesh&>
+            (
+                refCast<const fvMesh>(mesh())
+            )
+        )
+    );
+}
+
+
 void Foam::fluidModel::makePimpleControl() const
 {
     if (!pimplePtr_.empty())
@@ -174,6 +195,37 @@ void Foam::fluidModel::CourantNo
 }
 
 
+#if FOAMEXTEND > 40
+void Foam::fluidModel::oversetCourantNo
+(
+    scalar& CoNum,
+    scalar& meanCoNum,
+    scalar& velMag
+) const
+{
+    if (mesh().nInternalFaces())
+    {
+        const surfaceScalarField magPhi = mag(osMesh().sGamma()*phi());
+
+        const surfaceScalarField SfUfbyDelta =
+            mesh().surfaceInterpolation::deltaCoeffs()*magPhi;
+
+        const scalar deltaT = runTime().deltaT().value();
+
+        CoNum = max(SfUfbyDelta/mesh().magSf()).value()*deltaT;
+
+        meanCoNum = (sum(SfUfbyDelta)/sum(mesh().magSf())).value()*deltaT;
+
+        velMag = max(magPhi/mesh().magSf()).value();
+    }
+
+    Info<< "Courant Number mean: " << meanCoNum
+        << " max: " << CoNum
+        << " velocity magnitude: " << velMag
+        << endl;
+}
+#endif
+
 void Foam::fluidModel::continuityErrs()
 {
     const volScalarField contErr = fvc::div(phi());
@@ -192,6 +244,25 @@ void Foam::fluidModel::continuityErrs()
         << endl;
 }
 
+#if FOAMEXTEND > 40 
+void Foam::fluidModel::oversetContinuityErrs()
+{
+    const volScalarField contErr = osMesh().gamma()*fvc::div(phi());
+
+    const scalar sumLocalContErr = runTime().deltaT().value()*
+        mag(contErr)().weightedAverage(mesh().V()).value();
+
+    const scalar globalContErr = runTime().deltaT().value()*
+        contErr.weightedAverage(mesh().V()).value();
+
+    cumulativeContErr_ += globalContErr;
+
+    Info<< "time step continuity errors : sum local = "
+        << sumLocalContErr << ", global = " << globalContErr
+        << ", cumulative = " << cumulativeContErr_
+        << endl;
+}
+#endif
 
 void Foam::fluidModel::boundPU
 (
@@ -335,6 +406,7 @@ Foam::fluidModel::fluidModel
         )
     ),
     fluidProperties_(subDict(type + "Coeffs")),
+    pisoPtr_(),
     pimplePtr_(),
     waveProperties_
     (
@@ -430,6 +502,17 @@ Foam::fluidModel::~fluidModel()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+Foam::pisoControl& Foam::fluidModel::piso()
+{
+    if (pisoPtr_.empty())
+    {
+        makePisoControl();
+    }
+
+    return pisoPtr_();
+}
+
+
 Foam::pimpleControl& Foam::fluidModel::pimple()
 {
     if (pimplePtr_.empty())
@@ -440,6 +523,12 @@ Foam::pimpleControl& Foam::fluidModel::pimple()
     return pimplePtr_();
 }
 
+#if FOAMEXTEND > 40
+const Foam::oversetMesh& Foam::fluidModel::osMesh() const
+{
+    return oversetMesh::New(mesh());
+}
+#endif
 
 Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce() const
 {

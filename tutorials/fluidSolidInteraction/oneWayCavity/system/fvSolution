@@ -16,7 +16,7 @@ FoamFile
 
 solvers
 {
-    p
+    "p|pFinal"
     {
         solver           PCG;
         preconditioner   DIC;

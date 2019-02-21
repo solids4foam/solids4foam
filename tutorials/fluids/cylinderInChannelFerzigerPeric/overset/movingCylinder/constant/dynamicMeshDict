@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      dynamicMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// dynamicFvMesh staticFvMesh;
+
+dynamicFvMesh oversetSolidBodyMotionFvMesh;
+
+oversetSolidBodyMotionFvMeshCoeffs
+{
+    motionFunctions
+    (
+        front
+        {
+            movingZones ( front );
+
+//             solidBodyMotionFunction     translation;
+//             translationCoeffs
+//             {
+//                 velocity (0.1 0 0);
+//             }
+
+            solidBodyMotionFunction     linearOscillation;
+            linearOscillationCoeffs
+            {
+                amplitude    (0 0.25 0);
+                period       3.333333;
+            }
+        }
+    );
+}
+
+
+// ************************************************************************* //

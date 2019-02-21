@@ -72,6 +72,11 @@ class pisoFluid
         //- Density
         dimensionedScalar rho_;
 
+        //- Reference pressure cell
+        label pRefCell_;
+
+        //- Reference pressure value
+        scalar pRefValue_;
 
     // Private Member Functions
 

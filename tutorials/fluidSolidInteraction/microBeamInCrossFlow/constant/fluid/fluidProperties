@@ -14,20 +14,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//fluidModel icoFluid;
-fluidModel transientSimpleFluid;
+fluidModel icoFluid;
 
 icoFluidCoeffs
-{
-    nCorrectors 3;
-    nNonOrthogonalCorrectors 1;
-    nOuterCorrectors 1;
-}
-
-transientSimpleFluidCoeffs
-{
-    nOuterCorrectors 3;
-    nNonOrthogonalCorrectors 1;
-}
+{}
 
 // ************************************************************************* //

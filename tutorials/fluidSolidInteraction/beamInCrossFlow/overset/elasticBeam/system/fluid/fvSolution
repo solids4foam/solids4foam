@@ -1,0 +1,76 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "p|pFinal"
+    {
+        solver           BiCGStab;
+        preconditioner   DILU;
+
+//         solver           CG;
+//         preconditioner   DIC;
+
+        maxIter          1000;
+        tolerance        1e-7;
+        relTol           0;
+    }
+
+    U
+    {
+        solver           BiCGStab;
+        preconditioner   DILU;
+
+        tolerance        1e-06;
+        relTol           0;
+        maxIter          200;
+    }
+    
+    cellMotionU
+    {
+        solver          GAMG;
+        tolerance       1e-06;
+        relTol          0.001;
+        minIter         1;
+        maxIter         100;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+}
+
+PIMPLE 
+{
+    nOuterCorrectors 2;
+    nCorrectors     3;
+    nNonOrthogonalCorrectors 1;
+}
+
+relaxationFactors
+{
+    U    1;
+    UFinal 1;
+    // p    0.3;
+}
+
+// ************************************************************************* //

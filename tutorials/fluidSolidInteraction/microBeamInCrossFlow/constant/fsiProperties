@@ -14,9 +14,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//fluidSolidInterface    fixedRelaxation;
+// fluidSolidInterface    fixedRelaxation;
 fluidSolidInterface    Aitken;
-//fluidSolidInterface    IQNILS;
+// fluidSolidInterface    IQNILS;
 
 "fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
 {
@@ -34,7 +34,7 @@ fluidSolidInterface    Aitken;
 
     // Fixed under-relaxation factor
     // Some methods use this as the initial factor
-    relaxationFactor 0.1;
+    relaxationFactor 0.05;
 
     // The entire fluid domain mesh is moved when the interface moves more
     // than this limit

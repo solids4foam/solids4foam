@@ -30,11 +30,13 @@ boundaryField
     }
     outlet
     {
-        type         zeroGradient;
+        type         fluxCorrectedVelocity;
+        // type         zeroGradient;
     }
     inlet
     {
-        type         zeroGradient;
+        type         fluxCorrectedVelocity;
+        // type         zeroGradient;
     }
     wall
     {

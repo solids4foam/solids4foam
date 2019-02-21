@@ -29,8 +29,8 @@ Description
     icoFoam fluid model
 
 Author
-    Hrvoje Jasak, Wikki Ltd.  All rights reserved.
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
+    Hrvoje Jasak, Wikki Ltd. All rights reserved.
+    Zeljko Tukovic, FSB Zagreb. All rights reserved.
     Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
@@ -69,6 +69,11 @@ class icoFluid
         //- Density
         dimensionedScalar rho_;
 
+        //- Reference pressure cell
+        label pRefCell_;
+
+        //- Reference pressure value
+        scalar pRefValue_;
 
     // Private Member Functions
 

@@ -236,12 +236,14 @@ bool Foam::solidPointTemperature::start()
     return false;
 }
 
-
+#if FOAMEXTEND > 40
+bool Foam::solidPointTemperature::execute(const bool forceWrite)
+#else
 bool Foam::solidPointTemperature::execute()
+#endif
 {
     return writeData();
 }
-
 
 bool Foam::solidPointTemperature::read(const dictionary& dict)
 {

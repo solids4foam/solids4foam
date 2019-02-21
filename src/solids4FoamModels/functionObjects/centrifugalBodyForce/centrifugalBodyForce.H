@@ -42,6 +42,7 @@ SourceFiles
 #include "dictionary.H"
 #include "fvMesh.H"
 #include "OFstream.H"
+#include "dimensionedVector.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -106,10 +107,28 @@ public:
         virtual bool start();
 
         //- execute is called at each ++ or += of the time-loop
+#if FOAMEXTEND > 40
+        virtual bool execute(const bool forceWrite);
+#else
         virtual bool execute();
+#endif
 
+        //- Called when time was set at the end of the Time::operator++
+        virtual bool timeSet()
+        {
+            return true;
+        }
+  
         //- Read and set the function object if its data has changed
         virtual bool read(const dictionary& dict);
+  
+        //- Update for changes of mesh
+        virtual void updateMesh(const mapPolyMesh&)
+        {}
+
+        //- Update for changes of mesh
+        virtual void movePoints(const pointField&)
+        {}
 };
 
 

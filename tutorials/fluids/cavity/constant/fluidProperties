@@ -18,20 +18,9 @@ fluidModel icoFluid;
 // fluidModel pisoFluid;
 
 icoFluidCoeffs
-{
-    nCorrectors     2;
-    nNonOrthogonalCorrectors 0;
-    nOuterCorrectors 1;
-    pRefCell        0;
-    pRefValue       0;
-}
+{}
 
 pisoFluidCoeffs
-{
-    nCorrectors     2;
-    nNonOrthogonalCorrectors 0;
-    pRefCell        0;
-    pRefValue       0;
-}
+{}
 
 // ************************************************************************* //

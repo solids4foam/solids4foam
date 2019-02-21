@@ -8,7 +8,7 @@ runApplication fluentMeshToFoam cylinderInChannel.msh
 runApplication changeDictionary
 
 # Run the solver in serial
-runApplication solids4Foam
+# runApplication solids4Foam
 
 # Run the solver in parallel
 #runApplication decomposePar

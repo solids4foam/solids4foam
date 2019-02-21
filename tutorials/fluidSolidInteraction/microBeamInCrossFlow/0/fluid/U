@@ -47,7 +47,7 @@ boundaryField
     }
     interface
     {
-        type            fixedValue;
+        type            newMovingWallVelocity;
         value           uniform (0 0 0);
     }
     back
