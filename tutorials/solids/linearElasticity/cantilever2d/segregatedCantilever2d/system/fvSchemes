@@ -35,6 +35,7 @@ divSchemes
 {
     default                 none;
     div(sigma)              Gauss linear;
+    div((impK*grad(D)))     Gauss linear;
 }
 
 laplacianSchemes
