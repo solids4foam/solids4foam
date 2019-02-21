@@ -123,37 +123,6 @@ tmp<scalarField> pimpleFluid::patchPressureForce(const label patchID) const
 }
 
 
-tmp<scalarField> pimpleFluid::faceZoneMuEff
-(
-    const label zoneID,
-    const label patchID
-) const
-{
-    scalarField pMuEff =
-        rho_.value()*turbulence_->nuEff()().boundaryField()[patchID];
-
-    tmp<scalarField> tMuEff
-    (
-        new scalarField(mesh().faceZones()[zoneID].size(), 0)
-    );
-    scalarField& muEff = tMuEff();
-
-    const label patchStart =
-        mesh().boundaryMesh()[patchID].start();
-
-    forAll(pMuEff, I)
-    {
-        muEff[mesh().faceZones()[zoneID].whichFace(patchStart + I)] =
-            pMuEff[I];
-    }
-
-    // Parallel data exchange: collect pressure field on all processors
-    reduce(muEff, sumOp<scalarField>());
-
-    return tMuEff;
-}
-
-
 bool pimpleFluid::evolve()
 {
     Info<< "Evolving fluid model: " << this->type() << endl;

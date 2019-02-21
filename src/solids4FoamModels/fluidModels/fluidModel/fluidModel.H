@@ -51,6 +51,8 @@ SourceFiles
 #include "runTimeSelectionTables.H"
 #include "pimpleControl.H"
 #include "pisoControl.H"
+#include "uniformDimensionedFields.H"
+#include "globalPolyPatch.H"
 #if FOAMEXTEND > 40
     #include "oversetMesh.H"
 #endif
