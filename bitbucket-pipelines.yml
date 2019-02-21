@@ -7,7 +7,7 @@ options:
 
 pipelines:
   branches:
-  '{foam-extend-4.0, development}':
+  '{master, foam-extend-4.0, development}':
     - step:
         script:
           # Compile repository
