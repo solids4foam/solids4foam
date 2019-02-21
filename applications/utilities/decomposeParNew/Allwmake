@@ -3,8 +3,7 @@ cd ${0%/*} || exit 1    # run from this directory
 
 if [ "$WM_PROJECT" = "foam" ]
 then
-    var=$(awk 'BEGIN{ print "'$WM_PROJECT_VERSION'"<"'4.0'" }')
-    if [ "$var" -eq 1 ]
+    if (( $(echo "$WM_PROJECT_VERSION > 4.0" |bc -l) ))
     then
         wmake
         exit 0

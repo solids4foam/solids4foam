@@ -1,0 +1,62 @@
+#!/bin/bash
+cd ${0%/*} || exit 1    # run from this directory
+
+# Not needed for newer version of foam
+if [ "$WM_PROJECT" = "foam" ]
+then
+    if (( $(echo "$WM_PROJECT_VERSION > 4.0" |bc -l) ))
+    then
+        echo "No checks for versions of foam-extend greater than 4.0"
+        exit 0
+    fi
+fi
+
+# Function for the checking and reporting how to fix file that needs to be fixed
+# Arguments:
+#   $1  - File name
+#   $2  - Target path, without the file name and the slash at the end
+#   $3  - Path to library to be re-built
+#
+checkAndReport()
+{
+    if cmp --silent "./${1}" "${2}/${1}"
+    then
+        echo "'${1}' has already been replaced"
+    else
+        echo
+        echo "******** PLEASE FIX THIS ***********"
+        echo "You should replace the file '${2}/${1}' with 'filesToReplaceInOF/${1}'"
+        echo
+        echo "You can do it by running the following commands:"
+        echo "    cp filesToReplaceInOF/${1} ${2}/"
+        echo "    wmake libso ${3}"
+        echo "************************************"
+        echo
+        exit 1
+    fi
+}
+
+
+
+# Check if the foam files have been replaced
+echo "Check filesToReplaceInOF"
+
+checkAndReport \
+    "solution.C" \
+    "$FOAM_SRC/foam/matrices/solution" \
+    "$FOAM_SRC/foam"
+
+checkAndReport \
+    "WedgePointPatchField.C" \
+    "$FOAM_SRC/foam/fields/PointPatchFieldTemplates/constraint/wedge" \
+    "$FOAM_SRC/foam"
+
+checkAndReport \
+    "tensor.C" \
+    "$FOAM_SRC/foam/primitives/Tensor/tensor" \
+    "$FOAM_SRC/foam"
+
+checkAndReport \
+    "fvMesh.C" \
+    "$FOAM_SRC/finiteVolume/fvMesh" \
+    "$FOAM_SRC/finiteVolume"
