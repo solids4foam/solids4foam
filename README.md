@@ -11,22 +11,20 @@ fluid solid interactions.
 
 ### How do I get set up? ###
 
-To get setup, you must first have foam-extend-4.0 installed, details of which
-can be found on the OpenFOAM Wiki at:
+To get setup, you must first install foam-extend-4.0 or foam-extend-4.1,
+details of which can be found on the OpenFOAM Wiki at:
 https://openfoamwiki.net/index.php/Installation
 
-Once foam-extend-4.0 has been installed, download solids4Foam and change to
-the foam-extend-4.0 branch using the command:
-
-    git checkout foam-extend-4.0
-
-then run the enclosed `Allwmake` script to compile solids4Foam.
+Once foam-extend-4.0 or foam-extend-4.0 has been installed, download solids4foam
+and then run the enclosed `Allwmake` script to compile solids4foam.
 
 Notes:
 
-  1. the `master` branch is for foam-extend-3.2 but is not up-to-date.
-  2. the `of30parFSIwip` branch compiles with OpenFOAM-3.0.1 and includes
-some of the functionality.
+  1. the `master` branch compiles with foam-extend-4.0 and foam-extend-4.1.
+  2. the `foam-extend-3.2` branch compiles with foam-extend-3.2 but is not
+up-to-date.
+  4. the `of30parFSIwip` branch compiles with OpenFOAM-3.0.1 but is not
+up-to-date.
 
 
 ### Contribution guidelines ###
@@ -37,7 +35,8 @@ email: philip.cardiff@ucd.ie
 
 ### Who do I talk to? ###
 
-solids4foam is developed by Philip Cardiff and Zeljko Tukovic.
+solids4foam is developed by Philip Cardiff and Zeljko Tukovic, with
+contributions for many others.
 
 Emails: philip.cardiff@ucd.ie and zeljko.tukovic@fsb.hr
 
@@ -46,16 +45,16 @@ Emails: philip.cardiff@ucd.ie and zeljko.tukovic@fsb.hr
 
 A number of the tutorial cases are described in the following publications:
 
-P. Cardiff, A Karac, P. De Jaeger, H. Jasak, J. Nagy, A. Ivankovic, Ž. Tukovc:
+P. Cardiff, A Karac, P. De Jaeger, H. Jasak, J. Nagy, A. Ivanković, Ž. Tuković:
 An open-source finite volume toolbox for solid mechanics and fluid-solid
-interaction simulations. Computer Programs in Physics, Computer Physics
-Communications, 2017, Under review.
+interaction simulations. arXiv:1808.10736v2, 2018, available at
+https://arxiv.org/abs/1808.10736.
 
-Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković: Parallel unstruct
-red finite-volume method for fluid-structure interaction in OpenFOAM. Transaction
-of FAMENA, 2016, Under review.
+Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković: OpenFOAM finite volume
+solver for fluid-solid interaction.  Transactions of Famena, 42 (3), pp. 1-31,
+2018, 10.21278/TOF.42301.
 
-P. Cardiff, A Karac, P. De Jaeger, H. Jasak, J. Nagy, A. Ivankovic, Z. Tukovic:
+P. Cardiff, A Karac, P. De Jaeger, H. Jasak, J. Nagy, A. Ivanković, Ž. Tuković:
 Towards the Development of an Extendable Solid Mechanics and Fluid-Solid
 Interactions Toolbox for OpenFOAM. 12th OpenFOAM Workshop University of Exeter,
 Exeter, UK. 24th to 27th July 2017.
