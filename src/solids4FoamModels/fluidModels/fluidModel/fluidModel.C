@@ -398,6 +398,7 @@ void Foam::fluidModel::CourantNo
 }
 
 
+#if FOAMEXTEND > 40
 void Foam::fluidModel::oversetCourantNo
 (
     scalar& CoNum,
@@ -426,7 +427,7 @@ void Foam::fluidModel::oversetCourantNo
         << " velocity magnitude: " << velMag
         << endl;
 }
-
+#endif
 
 void Foam::fluidModel::continuityErrs()
 {
@@ -446,7 +447,7 @@ void Foam::fluidModel::continuityErrs()
         << endl;
 }
 
-
+#if FOAMEXTEND > 40 
 void Foam::fluidModel::oversetContinuityErrs()
 {
     const volScalarField contErr = osMesh().gamma()*fvc::div(phi());
@@ -464,7 +465,7 @@ void Foam::fluidModel::oversetContinuityErrs()
         << ", cumulative = " << cumulativeContErr_
         << endl;
 }
-
+#endif
 
 void Foam::fluidModel::boundPU
 (
@@ -650,12 +651,12 @@ Foam::pimpleControl& Foam::fluidModel::pimple()
     return pimplePtr_();
 }
 
-
+#if FOAMEXTEND > 40
 const Foam::oversetMesh& Foam::fluidModel::osMesh() const
 {
     return oversetMesh::New(mesh());
 }
-
+#endif
 
 Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce
 (

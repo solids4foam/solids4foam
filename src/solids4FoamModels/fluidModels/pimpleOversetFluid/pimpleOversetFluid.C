@@ -24,6 +24,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#if FOAMEXTEND > 40
+
 #include "pimpleOversetFluid.H"
 #include "volFields.H"
 #include "fvm.H"
@@ -296,5 +298,7 @@ bool pimpleOversetFluid::evolve()
 
 } // End namespace fluidModels
 } // End namespace Foam
+
+#endif
 
 // ************************************************************************* //

@@ -51,8 +51,9 @@ SourceFiles
 #include "runTimeSelectionTables.H"
 #include "pimpleControl.H"
 #include "pisoControl.H"
-#include "oversetMesh.H"
-
+#if FOAMEXTEND > 40
+    #include "oversetMesh.H"
+#endif
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -179,18 +180,22 @@ protected:
         //- Calculate the Courant number
         void CourantNo(scalar& CoNum, scalar& meanCoNum, scalar& velMag) const;
 
+#if FOAMEXTEND > 40
         //- Calculate the Courant number
         void oversetCourantNo
         (
             scalar& CoNum, scalar& meanCoNum, scalar& velMag
         ) const;
-  
+#endif
+
         //- Continuity errors
         void continuityErrs();
 
+#if FOAMEXTEND > 40
         //- Continuity errors
         void oversetContinuityErrs();
-  
+#endif
+
         //- Bound the pressure and velocity fields
         void boundPU
         (
@@ -270,9 +275,11 @@ public:
             //- Return non-const acess to the pimple control
             pimpleControl& pimple();
 
+#if FOAMEXTEND > 40
             //- Return non-const acess to the overset mesh
             const oversetMesh& osMesh() const;
-  
+#endif
+
             //- Return const velocity field
             virtual const volVectorField& U() const
             {

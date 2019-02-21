@@ -204,21 +204,34 @@ bool pimpleFluid::evolve()
 
         if (pimple().momentumPredictor())
         {
+#if FOAMEXTEND > 40
             solve(relax(ddtUEqn + HUEqn) == -fvc::grad(p()));
+#else
+            fvVectorMatrix ddtUEqnHUEqn = ddtUEqn + HUEqn;
+            ddtUEqnHUEqn.relax();
+            solve(ddtUEqnHUEqn == -fvc::grad(p()));
+#endif
         }
 
         // --- PISO loop
 
         // Prepare clean 1/a_p without time derivative contribution
         volScalarField rAU = 1.0/HUEqn.A();
+#if FOAMEXTEND < 41
+        surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
+#endif
 
         while (pimple().correct())
         {
             // Calculate U from convection-diffusion matrix
             U() = rAU*HUEqn.H();
 
+#if FOAMEXTEND > 40
             // Consistently calculate flux
             pimple().calcTransientConsistentFlux(phi(), U(), rAU, ddtUEqn);
+#else
+            phi() = (fvc::interpolate(U()) & mesh.Sf());
+#endif
 
             adjustPhi(phi(), U(), p());
 
@@ -229,9 +242,13 @@ bool pimpleFluid::evolve()
                 (
                     fvm::laplacian
                     (
+#if FOAMEXTEND > 40
                         fvc::interpolate(rAU)/pimple().aCoeff(U().name()),
                         p(),
                         "laplacian(rAU," + p().name() + ')'
+#else
+                        rAUf, p(), "laplacian((1|A(U)),p)"
+#endif
                     )
                  == fvc::div(phi())
                 );
@@ -260,12 +277,16 @@ bool pimpleFluid::evolve()
                 p().relax();
             }
 
+#if FOAMEXTEND > 40
             // Consistently reconstruct velocity after pressure equation.
             // Note: flux is made relative inside the function
-            pimple().reconstructTransientVelocity
-            (
-                U(), phi(), ddtUEqn, rAU, p()
-            );
+            pimple().reconstructTransientVelocity(U(), phi(), ddtUEqn, rAU, p());
+#else
+            U() -= rAU*gradp();
+            U().correctBoundaryConditions();
+#endif
+
+            gradU() = fvc::grad(U());
         }
 
         turbulence_->correct();

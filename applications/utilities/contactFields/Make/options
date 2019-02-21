@@ -1,3 +1,12 @@
+ifeq ($(WM_PROJECT), foam)
+    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
+    ifeq ($(VER), 1)
+        VERSION_SPECIFIC_INC = -loversetMesh -loversetDynamicFvMesh
+    else
+        VERSION_SPECIFIC_INC =
+    endif
+endif
+
 EXE_INC = \
     -I../../../src/solids4FoamModels/lnInclude \
     -I../../../src/blockCoupledSolids4FoamTools/lnInclude \
@@ -10,6 +19,7 @@ EXE_INC = \
 
 EXE_LIBS = \
     -L$(FOAM_USER_LIBBIN) \
+    $(VERSION_SPECIFIC_INC) \
     -lblockCoupledSolids4FoamTools \
     -lsolids4FoamModels \
     -lfiniteVolume \
@@ -22,6 +32,4 @@ EXE_LIBS = \
     -ldynamicMesh \
     -lmeshTools \
     -ltopoChangerFvMesh \
-    -llduSolvers \
-    -loversetMesh \
-    -loversetDynamicFvMesh
+    -llduSolvers

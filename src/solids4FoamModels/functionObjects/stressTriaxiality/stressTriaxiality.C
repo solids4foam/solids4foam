@@ -116,7 +116,11 @@ bool Foam::stressTriaxiality::start()
 }
 
 
+#if FOAMEXTEND > 40
 bool Foam::stressTriaxiality::execute(const bool forceWrite)
+#else
+bool Foam::stressTriaxiality::execute()
+#endif
 {
     if (runTime_.outputTime())
     {

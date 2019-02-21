@@ -262,7 +262,11 @@ bool Foam::solidForcesDisplacements::start()
 }
 
 
+#if FOAMEXTEND > 40
 bool Foam::solidForcesDisplacements::execute(const bool forceWrite)
+#else
+bool Foam::solidForcesDisplacements::execute()
+#endif
 {
     return writeData();
 }

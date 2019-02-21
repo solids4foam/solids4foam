@@ -184,14 +184,21 @@ bool icoFluid::evolve()
 
     // Prepare clean 1/a_p without time derivative contribution
     volScalarField rAU = 1.0/HUEqn.A();
+#if FOAMEXTEND < 41
+    surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
+#endif
 
     while (piso().correct())
     {
         // Calculate U from convection-diffusion matrix
         U() = rAU*HUEqn.H();
 
+#if FOAMEXTEND > 40
         // Consistently calculate flux
         piso().calcTransientConsistentFlux(phi(), U(), rAU, ddtUEqn);
+#else
+        phi() = (fvc::interpolate(U()) & mesh.Sf());
+#endif
 
         adjustPhi(phi(), U(), p());
 
@@ -202,9 +209,13 @@ bool icoFluid::evolve()
             (
                 fvm::laplacian
                 (
+#if FOAMEXTEND > 40
                     fvc::interpolate(rAU)/piso().aCoeff(U().name()),
                     p(),
                     "laplacian(rAU," + p().name() + ')'
+#else
+                    rAUf, p(), "laplacian((1|A(U)),p)"
+#endif
                 )
              == fvc::div(phi())
             );
@@ -223,9 +234,16 @@ bool icoFluid::evolve()
 
         fluidModel::continuityErrs();
 
+#if FOAMEXTEND > 40
         // Consistently reconstruct velocity after pressure equation.
         // Note: flux is made relative inside the function
         piso().reconstructTransientVelocity(U(), phi(), ddtUEqn, rAU, p());
+#else
+        U() -= rAU*gradp();
+        U().correctBoundaryConditions();
+#endif
+
+        gradU() = fvc::grad(U());
     }
 
     // Make the fluxes absolut to the mesh motion

@@ -304,7 +304,11 @@ bool Foam::principalStresses::start()
 }
 
 
+#if FOAMEXTEND > 40
 bool Foam::principalStresses::execute(const bool forceWrite)
+#else
+bool Foam::principalStresses::execute()
+#endif
 {
     if (runTime_.outputTime())
     {

@@ -223,7 +223,11 @@ bool Foam::patchAvgTractionHistory::start()
 }
 
 
+#if FOAMEXTEND > 40
 bool Foam::patchAvgTractionHistory::execute(const bool forceWrite)
+#else
+bool Foam::patchAvgTractionHistory::execute()
+#endif
 {
     return writeData();
 }

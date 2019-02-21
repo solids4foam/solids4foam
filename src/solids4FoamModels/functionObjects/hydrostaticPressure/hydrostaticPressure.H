@@ -131,7 +131,11 @@ public:
         virtual bool start();
 
         //- execute is called at each ++ or += of the time-loop
+#if FOAMEXTEND > 40
         virtual bool execute(const bool forceWrite);
+#else
+        virtual bool execute();
+#endif
 
         //- Called when time was set at the end of the Time::operator++
         virtual bool timeSet()

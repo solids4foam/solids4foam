@@ -101,7 +101,11 @@ bool Foam::centrifugalBodyForce::start()
 }
 
 
+#if FOAMEXTEND > 40
 bool Foam::centrifugalBodyForce::execute(const bool forceWrite)
+#else
+bool Foam::centrifugalBodyForce::execute()
+#endif
 {
     return setBodyForce();
 }

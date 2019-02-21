@@ -145,7 +145,11 @@ bool Foam::setInletVelocity::start()
 }
 
 
+#if FOAMEXTEND > 40
 bool Foam::setInletVelocity::execute(const bool forceWrite)
+#else
+bool Foam::setInletVelocity::execute()
+#endif
 {
     return setVelocity();
 }

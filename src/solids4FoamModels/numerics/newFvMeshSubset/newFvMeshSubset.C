@@ -38,7 +38,9 @@ Description
 #include "emptyPolyPatch.H"
 #include "demandDrivenData.H"
 #include "cyclicPolyPatch.H"
-#include "oversetPolyPatch.H"
+#if FOAMEXTEND > 40
+    #include "oversetPolyPatch.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -1344,6 +1346,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
     {
         label newSize = boundaryPatchSizes[globalPatchMap[oldPatchI]];
 
+#if FOAMEXTEND > 40
         if (isA<oversetPolyPatch>(oldPatches[oldPatchI]))
         {
             newBoundary[nNewPatches] = new polyPatch
@@ -1356,6 +1359,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
             );
         }
         else
+#endif
         {
             // Clone (even if 0 size)
             newBoundary[nNewPatches] = oldPatches[oldPatchI].clone

@@ -1,12 +1,22 @@
 ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
-    DISABLE_WARNING_FLAGS = -Wno-old-style-cast
+    DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-deprecated-declarations
 else
     DISABLE_WARNING_FLAGS =
 endif
 
+ifeq ($(WM_PROJECT), foam)
+    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
+    ifeq ($(VER), 1)
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
+    else
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
+    endif
+endif
+
 EXE_INC = \
-    $(DISABLE_WARNING_FLAGS) \
     -std=c++11 \
+    $(DISABLE_WARNING_FLAGS) \
+    $(VERSION_SPECIFIC_INC) \
     -I../../ThirdParty/eigen3 \
     -I../blockCoupledSolids4FoamTools/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
