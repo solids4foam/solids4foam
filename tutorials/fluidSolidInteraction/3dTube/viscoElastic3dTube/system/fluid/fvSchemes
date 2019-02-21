@@ -27,7 +27,7 @@ gradSchemes
 divSchemes
 {
     default none;
-    // div(phi,U)   Gauss skewCorrected linear;
+    // div(phi,U)   Gauss linear;
     div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
 }
 
@@ -35,14 +35,14 @@ laplacianSchemes
 {
     default none;
     laplacian(nu,U) Gauss linear corrected;
-    laplacian(rAU,p)  Gauss linear corrected;
+    laplacian(rAU,p) Gauss linear corrected;
+    laplacian((1|A(U)),p) Gauss linear corrected;
     laplacian(diffusivity,cellMotionU) Gauss linear corrected;
 }
 
 interpolationSchemes
 {
     default linear;
-    // interpolate(U) skewCorrected linear;
 }
 
 snGradSchemes

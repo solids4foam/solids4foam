@@ -20,7 +20,8 @@ solvers
     {
         solver          AMG;
         cycle           W-cycle;
-        coarseningType  SAMG;
+        coarseningType  AAMG;
+        //coarseningType  SAMG;
         norm            twoNorm;
         normComponent   3;
 
