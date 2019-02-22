@@ -321,7 +321,7 @@ void blockFixedGradientFvPatchVectorField::insertBlockCoeffs
 
             // Put start and end point ID in a list so we will perform
             // the same actions to both start and end vertex
-            labelList sePointIDs(2, -1);
+            labelList sePointIDs(2, label(-1));
             sePointIDs[0] = startPointID;
             sePointIDs[1] = endPointID;
 

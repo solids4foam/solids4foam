@@ -4,6 +4,15 @@ else
     DISABLE_WARNING_FLAGS =
 endif
 
+ifeq ($(WM_PROJECT), foam)
+    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
+    ifeq ($(VER), 1)
+        WM_VERSION = FOAMEXTEND=41
+    else
+        WM_VERSION = FOAMEXTEND=40
+    endif
+endif
+
 EXE_INC = \
     $(DISABLE_WARNING_FLAGS) \
     -I../../ThirdParty/eigen3 \

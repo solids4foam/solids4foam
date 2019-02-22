@@ -158,7 +158,11 @@ class solidPolyMesh
         mutable Map<symmTensor>* pointFixedDirectionPtr_;
 
         //- Communicator used for parallel communication
+	#if FOAMEXTEND > 40
+        int comm_;
+	#else
         label comm_;
+	#endif
 
     // Private Member Functions
 
@@ -364,10 +368,17 @@ public:
             // Communication support
 
                 //- Return communicator used for parallel communication
+		#if FOAMEXTEND > 40
+                int comm() const
+                {
+                    return comm_;
+                }
+		#else
                 label comm() const
                 {
                     return comm_;
                 }
+		#endif
 
 
             // Parallel mesh analysis data

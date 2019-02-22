@@ -141,7 +141,7 @@ void Foam::setCellDisplacements::readDict()
         }
 
         // Create new lists
-        labelList newCellIDs(i, -1);
+        labelList newCellIDs(i, label(-1));
         vectorField newConstantDisps(i, vector::zero);
         List< interpolationTable<vector> > newTimeVaryingDisps
         (
