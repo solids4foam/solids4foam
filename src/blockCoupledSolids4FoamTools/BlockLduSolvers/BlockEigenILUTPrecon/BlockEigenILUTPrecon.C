@@ -526,7 +526,7 @@ void Foam::BlockEigenILUTPrecon::precondition
 
 
     // Perform the preconditioning
-    precon()._solve(b, x);
+    precon()._solve_impl(b, x);
     //x = precon().solve(b);
 
     // Copy the solution vector back into the foam format
