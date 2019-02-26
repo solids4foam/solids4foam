@@ -184,21 +184,26 @@ bool pimpleFluid::evolve()
 
         // --- PISO loop
 
+#if FOAMEXTEND > 40
         // Prepare clean 1/a_p without time derivative contribution
         volScalarField rAU = 1.0/HUEqn.A();
-#if FOAMEXTEND < 41
+#else
+        volScalarField rAU = 1.0/(HUEqn.A() + ddtUEqn.A());
         surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
 #endif
 
         while (pimple().correct())
         {
+#if FOAMEXTEND > 40
             // Calculate U from convection-diffusion matrix
             U() = rAU*HUEqn.H();
 
-#if FOAMEXTEND > 40
             // Consistently calculate flux
             pimple().calcTransientConsistentFlux(phi(), U(), rAU, ddtUEqn);
 #else
+            // Calculate U from convection-diffusion matrix
+            U() = rAU*(HUEqn.H() + ddtUEqn.H());
+
             phi() = (fvc::interpolate(U()) & mesh.Sf());
 #endif
 
@@ -231,6 +236,8 @@ bool pimpleFluid::evolve()
                     )
                 );
 
+                gradp() = fvc::grad(p());
+
                 if (pimple().finalNonOrthogonalIter())
                 {
                     phi() -= pEqn.flux();
@@ -251,6 +258,9 @@ bool pimpleFluid::evolve()
             // Note: flux is made relative inside the function
             pimple().reconstructTransientVelocity(U(), phi(), ddtUEqn, rAU, p());
 #else
+            // Make the fluxes relative to the mesh motion
+            fvc::makeRelative(phi(), U());
+
             U() -= rAU*gradp();
             U().correctBoundaryConditions();
 #endif
