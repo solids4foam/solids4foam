@@ -142,6 +142,8 @@ bool linGeomSolid::evolve()
     }
     while (mesh().update());
 
+    blockLduMatrix::debug = 1;
+
     return true;
 }
 
