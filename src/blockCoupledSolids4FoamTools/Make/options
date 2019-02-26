@@ -7,14 +7,15 @@ endif
 ifeq ($(WM_PROJECT), foam)
     VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
     ifeq ($(VER), 1)
-        WM_VERSION = FOAMEXTEND=41
+        WM_VERSION_SPECIFIC = -DFOAMEXTEND=41
     else
-        WM_VERSION = FOAMEXTEND=40
+        WM_VERSION_SPECIFIC = -DFOAMEXTEND=40
     endif
 endif
 
 EXE_INC = \
     $(DISABLE_WARNING_FLAGS) \
+    $(WM_VERSION_SPECIFIC) \
     -I../../ThirdParty/eigen3 \
     -I../solids4FoamModels/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
