@@ -56,7 +56,8 @@ tmp<fvVectorMatrix> buoyantBoussinesqPimpleFluid::solveUEqn()
 
     tmp<fvVectorMatrix> tUEqn
     (
-        fvm::div(phi(), U())
+        fvm::ddt(U())
+      + fvm::div(phi(), U())
       + turbulence_->divDevReff()
     );
     fvVectorMatrix& UEqn = tUEqn();
@@ -90,7 +91,8 @@ void buoyantBoussinesqPimpleFluid::solveTEqn()
 
     fvScalarMatrix TEqn
     (
-        fvm::div(phi(), T_)
+        fvm::ddt(T)
+      + fvm::div(phi(), T_)
       - fvm::Sp(fvc::div(phi()), T_)
       - fvm::laplacian(kappaEff, T_)
     );
@@ -270,6 +272,9 @@ bool buoyantBoussinesqPimpleFluid::evolve()
     scalar pRefValue = 0.0;
     setRefCell(p(), pimple.dict(), pRefCell, pRefValue);
 
+    // Make the fluxes relative to the mesh motion
+    fvc::makeRelative(phi(), U());
+
     // Calculate CourantNo
     {
         scalar CoNum = 0.0;
@@ -290,10 +295,16 @@ bool buoyantBoussinesqPimpleFluid::evolve()
         // Pressure equation
         solvePEqn(pimple, UEqn, pRefCell, pRefValue);
 
+        // Make the fluxes relative to the mesh motion
+        fvc::makeRelative(phi(), U());
+
         gradU() = fvc::grad(U());
 
         turbulence_->correct();
     }
+
+    // Make the fluxes absolut to the mesh motion
+    fvc::makeAbsolute(phi(), U());
 
     return 0;
 }
