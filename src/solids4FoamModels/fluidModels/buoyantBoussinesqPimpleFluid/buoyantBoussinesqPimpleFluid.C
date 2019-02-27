@@ -93,7 +93,6 @@ void buoyantBoussinesqPimpleFluid::solveTEqn()
     (
         fvm::ddt(T_)
       + fvm::div(phi(), T_)
-      - fvm::Sp(fvc::div(phi()), T_)
       - fvm::laplacian(kappaEff, T_)
     );
 
