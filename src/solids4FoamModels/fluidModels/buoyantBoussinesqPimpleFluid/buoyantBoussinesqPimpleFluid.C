@@ -86,17 +86,14 @@ tmp<fvVectorMatrix> buoyantBoussinesqPimpleFluid::solveUEqn()
 
 void buoyantBoussinesqPimpleFluid::solveTEqn()
 {
-    const volScalarField kappaEff
-    (
-        "kappaEff",
-        turbulence_->nu()/Pr_ + turbulence_->nut()/Prt_
-    );
+    kappaEff_ =
+        turbulence_->nu()/Pr_ + turbulence_->nut()/Prt_;
 
     fvScalarMatrix TEqn
     (
         fvm::ddt(T_)
       + fvm::div(phi(), T_)
-      - fvm::laplacian(kappaEff, T_)
+      - fvm::laplacian(kappaEff_, T_)
     );
 
     TEqn.relax();
@@ -187,6 +184,18 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
         (
             U(), phi(), laminarTransport_
         )
+    ),
+    kappaEff_
+    (
+        IOobject
+        (
+            "kappaEff",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        turbulence_->nu()/Pr_ + turbulence_->nut()/Prt_
     ),
     rho_(laminarTransport_.lookup("rho")),
     g_
