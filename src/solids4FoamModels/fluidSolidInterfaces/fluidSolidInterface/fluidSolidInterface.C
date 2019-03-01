@@ -418,6 +418,18 @@ void Foam::fluidSolidInterface::calcFluidToSolidFaceMap() const
             << "pointer already set!" << abort(FatalError);
     }
 
+    if
+    (
+        solid().globalPatch().globalPatch().size()
+     != fluid().globalPatch().globalPatch().size()
+    )
+    {
+        FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
+            << "Fluid and solid interfaces are not conformal!" << nl
+            << "directMap method requires conformal interfaces"
+            << abort(FatalError);
+    }
+
     // Initialise map
     fluidToSolidFaceMapPtr_.set
     (
@@ -476,6 +488,18 @@ void Foam::fluidSolidInterface::calcSolidToFluidFaceMap() const
     {
         FatalErrorIn(type() + "::calcSolidToFluidFaceMap() const")
             << "pointer already set!" << abort(FatalError);
+    }
+
+    if
+    (
+        solid().globalPatch().globalPatch().size()
+     != fluid().globalPatch().globalPatch().size()
+    )
+    {
+        FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
+            << "Fluid and solid interfaces are not conformal!" << nl
+            << "directMap method requires conformal interfaces"
+            << abort(FatalError);
     }
 
     // Initialise map
@@ -539,6 +563,18 @@ void Foam::fluidSolidInterface::calcFluidToSolidPointMap() const
             << "pointer already set!" << abort(FatalError);
     }
 
+    if
+    (
+        solid().globalPatch().globalPatch().size()
+     != fluid().globalPatch().globalPatch().size()
+    )
+    {
+        FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
+            << "Fluid and solid interfaces are not conformal!" << nl
+            << "directMap method requires conformal interfaces"
+            << abort(FatalError);
+    }
+
     // Initialise map
     fluidToSolidPointMapPtr_.set
     (
@@ -597,6 +633,18 @@ void Foam::fluidSolidInterface::calcSolidToFluidPointMap() const
     {
         FatalErrorIn(type() + "::calcSolidToFluidPointMap() const")
             << "pointer already set!" << abort(FatalError);
+    }
+
+    if
+    (
+        solid().globalPatch().globalPatch().size()
+     != fluid().globalPatch().globalPatch().size()
+    )
+    {
+        FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
+            << "Fluid and solid interfaces are not conformal!" << nl
+            << "directMap method requires conformal interfaces"
+            << abort(FatalError);
     }
 
     // Initialise map
