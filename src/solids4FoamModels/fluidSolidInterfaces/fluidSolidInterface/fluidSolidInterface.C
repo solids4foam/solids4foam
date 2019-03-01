@@ -481,7 +481,7 @@ void Foam::fluidSolidInterface::calcSolidToFluidFaceMap() const
     // Initialise map
     solidToFluidFaceMapPtr_.set
     (
-        new labelList(solid().globalPatch().globalPatch().size(), -1)
+        new labelList(fluid().globalPatch().globalPatch().size(), -1)
     );
     labelList& solidToFluidMap = solidToFluidFaceMapPtr_();
 
@@ -542,7 +542,7 @@ void Foam::fluidSolidInterface::calcFluidToSolidPointMap() const
     // Initialise map
     fluidToSolidPointMapPtr_.set
     (
-        new labelList(solid().globalPatch().globalPatch().size(), -1)
+        new labelList(solid().globalPatch().globalPatch().nPoints(), -1)
     );
     labelList& fluidToSolidMap = fluidToSolidPointMapPtr_();
 
@@ -602,7 +602,7 @@ void Foam::fluidSolidInterface::calcSolidToFluidPointMap() const
     // Initialise map
     solidToFluidPointMapPtr_.set
     (
-        new labelList(solid().globalPatch().globalPatch().size(), -1)
+        new labelList(fluid().globalPatch().globalPatch().nPoints(), -1)
     );
     labelList& solidToFluidMap = solidToFluidPointMapPtr_();
 
