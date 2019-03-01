@@ -93,7 +93,10 @@ class fluidSolidInterface
             currentSolidZonePatchPtr_;
 
         //- Fluid zone to solid zone interpolator
-        mutable std::shared_ptr<RBFInterpolation> fluidToSolidPtr_;
+        mutable std::shared_ptr<RBFInterpolation> rbfFluidToSolidPtr_;
+
+        //- Solid zone to fluid zone interpolator
+        mutable std::shared_ptr<RBFInterpolation> rbfSolidToFluidPtr_;
 
         //- Ggi zone-to-zone interpolation
         //mutable ggiZoneInterpolation* ggiInterpolatorPtr_;
@@ -103,14 +106,29 @@ class fluidSolidInterface
             standAlonePatch
         >* ggiInterpolatorPtr_;
 
-        //- Solid zone to fluid zone interpolator
-        mutable std::shared_ptr<RBFInterpolation> solidToFluidPtr_;
+        //- Face map for conformal fluid and solid interfaces
+        //  For each solid face, give the index of the corresponding fluid face
+        mutable autoPtr<labelList> fluidToSolidFaceMapPtr_;
+
+        //- Face map for conformal fluid and solid interfaces
+        //  For each fluid face, give the index of the corresponding solid face
+        mutable autoPtr<labelList> solidToFluidFaceMapPtr_;
+
+        //- Point map for conformal fluid and solid interfaces
+        //  For each solid point, give the index of the corresponding fluid
+        //  point
+        mutable autoPtr<labelList> fluidToSolidPointMapPtr_;
+
+        //- Point map for conformal fluid and solid interfaces
+        //  For each fluid point, give the index of the corresponding solid
+        //  point
+        mutable autoPtr<labelList> solidToFluidPointMapPtr_;
 
         //- Outer correction loop stoping tolerance
-        scalar outerCorrTolerance_;
+        const scalar outerCorrTolerance_;
 
         //- Maximal number of outer correctors
-        label nOuterCorr_;
+        const label nOuterCorr_;
 
         //- Fsi coupling on/off
         Switch coupled_;
@@ -119,13 +137,10 @@ class fluidSolidInterface
         const scalar couplingStartTime_;
 
         //- Predictor on/off
-        Switch predictor_;
-
-        //- Use rbf interpolation
-        Switch rbfInterpolation_;
+        const Switch predictor_;
 
         //- Interface deformation limit
-        scalar interfaceDeformationLimit_;
+        const scalar interfaceDeformationLimit_;
 
         //- Fluid zone point displacement
         vectorField fluidZonePointsDispl_;
@@ -147,9 +162,6 @@ class fluidSolidInterface
 
         //- Solid zone ref. point displacement
         vectorField interfacePointsDisplPrev_;
-
-        //- Solid zone pressure
-        scalarField solidZonePressure_;
 
         //- Current FSI residual
         vectorField residual_;
@@ -186,14 +198,38 @@ class fluidSolidInterface
         //- Calculate current solid zone primitive patch
         void calcCurrentSolidZonePatch() const;
 
-        //- Calculate fluid to solid interpolator
-        void calcFluidToSolidInterpolator() const;
+        //- Calculate RBF fluid to solid interpolator
+        void calcRbfFluidToSolidInterpolator() const;
+
+        //- Calculate RBF fluid to solid interpolator
+        void calcRbfSolidToFluidInterpolator() const;
 
         //- Calculate fluid-to-solid / solid-to-fluid ggi interpolator
         void calcGgiInterpolator() const;
 
-        //- Calculate fluid to solid interpolator
-        void calcSolidToFluidInterpolator() const;
+        //- Calculate fluid to solid face map
+        void calcFluidToSolidFaceMap() const;
+
+        //- Return a reference to the fluid to solid face map
+        const labelList& fluidToSolidFaceMap() const;
+
+        //- Calculate solid to fluid face map
+        void calcSolidToFluidFaceMap() const;
+
+        //- Return a reference to the solid to fluid face map
+        const labelList& solidToFluidFaceMap() const;
+
+        //- Calculate fluid to solid point map
+        void calcFluidToSolidPointMap() const;
+
+        //- Return a reference to the fluid to solid point map
+        const labelList& fluidToSolidPointMap() const;
+
+        //- Calculate solid to fluid point map
+        void calcSolidToFluidPointMap() const;
+
+        //- Return a reference to the solid to fluid point map
+        const labelList& solidToFluidPointMap() const;
 
         //- Accumulated fluid interface displacement
         void calcAccumulatedFluidInterfaceDisplacement() const;
@@ -259,6 +295,28 @@ public:
     // Destructor
 
         virtual ~fluidSolidInterface();
+
+
+    // Public enumerations
+
+        //- Method for transferring information between the solid and the fluid
+        //  interfaces
+        enum interfaceTransferMethod
+        {
+            directMap,
+            RBF,
+            GGI
+        };
+
+        //- interfaceTransferMethod names
+        static const NamedEnum<interfaceTransferMethod, 3>
+            interfaceTransferMethodNames_;
+
+private:
+        //- Transfer method
+        interfaceTransferMethod transferMethod_;
+
+public:
 
 
     // Member Functions
@@ -346,7 +404,7 @@ public:
             currentSolidZonePatch() const;
 
             //- Return fluid to solid interpolator
-            const std::shared_ptr<RBFInterpolation>& fluidToSolid() const;
+            const std::shared_ptr<RBFInterpolation>& rbfFluidToSolid() const;
 
             //- Return fluid to solid interpolator
             const GGIInterpolation
@@ -355,7 +413,33 @@ public:
             >& ggiInterpolator() const;
 
             //- Return fluid to solid interpolator
-            const std::shared_ptr<RBFInterpolation>& solidToFluid() const;
+            const std::shared_ptr<RBFInterpolation>& rbfSolidToFluid() const;
+
+            //- Transfer/map/interpolate from one zone faces to another zone
+            //  faces
+            template<class Type>
+            void transferFacesZoneToZone
+            (
+                const word& fromRegion,          // from region name
+                const word& toRegion,            // to region name
+                const standAlonePatch& fromZone, // from zone
+                const standAlonePatch& toZone,   // to zone
+                const Field<Type>& fromField,    // from field
+                Field<Type>& toField             // to field
+            ) const;
+
+            //- Transfer/map/interpolate from one zone points to another zone
+            //  points
+            template<class Type>
+            void transferPointsZoneToZone
+            (
+                const word& fromRegion,          // from region name
+                const word& toRegion,            // to region name
+                const standAlonePatch& fromZone, // from zone
+                const standAlonePatch& toZone,   // to zone
+                const Field<Type>& fromField,    // from field
+                Field<Type>& toField             // to field
+            ) const;
 
             //- Return outer corrector loop tolerance
             scalar outerCorrTolerance() const
@@ -433,12 +517,6 @@ public:
             vectorField& interfacePointsDisplPrev()
             {
                 return interfacePointsDisplPrev_;
-            }
-
-            //- Return solid zone pressure
-            scalarField& solidZonePressure()
-            {
-                return solidZonePressure_;
             }
 
             //- Return current fsi residual
@@ -535,6 +613,12 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+#ifdef NoRepository
+#   include "fluidSolidInterfaceTemplates.C"
+#endif
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
