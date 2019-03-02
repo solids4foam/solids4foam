@@ -44,6 +44,11 @@ fluidSolidInterface    Aitken;
     // Enable/disable coupling from the start
     coupled yes;
 
+    // Method for transferring information between the interfaces
+    interfaceTransferMethod directMap;
+    //interfaceTransferMethod RBF;
+    //interfaceTransferMethod GGI;
+
     // Optional: if coupled is set to "no", then the couplingStartTime allows
     // you to enable coupling at a specified time
     // Defaults to 0.0
@@ -69,8 +74,6 @@ fluidSolidInterface    Aitken;
     // every 10 time-steps
     // Defaults to 0
     // interpolatorUpdateFrequency 0;
-
 }
-    rbfInterpolation true;
 
 // ************************************************************************* //

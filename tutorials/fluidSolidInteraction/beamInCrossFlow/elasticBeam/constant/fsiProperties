@@ -22,11 +22,9 @@ fluidSolidInterface    Aitken;
 {
     // Solid interface patch and faceZone
     solidPatch interface;
-    solidZone interface-zone;
 
     // Fluid interface patch and faceZone
     fluidPatch interface;
-    fluidZone interface-zone;
 
     // Under-relaxation factor for passing the solid interface
     // displacement/velocity to the fluid interface
@@ -45,6 +43,11 @@ fluidSolidInterface    Aitken;
 
     // Enable/disable coupling from the start
     coupled yes;
+
+    // Method for transferring information between the interfaces
+    interfaceTransferMethod directMap;
+    //interfaceTransferMethod RBF;
+    //interfaceTransferMethod GGI;
 
     // Optional: if coupled is set to "no", then the couplingStartTime allows
     // you to enable coupling at a specified time
@@ -71,8 +74,6 @@ fluidSolidInterface    Aitken;
     // every 10 time-steps
     // Defaults to 0
     // interpolatorUpdateFrequency 0;
-
 }
-    rbfInterpolation true;
 
 // ************************************************************************* //
