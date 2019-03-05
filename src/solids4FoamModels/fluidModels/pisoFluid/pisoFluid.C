@@ -174,21 +174,26 @@ bool pisoFluid::evolve()
 
     // --- PISO loop
 
+#if FOAMEXTEND > 40
     // Prepare clean 1/a_p without time derivative contribution
     volScalarField rAU = 1.0/HUEqn.A();
-#if FOAMEXTEND < 41
+#else
+    volScalarField rAU = 1.0/(HUEqn.A() + ddtUEqn.A());
     surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
 #endif
 
     while (piso().correct())
     {
+#if FOAMEXTEND > 40
         // Calculate U from convection-diffusion matrix
         U() = rAU*HUEqn.H();
 
-#if FOAMEXTEND > 40
         // Consistently calculate flux
         piso().calcTransientConsistentFlux(phi(), U(), rAU, ddtUEqn);
 #else
+        // Calculate U from convection-diffusion matrix
+        U() = rAU*(HUEqn.H() + ddtUEqn.H());
+
         phi() = (fvc::interpolate(U()) & mesh.Sf());
 #endif
 
@@ -218,6 +223,8 @@ bool pisoFluid::evolve()
                 mesh.solutionDict().solver(p().select(piso().finalInnerIter()))
             );
 
+            gradp() = fvc::grad(p());
+
             if (piso().finalNonOrthogonalIter())
             {
                 phi() -= pEqn.flux();
@@ -231,6 +238,9 @@ bool pisoFluid::evolve()
         // Note: flux is made relative inside the function
         piso().reconstructTransientVelocity(U(), phi(), ddtUEqn, rAU, p());
 #else
+        // Make the fluxes relative to the mesh motion
+        fvc::makeRelative(phi(), U());
+
         U() -= rAU*gradp();
         U().correctBoundaryConditions();
 #endif

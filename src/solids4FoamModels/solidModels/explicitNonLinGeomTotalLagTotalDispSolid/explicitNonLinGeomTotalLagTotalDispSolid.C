@@ -225,6 +225,8 @@ void explicitNonLinGeomTotalLagTotalDispSolid::setDeltaT(Time& runTime)
         rho(), U(), DD(), sigma(), gradD(), gradDD(), waveSpeed_
     );
 
+    blockLduMatrix::debug = 1;
+
     return true;
 }
 

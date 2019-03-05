@@ -60,7 +60,7 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#include "RASModel.H"
+#include "turbulenceModel.H"
 #include "pimpleControl.H"
 #include "fvm.H"
 #include "uniformDimensionedFields.H"
@@ -101,8 +101,11 @@ class buoyantBoussinesqPimpleFluid
         // Turbulent Prandtl number
         dimensionedScalar Prt_;
 
-        //- Density of phase 1
-        autoPtr<incompressible::RASModel> turbulence_;
+        //- Turbulent Transport model
+        autoPtr<incompressible::turbulenceModel> turbulence_;
+
+        //- Effective fluid conductivity
+        volScalarField kappaEff_;
 
         //- Density
         dimensionedScalar rho_;
@@ -116,6 +119,12 @@ class buoyantBoussinesqPimpleFluid
         //- Kinematic density for buoyancy force
         volScalarField rhok_;
 
+        //- Reference pressure cell
+        label pRefCell_;
+
+        //- Reference pressure value
+        scalar pRefValue_;
+
 
     // Private Member Functions
 
@@ -128,10 +137,7 @@ class buoyantBoussinesqPimpleFluid
         //- Solve pressure equation
         void solvePEqn
         (
-            pimpleControl& pimple,
-            tmp<fvVectorMatrix>& UEqn,
-            const label pdRefCell,
-            const scalar pdRefValue
+            tmp<fvVectorMatrix>& UEqn
         );
 
         //- Disallow default bitwise copy construct
