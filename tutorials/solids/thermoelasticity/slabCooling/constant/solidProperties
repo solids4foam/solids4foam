@@ -1,0 +1,49 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+//solidModel     weakThermalLinearGeometry;
+solidModel     thermalLinearGeometry;
+//solidModel     linearGeometryTotalDisplacement;
+
+"linearGeometryTotalDisplacementCoeffs|thermalLinearGeometryCoeffs"
+{
+    // Maximum number of correctors
+    nCorrectors     10000;
+
+    // Solution tolerance
+    solutionTolerance 1e-8;
+
+    // Alternative solution tolerance
+    alternativeTolerance 1e-8;
+
+    // Write frequency for the residuals
+    infoFrequency  100;
+
+    // Set displacements of internal cells
+    cellDisplacements
+    {
+        // Set displacement to zero for the cell closest to the centre of the
+        // block
+        cellDisp1
+        {
+            approximateCoordinate    (3 1 0.5);
+            displacement             (0 0 0);
+        }
+    }
+}
+
+// ************************************************************************* //

@@ -283,10 +283,7 @@ Foam::thermoLinearElastic::thermoLinearElastic
     TrunTimePtr_(),
     TmeshPtr_(),
     curTimeIndex_(-1)
-{
-    // Check if the T field needs to be read from disk
-    readTField();
-}
+{}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //

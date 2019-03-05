@@ -1,0 +1,4 @@
+Initial case provided by erich1016 (Duo Huang) on cfd-online forum at:
+https://www.cfd-online.com/Forums/openfoam-community-contributions/126706-support-thread-solid-mechanics-solvers-added-openfoam-extend-22.html#post726239
+
+Modified for solids4foam by Philip Cardiff
