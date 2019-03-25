@@ -60,3 +60,8 @@ checkAndReport \
     "fvMesh.C" \
     "$FOAM_SRC/finiteVolume/fvMesh" \
     "$FOAM_SRC/finiteVolume"
+
+checkAndReport \
+    "fvBlockMatrix.C" \
+    "$FOAM_SRC/finiteVolume/fvMatrices/fvBlockMatrix" \
+    "$FOAM_SRC/finiteVolume"

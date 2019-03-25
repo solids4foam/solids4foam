@@ -514,6 +514,59 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalModel::impKf() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::bulkModulus() const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        return laws[0].bulkModulus();
+    }
+    else
+    {
+        // Accumulate data for all fields
+        tmp<volScalarField> tresult
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "bulkModulusLaw",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimDensity, 0),
+                calculatedFvPatchScalarField::typeName
+            )
+        );
+        volScalarField& result = tresult();
+
+        // Accumulated subMesh fields and then map to the base mesh
+        PtrList<volScalarField> bulkModulii(laws.size());
+
+        forAll(laws, lawI)
+        {
+            bulkModulii.set
+            (
+                lawI,
+                new volScalarField(laws[lawI].bulkModulus())
+            );
+        }
+
+        // Map subMesh fields to the base mesh
+        solSubMeshes().mapSubMeshVolFields<scalar>(bulkModulii, result);
+
+        // Clear subMesh fields
+        bulkModulii.clear();
+
+        return tresult;
+    }
+}
+
+
 void Foam::mechanicalModel::correct(volSymmTensorField& sigma)
 {
     PtrList<mechanicalLaw>& laws = *this;

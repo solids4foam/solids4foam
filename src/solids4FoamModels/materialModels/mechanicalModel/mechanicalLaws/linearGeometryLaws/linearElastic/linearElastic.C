@@ -411,6 +411,32 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::rho() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::linearElastic::bulkModulus() const
+{
+    tmp<volScalarField> tresult
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "bulkModulus",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            K_,
+            zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+    tresult().correctBoundaryConditions();
+
+    return tresult;
+}
+
+
 const Foam::dimensionedScalar& Foam::linearElastic::rhoScalar() const
 {
     return rho_;

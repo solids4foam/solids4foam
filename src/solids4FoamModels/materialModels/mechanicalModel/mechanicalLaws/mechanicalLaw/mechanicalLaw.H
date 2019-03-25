@@ -225,6 +225,15 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<surfaceScalarField> impKf() const;
 
+        //- Return bulk modulus
+        virtual tmp<volScalarField> bulkModulus() const
+        {
+            notImplemented("Not yet implemented for this mechanical law");
+
+            // Keep compiler happy
+            return rho();
+        }
+
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma) = 0;
 

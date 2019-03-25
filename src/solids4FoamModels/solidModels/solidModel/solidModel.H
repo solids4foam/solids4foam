@@ -34,7 +34,7 @@ Author
 
 SourceFiles
     solidModel.C
-    newSolidModel.C
+    solidModelTemplates.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -271,12 +271,14 @@ protected:
         void relaxField(volVectorField& D, int iCorr);
 
         //- Check if the equation has converged
+        template<class Type>
         bool converged
         (
             const int iCorr,
             const scalar solverPerfInitRes,
             const int solverPerfNIters,
-            const volVectorField& D
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const bool writeResiduals = true
         );
 
         //- Return const reference to the gravitational acceleration
@@ -665,6 +667,10 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+#ifdef NoRepository
+#   include "solidModelTemplates.C"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

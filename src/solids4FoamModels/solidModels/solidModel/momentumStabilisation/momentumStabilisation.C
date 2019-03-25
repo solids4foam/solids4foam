@@ -67,7 +67,9 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
             vf.mesh(),
             dimensionedVector
             (
-                "zero", gamma.dimensions()*gradVf.dimensions()/dimLength, vector::zero
+                "zero",
+                gamma.dimensions()*gradVf.dimensions()/dimLength,
+                vector::zero
             )
         )
     );
@@ -105,7 +107,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     {
         FatalErrorIn(type() + "::stabilisation() const")
             << "Unknown method = " << method << nl
-            << "Methods are: RhieChow, JamesonSchmidtTurek and Laplacian"
+            << "Methods are: RhieChow, JamesonSchmidtTurkel and Laplacian"
             <<  abort(FatalError);
     }
 
