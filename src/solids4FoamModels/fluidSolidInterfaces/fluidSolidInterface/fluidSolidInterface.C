@@ -1229,15 +1229,22 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 {
     // Get fluid patch displacement from fluid zone displacement
 
+    // Take care: these are local patch fields not global patch fields
+
     const vectorField fluidPatchPointsDispl =
         fluid().globalPatch().globalPointToPatch(fluidZonePointsDispl());
 
     const vectorField fluidPatchPointsDisplPrev =
         fluid().globalPatch().globalPointToPatch(fluidZonePointsDisplPrev());
 
-    // Move fluid mesh
-    const vectorField& n = fluid().globalPatch().globalPatch().pointNormals();
+    // Patch point normals
+    const vectorField& n =
+        fluid().mesh().boundaryMesh()
+        [
+            fluid().globalPatch().patch().index()
+        ].pointNormals();
 
+    // Patch deltaCoeffs
     const scalarField fluidZoneDeltaCoeffs =
         fluid().globalPatch().patchFaceToGlobal
         (
@@ -1247,11 +1254,16 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             ].deltaCoeffs()
         );
 
-    const scalarField pointDeltaCoeffs =
+    // Zone deltaCoeffs at points
+    const scalarField fluidZonePointDeltaCoeffs =
         fluid().globalPatch().interpolator().faceToPointInterpolate
         (
             fluidZoneDeltaCoeffs
         );
+
+    // Patch deltaCoeffs at points
+    const scalarField fluidPatchPointDeltaCoeffs =
+        fluid().globalPatch().globalPointToPatch(fluidZonePointDeltaCoeffs);
 
     const scalar delta =
         gMax
@@ -1264,7 +1276,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                   + fluidPatchPointsDispl
                   - fluidPatchPointsDisplPrev
                 )
-            )*pointDeltaCoeffs
+            )*fluidPatchPointDeltaCoeffs
         );
 
     Info<< "Maximal accumulated displacement of interface points: "
