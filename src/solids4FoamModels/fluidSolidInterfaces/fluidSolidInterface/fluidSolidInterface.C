@@ -115,7 +115,7 @@ void Foam::fluidSolidInterface::calcCurrentSolidZonePatch() const
     }
 
     currentSolidZonePatchPtr_ =
-        new PrimitivePatch<face, List, const pointField&>
+        new standAlonePatch
         (
             solid().globalPatch().globalPatch().localFaces(),
             currentSolidZonePoints()
@@ -313,12 +313,10 @@ void Foam::fluidSolidInterface::calcGgiInterpolator() const
             << abort(FatalError);
     }
 
-    // Create copy of solid face zone primitive patch in current configuration
-
+    // Remove current solid zone and points so that it will be re-created in the
+    // deformed position
     deleteDemandDrivenData(currentSolidZonePatchPtr_);
     deleteDemandDrivenData(currentSolidZonePointsPtr_);
-
-    //currentSolidZonePatch().movePoints(currentSolidZonePoints());
 
     Info<< "Create GGI zone-to-zone interpolator" << endl;
 
@@ -326,7 +324,7 @@ void Foam::fluidSolidInterface::calcGgiInterpolator() const
         new GGIInterpolation<standAlonePatch, standAlonePatch>
         (
             fluid().globalPatch().globalPatch(),
-            solid().globalPatch().globalPatch(), //currentSolidZonePatch(),
+            currentSolidZonePatch(),
             tensorField(0),
             tensorField(0),
             vectorField(0), // Slave-to-master separation. Bug fix
@@ -372,15 +370,12 @@ void Foam::fluidSolidInterface::calcGgiInterpolator() const
             << endl;
     }
 
-    Info<< "Checking solid-to-fluid point interpolator (GGI)" << endl;
+    Info<< "Checking solid-to-fluid point interpolator" << endl;
     {
-        const vectorField solidZonePoints_ = currentSolidZonePoints();
-            //solid().globalPatch().globalPatch().localPoints();
-
-        const vectorField solidZonePoints =
+        const vectorField solidZonePointsAtFluid =
             ggiInterpolatorPtr_->slaveToMasterPointInterpolate
             (
-                solidZonePoints_
+                currentSolidZonePoints()
             );
 
         const vectorField fluidZonePoints =
@@ -391,11 +386,11 @@ void Foam::fluidSolidInterface::calcGgiInterpolator() const
             mag
             (
                 fluidZonePoints
-              - solidZonePoints
+              - solidZonePointsAtFluid
             )
         );
 
-        Info<< "Solid-to-fluid point interpolation error (GGI): " << maxDist
+        Info<< "Solid-to-fluid point interpolation error: " << maxDist
             << endl;
     }
 
@@ -430,38 +425,79 @@ void Foam::fluidSolidInterface::calcFluidToSolidFaceMap() const
             << abort(FatalError);
     }
 
-    // Initialise map
-    fluidToSolidFaceMapPtr_.set
+    IOobject mapHeader
     (
-        new labelList(solid().globalPatch().globalPatch().size(), -1)
+        "fluidToSolidFaceMap",
+        fluid().runTime().timeName(),
+        fluidMesh(),
+        IOobject::MUST_READ
     );
-    labelList& fluidToSolidMap = fluidToSolidFaceMapPtr_();
 
-    // Perform N^2 search for corresponding faces
+    if (mapHeader.headerOk())
+    {
+        // Read map
+        Info<< "Reading fluidToSolidFaceMap from disk" << endl;
+        fluidToSolidFaceMapPtr_.set
+        (
+            new labelIOList
+            (
+                IOobject
+                (
+                    "fluidToSolidFaceMap",
+                    fluid().runTime().timeName(),
+                    fluidMesh(),
+                    IOobject::MUST_READ,
+                    IOobject::AUTO_WRITE
+                )
+            )
+        );
+    }
+    else
+    {
+        // Initialise map
+        fluidToSolidFaceMapPtr_.set
+        (
+            new labelIOList
+            (
+                IOobject
+                (
+                    "fluidToSolidFaceMap",
+                    fluid().runTime().timeName(),
+                    fluidMesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                labelList(solid().globalPatch().globalPatch().size(), -1)
+            )
+        );
+        labelList& fluidToSolidMap = fluidToSolidFaceMapPtr_();
+
+        // Perform N^2 search for corresponding faces
     // We will take 0.1% of the minEdgeLength as the exact match tolerance
 
-    const vectorField& fluidCf =
-        fluid().globalPatch().globalPatch().faceCentres();
-    const vectorField& solidCf =
-        solid().globalPatch().globalPatch().faceCentres();
+        const vectorField& fluidCf =
+            fluid().globalPatch().globalPatch().faceCentres();
+        const vectorField& solidCf =
+            solid().globalPatch().globalPatch().faceCentres();
 
-    const scalar tol = 0.001*gMin(minEdgeLength());
+        const scalar tol = 0.001*gMin(minEdgeLength());
 
-    forAll(solidCf, solidFaceI)
-    {
-        const vector& curSolidCf = solidCf[solidFaceI];
-
-        forAll(fluidCf, fluidFaceI)
+        forAll(solidCf, solidFaceI)
         {
-            if (mag(curSolidCf - fluidCf[fluidFaceI]) < tol)
+            const vector& curSolidCf = solidCf[solidFaceI];
+
+            forAll(fluidCf, fluidFaceI)
             {
-                fluidToSolidMap[solidFaceI] = fluidFaceI;
-                break;
+                if (mag(curSolidCf - fluidCf[fluidFaceI]) < tol)
+                {
+                    fluidToSolidMap[solidFaceI] = fluidFaceI;
+                    break;
+                }
             }
         }
     }
 
-    if (gMin(fluidToSolidMap) == -1)
+    if (gMin(fluidToSolidFaceMapPtr_()) == -1)
     {
         FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
             << "Cannot calculate the map between interfaces" << nl
@@ -502,38 +538,79 @@ void Foam::fluidSolidInterface::calcSolidToFluidFaceMap() const
             << abort(FatalError);
     }
 
-    // Initialise map
-    solidToFluidFaceMapPtr_.set
+    IOobject mapHeader
     (
-        new labelList(fluid().globalPatch().globalPatch().size(), -1)
+        "solidToFluidFaceMap",
+        solid().runTime().timeName(),
+        solidMesh(),
+        IOobject::MUST_READ
     );
-    labelList& solidToFluidMap = solidToFluidFaceMapPtr_();
 
-    // Perform N^2 search for corresponding faces
-    // We will take 0.1% of the minEdgeLength as the exact match tolerance
-
-    const vectorField& fluidCf =
-        fluid().globalPatch().globalPatch().faceCentres();
-    const vectorField& solidCf =
-        solid().globalPatch().globalPatch().faceCentres();
-
-    const scalar tol = 0.001*gMin(minEdgeLength());
-
-    forAll(fluidCf, fluidFaceI)
+    if (mapHeader.headerOk())
     {
-        const vector& curFluidCf = fluidCf[fluidFaceI];
+        // Read map
+        Info<< "Reading solidToFluidFaceMap from disk" << endl;
+        solidToFluidFaceMapPtr_.set
+        (
+            new labelIOList
+            (
+                IOobject
+                (
+                    "solidToFluidFaceMap",
+                    solid().runTime().timeName(),
+                    solidMesh(),
+                    IOobject::MUST_READ,
+                    IOobject::AUTO_WRITE
+                )
+            )
+        );
+    }
+    else
+    {
+        // Initialise map
+        solidToFluidFaceMapPtr_.set
+        (
+            new labelIOList
+            (
+                IOobject
+                (
+                    "solidToFluidFaceMap",
+                    solid().runTime().timeName(),
+                    solidMesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                labelList(fluid().globalPatch().globalPatch().size(), -1)
+            )
+        );
+        labelList& solidToFluidMap = solidToFluidFaceMapPtr_();
 
-        forAll(solidCf, solidFaceI)
+        // Perform N^2 search for corresponding faces
+        // We will take 0.1% of the minEdgeLength as the exact match tolerance
+
+        const vectorField& fluidCf =
+            fluid().globalPatch().globalPatch().faceCentres();
+        const vectorField& solidCf =
+            solid().globalPatch().globalPatch().faceCentres();
+
+        const scalar tol = 0.001*gMin(minEdgeLength());
+
+        forAll(fluidCf, fluidFaceI)
         {
-            if (mag(curFluidCf - solidCf[solidFaceI]) < tol)
+            const vector& curFluidCf = fluidCf[fluidFaceI];
+
+            forAll(solidCf, solidFaceI)
             {
-                solidToFluidMap[fluidFaceI] = solidFaceI;
-                break;
+                if (mag(curFluidCf - solidCf[solidFaceI]) < tol)
+                {
+                    solidToFluidMap[fluidFaceI] = solidFaceI;
+                    break;
+                }
             }
         }
     }
 
-    if (gMin(solidToFluidMap) == -1)
+    if (gMin(solidToFluidFaceMapPtr_()) == -1)
     {
         FatalErrorIn(type() + "::calcSolidToFluidFaceMap() const")
             << "Cannot calculate the map between interfaces" << nl
@@ -551,7 +628,6 @@ const Foam::labelList& Foam::fluidSolidInterface::solidToFluidFaceMap() const
     }
 
     return solidToFluidFaceMapPtr_();
-
 }
 
 
@@ -575,38 +651,79 @@ void Foam::fluidSolidInterface::calcFluidToSolidPointMap() const
             << abort(FatalError);
     }
 
-    // Initialise map
-    fluidToSolidPointMapPtr_.set
+    IOobject mapHeader
     (
-        new labelList(solid().globalPatch().globalPatch().nPoints(), -1)
+        "fluidToSolidPointMap",
+        fluid().runTime().timeName(),
+        fluidMesh(),
+        IOobject::MUST_READ
     );
-    labelList& fluidToSolidMap = fluidToSolidPointMapPtr_();
 
-    // Perform N^2 search for corresponding points
-    // We will take 0.1% of the minEdgeLength as the exact match tolerance
-
-    const vectorField& fluidLP =
-        fluid().globalPatch().globalPatch().localPoints();
-    const vectorField& solidLP =
-        solid().globalPatch().globalPatch().localPoints();
-
-    const scalar tol = gMin(minEdgeLength());
-
-    forAll(solidLP, solidPointI)
+    if (mapHeader.headerOk())
     {
-        const vector& curSolidLP = solidLP[solidPointI];
+        // Read map
+        Info<< "Reading fluidToSolidPointMap from disk" << endl;
+        fluidToSolidPointMapPtr_.set
+        (
+            new labelIOList
+            (
+                IOobject
+                (
+                    "fluidToSolidPointMap",
+                    fluid().runTime().timeName(),
+                    fluidMesh(),
+                    IOobject::MUST_READ,
+                    IOobject::AUTO_WRITE
+                )
+            )
+        );
+    }
+    else
+    {
+        // Initialise map
+        fluidToSolidPointMapPtr_.set
+        (
+            new labelIOList
+            (
+                IOobject
+                (
+                    "fluidToSolidPointMap",
+                    fluid().runTime().timeName(),
+                    fluidMesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                labelList(solid().globalPatch().globalPatch().nPoints(), -1)
+            )
+        );
+        labelList& fluidToSolidMap = fluidToSolidPointMapPtr_();
 
-        forAll(fluidLP, fluidPointI)
+        // Perform N^2 search for corresponding points
+        // We will take 0.1% of the minEdgeLength as the exact match tolerance
+
+        const vectorField& fluidLP =
+            fluid().globalPatch().globalPatch().localPoints();
+        const vectorField& solidLP =
+            solid().globalPatch().globalPatch().localPoints();
+
+        const scalar tol = 0.001*gMin(minEdgeLength());
+
+        forAll(solidLP, solidPointI)
         {
-            if (mag(curSolidLP - fluidLP[fluidPointI]) < tol)
+            const vector& curSolidLP = solidLP[solidPointI];
+
+            forAll(fluidLP, fluidPointI)
             {
-                fluidToSolidMap[solidPointI] = fluidPointI;
-                break;
+                if (mag(curSolidLP - fluidLP[fluidPointI]) < tol)
+                {
+                    fluidToSolidMap[solidPointI] = fluidPointI;
+                    break;
+                }
             }
         }
     }
 
-    if (gMin(fluidToSolidMap) == -1)
+    if (gMin(fluidToSolidPointMapPtr_()) == -1)
     {
         FatalErrorIn(type() + "::calcFluidToSolidPointMap() const")
             << "Cannot calculate the map between interfaces" << nl
@@ -647,38 +764,79 @@ void Foam::fluidSolidInterface::calcSolidToFluidPointMap() const
             << abort(FatalError);
     }
 
-    // Initialise map
-    solidToFluidPointMapPtr_.set
+    IOobject mapHeader
     (
-        new labelList(fluid().globalPatch().globalPatch().nPoints(), -1)
+        "solidToFluidPointMap",
+        solid().runTime().timeName(),
+        solidMesh(),
+        IOobject::MUST_READ
     );
-    labelList& solidToFluidMap = solidToFluidPointMapPtr_();
 
-    // Perform N^2 search for corresponding points
-    // We will take 0.1% of the minEdgeLength as the exact match tolerance
-
-    const vectorField& fluidLP =
-        fluid().globalPatch().globalPatch().localPoints();
-    const vectorField& solidLP =
-        solid().globalPatch().globalPatch().localPoints();
-
-    const scalar tol = gMin(minEdgeLength());
-
-    forAll(fluidLP, fluidPointI)
+    if (mapHeader.headerOk())
     {
-        const vector& curFluidLP = fluidLP[fluidPointI];
+        // Read map
+        Info<< "Reading solidToFluidPointMap from disk" << endl;
+        solidToFluidPointMapPtr_.set
+        (
+            new labelIOList
+            (
+                IOobject
+                (
+                    "solidToFluidPointMap",
+                    solid().runTime().timeName(),
+                    solidMesh(),
+                    IOobject::MUST_READ,
+                    IOobject::AUTO_WRITE
+                )
+            )
+        );
+    }
+    else
+    {
+        // Initialise map
+        solidToFluidPointMapPtr_.set
+        (
+            new labelIOList
+            (
+                IOobject
+                (
+                    "solidToFluidPointMap",
+                    solid().runTime().timeName(),
+                    solidMesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                labelList(fluid().globalPatch().globalPatch().nPoints(), -1)
+            )
+        );
+        labelList& solidToFluidMap = solidToFluidPointMapPtr_();
 
-        forAll(solidLP, solidPointI)
+        // Perform N^2 search for corresponding points
+        // We will take 0.1% of the minEdgeLength as the exact match tolerance
+
+        const vectorField& fluidLP =
+            fluid().globalPatch().globalPatch().localPoints();
+        const vectorField& solidLP =
+            solid().globalPatch().globalPatch().localPoints();
+
+        const scalar tol = 0.001*gMin(minEdgeLength());
+
+        forAll(fluidLP, fluidPointI)
         {
-            if (mag(curFluidLP - solidLP[solidPointI]) < tol)
+            const vector& curFluidLP = fluidLP[fluidPointI];
+
+            forAll(solidLP, solidPointI)
             {
-                solidToFluidMap[fluidPointI] = solidPointI;
-                break;
+                if (mag(curFluidLP - solidLP[solidPointI]) < tol)
+                {
+                    solidToFluidMap[fluidPointI] = solidPointI;
+                    break;
+                }
             }
         }
     }
 
-    if (gMin(solidToFluidMap) == -1)
+    if (gMin(solidToFluidPointMapPtr_()) == -1)
     {
         FatalErrorIn(type() + "::calcSolidToFluidPointMap() const")
             << "Cannot calculate the map between interpoints" << nl
@@ -999,6 +1157,15 @@ Foam::fluidSolidInterface::fluidSolidInterface
             << "The 'rbfInterpolation' is deprecated: instead please use the "
             << "'transferMethod' to specify the approach" << abort(FatalError);
     }
+
+    if (transferMethod_ == directMap)
+    {
+        // Force maps to be created, in case of restart, they need to be read
+        fluidToSolidFaceMap();
+        solidToFluidFaceMap();
+        fluidToSolidPointMap();
+        solidToFluidPointMap();
+    }
 }
 
 
@@ -1077,7 +1244,7 @@ Foam::fluidSolidInterface::currentSolidZonePoints() const
 }
 
 
-const Foam::PrimitivePatch<Foam::face, Foam::List, const Foam::pointField&>&
+const Foam::standAlonePatch&
 Foam::fluidSolidInterface::currentSolidZonePatch() const
 {
     if (!currentSolidZonePatchPtr_)

@@ -89,8 +89,7 @@ class fluidSolidInterface
         mutable vectorField* currentSolidZonePointsPtr_;
 
         //- Solid face zone primitive patch in current configuration
-        mutable PrimitivePatch<face, List, const pointField&>*
-            currentSolidZonePatchPtr_;
+        mutable standAlonePatch* currentSolidZonePatchPtr_;
 
         //- Fluid zone to solid zone interpolator
         mutable std::shared_ptr<RBFInterpolation> rbfFluidToSolidPtr_;
@@ -99,7 +98,6 @@ class fluidSolidInterface
         mutable std::shared_ptr<RBFInterpolation> rbfSolidToFluidPtr_;
 
         //- Ggi zone-to-zone interpolation
-        //mutable ggiZoneInterpolation* ggiInterpolatorPtr_;
         mutable GGIInterpolation
         <
             standAlonePatch,
@@ -108,21 +106,21 @@ class fluidSolidInterface
 
         //- Face map for conformal fluid and solid interfaces
         //  For each solid face, give the index of the corresponding fluid face
-        mutable autoPtr<labelList> fluidToSolidFaceMapPtr_;
+        mutable autoPtr<labelIOList> fluidToSolidFaceMapPtr_;
 
         //- Face map for conformal fluid and solid interfaces
         //  For each fluid face, give the index of the corresponding solid face
-        mutable autoPtr<labelList> solidToFluidFaceMapPtr_;
+        mutable autoPtr<labelIOList> solidToFluidFaceMapPtr_;
 
         //- Point map for conformal fluid and solid interfaces
         //  For each solid point, give the index of the corresponding fluid
         //  point
-        mutable autoPtr<labelList> fluidToSolidPointMapPtr_;
+        mutable autoPtr<labelIOList> fluidToSolidPointMapPtr_;
 
         //- Point map for conformal fluid and solid interfaces
         //  For each fluid point, give the index of the corresponding solid
         //  point
-        mutable autoPtr<labelList> solidToFluidPointMapPtr_;
+        mutable autoPtr<labelIOList> solidToFluidPointMapPtr_;
 
         //- Outer correction loop stoping tolerance
         const scalar outerCorrTolerance_;
@@ -400,8 +398,7 @@ public:
             const vectorField& currentSolidZonePoints() const;
 
             //- Return current solid zone patch
-            const PrimitivePatch<face, List, const pointField&>&
-            currentSolidZonePatch() const;
+            const standAlonePatch& currentSolidZonePatch() const;
 
             //- Return fluid to solid interpolator
             const std::shared_ptr<RBFInterpolation>& rbfFluidToSolid() const;
