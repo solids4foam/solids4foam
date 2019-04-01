@@ -24,7 +24,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "explicitUnsLinGeomSolid.H"
+#include "explicitUnsLinGeomTotalDispSolid.H"
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
@@ -43,14 +43,47 @@ namespace solidModels
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(explicitUnsLinGeomSolid, 0);
-addToRunTimeSelectionTable(physicsModel, explicitUnsLinGeomSolid, solid);
-addToRunTimeSelectionTable(solidModel, explicitUnsLinGeomSolid, dictionary);
+defineTypeNameAndDebug(explicitUnsLinGeomTotalDispSolid, 0);
+addToRunTimeSelectionTable
+(
+    physicsModel, explicitUnsLinGeomTotalDispSolid, solid
+);
+addToRunTimeSelectionTable
+(
+    solidModel, explicitUnsLinGeomTotalDispSolid, dictionary
+);
+
+// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+void explicitUnsLinGeomTotalDispSolid::updateStress()
+{
+    // Update increment of displacement
+    DD() = D() - D().oldTime();
+
+    // Interpolate D to pointD
+    mechanical().interpolate(D(), pointD(), false);
+
+    // Update gradient of displacement
+    mechanical().grad(D(), pointD(), gradD(), gradDf_);
+
+    // Update gradient of displacement increment
+    gradDD() = gradD() - gradD().oldTime();
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigmaf_);
+    mechanical().correct(sigma());
+
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
+
+    // Increment of displacement
+    DD() = D() - D().oldTime();
+}
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-explicitUnsLinGeomSolid::explicitUnsLinGeomSolid
+explicitUnsLinGeomTotalDispSolid::explicitUnsLinGeomTotalDispSolid
 (
     Time& runTime,
     const word& region
@@ -86,19 +119,18 @@ explicitUnsLinGeomSolid::explicitUnsLinGeomSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    RhieChowScaleFactor_
+    // RhieChowScaleFactor_
+    // (
+    //     solidModelDict().lookupOrDefault<scalar>
+    //     (
+    //         "RhieChowScale", 0.0
+    //     )
+    // ),
+    JSTScaleFactor_
     (
         solidModelDict().lookupOrDefault<scalar>
         (
-            "RhieChowScale", 0.0
-        )
-    ),
-    eta_
-    (
-        solidModelDict().lookupOrDefault<dimensionedScalar>
-        (
-            "numericalViscosity",
-            dimensionedScalar("eta", dimless/dimTime, 0.0)
+            "JSTScaleFactor", 0.01
         )
     ),
     waveSpeed_
@@ -113,18 +145,42 @@ explicitUnsLinGeomSolid::explicitUnsLinGeomSolid
         ),
         fvc::interpolate(Foam::sqrt(impK_/rho()))
     ),
-    energies_(mesh(), solidModelDict())
+    energies_(mesh(), solidModelDict()),
+    a_
+    (
+        IOobject
+        (
+            "a",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedVector
+        (
+            "zero", dimVelocity/dimTime, vector::zero
+        ),
+        "zeroGradient"
+    )
 {
-    // Store old times
-    gradDf_.oldTime();
-    sigmaf_.oldTime();
+    a_.oldTime();
+    U().oldTime();
+
+    // Update stress
+    updateStress();
+
+    // Update initial acceleration
+    a_.internalField() =
+        fvc::div(sigma(), "div(sigma)")().internalField()
+       /(rho().internalField());
+    a_.correctBoundaryConditions();
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-
-void explicitUnsLinGeomSolid::setDeltaT(Time& runTime)
+void explicitUnsLinGeomTotalDispSolid::setDeltaT(Time& runTime)
 {
     // waveSpeed = cellWidth/deltaT
     // So, deltaT = cellWidth/waveVelocity == (1.0/deltaCoeff)/waveSpeed
@@ -142,13 +198,6 @@ void explicitUnsLinGeomSolid::setDeltaT(Time& runTime)
            *waveSpeed_.internalField()
         );
 
-    Info<< "Min delta: "
-        << 1.0/
-        gMax
-        (
-            mesh().surfaceInterpolation::deltaCoeffs().internalField()
-        ) << endl;
-
     // Lookup the desired Courant number
     const scalar maxCo =
         runTime.controlDict().lookupOrDefault<scalar>("maxCo", 0.7071);
@@ -156,77 +205,80 @@ void explicitUnsLinGeomSolid::setDeltaT(Time& runTime)
     const scalar newDeltaT = maxCo*requiredDeltaT;
 
     Info<< "maxCo = " << maxCo << nl
-        << "deltaT = " << requiredDeltaT << nl << endl;
+        << "deltaT = " << newDeltaT << nl << endl;
 
     runTime.setDeltaT(newDeltaT);
 }
 
 
-bool explicitUnsLinGeomSolid::evolve()
+bool explicitUnsLinGeomTotalDispSolid::evolve()
 {
-    Info<< "Solving the momentum equation for D" << endl;
-
-    // Do not write default linear solver residuals
-    blockLduMatrix::debug = 0;
+    Info<< "Evolving solid solver" << endl;
 
     // Mesh update loop
     do
     {
-        // Linear momentum equation total displacement form
-        fvVectorMatrix DEqn
-        (
-            rho()*fvm::d2dt2(D())
-          - eta_*rho()*fvm::ddt(D())
-         == fvc::div(mesh().Sf() & sigmaf_)
-          + rho()*g()
-          + RhieChowScaleFactor_*mechanical().RhieChowCorrection(D(), gradD())
-          + fvc::div
+        Info<< "Solving the momentum equation for D" << endl;
+
+        // Central difference scheme
+
+        const dimensionedScalar& deltaT = time().deltaT();
+        const dimensionedScalar& deltaT0 = time().deltaT0();
+
+        // Compute the velocity
+        // Note: this is the velocity at the middle of the time-step
+        U() = U().oldTime() + 0.5*(deltaT + deltaT0)*a_.oldTime();
+
+        // Compute displacement
+        D() = D().oldTime() + deltaT*U();
+
+        // Enforce boundary conditions on the displacement field
+        D().correctBoundaryConditions();
+
+        // Update the stress field based on the latest D field
+        updateStress();
+
+        // Compute acceleration
+        // Note the inclusion of a linear bulk viscosity pressure term to
+        // dissipate high frequency energies, and a Rhie-Chow term to avoid
+        // checker-boarding
+        a_.internalField() =
             (
-                energies_.viscousPressure(rho(), waveSpeed_, gradD())
-                *mesh().Sf()
-            )
-        );
-
-        // Solve the linear system
-        DEqn.solve();
-
-        // Update increment of displacement
-        DD() = D() - D().oldTime();
-
-        // Interpolate D to pointD
-        mechanical().interpolate(D(), pointD(), false);
-
-        // Update gradient of displacement
-        mechanical().grad(D(), pointD(), gradD(), gradDf_);
-
-        // Update gradient of displacement increment
-        gradDD() = gradD() - gradD().oldTime();
-
-        // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigmaf_);
-        mechanical().correct(sigma());
-
-        // Increment of point displacement
-        pointDD() = pointD() - pointD().oldTime();
-
-        // Velocity
-        U() = fvc::ddt(D());
+                fvc::div
+                (
+                    (mesh().Sf() & sigmaf_)
+                  + mesh().Sf()*energies_.viscousPressure
+                    (
+                        rho(), waveSpeed_, gradD()
+                    )
+                )().internalField()
+              - JSTScaleFactor_*fvc::laplacian
+                (
+                    mesh().magSf(),
+                    fvc::laplacian
+                    (
+                        0.5*(deltaT + deltaT0)*impKf_, U(), "laplacian(DU,U)"
+                    ),
+                    "laplacian(DU,U)"
+                )().internalField()
+            )/rho().internalField()
+          + g().value();
+        a_.correctBoundaryConditions();
 
         // Check energies
         energies_.checkEnergies
         (
-            rho(), U(), DD(), sigma(), gradD(), gradDD(), waveSpeed_
+            rho(), U(), D(), DD(), sigma(), gradD(), gradDD(), waveSpeed_, g(),
+            0.0, impKf_
         );
     }
     while (mesh().update());
-
-    blockLduMatrix::debug = 1;
 
     return true;
 }
 
 
-tmp<vectorField> explicitUnsLinGeomSolid::tractionBoundarySnGrad
+tmp<vectorField> explicitUnsLinGeomTotalDispSolid::tractionBoundarySnGrad
 (
     const vectorField& traction,
     const scalarField& pressure,
@@ -243,10 +295,10 @@ tmp<vectorField> explicitUnsLinGeomSolid::tractionBoundarySnGrad
     const scalarField& rImpK = rImpK_.boundaryField()[patchID];
 
     // Patch gradient
-    const tensorField& gradD = gradDf_.boundaryField()[patchID];
+    const tensorField& pGradD = gradD().boundaryField()[patchID];
 
     // Patch stress
-    const symmTensorField& sigma = sigmaf_.boundaryField()[patchID];
+    const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
     const vectorField n = patch.nf();
@@ -258,7 +310,7 @@ tmp<vectorField> explicitUnsLinGeomSolid::tractionBoundarySnGrad
         (
             (
                 (traction - n*pressure)
-              - (n & (sigma - impK*gradD))
+              - (n & (pSigma - impK*pGradD))
             )*rImpK
         )
     );

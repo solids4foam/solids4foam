@@ -15,6 +15,8 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+libs            ("libsampling.so");
+
 application     solids4Foam;
 
 startFrom       latestTime;
@@ -23,15 +25,15 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         4e-05;
+endTime         1.6e-03;
 
 deltaT          1e-07;
 
-maxCo           0.1;
+maxCo           0.7;
 
 writeControl    runTime;
 
-writeInterval   1e-06;
+writeInterval   1.6e-04;
 
 cycleWrite      0;
 
@@ -49,10 +51,13 @@ runTimeModifiable no;
 
 functions
 {
-    force
+    probe
     {
-        type           solidForces;
-        historyPatch   top;
+        type           probes;
+        outputControl  timeStep;
+        outputInterval 1;
+        fields         (D sigma);
+        probeLocations ((0.1 0 0));
     }
 }
 

@@ -37,15 +37,18 @@ divSchemes
 laplacianSchemes
 {
     default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
-    laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
+    laplacian(DD,D)    Gauss linear corrected;
+    laplacian(DDD,DD)  Gauss linear corrected;
+    laplacian(DU,U)    Gauss linear corrected;
 }
 
 snGradSchemes
 {
     default            none;
-    snGrad(D)          newSkewCorrected 1;
-    snGrad(DD)         newSkewCorrected 1;
+    snGrad(D)          corrected;
+    snGrad(DD)         corrected;
+    snGrad(U_0)        corrected;
+    snGrad(U)          corrected;
 }
 
 interpolationSchemes
@@ -55,6 +58,11 @@ interpolationSchemes
     interpolate(grad(D)) linear;
     interpolate(sqrt((impK|rho))) linear;
     interpolate((rho*ddt(epsilonVol))) linear;
+    interpolate(sigma) linear;
+    interpolate(sigma0) linear;
+    interpolate(grad(U)) linear;
+    interpolate(grad(laplacian(((0.5*(deltaT+deltaT0))*interpolate(impK)),U))) linear;
+    interpolate(grad(U_0)) linear;
 }
 
 // ************************************************************************* //

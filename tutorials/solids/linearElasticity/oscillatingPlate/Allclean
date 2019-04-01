@@ -6,4 +6,4 @@
 cleanCase
 \rm -rf constant/polyMesh/sets constant/polyMesh/*Zones*
 \rm -rf VTK case.foam history
-\rm -rf system/*Subset energies.dat probe
+\rm -rf system/*Subset probe energies.dat

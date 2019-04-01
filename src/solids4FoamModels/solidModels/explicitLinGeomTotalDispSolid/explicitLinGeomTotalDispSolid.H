@@ -29,6 +29,19 @@ Description
     Version of the linGeomTotalDispSolid solid model, where a fully explicit
     solution algorithm is used.
 
+    The explicit implementation uses central differencing, where a linear bulk
+    viscosity pressure term dissipates high frequencies.
+
+    Details of the central differencing solution algorithm can be found in, e.g.
+    - Belytschko, Liu, Moran, 2000, Box 6.1
+    - Ding and Ye, Laser shock peening, Performance and process simulation,
+      2006, Section 3.5.2
+
+    The linear bulk viscosity term is described in the Abaqus documentation.
+
+    A Jameson-Schmidt-Turkel (JST) 4th order diffusion term is used for
+    stabilisation.
+
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
@@ -81,10 +94,10 @@ class explicitLinGeomTotalDispSolid
         const volScalarField rImpK_;
 
         //- Scale factor for Rhie-Chow smoothing term
-        const scalar RhieChowScaleFactor_;
+        //const scalar RhieChowScaleFactor_;
 
-        // Damping viscosity coefficient
-        const dimensionedScalar eta_;
+        // Scale factor for Jameson-Schmidt-Turkel smoothing term
+        const scalar JSTScaleFactor_;
 
         //- Wave speed field
         surfaceScalarField waveSpeed_;
@@ -92,10 +105,25 @@ class explicitLinGeomTotalDispSolid
         //- Energy calculation
         mechanicalEnergies energies_;
 
+        //- Acceleration
+        volVectorField a_;
+
     // Private Member Functions
 
+        //- Update the stress field
+        void updateStress();
+
+        //- Smooth the hydrostatic pressure field
+        void smoothPressure();
+
+        //- Return smoothed U old time based on Lax-Friedlichs method
+        tmp<volVectorField> smoothUOldTime();
+
         //- Disallow default bitwise copy construct
-        explicitLinGeomTotalDispSolid(const explicitLinGeomTotalDispSolid&);
+        explicitLinGeomTotalDispSolid
+        (
+            const explicitLinGeomTotalDispSolid&
+        );
 
         //- Disallow default bitwise assignment
         void operator=(const explicitLinGeomTotalDispSolid&);
@@ -159,6 +187,10 @@ public:
                 const scalarField& pressure,
                 const fvPatch& patch
             ) const;
+
+            //- End of the program
+            virtual void end()
+            {}
 };
 
 

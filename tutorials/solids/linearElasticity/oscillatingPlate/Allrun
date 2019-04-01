@@ -9,8 +9,5 @@ runApplication blockMesh
 runApplication solids4Foam
 
 # Plot energies, if gnuplot is installed
-echo "If gnuplot is installed, view plots with:"
-echo "$> gnuplot plotStress.gnuplot -p"
-echo "$> gnuplot plotEnergies.gnuplot -p"
-#gnuplot plotStress.gnuplot -p
+echo "If gnuplot is installed, view the energies with 'gnuplot plotEnergies.gnuplot -p'"
 #gnuplot plotEnergies.gnuplot -p

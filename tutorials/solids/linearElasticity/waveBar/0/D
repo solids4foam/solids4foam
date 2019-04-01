@@ -21,7 +21,7 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-    right
+    left
     {
         type            solidTraction;
         tractionSeries
@@ -32,38 +32,26 @@ boundaryField
         pressure        uniform 0;
         value           uniform (0 0 0);
     }
-    left
+    right
     {
         type            fixedDisplacement;
         value           uniform (0 0 0);
     }
     top
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type            empty;
     }
     bottom
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type            empty;
     }
     back
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type            empty;
     }
     front
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type            empty;
     }
 }
 
