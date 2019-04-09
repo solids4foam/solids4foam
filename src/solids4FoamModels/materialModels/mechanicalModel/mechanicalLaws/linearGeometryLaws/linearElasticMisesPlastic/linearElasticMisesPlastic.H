@@ -197,6 +197,21 @@ class linearElasticMisesPlastic
         //- Disallow default bitwise assignment
         void operator=(const linearElasticMisesPlastic&);
 
+        //- Update plasticN, DLambda, DSigmaY and sigmaY
+        void updatePlasticity
+        (
+            symmTensor& plasticN,          // Plastic return direction
+            scalar& DLambda,               // Plastic multiplier increment
+            scalar& DSigmaY,               // Increment of yield stress
+            scalar& sigmaY,                // Yield stress
+            const scalar sigmaYOld,        // Yield stress old time
+            const scalar fTrial,           // Trial yield function
+            const symmTensor& sTrial,      // Trial deviatoric stress
+            const scalar epsilonPEqOld,    // Old equivalent plastic strain
+            const scalar muBar,            // Scaled shear modulus
+            const scalar maxMagDEpsilon    // Max strain increment magnitude
+        ) const;
+
         //- Return the current yield stress
         scalar curYieldStress
         (
