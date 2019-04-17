@@ -103,11 +103,11 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     {
         result = scaleFactor*fvc::laplacian(gamma, vf);
     }
-    else
+    else if (method != "none")
     {
         FatalErrorIn(type() + "::stabilisation() const")
             << "Unknown method = " << method << nl
-            << "Methods are: RhieChow, JamesonSchmidtTurkel and Laplacian"
+            << "Methods are: none, RhieChow, JamesonSchmidtTurkel and Laplacian"
             <<  abort(FatalError);
     }
 
