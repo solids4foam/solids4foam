@@ -157,7 +157,7 @@ void Foam::fv::blockFvmInsertCoeffsTang
         solidMesh.gPtNgbProcCellCoeffs();
 
     // Fixed points: value and direction
-    const bool enforcePointConstraints = true;
+    const bool enforcePointConstraints = false;
     const Map<vector>& pointFixedComp = solidMesh.pointFixedComponent(vf);
     const Map<symmTensor>& pointFixedDir = solidMesh.pointFixedDirection(vf);
 
