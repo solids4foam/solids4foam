@@ -119,14 +119,17 @@ void Foam::fluidSolidInterface::transferFacesZoneToZone
         Info<< "Interpolating from " << fromRegion << " to " << toRegion
             << " using RBF interpolation" << endl;
 
-        matrix fromRbfField(fromField.size(), 3);
-        matrix toRbfField(toField.size(), 3);
+        matrix fromRbfField(fromField.size(), int(pTraits<Type>::nComponents));
+        matrix toRbfField(toField.size(), int(pTraits<Type>::nComponents));
 
-        forAll(fromField, faceI)
+        for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
         {
-            fromRbfField(faceI, 0) = fromField[faceI].x();
-            fromRbfField(faceI, 1) = fromField[faceI].y();
-            fromRbfField(faceI, 2) = fromField[faceI].z();
+            const scalarField fromFieldCmptI = fromField.component(cmptI);
+
+            forAll(fromField, faceI)
+            {
+                fromRbfField(faceI, cmptI) = fromFieldCmptI[faceI];
+            }
         }
 
         if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
@@ -156,11 +159,16 @@ void Foam::fluidSolidInterface::transferFacesZoneToZone
                 << " and/or " << toRegion << abort(FatalError);
         }
 
-        forAll(toField, faceI)
+        for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
         {
-            toField[faceI].x() = toRbfField(faceI, 0);
-            toField[faceI].y() = toRbfField(faceI, 1);
-            toField[faceI].z() = toRbfField(faceI, 2);
+            scalarField toFieldCmptI(toField.size(), 0.0);
+
+            forAll(toField, faceI)
+            {
+                toFieldCmptI[faceI] = toRbfField(faceI, cmptI);
+            }
+
+            toField.replace(cmptI, toFieldCmptI);
         }
     }
     else if (transferMethod_ == GGI)
@@ -311,14 +319,17 @@ void Foam::fluidSolidInterface::transferPointsZoneToZone
         Info<< "Interpolating from " << fromRegion << " to " << toRegion
             << " using RBF interpolation" << endl;
 
-        matrix fromRbfField(fromField.size(), 3);
-        matrix toRbfField(toField.size(), 3);
+        matrix fromRbfField(fromField.size(), int(pTraits<Type>::nComponents));
+        matrix toRbfField(toField.size(), int(pTraits<Type>::nComponents));
 
-        forAll(fromField, faceI)
+        for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
         {
-            fromRbfField(faceI, 0) = fromField[faceI].x();
-            fromRbfField(faceI, 1) = fromField[faceI].y();
-            fromRbfField(faceI, 2) = fromField[faceI].z();
+            const scalarField fromFieldCmptI = fromField.component(cmptI);
+
+            forAll(fromField, faceI)
+            {
+                fromRbfField(faceI, cmptI) = fromFieldCmptI[faceI];
+            }
         }
 
         if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
@@ -348,11 +359,16 @@ void Foam::fluidSolidInterface::transferPointsZoneToZone
                 << " and/or " << toRegion << abort(FatalError);
         }
 
-        forAll(toField, faceI)
+        for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
         {
-            toField[faceI].x() = toRbfField(faceI, 0);
-            toField[faceI].y() = toRbfField(faceI, 1);
-            toField[faceI].z() = toRbfField(faceI, 2);
+            scalarField toFieldCmptI(toField.size(), 0.0);
+
+            forAll(toField, faceI)
+            {
+                toFieldCmptI[faceI] = toRbfField(faceI, cmptI);
+            }
+
+            toField.replace(cmptI, toFieldCmptI);
         }
     }
     else if (transferMethod_ == GGI)
