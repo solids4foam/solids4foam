@@ -27,6 +27,7 @@ License
 #include "mechanicalEnergies.H"
 #include "fvc.H"
 
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -47,6 +48,15 @@ mechanicalEnergies::mechanicalEnergies
 )
 :
     mesh_(mesh),
+    externalWork_(0.0),
+    externalWorkOldTime_(0.0),
+    internalEnergy_(0.0),
+    internalEnergyOldTime_(0.0),
+    kineticEnergy_(0.0),
+    // laplacianSmoothingEnergy_(0.0),
+    // laplacianSmoothingEnergyOldTime_(0.0),
+    linearBulkViscosityEnergy_(0.0),
+    linearBulkViscosityEnergyOldTime_(0.0),
     linearBulkViscosityCoeff_
     (
         dict.lookupOrDefault<scalar>
@@ -56,49 +66,27 @@ mechanicalEnergies::mechanicalEnergies
     ),
     viscousPressurePtr_(),
     epsilonVolPtr_(),
-    externalWorkField_
-    (
-        IOobject
-        (
-            "externalWorkField",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimEnergy, 0.0)
-    ),
-    internalEnergyField_
-    (
-        IOobject
-        (
-            "internalEnergyField",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimEnergy, 0.0)
-    ),
-    bulkViscosityEnergyField_
-    (
-        IOobject
-        (
-            "bulkViscosityEnergyField",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimEnergy, 0.0)
-    )
+    energiesFilePtr_(),
+    curTimeIndex_(-1)
 {
-    externalWorkField_.oldTime();
-    internalEnergyField_.oldTime();
-    bulkViscosityEnergyField_.oldTime();
+    // TODO: read/write energies to allow restart?
+    //wip();
+
+    if (Pstream::master)
+    {
+        Pout<< "Writing energies.dat" << endl;
+
+        energiesFilePtr_.set(new OFstream("energies.dat"));
+
+        energiesFilePtr_()
+            << "Time "
+            << "External "
+            << "Internal "
+            << "Kinetic "
+            //<< "Smoothing "
+            << "Viscosity"
+            << endl;
+    }
 }
 
 
@@ -170,91 +158,130 @@ const volScalarField& mechanicalEnergies::epsilonVol
     return epsilonVolPtr_();
 }
 
+
 void mechanicalEnergies::checkEnergies
 (
     const volScalarField& rho,
     const volVectorField& U,
+    const volVectorField& D,
     const volVectorField& DD,
     const volSymmTensorField& sigma,
     const volTensorField& gradD,
     const volTensorField& gradDD,
-    const surfaceScalarField& waveSpeed
+    const surfaceScalarField& waveSpeed,
+    const dimensionedVector& g,
+    const scalar, // laplacianSmoothCoeff,
+    const surfaceScalarField& impKf
 )
 {
-    // Calculate kinetic energy
-    const scalar kineticEnergy =
-        gSum(0.5*rho.internalField()*mesh_.V()*(U & U));
-
-    // Calculate internal energy
-    internalEnergyField_.internalField() =
-        internalEnergyField_.oldTime().internalField()
-      + (sigma && symm(gradDD))*mesh_.V();
-
-    const scalar internalEnergy = gSum(internalEnergyField_.internalField());
-
-    // Calculate external work energy
-    scalar externalWork = 0.0;
-    forAll(externalWorkField_.boundaryField(), patchI)
+    if (curTimeIndex_ != mesh_.time().timeIndex())
     {
-        if (!externalWorkField_.boundaryField()[patchI].coupled())
+        curTimeIndex_ = mesh_.time().timeIndex();
+
+        // Update old time values
+        externalWorkOldTime_ = externalWork_;
+        internalEnergyOldTime_ = internalEnergy_;
+        //laplacianSmoothingEnergyOldTime_ = laplacianSmoothingEnergy_;
+        linearBulkViscosityEnergyOldTime_ = linearBulkViscosityEnergy_;
+    }
+
+    // Calculate kinetic energy
+    kineticEnergy_ = gSum(0.5*rho.internalField()*mesh_.V()*(U & U));
+
+    // Integrate internal energy using the trapezoidal rule
+    internalEnergy_ =
+        internalEnergyOldTime_
+      + gSum
+        (
+            mesh_.V()*0.5
+           *(
+               sigma.internalField() + sigma.oldTime().internalField()
+            ) && symm(gradDD.internalField())
+        );
+
+    // Integrate external work energy using the trapezoidal rule
+    externalWork_ = externalWorkOldTime_;
+    forAll(mesh_.boundary(), patchI)
+    {
+        if (!mesh_.boundary()[patchI].coupled())
         {
-            externalWorkField_.boundaryField()[patchI] =
-                externalWorkField_.oldTime().boundaryField()[patchI]
-              + (
+            externalWork_ +=
+                gSum
+                (
                     (
-                        mesh_.Sf().boundaryField()[patchI]
-                      & sigma.boundaryField()[patchI]
+                        0.5*mesh_.Sf().boundaryField()[patchI]
+                      & (
+                          sigma.boundaryField()[patchI]
+                        + sigma.oldTime().boundaryField()[patchI]
+                        )
                     )
                   & DD.boundaryField()[patchI]
                 );
-
-            externalWork += sum(externalWorkField_.boundaryField()[patchI]);
         }
     }
 
-    // Sync in parallel
-    reduce(externalWork, sumOp<scalar>());
+    // Include gravity energy
+    externalWork_ +=
+        gSum(mesh_.V()*rho.internalField()*g.value() & DD.internalField());
 
+    // Integrate linear bulk viscosity energy using the trapezoidal rule
+    if (viscousPressurePtr_.valid())
+    {
+        linearBulkViscosityEnergy_ =
+            linearBulkViscosityEnergyOldTime_
+          + gSum
+            (
+                fvc::reconstruct
+                (
+                    0.5
+                   *(
+                       viscousPressurePtr_() + viscousPressurePtr_().oldTime()
+                    )*mesh_.Sf()
+                )().internalField() && gradDD.internalField()*mesh_.V()
+            );
+    }
 
-    // Calculate energy dissipated due to linear bulk viscosity term
-    bulkViscosityEnergyField_.internalField() =
-        bulkViscosityEnergyField_.oldTime().internalField()
-      + (
-            fvc::reconstruct(viscousPressurePtr_()*mesh_.Sf()) && gradDD
-        )*mesh_.V();
+    // Integrate energy dissipated due to Laplacian (Lax-Friedrichs) smoothing
+    // term
+    const dimensionedScalar& deltaT = mesh_.time().deltaT();
+    const dimensionedScalar& deltaT0 = mesh_.time().deltaT0();
+    // laplacianSmoothingEnergy_ =
+    //     laplacianSmoothingEnergyOldTime_
+    //   + gSum
+    //     (
+    //         fvc::reconstruct
+    //         (
+    //             laplacianSmoothCoeff*0.5*(deltaT + deltaT0)*impKf
+    //            *(
+    //                fvc::snGrad(U) + fvc::snGrad(U.oldTime())
+    //             )*mesh_.magSf()
+    //         )().internalField() && gradDD.internalField()*mesh_.V()
+    //     );
 
-    const scalar bulkViscosityEnergy =
-        gSum(bulkViscosityEnergyField_.internalField());
+    // Check the energy imbalance
+    // Ideally this should stay less than 1% of the max energy component
 
-    // Calculate energy due to Rhie-Chow smoothing traction
-    // Calculate internal energy
-    // internalEnergyField_.internalField() =
-    //     internalEnergyField_.oldTime().internalField()
-    //   + (sigma && symm(gradDD))*mesh_.V();
-    // scale*fvc::div(impK*mesh.Sf()*(snGrad(D) - fvc::interpolate(gradD)))
-
-    // Calculate energy dissipated due to velocity damping term
-    // To-do
-    //eta*rho()*fvm::ddt(D())
-
-    // Calculate energy generated due to gravity forces
-    // To-do
-
-    // Calculate the energy imbalance
-    // This should stay less than 1% of the max energy component
     const scalar energyImbalance =
-        externalWork - internalEnergy - kineticEnergy - bulkViscosityEnergy;
+        externalWork_
+      - internalEnergy_
+      - kineticEnergy_
+        //- laplacianSmoothingEnergy_
+      - linearBulkViscosityEnergy_;
+
     const scalar energyImbalancePercent =
         100.0*mag(energyImbalance)/max
         (
-            SMALL, max(externalWork, max(internalEnergy, kineticEnergy))
+            SMALL, max(externalWork_, max(internalEnergy_, kineticEnergy_))
         );
 
-    Info<< "External work = " << externalWork << " J" << nl
-        << "Internal energy = " << internalEnergy << " J" << nl
-        << "Kinetic energy = " << kineticEnergy << " J" << nl
-        << "Bulk viscosity energy = " << bulkViscosityEnergy << " J" << nl
-        << "Energy imbalance = " << energyImbalance << " J" << nl
+    Info<< "External work = " << externalWork_ << " J" << nl
+        << "Internal energy = " << internalEnergy_ << " J" << nl
+        << "Kinetic energy = " << kineticEnergy_ << " J" << nl
+        //<< "laplacian smoothing energy = "
+        //<< laplacianSmoothingEnergy_ << " J"
+        << nl
+        << "Bulk viscosity energy = " << linearBulkViscosityEnergy_ << " J"
+        << nl
         << "Energy imbalance (% of max) = " << energyImbalancePercent << " %"
         << endl;
 
@@ -265,6 +292,19 @@ void mechanicalEnergies::checkEnergies
        // FatalErrorIn(type() + "::checkEnergies()")
        //     << "The energy imbalance is greater than 10%"
        //     << abort(FatalError);
+    }
+
+    // Write energies to file
+    if (Pstream::master())
+    {
+        energiesFilePtr_()
+            << mesh_.time().value() << " "
+            << externalWork_ << " "
+            << internalEnergy_ << " "
+            << kineticEnergy_ << " "
+            //<< laplacianSmoothingEnergy_ << " "
+            << linearBulkViscosityEnergy_
+            << endl;
     }
 }
 

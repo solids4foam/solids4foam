@@ -11,7 +11,7 @@ Files in OpenFOAM that need to be replaced:
   * Already in commit 248fcc3a2d102dcac4de22346a479168459cd087 at
     https://sourceforge.net/p/foam-extend/foam-extend-4.0/
 
-* tensor.C: for "Limitting cosTheta to be inside [-1,1] interval"
+* tensor.C: for "Limiting cosTheta to be inside [-1,1] interval"
 
   * Already in commit 9c11730d7c0af71ee29be98c803071d791dc6a6d at
     https://sourceforge.net/p/foam-extend/foam-extend-4.0/
@@ -23,6 +23,7 @@ Files in OpenFOAM that need to be replaced:
      // using movePoints
      //deltaCoeffs();
 
+* fvBlockMatrix.C: place Info statement inside debug check
 
 Optional:
 

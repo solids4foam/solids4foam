@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -10,27 +10,30 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
+    location    "system";
     object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+libs            ("libsampling.so");
+
 application     solids4Foam;
 
-startFrom       startTime;
+startFrom       latestTime;
 
 startTime       0;
 
 stopAt          endTime;
 
-endTime         1;
+endTime         0.05;
 
-deltaT          1e-06;
+deltaT          1e-07;
 
-maxCo           0.5;
+maxCo           0.7;
 
-writeControl    adjustableRunTime;
+writeControl    runTime;
 
-writeInterval   1e-01;
+writeInterval   0.01;
 
 cycleWrite      0;
 
@@ -46,13 +49,16 @@ timePrecision   6;
 
 runTimeModifiable no;
 
-// functions
-// {
-//     forceDisp1
-//     {
-//         type          solidForcesDisplacements;
-//         historyPatch  right;
-//     }
-// }
+functions
+{
+    probe
+    {
+        type           probes;
+        outputControl  timeStep;
+        outputInterval 1;
+        fields         (D);
+        probeLocations ((0.45 0.45 0));
+    }
+}
 
 // ************************************************************************* //

@@ -15,20 +15,17 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// linearGeometry: assumes small strains and rotations
-solidModel     explicitLinearGeometryTotalDisplacement;
+//solidModel     explicitLinearGeometryTotalDisplacement;
+solidModel     explicitUnsLinearGeometryTotalDisplacement;
 
-explicitLinearGeometryTotalDisplacementCoeffs
+"explicitLinearGeometryTotalDisplacementCoeffs|explicitUnsLinearGeometryTotalDisplacementCoeffs"
 {
     // Linear bulk viscosity coefficient to kill high frequency oscillations
     // Defaults to 0.06
     linearBulkViscosityCoeff 0.06;
 
-    // Scale factor for Rhie-Chow smoothing term
-    RhieChowScale   0.0;
-
-    // Numerical viscosity for 1st temporal derivative term
-    numericalViscosity    eta [ 0 0 -1 0 0 0 0 ] 0;
+    // JST stabilisation
+    JSTScaleFactor 0.01;
 }
 
 

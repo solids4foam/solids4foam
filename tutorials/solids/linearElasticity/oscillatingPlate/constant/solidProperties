@@ -20,18 +20,15 @@ solidModel explicitLinearGeometryTotalDisplacement;
 
 "explicitLinearGeometryTotalDisplacementCoeffs|explicitUnsLinearGeometryCoeffs"
 {
-    // Linear bulk viscosity coefficient to kill high frequency oscillations
+    // Linear bulk viscosity coefficient to dissipate high frequency energies
     // Defaults to 0.06
-    linearBulkViscosityCoeff 0.06;
+    linearBulkViscosityCoeff 0.0;
 
     // Scale factor for Rhie-Chow smoothing term
     // 0.0 is no smoothing
     // 1.0 is standard smoothing
     // >1.0 is extra smoothing
-    //RhieChowScale   0.7;
-
-    // Laplacian smoothing
-    laplacianSmoothingCoeff     0.05;
+    RhieChowScale   0.7;
 }
 
 

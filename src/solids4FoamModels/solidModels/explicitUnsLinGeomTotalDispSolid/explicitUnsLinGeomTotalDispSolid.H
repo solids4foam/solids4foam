@@ -23,24 +23,41 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    explicitNonLinGeomTotalLagTotalDispSolid
+    explicitUnsLinGeomTotalDispSolid
 
 Description
-    Version of the nonLinGeomTotalLagTotalDispSolid solver, where a fully
-    explicit solution algorithm is used.
+    Version of the unsLinGeomSolid solid model, where a fully explicit
+    solution algorithm is used.
+
+    The explicit implementation uses central differencing, where a linear bulk
+    viscosity pressure term dissipates high frequencies.
+
+    Details of the central differencing solution algorithm can be found in, e.g.
+    - Belytschko, Liu, Moran, 2000, Box 6.1
+    - Ding and Ye, Laser shock peening, Performance and process simulation,
+      2006, Section 3.5.2
+
+    The linear bulk viscosity term is described in the Abaqus documentation.
+
+    A Jameson-Schmidt-Turkel (JST) 4th order diffusion term is used for
+    stabilisation.
 
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
-    explicitNonLinGeomTotalLagTotalDispSolid.C
+    explicitUnsLinGeomTotalDispSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef explicitNonLinGeomTotalLagTotalDispSolid_H
-#define explicitNonLinGeomTotalLagTotalDispSolid_H
+#ifndef explicitUnsLinGeomTotalDispSolid_H
+#define explicitUnsLinGeomTotalDispSolid_H
 
 #include "solidModel.H"
+#include "volFields.H"
+#include "surfaceFields.H"
+#include "pointFields.H"
+#include "uniformDimensionedFields.H"
 #include "mechanicalEnergies.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -54,23 +71,20 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-          Class explicitNonLinGeomTotalLagTotalDispSolid Declaration
+                        Class explicitUnsLinGeomTotalDispSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class explicitNonLinGeomTotalLagTotalDispSolid
+class explicitUnsLinGeomTotalDispSolid
 :
     public solidModel
 {
     // Private data
 
-        //- Total deformation gradient
-        volTensorField F_;
+        //- Stress surface field
+        surfaceSymmTensorField sigmaf_;
 
-        //- Inverse of the total deformation gradient
-        volTensorField Finv_;
-
-        //- Jacobian of total deformation gradient
-        volScalarField J_;
+        //- Surface displacement gradient
+        surfaceTensorField gradDf_;
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
@@ -78,7 +92,7 @@ class explicitNonLinGeomTotalLagTotalDispSolid
         const volScalarField impK_;
 
         //- Implicit stiffness surface field
-        const surfaceScalarField impKf_;
+        surfaceScalarField impKf_;
 
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
@@ -86,10 +100,10 @@ class explicitNonLinGeomTotalLagTotalDispSolid
         const volScalarField rImpK_;
 
         //- Scale factor for Rhie-Chow smoothing term
-        const scalar RhieChowScaleFactor_;
+        //const scalar RhieChowScaleFactor_;
 
-        // Damping viscosity coefficient
-        const dimensionedScalar eta_;
+        // Scale factor for Jameson-Schmidt-Turkel smoothing term
+        const scalar JSTScaleFactor_;
 
         //- Wave speed field
         surfaceScalarField waveSpeed_;
@@ -97,16 +111,25 @@ class explicitNonLinGeomTotalLagTotalDispSolid
         //- Energy calculation
         mechanicalEnergies energies_;
 
+        //- Acceleration
+        volVectorField a_;
+
     // Private Member Functions
 
+        //- Update the stress field
+        void updateStress();
+
+        //- Smooth the hydrostatic pressure field
+        //void smoothPressure();
+
         //- Disallow default bitwise copy construct
-        explicitNonLinGeomTotalLagTotalDispSolid
+        explicitUnsLinGeomTotalDispSolid
         (
-            const explicitNonLinGeomTotalLagTotalDispSolid&
+            const explicitUnsLinGeomTotalDispSolid&
         );
 
         //- Disallow default bitwise assignment
-        void operator=(const explicitNonLinGeomTotalLagTotalDispSolid&);
+        void operator=(const explicitUnsLinGeomTotalDispSolid&);
 
 
 protected:
@@ -116,28 +139,27 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            return nonLinearGeometry::TOTAL_LAGRANGIAN;
+            return nonLinearGeometry::LINEAR_GEOMETRY;
         }
 
 
 public:
 
     //- Runtime type information
-    TypeName("explicitNonLinearGeometryTotalLagrangianTotalDisplacement");
+    TypeName("explicitUnsLinearGeometryTotalDisplacement");
 
     // Constructors
 
         //- Construct from components
-        explicitNonLinGeomTotalLagTotalDispSolid
+        explicitUnsLinGeomTotalDispSolid
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
         );
 
-
     // Destructor
 
-        virtual ~explicitNonLinGeomTotalLagTotalDispSolid()
+        virtual ~explicitUnsLinGeomTotalDispSolid()
         {}
 
 
@@ -168,6 +190,10 @@ public:
                 const scalarField& pressure,
                 const fvPatch& patch
             ) const;
+
+            //- End of the program
+            virtual void end()
+            {}
 };
 
 

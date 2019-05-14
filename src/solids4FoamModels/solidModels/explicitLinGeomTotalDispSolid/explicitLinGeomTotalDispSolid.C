@@ -44,11 +44,38 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(explicitLinGeomTotalDispSolid, 0);
-addToRunTimeSelectionTable(physicsModel, explicitLinGeomTotalDispSolid, solid);
+addToRunTimeSelectionTable
+(
+    physicsModel, explicitLinGeomTotalDispSolid, solid
+);
 addToRunTimeSelectionTable
 (
     solidModel, explicitLinGeomTotalDispSolid, dictionary
 );
+
+// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+void explicitLinGeomTotalDispSolid::updateStress()
+{
+    // Update increment of displacement
+    DD() = D() - D().oldTime();
+
+    // Update gradient of displacement
+    mechanical().grad(D(), gradD());
+
+    // Update gradient of displacement increment
+    gradDD() = gradD() - gradD().oldTime();
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
+
+    // Interpolate cell displacements to vertices
+    mechanical().interpolate(D(), pointD());
+
+    // Increment of displacement
+    DD() = D() - D().oldTime();
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -62,19 +89,18 @@ explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    RhieChowScaleFactor_
+    // RhieChowScaleFactor_
+    // (
+    //     solidModelDict().lookupOrDefault<scalar>
+    //     (
+    //         "RhieChowScale", 0.0
+    //     )
+    // ),
+    JSTScaleFactor_
     (
         solidModelDict().lookupOrDefault<scalar>
         (
-            "RhieChowScale", 0.0
-        )
-    ),
-    eta_
-    (
-        solidModelDict().lookupOrDefault<dimensionedScalar>
-        (
-            "numericalViscosity",
-            dimensionedScalar("eta", dimless/dimTime, 0.0)
+            "JSTScaleFactor", 0.01
         )
     ),
     waveSpeed_
@@ -89,8 +115,37 @@ explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
         ),
         fvc::interpolate(Foam::sqrt(impK_/rho()))
     ),
-    energies_(mesh(), solidModelDict())
-{}
+    energies_(mesh(), solidModelDict()),
+    a_
+    (
+        IOobject
+        (
+            "a",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedVector
+        (
+            "zero", dimVelocity/dimTime, vector::zero
+        ),
+        "zeroGradient"
+    )
+{
+    a_.oldTime();
+    U().oldTime();
+
+    // Update stress
+    updateStress();
+
+    // Update initial acceleration
+    a_.internalField() =
+        fvc::div(sigma(), "div(sigma)")().internalField()
+       /(rho().internalField());
+    a_.correctBoundaryConditions();
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -113,13 +168,6 @@ void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
            *waveSpeed_.internalField()
         );
 
-    Info<< "Min delta: "
-        << 1.0/
-        gMax
-        (
-            mesh().surfaceInterpolation::deltaCoeffs().internalField()
-        ) << endl;
-
     // Lookup the desired Courant number
     const scalar maxCo =
         runTime.controlDict().lookupOrDefault<scalar>("maxCo", 0.7071);
@@ -127,7 +175,7 @@ void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
     const scalar newDeltaT = maxCo*requiredDeltaT;
 
     Info<< "maxCo = " << maxCo << nl
-        << "deltaT = " << requiredDeltaT << nl << endl;
+        << "deltaT = " << newDeltaT << nl << endl;
 
     runTime.setDeltaT(newDeltaT);
 }
@@ -137,65 +185,71 @@ bool explicitLinGeomTotalDispSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
 
-    // Do not write default linear solver residuals
-    blockLduMatrix::debug = 0;
-
     // Mesh update loop
     do
     {
         Info<< "Solving the momentum equation for D" << endl;
 
-        // Linear momentum equation total displacement form
-        fvVectorMatrix DEqn
-        (
-            rho()*fvm::d2dt2(D())
-          - eta_*rho()*fvm::ddt(D())
-         == fvc::div(sigma(), "div(sigma)")
-          + rho()*g()
-          + RhieChowScaleFactor_*mechanical().RhieChowCorrection(D(), gradD())
-          + fvc::div
+        // Central difference scheme
+
+        const dimensionedScalar& deltaT = time().deltaT();
+        const dimensionedScalar& deltaT0 = time().deltaT0();
+
+        // Compute the velocity
+        // Note: this is the velocity at the middle of the time-step
+        U() = U().oldTime() + 0.5*(deltaT + deltaT0)*a_.oldTime();
+
+        // Compute displacement
+        D() = D().oldTime() + deltaT*U();
+
+        // Enforce boundary conditions on the displacement field
+        D().correctBoundaryConditions();
+
+        // Update the stress field based on the latest D field
+        updateStress();
+
+        // Compute acceleration
+        // Note the inclusion of a linear bulk viscosity pressure term to
+        // dissipate high frequency energies, and a Rhie-Chow term to avoid
+        // checker-boarding
+        a_.internalField() =
             (
-                energies_.viscousPressure(rho(), waveSpeed_, gradD())
-               *mesh().Sf()
-            )
-        );
-
-        // Solve the linear system
-        DEqn.solve();
-
-        // Update increment of displacement
-        DD() = D() - D().oldTime();
-
-        // Update gradient of displacement
-        mechanical().grad(D(), gradD());
-
-        // Update gradient of displacement increment
-        gradDD() = gradD() - gradD().oldTime();
-
-        // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
-
-        // Interpolate cell displacements to vertices
-        mechanical().interpolate(D(), pointD());
-
-        // Increment of displacement
-        DD() = D() - D().oldTime();
-
-        // Increment of point displacement
-        pointDD() = pointD() - pointD().oldTime();
-
-        // Velocity
-        U() = fvc::ddt(D());
+                fvc::div
+                (
+                    (mesh().Sf() & fvc::interpolate(sigma()))
+                  + mesh().Sf()*energies_.viscousPressure
+                    (
+                        rho(), waveSpeed_, gradD()
+                    )
+                )().internalField()
+                // This corresponds to Lax–Friedrichs smoothing
+                // + LFScaleFactor_*fvc::laplacian
+                //   (
+                //       0.5*(deltaT + deltaT0)*impKf_,
+                //       U(),
+                //       "laplacian(DU,U)"
+                //   )().internalField()
+              - JSTScaleFactor_*fvc::laplacian
+                (
+                    mesh().magSf(),
+                    fvc::laplacian
+                    (
+                        0.5*(deltaT + deltaT0)*impKf_, U(), "laplacian(DU,U)"
+                    ),
+                    "laplacian(DU,U)"
+                )().internalField()
+            )/rho().internalField()
+          + g().value();
+        a_.correctBoundaryConditions();
 
         // Check energies
         energies_.checkEnergies
         (
-            rho(), U(), DD(), sigma(), gradD(), gradDD(), waveSpeed_
+            rho(), U(), D(), DD(), sigma(), gradD(), gradDD(), waveSpeed_, g(),
+            0.0, impKf_
         );
     }
     while (mesh().update());
-
-    blockLduMatrix::debug = 1;
 
     return true;
 }

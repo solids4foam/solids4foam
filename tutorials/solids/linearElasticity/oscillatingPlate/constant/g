@@ -3,36 +3,19 @@
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
 |  \\    /   O peration     | Version:     3.2                                |
 |   \\  /    A nd           | Web:         http://www.foam-extend.org         |
-|    \\/     M anipulation  | For copyright notice see file Copyright         |
+|    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
+    class       uniformDimensionedVectorField;
     location    "constant";
-    object      solidProperties;
+    object      g;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel explicitLinearGeometryTotalDisplacement;
-//solidModel explicitUnsLinearGeometry;
-
-"explicitLinearGeometryTotalDisplacementCoeffs|explicitUnsLinearGeometryCoeffs"
-{
-    // Linear bulk viscosity coefficient to kill high frequency oscillations
-    // Defaults to 0.06
-    linearBulkViscosityCoeff 0.06;
-
-    // Scale factor for Rhie-Chow smoothing term
-    // 0.0 is no smoothing
-    // 1.0 is standard smoothing
-    // >1.0 is extra smoothing
-    //RhieChowScale   0.7;
-
-    // Laplacian smoothing
-    laplacianSmoothingCoeff     0.05;
-}
-
+dimensions      [0 1 -2 0 0 0 0];
+value           ( 0 -10 0 );
 
 // ************************************************************************* //

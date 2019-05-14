@@ -22,6 +22,7 @@ checkAndReport()
     if cmp --silent "./${1}" "${2}/${1}"
     then
         echo "'${1}' has already been replaced"
+        return 0
     else
         echo
         echo "******** PLEASE FIX THIS ***********"
@@ -32,7 +33,7 @@ checkAndReport()
         echo "    wmake libso ${3}"
         echo "************************************"
         echo
-        exit 1
+        return 1
     fi
 }
 
@@ -41,27 +42,43 @@ checkAndReport()
 # Check if the foam files have been replaced
 echo "Check filesToReplaceInOF"
 
+result=0
+
 checkAndReport \
     "solution.C" \
     "$FOAM_SRC/foam/matrices/solution" \
     "$FOAM_SRC/foam"
+if [ $? -ne 0 ]; then result=1; fi
 
 checkAndReport \
     "WedgePointPatchField.C" \
     "$FOAM_SRC/foam/fields/PointPatchFieldTemplates/constraint/wedge" \
     "$FOAM_SRC/foam"
+if [ $? -ne 0 ]; then result=1; fi
 
 checkAndReport \
     "tensor.C" \
     "$FOAM_SRC/foam/primitives/Tensor/tensor" \
     "$FOAM_SRC/foam"
+if [ $? -ne 0 ]; then result=1; fi
 
 checkAndReport \
     "fvMesh.C" \
     "$FOAM_SRC/finiteVolume/fvMesh" \
     "$FOAM_SRC/finiteVolume"
+if [ $? -ne 0 ]; then result=1; fi
 
 checkAndReport \
     "fvBlockMatrix.C" \
     "$FOAM_SRC/finiteVolume/fvMatrices/fvBlockMatrix" \
     "$FOAM_SRC/finiteVolume"
+
+if [ "$result" -ne 0 ]
+then
+    echo
+    echo "******** PLEASE FIX THIS ***********"
+    echo "Please replace the files above"
+    echo "************************************"
+    echo
+    exit 1
+fi
