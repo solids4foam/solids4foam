@@ -39,6 +39,7 @@ laplacianSchemes
     default            none;
     laplacian(DD,D)    Gauss linear newSkewCorrected 1;
     laplacian(DDD,DD)  Gauss linear newSkewCorrected 1;
+    laplacian(DU,U)    Gauss linear newSkewCorrected 1;
 }
 
 snGradSchemes
