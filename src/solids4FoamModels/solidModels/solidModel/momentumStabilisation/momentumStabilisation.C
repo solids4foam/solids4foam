@@ -78,12 +78,11 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     // Lookup method
     const word method = word(dict_.lookup("type"));
 
-    // Lookup scale factor
-    const scalar scaleFactor = readScalar(dict_.lookup("scaleFactor"));
-
     // Calculate stabilisation term
     if (method == "RhieChow")
     {
+        const scalar scaleFactor = readScalar(dict_.lookup("scaleFactor"));
+
         result = scaleFactor
        *(
            fvc::laplacian(gamma, vf, "laplacian(DD,D)") - fvc::div(gamma*gradVf)
@@ -91,6 +90,8 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     }
     else if (method == "JamesonSchmidtTurkel")
     {
+        const scalar scaleFactor = readScalar(dict_.lookup("scaleFactor"));
+
         result = -scaleFactor*fvc::laplacian
         (
             vf.mesh().magSf(),
@@ -101,6 +102,8 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     }
     else if (method == "Laplacian")
     {
+        const scalar scaleFactor = readScalar(dict_.lookup("scaleFactor"));
+
         result = scaleFactor*fvc::laplacian(gamma, vf);
     }
     else if (method != "none")
