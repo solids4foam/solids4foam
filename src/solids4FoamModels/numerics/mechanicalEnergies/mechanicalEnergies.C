@@ -243,8 +243,8 @@ void mechanicalEnergies::checkEnergies
 
     // Integrate energy dissipated due to Laplacian (Lax-Friedrichs) smoothing
     // term
-    const dimensionedScalar& deltaT = mesh_.time().deltaT();
-    const dimensionedScalar& deltaT0 = mesh_.time().deltaT0();
+    //const dimensionedScalar& deltaT = mesh_.time().deltaT();
+    //const dimensionedScalar& deltaT0 = mesh_.time().deltaT0();
     // laplacianSmoothingEnergy_ =
     //     laplacianSmoothingEnergyOldTime_
     //   + gSum
