@@ -8,9 +8,7 @@ cleanCase fluid
 cleanCase solid
 foamClearPolyMesh -region fluid
 foamClearPolyMesh -region solid
-\rm -f constant/polyMesh/boundary
-\rm -rf history
-\rm -f constant/solid/polyMesh/boundary
+\rm -rf history constant/solid/polyMesh/boundary
 \rm -rf constant/solid/polyMesh/[c-z]*
 \rm -rf case.foam
-\cp 0/fluid/alpha1.org 0/fluid/alpha1
+\rm 0/fluid/alpha1
