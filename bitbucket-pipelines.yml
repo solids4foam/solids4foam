@@ -1,5 +1,5 @@
 # Specify foam-extend-4.0 docker image as the build environment
-image: philippic/foam-extend-4.0:latest
+image: philippic/foam-extend-4.0-ubuntu18.04:latest
 
 # Increase memory as gcc seems to run out of and give an internal error
 options:
