@@ -6,8 +6,7 @@ options:
   size: 2x
 
 pipelines:
-  branches:
-  '{master, foam-extend-4.0, development}':
+  default:
     - step:
         script:
           # Compile repository
