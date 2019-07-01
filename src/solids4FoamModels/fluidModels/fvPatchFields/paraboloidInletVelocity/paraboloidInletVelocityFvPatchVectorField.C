@@ -151,7 +151,8 @@ void paraboloidInletVelocityFvPatchVectorField::updateCoeffs()
         const scalar z = Cf[faceI].z();
 
         patchU[faceI] =
-            curMaxU*y*(zMax_ - y)*(sqr(zMax_) - sqr(z))
+            //curMaxU*y*(zMax_ - y)*(sqr(zMax_) - sqr(z))
+            curMaxU*y*(2*yMax_ - y)*(sqr(zMax_) - sqr(z)) // fix: A. Shay Jun-19
            *vector(1, 0, 0)/(sqr(yMax_)*sqr(zMax_));
     }
 
