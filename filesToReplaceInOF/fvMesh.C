@@ -561,7 +561,7 @@ void Foam::fvMesh::updateMesh(const mapPolyMesh& mpm)
     // individual boundary conditions
     // HJ, VV and IG, 25/Oct/2016
     // PC, 21/12/17: Constructing the deltaCoeffs causes a floating error if
-    // there are faces with zero area: this is the cause for layer addition
+    // there are faces with zero area: this is the case for layer addition
     // where a zero thickness layer is added and then subsequently inflated
     // using movePoints
     //deltaCoeffs();
