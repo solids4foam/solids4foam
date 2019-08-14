@@ -1072,6 +1072,11 @@ Foam::fluidSolidInterface::fluidSolidInterface
     maxResidualNorm_(0),
     maxIntDisplNorm_(0),
     outerCorr_(0),
+    writeResidualsToFile_
+    (
+        fsiProperties_.lookupOrDefault<Switch>("writeResidualsToFile", false)
+    ),
+    residualFilePtr_(),
     interpolatorUpdateFrequency_
     (
         fsiProperties_.lookupOrDefault<int>("interpolatorUpdateFrequency", 0)
@@ -1229,6 +1234,33 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
     }
 
     return autoPtr<fluidSolidInterface>(cstrIter()(runTime, region));
+}
+
+
+Foam::OFstream& Foam::fluidSolidInterface::residualFile()
+{
+    if (Pstream::parRun())
+    {
+        if (!Pstream::master())
+        {
+            FatalErrorIn
+            (
+                "Foam::OFstream& Foam::fluidSolidInterface::residualFile()"
+            )   << "Only the master processor can call this functon!"
+                << abort(FatalError);
+        }
+    }
+
+    if (residualFilePtr_.empty())
+    {
+        const fileName historyDir = runTime().path()/"residuals";
+        mkDir(historyDir);
+        residualFilePtr_.set(new OFstream(historyDir/"fsiResiduals.dat"));
+        residualFilePtr_()
+            << "Time outerCorrector residual" << endl;
+    }
+
+    return residualFilePtr_();
 }
 
 

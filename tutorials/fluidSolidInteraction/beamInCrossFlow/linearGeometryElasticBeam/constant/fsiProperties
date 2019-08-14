@@ -49,6 +49,9 @@ fluidSolidInterface    Aitken;
     //interfaceTransferMethod RBF;
     //interfaceTransferMethod GGI;
 
+    // Optional: write residual to file
+    writeResidualsToFile yes;
+
     // Optional: if coupled is set to "no", then the couplingStartTime allows
     // you to enable coupling at a specified time
     // Defaults to 0.0
