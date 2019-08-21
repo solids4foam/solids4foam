@@ -107,6 +107,15 @@ bool AitkenCouplingInterface::evolve()
 
         // Calculate the FSI residual
         residualNorm = updateResidual();
+
+        // Optional: write residuals to file
+        if (writeResidualsToFile() && Pstream::master())
+        {
+            residualFile()
+                << runTime().value() << " "
+                << outerCorr() << " "
+                << residualNorm << endl;
+        }
     }
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 

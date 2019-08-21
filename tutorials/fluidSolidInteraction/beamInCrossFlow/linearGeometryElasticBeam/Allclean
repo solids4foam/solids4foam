@@ -13,4 +13,4 @@ foamClearPolyMesh -region solid
 
 \rm -f constant/solid/polyMesh/boundary
 \rm -rf constant/solid/polyMesh/[c-z]*
-\rm -rf case.foam
+\rm -rf case.foam residuals

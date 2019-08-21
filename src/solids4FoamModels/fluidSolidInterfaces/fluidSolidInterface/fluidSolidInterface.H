@@ -176,6 +176,12 @@ class fluidSolidInterface
         //- Outer corrector
         label outerCorr_;
 
+        //- Switch to enable writing o FSI residual to file
+        const Switch writeResidualsToFile_;
+
+        //- Residual file pointer
+        autoPtr<OFstream> residualFilePtr_;
+
         //- Interpolator update frequency
         label interpolatorUpdateFrequency_;
 
@@ -449,6 +455,15 @@ public:
             {
                 return nOuterCorr_;
             }
+
+            //- Return reference to writeResidualToFile switch
+            const Switch& writeResidualsToFile() const
+            {
+                return writeResidualsToFile_;
+            }
+
+            //- Return reference to the residualFile
+            OFstream& residualFile();
 
             //- Is it fluid and solid coupled
             const Switch& coupled() const
