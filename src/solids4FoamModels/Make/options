@@ -2,7 +2,8 @@ c++WARN = \
     -Wno-deprecated -Wall -Wextra -Wno-unused-parameter -Wnon-virtual-dtor \
     -Werror -Wredundant-decls -Wcast-align \
     -Wmissing-declarations  -Wswitch-enum -Winvalid-pch -Wredundant-decls \
-    -Wformat=2 -Wmissing-format-attribute -Wformat-nonliteral
+    -Wformat=2 -Wmissing-format-attribute -Wformat-nonliteral \
+    -Wno-implicit-fallthrough
 
 ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
     DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-deprecated-declarations

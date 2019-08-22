@@ -40,6 +40,7 @@ SourceFiles
 #ifndef fixedTemperatureGradientFvPatchScalarField_H
 #define fixedTemperatureGradientFvPatchScalarField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
 

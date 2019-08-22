@@ -40,6 +40,7 @@ Author
 #ifndef solidSymmetryFvPatchVectorField_H
 #define solidSymmetryFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "symmetryFvPatchFields.H"
 #include "symmetryFvPatch.H"
 
