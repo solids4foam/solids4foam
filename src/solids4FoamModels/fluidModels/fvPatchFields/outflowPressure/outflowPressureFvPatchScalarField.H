@@ -35,6 +35,7 @@ SourceFiles
 #ifndef outflowPressureFvPatchScalarField_H
 #define outflowPressureFvPatchScalarField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 

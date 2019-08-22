@@ -34,6 +34,7 @@ SourceFiles
 #ifndef componentMixedPointPatchVectorField_H
 #define componentMixedPointPatchVectorField_H
 
+#include "foamTime.H"
 #include "pointPatchField.H"
 #include "ComponentMixedPointPatchVectorField.H"
 #include "fieldTypes.H"

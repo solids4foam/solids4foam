@@ -34,6 +34,7 @@ SourceFiles
 
 Author
     Zeljko Tukovic FSB Zagreb
+    Philip Cardiff UCD
 
 \*---------------------------------------------------------------------------*/
 
@@ -57,6 +58,10 @@ class solidSymmetryFvPatchVectorField
 :
     public symmetryFvPatchVectorField
 {
+    // Private Data
+
+        //- Second order accuracy correction
+        Switch secondOrder_;
 
 public:
 

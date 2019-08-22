@@ -39,6 +39,7 @@ SourceFiles
 #ifndef thermalConvectionFvPatchScalarFields_H
 #define thermalConvectionFvPatchScalarFields_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 #include "Switch.H"

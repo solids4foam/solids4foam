@@ -35,6 +35,7 @@ SourceFiles
 #ifndef robinFvPatchField_H
 #define robinFvPatchField_H
 
+#include "foamTime.H"
 #include "fvPatchField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

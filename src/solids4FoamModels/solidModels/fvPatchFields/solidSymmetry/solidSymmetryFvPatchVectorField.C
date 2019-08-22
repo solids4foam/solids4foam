@@ -41,7 +41,8 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    symmetryFvPatchField<vector>(p, iF)
+    symmetryFvPatchField<vector>(p, iF),
+    secondOrder_(false)
 {}
 
 
@@ -53,7 +54,8 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
     const fvPatchFieldMapper& mapper
 )
 :
-    symmetryFvPatchField<vector>(ptf, p, iF, mapper)
+    symmetryFvPatchField<vector>(ptf, p, iF, mapper),
+    secondOrder_(ptf.secondOrder_)
 {
     if (!isType<symmetryFvPatch>(this->patch()))
     {
@@ -84,10 +86,17 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
     const dictionary& dict
 )
 :
-    symmetryFvPatchField<vector>(p, iF, dict)
+    symmetryFvPatchField<vector>(p, iF, dict),
+    secondOrder_(false)
 {
     Info << "Symmetry boundary condition with non-orthogonal correction"
         << endl;
+
+    if (dict.found("secondOrder"))
+    {
+        secondOrder_ = Switch(dict.lookup("secondOrder"));
+        Info<< "Second order correction: " << secondOrder_ << endl;
+    }
 
     if (!isType<symmetryFvPatch>(p))
     {
@@ -116,7 +125,8 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
     const solidSymmetryFvPatchVectorField& ptf
 )
 :
-    symmetryFvPatchField<vector>(ptf)
+    symmetryFvPatchField<vector>(ptf),
+    secondOrder_(ptf.secondOrder_)
 {}
 
 
@@ -126,32 +136,54 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    symmetryFvPatchField<vector>(ptf, iF)
+    symmetryFvPatchField<vector>(ptf, iF),
+    secondOrder_(ptf.secondOrder_)
 {}
 
 
 // return gradient at boundary
 tmp<Field<vector> > solidSymmetryFvPatchVectorField::snGrad() const
 {
-    vectorField nHat = this->patch().nf();
+    // Unit normals
+    const vectorField nHat = patch().nf();
 
-    vectorField delta = patch().delta();
-    vectorField k = delta - nHat*(nHat&delta);
+    // Delta vectors
+    const vectorField delta = patch().delta();
 
-    const fvPatchField<tensor>& gradU =
+    // Non-orthogonal correction vectors
+    const vectorField k = ((I - sqr(nHat)) & delta);
+
+    // Lookup the gradient of displacement field
+    const fvPatchField<tensor>& gradD =
         patch().lookupPatchField<volTensorField, tensor>
         (
-            "grad(" + this->dimensionedInternalField().name() + ")"
+            "grad(" + dimensionedInternalField().name() + ")"
         );
 
-    vectorField UP = this->patchInternalField();
-    UP += (k&gradU.patchInternalField());
+    // Calculate the corrected patch internal field
+    const vectorField DP =
+        patchInternalField()
+      + (k & gradD.patchInternalField());
 
-    return
-    (
-        transform(I - 2.0*sqr(nHat), UP)
-      - UP
-    )*(this->patch().deltaCoeffs()/2.0);
+    if (secondOrder_)
+    {
+        // Normal component of patch internal gradient
+        const vectorField nGradDP = (nHat & gradD.patchInternalField());
+
+        return
+          2*(
+                transform(I - 2.0*sqr(nHat), DP) - DP
+            )*(patch().deltaCoeffs()/2.0)
+          - transform(sqr(nHat), nGradDP);
+    }
+    else
+    {
+        return
+        (
+            transform(I - 2.0*sqr(nHat), DP)
+          - DP
+        )*(patch().deltaCoeffs()/2.0);
+    }
 }
 
 
@@ -164,27 +196,52 @@ evaluate(const Pstream::commsTypes)
         this->updateCoeffs();
     }
 
-    vectorField nHat = this->patch().nf();
+    // Unit normals
+    const vectorField nHat = patch().nf();
 
-    vectorField delta = patch().delta();
-    vectorField k = delta - nHat*(nHat&delta);
+    // Delta vectors
+    const vectorField delta = patch().delta();
 
-    const fvPatchField<tensor>& gradU =
+    // Non-orthogonal correction vectors
+    const vectorField k = ((I - sqr(nHat)) & delta);
+
+    // Lookup the gradient of displacement field
+    const fvPatchField<tensor>& gradD =
         patch().lookupPatchField<volTensorField, tensor>
         (
-            "grad(" + this->dimensionedInternalField().name() + ")"
+            "grad(" + dimensionedInternalField().name() + ")"
         );
 
-    vectorField UP = this->patchInternalField();
-    UP += (k&gradU.patchInternalField());
+    // Calculate the corrected patch internal field
+    const vectorField DP =
+        patchInternalField()
+      + (k & gradD.patchInternalField());
 
-    Field<vector>::operator=
-    (
+    if (secondOrder_)
+    {
+        vectorField nGradDP = (nHat&gradD.patchInternalField());
+
+        Field<vector>::operator=
         (
-            UP
-          + transform(I - 2.0*sqr(nHat), UP)
-        )/2.0
-    );
+            transform
+            (
+                I - sqr(nHat),
+                DP + 0.5*nGradDP/this->patch().deltaCoeffs()
+            )
+        );
+    }
+    else
+    {
+        Field<vector>::operator=
+        (
+            (
+                DP
+              + transform(I - 2.0*sqr(nHat), DP)
+            )/2.0
+        );
+    }
+
+    transformFvPatchField<vector>::evaluate();
 }
 
 
@@ -192,6 +249,8 @@ evaluate(const Pstream::commsTypes)
 void solidSymmetryFvPatchVectorField::write(Ostream& os) const
 {
     fvPatchVectorField::write(os);
+    os.writeKeyword("secondOrder")
+        << secondOrder_ << token::END_STATEMENT << nl;
     writeEntry("value", os);
 }
 

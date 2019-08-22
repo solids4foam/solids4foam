@@ -35,6 +35,7 @@ SourceFiles
 #ifndef newMovingWallVelocityFvPatchVectorField_H
 #define newMovingWallVelocityFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 

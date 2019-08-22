@@ -37,6 +37,7 @@ SourceFiles
 #ifndef freeSurfacePressureFvPatchScalarField_H
 #define freeSurfacePressureFvPatchScalarField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 

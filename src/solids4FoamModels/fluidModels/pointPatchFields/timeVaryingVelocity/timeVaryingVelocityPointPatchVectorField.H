@@ -46,6 +46,7 @@ Author
 #ifdef OPENFOAM
     #include "fixedValuePointPatchField.H"
 #else
+    #include "foamTime.H"
     #include "FixedValuePointPatchField.H"
     #include "pointPatchField.H"
     #include "pointMesh.H"

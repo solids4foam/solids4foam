@@ -107,10 +107,7 @@ $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
 $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
-$(solidFvPatchFields)/symmetryDisplacement/symmetryDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/convectiveFlux/convectiveFluxFvPatchScalarField.C
-$(solidFvPatchFields)/newWedge/newWedgeFvPatchFields.C
-$(solidFvPatchFields)/newWedge/newWedgeFvPatchScalarField.C
 
 pointPatchFields = solidModels/pointPatchFields
 $(pointPatchFields)/componentMixed/componentMixedPointPatchFields.C

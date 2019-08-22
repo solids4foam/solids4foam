@@ -44,6 +44,7 @@ Author
 #ifndef paraboloidInletVelocityFvPatchVectorField_H
 #define paraboloidInletVelocityFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 
