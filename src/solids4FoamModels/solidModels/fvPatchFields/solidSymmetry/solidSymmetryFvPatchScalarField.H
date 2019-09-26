@@ -38,6 +38,7 @@ Author
 #ifndef solidSymmetryFvPatchScalarField_H
 #define solidSymmetryFvPatchScalarField_H
 
+#include "foamTime.H"
 #include "symmetryFvPatchFields.H"
 #include "symmetryFvPatch.H"
 

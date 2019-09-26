@@ -38,6 +38,7 @@ SourceFiles
 #ifndef rigidCylinderContactFvPatchVectorField_H
 #define rigidCylinderContactFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "interpolationTable.H"

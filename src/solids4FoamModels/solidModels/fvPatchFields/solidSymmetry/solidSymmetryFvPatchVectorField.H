@@ -34,12 +34,14 @@ SourceFiles
 
 Author
     Zeljko Tukovic FSB Zagreb
+    Philip Cardiff UCD
 
 \*---------------------------------------------------------------------------*/
 
 #ifndef solidSymmetryFvPatchVectorField_H
 #define solidSymmetryFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "symmetryFvPatchFields.H"
 #include "symmetryFvPatch.H"
 
@@ -56,6 +58,10 @@ class solidSymmetryFvPatchVectorField
 :
     public symmetryFvPatchVectorField
 {
+    // Private Data
+
+        //- Second order accuracy correction
+        Switch secondOrder_;
 
 public:
 

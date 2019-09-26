@@ -34,13 +34,14 @@ SourceFiles
 
 Author
     Philip Cardiff UCD/UT
-    Michael Clancy UCD/UT
+    Michael Clancy UCD
 
 \*---------------------------------------------------------------------------*/
 
 #ifndef normalDisplacementFvPatchVectorField_H
 #define normalDisplacementFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 #include "interpolationTable.H"

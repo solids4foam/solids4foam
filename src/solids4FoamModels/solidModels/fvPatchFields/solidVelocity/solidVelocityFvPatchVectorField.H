@@ -44,6 +44,7 @@ Author
 #ifndef solidVelocityFvPatchVectorField_H
 #define solidVelocityFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 #include "interpolationTable.H"

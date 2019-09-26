@@ -45,6 +45,7 @@ Author
 #ifndef fixedDisplacementZeroShearFvPatchVectorField_H
 #define fixedDisplacementZeroShearFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "solidDirectionMixedFvPatchVectorField.H"
 #include "Switch.H"

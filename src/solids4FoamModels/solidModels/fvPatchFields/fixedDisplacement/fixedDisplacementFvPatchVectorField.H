@@ -42,6 +42,7 @@ Author
 #ifndef fixedDisplacementFvPatchVectorField_H
 #define fixedDisplacementFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 #include "interpolationTable.H"

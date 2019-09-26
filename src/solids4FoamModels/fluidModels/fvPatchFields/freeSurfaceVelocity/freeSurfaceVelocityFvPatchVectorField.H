@@ -37,6 +37,7 @@ SourceFiles
 #ifndef freeSurfaceVelocityFvPatchVectorField_H
 #define freeSurfaceVelocityFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
 

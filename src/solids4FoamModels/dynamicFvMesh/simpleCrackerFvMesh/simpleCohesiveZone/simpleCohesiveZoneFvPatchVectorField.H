@@ -47,6 +47,7 @@ Author
 #ifndef simpleCohesiveZoneFvPatchVectorField_H
 #define simpleCohesiveZoneFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "solidDirectionMixedFvPatchVectorField.H"
 #include "simpleCohesiveZoneLaw.H"
