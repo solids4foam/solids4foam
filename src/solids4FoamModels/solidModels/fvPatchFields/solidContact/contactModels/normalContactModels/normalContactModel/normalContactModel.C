@@ -50,8 +50,6 @@ normalContactModel::normalContactModel
     const dictionary& dict,
     const label masterPatchID,
     const label slavePatchID,
-    const label masterFaceZoneID,
-    const label slaveFaceZoneID,
     const standAlonePatch& masterFaceZonePatch,
     const standAlonePatch& slaveFaceZonePatch
 )
@@ -60,13 +58,17 @@ normalContactModel::normalContactModel
     patch_(patch),
     masterPatchID_(masterPatchID),
     slavePatchID_(slavePatchID),
-    masterFaceZoneID_(masterFaceZoneID),
-    slaveFaceZoneID_(slaveFaceZoneID),
     slaveContactPointGap_
     (
         patch.boundaryMesh().mesh().boundaryMesh()[slavePatchID].nPoints(), 0.0
     )
-{}
+{
+    if (slavePatchID == -1)
+    {
+        FatalErrorIn("normalContactModel::normalContactModel")
+            << "slavePatchID cannot be -1" << abort(FatalError);
+    }
+}
 
 
 normalContactModel::normalContactModel(const normalContactModel& nm)
@@ -75,8 +77,6 @@ normalContactModel::normalContactModel(const normalContactModel& nm)
     patch_(nm.patch_),
     masterPatchID_(nm.masterPatchID_),
     slavePatchID_(nm.slavePatchID_),
-    masterFaceZoneID_(nm.masterFaceZoneID_),
-    slaveFaceZoneID_(nm.slaveFaceZoneID_),
     slaveContactPointGap_(nm.slaveContactPointGap_)
 {}
 

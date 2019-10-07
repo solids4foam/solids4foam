@@ -6,12 +6,10 @@
 # Create mesh
 runApplication blockMesh
 
-# Create faceZones for solidContact boundaries
-runApplication setSet -batch batch.setSet
-runApplication setsToZones -noFlipMap
-
-# Run solver
+# Run solver in serial
 runApplication solids4Foam
+
+# Run solver in parallel
 #runApplication decomposePar
 #runParallel solidFoam 8
 #runApplication reconstructPar

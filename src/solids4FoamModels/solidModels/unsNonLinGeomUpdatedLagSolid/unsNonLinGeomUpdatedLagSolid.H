@@ -184,6 +184,12 @@ public:
                 return true;
             }
 
+            //- Does this model move the mesh?
+            virtual bool movingMesh() const
+            {
+                return true;
+            }
+
     // Edit
 
             //- Evolve the solid solver and solve the mathematical model

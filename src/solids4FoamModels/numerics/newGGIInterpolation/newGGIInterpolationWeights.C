@@ -38,7 +38,6 @@ Modification by:
 #include "boolList.H"
 #include "DynamicList.H"
 #include "dimensionedConstants.H"
-#include "triPointRef.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -121,7 +120,11 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
     // Note: Allocated to local size for parallel search.  HJ, 27/Apr/2016
     labelListList candidateMasterNeighbors;
 
-    if (reject_ == AABB)
+    if (usePrevCandidateMasterNeighbors_)
+    {
+        updateNeighboursAABB(candidateMasterNeighbors);
+    }
+    else if (reject_ == AABB)
     {
          findNeighboursAABB(candidateMasterNeighbors);
     }
@@ -152,7 +155,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
     // neighbors.  So for a given a neighbor face, we need as many
     // projections as there are neighbors closeby.
 
-    const pointField& masterPatchPoints = masterPatch_.points();
+    const pointField& masterPatchPoints = masterPatch_.localPoints();
     const vectorField masterPatchNormals = masterPatch_.faceNormals();
 
     // ZT, 05/07/2014
@@ -181,15 +184,15 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
     );
 
     // Parallel search split.  HJ, 27/Apr/2016
-    //const label pmStart = this->parMasterStart();
+    const label pmStart = this->parMasterStart();
 
-    // for
-    // (
-    //     label faceMi = this->parMasterStart();
-    //     faceMi < this->parMasterEnd();
-    //     faceMi++
-    // )
-    forAll (masterPatch_, faceMi)
+    for
+    (
+        label faceMi = this->parMasterStart();
+        faceMi < this->parMasterEnd();
+        faceMi++
+    )
+//     forAll (masterPatch_, faceMi)
     {
         // Set capacity
         masterNeighbors[faceMi].setCapacity(8);
@@ -294,7 +297,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
         // Next, project the candidate master neighbours faces points
         // onto the same plane using the new orthonormal basis
         // Note: Allocated to local size for parallel search.  HJ, 27/Apr/2016
-        const labelList& curCMN = candidateMasterNeighbors[faceMi];
+        const labelList& curCMN = candidateMasterNeighbors[faceMi - pmStart];
 
         forAll (curCMN, neighbI)
         {
@@ -313,7 +316,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
 
             // We use the xyz points directly, with a possible transformation
             pointField curSlaveFacePoints =
-                slavePatch_[curCMN[neighbI]].points(slavePatch_.points());
+                slavePatch_[curCMN[neighbI]].points(slavePatch_.localPoints());
 
             if (doTransform())
             {
@@ -463,7 +466,8 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
                         << " and Neighbour face: " << curCMN[neighbI]
                         << " intersection area = " << intersectionArea << nl
                         << "Please check the two quick-check algorithms for "
-                        << "newGGIInterpolation.  Something is  missing." << endl;
+                        << "newGGIInterpolation.  Something is  missing."
+                        << endl;
                 }
             }
         }
@@ -477,51 +481,51 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
     labelListList& ma  = *masterAddrPtr_;
 
     // Parallel search split.  HJ, 27/Apr/2016
-    //for(label mfI = this->parMasterStart(); mfI < this->parMasterEnd(); mfI++)
-    forAll (ma, mfI)
+    for (label mfI = this->parMasterStart(); mfI < this->parMasterEnd(); mfI++)
+//     forAll (ma, mfI)
     {
         ma[mfI].transfer(masterNeighbors[mfI].shrink());
     }
 
     // Parallel communication: reduce master addressing
-    // if (globalData())
-    // {
-    //     Pstream::combineGather(ma, Pstream::listEq());
-    //     Pstream::combineScatter(ma);
-    // }
+    if (globalData())
+    {
+        Pstream::combineGather(ma, Pstream::listEq());
+        Pstream::combineScatter(ma);
+    }
 
     masterWeightsPtr_ = new scalarListList(masterPatch_.size());
     scalarListList& maW = *masterWeightsPtr_;
 
     // Parallel search split.  HJ, 27/Apr/2016
-    //for(label mfI = this->parMasterStart(); mfI < this->parMasterEnd(); mfI++)
-    forAll (maW, mfI)
+    for (label mfI = this->parMasterStart(); mfI < this->parMasterEnd(); mfI++)
+//     forAll (maW, mfI)
     {
         maW[mfI].transfer(masterNeighborsWeights[mfI].shrink());
     }
 
     // Parallel communication: reduce master weights
-    // if (globalData())
-    // {
-    //     Pstream::combineGather(maW, Pstream::listEq());
-    //     Pstream::combineScatter(maW);
-    // }
+    if (globalData())
+    {
+        Pstream::combineGather(maW, Pstream::listEq());
+        Pstream::combineScatter(maW);
+    }
 
     // Reduce slave on master weights
     scalarListList smaW(masterPatch_.size());
 
-    //for(label mfI = this->parMasterStart(); mfI < this->parMasterEnd(); mfI++)
-    forAll (smaW, mfI)
+    for (label mfI = this->parMasterStart(); mfI < this->parMasterEnd(); mfI++)
+//     forAll (smW, mfI)
     {
         smaW[mfI].transfer(slaveOnMasterNeighborsWeights[mfI].shrink());
     }
 
     // Parallel communication: reduce master weights
-    // if (globalData())
-    // {
-    //     Pstream::combineGather(smaW, Pstream::listEq());
-    //     Pstream::combineScatter(smaW);
-    // }
+    if (globalData())
+    {
+        Pstream::combineGather(smaW, Pstream::listEq());
+        Pstream::combineScatter(smaW);
+    }
     // Slave neighbours and weights
     List<DynamicList<label, 8> > slaveNeighbors(slavePatch_.size());
     List<DynamicList<scalar, 8> > slaveNeighborsWeights(slavePatch_.size());
@@ -755,21 +759,1164 @@ newGGIInterpolation<MasterPatch, SlavePatch>::findNonOverlappingFaces
     return tpatchFaceNonOverlapAddr;
 }
 
+
+template<class FromPatch, class ToPatch>
+void newGGIInterpolation<FromPatch, ToPatch>::
+setSourceToTargetPointAddressing
+(
+    List<labelPair>& sourcePointAddr,   // source point addressing
+    scalarField& sourcePointDist,       // source point distances
+    vectorField& sourcePointDistVecs,   // source point distance vectors
+    const FromPatch& sourcePatch,       // source patch
+    const ToPatch& targetPatch,         // target patch
+    const labelListList& sourceFaceAddr, // source patch face addressing
+    const List< Map<label> >& targetEdgeLoopsMap // target edge loops map
+) const
+{
+    // Procedure
+    // for all source points
+    //     count how many target faces the source point projects
+    //     if the source point (pt S) projects to only one target face
+    //         then the projection is unique
+    //         the direction is the target face normal direction
+    //         the distance is the projected distance to the target face in this
+    //         direction
+    //     else if the source point (pt S) projects to two target faces
+    //         no unique projection
+    //         if the two target faces share an edge
+    //             find the target edge (edg E) shared by the two target faces
+    //             pt S projects to pt S1 on target face 1 and to pt S2 on
+    //             target face 2
+    //             calculate the perpendicular distance (d1, d2) to edg E from
+    //             the projection points (S1, S2)
+    //             the direction is the weighted average of the target face
+    //             normals, where the weights are based on d1, d2
+    //             the distance is taken in this direction; it will project to
+    //             one of the faces or the shared edge
+    //        else
+    //            project to the closest face
+    //        end
+    //     else if the source point (pt S) projects to greater than two target
+    //         faces
+    //         no unique projection
+    //         if all the target faces share a common point
+    //             pt S projects to pt Si on target face i
+    //             calculate the distance (di) to pt M from the projection
+    //             points (Si)
+    //             the direction is the weighted average of the target face
+    //             normals, where the weights are based on di
+    //             the distance is taken in this direction; it will project to
+    //             one of the faces or the shared point
+    //         else
+    //             project to the closest face
+    //         end
+    //     else
+    //         projection is undefined
+    //         if the source point (pt S) projects to any of the target
+    //         edges connected to pt M
+    //             if the point projects to more than one edge then find the
+    //             closest edge
+    //             the direction is the normal direction to the edge
+    //             the distance is the projected distance to the edge
+    //             this direction
+    //         else
+    //             the direction is from pt S to pt M
+    //             the distance is the projected distance in this direction
+    //         end
+    //     end
+    // end
+
+    // Define references for convenience and efficiency
+    const labelListList& sourcePointFaces = sourcePatch.pointFaces();
+    const faceList& targetFaces = targetPatch.localFaces();
+    const pointField& targetPoints = targetPatch.localPoints();
+    const pointField& sourcePoints = sourcePatch.localPoints();
+    const labelListList& targetPointEdges = targetPatch.pointEdges();
+    const edgeList& targetEdges = targetPatch.edges();
+    const vectorField targetPointNormals = targetPatch.pointNormals();
+
+    // Allow projection of source points to points/edges on the boundary of the
+    // target patch: if true, then all points with possibleMasterFaces will
+    // project to the target; if false, then some points may not project to
+    // anything
+    const labelListList& targetEdgeLoops = targetPatch.edgeLoops();
+
+    forAll(sourcePointAddr, pointI)
+    {
+        const point& P = sourcePoints[pointI];
+
+        // Find target faces that could possibly be in contact with this point
+        // We will use the face addressing for this
+        const labelList possibleTargetFaces =
+            this->possibleTargetFaces(sourcePointFaces[pointI], sourceFaceAddr);
+
+        if (possibleTargetFaces.size() == 0)
+        {
+            // We will not calculate the point distances for points that are far
+            // from contact i.e. their adjacent faces do not project to faces on
+            // the target patch
+            continue;
+        }
+
+        // Next we will count how many target faces (triangular sub-faces) to
+        // which the current point can be projected
+        // projectedTriangularSubFaces is a list of triangular sub-faces to
+        // which the current point can be projected; each labelPair entry
+        // returns the target face index (first) and the face local point index
+        // indicating the sub-triangle
+        List<labelPair> triSubFacesIndex(0);
+        List<vector> triSubFacesProjDirections(0);
+        PtrList< triangle<point, point> > triSubFaces(0);
+        projectPointToTriangularSubFaces
+        (
+            triSubFacesIndex,
+            triSubFacesProjDirections,
+            triSubFaces,
+            P,
+            possibleTargetFaces,
+            targetFaces,
+            targetPoints
+        );
+
+        if (triSubFacesIndex.size() == 1)
+        {
+            // Calculate the triangle unit normal
+            vector triNormal = triSubFaces[0].normal();
+            triNormal /= mag(triNormal);
+
+            // The distance is negative when the point is in contact
+            sourcePointDist[pointI] = -triNormal & triSubFacesProjDirections[0];
+            sourcePointDistVecs[pointI] = triSubFacesProjDirections[0];
+
+            // The point projects uniquely to one face
+            sourcePointAddr[pointI] = triSubFacesIndex[0];
+        }
+        else if (triSubFacesIndex.size() == 2)
+        {
+            // Point projects to two faces
+            // If they share an edge then we will blend the return
+            // directions, else we will pick the face with the smallest
+            // distance
+
+            // Triangle A
+            const triangle<point, point>& triA = triSubFaces[0];
+
+            // Triangle B
+            const triangle<point, point>& triB = triSubFaces[1];
+
+            // Find shared points, if any, of the two triangles
+            List<vector> sharedPoints;
+            triangleSharedPoints(sharedPoints, triA, triB);
+
+            // If the two sub-faces share an edge
+            if (sharedPoints.size() == 2)
+            {
+                // Find the projection points on both sub-faces
+                const point S0 = P + triSubFacesProjDirections[0];
+                const point S1 = P + triSubFacesProjDirections[1];
+
+                // Calculate the edge vector direction
+                const point& e0 = sharedPoints[0];
+                const point& e1 = sharedPoints[1];
+                vector e = e1 - e0;
+                e /= mag(e);
+
+                // Vectors from S0/S1 to the start of edge e
+                const vector S0e0 = e0 - S0;
+                const vector S1e0 = e0 - S1;
+
+                // Calculate the perpendicular distance from S0/S1 to edge e
+                const scalar d0 = mag((I - sqr(e)) & S0e0);
+                const scalar d1 = mag((I - sqr(e)) & S1e0);
+
+                // The projection direction will be a weighted average of
+                // the inverted normals of both triangles, where the weights
+                // are a function of the perpendicular distances, d0 and d1
+                const scalar w0 = d0/(d0 + d1);
+                //const scalar w1 = d1/(d0 + d1);
+                const scalar w1 = 1.0 - w0;
+
+                // Calculate the triangle unit normals
+                vector triN0 = triSubFaces[0].normal();
+                triN0 /= mag(triN0);
+                vector triN1 = triSubFaces[1].normal();
+                triN1 /= mag(triN1);
+
+                // Projection direction is the weighed average of the triangle
+                // unit normals
+                const vector weightedNormal = w0*triN0 + w1*triN1;
+                // We need to be careful with the sign:
+                // If eP is in the same direction as weightedNormal then we
+                // project in the weightedNormal direction
+                // Unit vector from the edge mid-point to point P
+                vector eP = P - 0.5*(e0 + e1);
+                eP /= mag(eP);
+                vector dir = -sign(weightedNormal & eP)*weightedNormal;
+                dir /= mag(dir);
+
+                // Calculate the distance along dir to the face
+                // We are performing a non-orthogonal projection to the
+                // plane of the face
+                // e.g. https://computergraphics.stackexchange.com/
+                // questions/4360/how-to-project-a-3d-point-onto-a-
+                // plane-along-another-axis-vector/4362
+                if (w0 > w1)
+                {
+                    // Point is projected to triangle 0
+                    sourcePointDist[pointI] =
+                        sign(weightedNormal & eP)
+                        *mag(triSubFacesProjDirections[0]/(triN0 & dir));
+
+                    sourcePointAddr[pointI] = triSubFacesIndex[0];
+                }
+                else
+                {
+                    // Point is projected to triangle 1
+                    sourcePointDist[pointI] =
+                        sign(weightedNormal & eP)*
+                        mag(triSubFacesProjDirections[1]/(triN1 & dir));
+
+                    sourcePointAddr[pointI] = triSubFacesIndex[1];
+                }
+
+                sourcePointDistVecs[pointI] = dir*mag(sourcePointDist[pointI]);
+            }
+            else
+            {
+                // The two triangles don't share an edge so we will select
+                // the triangle with the shortest projection distance
+
+                // Can we do something better/smoother here?
+                // We could check if the triangles share a point and calculate
+                // the weighted projection direction based on the distance to
+                // this shared point...?
+
+                label closestTriID = 0;
+                if
+                (
+                    mag(triSubFacesProjDirections[1])
+                  < mag(triSubFacesProjDirections[0])
+                )
+                {
+                    closestTriID = 1;
+                }
+
+                // Calculate triangle unit normal
+                vector triNormal = triSubFaces[closestTriID].normal();
+                triNormal /= mag(triNormal);
+
+                // Set the distance
+                sourcePointDist[pointI] =
+                    -triNormal & triSubFacesProjDirections[closestTriID];
+                sourcePointDistVecs[pointI] =
+                    triSubFacesProjDirections[closestTriID];
+
+                // The point projects to one face
+                sourcePointAddr[pointI] = triSubFacesIndex[closestTriID];
+            }
+        }
+        else if (triSubFacesIndex.size() > 2)
+        {
+            // Point projects to more than two faces
+
+            // Count the number of points common to all the triangles
+            List< List<vector> > allSharedPoints(triSubFacesIndex.size() - 1);
+            const triangle<point, point>& tri0 = triSubFaces[0];
+            for (int triI = 1; triI < triSubFacesIndex.size() - 1; triI++)
+            {
+                const triangle<point, point>& triangleI = triSubFaces[triI];
+                triangleSharedPoints(allSharedPoints[triI], tri0, triangleI);
+
+                if (allSharedPoints[triI].size() == 0)
+                {
+                    // There are no common shared points
+                    break;
+                }
+            }
+
+            // Check for common shared point
+            List<vector> sharedPoints;
+            for (int ptI = 0; ptI < allSharedPoints[0].size(); ptI++)
+            {
+                vector& candidateSharedPoint = allSharedPoints[0][ptI];
+                label nTriWithSharedPoint = 1;
+                for (int triI = 1; triI < allSharedPoints.size(); triI++)
+                {
+                    const List<vector>& curSharedPoints = allSharedPoints[triI];
+                    bool foundPoint = false;
+                    for (int neiI = 0; neiI < curSharedPoints.size(); neiI++)
+                    {
+                        if (candidateSharedPoint == curSharedPoints[neiI])
+                        {
+                            foundPoint = true;
+                            nTriWithSharedPoint++;
+                            break;
+                        }
+                    }
+
+                    if (!foundPoint)
+                    {
+                        break;
+                    }
+                }
+
+                if (nTriWithSharedPoint == allSharedPoints.size())
+                {
+                    sharedPoints.setSize(1);
+                    sharedPoints[0] = candidateSharedPoint;
+                }
+            }
+
+            // If all the sub-faces share a common point
+            if (sharedPoints.size() == 1)
+            {
+                // If they share a point then we can set the return direction to
+                // be the weighted average of the triangle normals, where the
+                // weights depend on the distance from the projection point (on
+                // each face) to the shared point
+
+                // Shared point
+                const vector& M = sharedPoints[0];
+
+                List<point> Si(triSubFacesIndex.size());
+                Field<scalar> Wi(triSubFacesIndex.size());
+                List<vector> triNi(triSubFacesIndex.size());
+                scalar sumW = 0;
+                vector weightedNormal = vector::zero;
+                forAll(triSubFacesIndex, triI)
+                {
+                    // Find the projection points on each sub-faces
+                    Si[triI] = P + triSubFacesProjDirections[triI];
+
+                    // Calculate the distance from the Si points to point M
+                    Wi[triI] = mag(M - Si[triI]);
+                    sumW += Wi[triI];
+
+                    // Calculate the triangle unit normals
+                    triNi[triI] = triSubFaces[triI].normal();
+                    triNi[triI] /= mag(triNi[triI]);
+
+                    // Calculate the weighted normal
+                    weightedNormal += Wi[triI]*triNi[triI];
+                }
+
+                // Normalise the weights
+                Wi /= sumW;
+                weightedNormal /= sumW;
+
+                // Unit vector from the opint M to point P
+                vector MP = P - M;
+                MP /= mag(MP);
+
+                // We need to be careful with the sign:
+                // If MP is in the same direction as weightedNormal then we
+                // project in the weightedNormal direction
+                vector dir = -sign(weightedNormal & MP)*weightedNormal;
+                dir /= mag(dir);
+
+                // Find the largest Wi to know which face to project to
+                scalar maxWi = 0.0;
+                label triWithMaxWi = -1;
+                forAll(Wi, triI)
+                {
+                    if (Wi[triI] > maxWi)
+                    {
+                        maxWi = Wi[triI];
+                        triWithMaxWi = triI;
+                    }
+                }
+
+                // Point is projected to triangle triWithMaxWi
+                sourcePointDist[pointI] =
+                    sign(weightedNormal & MP)
+                   *mag
+                    (
+                        triSubFacesProjDirections[triWithMaxWi]
+                       /(triNi[triWithMaxWi] & dir)
+                    );
+
+                sourcePointAddr[pointI] = triSubFacesIndex[triWithMaxWi];
+
+                sourcePointDistVecs[pointI] = dir*mag(sourcePointDist[pointI]);
+            }
+            else
+            {
+                // Project to the closest triangle
+
+                // Like abive, can we do something better/smoother here?
+
+                label closestTriID = -1;
+                scalar closestDist = GREAT;
+
+                forAll(triSubFacesIndex, triI)
+                {
+                    const scalar distI = mag(triSubFacesProjDirections[triI]);
+
+                    if (distI < closestDist)
+                    {
+                        closestTriID = triI;
+                        closestDist = distI;
+                    }
+                }
+
+                // Calculate triangle unit normal
+                vector triNormal = triSubFaces[closestTriID].normal();
+                triNormal /= mag(triNormal);
+
+                // Set the distance
+                sourcePointDist[pointI] =
+                    -triNormal & triSubFacesProjDirections[closestTriID];
+                sourcePointDistVecs[pointI] =
+                    triSubFacesProjDirections[closestTriID];
+
+                // The point projects to one face
+                sourcePointAddr[pointI] = triSubFacesIndex[closestTriID];
+            }
+        }
+        else
+        {
+            // No point-to-face projection is defined
+            // So we will project to an edge or point
+
+            // Find closest vertex on the target
+            const label closestTargetPointID =
+                findClosestVertex
+                (
+                    P, possibleTargetFaces, targetFaces, targetPoints
+                );
+            const point& M =
+                targetPoints[closestTargetPointID];
+
+            // For all edges connected to the target point, we will check if
+            // the source point projects to the edge
+
+            // Get the edges attached to the target point
+            const labelList& closestEdges =
+                targetPointEdges[closestTargetPointID];
+
+            // Find the closest edge to project to, if any
+            label closestEdgeI = -1;
+            scalar minDist = GREAT;
+            forAll(closestEdges, eI)
+            {
+                const label curEdgeID = closestEdges[eI];
+                const edge& curEdge = targetEdges[curEdgeID];
+
+                // Vector from M to P
+                const vector MP = P - M;
+
+                // Vertex at the other end of the edge
+                const label otherPointID =
+                    curEdge.otherVertex(closestTargetPointID);
+
+                // Unit edge vector away from M
+                vector e = targetPoints[otherPointID] - M;
+                const scalar magE = mag(e);
+                e /= magE;
+
+                // Project point P to the edge and calculate the distance
+                // along the edge to the projection point
+                const scalar d = e & MP;
+
+                // If 0 <= d <= magE, then P projects to the edge
+                if (d >= 0 && d <= magE)
+                {
+                    const scalar dist = mag((I - sqr(e)) & MP);
+
+                    if (dist < minDist)
+                    {
+                        minDist = dist;
+                        closestEdgeI = eI;
+                    }
+                }
+            }
+
+            // If the point projects to an edge then perform the projection,
+            // else we will project to the point M
+            if (closestEdgeI > -1)
+            {
+                const label curEdgeID = closestEdges[closestEdgeI];
+                const edge& curEdge = targetEdges[curEdgeID];
+
+                // Vector from M to P
+                const vector MP = P - M;
+
+                // Vertex at the other end of the edge
+                const label otherPointID =
+                    curEdge.otherVertex(closestTargetPointID);
+
+                // Unit edge vector away from M
+                vector e = targetPoints[otherPointID] - M;
+                const scalar magE = mag(e);
+                e /= magE;
+
+                // To check if the distance is positive or negative, we
+                // will compare the projection vector with the edge normal
+                // vector, where we will define the edge normal vector as the
+                // average of the edge-start and edge-end point normals
+                const vector& startNormal = targetPointNormals[curEdge.start()];
+                const vector& endNormal = targetPointNormals[curEdge.end()];
+                vector edgeN = 0.5*(startNormal + endNormal);
+                const scalar magEdgeN = mag(edgeN);
+                if (magEdgeN < SMALL)
+                {
+                    FatalErrorIn
+                    (
+                        "template<class FromPatch, class ToPatch>\n"
+                        "void newGGIInterpolation<FromPatch, ToPatch>::\n"
+                        "setSourceToTargetPointAddressing\n"
+                        "(\n"
+                        "    List<labelPair>& sourcePointAddressing,\n"
+                        "    scalarField& sourcePointDistance,\n"
+                        "    vectorField& sourcePointDistVecs,\n"
+                        "    const FromPatch& sourcePatch,\n"
+                        "    const ToPatch& targetPatch,\n"
+                        "    const labelListList& sourceAddr\n"
+                        ") const"
+                    )   << "Something went wrong projecting to an edge!"
+                        << " The edge start point normal is the neative of the "
+                        << "end point normal!"
+                        << abort(FatalError);
+                }
+                edgeN /= mag(edgeN);
+
+                // Projection vector from point P to the closest point
+                // on the edge
+                sourcePointDist[pointI] =
+                    sign(edgeN & MP)*mag((I - sqr(e)) & MP);
+                sourcePointDistVecs[pointI] = -(I - sqr(e)) & MP;
+
+                // The point projects to one an edge so there is no
+                // triangle address to store here, so we will leave it
+                // as -1
+                sourcePointAddr[pointI] = labelPair(-1, -1);
+
+                if (!projectPointsToPatchBoundary_)
+                {
+                    correctBoundaryPointProjection
+                    (
+                        targetPatch,
+                        closestTargetPointID,
+                        targetEdgeLoops,
+                        targetEdgeLoopsMap,
+                        MP,
+                        sourcePointDist[pointI],
+                        sourcePointDistVecs[pointI]
+                    );
+                }
+            }
+            else
+            {
+                // If the point does not project to any edge or projects to more
+                // than one edge then we will project directly to the point M
+
+                // Vector from M to P
+                const vector MP = P - M;
+
+                // Get the point normal
+                const vector& pointN = targetPointNormals[closestTargetPointID];
+
+                // The distance is negative when the point is in contact
+                sourcePointDist[pointI] = sign(pointN & MP)*mag(MP);
+                sourcePointDistVecs[pointI] = -MP;
+
+                // The point projects to a point so there is no triangle
+                // address to store here; we will leave it as -1
+                sourcePointAddr[pointI] = labelPair(-1, -1);
+
+                if (!projectPointsToPatchBoundary_)
+                {
+                    correctBoundaryPointProjection
+                    (
+                        targetPatch,
+                        closestTargetPointID,
+                        targetEdgeLoops,
+                        targetEdgeLoopsMap,
+                        MP,
+                        sourcePointDist[pointI],
+                        sourcePointDistVecs[pointI]
+                    );
+                }
+            }
+        }
+    }
+
+    // Check orientation
+    if (checkPointDistanceOrientations_)
+    {
+        const pointField& sourcePointNormals = sourcePatch.pointNormals();
+        const vectorField& targetFaceNormals = targetPatch.faceNormals();
+
+        scalarField orientation(sourcePointAddr.size(), 0);
+
+        label nIncorrectPoints = 0;
+
+        forAll(sourcePointAddr, pointI)
+        {
+            if (sourcePointAddr[pointI].first() != -1)
+            {
+                orientation[pointI] =
+                    (
+                        sourcePointNormals[pointI]
+                      & targetFaceNormals[sourcePointAddr[pointI].first()]
+                    );
+
+                if (orientation[pointI] > -SMALL)
+                {
+                    nIncorrectPoints++;
+
+                    // Ignore these points
+                    sourcePointAddr[pointI] = labelPair(-1, -1);
+                    sourcePointDist[pointI] = GREAT;
+                }
+            }
+        }
+    }
+
+    if (debug)
+    {
+        Info<< "GGI, source point distance"
+            << ", max: " << max(sourcePointDist)
+            << ", min: " << min(sourcePointDist)
+            << ", avg: " << average(sourcePointDist) << endl;
+    }
+}
+
+
+template<class FromPatch, class ToPatch>
+void newGGIInterpolation<FromPatch, ToPatch>::
+setSourceToTargetPointAddressingPrev
+(
+    List<labelPair>& sourcePointAddr,   // source point addressing
+    scalarField& sourcePointDist,       // source point distances
+    const FromPatch& sourcePatch,       // source patch
+    const ToPatch& targetPatch,         // target patch
+    const labelListList& sourceFaceAddr // source patch face addressing
+) const
+{
+    // Take references for convenience and efficiency
+    const labelListList& pointFaces = sourcePatch.pointFaces();
+    const faceList& targetFaces = targetPatch.localFaces();
+    const pointField& targetPoints = targetPatch.localPoints();
+    const pointField& sourcePoints = sourcePatch.localPoints();
+
+    forAll(sourcePointAddr, pointI)
+    {
+        const point& P = sourcePoints[pointI];
+
+        labelHashSet possibleTargetFacesSet;
+
+        const labelList& curPointFaces = pointFaces[pointI];
+        forAll(curPointFaces, faceI)
+        {
+            const label curFace = curPointFaces[faceI];
+
+            const labelList& curTargetFaces = sourceFaceAddr[curFace];
+
+            forAll(curTargetFaces, fI)
+            {
+                if (!possibleTargetFacesSet.found(curTargetFaces[fI]))
+                {
+                    possibleTargetFacesSet.insert(curTargetFaces[fI]);
+                }
+            }
+        }
+
+        labelList possibleTargetFaces = possibleTargetFacesSet.toc();
+
+        scalar MinEta = -GREAT;
+        labelPair faceTriangle(-1, -1);
+        scalar distance = GREAT;
+
+        forAll(possibleTargetFaces, faceI)
+        {
+            const label curTargetFace = possibleTargetFaces[faceI];
+
+            const face& f = targetFaces[curTargetFace];
+
+            const point ctr = Foam::average(f.points(targetPoints));
+
+            //point nextPoint = ctr;
+
+            for (label pI = 0; pI < f.size(); pI++)
+            {
+                const point nextPoint = targetPoints[f.nextLabel(pI)];
+
+                triPointRef t
+                (
+                    targetPoints[f[pI]],
+                    nextPoint,
+                    ctr
+                );
+
+                vector n = t.normal();
+                const scalar A = mag(n);
+                n /= A;
+
+                // Intersection point
+                const point I = P + n*(n & (t.a() - P));
+
+                // Areal coordinates
+                scalarField eta(3, 0);
+
+                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
+                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
+                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
+
+                const scalar minEta = min(eta);
+
+                // PC/PDJ/TT: 28-11-17: for projections within the face, the
+                // sum of mag(eta[0]) + mag(eta[1]) + mag(eta[2]) must be equal
+                // to one if the point is projected within the triangle
+                // We will allow 5% to account for convex corners, but we must
+                // come back to solve these convex corners correctly!!!
+                // PC: 01-11-18: I'm back: the default behaviour is more robust
+                // so we will not force the point to be projected within the
+                // face
+                // if (mag(eta[0]) + mag(eta[1]) + mag(eta[2]) < 1.05)
+                {
+                    if (minEta > MinEta)
+                    {
+                        MinEta = minEta;
+                        faceTriangle.first() = curTargetFace;
+                        faceTriangle.second() = pI;
+
+                        distance = ((P - I) & n);
+                    }
+                }
+            }
+        }
+
+        sourcePointAddr[pointI] = faceTriangle;
+        sourcePointDist[pointI] = distance;
+    }
+
+    if (debug)
+    {
+        Info<< "GGI, source point distance"
+            << ", max: " << max(sourcePointDist)
+            << ", min: " << min(sourcePointDist)
+            << ", avg: " << average(sourcePointDist) << endl;
+    }
+
+    // Check orientation
+    if (checkPointDistanceOrientations_)
+    {
+        const pointField& sourcePointNormals =
+            sourcePatch.pointNormals();
+
+        const vectorField& targetFaceNormals =
+            targetPatch.faceNormals();
+
+        scalarField orientation(sourcePointAddr.size(), 0);
+
+        label nIncorrectPoints = 0;
+
+        forAll(sourcePointAddr, pointI)
+        {
+            if (sourcePointAddr[pointI].first() != -1)
+            {
+                orientation[pointI] =
+                    (
+                        sourcePointNormals[pointI]
+                      & targetFaceNormals[sourcePointAddr[pointI].first()]
+                    );
+
+                if (orientation[pointI] > -SMALL)
+                {
+                    nIncorrectPoints++;
+
+                    // Ignore these points
+                    sourcePointAddr[pointI] = labelPair(-1, -1);
+                    sourcePointDist[pointI] = GREAT;
+                }
+            }
+        }
+    }
+}
+
+
+template<class FromPatch, class ToPatch>
+tmp<labelField> newGGIInterpolation<FromPatch, ToPatch>::possibleTargetFaces
+(
+    const labelList& sourceFaces,
+    const labelListList& sourceFaceAddr
+) const
+{
+    tmp<labelField> tpossibleFaces(new labelField());
+    labelField& possibleFaces = tpossibleFaces();
+
+    labelHashSet possibleFacesSet;
+
+    forAll(sourceFaces, faceI)
+    {
+        const label curFace = sourceFaces[faceI];
+        const labelList& curTargetFaces = sourceFaceAddr[curFace];
+
+        forAll(curTargetFaces, fI)
+        {
+            if (!possibleFacesSet.found(curTargetFaces[fI]))
+            {
+                possibleFacesSet.insert(curTargetFaces[fI]);
+            }
+        }
+    }
+
+    possibleFaces = possibleFacesSet.toc();
+
+    return tpossibleFaces;
+}
+
+template<class FromPatch, class ToPatch>
+void newGGIInterpolation<FromPatch, ToPatch>::
+projectPointToTriangularSubFaces
+(
+    List<labelPair>& triSubFacesIndex,
+    List<vector>& triSubFacesProjDirections,
+    PtrList< triangle<point, point> >& triSubFaces,
+    const point& P,
+    const labelList& possibleTargetFaces,
+    const faceList& targetFaces,
+    const pointField& targetPoints
+) const
+{
+    DynamicList<labelPair> faceTrianglesIndex(10);
+    DynamicList<vector> faceTrianglesDistVecs(10);
+
+    forAll(possibleTargetFaces, faceI)
+    {
+        const label curFaceID = possibleTargetFaces[faceI];
+        const face& curFace = targetFaces[curFaceID];
+
+        // Centre of the face: average position of the points
+        const point ctr = Foam::average(curFace.points(targetPoints));
+
+        //point nextPoint = ctr;
+
+        for (label pI = 0; pI < curFace.size(); pI++)
+        {
+            // Next point on the face following the right-hand rule
+            const point nextPoint = targetPoints[curFace.nextLabel(pI)];
+
+            // Create the triangular sub-face
+            const triPointRef t
+            (
+                targetPoints[curFace[pI]],
+                nextPoint,
+                ctr
+            );
+
+            // Area vector of the triangle (we make this a unit normal below)
+            vector n = t.normal();
+
+            // Area magnitude of the triangle
+            const scalar A = mag(n);
+
+            // Unit normal of the triangle
+            n /= A;
+
+            // Intersection point when P is projected in the normal direction to
+            // the triangle
+            const point I = P + n*(n & (t.a() - P));
+
+            // Areal coordinates within the triangle e.g. see
+            // https://en.wikipedia.org/wiki/Barycentric_coordinate_system
+            scalarField eta(3, 0);
+            eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
+            eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
+            eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
+
+            // If I is within the face, the min(eta) must be greater than or
+            // equal to 0 and the sum (mag(eta[0]) + mag(eta[1]) + mag(eta[2]))
+            // must be equal to 1.
+            if (min(eta) > 0.0)
+            {
+                faceTrianglesIndex.append(labelPair(curFaceID, pI));
+
+                // The distance vector from point P to the point I on the face
+                faceTrianglesDistVecs.append(sqr(n) & (I - P));
+
+                // The distance vector is given as
+                const label oldSize = triSubFaces.size();
+                triSubFaces.resize(oldSize + 1);
+                triSubFaces.set
+                (
+                    oldSize,
+                    new triangle<point, point>(t.a(), t.b(), t.c())
+                );
+            }
+        }
+    }
+
+    triSubFacesIndex = faceTrianglesIndex;
+    triSubFacesProjDirections = faceTrianglesDistVecs;
+}
+
+
+template<class FromPatch, class ToPatch>
+void newGGIInterpolation<FromPatch, ToPatch>::
+triangleSharedPoints
+(
+    List<point>& sharedPoints,
+    const triangle<point, point>& triA,
+    const triangle<point, point>& triB
+) const
+{
+    int nSharedPoints = 0;
+    List<vector> sp(3, vector::zero);
+
+    if
+    (
+        triA.a() == triB.a() || triA.a() == triB.b() || triA.a() == triB.c()
+    )
+    {
+        sp[nSharedPoints] = triA.a();
+        nSharedPoints++;
+    }
+
+    if
+    (
+        triA.b() == triB.a() || triA.b() == triB.b() || triA.b() == triB.c()
+    )
+    {
+        sp[nSharedPoints] = triA.b();
+        nSharedPoints++;
+    }
+
+    if
+    (
+        triA.c() == triB.a() || triA.c() == triB.b() || triA.c() == triB.c()
+    )
+    {
+        sp[nSharedPoints] = triA.c();
+        nSharedPoints++;
+    }
+
+    sharedPoints.resize(nSharedPoints);
+    forAll(sharedPoints, pI)
+    {
+        sharedPoints[pI] = sp[pI];
+    }
+}
+
+
+template<class MasterPatch, class SlavePatch>
+void newGGIInterpolation<MasterPatch, SlavePatch>::
+correctBoundaryPointProjection
+(
+    const MasterPatch& targetPatch,
+    const label closestTargetPointID,
+    const labelListList& targetEdgeLoops,
+    const List< Map<label> >& targetEdgeLoopsMap,
+    const vector& MP,
+    scalar& sourcePointDist,
+    vector& sourcePointDistVecs
+) const
+{
+    forAll(targetEdgeLoopsMap, loopI)
+    {
+        const Map<label>& targetEdgeLoopsMapI =
+            targetEdgeLoopsMap[loopI];
+
+        if (targetEdgeLoopsMapI.found(closestTargetPointID))
+        {
+            // M is on the boundary of the target patch
+
+            // Calculate the vector pointing out from the patch
+            // interior, that is perpendicular to the point
+            // normal and to the average direction vectors of
+            // the adjacent boundary edges. This is equivalent
+            // to the "m" vector in the finite area method
+            vector m = vector::zero;
+            boundaryPointBiNormal
+            (
+                m,
+                targetPatch,
+                closestTargetPointID,
+                targetEdgeLoops[loopI],
+                targetEdgeLoopsMapI
+            );
+
+            if ((MP & m) > SMALL)
+            {
+                sourcePointDist = GREAT;
+                sourcePointDistVecs = vector::zero;
+
+                return;
+            }
+        }
+    }
+}
+
+template<class MasterPatch, class SlavePatch>
+void newGGIInterpolation<MasterPatch, SlavePatch>::boundaryPointBiNormal
+(
+    vector& m,
+    const MasterPatch& targetPatch,
+    const label pointID,
+    const labelList& targetBoundaryPoints,
+    const Map<label>& targetBoundaryPointsMap
+) const
+{
+    // Take references
+    const labelListList& pointFaces = targetPatch.pointFaces();
+    const faceList& faces = targetPatch.localFaces();
+    const pointField& points = targetPatch.localPoints();
+
+    // Find index in boundaryPoints list, which is an
+    // ordered list of the boundary points
+    Map<label>::const_iterator iter = targetBoundaryPointsMap.find(pointID);
+
+    if (iter == Map<label>::end())
+    {
+        FatalErrorIn
+        (
+            "template<class MasterPatch, class SlavePatch>\n"
+            "vector newGGIInterpolation<MasterPatch, SlavePatch>::\n"
+            "boundaryPointBiNormal\n"
+            "(\n"
+            "    vector& m,\n"
+            "    const MasterPatch& targetPatch,\n"
+            "    const label pointID,\n"
+            "    const labelList& targetBoundaryPoints,\n"
+            "    const Map<label> targetBoundaryPointsMap\n"
+            ") const"
+        )   << "Could not point in the boundary points map!"
+            << abort(FatalError);
+    }
+
+    const label bpI = iter();
+
+    // Find the next and previous points along the boundary
+    label nextBpI = bpI + 1;
+    label prevBpI = bpI - 1;
+    if (prevBpI == -1)
+    {
+        prevBpI = targetBoundaryPoints.size() - 1;
+    }
+    if (nextBpI == targetBoundaryPoints.size())
+    {
+        nextBpI = 0;
+    }
+
+    const label nextPointID = targetBoundaryPoints[nextBpI];
+    const label prevPointID = targetBoundaryPoints[prevBpI];
+
+    // Find the face containing bpI and prevBpI
+    const labelList& curPointFaces = pointFaces[pointID];
+    label nextFaceID = -1;
+    label prevFaceID = -1;
+    forAll(curPointFaces, pI)
+    {
+        const label faceID = curPointFaces[pI];
+        const face& curFace = faces[faceID];
+
+        forAll(curFace, fpI)
+        {
+            if (curFace[fpI] == prevPointID)
+            {
+                prevFaceID = faceID;
+                break;
+            }
+            else if (curFace[fpI] == nextPointID)
+            {
+                nextFaceID = faceID;
+                break;
+            }
+        }
+    }
+
+    if (prevFaceID == -1 || nextFaceID == -1)
+    {
+        FatalErrorIn
+        (
+            "template<class MasterPatch, class SlavePatch>\n"
+            "vector newGGIInterpolation<MasterPatch, SlavePatch>::\n"
+            "boundaryPointBiNormal\n"
+            "(\n"
+            "    vector& m,\n"
+            "    const MasterPatch& targetPatch,\n"
+            "    const label pointID,\n"
+            "    const labelList& targetBoundaryPoints,\n"
+            "    const Map<label> targetBoundaryPointsMap\n"
+            ") const"
+        )   << "Could not find previous and/or next faces at a boundary point!"
+            << nl << "PrevPoint: " << points[prevPointID]
+            << ", Point: " << points[bpI] << ", NextPoint: "
+            << points[nextPointID] << nl
+            << "prevBpI: " << prevBpI << ", bpI: " << bpI
+            << ", nextBpI: " << nextBpI
+            << nl << "prevFaceID: " << prevFaceID
+            << ", nextFaceID: " << nextFaceID
+            << abort(FatalError);
+    }
+
+    const face& prevFace = faces[prevFaceID];
+    const face& nextFace = faces[nextFaceID];
+
+    // Find vector from prevFace/nextFace centre to point M
+    const point& M = points[pointID];
+    const vector prevM = M - prevFace.centre(points);
+    const vector nextM = M - nextFace.centre(points);
+
+    // We will take the average of prevM and nextM as the biNormal direction
+    m = 0.5*(prevM + nextM);
+    m /= mag(m);
+}
+
+
+template<class FromPatch, class ToPatch>
+label newGGIInterpolation<FromPatch, ToPatch>::
+findClosestVertex
+(
+    const point& P,
+    const labelList& possibleTargetFaces,
+    const faceList& targetFaces,
+    const pointField& targetPoints
+) const
+{
+    scalar minDist = GREAT;
+    label closestPointID = -1;
+
+    forAll(possibleTargetFaces, faceI)
+    {
+        const label curFaceID = possibleTargetFaces[faceI];
+        const face& curFace = targetFaces[curFaceID];
+
+        forAll(curFace, pI)
+        {
+            const label curPointID = curFace[pI];
+            const point& curPoint = targetPoints[curPointID];
+            const scalar dist = mag(P - curPoint);
+
+            if (dist < minDist)
+            {
+                minDist = dist;
+                closestPointID = curPointID;
+            }
+        }
+    }
+
+    if (closestPointID == -1)
+    {
+        FatalErrorIn("newGGIInterpolation::findClosestVertex(...)")
+            << "No point was found!" << abort(FatalError);
+    }
+
+    return closestPointID;
+}
+
+
 template<class FromPatch, class ToPatch>
 void newGGIInterpolation<FromPatch, ToPatch>::
 calcMasterPointAddressing() const
 {
-    Info << "calcMasterPointAddressing() const" << endl;
-
-    // Find master points addressing
     if (masterPointAddressingPtr_)
     {
         FatalErrorIn
         (
-            "void newGGIInterpolation::"
-            "calcMasterPointAddressing() const"
-        )   << "Master points addressing already exists"
-            << abort(FatalError);
+            "void newGGIInterpolation::calcMasterPointAddressing() const"
+        )   << "Pointer already set!" << abort(FatalError);
     }
 
     masterPointAddressingPtr_ =
@@ -788,135 +1935,42 @@ calcMasterPointAddressing() const
         );
     scalarField& masterPointDist = *masterPointDistancePtr_;
 
-    const labelListList& masterFaceAddr = this->masterAddr();
+    masterPointDistanceVectorsPtr_ =
+        new vectorField
+        (
+            this->masterPatch().nPoints(),
+            vector::zero
+        );
+    vectorField& masterPointDistVecs = *masterPointDistanceVectorsPtr_;
 
-    const labelListList& pointFaces = this->masterPatch().pointFaces();
-
-    const faceList& slaveFaces = this->slavePatch().localFaces();
-    const pointField& slavePoints = this->slavePatch().localPoints();
-
-    const pointField& masterPoints = this->masterPatch().localPoints();
-
-    forAll(masterPointAddr, pointI)
+    if (useNewPointDistanceMethod_)
     {
-        const point& P = masterPoints[pointI];
-
-        labelHashSet possibleSlaveFacesSet;
-
-        const labelList& curPointFaces = pointFaces[pointI];
-        forAll(curPointFaces, faceI)
-        {
-            label curFace = curPointFaces[faceI];
-
-            const labelList& curSlaveFaces = masterFaceAddr[curFace];
-
-            forAll(curSlaveFaces, fI)
-            {
-                if (!possibleSlaveFacesSet.found(curSlaveFaces[fI]))
-                {
-                    possibleSlaveFacesSet.insert(curSlaveFaces[fI]);
-                }
-            }
-        }
-
-        labelList possibleSlaveFaces = possibleSlaveFacesSet.toc();
-
-        scalar MinEta = -GREAT;
-        labelPair faceTriangle(-1, -1);
-        scalar distance = GREAT;
-
-        forAll(possibleSlaveFaces, faceI)
-        {
-            label curSlaveFace = possibleSlaveFaces[faceI];
-
-            const face& f = slaveFaces[curSlaveFace];
-
-            point ctr = Foam::average(f.points(slavePoints));
-
-            point nextPoint = ctr;
-
-            for (label pI = 0; pI < f.size(); pI++)
-            {
-                nextPoint = slavePoints[f.nextLabel(pI)];
-
-                triPointRef t
-                (
-                    slavePoints[f[pI]],
-                    nextPoint,
-                    ctr
-                );
-
-                vector n = t.normal();
-                scalar A = mag(n);
-                n /= A;
-
-                // Intersection point
-                point I = P + n*(n&(t.a() - P));
-
-                // Areal coordinates
-                scalarField eta(3, 0);
-
-                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
-                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
-                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
-
-                scalar minEta = min(eta);
-
-                if (minEta > MinEta)
-                {
-                    MinEta = minEta;
-                    faceTriangle.first() = curSlaveFace;
-                    faceTriangle.second() = pI;
-
-                    distance = ((P - I)&n);
-                }
-            }
-        }
-
-        masterPointAddr[pointI] = faceTriangle;
-        masterPointDist[pointI] = distance;
+        // Set the point addressing from the source patch points to the target
+        // patch faces
+        setSourceToTargetPointAddressing
+        (
+            masterPointAddr,     // source point addressing
+            masterPointDist,     // source point distances
+            masterPointDistVecs, // source point distance vectors
+            masterPatch(),       // source patch
+            slavePatch(),        // target patch
+            masterAddr(),        // source patch face addressing
+            slaveEdgeLoopsMap()  // target edge loops map
+        );
     }
-
-    Info<< "GGI, master point distance, max: "
-        << max(masterPointDist)
-        << ", avg: " << average(masterPointDist)
-        << ", min: " << min(masterPointDist) << endl;
-
-
-    // Check orientation
-
-    const pointField& masterPointNormals =
-        this->masterPatch().pointNormals();
-
-    const vectorField& slaveFaceNormals =
-        this->slavePatch().faceNormals();
-
-    scalarField orientation(masterPointAddr.size(), 0);
-
-    label nIncorrectPoints = 0;
-
-    forAll(masterPointAddr, pointI)
+    else
     {
-        orientation[pointI] =
-            (
-                masterPointNormals[pointI]
-              & slaveFaceNormals[masterPointAddr[pointI].first()]
-            );
-
-        if (orientation[pointI] > -SMALL)
-        {
-            nIncorrectPoints++;
-
-            // Ignore these points
-            masterPointAddr[pointI] = labelPair(-1, -1);
-            masterPointDist[pointI] = GREAT;
-        }
+        // Previous method
+        // Note: the distance vectors are not set and left as zero
+        setSourceToTargetPointAddressingPrev
+        (
+            masterPointAddr,     // source point addressing
+            masterPointDist,     // source point distances
+            masterPatch(),       // source patch
+            slavePatch(),        // target patch
+            masterAddr()         // source patch face addressing
+        );
     }
-
-    Info<< "GGI, master point orientation (<0), max: "
-        << max(orientation)
-        << ", min: " << min(orientation) << ", nIncorrectPoints: "
-        << nIncorrectPoints << "/" << masterPointAddr.size() << endl;
 }
 
 
@@ -988,17 +2042,12 @@ calcMasterPointWeights() const
 template<class FromPatch, class ToPatch>
 void newGGIInterpolation<FromPatch, ToPatch>::calcSlavePointAddressing() const
 {
-    //Info << "calcSlavePointAddressing() const" << endl;
-
-    // Find master points addressing
     if (slavePointAddressingPtr_)
     {
         FatalErrorIn
         (
-            "void newGGIInterpolation::"
-            "calcSlavePointAddressing() const"
-        )   << "Slave points addressing already exists"
-            << abort(FatalError);
+            "void newGGIInterpolation::calcSlavePointAddressing() const"
+        )   << "Pointer already set!" << abort(FatalError);
     }
 
     slavePointAddressingPtr_ =
@@ -1017,137 +2066,43 @@ void newGGIInterpolation<FromPatch, ToPatch>::calcSlavePointAddressing() const
         );
     scalarField& slavePointDist = *slavePointDistancePtr_;
 
-    const labelListList& slaveFaceAddr = this->slaveAddr();
+    slavePointDistanceVectorsPtr_ =
+        new vectorField
+        (
+            this->slavePatch().nPoints(),
+            vector::zero
+        );
+    vectorField& slavePointDistVecs = *slavePointDistanceVectorsPtr_;
 
-    const labelListList& pointFaces = this->slavePatch().pointFaces();
-
-    const faceList& masterFaces = this->masterPatch().localFaces();
-    const pointField& masterPoints = this->masterPatch().localPoints();
-
-    const pointField& slavePoints = this->slavePatch().localPoints();
-
-    forAll(slavePointAddr, pointI)
+    if (useNewPointDistanceMethod_)
     {
-        const point& P = slavePoints[pointI];
-
-        labelHashSet possibleMasterFacesSet;
-
-        const labelList& curPointFaces = pointFaces[pointI];
-        forAll(curPointFaces, faceI)
-        {
-            label curFace = curPointFaces[faceI];
-
-            const labelList& curMasterFaces = slaveFaceAddr[curFace];
-
-            forAll(curMasterFaces, fI)
-            {
-                if (!possibleMasterFacesSet.found(curMasterFaces[fI]))
-                {
-                    possibleMasterFacesSet.insert(curMasterFaces[fI]);
-                }
-            }
-        }
-
-        labelList possibleMasterFaces = possibleMasterFacesSet.toc();
-
-        scalar MinEta = -GREAT;
-        labelPair faceTriangle(-1, -1);
-        scalar distance = GREAT;
-
-        forAll(possibleMasterFaces, faceI)
-        {
-            label curMasterFace = possibleMasterFaces[faceI];
-
-            const face& f = masterFaces[curMasterFace];
-
-            point ctr = Foam::average(f.points(masterPoints));
-
-            point nextPoint = ctr;
-
-            for (label pI = 0; pI < f.size(); pI++)
-            {
-                nextPoint = masterPoints[f.nextLabel(pI)];
-
-                triPointRef t
-                (
-                    masterPoints[f[pI]],
-                    nextPoint,
-                    ctr
-                );
-
-                vector n = t.normal();
-                scalar A = mag(n);
-                n /= A;
-
-                // Intersection point
-                point I = P + n*(n&(t.a() - P));
-
-                // Areal coordinates
-                scalarField eta(3, 0);
-
-                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
-                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
-                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
-
-                scalar minEta = min(eta);
-
-                if (minEta > MinEta)
-                {
-                    MinEta = minEta;
-                    faceTriangle.first() = curMasterFace;
-                    faceTriangle.second() = pI;
-
-                    distance = ((P - I)&n);
-                }
-            }
-        }
-
-        slavePointAddr[pointI] = faceTriangle;
-        slavePointDist[pointI] = distance;
+        // Set the point addressing from the source patch points to the target
+        // patch faces
+        setSourceToTargetPointAddressing
+        (
+            slavePointAddr,      // source point addressing
+            slavePointDist,      // source point distances
+            slavePointDistVecs,  // source point distance vectors
+            slavePatch(),        // source patch
+            masterPatch(),       // target patch
+            slaveAddr(),         // source patch face addressing
+            masterEdgeLoopsMap() // target edge loops map
+        );
     }
-
-    Info<< "GGI, slave point distance, max: "
-        << max(slavePointDist)
-        << ", avg: " << average(slavePointDist)
-        << ", min: " << min(slavePointDist) << endl;
-
-    // Check orientation
-
-    const pointField& slavePointNormals =
-        this->slavePatch().pointNormals();
-
-    const vectorField& masterFaceNormals =
-        this->masterPatch().faceNormals();
-
-    scalarField orientation(slavePointAddr.size(), 0);
-
-    label nIncorrectPoints = 0;
-
-    forAll(slavePointAddr, pointI)
+    else
     {
-        if (slavePointAddr[pointI].first() != -1)
-        {
-            orientation[pointI] =
-                (
-                    slavePointNormals[pointI]
-                  & masterFaceNormals[slavePointAddr[pointI].first()]
-                );
-
-            if (orientation[pointI] > -SMALL)
-            {
-                nIncorrectPoints++;
-
-                // Ignore these points
-                slavePointAddr[pointI] = labelPair(-1, -1);
-                slavePointDist[pointI] = GREAT;
-            }
-        }
+        // Set the point addressing from the source patch points to the target
+        // patch faces using the previous method
+        // Note: the distance vectors are not set and are left as zero
+        setSourceToTargetPointAddressingPrev
+        (
+            slavePointAddr,     // source point addressing
+            slavePointDist,     // source point distances
+            slavePatch(),       // source patch
+            masterPatch(),      // target patch
+            slaveAddr()         // source patch face addressing
+        );
     }
-
-    Info<< "GGI, slave point orientation (<0), max: "
-        << max(orientation)
-        << ", min: " << min(orientation) << ", nIncorrectPoints: "
-        << nIncorrectPoints << "/" << slavePointAddr.size() << endl;
 }
 
 template<class FromPatch, class ToPatch>
@@ -1215,6 +2170,90 @@ calcSlavePointWeights() const
     }
 }
 
+
+template<class FromPatch, class ToPatch>
+void newGGIInterpolation<FromPatch, ToPatch>::calcMasterEdgeLoopsMap() const
+{
+    if (masterEdgeLoopsMap_.size() > 0)
+    {
+        FatalErrorIn
+        (
+            "template<class FromPatch, class ToPatch>"
+            "void newGGIInterpolation<FromPatch, ToPatch>::"
+            "calcMasterEdgeLoopsMap() const"
+        )   << "Pointer already set" << abort(FatalError);
+    }
+
+    const labelListList& masterEdgeLoops = masterPatch().edgeLoops();
+
+    masterEdgeLoopsMap_.setSize(masterEdgeLoops.size());
+
+    forAll(masterEdgeLoopsMap_, loopI)
+    {
+        const labelList& masterEdgeLoopsI = masterEdgeLoops[loopI];
+        Map<label>& masterEdgeLoopsMapI = masterEdgeLoopsMap_[loopI];
+
+        forAll(masterEdgeLoopsI, pI)
+        {
+            masterEdgeLoopsMapI.insert(masterEdgeLoopsI[pI], pI);
+        }
+    }
+}
+
+
+template<class FromPatch, class ToPatch>
+void newGGIInterpolation<FromPatch, ToPatch>::calcSlaveEdgeLoopsMap() const
+{
+    if (slaveEdgeLoopsMap_.size() > 0)
+    {
+        FatalErrorIn
+        (
+            "template<class FromPatch, class ToPatch>"
+            "void newGGIInterpolation<FromPatch, ToPatch>::"
+            "calcSlaveEdgeLoopsMap() const"
+        )   << "Pointer already set" << abort(FatalError);
+    }
+
+    const labelListList& slaveEdgeLoops = slavePatch().edgeLoops();
+
+    slaveEdgeLoopsMap_.setSize(slaveEdgeLoops.size());
+
+    forAll(slaveEdgeLoopsMap_, loopI)
+    {
+        const labelList& slaveEdgeLoopsI = slaveEdgeLoops[loopI];
+
+        forAll(slaveEdgeLoopsI, pI)
+        {
+            slaveEdgeLoopsMap_[loopI].insert(slaveEdgeLoopsI[pI], pI);
+        }
+    }
+}
+
+
+template<class FromPatch, class ToPatch>
+const List< Map<label> >&
+newGGIInterpolation<FromPatch, ToPatch>::masterEdgeLoopsMap() const
+{
+    if (masterEdgeLoopsMap_.size() == 0)
+    {
+        calcMasterEdgeLoopsMap();
+    }
+
+    return masterEdgeLoopsMap_;
+}
+
+
+template<class FromPatch, class ToPatch>
+const List< Map<label> >&
+newGGIInterpolation<FromPatch, ToPatch>::slaveEdgeLoopsMap() const
+{
+    if (slaveEdgeLoopsMap_.size() == 0)
+    {
+        calcSlaveEdgeLoopsMap();
+    }
+
+    return slaveEdgeLoopsMap_;
+}
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

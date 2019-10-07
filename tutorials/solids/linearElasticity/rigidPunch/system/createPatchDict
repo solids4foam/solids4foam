@@ -1,0 +1,70 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      createPatchDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+matchTolerance 1e-3;
+
+pointSync false;
+
+patchInfo
+(
+    {
+        name cylinderTractionFree;
+        dictionary
+        {
+            type patch;
+        }
+        constructFrom patches;
+        patches ("auto0");
+    }
+    {
+        name symmx;
+        dictionary
+        {
+            type symmetryPlane;
+        }
+        constructFrom patches;
+        patches ("auto4");
+    }
+    {
+        name cylinderContact;
+        dictionary
+        {
+            type patch;
+        }
+        constructFrom patches;
+        patches ("auto1");
+    }
+    {
+        name cylinderFixed;
+        dictionary
+        {
+            type patch;
+        }
+        constructFrom patches;
+        patches ("auto2");
+    }
+    {
+        name symmy;
+        dictionary
+        {
+            type symmetryPlane;
+        }
+        constructFrom patches;
+        patches ("auto3");
+    }
+);
+
+// ************************************************************************* //

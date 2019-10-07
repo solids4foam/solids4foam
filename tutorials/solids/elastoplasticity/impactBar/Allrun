@@ -10,12 +10,5 @@ runApplication blockMesh
 # Set the initial conditions
 runApplication setFields
 
-# Create the zones
-runApplication setSet -batch batch.setSet
-runApplication setsToZones -noFlipMap
-
-# RUn the solver
+# Run the solver
 runApplication solids4Foam
-#runApplication decomposePar
-#runParallel solidFoam 8
-#runApplication reconstructPar

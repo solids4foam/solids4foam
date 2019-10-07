@@ -46,7 +46,7 @@ Author
 #include "volFields.H"
 #include "tmp.H"
 #include "autoPtr.H"
-#include "extendedGgiInterpolation.H"
+#include "newGgiInterpolation.H"
 #include "standAlonePatch.H"
 
 
@@ -74,19 +74,10 @@ class normalContactModel
         //- Slave patch index
         const label slavePatchID_;
 
-        //- Master face zone index
-        const label masterFaceZoneID_;
-
-        //- Slave face zone index
-        const label slaveFaceZoneID_;
-
         //- Contact point gap
         scalarField slaveContactPointGap_;
 
     // Private Member Functions
-
-        //- Disallow copy construct
-        //normalContactModel(const normalContactModel&);
 
         //- Disallow default bitwise assignment
         void operator=(const normalContactModel&);
@@ -116,12 +107,12 @@ public:
             dictionary,
             (
                 const word name,
+                // THIS IS ONLY USED TO ACCESS THE MESH
+                // We should instead pass the mesh
                 const fvPatch& patch,
                 const dictionary& dict,
                 const label masterPatchID,
                 const label slavePatchID,
-                const label masterFaceZoneID,
-                const label slaveFaceZoneID,
                 const standAlonePatch& masterFaceZonePatch,
                 const standAlonePatch& slaveFaceZonePatch
             ),
@@ -131,8 +122,6 @@ public:
                 dict,
                 masterPatchID,
                 slavePatchID,
-                masterFaceZoneID,
-                slaveFaceZoneID,
                 masterFaceZonePatch,
                 slaveFaceZonePatch
             )
@@ -149,8 +138,6 @@ public:
             const dictionary& dict,
             const label masterPatchID,
             const label slavePatchID,
-            const label masterFaceZoneID,
-            const label slaveFaceZoneID,
             const standAlonePatch& masterFaceZonePatch,
             const standAlonePatch& slaveFaceZonePatch
         );
@@ -166,8 +153,6 @@ public:
             const dictionary& dict,
             const label masterPatchID,
             const label slavePatchID,
-            const label masterFaceZoneID,
-            const label slaveFaceZoneID,
             const standAlonePatch& masterFaceZonePatch,
             const standAlonePatch& slaveFaceZonePatch
         );
@@ -179,10 +164,9 @@ public:
         virtual autoPtr<normalContactModel> clone() const = 0;
 
 
-    // Destructor
-
-        virtual ~normalContactModel()
-        {}
+    //- Destructor
+    virtual ~normalContactModel()
+    {}
 
 
     // Member Functions
@@ -193,17 +177,13 @@ public:
             return name_;
         }
 
-        //- Return reference to patch
-        const fvPatch& patch() const
-        {
-            return patch_;
-        }
-
         //- Correct contact model
         virtual void correct
         (
             const vectorField& slavePatchFaceNormals,
-            const extendedGgiStandAlonePatchInterpolation& zoneToZone
+            const scalarField& slavePointPenetration,
+            const vectorField& slaveDU,
+            const vectorField& masterDUInterpToSlave
         ) = 0;
 
         //- It is the start of a new time step
@@ -225,18 +205,6 @@ public:
             return slavePatchID_;
         }
 
-        //- Return master face zone ID
-        virtual label masterFaceZoneID() const
-        {
-            return masterFaceZoneID_;
-        }
-
-        //- Return master face zone ID
-        virtual label slaveFaceZoneID() const
-        {
-            return slaveFaceZoneID_;
-        }
-
         //- Return point gap field
         virtual scalarField& slaveContactPointGap()
         {
@@ -245,6 +213,16 @@ public:
 
         //- Return area in contact of slave patch
         virtual const scalarField& areaInContact() const = 0;
+
+        //- Update penalty scale factors (for penalty laws)
+        virtual scalar updatePenaltyScale(const scalar previousPenaltyScale)
+        {
+            return previousPenaltyScale;
+        }
+
+        //- Perform any reauired field mapping e.g. after a topo change
+        virtual void autoMap(const fvPatchFieldMapper& m)
+        {}
 
         //- Write model dictionary
         virtual void writeDict(Ostream& os) const {};

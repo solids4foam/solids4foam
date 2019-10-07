@@ -6,12 +6,5 @@
 # Create the mesh
 runApplication blockMesh
 
-# Create the material cell zones
-runApplication setSet -batch batch.setSet
-runApplication setsToZones -noFlipMap
-
 # Run the solver
 runApplication solids4Foam
-
-# Write contact fields for visualisation
-runApplication contactFields

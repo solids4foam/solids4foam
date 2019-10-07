@@ -66,46 +66,39 @@ class standardPenalty
     // Private data
 
         //- Contact law dictionary
-        dictionary normalContactModelDict_;
+        mutable dictionary normalContactModelDict_;
 
         //- Const reference to mesh
         const fvMesh& mesh_;
 
-        //- Write debug file switch
-        const Switch writeDebugFile_;
-
         //- Slave pressure
-        vectorField slavePressure_;
-
-        //- Global and local slave point penetrations
-        scalarField globalSlavePointPenetration_;
-
-        //- Local slave point penetrations
-        scalarField slavePointPenetration_;
+        volVectorField slavePressureVolField_;
 
         //- Area in contact
-        scalarField areaInContact_;
+        volScalarField areaInContactVolField_;
 
         //- Penalty factor
-        mutable autoPtr<scalar> penaltyFactorPtr_;
+        mutable scalar penaltyFactor_;
 
         //- Penalty scale factor
-        const scalar penaltyScale_;
+        mutable scalar penaltyScale_;
 
         //- Under-relaxation factor
         const scalar relaxFac_;
 
-        //- Current slave point contact pressure
-        scalarField totalSlavePointPressure_;
+        //- Current average penetration in the contact region
+        //  This is zero if there is no contact
+        scalar averagePenetration_;
+
+        //- Current minimum (greatest) penetration in the contact region
+        //  Remember that penetration is negative for points in contact
+        scalar minPenetration_;
+
+        //- Reference distance spring force calculation
+        const scalar epsilon0_;
 
         //- Contact iteration number
         label contactIterNum_;
-
-        //- Frequency for printing info to the contact debug file
-        const int infoFreq_;
-
-        //- Contact info file
-        autoPtr<OFstream> contactFilePtr_;
 
 
     // Private Member Functions
@@ -113,12 +106,8 @@ class standardPenalty
         //- Calculate penalty factor
         void calcPenaltyFactor() const;
 
-        //- Disallow copy construct
-        //standardPenalty(const standardPenalty&);
-
         //- Disallow default bitwise assignment
         void operator=(const standardPenalty&);
-
 
 
 public:
@@ -137,8 +126,6 @@ public:
             const dictionary& dict,
             const label masterPatchID,
             const label slavePatchID,
-            const label masterFaceZoneID,
-            const label slaveFaceZoneID,
             const standAlonePatch& masterFaceZonePatch,
             const standAlonePatch& slaveFaceZonePatch
         );
@@ -166,19 +153,25 @@ public:
         virtual void correct
         (
             const vectorField& slavePatchFaceNormals,
-            const extendedGgiStandAlonePatchInterpolation& zoneToZone
+            const scalarField& slavePointPenetration,
+            const vectorField& slaveDU,
+            const vectorField& masterDUInterpToSlave
         );
+
+        //- It is the start of a new time step e.g. update penalty factor
+        virtual void newTimeStep() const
+        {}
 
         //- Return slave pressure
         virtual const vectorField& slavePressure() const
         {
-            return slavePressure_;
+            return slavePressureVolField_.boundaryField()[slavePatchID()];
         }
 
         //- Return slave pressure
         virtual vectorField& slavePressure()
         {
-            return slavePressure_;
+            return slavePressureVolField_.boundaryField()[slavePatchID()];
         }
 
         //- Penalty factor
@@ -187,8 +180,20 @@ public:
         //- Return area in contact of slave patch
         virtual const scalarField& areaInContact() const
         {
-            return areaInContact_;
+            return areaInContactVolField_.boundaryField()[slavePatchID()];
         };
+
+        //- Return area in contact of slave patch
+        virtual scalarField& areaInContact()
+        {
+            return areaInContactVolField_.boundaryField()[slavePatchID()];
+        };
+
+        //- Update penalty scale factors (for penalty laws)
+        virtual scalar updatePenaltyScale(const scalar previousPenaltyScale);
+
+        //- Perform any reauired field mapping e.g. after a topo change
+        virtual void autoMap(const fvPatchFieldMapper& m);
 
         //- Write model dictionary
         virtual void writeDict(Ostream& os) const;

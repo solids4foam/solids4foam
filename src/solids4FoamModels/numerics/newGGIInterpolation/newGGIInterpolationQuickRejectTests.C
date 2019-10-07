@@ -27,6 +27,10 @@ Description
 
 Author
     Martin Beaudoin, Hydro-Quebec, (2008)
+    updateNeighboursAABB added by
+    Philip Cardiff, UCD
+    Tian Tang, Bekaert
+    Peter De Jaeger, Bekaert
 
 \*---------------------------------------------------------------------------*/
 
@@ -130,7 +134,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighbours3D
 ) const
 {
     // Allocation to local size.  HJ, 27/Apr/2016
-    List<DynamicList<label, 8> > candidateMasterNeighbors(masterPatch_.size());
+    List<DynamicList<label, 8> > candidateMasterNeighbors(parMasterSize());
 
     // First, compute the face center and the sphere radius (squared)
     // of the slave patch faces so we will not have to recompute this
@@ -205,15 +209,15 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighbours3D
     // Next, we search for each master face a list of potential neighbors
 
     // Parallel search split.  HJ, 27/Apr/2016
-    //const label pmStart = this->parMasterStart();
+    const label pmStart = this->parMasterStart();
 
-    // for
-    // (
-    //     label faceMi = pmStart;
-    //     faceMi < this->parMasterEnd();
-    //     faceMi++
-    // )
-    forAll (masterPatch_, faceMi)
+    for
+    (
+        label faceMi = pmStart;
+        faceMi < this->parMasterEnd();
+        faceMi++
+    )
+//     forAll (masterPatch_, faceMi)
     {
         // For each masterPatch faces, compute the bounding box. With
         // this, we compute the radius of the bounding sphere for this
@@ -257,13 +261,13 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighbours3D
 
             if (distFaceCenters < (masterRadius2 + slaveRadius2[faceSi]))
             {
-                candidateMasterNeighbors[faceMi].append(faceSi);
+                candidateMasterNeighbors[faceMi - pmStart].append(faceSi);
             }
         }
     }
 
     // Repack the list.  Local size
-    result.setSize(masterPatch_.size());
+    result.setSize(parMasterSize());
 
     // Parallel search split: local size.  HJ, 27/Apr/2016
     forAll (result, i)
@@ -301,26 +305,24 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
     labelListList& result
 ) const
 {
-
-//    Info<<"Coming to the AABB neighbor searching!!!"<<endl;
     // Allocation to local size.  HJ, 27/Apr/2016
-    List<DynamicList<label, 8> > candidateMasterNeighbors(masterPatch_.size());
+    List<DynamicList<label, 8> > candidateMasterNeighbors(parMasterSize());
 
     // Allocation to local size.  HJ, 27/Apr/2016
-    List<boundBox> masterPatchBB(masterPatch_.size());
+    List<boundBox> masterPatchBB(parMasterSize());
 
     // Parallel search split.  HJ, 27/Apr/2016
-    //const label pmStart = this->parMasterStart();
+    const label pmStart = this->parMasterStart();
 
-    // for
-    // (
-    //     label faceMi = this->parMasterStart();
-    //     faceMi < this->parMasterEnd();
-    //     faceMi++
-    // )
-    forAll (masterPatch_, faceMi)
+    for
+    (
+        label faceMi = this->parMasterStart();
+        faceMi < this->parMasterEnd();
+        faceMi++
+    )
+//     forAll (masterPatch_, faceMi)
     {
-        masterPatchBB[faceMi] = boundBox
+        masterPatchBB[faceMi - pmStart] = boundBox
         (
             masterPatch_[faceMi].points(masterPatch_.points()),
             false
@@ -423,41 +425,79 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
     // then, compute the intersection
     const vectorField& masterFaceNormals = masterPatch_.faceNormals();
 
-    // Parallel search split.  HJ, 27/Apr/2016
-    // for
-    // (
-    //     label faceMi = this->parMasterStart();
-    //     faceMi < this->parMasterEnd();
-    //     faceMi++
-    // )
-    forAll (masterPatch_, faceMi)
+    // Check which faces are in the region of interest
+    boolList checkMasterFace(masterPatchBB.size(), false);
+    forAll (masterPatchBB, faceMi)
     {
-        forAll (slavePatchBB, faceSi)
+        if (regionOfInterest_.contains(masterPatchBB[faceMi].midpoint()))
         {
-            // Compute the augmented AABB
-            boundBox augmentedBBMaster
-            (
-                masterPatchBB[faceMi].min() - deltaBBSlave[faceSi],
-                masterPatchBB[faceMi].max() + deltaBBSlave[faceSi]
-            );
+            checkMasterFace[faceMi] = true;
+        }
+    }
 
-            if (augmentedBBMaster.overlaps(slavePatchBB[faceSi]))
+    boolList checkSlaveFace(slavePatchBB.size(), false);
+    forAll (slavePatchBB, faceSi)
+    {
+        if (regionOfInterest_.contains(slavePatchBB[faceSi].midpoint()))
+        {
+            checkSlaveFace[faceSi] = true;
+        }
+    }
+
+    int countMaster(0);
+    int countSlave(0);
+
+    // Parallel search split.  HJ, 27/Apr/2016
+    for
+    (
+        label faceMi = this->parMasterStart();
+        faceMi < this->parMasterEnd();
+        faceMi++
+    )
+    //forAll (masterPatch_, faceMi)
+    {
+        if (checkMasterFace[faceMi - pmStart])
+        {
+            countMaster++;
+            countSlave = 0;
+
+            forAll(slavePatchBB, faceSi)
             {
-                // Compute featureCos between the two face normals
-                // before adding to the list of candidates
-                scalar featureCos =
-                    masterFaceNormals[faceMi] & slaveNormals[faceSi];
-
-                if (mag(featureCos) > featureCosTol_)
+                if (checkSlaveFace[faceSi])
                 {
-                    candidateMasterNeighbors[faceMi].append(faceSi);
+                    countSlave++;
+
+                    // Compute the augmented AABB
+                    boundBox augmentedBBMaster
+                    (
+                        masterPatchBB[faceMi - pmStart].min()
+                      - deltaBBSlave[faceSi],
+                        masterPatchBB[faceMi - pmStart].max()
+                      + deltaBBSlave[faceSi]
+                    );
+
+                    if (augmentedBBMaster.overlaps(slavePatchBB[faceSi]))
+                    {
+                        // Compute featureCos between the two face normals
+                        // before adding to the list of candidates
+                        scalar featureCos =
+                            masterFaceNormals[faceMi] & slaveNormals[faceSi];
+
+                        if (mag(featureCos) > featureCosTol_)
+                        {
+                            candidateMasterNeighbors[faceMi - pmStart].append
+                            (
+                                faceSi
+                            );
+                        }
+                    }
                 }
             }
         }
     }
 
     // Repack the list.  Local size
-    result.setSize(masterPatch_.size());
+    result.setSize(parMasterSize());
 
     // Parallel search split: local size.  HJ, 27/Apr/2016
     forAll (result, i)
@@ -476,21 +516,21 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursBBOctree
 ) const
 {
     // Allocation to local size.  HJ, 27/Apr/2016
-    List<DynamicList<label, 8> > candidateMasterNeighbors(masterPatch_.size());
+    List<DynamicList<label, 8> > candidateMasterNeighbors(parMasterSize());
 
     // Allocation to local size.  HJ, 27/Apr/2016
-    treeBoundBoxList lmasterFaceBB(masterPatch_.size());
+    treeBoundBoxList lmasterFaceBB(parMasterSize());
 
     // Parallel search split.  HJ, 27/Apr/2016
-    //const label pmStart = this->parMasterStart();
+    const label pmStart = this->parMasterStart();
 
-    // for
-    // (
-    //     label faceMi = this->parMasterStart();
-    //     faceMi < this->parMasterEnd();
-    //     faceMi++
-    // )
-    forAll (masterPatch_, faceMi)
+    for
+    (
+        label faceMi = this->parMasterStart();
+        faceMi < this->parMasterEnd();
+        faceMi++
+    )
+//     forAll (masterPatch_, faceMi)
     {
         pointField facePoints
         (
@@ -502,7 +542,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursBBOctree
         // (1% by default)
         treeBoundBox bbFaceMaster(facePoints);
 
-        lmasterFaceBB[faceMi] =
+        lmasterFaceBB[faceMi - pmStart] =
             bbFaceMaster.extend(faceBoundBoxExtendSpanFraction_());
     }
 
@@ -587,17 +627,17 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursBBOctree
     // using the slave patch octree
 
     // Parallel search split.  HJ, 27/Apr/2016
-    // for
-    // (
-    //     label faceMi = this->parMasterStart();
-    //     faceMi < this->parMasterEnd();
-    //     faceMi++
-    // )
-    forAll (masterPatch_, faceMi)
+    for
+    (
+        label faceMi = this->parMasterStart();
+        faceMi < this->parMasterEnd();
+        faceMi++
+    )
+//     forAll (masterPatch_, faceMi)
     {
         // List of candidate neighbours
         labelList overlappedFaces  =
-            slavePatchOctree.findBox(lmasterFaceBB[faceMi]);
+            slavePatchOctree.findBox(lmasterFaceBB[faceMi - pmStart]);
 
         forAll (overlappedFaces, ovFi)
         {
@@ -610,13 +650,13 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursBBOctree
 
             if (mag(featureCos) > featureCosTol_)
             {
-                candidateMasterNeighbors[faceMi].append(faceSi);
+                candidateMasterNeighbors[faceMi - pmStart].append(faceSi);
             }
         }
     }
 
     // Repack the list.  Local size
-    result.setSize(masterPatch_.size());
+    result.setSize(parMasterSize());
 
     // Parallel search split: local size.  HJ, 27/Apr/2016
     forAll (result, i)
@@ -631,12 +671,312 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursBBOctree
 }
 
 
+template<class MasterPatch, class SlavePatch>
+void newGGIInterpolation<MasterPatch, SlavePatch>::updateNeighboursAABB
+(
+    labelListList& result
+) const
+{
+    // Allocation to local size.  HJ, 27/Apr/2016
+    List<DynamicList<label, 8> > candidateMasterNeighbors(parMasterSize());
+
+
+    // Create master face bounding boxes
+
+
+    // Allocation to local size.  HJ, 27/Apr/2016
+    List<boundBox> masterPatchBB(parMasterSize());
+
+    // Parallel search split.  HJ, 27/Apr/2016
+    const label pmStart = parMasterStart();
+    const label pmEnd = parMasterEnd();
+
+    for (label faceMi = pmStart; faceMi < pmEnd; faceMi++)
+    {
+        masterPatchBB[faceMi - pmStart] = boundBox
+        (
+            masterPatch_[faceMi].points(masterPatch_.points()),
+            false
+        );
+    }
+
+
+    // Create augmented slave face bounding boxes
+
+
+    // Grab the slave patch faces bounding boxes, plus compute its
+    // extend or delta
+    List<boundBox> slavePatchBB(slavePatch_.size());
+    pointField deltaBBSlave(slavePatch_.size());
+
+    // We expect that any neighbour face to face intersection will fall
+    // within augmented BB.
+    vectorField slaveFaceBBminThickness(slavePatch_.size(), vector::zero);
+
+    const faceList& slaveLocalFaces = slavePatch_.localFaces();
+    vectorField slaveNormals = slavePatch_.faceNormals();
+    const pointField& slaveLocalPoints = slavePatch_.localPoints();
+
+    // Transform slave normals to master plane if needed
+    if (doTransform())
+    {
+        if (forwardT_.size() == 1)
+        {
+            transform(slaveNormals, forwardT_[0], slaveNormals);
+        }
+        else
+        {
+            transform(slaveNormals, forwardT_, slaveNormals);
+        }
+    }
+
+    forAll(slaveFaceBBminThickness, sI)
+    {
+        scalar maxEdgeLength = 0.0;
+
+        // Let's use the length of the longest edge from each faces
+        const edgeList el = slaveLocalFaces[sI].edges();
+
+        forAll(el, elI)
+        {
+            const scalar edgeLength = el[elI].mag(slaveLocalPoints);
+            maxEdgeLength = Foam::max(edgeLength, maxEdgeLength);
+        }
+
+        // Make sure our offset is positive. Ugly, but cheap
+        const vector posNormal = cmptMag(slaveNormals[sI]);
+
+        slaveFaceBBminThickness[sI] = posNormal*maxEdgeLength;
+    }
+
+    // Iterate over slave patch faces, compute its bounding box,
+    // using a possible transformation and separation for cyclic patches
+    forAll(slavePatch_, faceSi)
+    {
+        pointField curFacePoints =
+            slavePatch_[faceSi].points(slavePatch_.points());
+
+        if (doTransform())
+        {
+            if (forwardT_.size() == 1)
+            {
+                transform(curFacePoints, forwardT_[0], curFacePoints);
+            }
+            else
+            {
+                transform(curFacePoints, forwardT_[faceSi], curFacePoints);
+            }
+        }
+
+        if (doSeparation())
+        {
+            if (forwardSep_.size() == 1)
+            {
+                curFacePoints += forwardSep_[0];
+            }
+            else
+            {
+                curFacePoints += forwardSep_[faceSi];
+            }
+        }
+
+        slavePatchBB[faceSi] = boundBox(curFacePoints, false);
+
+        // We compute the extent of the slave face BB.
+        // Plus, we boost it a little bit, just to stay clear
+        // of floating point numerical issues when doing intersections
+        // Let's boost by 10%.
+        // PC: we'll boost by a larger factor as faces could be in contact by a
+        // large ammount
+        deltaBBSlave[faceSi] =
+            1.1*
+            //2.0*
+            (
+                slavePatchBB[faceSi].max()
+              - slavePatchBB[faceSi].min()
+              + slaveFaceBBminThickness[faceSi]
+            );
+    }
+
+
+    // Method: Philip Cardiff and Tian Tang
+    // Starting from the previous neighbours, we will perform a walk from
+    // face-to-face to find new potential neighbours: this method takes N time.
+
+
+    const vectorField& masterFaceNormals = masterPatch_.faceNormals();
+    const labelListList& masterFaceFaces = masterPatch_.faceFaces();
+    const labelListList& slaveFaceFaces = slavePatch_.faceFaces();
+
+    // Check if there are any neighbours stored from the previous iteration
+    if (prevCandidateMasterNeighbors_.size() == 0)
+    {
+        Info<< "    " << typeName << " : n2 search" << endl;
+
+        // Set the size of the stored neighbours list
+        prevCandidateMasterNeighbors_.setSize(parMasterSize());
+
+        for (label faceMi = pmStart; faceMi < pmEnd; faceMi++)
+        {
+            forAll(slavePatchBB, faceSi)
+            {
+                // Compute the augmented AABB
+                boundBox augmentedBBMaster
+                (
+                    masterPatchBB[faceMi - pmStart].min()
+                  - deltaBBSlave[faceSi],
+                    masterPatchBB[faceMi - pmStart].max()
+                  + deltaBBSlave[faceSi]
+                );
+
+                if (augmentedBBMaster.overlaps(slavePatchBB[faceSi]))
+                {
+                    // Compute featureCos between the two face normals
+                    // before adding to the list of candidates
+                    const scalar featureCos =
+                        masterFaceNormals[faceMi] & slaveNormals[faceSi];
+
+                    if (mag(featureCos) > featureCosTol_)
+                    {
+                        candidateMasterNeighbors[faceMi - pmStart].append
+                        (
+                            faceSi
+                        );
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        // We will use the previous neighbours as a starting guess to find the
+        // new candidate neighbours
+        for (label faceMi = pmStart; faceMi < pmEnd; faceMi++)
+        {
+            // Neighbour for this master face from the last iteration
+            // Note: this array becomes invalid below
+            labelList& curPrevResult =
+                prevCandidateMasterNeighbors_[faceMi - pmStart];
+
+            // If this master face has no previous neighbours then we
+            // will use the previous neighbours of the face-faces as a guess
+            if (curPrevResult.size() == 0)
+            {
+                labelHashSet prevNeiSet;
+                const labelList& curFaceFaces = masterFaceFaces[faceMi];
+                forAll(curFaceFaces, ffI)
+                {
+                    const label curFaceID = curFaceFaces[ffI];
+
+                    if (curFaceID >= pmStart && curFaceID < pmEnd)
+                    {
+                        if
+                        (
+                            prevCandidateMasterNeighbors_
+                            [
+                                curFaceID - pmStart
+                            ].size() > 0
+                        )
+                        {
+                            if (!prevNeiSet.found(curFaceID))
+                            {
+                                prevNeiSet.insert(curFaceID);
+                            }
+                        }
+                    }
+                }
+
+                // Update the previous neighbours for this face
+                curPrevResult = prevNeiSet.toc();
+            }
+
+            if (curPrevResult.size() > 0)
+            {
+                // Keep track of the slave faces that have been checked
+                labelHashSet slaveFacesChecked;
+                forAll(curPrevResult, fI)
+                {
+                    slaveFacesChecked.insert(curPrevResult[fI]);
+                }
+
+                // Transfer curPrevResult to a dynamic list
+                DynamicList<label> facesToCheck(10*curPrevResult.size());
+                facesToCheck.transfer(curPrevResult);
+
+                do
+                {
+                    // Get the next face to check and remove it from the list
+                    const label faceSi = facesToCheck.remove();
+
+                    // Mark this face as having been checked
+                    slaveFacesChecked.insert(faceSi);
+
+                    // Compute the augmented AABB for the master face
+                    boundBox augmentedBBMaster
+                    (
+                        masterPatchBB[faceMi - pmStart].min()
+                      - deltaBBSlave[faceSi],
+                        masterPatchBB[faceMi - pmStart].max()
+                      + deltaBBSlave[faceSi]
+                    );
+
+                    // Check if the master and slave BB overlap
+                    if (augmentedBBMaster.overlaps(slavePatchBB[faceSi]))
+                    {
+                        // Compute featureCos between the two face normals
+                        // before adding to the list of candidates
+                        const scalar featureCos =
+                            masterFaceNormals[faceMi] & slaveNormals[faceSi];
+
+                        if (mag(featureCos) > featureCosTol_)
+                        {
+                            // Add the face to the list of candidate neighbours
+                            candidateMasterNeighbors[faceMi - pmStart].append
+                            (
+                                faceSi
+                            );
+
+                            // Add face-face neighbours to be checked
+                            const labelList& curSlaveFaceFaces =
+                                slaveFaceFaces[faceSi];
+
+                            forAll(curSlaveFaceFaces, ffI)
+                            {
+                                const label faceID = curSlaveFaceFaces[ffI];
+
+                                if (!slaveFacesChecked.found(faceID))
+                                {
+                                    facesToCheck.append(faceID);
+                                }
+                            }
+                        }
+                    }
+                } while (facesToCheck.size());
+            }
+        }
+    }
+
+    // Repack the list.  Local size
+    result.setSize(parMasterSize());
+
+    // Parallel search split: local size.  HJ, 27/Apr/2016
+    forAll(result, i)
+    {
+        result[i].transfer(candidateMasterNeighbors[i].shrink());
+    }
+
+    // Update the previous neighbours to be used for the search next time
+    prevCandidateMasterNeighbors_ = result;
+}
+
+
 // Projects a list of points onto a plane located at planeOrig,
 // oriented along planeNormal.  Return the projected points in a
 // pointField, and the normal distance of each points from the
 // projection plane
 template<class MasterPatch, class SlavePatch>
-tmp<pointField> newGGIInterpolation<MasterPatch, SlavePatch>::projectPointsOnPlane
+tmp<pointField>
+newGGIInterpolation<MasterPatch, SlavePatch>::projectPointsOnPlane
 (
     const pointField& lpoints,
     const vector& planeOrig,

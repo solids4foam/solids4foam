@@ -1,0 +1,88 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    cylinderContact
+    {
+        type            solidRigidContact;
+        triSurfaces
+        {
+            punch_top_scaled
+            {
+                displacement (0 0 -1e-2);
+                dispRampTime 1;
+
+                // Rotation can also be set, but we do not use it here
+                rpm 0;
+                rotationRampTime 0;
+                rotationAxis (0 0 1);
+            }
+        }
+        
+        cylinderContact_to_punch_top_scaled_dict
+        {
+            normalContactModel standardPenalty;
+            standardPenaltyNormalModelDict
+            {
+                relaxationFactor 0.01;
+                penaltyScale     1;
+            }
+            frictionContactModel standardPenalty;
+            standardPenaltyFrictionModelDict
+            {
+                relaxationFactor  0.01;
+                penaltyScale      1;
+                frictionLaw       coulomb;
+                frictionLawDict
+                {
+                    frictionCoeff 0.1;
+                }
+            }
+        }
+        value           uniform (0 0 0);
+    }
+    cylinderFixed
+    {
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
+    }
+    cylinderTractionFree
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    symmx
+    {
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
+    }
+    symmy
+    {
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
+    }
+}
+
+// ************************************************************************* //

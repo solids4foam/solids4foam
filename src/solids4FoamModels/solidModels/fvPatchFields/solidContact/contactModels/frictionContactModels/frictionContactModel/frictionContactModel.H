@@ -75,12 +75,6 @@ class frictionContactModel
         //- Slave patch index
         const label slavePatchID_;
 
-        //- Master face zone index
-        const label masterFaceZoneID_;
-
-        //- Slave face zone index
-        const label slaveFaceZoneID_;
-
         // For visualistion of sticking and slipping faces
         // face not in contact is set to 0.0
         //     slipping face is set to 1.0
@@ -112,21 +106,19 @@ public:
             dictionary,
             (
                 const word name,
+                // THIS IS ONLY USED TO ACCESS THE MESH
+                // We should instead pass the mesh
                 const fvPatch& patch,
                 const dictionary& dict,
                 const label masterPatchID,
-                const label slavePatchID,
-                const label masterFaceZoneID,
-                const label slaveFaceZoneID
+                const label slavePatchID
             ),
             (
                 name,
                 patch,
                 dict,
                 masterPatchID,
-                slavePatchID,
-                masterFaceZoneID,
-                slaveFaceZoneID
+                slavePatchID
             )
         );
 
@@ -140,9 +132,7 @@ public:
             const fvPatch& patch,
             const dictionary& dict,
             const label masterPatchID,
-            const label slavePatchID,
-            const label masterFaceZoneID,
-            const label slaveFaceZoneID
+            const label slavePatchID
         );
 
 
@@ -155,9 +145,7 @@ public:
             const fvPatch& patch,
             const dictionary& dict,
             const label masterPatchID,
-            const label slavePatchID,
-            const label masterFaceZoneID,
-            const label slaveFaceZoneID
+            const label slavePatchID
         );
 
         //- Construct as copy
@@ -179,12 +167,6 @@ public:
         const word& name() const
         {
             return name_;
-        }
-
-        //- Return reference to fvPatch
-        const fvPatch& patch() const
-        {
-            return patch_;
         }
 
         //- Return reference to mesh
@@ -229,18 +211,6 @@ public:
             return slavePatchID_;
         }
 
-        //- Return master face zone ID
-        virtual label masterFaceZoneID() const
-        {
-            return masterFaceZoneID_;
-        }
-
-        //- Return master face zone ID
-        virtual label slaveFaceZoneID() const
-        {
-            return slaveFaceZoneID_;
-        }
-
         //- Return stick slip faces field
         // virtual volScalarField& stickSlipFaces()
         virtual scalarField& stickSlipFaces()
@@ -250,6 +220,9 @@ public:
 
         //- Return slip field
         virtual const vectorField& slip() const = 0;
+
+        //- Perform any reauired field mapping e.g. after a topo change
+        virtual void autoMap(const fvPatchFieldMapper& m);
 
         //- Write model dictionary
         virtual void writeDict(Ostream& os) const

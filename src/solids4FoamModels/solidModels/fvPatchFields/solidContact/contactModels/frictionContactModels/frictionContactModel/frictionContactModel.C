@@ -49,17 +49,13 @@ frictionContactModel::frictionContactModel
     const fvPatch& patch,
     const dictionary& dict,
     const label masterPatchID,
-    const label slavePatchID,
-    const label masterFaceZoneID,
-    const label slaveFaceZoneID
+    const label slavePatchID
 )
 :
     name_(name),
     patch_(patch),
     masterPatchID_(masterPatchID),
     slavePatchID_(slavePatchID),
-    masterFaceZoneID_(masterFaceZoneID),
-    slaveFaceZoneID_(slaveFaceZoneID),
     stickSlipFaces_(patch.boundaryMesh()[slavePatchID].size(), 0.0)
 {}
 
@@ -70,11 +66,17 @@ frictionContactModel::frictionContactModel(const frictionContactModel& fm)
     patch_(fm.patch_),
     masterPatchID_(fm.masterPatchID_),
     slavePatchID_(fm.slavePatchID_),
-    masterFaceZoneID_(fm.masterFaceZoneID_),
-    slaveFaceZoneID_(fm.slaveFaceZoneID_),
     stickSlipFaces_(fm.stickSlipFaces_)
 {}
 
+
+// * * * * * * * * * * * * Public Member Functions * * * * * * * * * * * * * //
+
+
+void frictionContactModel::autoMap(const fvPatchFieldMapper& m)
+{
+    stickSlipFaces_.autoMap(m);
+}
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

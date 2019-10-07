@@ -72,6 +72,9 @@ SourceFiles
 #include "optimisationSwitch.H"
 #include "labelPair.H"
 #include "boundBox.H"
+#include "triPointRef.H"
+#include "Map.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -166,7 +169,7 @@ class newGGIInterpolation
 
         //- Global data: are master and slave present on all processors?
         //  If true, cutting will be performed in parallel
-        // bool globalData_;
+        bool globalData_;
 
         //- Master non-overlap face tolerance factor
         const scalar masterNonOverlapFaceTol_;
@@ -180,12 +183,19 @@ class newGGIInterpolation
         //- Quick reject search algorithm
         quickReject reject_;
 
+        //- Use the previous candidate master neighbors in the quick reject
+        //  search
+        Switch usePrevCandidateMasterNeighbors_;
+
+        //- Previous candidate master neighbors
+        mutable labelListList prevCandidateMasterNeighbors_;
+
         //- Optional: region of interest where weights and intersections are
         //  calculated; outside this box, the intersections are not caculated.
         //  This is motivated by contact simulations where in general we might
         //  know the approximate contacting region, so there is no need to
         //  spend time checking faces outside of this
-        // const boundBox regionOfInterest_;
+        const boundBox regionOfInterest_;
 
 
     // Demand-driven data
@@ -207,12 +217,18 @@ class newGGIInterpolation
             //- Distance to intersection for master patch points
             mutable scalarField* masterPointDistancePtr_;
 
+            //- Distance to intersection vectors for master patch points
+            mutable vectorField* masterPointDistanceVectorsPtr_;
+
+            //- Master edge loops map
+            mutable List< Map<label> > masterEdgeLoopsMap_;
+
         // Slave-to-master interpolation
 
-            //- Slave to master addressing
+            //- Slave to master face addressing
             mutable labelListList* slaveAddrPtr_;
 
-            //- Slave to master weights
+            //- Slave to master face weights
             mutable scalarListList* slaveWeightsPtr_;
 
             //- Master face into which each point of slave patch is projected
@@ -221,8 +237,24 @@ class newGGIInterpolation
             //- Weighting factors
             mutable FieldField<Field, scalar>* slavePointWeightsPtr_;
 
-            //- Distance to intersection for master patch points
+            //- Distance to intersection for slave patch points
             mutable scalarField* slavePointDistancePtr_;
+
+            //- Distance to intersection vector for slave patch points
+            mutable vectorField* slavePointDistanceVectorsPtr_;
+
+            //- Slave edge loops map
+            mutable List< Map<label> > slaveEdgeLoopsMap_;
+
+            //- Use the new method for calculating the point distances
+            Switch useNewPointDistanceMethod_;
+
+            //- Project points outside of contact back to the edge of the target
+            //  patch
+            Switch projectPointsToPatchBoundary_;
+
+            //- Check and fix point distance orientations
+            Switch checkPointDistanceOrientations_;
 
             //- List of uncovered master faces
             mutable labelList* uncoveredMasterAddrPtr_;
@@ -292,25 +324,37 @@ class newGGIInterpolation
         //- Calculate point weights
         void calcSlavePointWeights() const;
 
+        //- Calculate edge loops map
+        void calcMasterEdgeLoopsMap() const;
+
+        //- Calculate edge loops map
+        void calcSlaveEdgeLoopsMap() const;
+
+        //- Return edge loops map
+        const List< Map<label> >& masterEdgeLoopsMap() const;
+
+        //- Return edge loops map
+        const List< Map<label> >& slaveEdgeLoopsMap() const;
+
     // Helper functions for parallel search
 
         //- Is parallel cutting active?
-        // bool globalData() const
-        // {
-        //     return
-        //         Pstream::parRun()
-        //      && globalData_
-        //      && masterPatch_.size() > 10*Pstream::nProcs();
-        // }
+        bool globalData() const
+        {
+            return
+                Pstream::parRun()
+             && globalData_
+             && masterPatch_.size() > 10*Pstream::nProcs();
+        }
 
         //- Parallel master slice start
-        // label parMasterStart() const;
+        label parMasterStart() const;
 
         //- Parallel master slice end
-        // label parMasterEnd() const;
+        label parMasterEnd() const;
 
         //- Parallel master slice size
-        // label parMasterSize() const;
+        label parMasterSize() const;
 
 
     // Helper functions for demand-driven data
@@ -324,6 +368,10 @@ class newGGIInterpolation
         //- Evaluate faces neighborhood based of faces BB and an octree
         //  search engine
         void findNeighboursBBOctree(labelListList& result) const;
+
+        //- Update the neighbour faces using the previous neighbours and the
+        //  Axis Aligned BB method
+        void updateNeighboursAABB(labelListList& result) const;
 
         //- Projects a list of points onto a plane located at
         //  planeOrig, oriented along planeNormal
@@ -425,6 +473,93 @@ class newGGIInterpolation
             const scalar& nonOverlapFaceTol
         ) const;
 
+        //- Set the source point distance, vcetor distance and addressing
+        void setSourceToTargetPointAddressing
+        (
+            List<labelPair>& sourcePointAddr, // source point addressing
+            scalarField& sourcePointDist,     // source point distances
+            vectorField& sourcePointDistVecs, // source point distance vectors
+            const MasterPatch& sourcePatch,   // source patch
+            const SlavePatch& targetPatch,    // target patch
+            const labelListList& sourceAddr,   // source patch face addressing
+            const List< Map<label> >& targetEdgeLoopsMap // target edge loop map
+        ) const;
+
+        //- Set the source point distance and addressing using the previous
+        //  method
+        void setSourceToTargetPointAddressingPrev
+        (
+            List<labelPair>& sourcePointAddr, // source point addressing
+            scalarField& sourcePointDist,     // source point distances
+            const MasterPatch& sourcePatch,   // source patch
+            const SlavePatch& targetPatch,    // target patch
+            const labelListList& sourceAddr   // source patch face addressing
+        ) const;
+
+        //- Return list of possibly in contact shadow faces for the given faces
+        tmp<labelField> possibleTargetFaces
+        (
+            const labelList& sourceFaces,
+            const labelListList& sourceFaceAddr
+        ) const;
+
+        //- Calculates the list of triangular sub-faces to which the current
+        //  point can be projected.
+        //  Each labelPair entry returns the master face index (first) and the
+        //  face local point index indicating the sub-triangle
+        //  The projection directions are the non-unit vectors from P to the
+        //  triangular sub face
+        void projectPointToTriangularSubFaces
+        (
+            List<labelPair>& triSubFacesIndex,
+            List<vector>& triSubFacesProjDirections,
+            PtrList< triangle<point, point> >& triSubFaces,
+            const point& P,
+            const labelList& possibleTargetFaces,
+            const faceList& targetFaces,
+            const pointField& taretPoints
+        ) const;
+
+        //- Find the closest vertex to P in the given set of faces
+        label findClosestVertex
+        (
+            const point& P,
+            const labelList& possibleTargetFaces,
+            const faceList& targetFaces,
+            const pointField& targetPoints
+        ) const;
+
+        //- Do the triangles share an edge
+        void triangleSharedPoints
+        (
+            List<point>& sharedPoints,
+            const triangle<point, point>& triA,
+            const triangle<point, point>& triB
+        ) const;
+
+        //- Correct point projections on the boundary of the patch
+        void correctBoundaryPointProjection
+        (
+            const MasterPatch& targetPatch,
+            const label closestTargetPointID,
+            const labelListList& targetEdgeLoops,
+            const List< Map<label> >& targetEdgeLoopsMap,
+            const vector& MP,
+            scalar& sourcePointDist,
+            vector& sourcePointDistVecs
+        ) const;
+
+        //- Find the boundary point bi-normal
+        //  This is the vector pointing away from the patch internal field
+        void boundaryPointBiNormal
+        (
+            vector& boundaryPointBiNormal,
+            const MasterPatch& targetPatch,
+            const label closestTargetPointID,
+            const labelList& targetBoundaryPoints,
+            const Map<label>& targetBoundaryPointsMap
+        ) const;
+
         //- Clear all geometry and addressing
         void clearOut();
 
@@ -498,13 +633,13 @@ public:
             const tensorField& forwardT,
             const tensorField& reverseT,
             const vectorField& forwardSep,
-            //const bool globalData,
+            const bool globalData,
             const scalar masterFaceNonOverlapFaceTol = 0,
             const scalar slaveFaceNonOverlapFaceTol = 0,
             const bool rescaleGGIWeightingFactors = true,
-            const quickReject reject = AABB //,
-            // const boundBox regionOfInterest =
-            //     boundBox(vector::min, vector::max)
+            const quickReject reject = BB_OCTREE,
+            const boundBox regionOfInterest =
+                boundBox(vector::min, vector::max)
         );
 
 
@@ -555,6 +690,9 @@ public:
             //- Return distance to intersection for patch points
             const scalarField& masterPointDistanceToIntersection() const;
 
+            //- Return distance to intersection vectors for patch points
+            const vectorField& masterPointDistanceVectorsToIntersection() const;
+
             //- Return reference to point addressing
             const List<labelPair>& slavePointAddr() const;
 
@@ -563,6 +701,40 @@ public:
 
             //- Return distance to intersection for patch points
             const scalarField& slavePointDistanceToIntersection() const;
+
+            //- Return distance to intersection vectors for patch points
+            const vectorField& slavePointDistanceVectorsToIntersection() const;
+
+            //- Non-const reference to the usePrevCandidateMasterNeighbours
+            //  switch
+            Switch& usePrevCandidateMasterNeighbors()
+            {
+                return usePrevCandidateMasterNeighbors_;
+            }
+
+            //- Clear the prevCandidateMasterNeighbours list
+            void clearPrevCandidateMasterNeighbors()
+            {
+                prevCandidateMasterNeighbors_.clear();
+            }
+
+            //- Non-const reference to the point distance calculation switch
+            Switch& useNewPointDistanceMethod()
+            {
+                return useNewPointDistanceMethod_;
+            }
+
+            //- Non-const reference to the projectPointsToPatchBoundary switch
+            Switch& projectPointsToPatchBoundary()
+            {
+                return projectPointsToPatchBoundary_;
+            }
+
+            //- Non-const reference to the checkPointDistanceOrientations switch
+            Switch& checkPointDistanceOrientations()
+            {
+                return checkPointDistanceOrientations_;
+            }
 
     // Interpolation functions
 

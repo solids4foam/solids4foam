@@ -44,9 +44,7 @@ autoPtr<frictionContactModel> frictionContactModel::New
     const fvPatch& patch,
     const dictionary& dict,
     const label masterPatchID,
-    const label slavePatchID,
-    const label masterFaceZoneID,
-    const label slaveFaceZoneID
+    const label slavePatchID
 )
 {
     Info<< "    Friction contact model: " << name << endl;
@@ -63,9 +61,7 @@ autoPtr<frictionContactModel> frictionContactModel::New
             "    const fvPatch& patch,\n"
             "    const dictionary& dict,\n"
             "    const label masterPatchID,\n"
-            "    const label slavePatchID,\n"
-        "    const label masterFaceZoneID,\n"
-        "    const label slaveFaceZoneID\n"
+            "    const label slavePatchID\n"
             ")",
             dict
         )   << "Unknown frictionContactModel type "
@@ -83,9 +79,7 @@ autoPtr<frictionContactModel> frictionContactModel::New
             patch,
             dict,
             masterPatchID,
-            slavePatchID,
-            masterFaceZoneID,
-            slaveFaceZoneID
+            slavePatchID
         )
     );
 }

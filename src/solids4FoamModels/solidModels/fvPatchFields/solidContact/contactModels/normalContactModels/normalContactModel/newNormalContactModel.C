@@ -45,8 +45,6 @@ autoPtr<normalContactModel> normalContactModel::New
     const dictionary& dict,
     const label masterPatchID,
     const label slavePatchID,
-    const label masterFaceZoneID,
-    const label slaveFaceZoneID,
     const standAlonePatch& masterFaceZonePatch,
     const standAlonePatch& slaveFaceZonePatch
 )
@@ -66,8 +64,6 @@ autoPtr<normalContactModel> normalContactModel::New
             "    const dictionary& dict,\n"
             "    const label masterPatchID,\n"
             "    const label slavePatchID,\n"
-            "    const label masterFaceZoneID,\n"
-            "    const label slaveFaceZoneID,\n"
             "    const standAlonePatch& masterFaceZonePatch,\n"
             "    const standAlonePatch& slaveFaceZonePatch\n"
             ")",
@@ -88,8 +84,6 @@ autoPtr<normalContactModel> normalContactModel::New
             dict,
             masterPatchID,
             slavePatchID,
-            masterFaceZoneID,
-            slaveFaceZoneID,
             masterFaceZonePatch,
             slaveFaceZonePatch
         )

@@ -84,6 +84,19 @@ scalar frictionLaw::slipTraction(const scalar pressure, const vector& slipDir)
 
 scalar frictionLaw::slipTraction
 (
+        const scalar contactPressure,
+        const vector& faceSlip,
+        const vector& slaveFaceVelocity,
+        const vector& masterFaceVelocity
+)
+{
+    // If this function is not overwritten, then we default to the
+    // more simple law
+    return slipTraction(contactPressure);
+}
+
+scalar frictionLaw::slipTraction
+(
     const scalar contactPressure,         // Contact pressure
     const vector& faceSlip,               // Slip vector
     const vector& slaveFaceVelocity,      // Velocity of slave face

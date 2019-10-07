@@ -566,6 +566,12 @@ public:
                 return false;
             }
 
+            //- Does this model move the mesh?
+            virtual bool movingMesh() const
+            {
+                return false;
+            }
+
             //- This function will check that the D field was read from disk
             virtual void DisRequired();
 

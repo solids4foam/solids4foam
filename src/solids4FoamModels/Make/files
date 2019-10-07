@@ -98,6 +98,10 @@ $(solidFvPatchFields)/normalDisplacement/normalDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/oscillateDisplacement/oscillateDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/rigidCylinderContact/rigidCylinderContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
+$(solidFvPatchFields)/solidContact/solidContactFvPatchVectorFieldCalcContact.C
+$(solidFvPatchFields)/solidRigidContact/solidRigidContactFvPatchVectorField.C
+$(solidFvPatchFields)/solidRigidContact/solidRigidContactFvPatchVectorFieldCalcContact.C
+$(solidFvPatchFields)/solidRigidContact/triSurfaceMotion/triSurfaceMotion.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
 $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C

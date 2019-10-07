@@ -68,20 +68,17 @@ class standardPenaltyFriction
          //- Const reference to the mesh
         const fvMesh& mesh_;
 
-        //- Write debug file switch
-        const Switch writeDebugFile_;
-
         //- Slave traction
-        vectorField slaveTraction_;
+        volVectorField slaveTractionVolField_;
 
         //- Previous slave traction used for under-relaxation
-        vectorField prevSlaveTraction_;
+        //vectorField prevSlaveTraction_;
 
         //- Slip
         vectorField slip_;
 
         //- Frictional penalty factor and scaling factor
-        autoPtr<scalar> frictionPenaltyFactorPtr_;
+        scalar frictionPenaltyFactor_;
 
         //- Frictional penalty scaling factor
         scalar frictionPenaltyScale_;
@@ -92,25 +89,11 @@ class standardPenaltyFriction
         //- Contact iteration number
         label contactIterNum_;
 
-        //- Info frequency - how often to print to contact file
-        int infoFreq_;
-
-        //- Contact info debug file
-        autoPtr<OFstream> contactFilePtr_;
-
 
     // Private Member Functions
 
         //- Return penalty factor
-        virtual scalar frictionPenaltyFactor()
-        {
-            if (frictionPenaltyFactorPtr_.empty())
-            {
-                calcFrictionPenaltyFactor();
-            }
-
-            return frictionPenaltyFactorPtr_();
-        }
+        virtual scalar frictionPenaltyFactor();
 
         //- Disallow default bitwise copy construct
         //standardPenaltyFriction(const standardPenaltyFriction&);
@@ -133,9 +116,7 @@ public:
             const fvPatch& patch,
             const dictionary& dict,
             const label masterPatchID,
-            const label slavePatchID,
-            const label masterFaceZoneID,
-            const label slaveFaceZoneID
+            const label slavePatchID
         );
 
         //- Construct as copy
@@ -152,10 +133,8 @@ public:
         }
 
 
-    // Destructor
-
-        virtual ~standardPenaltyFriction()
-        {}
+    //- Destructor
+    virtual ~standardPenaltyFriction();
 
 
     // Member Functions
@@ -170,10 +149,16 @@ public:
             const vectorField& masterDUInterpToSlave
         );
 
-        //- Return slave friction traction
+        //- Return const reference to slave friction traction
         virtual const vectorField& slaveTraction() const
         {
-            return slaveTraction_;
+            return slaveTractionVolField_.boundaryField()[slavePatchID()];
+        }
+
+        //- Return non-const reference to slave friction traction
+        virtual vectorField& slaveTraction()
+        {
+            return slaveTractionVolField_.boundaryField()[slavePatchID()];
         }
 
         //- calculate penalty factor
@@ -185,6 +170,9 @@ public:
             // Note: slip is updated inside the correct function
             return slip_;
         }
+
+        //- Perform any reauired field mapping e.g. after a topo change
+        virtual void autoMap(const fvPatchFieldMapper& m);
 
         //- Write law dictionary
         virtual void writeDict(Ostream& os) const;

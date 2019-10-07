@@ -1,3 +1,0 @@
-faceSet pipeContactFaceZone new patchToFace pipeContact
-faceSet anvilContactFaceZone new patchToFace anvilContact
-quit

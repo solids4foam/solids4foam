@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
   =========                 |
-  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
-   \\    /   O peration     |
-    \\  /    A nd           | Copyright (C) 2004-2007 Hrvoje Jasak
-     \\/     M anipulation  |
+  \\      /  F ield         | foam-extend: Open Source CFD
+   \\    /   O peration     | Version:     4.0
+    \\  /    A nd           | Web:         http://www.foam-extend.org
+     \\/     M anipulation  | For copyright notice see file Copyright
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -32,10 +32,9 @@ Description
     individually at run-time using the normalContactModel and
     frictionContactModel.
 
-    The buondary condition makes a copy of the master and slave face zones and
+    The boundary condition keeps a copy of the master and slave patch and
     keeps them in the deformed configuration; this allows the calculation of
-    contact distances and interpolation between the zones.
-    Note: we use const_cast to move the standAlonePatch zone points.
+    contact distances and interpolation between the globalPatchZones.
 
     The distance calculations and interpolations are performed by the GGI class.
 
@@ -55,9 +54,11 @@ Description
 
 SourceFiles
     solidContactFvPatchVectorField.C
+    solidContactFvPatchVectorFieldCalcContact.C
 
 Author
     Philip Cardiff, UCD. All rights reserved.
+    Rewrite by Hrvoje Jasak.
 
 \*---------------------------------------------------------------------------*/
 
@@ -68,7 +69,8 @@ Author
 #include "solidTractionFvPatchVectorField.H"
 #include "normalContactModel.H"
 #include "frictionContactModel.H"
-#include "extendedGgiInterpolation.H"
+#include "globalPolyPatch.H"
+#include "newGgiInterpolation.H"
 #include "Switch.H"
 #include "boundBox.H"
 #include "standAlonePatch.H"
@@ -84,9 +86,14 @@ namespace Foam
 
 class solidContactFvPatchVectorField
 :
-        public solidTractionFvPatchVectorField
+    public solidTractionFvPatchVectorField
 {
     // Private data
+
+        //- Store a copy of the patch dictionary
+        //  This allows us to use lazy evaluation when creating the contact
+        //  models
+        const dictionary dict_;
 
         //- Is this patch the master
         const Switch master_;
@@ -94,45 +101,69 @@ class solidContactFvPatchVectorField
         //- Write the deformed contact zones to VTK surface files
         const Switch writeZoneVTK_;
 
-        //- Shadow patch name
-        word shadowPatchName_;
+        //- Write the contact point distances fields for viewing
+        const Switch writePointDistanceFields_;
 
-        //- Shadow patch index
-        label shadowPatchIndex_;
+        //- Shadow patch names
+        mutable wordList shadowPatchNames_;
 
-        //- Zone index
-        mutable label* zoneIndexPtr_;
+        //- Shadow patch indices
+        mutable labelList* shadowPatchIndicesPtr_;
 
-        //- Shadow zone index
-        mutable label* shadowZoneIndexPtr_;
-
-        // is the contact boundary active
+        //- Is the contact boundary active
         Switch rigidMaster_;
 
-        // Copy of contact dictionary
-        const dictionary dict_;
-
-        //- Normal contact model pointer
-        mutable normalContactModel* normalModelPtr_;
+        //- Normal contact model pointers
+        mutable PtrList<normalContactModel> normalModels_;
 
         //- Friction contact model pointer
-        mutable frictionContactModel* frictionModelPtr_;
+        mutable PtrList<frictionContactModel> frictionModels_;
 
-        // Master face zone kept in deformed configuration
-        mutable standAlonePatch* zonePtr_;
+        //- Store current penalty scale factors (if using penalty contact model)
+        mutable scalarField normalPenaltyFactors_;
 
-        // Slave face zone kept in deformed configuration
-        mutable standAlonePatch* shadowZonePtr_;
+        //- Master face zone kept in deformed configuration
+        mutable globalPolyPatch* zonePtr_;
 
-        //- Zone-to-zone interpolation
-        mutable extendedGgiStandAlonePatchInterpolation* zoneToZonePtr_;
+        //- Shadow face zones kept in deformed configuration
+        //  Stored by the master patch
+        mutable PtrList<globalPolyPatch> shadowZones_;
+
+        //- Zone-to-zone interpolations
+        mutable PtrList<newGgiStandAlonePatchInterpolation> zoneToZones_;
 
         //- GGI quick reject algorithm
-        extendedGgiInterpolation::quickReject quickReject_;
+        newGgiInterpolation::quickReject quickReject_;
 
-        //- Region where the contact is expected to be. This aims to save
-        // time in the GGI distance calculations
-        //const boundBox regionOfInterest_;
+        //- Top corner of the region where te contact is expected to be
+        // This aims to save time in the GGI distance calculation
+        const vector regionOfInterestTopCorner_;
+
+        //- Bottom corner of the region where te contact is expected to be
+        // This aims to save time in the GGI distance calculation
+        const vector regionOfInterestBottomCorner_;
+
+        //- Region where the contact is expected to be
+        //  This aims to save time in the GGI distance calculations
+        const boundBox regionOfInterest_;
+
+        //- Contact field for all the contacts, stored on the current patch
+        //  1 means in contact
+        //  0 means not in contact
+        scalarField contact_;
+
+        //- Contact field corresponding to each shadow patch, stored on the
+        //  current patch
+        //  1 means in contact
+        //  0 means not in contact
+        mutable PtrList<scalarField> contactPerShadow_;
+
+        //- Flag to enable approach for scaling traction near the downstream
+        //  patch to fix an issue with unphysical behaviour
+        Switch scaleFaceTractionsNearDownstreamPatch_;
+
+        //- Field to scale traction of slave patch
+        mutable autoPtr<scalarField> scaleTractionFieldPtr_;
 
         //- Current time index
         label curTimeIndex_;
@@ -140,72 +171,61 @@ class solidContactFvPatchVectorField
 
     // Private Member Functions
 
-        //- Is a moving mesh (e.g. updated Lagrangian) approach being used
+        //- Is a moving mesh (e.g. updated Lagrangian) approach be used
         bool movingMesh() const;
 
-        //- Is a nonlinear geometry (i.e. finite strain) approach being used
-        bool nonLinearGeometry() const;
+        //- Make the shadow patch names
+        void makeShadowPatchNames(const dictionary& dict) const;
 
-        //- Calculate the zone index
-        void calcZoneIndex() const;
+        //- Calculate the shadow patch indices
+        void calcShadowPatchIndices() const;
 
-        //- Calculate the shadow zone index
-        void calcShadowZoneIndex() const;
+        //- Make normal contact models
+        void makeNormalModels(const dictionary& dict) const;
 
-        //- Create the normal contact model
-        void calcNormalModel() const;
+        //- Make friction contact models
+        void makeFrictionModels(const dictionary& dict) const;
 
-        //- Create the friction contact model
-        void calcFrictionModel() const;
+        //- Clear out demand driven data
+        //virtual void clearOut();
 
         //- Create the zone
         void calcZone() const;
 
-        //- Create the shadow zone
-        void calcShadowZone() const;
+        //- Create the shadow zones
+        void calcShadowZones() const;
 
-        //- Create the zone-to-zone interpolator
-        void calcZoneToZone() const;
+        //- Create the zone-to-zone interpolators
+        void calcZoneToZones() const;
 
-        // Return the Ccntact dictionary
-        const dictionary& dict() const
-        {
-            return dict_;
-        };
+        //- Move the master and slave zones to the deformed configuration
+        void moveZonesToDeformedConfiguration();
 
-        //- Get zone field from patch field
-        template<class Type>
-        tmp<Field<Type> > zoneField
-        (
-            const label zoneIndex,
-            const label patchIndex,
-            const Field<Type>& patchField
-        ) const;
+        // Set the contactPerShadow field
+        void calcContactPerShadow() const;
 
-        //- Get patch field from zone field
-        template<class Type>
-        tmp<Field<Type> > patchField
-        (
-            const label patchIndex,
-            const label zoneIndex,
-            const Field<Type>& zoneField
-        ) const;
+        // //- Interpolate zone face values to points
+        // template<class Type>
+        // tmp<Field<Type> > zoneFaceToPointInterpolate
+        // (
+        //     const label zoneIndex,
+        //     const Field<Type>& zoneField
+        // ) const;
 
-        //- Interpolate zone face values to points
-        template<class Type>
-        tmp<Field<Type> > zoneFaceToPointInterpolate
-        (
-            const label zoneIndex,
-            const Field<Type>& zoneField
-        ) const;
+        // //- Interpolate zone point values to faces
+        // template<class Type>
+        // tmp<Field<Type> > zonePointToFaceInterpolate
+        // (
+        //     const label zoneIndex,
+        //     const Field<Type>& zonePointField
+        // ) const;
 
-        //- Interpolate zone point values to faces
-        template<class Type>
-        tmp<Field<Type> > zonePointToFaceInterpolate
-        (
-            const label zoneIndex,
-            const Field<Type>& zonePointField
-        ) const;
+        //- Return field to scale the traction field on the slave patch
+        scalarField scaleTractionField() const;
+
+        //- Make the scaleTractionField
+        void makeScaleTractionField() const;
+
 
 public:
 
@@ -274,73 +294,93 @@ public:
             );
         }
 
-    // Destructor
-
-        virtual ~solidContactFvPatchVectorField();
+    //- Destructor
+    virtual ~solidContactFvPatchVectorField();
 
 
     // Member functions
 
         // Access
 
-            //- Return if this patch is the master
+            //- Return if this patch is the slave
             Switch master() const
             {
                 return master_;
             }
 
-            //- Return the name of the shadow patch
-            const word& shadowPatchName() const
-            {
-                return shadowPatchName_;
-            }
+            //- Return the shadow patch names
+            const wordList& shadowPatchNames() const;
 
-            //- Return the name of the shadow patch
-            label shadowPatchIndex() const
-            {
-                return shadowPatchIndex_;
-            }
+            //- Return the shadow patch indices
+            const labelList& shadowPatchIndices() const;
 
-            //- Return index of the zone
-            label zoneIndex() const;
+            //- Return the shadow patch
+            //  This function is not allowed if shadowPatchIndices.size() > 1
+            const solidContactFvPatchVectorField& shadowPatchField() const;
 
-            //- Return index of the shadow zone
-            label shadowZoneIndex() const;
+            //- Return reference to the normal contact models
+            PtrList<normalContactModel>& normalModels();
 
-            //- Return reference to the normal contact model
-            normalContactModel& normalModel();
+            //- Return const reference to the normal contact models
+            const PtrList<normalContactModel>& normalModels() const;
 
-            //- Return const reference to the normal contact model
-            const normalContactModel& normalModel() const;
+            //- Return reference to the friction contact models
+            PtrList<frictionContactModel>& frictionModels();
 
-            //- Return reference to the friction contact model
-            frictionContactModel& frictionModel();
+            //- Return const reference to the friction contact models
+            const PtrList<frictionContactModel>& frictionModels() const;
 
-            //- Return const reference to the friction contact model
-            const frictionContactModel& frictionModel() const;
+            //- Return normal contact model for the slave patch calling this
+            //  function
+            normalContactModel& normalModelForThisSlave();
 
-            //- Return const reference to deformed master zone
-            const standAlonePatch& zone() const;
+            //- Return friction contact model for the slave patch calling this
+            //  function
+            frictionContactModel& frictionModelForThisSlave();
 
-            //- Return reference to deformed master zone
-            standAlonePatch& zone();
+            //- Return const reference to deformed zone
+            const globalPolyPatch& zone() const;
 
-            //- Return const reference to deformed master zone
-            const standAlonePatch& shadowZone() const;
+            //- Return reference to deformed zone
+            globalPolyPatch& zone();
 
-            //- Return reference to deformed master zone
-            standAlonePatch& shadowZone();
+            //- Return const reference to deformed shadow zones
+            const PtrList<globalPolyPatch>& shadowZones() const;
+
+            //- Return reference to deformed shadow zones
+            PtrList<globalPolyPatch>& shadowZones();
 
             //- Return const reference to patch-to-patch interpolation
-            const extendedGgiStandAlonePatchInterpolation& zoneToZone() const;
+            const PtrList<newGgiStandAlonePatchInterpolation>&
+                zoneToZones() const;
 
             //- Return reference to patch-to-patch interpolation
-            extendedGgiStandAlonePatchInterpolation& zoneToZone();
+            PtrList<newGgiStandAlonePatchInterpolation>& zoneToZones();
+
+            //- Return const reference to zone-to-zone interpolation for the
+            //  current slave patch; an error is thrown if the master calls this
+            //  function
+            const newGgiStandAlonePatchInterpolation&
+            zoneToZoneForThisSlave() const;
+
+            //- Return the global patch for the current slave patch
+            //  An error is thrown if the master calls this function
+            const globalPolyPatch& zoneForThisSlave() const;
+
+            //- Return reference to contact field
+            const scalarField& contact() const
+            {
+                return contact_;
+            }
+
+            //- Return reference to contactPerShadow fields
+            PtrList<scalarField>& contactPerShadow();
+
+            //- Return const reference to contactPerShadow fields
+            const PtrList<scalarField>& contactPerShadow() const;
+
 
         // Mapping functions
-
-            //- Clear out demand driven data
-            virtual void clearOut();
 
             //- Map (and resize as needed) from self given a mapping object
             virtual void autoMap
@@ -358,16 +398,18 @@ public:
 
         // Evaluation functions
 
-            //- Move the master and slave zones to the deformed configuration
-            void moveZonesToDeformedConfiguration();
-
             //- Update the coefficients associated with the patch field
             virtual void updateCoeffs();
 
+
         // Member functions
 
-            //- Dissipated energy due to friction
-            //virtual tmp<scalarField> Qc() const;
+            //- Clear out demand driven data
+            virtual void clearOut();
+
+            //- Return the rate of dissipated energy due to friction for the
+            //  master patch
+            virtual tmp<scalarField> frictionHeatRate() const;
 
             //- Write
             virtual void write(Ostream&) const;
@@ -378,9 +420,9 @@ public:
 
 } // End namespace Foam
 
-#ifdef NoRepository
-#   include "solidContactFvPatchVectorFieldTemplates.C"
-#endif
+//#ifdef NoRepository
+//#   include "solidContactFvPatchVectorFieldTemplates.C"
+//#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

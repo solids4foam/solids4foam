@@ -70,6 +70,7 @@ class frictionLaw
         //- Friction law dictionary
         dictionary frictionLawDict_;
 
+
     // Private Member Functions
 
         //- Disallow copy construct
@@ -154,6 +155,15 @@ public:
         virtual scalar slipTraction
         (
             const scalar pressure, const vector& slipDir
+        );
+
+        //- Return traction that would cause slipping
+        virtual scalar slipTraction
+        (
+                const scalar contactPressure,         // Contact pressure
+                const vector& faceSlip,               // Slip vector
+                const vector& slaveFaceVelocity,      // Velocity of slave face
+                const vector& masterFaceVelocity      // Velocity of master face
         );
 
         //- Return traction that would cause slipping

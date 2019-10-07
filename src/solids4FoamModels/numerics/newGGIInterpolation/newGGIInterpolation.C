@@ -43,56 +43,56 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-// template<class MasterPatch, class SlavePatch>
-// label newGGIInterpolation<MasterPatch, SlavePatch>::parMasterStart() const
-// {
-//     if (globalData())
-//     {
-//         // Integer division intended
-//         return Foam::min
-//         (
-//             masterPatch_.size(),
-//             Pstream::myProcNo()*(masterPatch_.size()/Pstream::nProcs() + 1)
-//         );
-//     }
-//     else
-//     {
-//         // No parallel search: do complete patch
-//         return 0;
-//     }
-// }
+template<class MasterPatch, class SlavePatch>
+label newGGIInterpolation<MasterPatch, SlavePatch>::parMasterStart() const
+{
+    if (globalData())
+    {
+        // Integer division intended
+        return Foam::min
+        (
+            masterPatch_.size(),
+            Pstream::myProcNo()*(masterPatch_.size()/Pstream::nProcs() + 1)
+        );
+    }
+    else
+    {
+        // No parallel search: do complete patch
+        return 0;
+    }
+}
 
 
-// template<class MasterPatch, class SlavePatch>
-// label newGGIInterpolation<MasterPatch, SlavePatch>::parMasterEnd() const
-// {
-//     if (globalData())
-//     {
-//         // Integer division intended
-//         return Foam::min
-//         (
-//             masterPatch_.size(),
-//             (Pstream::myProcNo() + 1)*
-//             (masterPatch_.size()/Pstream::nProcs() + 1)
-//         );
-//     }
-//     else
-//     {
-//         // No parallel search: do complete patch
-//         return masterPatch_.size();
-//     }
-// }
+template<class MasterPatch, class SlavePatch>
+label newGGIInterpolation<MasterPatch, SlavePatch>::parMasterEnd() const
+{
+    if (globalData())
+    {
+        // Integer division intended
+        return Foam::min
+        (
+            masterPatch_.size(),
+            (Pstream::myProcNo() + 1)*
+            (masterPatch_.size()/Pstream::nProcs() + 1)
+        );
+    }
+    else
+    {
+        // No parallel search: do complete patch
+        return masterPatch_.size();
+    }
+}
 
 
-// template<class MasterPatch, class SlavePatch>
-// label newGGIInterpolation<MasterPatch, SlavePatch>::parMasterSize() const
-// {
-//     return Foam::max
-//     (
-//         0,
-//         this->parMasterEnd() - this->parMasterStart()
-//     );
-// }
+template<class MasterPatch, class SlavePatch>
+label newGGIInterpolation<MasterPatch, SlavePatch>::parMasterSize() const
+{
+    return Foam::max
+    (
+        0,
+        this->parMasterEnd() - this->parMasterStart()
+    );
+}
 
 
 template<class MasterPatch, class SlavePatch>
@@ -109,10 +109,14 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::clearOut()
     deleteDemandDrivenData(masterPointAddressingPtr_);
     deleteDemandDrivenData(masterPointWeightsPtr_);
     deleteDemandDrivenData(masterPointDistancePtr_);
+    deleteDemandDrivenData(masterPointDistanceVectorsPtr_);
+    masterEdgeLoopsMap_.clear();
 
     deleteDemandDrivenData(slavePointAddressingPtr_);
     deleteDemandDrivenData(slavePointWeightsPtr_);
     deleteDemandDrivenData(slavePointDistancePtr_);
+    deleteDemandDrivenData(slavePointDistanceVectorsPtr_);
+    slaveEdgeLoopsMap_.clear();
 }
 
 
@@ -127,12 +131,12 @@ newGGIInterpolation<MasterPatch, SlavePatch>::newGGIInterpolation
     const tensorField& forwardT,
     const tensorField& reverseT,
     const vectorField& forwardSep,
-    //const bool globalData,
+    const bool globalData,
     const scalar masterNonOverlapFaceTol,
     const scalar slaveNonOverlapFaceTol,
     const bool rescaleGGIWeightingFactors,
-    const quickReject reject //,
-    //const boundBox regionOfInterest
+    const quickReject reject,
+    const boundBox regionOfInterest
 )
 :
     masterPatch_(masterPatch),
@@ -140,22 +144,31 @@ newGGIInterpolation<MasterPatch, SlavePatch>::newGGIInterpolation
     forwardT_(forwardT),
     reverseT_(reverseT),
     forwardSep_(forwardSep),
-    //globalData_(globalData),
+    globalData_(globalData),
     masterNonOverlapFaceTol_(masterNonOverlapFaceTol),
     slaveNonOverlapFaceTol_(slaveNonOverlapFaceTol),
     rescaleGGIWeightingFactors_(rescaleGGIWeightingFactors),
     reject_(reject),
-    //regionOfInterest_(regionOfInterest),
+    usePrevCandidateMasterNeighbors_(false),
+    prevCandidateMasterNeighbors_(0),
+    regionOfInterest_(regionOfInterest),
     masterAddrPtr_(NULL),
     masterWeightsPtr_(NULL),
     masterPointAddressingPtr_(NULL),
     masterPointWeightsPtr_(NULL),
     masterPointDistancePtr_(NULL),
+    masterPointDistanceVectorsPtr_(NULL),
+    masterEdgeLoopsMap_(0),
     slaveAddrPtr_(NULL),
     slaveWeightsPtr_(NULL),
     slavePointAddressingPtr_(NULL),
     slavePointWeightsPtr_(NULL),
     slavePointDistancePtr_(NULL),
+    slavePointDistanceVectorsPtr_(NULL),
+    slaveEdgeLoopsMap_(0),
+    useNewPointDistanceMethod_(true),
+    projectPointsToPatchBoundary_(false),
+    checkPointDistanceOrientations_(useNewPointDistanceMethod_ ? false : true),
     uncoveredMasterAddrPtr_(NULL),
     uncoveredSlaveAddrPtr_(NULL)
 {
@@ -284,6 +297,16 @@ bool newGGIInterpolation<MasterPatch, SlavePatch>::movePoints
     this->reverseT_ = reverseT;
     this->forwardSep_ = forwardSep;
 
+    if (prevCandidateMasterNeighbors_.size() > 0)
+    {
+        if (prevCandidateMasterNeighbors_.size() != parMasterSize())
+        {
+            Info<< "    " << typeName
+                << " : clearing prevCandidateMasterNeighbors" << endl;
+            clearPrevCandidateMasterNeighbors();
+        }
+    }
+
     clearOut();
 
     return true;
@@ -329,6 +352,20 @@ newGGIInterpolation<MasterPatch, SlavePatch>
 
 
 template<class MasterPatch, class SlavePatch>
+const vectorField&
+newGGIInterpolation<MasterPatch, SlavePatch>
+::masterPointDistanceVectorsToIntersection() const
+{
+    if (!masterPointDistanceVectorsPtr_)
+    {
+        calcMasterPointAddressing();
+    }
+
+    return *masterPointDistanceVectorsPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
 const Foam::List<labelPair>&
 newGGIInterpolation<MasterPatch, SlavePatch>::slavePointAddr() const
 {
@@ -368,6 +405,20 @@ newGGIInterpolation<MasterPatch, SlavePatch>
 
 
 template<class MasterPatch, class SlavePatch>
+const vectorField&
+newGGIInterpolation<MasterPatch, SlavePatch>
+::slavePointDistanceVectorsToIntersection() const
+{
+    if (!slavePointDistanceVectorsPtr_)
+    {
+        calcSlavePointAddressing();
+    }
+
+    return *slavePointDistanceVectorsPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
 template<class Type>
 tmp<Field<Type> > newGGIInterpolation<MasterPatch, SlavePatch>::
 slaveToMasterPointInterpolate
@@ -379,7 +430,7 @@ slaveToMasterPointInterpolate
     {
         FatalErrorIn
         (
-            "ExtendednewGGIInterpolation::slaveToMasterPointInterpolate"
+            "newGGIInterpolation::slaveToMasterPointInterpolate"
             "(const Field<Type> pf)"
         )   << "given field does not correspond to patch. Patch size: "
             << this->slavePatch().nPoints() << " field size: " << pf.size()
@@ -430,7 +481,7 @@ slaveToMasterPointInterpolate
         {
             FatalErrorIn
             (
-                "ExtendednewGGIInterpolation::masterToSlavePointInterpolate"
+                "newGGIInterpolation::masterToSlavePointInterpolate"
                 "(const Field<Type> pf)"
             )   << "Master point addressing is not correct"
                 << abort(FatalError);
@@ -453,7 +504,7 @@ masterToSlavePointInterpolate
     {
         FatalErrorIn
         (
-            "ExtendednewGGIInterpolation::masterToSlavePointInterpolate"
+            "newGGIInterpolation::masterToSlavePointInterpolate"
             "(const Field<Type> pf)"
         )   << "given field does not correspond to patch. Patch size: "
             << this->masterPatch().nPoints() << " field size: " << pf.size()
@@ -504,7 +555,7 @@ masterToSlavePointInterpolate
         {
             FatalErrorIn
             (
-                "ExtendednewGGIInterpolation::masterToSlavePointInterpolate"
+                "newGGIInterpolation::masterToSlavePointInterpolate"
                 "(const Field<Type> pf)"
             )   << "Slave point addressing is not correct"
                 << abort(FatalError);

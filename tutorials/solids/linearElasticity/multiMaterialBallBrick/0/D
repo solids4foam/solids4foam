@@ -34,13 +34,12 @@ boundaryField
     }
     bottomBrickUp
     {
-//         type            solidTraction;
-//         traction        uniform ( 1e6 0 0 );
-//         pressure        uniform 1e6;
-//         value           uniform (0 0 0);
-
         type            solidContact;
         master          yes;
+
+        // Write point distance field in contact region
+        writePointDistanceFields yes;
+
         rigidMaster     no;
         shadowPatch     topBrickDown;
         normalContactModel standardPenalty;

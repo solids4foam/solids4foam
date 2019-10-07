@@ -43,6 +43,17 @@ namespace Foam
 
 // * * * * * * * * * * * Private Members Functions * * * * * * * * * * * * * //
 
+Foam::scalar Foam::standardPenaltyFriction::frictionPenaltyFactor()
+{
+    if (frictionPenaltyFactor_ < -SMALL)
+    {
+        calcFrictionPenaltyFactor();
+    }
+
+    return frictionPenaltyFactor_;
+}
+
+
 void Foam::standardPenaltyFriction::calcFrictionPenaltyFactor()
 {
     // Set penalty factor using a similar method to the normal
@@ -56,50 +67,85 @@ void Foam::standardPenaltyFriction::calcFrictionPenaltyFactor()
     // bulk modulus
     const volScalarField& impK = mesh_.lookupObject<volScalarField>("impK");
 
-    // Avarage contact patch bulk modulus
-    scalar masterK = gAverage(impK.boundaryField()[masterPatchIndex]);
-    scalar slaveK = gAverage(impK.boundaryField()[slavePatchIndex]);
-
-    // avarage contact patch shear modulus
-    scalar modulus = 0.5*(masterK + slaveK);
-
-    // average contact patch face area
-    scalar masterMagSf =
-        gAverage(mesh_.magSf().boundaryField()[masterPatchIndex]);
-    scalar slaveMagSf =
-        gAverage(mesh_.magSf().boundaryField()[slavePatchIndex]);
-    scalar faceArea = 0.5*(masterMagSf + slaveMagSf);
-
-    // average contact patch cell volume
-    scalarField masterV(mesh_.boundary()[masterPatchIndex].size(), 0.0);
-    scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
-    const volScalarField::DimensionedInternalField& V = mesh_.V();
+    // Note: for solidRigidContact, only the master index is set
+    if (masterPatchIndex > -1 && slavePatchIndex > -1)
     {
-        const unallocLabelList& faceCells =
-            mesh_.boundary()[masterPatchIndex].faceCells();
-        forAll(mesh_.boundary()[masterPatchIndex], facei)
+        // Avarage contact patch bulk modulus
+        const scalar masterK = gAverage(impK.boundaryField()[masterPatchIndex]);
+        const scalar slaveK = gAverage(impK.boundaryField()[slavePatchIndex]);
+
+        // avarage contact patch shear modulus
+        const scalar modulus = 0.5*(masterK + slaveK);
+
+        // average contact patch face area
+        const scalar masterMagSf =
+            gAverage(mesh_.magSf().boundaryField()[masterPatchIndex]);
+        const scalar slaveMagSf =
+            gAverage(mesh_.magSf().boundaryField()[slavePatchIndex]);
+        const scalar faceArea = 0.5*(masterMagSf + slaveMagSf);
+
+        // average contact patch cell volume
+        scalarField masterV(mesh_.boundary()[masterPatchIndex].size(), 0.0);
+        scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
+        const volScalarField::DimensionedInternalField& V = mesh_.V();
         {
-            masterV[facei] = V[faceCells[facei]];
+            const unallocLabelList& faceCells =
+                mesh_.boundary()[masterPatchIndex].faceCells();
+            forAll(mesh_.boundary()[masterPatchIndex], facei)
+            {
+                masterV[facei] = V[faceCells[facei]];
+            }
         }
+        {
+            const unallocLabelList& faceCells =
+                mesh_.boundary()[slavePatchIndex].faceCells();
+            forAll(mesh_.boundary()[slavePatchIndex], facei)
+            {
+                slaveV[facei] = V[faceCells[facei]];
+            }
+        }
+        const scalar cellVolume = 0.5*(gAverage(masterV) + gAverage(slaveV));
+
+        // approximate penalty factor based on Hallquist et al.
+        // we approximate penalty factor for traction instead of force
+        frictionPenaltyFactor_ =
+            frictionPenaltyScale_*modulus*faceArea/cellVolume;
     }
+    else if (slavePatchIndex > -1)
     {
-        const unallocLabelList& faceCells =
-            mesh_.boundary()[slavePatchIndex].faceCells();
-        forAll(mesh_.boundary()[slavePatchIndex], facei)
+        // Avarage contact patch bulk modulus
+        const scalar modulus = gAverage(impK.boundaryField()[slavePatchIndex]);
+
+        // average contact patch face area
+        const scalar faceArea =
+            gAverage(mesh_.magSf().boundaryField()[slavePatchIndex]);
+
+        // average contact patch cell volume
+        scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
+        const volScalarField::DimensionedInternalField& V = mesh_.V();
         {
-            slaveV[facei] = V[faceCells[facei]];
+            const unallocLabelList& faceCells =
+                mesh_.boundary()[slavePatchIndex].faceCells();
+            forAll(mesh_.boundary()[slavePatchIndex], facei)
+            {
+                slaveV[facei] = V[faceCells[facei]];
+            }
         }
+        const scalar cellVolume = gAverage(slaveV);
+
+        // approximate penalty factor based on Hallquist et al.
+        // we approximate penalty factor for traction instead of force
+        frictionPenaltyFactor_ =
+            frictionPenaltyScale_*modulus*faceArea/cellVolume;
     }
-    scalar cellVolume = 0.5*(gAverage(masterV) + gAverage(slaveV));
+    else
+    {
+        FatalErrorIn("void standardPenaltyFriction::calcPenaltyFactor() const")
+            << "This is unexpected! Neither the master nor slave index are set!"
+            << abort(FatalError);
+    }
 
-    // approximate penalty factor based on Hallquist et al.
-    // we approximate penalty factor for traction instead of force
-    frictionPenaltyFactorPtr_.set
-    (
-        new scalar(frictionPenaltyScale_*modulus*faceArea/cellVolume)
-    );
-
-    Info<< "    friction penalty factor: " << frictionPenaltyFactorPtr_()
+    Info<< "    friction penalty factor: " << frictionPenaltyFactor_
         << endl;
 }
 
@@ -113,9 +159,7 @@ Foam::standardPenaltyFriction::standardPenaltyFriction
     const fvPatch& patch,
     const dictionary& dict,
     const label masterPatchID,
-    const label slavePatchID,
-    const label masterFaceZoneID,
-    const label slaveFaceZoneID
+    const label slavePatchID
 )
 :
     frictionContactModel
@@ -124,25 +168,30 @@ Foam::standardPenaltyFriction::standardPenaltyFriction
         patch,
         dict,
         masterPatchID,
-        slavePatchID,
-        masterFaceZoneID,
-        slaveFaceZoneID
+        slavePatchID
     ),
     frictionContactModelDict_(dict.subDict(name + "FrictionModelDict")),
-    frictionLawPtr_(NULL),
+    frictionLawPtr_(),
     mesh_(patch.boundaryMesh().mesh()),
-    writeDebugFile_
+    slaveTractionVolField_
     (
-        frictionContactModelDict_.lookupOrDefault<Switch>
+        IOobject
         (
-            "writeDebugFile",
-            false
-        )
+            "slaveShearTraction_" + mesh_.boundaryMesh()[slavePatchID].name(),
+            mesh_.time().timeName(),
+            mesh_,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh_,
+        dimensionedVector("zero", dimPressure, vector::zero)
     ),
-    slaveTraction_(mesh().boundaryMesh()[slavePatchID].size(), vector::zero),
-    prevSlaveTraction_(slaveTraction_),
-    slip_(slaveTraction_),
-    frictionPenaltyFactorPtr_(NULL),
+    slip_
+    (
+        slaveTractionVolField_.boundaryField()[slavePatchID].size(),
+        vector::zero
+    ),
+    frictionPenaltyFactor_(-1),
     frictionPenaltyScale_
     (
         frictionContactModelDict_.lookupOrDefault<scalar>("penaltyScale", 1.0)
@@ -154,12 +203,7 @@ Foam::standardPenaltyFriction::standardPenaltyFriction
             "relaxationFactor", 0.1
         )
     ),
-    contactIterNum_(0),
-    infoFreq_
-    (
-        frictionContactModelDict_.lookupOrDefault<int>("infoFrequency", 1)
-    ),
-    contactFilePtr_(NULL)
+    contactIterNum_(0)
 {
     // Create friction law
     frictionLawPtr_.set
@@ -171,50 +215,6 @@ Foam::standardPenaltyFriction::standardPenaltyFriction
             frictionContactModelDict_
         ).ptr()
     );
-
-    // master proc open contact info file
-    if (Pstream::master() && writeDebugFile_)
-    {
-        const word masterName = mesh_.boundary()[masterPatchID].name();
-        const word slaveName = mesh_.boundary()[slavePatchID].name();
-
-        const fileName contactFileDir = "contact";
-
-        mkDir(contactFileDir);
-
-        contactFilePtr_.set
-        (
-            new OFstream
-            (
-                contactFileDir/
-                "frictionContact_" + masterName + "_" + slaveName + ".txt"
-            )
-        );
-
-        OFstream& contactFile = contactFilePtr_();
-
-        int width = 20;
-        contactFile
-            << "time";
-        contactFile.width(width);
-        contactFile
-            << "iterNum";
-        contactFile.width(width);
-        contactFile
-            << "penaltyScale";
-        contactFile.width(width);
-        contactFile
-            << "slipFaces";
-        contactFile.width(width);
-        contactFile
-            << "stickFaces";
-        contactFile.width(width);
-        contactFile
-            << "maxMagSlaveTraction";
-        contactFile.width(width);
-        contactFile
-            << "maxMagSlip" << endl;
-    }
 }
 
 
@@ -228,27 +228,19 @@ Foam::standardPenaltyFriction::standardPenaltyFriction
     frictionContactModelDict_(fm.frictionContactModelDict_),
     frictionLawPtr_(fm.frictionLawPtr_->clone().ptr()),
     mesh_(fm.mesh_),
-    writeDebugFile_(fm.writeDebugFile_),
-    slaveTraction_(fm.slaveTraction_),
-    prevSlaveTraction_(fm.prevSlaveTraction_),
+    slaveTractionVolField_(fm.slaveTractionVolField_),
     slip_(fm.slip_),
-    frictionPenaltyFactorPtr_(NULL),
+    frictionPenaltyFactor_(fm.frictionPenaltyFactor_),
     frictionPenaltyScale_(fm.frictionPenaltyScale_),
     relaxFac_(fm.relaxFac_),
-    contactIterNum_(fm.contactIterNum_),
-    infoFreq_(fm.infoFreq_),
-    contactFilePtr_(NULL)
-{
-    if (fm.frictionPenaltyFactorPtr_.valid())
-    {
-        frictionPenaltyFactorPtr_.set(new scalar(fm.frictionPenaltyFactorPtr_()));
-    }
+    contactIterNum_(fm.contactIterNum_)
+{}
 
-    if (fm.contactFilePtr_.valid())
-    {
-        contactFilePtr_.set(new OFstream(fm.contactFilePtr_()));
-    }
-}
+
+// * * * * * * * * * * * * * * * *  Destructor  * * * * * * * * * * * * * * //
+
+Foam::standardPenaltyFriction::~standardPenaltyFriction()
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -272,9 +264,10 @@ void Foam::standardPenaltyFriction::correct
     label numStickFaces = 0;
     scalarField& stickSlip = stickSlipFaces();
     const scalarField oldStickSlip = stickSlip;
-    scalar frictionPenaltyFac = frictionPenaltyFactor();
+    const scalar frictionPenaltyFac = frictionPenaltyFactor();
     scalar maxMagSlip = 0.0;
     scalarField slipTraction(magSlavePressure.size(), 0.0);
+    vectorField newSlaveTraction(slipTraction.size(), vector::zero);
 
     forAll(magSlavePressure, faceI)
     {
@@ -290,7 +283,7 @@ void Foam::standardPenaltyFriction::correct
             //    sqr(n) would remove the shear
             slip_[faceI] = (I - sqr(slaveFaceNormals[faceI])) & slip_[faceI];
 
-            slaveTraction_[faceI] = -frictionPenaltyFac*slip_[faceI];
+            newSlaveTraction[faceI] = -frictionPenaltyFac*slip_[faceI];
 
             const scalar magSlip = mag(slip_[faceI]);
             maxMagSlip = max(maxMagSlip, magSlip);
@@ -315,13 +308,13 @@ void Foam::standardPenaltyFriction::correct
                     faceI                       // Local slave face ID
                 );
 
-            if ((mag(slaveTraction_[faceI]) - slipTraction[faceI]) > SMALL)
+            if ((mag(newSlaveTraction[faceI]) - slipTraction[faceI]) > SMALL)
             {
                 // Analogous to plasticity
                 // slip is a combination of elastic slip and plastic slip
                 // elastic slip should be zero but is finite due to penalty
                 // stiffness. plastic slip is the permanent deformation
-                slaveTraction_[faceI] =
+                newSlaveTraction[faceI] =
                     slipTraction[faceI]*(-slip_[faceI]/magSlip);
 
                 numSlipFaces++;
@@ -337,7 +330,7 @@ void Foam::standardPenaltyFriction::correct
         {
             // No friction if pressure is negative or zero or face is not in
             // contact
-            slaveTraction_[faceI] = vector::zero;
+            newSlaveTraction[faceI] = vector::zero;
             slipTraction[faceI] = 0.0;
             stickSlip[faceI] = 0;
         }
@@ -348,52 +341,28 @@ void Foam::standardPenaltyFriction::correct
     stickSlip = relaxFac_*stickSlip + (1.0 - relaxFac_)*oldStickSlip;
 
     // Under-relax traction
-    slaveTraction_ =
-        relaxFac_*slaveTraction_ + (1.0 - relaxFac_)*prevSlaveTraction_;
+    slaveTraction() =
+        relaxFac_*newSlaveTraction + (1.0 - relaxFac_)*slaveTraction();
+}
 
-    // Update the previous traction
-    prevSlaveTraction_ = slaveTraction_;
 
-    scalar maxMagSlaveTraction = 0.0;
-    if (slaveTraction_.size() > 0)
+void Foam::standardPenaltyFriction::autoMap(const fvPatchFieldMapper& m)
+{
+    frictionContactModel::autoMap(m);
+
+    if (debug)
     {
-        maxMagSlaveTraction = max(mag(slaveTraction_));
+        InfoIn
+        (
+            "void standardPenaltyFriction::autoMap(const fvPatchFieldMapper& m)"
+        )   << "autoMap" << endl;
     }
-    reduce(maxMagSlaveTraction, maxOp<scalar>());
-    reduce(numSlipFaces, sumOp<int>());
-    reduce(numStickFaces, sumOp<int>());
 
-    // Writes to contact info file
-    if
-    (
-        Pstream::master()
-     && (contactIterNum_++ %  infoFreq_ == 0)
-     && writeDebugFile_
-    )
-    {
-        OFstream& contactFile = contactFilePtr_();
-        int width = 20;
-        contactFile
-            << mesh.time().value();
-        contactFile.width(width);
-        contactFile
-            << contactIterNum_;
-        contactFile.width(width);
-        contactFile
-            << frictionPenaltyScale_;
-        contactFile.width(width);
-        contactFile
-            << numSlipFaces;
-        contactFile.width(width);
-        contactFile
-            << numStickFaces;
-        contactFile.width(width);
-        contactFile
-            << maxMagSlaveTraction;
-        contactFile.width(width);
-        contactFile
-            << maxMagSlip << endl;
-    }
+    slip_.autoMap(m);
+
+    // The internal fields for the volFields should always be zero
+    // We will reset them as they may not be zero after field advection
+    slaveTractionVolField_.internalField() = vector::zero;
 }
 
 

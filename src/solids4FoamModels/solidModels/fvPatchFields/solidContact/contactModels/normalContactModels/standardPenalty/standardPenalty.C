@@ -49,6 +49,12 @@ namespace Foam
 
 void standardPenalty::calcPenaltyFactor() const
 {
+    if (penaltyFactor_ > -SMALL)
+    {
+        FatalErrorIn("void standardPenalty::calcPenaltyFactor() const")
+            << "value already set!" << abort(FatalError);
+    }
+
     // Set penalty factor
 
     // Approximate penaltyFactor from the mechanical properties
@@ -61,52 +67,86 @@ void standardPenalty::calcPenaltyFactor() const
     // bulk modulus
     const volScalarField& impK = mesh_.lookupObject<volScalarField>("impK");
 
-    // Avarage contact patch bulk modulus
-    const scalar masterK = gAverage(impK.boundaryField()[masterPatchIndex]);
-    const scalar slaveK = gAverage(impK.boundaryField()[slavePatchIndex]);
-
-    // Simple average
-    //const scalar bulkModulus = 0.5*(masterK + slaveK);
-    // Harmonic average
-    const scalar bulkModulus = 2.0*(masterK*slaveK)/(masterK + slaveK);
-
-    // Average contact patch face area
-    const scalar masterMagSf =
-        gAverage(mesh_.magSf().boundaryField()[masterPatchIndex]);
-    const scalar slaveMagSf =
-        gAverage(mesh_.magSf().boundaryField()[slavePatchIndex]);
-    const scalar faceArea = 0.5*(masterMagSf + slaveMagSf);
-
-    // Average contact patch cell volume
-    scalarField masterV(mesh_.boundary()[masterPatchIndex].size(), 0.0);
-    scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
-    const volScalarField::DimensionedInternalField& V = mesh_.V();
+    // Note: for solidRigidContact, only the master index is set
+    if (masterPatchIndex > -1 && slavePatchIndex > -1)
     {
-        const unallocLabelList& faceCells =
-            mesh_.boundary()[masterPatchIndex].faceCells();
-        forAll(mesh_.boundary()[masterPatchIndex], facei)
+        // Avarage contact patch bulk modulus
+        const scalar masterK = gAverage(impK.boundaryField()[masterPatchIndex]);
+        const scalar slaveK = gAverage(impK.boundaryField()[slavePatchIndex]);
+
+        // Simple average
+        //const scalar bulkModulus = 0.5*(masterK + slaveK);
+        // Harmonic average
+        const scalar bulkModulus = 2.0*(masterK*slaveK)/(masterK + slaveK);
+
+        // Average contact patch face area
+        const scalar masterMagSf =
+            gAverage(mesh_.magSf().boundaryField()[masterPatchIndex]);
+        const scalar slaveMagSf =
+            gAverage(mesh_.magSf().boundaryField()[slavePatchIndex]);
+        const scalar faceArea = 0.5*(masterMagSf + slaveMagSf);
+
+        // Average contact patch cell volume
+        scalarField masterV(mesh_.boundary()[masterPatchIndex].size(), 0.0);
+        scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
+        const volScalarField::DimensionedInternalField& V = mesh_.V();
         {
-            masterV[facei] = V[faceCells[facei]];
+            const unallocLabelList& faceCells =
+                mesh_.boundary()[masterPatchIndex].faceCells();
+            forAll(mesh_.boundary()[masterPatchIndex], facei)
+            {
+                masterV[facei] = V[faceCells[facei]];
+            }
         }
+        {
+            const unallocLabelList& faceCells =
+                mesh_.boundary()[slavePatchIndex].faceCells();
+            forAll(mesh_.boundary()[slavePatchIndex], facei)
+            {
+                slaveV[facei] = V[faceCells[facei]];
+            }
+        }
+        const scalar cellVolume = 0.5*(gAverage(masterV) + gAverage(slaveV));
+
+        // Approximate penalty factor based on Hallquist et al.
+        // we approximate penalty factor for traction instead of force
+        penaltyFactor_ = penaltyScale_*bulkModulus*faceArea/cellVolume;
     }
+    else if (slavePatchIndex > -1)
     {
-        const unallocLabelList& faceCells =
-            mesh_.boundary()[slavePatchIndex].faceCells();
-        forAll(mesh_.boundary()[slavePatchIndex], facei)
+        // Avarage contact patch bulk modulus
+        const scalar bulkModulus =
+            gAverage(impK.boundaryField()[slavePatchIndex]);
+
+        // Average contact patch face area
+        const scalar faceArea =
+            gAverage(mesh_.magSf().boundaryField()[slavePatchIndex]);
+
+        // Average contact patch cell volume
+        scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
+        const volScalarField::DimensionedInternalField& V = mesh_.V();
         {
-            slaveV[facei] = V[faceCells[facei]];
+            const unallocLabelList& faceCells =
+                mesh_.boundary()[slavePatchIndex].faceCells();
+            forAll(mesh_.boundary()[slavePatchIndex], facei)
+            {
+                slaveV[facei] = V[faceCells[facei]];
+            }
         }
+        const scalar cellVolume = gAverage(slaveV);
+
+        // Approximate penalty factor based on Hallquist et al.
+        // we approximate penalty factor for traction instead of force
+        penaltyFactor_ = penaltyScale_*bulkModulus*faceArea/cellVolume;
     }
-    const scalar cellVolume = 0.5*(gAverage(masterV) + gAverage(slaveV));
+    else
+    {
+        FatalErrorIn("void standardPenalty::calcPenaltyFactor() const")
+            << "This is unexpected! Neither the master nor slave index are set!"
+            << abort(FatalError);
+    }
 
-    // Approximate penalty factor based on Hallquist et al.
-    // we approximate penalty factor for traction instead of force
-    penaltyFactorPtr_.set
-    (
-        new scalar(penaltyScale_*bulkModulus*faceArea/cellVolume)
-    );
-
-    Info<< "    normal penalty factor: " << penaltyFactorPtr_() << endl;
+    Info<< "    normal penalty factor: " << penaltyFactor_ << endl;
 }
 
 
@@ -119,8 +159,6 @@ standardPenalty::standardPenalty
     const dictionary& dict,
     const label masterPatchID,
     const label slavePatchID,
-    const label masterFaceZoneID,
-    const label slaveFaceZoneID,
     const standAlonePatch& masterFaceZonePatch,
     const standAlonePatch& slaveFaceZonePatch
 )
@@ -132,25 +170,38 @@ standardPenalty::standardPenalty
         dict,
         masterPatchID,
         slavePatchID,
-        masterFaceZoneID,
-        slaveFaceZoneID,
         masterFaceZonePatch,
         slaveFaceZonePatch
     ),
     normalContactModelDict_(dict.subDict(name + "NormalModelDict")),
     mesh_(patch.boundaryMesh().mesh()),
-    writeDebugFile_
+    slavePressureVolField_
     (
-        normalContactModelDict_.lookupOrDefault<Switch>("writeDebugFile", false)
+        IOobject
+        (
+            "slavePressure_" + mesh_.boundaryMesh()[slavePatchID].name(),
+            mesh_.time().timeName(),
+            mesh_,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh_,
+        dimensionedVector("zero", dimPressure, vector::zero)
     ),
-    slavePressure_(mesh_.boundaryMesh()[slavePatchID].size(), vector::zero),
-    globalSlavePointPenetration_(slaveFaceZonePatch.points().size(), 0.0),
-    slavePointPenetration_
+    areaInContactVolField_
     (
-        mesh_.boundaryMesh()[slavePatchID].localPoints().size(), 0.0
+        IOobject
+        (
+            "areaInContact_" + mesh_.boundaryMesh()[slavePatchID].name(),
+            mesh_.time().timeName(),
+            mesh_,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh_,
+        dimensionedScalar("zero", dimArea, 0.0)
     ),
-    areaInContact_(slavePressure_.size(), 0.0),
-    penaltyFactorPtr_(NULL),
+    penaltyFactor_(-1),
     penaltyScale_
     (
         normalContactModelDict_.lookupOrDefault<scalar>("penaltyScale", 1.0)
@@ -162,50 +213,14 @@ standardPenalty::standardPenalty
             "relaxationFactor", 0.02
         )
     ),
-    totalSlavePointPressure_(slavePointPenetration_.size(), 0.0),
-    contactIterNum_(0),
-    infoFreq_(normalContactModelDict_.lookupOrDefault<int>("infoFrequency", 1)),
-    contactFilePtr_(NULL)
-{
-    if (Pstream::master() && writeDebugFile_)
-    {
-        const word masterName = mesh_.boundary()[masterPatchID].name();
-        const word slaveName = mesh_.boundary()[slavePatchID].name();
-
-        const fileName contactFileDir = "contact";
-
-        mkDir(contactFileDir);
-
-        contactFilePtr_.set
-        (
-            new OFstream
-            (
-                contactFileDir/"normalContact_"+masterName+"_"+slaveName+".txt"
-            )
-        );
-
-        OFstream& contactFile = contactFilePtr_();
-
-        int width = 20;
-        contactFile
-            << "Time";
-        contactFile.width(width);
-        contactFile
-        << "ContactIter";
-        contactFile.width(width);
-        contactFile
-            << "slaveContactVer";
-        contactFile.width(width);
-        contactFile
-            << "penetration";
-        contactFile.width(width);
-        contactFile
-            << "maxSlaveTrac";
-        contactFile.width(width);
-        contactFile
-            << "numMissedPoints" << endl;
-    }
-}
+    averagePenetration_(0),
+    minPenetration_(0),
+    epsilon0_
+    (
+        normalContactModelDict_.lookupOrDefault<scalar>("epsilon0", 0.0)
+    ),
+    contactIterNum_(0)
+{}
 
 
 standardPenalty::standardPenalty(const standardPenalty& nm)
@@ -213,23 +228,16 @@ standardPenalty::standardPenalty(const standardPenalty& nm)
     normalContactModel(nm),
     normalContactModelDict_(nm.normalContactModelDict_),
     mesh_(nm.mesh_),
-    writeDebugFile_(nm.writeDebugFile_),
-    slavePressure_(nm.slavePressure_),
-    globalSlavePointPenetration_(nm.globalSlavePointPenetration_),
-    slavePointPenetration_(nm.slavePointPenetration_),
-    areaInContact_(nm.areaInContact_),
-    penaltyFactorPtr_(NULL),
+    slavePressureVolField_(nm.slavePressureVolField_),
+    areaInContactVolField_(nm.areaInContactVolField_),
+    penaltyFactor_(nm.penaltyFactor_),
     penaltyScale_(nm.penaltyScale_),
     relaxFac_(nm.relaxFac_),
-    contactIterNum_(nm.contactIterNum_),
-    infoFreq_(nm.infoFreq_),
-    contactFilePtr_(nm.contactFilePtr_)
-{
-    if (nm.penaltyFactorPtr_.valid())
-    {
-        penaltyFactorPtr_.set(new scalar(nm.penaltyFactorPtr_()));
-    }
-}
+    averagePenetration_(nm.averagePenetration_),
+    minPenetration_(nm.minPenetration_),
+    epsilon0_(nm.epsilon0_),
+    contactIterNum_(nm.contactIterNum_)
+{}
 
 
 // * * * * * * * * * * * * * * Member Functions * * * * * * * * * * * * * * * //
@@ -238,23 +246,14 @@ standardPenalty::standardPenalty(const standardPenalty& nm)
 void standardPenalty::correct
 (
     const vectorField& slavePatchFaceNormals,
-    const extendedGgiStandAlonePatchInterpolation& zoneToZone
+    const scalarField& slavePointPenetration,
+    const vectorField& slaveDU,
+    const vectorField& masterDUInterpToSlave
 )
 {
     // Preliminaries
     const fvMesh& mesh = mesh_;
     const label slavePatchIndex = slavePatchID();
-
-    // Calculate the point distances for the slave zone
-    globalSlavePointPenetration_ =
-        zoneToZone.slavePointDistanceToIntersection();
-
-    // Transfer the global zone distances to patch patch distances
-    forAll(slavePointPenetration_, pointI)
-    {
-        // The local point values are kept at the start of the global field
-        slavePointPenetration_[pointI] = globalSlavePointPenetration_[pointI];
-    }
 
     // Calculate area in contact for slave patch
 
@@ -264,118 +263,171 @@ void standardPenalty::correct
     const pointField& slavePatchLocalPoints =
         mesh.boundaryMesh()[slavePatchIndex].localPoints();
 
+    scalarField slavePatchLocalFaceAreas(slavePatchLocalFaces.size(), 0.0);
+
+    scalarField& areaInContact = this->areaInContact();
     forAll(slavePatchLocalFaces, faceI)
     {
-        areaInContact_[faceI] =
+        areaInContact[faceI] =
             slavePatchLocalFaces[faceI].areaInContact
             (
                 slavePatchLocalPoints,
-                slavePointPenetration_
+                slavePointPenetration
             );
+
+        if (areaInContact[faceI] < -SMALL)
+        {
+            const labelList& labels = slavePatchLocalFaces[faceI];
+            scalarField vertexValue(labels.size());
+            forAll(labels, i)
+            {
+                vertexValue[i] = slavePointPenetration[labels[i]];
+            }
+
+            FatalErrorIn(type())
+                << "areaInContact is less than zero!" << nl
+                << "areaInContact[" << faceI << "] = " << areaInContact[faceI]
+                << nl
+                << "vertexValue = " << vertexValue << nl
+                << endl;
+        }
+
+        slavePatchLocalFaceAreas[faceI] =
+            mag(slavePatchLocalFaces[faceI].normal(slavePatchLocalPoints));
     }
 
-    // Calculate traction increments
+    // Calculate the point pressures
+    // We will also record the average and minium penetrations
 
-    int numSlaveContactPoints = 0;
-    const scalar minSlavePointPenetration = gMin(globalSlavePointPenetration_);
     const scalar penaltyFac = penaltyFactor();
+    scalarField totalSlavePointPressure(slavePointPenetration.size(), 0.0);
+    averagePenetration_ = 0.0;
+    minPenetration_ = 0.0;
+    int nPointsInContact = 0;
 
-    forAll(totalSlavePointPressure_, pointI)
+    forAll(totalSlavePointPressure, pointI)
     {
-        // If a point has penetrated (i.e. if the penetration is negative),
-        if (slavePointPenetration_[pointI] < 0.0)
-        {
-            // Count points in contact
-            numSlaveContactPoints++;
+        // Take copy of penetration
+        const scalar d = slavePointPenetration[pointI];
 
-            // The force is linearly proportional the penetration, like a spring
-            totalSlavePointPressure_[pointI] =
-                penaltyFac*slavePointPenetration_[pointI];
-        }
-        else
+        // Note: penetration is negative for points in contact
         {
-            totalSlavePointPressure_[pointI] = 0.0;
+            // The force is linearly proportional the penetration, like a spring
+            if (d < epsilon0_)
+            {
+                totalSlavePointPressure[pointI] =
+                    max(penaltyFac*(epsilon0_ - d), 0.0);
+
+                averagePenetration_ += d;
+                minPenetration_ = min(minPenetration_, d);
+                nPointsInContact++;
+            }
+            else
+            {
+                totalSlavePointPressure[pointI] = 0.0;
+            }
         }
     }
 
+    // Find global minimum penetration
+    // IB 11/2018
+    reduce(minPenetration_, minOp<scalar>());
 
-    // Interpolate point traction to faces
+    // Update the average penetration
+    reduce(averagePenetration_, sumOp<scalar>());
+    reduce(nPointsInContact, sumOp<label>());
+    if (nPointsInContact > 0)
+    {
+        averagePenetration_ /= nPointsInContact;
+    }
+    else
+    {
+        averagePenetration_ = 0.0;
+    }
+
+
+    // Interpolate point pressures to the faces
 
     // Create local patch interpolation: No need to interpolate using the entire
     // face zone patch
-    // This is using the original mesh weights; it would be better to use the
-    // deformed patch, and it might help
-    // This could be changed to used the current weights
     primitivePatchInterpolation localSlaveInterpolator
     (
         mesh.boundaryMesh()[slavePatchIndex]
     );
 
-    const vectorField newSlavePressure =
+    // Interpolate point pressures to the face centres and apply in the negative
+    // normal direction
+    vectorField newSlaveTraction =
         localSlaveInterpolator.pointToFaceInterpolate<scalar>
         (
-            totalSlavePointPressure_
-        )*slavePatchFaceNormals;
+            totalSlavePointPressure
+        )*(-slavePatchFaceNormals);
 
-    // Under-relax pressure
-    slavePressure_ =
-        relaxFac_*newSlavePressure + (1.0 - relaxFac_)*slavePressure_;
-
-    // Remove any tangential component as the normal model should only
-    // contribute to the normal stress
-    slavePressure_ = sqr(slavePatchFaceNormals) & slavePressure_;
-
-    // Write contact debug file
-    if ((contactIterNum_++ %  infoFreq_ == 0) && writeDebugFile_)
-    {
-        scalar maxMagSlaveTraction = 0.0;
-        if (slavePressure_.size() > 0)
-        {
-            maxMagSlaveTraction = max(mag(slavePressure_));
-        }
-        reduce(maxMagSlaveTraction, maxOp<scalar>());
-        reduce(numSlaveContactPoints, sumOp<int>());
-
-        // Master processor writes file
-        if (Pstream::master())
-        {
-            OFstream& contactFile = contactFilePtr_();
-            const int width = 20;
-            contactFile
-                << mesh.time().value();
-            contactFile.width(width);
-            contactFile
-                << contactIterNum_;
-            contactFile.width(width);
-            contactFile
-                << numSlaveContactPoints;
-            contactFile.width(width);
-            contactFile
-                << minSlavePointPenetration;
-            contactFile.width(width);
-            contactFile
-                << maxMagSlaveTraction;
-            contactFile.width(width);
-            contactFile
-                << endl;
-        }
-    }
+    // Under-relax pressure/traction
+    // Note: slavePressure_ is really a traction vector
+    slavePressure() =
+        relaxFac_*newSlaveTraction + (1.0 - relaxFac_)*slavePressure();
 }
 
 
 scalar standardPenalty::penaltyFactor() const
 {
-    if (penaltyFactorPtr_.empty())
+    if (penaltyFactor_ < -SMALL)
     {
         calcPenaltyFactor();
     }
 
-    return penaltyFactorPtr_();
+    return penaltyFactor_;
+}
+
+
+scalar standardPenalty::updatePenaltyScale(const scalar previousPenaltyScale)
+{
+    if (previousPenaltyScale > 0.0)
+    {
+        // Lookup initial value for penaltyScale
+        const scalar initialPenaltyScale =
+            normalContactModelDict_.lookupOrDefault<scalar>
+            (
+                "penaltyScale", 1.0
+            );
+
+        if (mag(initialPenaltyScale - penaltyScale_) < SMALL)
+        {
+            // After a topo change, use the previous value of penalty scale
+            penaltyScale_ = previousPenaltyScale;
+        }
+    }
+
+    return penaltyScale_;
+}
+
+
+void standardPenalty::autoMap(const fvPatchFieldMapper& m)
+{
+    if (debug)
+    {
+        InfoIn
+        (
+            "void standardPenalty::autoMap(const fvPatchFieldMapper& m)"
+        )   << "autoMap" << endl;
+    }
+
+    normalContactModel::autoMap(m);
+
+    // The internal fields for the volFields should always be zero
+    // We will reset them as they may not be zero after field advection
+    slavePressureVolField_.internalField() = vector::zero;
+    areaInContactVolField_.internalField() = 0.0;
 }
 
 
 void standardPenalty::writeDict(Ostream& os) const
 {
+    // Update the penalty scale in the dictionary
+    normalContactModelDict_.set("penaltyScale", penaltyScale_);
+
+    // Write the dictionary
     word keyword(name() + "NormalModelDict");
     os.writeKeyword(keyword)
         << normalContactModelDict_;

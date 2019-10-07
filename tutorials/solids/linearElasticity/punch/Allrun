@@ -30,10 +30,6 @@ runApplication autoPatch 45 -overwrite
 runApplication createPatch -overwrite
 runApplication splitPatch -overwrite
 
-# Create contact face zones
-runApplication setSet -batch batch.setSet 
-runApplication setsToZones -noFlipMap
-
 # Remove the sub meshes
 \rm -rf constant/punch_top constant/punch_bottom system/meshDict
 

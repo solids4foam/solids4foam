@@ -84,9 +84,7 @@ public:
             const fvPatch& patch,
             const dictionary& dict,
             const label masterPatchID,
-            const label slavePatchID,
-            const label masterFaceZoneID,
-            const label slaveFaceZoneID
+            const label slavePatchID
         );
 
         //- Construct as copy
@@ -95,16 +93,15 @@ public:
         //- Construct and return a clone
         virtual autoPtr<frictionContactModel> clone() const
         {
-            return
-                autoPtr<frictionContactModel>
-                (
-                    new frictionless(*this)
-                );
+            return autoPtr<frictionContactModel>
+            (
+                new frictionless(*this)
+            );
         }
 
-    // Destructor
 
-        virtual ~frictionless();
+    //- Destructor
+    virtual ~frictionless();
 
 
     // Member Functions
@@ -132,6 +129,9 @@ public:
             // slaveTraction is always zero
             return slaveTraction_;
         }
+
+        //- Perform any reauired field mapping e.g. after a topo change
+        virtual void autoMap(const fvPatchFieldMapper& m);
 
         //- Write law dictionary
         virtual void writeDict(Ostream& os) const

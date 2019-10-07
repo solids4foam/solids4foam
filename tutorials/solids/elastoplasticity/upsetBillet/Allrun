@@ -7,12 +7,10 @@
 m4 constant/polyMesh/blockMeshDict.cylinder.m4 > constant/polyMesh/blockMeshDict
 runApplication blockMesh
 
-# Create zones
-runApplication setSet -batch batch.setSet
-runApplication setsToZones -noFlipMap
-
-# Run the solver
+# Run the solver in serial
 runApplication solids4Foam
+
+# Run the solver in parallel
 #runApplication decomposePar
 #runParallel solidFoam 8
 #runApplication reconstructPar

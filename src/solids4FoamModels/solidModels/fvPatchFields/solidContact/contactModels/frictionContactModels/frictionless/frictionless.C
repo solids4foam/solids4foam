@@ -46,9 +46,7 @@ Foam::frictionless::frictionless
     const fvPatch& patch,
     const dictionary& dict,
     const label masterPatchID,
-    const label slavePatchID,
-    const label masterFaceZoneID,
-    const label slaveFaceZoneID
+    const label slavePatchID
 )
 :
     frictionContactModel
@@ -57,9 +55,7 @@ Foam::frictionless::frictionless
         patch,
         dict,
         masterPatchID,
-        slavePatchID,
-        masterFaceZoneID,
-        slaveFaceZoneID
+        slavePatchID
     ),
     slaveTraction_(mesh().boundaryMesh()[slavePatchID].size(), vector::zero)
 {}
@@ -78,5 +74,22 @@ Foam::frictionless::frictionless(const frictionless& fricLaw)
 Foam::frictionless::~frictionless()
 {}
 
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void Foam::frictionless::autoMap(const fvPatchFieldMapper& m)
+{
+    frictionContactModel::autoMap(m);
+
+    if (debug)
+    {
+        InfoIn
+        (
+            "void frictionless::autoMap(const fvPatchFieldMapper& m)"
+        )   << "autoMap" << endl;
+    }
+
+    slaveTraction_.autoMap(m);
+}
 
 // ************************************************************************* //

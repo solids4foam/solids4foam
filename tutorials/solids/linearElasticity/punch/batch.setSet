@@ -1,3 +1,0 @@
-faceSet punchContactFaceZone new patchToFace punchContact
-faceSet cylinderContactFaceZone new patchToFace cylinderContact
-quit
