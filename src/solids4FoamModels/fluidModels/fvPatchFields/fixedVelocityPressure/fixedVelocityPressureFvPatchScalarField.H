@@ -36,6 +36,7 @@ SourceFiles
 #ifndef fixedVelocityPressureFvPatchScalarFields_H
 #define fixedVelocityPressureFvPatchScalarFields_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
 

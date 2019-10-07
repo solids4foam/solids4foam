@@ -34,6 +34,7 @@ SourceFiles
 #ifndef movingWallPressureFvPatchScalarFields_H
 #define movingWallPressureFvPatchScalarFields_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
 

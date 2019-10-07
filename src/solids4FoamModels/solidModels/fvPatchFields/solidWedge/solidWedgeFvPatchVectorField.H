@@ -39,6 +39,7 @@ Author
 #ifndef solidWedgeFvPatchVectorField_H
 #define solidWedgeFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "wedgeFvPatchFields.H"
 #include "wedgeFvPatch.H"
 

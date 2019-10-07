@@ -35,6 +35,7 @@ SourceFiles
 #ifndef elasticWallPressureFvPatchScalarField_H
 #define elasticWallPressureFvPatchScalarField_H
 
+#include "foamTime.H"
 #include "robinFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

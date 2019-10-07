@@ -35,6 +35,7 @@ SourceFiles
 #ifndef convectiveFluxFvPatchScalarFields_H
 #define convectiveFluxFvPatchScalarFields_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 #include "Switch.H"

@@ -41,6 +41,7 @@ Author
 #ifndef fixedTemperatureFvPatchScalarField_H
 #define fixedTemperatureFvPatchScalarField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 #include "interpolationTable.H"

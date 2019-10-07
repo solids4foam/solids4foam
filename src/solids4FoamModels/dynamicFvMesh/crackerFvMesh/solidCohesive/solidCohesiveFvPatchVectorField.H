@@ -40,6 +40,7 @@ SourceFiles
 #ifndef solidCohesiveFvPatchVectorField_H
 #define solidCohesiveFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
 #include "cohesiveFvPatch.H"

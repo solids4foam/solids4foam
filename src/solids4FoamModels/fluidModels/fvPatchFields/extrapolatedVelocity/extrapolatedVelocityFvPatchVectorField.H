@@ -38,6 +38,7 @@ SourceFiles
 #ifndef extrapolatedVelocityFvPatchVectorFields_H
 #define extrapolatedVelocityFvPatchVectorFields_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "zeroGradientFvPatchFields.H"
 

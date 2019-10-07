@@ -40,6 +40,7 @@ SourceFiles
 #ifndef solidTractionFvPatchVectorField_H
 #define solidTractionFvPatchVectorField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
 #include "Switch.H"
