@@ -23,25 +23,34 @@ boundaryField
 {
     right
     {
-        type            solidTraction;
-        traction        uniform ( 0 -1e6 0 );
-        pressure        uniform 0;
+        // Example of usage for displacementOrTraction
+        type            displacementOrTraction;
+        constantDisplacement uniform (0 0 0);
+        constantTraction uniform (1e6 0 0);
+        // Normal direction will be traction, tangential will be displacement
+        specifyNormalDirection uniform -1;
         value           uniform (0 0 0);
     }
 
     top
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
+        // Example of usage for displacementOrTraction
+        type            displacementOrTraction;
+        constantDisplacement uniform (0 0 0);
+        constantTraction uniform (0 0 0);
+        // Normal direction will be displacement, tangential will be traction
+        specifyNormalDirection uniform 1;
         value           uniform (0 0 0);
     }
 
     bottom
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
+        // Example of usage for displacementOrTraction
+        type            displacementOrTraction;
+        constantDisplacement uniform (0 0 0);
+        constantTraction uniform (0 0 0);
+        // Patch is just traction (same as solidTraction)
+        valueFraction   uniform (0 0 0 0 0 0);
         value           uniform (0 0 0);
     }
 
