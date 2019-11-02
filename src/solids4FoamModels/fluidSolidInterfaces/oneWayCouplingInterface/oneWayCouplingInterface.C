@@ -61,15 +61,18 @@ oneWayCouplingInterface::oneWayCouplingInterface
 )
 :
     fluidSolidInterface(typeName, runTime, region),
-    solidZoneTraction_()
+    solidZonesTraction_(fluid().globalPatches().size())
 {
     // Initialize zone traction fields
-    solidZoneTraction_ =
-        vectorField
-        (
-            solid().globalPatch().globalPatch().size(),
-            vector::zero
-        );
+    forAll(fluid().globalPatches(), i)
+    {
+        solidZonesTraction_[i] =
+            vectorField
+            (
+                solid().globalPatches()[i].globalPatch().size(),
+                vector::zero
+            );
+    }
 
     if (!isA<fluidModels::oneWayFsiFluid>(fluid()))
     {
@@ -108,79 +111,128 @@ bool oneWayCouplingInterface::evolve()
 
 void oneWayCouplingInterface::updateTraction()
 {
-    Info<< "Update traction on solid patch" << endl;
+    Info<< "Update traction on solid patch/patches" << endl;
 
-    // Calculate fluid traction
+    const List<tmp<vectorField> > faceZonesViscousForce
+    (
+        fluid().faceZonesViscousForce()
+    );
 
-    const vectorField& p =
-        fluid().globalPatch().globalPatch().localPoints();
-    const faceList& f =
-        fluid().globalPatch().globalPatch().localFaces();
+    const List<tmp<scalarField> > faceZonesPressureForce
+    (
+        fluid().faceZonesPressureForce()
+    );
 
-    vectorField n(f.size(), vector::zero);
-    forAll(n, faceI)
+    List<vectorField> fluidZonesTractionAtSolid
+    (
+        solid().globalPatches().size(), vectorField()
+    );
+
+    List<vectorField> fluidZonesTraction
+    (
+        fluid().globalPatches().size(), vectorField()
+    );
+
+    forAll(fluid().globalPatches(), i)
     {
-        n[faceI] = f[faceI].normal(p);
-        n[faceI] /= mag(n[faceI]);
+        const vectorField& fluidZoneTraction = faceZonesViscousForce[i]();
+
+        const scalarField& fluidZonePressure = faceZonesPressureForce[i]();
+
+        // Calculate fluid traction
+        const vectorField& p =
+            fluid().globalPatches()[i].globalPatch().localPoints();
+
+        const faceList& f =
+            fluid().globalPatches()[i].globalPatch().localFaces();
+
+        vectorField n(f.size(), vector::zero);
+        forAll(n, faceI)
+        {
+            n[faceI] = f[faceI].normal(p);
+            n[faceI] /= mag(n[faceI]);
+        }
+
+        fluidZonesTraction[i] =
+            fluidZoneTraction - fluidZonePressure*n;
+
+        fluidZonesTractionAtSolid[i] =
+            vectorField
+            (
+                solid().globalPatches()[i].globalPatch().size(),
+                vector::zero
+            );
+
+        fluidZonesTractionAtSolid[i] =
+            ggiInterpolators()[i].masterToSlave
+            (
+                -fluidZonesTraction[i]
+            );
+
+        solidZonesTraction_[i] = fluidZonesTractionAtSolid[i];
     }
-
-    const vectorField fluidZoneTraction =
-        fluid().faceZoneViscousForce() - fluid().faceZonePressureForce()*n;
-
-    const vectorField fluidZoneTractionAtSolid =
-        ggiInterpolator().masterToSlave
-        (
-            -fluidZoneTraction
-        );
-
-    solidZoneTraction_ = fluidZoneTractionAtSolid;
 
     if (coupled())
     {
         solid().setTraction
         (
-            solidPatchIndex(),
-            solidZoneTraction_
+            solidPatchIndices(),
+            solidZonesTraction_
         );
     }
 
     // Total force at the fluid side of the interface
     {
-        const vectorField& p =
-            fluid().globalPatch().globalPatch().localPoints();
-        const faceList& f =
-            fluid().globalPatch().globalPatch().localFaces();
-
-        vectorField S(f.size(), vector::zero);
-
-        forAll(S, faceI)
+        forAll(fluid().globalPatches(), i)
         {
-            S[faceI] = f[faceI].normal(p);
+            const vectorField& p =
+                fluid().globalPatches()[i].globalPatch().localPoints();
+            const faceList& f =
+                fluid().globalPatches()[i].globalPatch().localFaces();
+
+            vectorField S(f.size(), vector::zero);
+
+            forAll(S, faceI)
+            {
+                S[faceI] = f[faceI].normal(p);
+            }
+
+            const vector totalTractionForce = sum(fluidZonesTraction[i]*mag(S));
+
+            Info<< "Total force on interface patch "
+                << fluidMesh().boundary()
+                   [
+                       fluid().globalPatches()[i].patch().index()
+                   ].name()
+                << " (fluid) = " << totalTractionForce << endl;
         }
-
-        const vector totalTractionForce = sum(fluidZoneTraction*mag(S));
-
-        Info<< "Total force (fluid) = " << totalTractionForce << endl;
     }
 
     // Total force at the solid side of the interface
     {
-        const vectorField& p =
-            solid().globalPatch().globalPatch().localPoints();
-        const faceList& f =
-            solid().globalPatch().globalPatch().localFaces();
-
-        vectorField S(f.size(), vector::zero);
-
-        forAll(S, faceI)
+        forAll(solid().globalPatches(), i)
         {
-            S[faceI] = f[faceI].normal(p);
+            const vectorField& p =
+                solid().globalPatches()[i].globalPatch().localPoints();
+            const faceList& f =
+                solid().globalPatches()[i].globalPatch().localFaces();
+
+            vectorField S(f.size(), vector::zero);
+
+            forAll(S, faceI)
+            {
+                S[faceI] = f[faceI].normal(p);
+            }
+
+            const vector totalTractionForce = sum(fluidZonesTractionAtSolid[i]*mag(S));
+
+            Info<< "Total force on interface patch "
+                << solidMesh().boundary()
+                   [
+                       solid().globalPatches()[i].patch().index()
+                   ].name()
+                << " (solid) = " << totalTractionForce << endl;
         }
-
-        const vector totalTractionForce = sum(fluidZoneTractionAtSolid*mag(S));
-
-        Info<< "Total force (solid) = "
-            << totalTractionForce << endl;
     }
 }
 

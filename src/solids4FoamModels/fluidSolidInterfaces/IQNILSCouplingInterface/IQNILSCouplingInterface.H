@@ -74,14 +74,14 @@ class IQNILSCouplingInterface
         //- Predict solid
         const bool predictSolid_;
 
-        //- Coupling field V
-        DynamicList<vectorField> fluidPatchPointsV_;
+        //- List of coupling field V
+        List<DynamicList<vectorField> > fluidPatchesPointsV_;
 
-        //- Coupling field W
-        DynamicList<vectorField> fluidPatchPointsW_;
+        //- List of coupling field W
+        List<DynamicList<vectorField> > fluidPatchesPointsW_;
 
-        //- Coupling field T
-        DynamicList<scalar> fluidPatchPointsT_;
+        //- List of coupling field T
+        List<DynamicList<scalar> > fluidPatchesPointsT_;
 
 
     // Private Member Functions

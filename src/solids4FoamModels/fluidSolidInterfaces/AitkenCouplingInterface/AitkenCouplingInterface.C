@@ -62,7 +62,7 @@ AitkenCouplingInterface::AitkenCouplingInterface
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
     ),
     predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
-    aitkenRelaxationFactor_(relaxationFactor_)
+    aitkenRelaxationFactors_(fluid().globalPatches().size(), relaxationFactor_)
 {}
 
 
@@ -135,56 +135,66 @@ void AitkenCouplingInterface::updateDisplacement()
         Info<< "Current fsi under-relaxation factor (fixed): "
             << relaxationFactor_ << endl;
 
-        fluidZonePointsDisplPrev() = fluidZonePointsDispl();
+        forAll(fluid().globalPatches(), i)
+        {
+            fluidZonesPointsDisplsPrev()[i] = fluidZonesPointsDispls()[i];
 
-        fluidZonePointsDispl() += relaxationFactor_*residual();
+            fluidZonesPointsDispls()[i] += relaxationFactor_*residuals()[i];
+        }
     }
     else
     {
-        aitkenRelaxationFactor_ =
-            -aitkenRelaxationFactor_
-           *(
-                sum
-                (
-                    residualPrev()
-                  & (residual() - residualPrev())
-                )
-               /(
+        forAll(fluid().globalPatches(), i)
+        {
+            aitkenRelaxationFactors_[i] =
+                -aitkenRelaxationFactors_[i]
+               *(
                     sum
                     (
-                        (residual() - residualPrev())
-                      & (residual() - residualPrev())
+                        residualsPrev()[i]
+                      & (residuals()[i] - residualsPrev()[i])
                     )
-                )
-            );
+                   /(
+                        sum
+                        (
+                            (residuals()[i] - residualsPrev()[i])
+                          & (residuals()[i] - residualsPrev()[i])
+                        )
+                    )
+                );
 
-        if (Pstream::parRun())
-        {
-            if (!Pstream::master())
+            if (Pstream::parRun())
             {
-                aitkenRelaxationFactor_ = 0.0;
+                if (!Pstream::master())
+                {
+                    aitkenRelaxationFactors_[i] = 0.0;
+                }
+
+                // Pass to all procs
+                reduce(aitkenRelaxationFactors_[i], sumOp<scalar>());
             }
 
-            // Pass to all procs
-            reduce(aitkenRelaxationFactor_, sumOp<scalar>());
+            aitkenRelaxationFactors_[i] = mag(aitkenRelaxationFactors_[i]);
+
+            if (aitkenRelaxationFactors_[i] > 1)
+            {
+                // PC: in this case, would 1.0 be a better option?
+                // Of course, the current option is more more stable
+                //aitkenRelaxationFactors_[i] = relaxationFactor_;
+                aitkenRelaxationFactors_[i] = 1.0;
+            }
+
+            Info<< "Current fsi under-relaxation factor (Aitken) of "
+                << fluidMesh().boundary()
+                   [
+                       fluid().globalPatches()[i].patch().index()
+                   ].name()
+                << ": " << aitkenRelaxationFactors_[i] << endl;
+
+            fluidZonesPointsDisplsPrev()[i] = fluidZonesPointsDispls()[i];
+
+            fluidZonesPointsDispls()[i] += aitkenRelaxationFactors_[i]*residuals()[i];
         }
-
-        aitkenRelaxationFactor_ = mag(aitkenRelaxationFactor_);
-
-        if (aitkenRelaxationFactor_ > 1)
-        {
-            // PC: in this case, would 1.0 be a better option?
-            // Of course, the current option is more more stable
-            //aitkenRelaxationFactor_ = relaxationFactor_;
-            aitkenRelaxationFactor_ = 1.0;
-        }
-
-        Info<< "Current fsi under-relaxation factor (Aitken): "
-            << aitkenRelaxationFactor_ << endl;
-
-        fluidZonePointsDisplPrev() = fluidZonePointsDispl();
-
-        fluidZonePointsDispl() += aitkenRelaxationFactor_*residual();
     }
 
     // Update movingWallPressure boundary conditions, if found
@@ -192,7 +202,7 @@ void AitkenCouplingInterface::updateDisplacement()
 
     // Make sure that displacement on all processors is equal to one
     // calculated on master processor
-    fluidSolidInterface::syncFluidZonePointsDispl(fluidZonePointsDispl());
+    fluidSolidInterface::syncFluidZonePointsDispl(fluidZonesPointsDispls());
 }
 
 

@@ -83,107 +83,112 @@ bool Foam::fluidSolidInterface::updateCoupled()
 }
 
 
-void Foam::fluidSolidInterface::calcCurrentSolidZonePoints() const
+void Foam::fluidSolidInterface::calcCurrentSolidZonesPoints() const
 {
-    // Find global face zones
-    if (currentSolidZonePointsPtr_)
+    const List<tmp<vectorField> > currentFaceZonesPoints
+    (
+        solid().currentFaceZonesPoints()
+    );
+
+    currentSolidZonesPointsPtrList_.setSize(solid().globalPatches().size());
+
+    forAll(solid().globalPatches(), i)
     {
-        FatalErrorIn
+        // Find global face zones
+        if (currentSolidZonesPointsPtrList_.set(i))
+        {
+            FatalErrorIn
+            (
+                "void fluidSolidInterface::"
+                "calcCurrentSolidZonesPoints() const"
+            )   << "Current solid zone points already exists "
+                << "for global patch: "
+                << solidMesh().boundary()
+                   [
+                       solid().globalPatches()[i].patch().index()
+                   ].name()
+                << "!" << abort(FatalError);
+        }
+
+        currentSolidZonesPointsPtrList_.set
         (
-            "void fluidSolidInterface::"
-            "calcCurrentSolidZonePoints() const"
-        )   << "Current solid zone points already exist"
-            << abort(FatalError);
-    }
-
-    currentSolidZonePointsPtr_ =
-        new vectorField(solid().currentFaceZonePoints());
-}
-
-
-void Foam::fluidSolidInterface::calcCurrentSolidZonePatch() const
-{
-    // Find global face zones
-    if (currentSolidZonePatchPtr_)
-    {
-        FatalErrorIn
-        (
-            "void fluidSolidInterface::"
-            "calcCurrentSolidZonePatch() const"
-        )   << "Current solid zone patch already exists"
-            << abort(FatalError);
-    }
-
-    currentSolidZonePatchPtr_ =
-        new standAlonePatch
-        (
-            solid().globalPatch().globalPatch().localFaces(),
-            currentSolidZonePoints()
+            i,
+            new vectorField(currentFaceZonesPoints[i]())
         );
+    }
 }
 
 
-void Foam::fluidSolidInterface::calcRbfFluidToSolidInterpolator() const
+void Foam::fluidSolidInterface::calcCurrentSolidZonesPatches() const
 {
-    if (rbfFluidToSolidPtr_)
+    currentSolidZonesPatchesPtrList_.setSize(solid().globalPatches().size());
+
+    forAll(solid().globalPatches(), i)
     {
-        FatalErrorIn
+        // Find global face zones
+        if (currentSolidZonesPatchesPtrList_.set(i))
+        {
+            FatalErrorIn
+            (
+                "void fluidSolidInterface::"
+                "calcCurrentSolidZonesPatches() const"
+            )   << "Current solid zone patch already exists "
+                << "for global patch: "
+                << solidMesh().boundary()
+                   [
+                       solid().globalPatches()[i].patch().index()
+                   ].name()
+                << "!" << abort(FatalError);
+        }
+
+        currentSolidZonesPatchesPtrList_.set
         (
-            "void fluidSolidInterface::calcRbfFluidToSolidInterpolator() const"
-        )   << "Fluid to solid interpolator already exists"
-            << abort(FatalError);
-    }
-
-    std::shared_ptr<RBFFunctionInterface> rbfFunction;
-    rbfFunction = std::shared_ptr<RBFFunctionInterface>(new TPSFunction());
-
-    rbfFluidToSolidPtr_ =
-        std::shared_ptr<RBFInterpolation>(new RBFInterpolation(rbfFunction));
-
-    const vectorField solidZoneFaceCentres =
-        currentSolidZonePatch().faceCentres();
-    const vectorField fluidZoneFaceCentres =
-        fluid().globalPatch().globalPatch().faceCentres();
-
-    matrix fluidX(fluidZoneFaceCentres.size(), 3);
-    matrix solidX(solidZoneFaceCentres.size(), 3);
-
-    forAll(fluidZoneFaceCentres, faceI)
-    {
-        fluidX(faceI, 0) = fluidZoneFaceCentres[faceI].x();
-        fluidX(faceI, 1) = fluidZoneFaceCentres[faceI].y();
-        fluidX(faceI, 2) = fluidZoneFaceCentres[faceI].z();
-    }
-
-    forAll(solidZoneFaceCentres, faceI)
-    {
-        solidX(faceI, 0) = solidZoneFaceCentres[faceI].x();
-        solidX(faceI, 1) = solidZoneFaceCentres[faceI].y();
-        solidX(faceI, 2) = solidZoneFaceCentres[faceI].z();
-    }
-
-    rbfFluidToSolidPtr_->compute(fluidX, solidX);
-
-    Info<< "Checking fluid-to-solid interpolator" << endl;
-    {
-        vectorField fluidPatchFaceCentres =
-            vectorField
+            i,
+            new standAlonePatch
             (
-                fluidMesh().boundaryMesh()[fluidPatchIndex_].faceCentres()
-            );
+                solid().globalPatches()[i].globalPatch().localFaces(),
+                currentSolidZonesPoints()[i]
+            )
+        );
+    }
+}
 
-        vectorField fluidZoneFaceCentres =
-            fluid().globalPatch().patchFaceToGlobal(fluidPatchFaceCentres);
 
+void Foam::fluidSolidInterface::calcRbfFluidToSolidInterpolators() const
+{
+    rbfFluidToSolidPtrList_.setSize(fluid().globalPatches().size());
 
-        vectorField solidPatchFaceCentres =
-            vectorField
+    forAll(fluid().globalPatches(), i)
+    {
+        const label patchID = fluid().globalPatches()[i].patch().index();
+
+        if (rbfFluidToSolidPtrList_[i])
+        {
+            FatalErrorIn
             (
-                solidMesh().boundaryMesh()[solidPatchIndex_].faceCentres()
-            );
+                "void fluidSolidInterface::calcRbfFluidToSolidInterpolators() const"
+            )   << "Fluid to solid interpolator already exists for global patch: "
+                << fluidMesh().boundary()[patchID].name() << "!"
+                << abort(FatalError);
+        }
+
+        Info<< "Create RBF fluid-to-solid interpolator for interface patch: "
+            << fluidMesh().boundary()[patchID].name() << "!" << endl;
+
+        std::shared_ptr<RBFFunctionInterface> rbfFunction;
+        rbfFunction = std::shared_ptr<RBFFunctionInterface>(new TPSFunction());
+
+        rbfFluidToSolidPtrList_[i] =
+            std::shared_ptr<RBFInterpolation>(new RBFInterpolation(rbfFunction));
+
+        const vectorField solidZoneFaceCentres =
+            currentSolidZonesPatches()[i].faceCentres();
+
+        const vectorField fluidZoneFaceCentres =
+            fluid().globalPatches()[i].globalPatch().faceCentres();
 
         matrix fluidX(fluidZoneFaceCentres.size(), 3);
-        matrix fluidXsolid(solidPatchFaceCentres.size(), 3);
+        matrix solidX(solidZoneFaceCentres.size(), 3);
 
         forAll(fluidZoneFaceCentres, faceI)
         {
@@ -192,815 +197,1048 @@ void Foam::fluidSolidInterface::calcRbfFluidToSolidInterpolator() const
             fluidX(faceI, 2) = fluidZoneFaceCentres[faceI].z();
         }
 
-        rbfFluidToSolidPtr_->interpolate(fluidX, fluidXsolid);
-
-        vectorField fluidPatchFaceCentresAtSolid
-        (
-            solidPatchFaceCentres.size(),
-            vector::zero
-        );
-
-        forAll(fluidPatchFaceCentresAtSolid, faceI)
+        forAll(solidZoneFaceCentres, faceI)
         {
-            fluidPatchFaceCentresAtSolid[faceI].x() = fluidXsolid(faceI, 0);
-            fluidPatchFaceCentresAtSolid[faceI].y() = fluidXsolid(faceI, 1);
-            fluidPatchFaceCentresAtSolid[faceI].z() = fluidXsolid(faceI, 2);
+            solidX(faceI, 0) = solidZoneFaceCentres[faceI].x();
+            solidX(faceI, 1) = solidZoneFaceCentres[faceI].y();
+            solidX(faceI, 2) = solidZoneFaceCentres[faceI].z();
         }
 
-        scalar maxDist = gMax
-        (
-            mag
-            (
-                 fluidPatchFaceCentresAtSolid
-               - solidPatchFaceCentres
-            )
-        );
+        rbfFluidToSolidPtrList_[i]->compute(fluidX, solidX);
 
-        Info<< "Fluid-to-solid face interpolation error: " << maxDist
-            << endl;
+        Info<< "Checking fluid-to-solid interpolator" << endl;
+
+        {
+            vectorField fluidPatchFaceCentres =
+                vectorField
+                (
+                    fluidMesh().boundaryMesh()[fluidPatchIndices()[i]].faceCentres()
+                );
+
+            vectorField fluidZoneFaceCentres =
+                fluid().globalPatches()[i].patchFaceToGlobal(fluidPatchFaceCentres);
+
+
+            vectorField solidPatchFaceCentres =
+                vectorField
+                (
+                    solidMesh().boundaryMesh()[solidPatchIndices()[i]].faceCentres()
+                );
+
+            matrix fluidX(fluidZoneFaceCentres.size(), 3);
+            matrix fluidXsolid(solidPatchFaceCentres.size(), 3);
+
+            forAll(fluidZoneFaceCentres, faceI)
+            {
+                fluidX(faceI, 0) = fluidZoneFaceCentres[faceI].x();
+                fluidX(faceI, 1) = fluidZoneFaceCentres[faceI].y();
+                fluidX(faceI, 2) = fluidZoneFaceCentres[faceI].z();
+            }
+
+            rbfFluidToSolidPtrList_[i]->interpolate(fluidX, fluidXsolid);
+
+            vectorField fluidPatchFaceCentresAtSolid
+            (
+                solidPatchFaceCentres.size(),
+                vector::zero
+            );
+
+            forAll(fluidPatchFaceCentresAtSolid, faceI)
+            {
+                fluidPatchFaceCentresAtSolid[faceI].x() = fluidXsolid(faceI, 0);
+                fluidPatchFaceCentresAtSolid[faceI].y() = fluidXsolid(faceI, 1);
+                fluidPatchFaceCentresAtSolid[faceI].z() = fluidXsolid(faceI, 2);
+            }
+
+            scalar maxDist = gMax
+            (
+                mag
+                (
+                    fluidPatchFaceCentresAtSolid
+                  - solidPatchFaceCentres
+                )
+            );
+
+            Info<< "Fluid-to-solid face interpolation error: " << maxDist
+                << endl;
+        }
+
+        Info<< endl;
     }
 }
 
 
-void Foam::fluidSolidInterface::calcRbfSolidToFluidInterpolator() const
+void Foam::fluidSolidInterface::calcRbfSolidToFluidInterpolators() const
 {
-    if (rbfSolidToFluidPtr_)
+    rbfSolidToFluidPtrList_.setSize(solid().globalPatches().size());
+
+    forAll(solid().globalPatches(), i)
     {
-        FatalErrorIn
-        (
-            "void fluidSolidInterface::calcRbfSolidToFluidInterpolator() const"
-        )   << "Solid to fluid interpolator already exists"
-            << abort(FatalError);
-    }
+        const label patchID = solid().globalPatches()[i].patch().index();
 
-    std::shared_ptr<RBFFunctionInterface> rbfFunction;
-    rbfFunction = std::shared_ptr<RBFFunctionInterface>(new TPSFunction());
-
-    rbfSolidToFluidPtr_ =
-        std::shared_ptr<RBFInterpolation>(new RBFInterpolation(rbfFunction));
-
-    const vectorField solidZonePoints = currentSolidZonePatch().localPoints();
-    const vectorField fluidZonePoints =
-        fluid().globalPatch().globalPatch().localPoints();
-
-    matrix fluidX(fluidZonePoints.size(), 3);
-    matrix solidX(solidZonePoints.size(), 3);
-
-    forAll(fluidZonePoints, faceI)
-    {
-        fluidX(faceI, 0) = fluidZonePoints[faceI].x();
-        fluidX(faceI, 1) = fluidZonePoints[faceI].y();
-        fluidX(faceI, 2) = fluidZonePoints[faceI].z();
-    }
-
-    forAll(solidZonePoints, faceI)
-    {
-        solidX(faceI, 0) = solidZonePoints[faceI].x();
-        solidX(faceI, 1) = solidZonePoints[faceI].y();
-        solidX(faceI, 2) = solidZonePoints[faceI].z();
-    }
-
-    rbfSolidToFluidPtr_->compute(solidX, fluidX);
-
-    Info<< "Checking solid-to-fluid interpolator" << endl;
-    {
-        matrix fluidPoints(fluidZonePoints.size(), 3);
-        matrix solidPoints(solidZonePoints.size(), 3);
-        vectorField fluidZonePointsInterp(fluidZonePoints.size(), vector::zero);
-
-
-        forAll(solidZonePoints, faceI)
+        if (rbfSolidToFluidPtrList_[i])
         {
-            solidPoints(faceI, 0) = solidZonePoints[faceI].x();
-            solidPoints(faceI, 1) = solidZonePoints[faceI].y();
-            solidPoints(faceI, 2) = solidZonePoints[faceI].z();
+            FatalErrorIn
+            (
+                "void fluidSolidInterface::calcRbfSolidToFluidInterpolators() const"
+            )   << "Solid to fluid interpolator already exists for global patch: "
+                << solidMesh().boundary()[patchID].name() << "!"
+                << abort(FatalError);
         }
 
-        rbfSolidToFluidPtr_->interpolate(solidPoints, fluidPoints);
+        Info<< "Create RBF solid-to-fluid interpolator for interface patch: "
+            << solidMesh().boundary()[patchID].name() << endl;
+
+        std::shared_ptr<RBFFunctionInterface> rbfFunction;
+        rbfFunction = std::shared_ptr<RBFFunctionInterface>(new TPSFunction());
+
+        rbfSolidToFluidPtrList_[i] =
+            std::shared_ptr<RBFInterpolation>(new RBFInterpolation(rbfFunction));
+
+        const vectorField solidZonePoints =
+            currentSolidZonesPatches()[i].localPoints();
+
+        const vectorField fluidZonePoints =
+            fluid().globalPatches()[i].globalPatch().localPoints();
+
+        matrix fluidX(fluidZonePoints.size(), 3);
+        matrix solidX(solidZonePoints.size(), 3);
 
         forAll(fluidZonePoints, faceI)
         {
-            fluidZonePointsInterp[faceI].x() = fluidPoints(faceI, 0);
-            fluidZonePointsInterp[faceI].y() = fluidPoints(faceI, 1);
-            fluidZonePointsInterp[faceI].z() = fluidPoints(faceI, 2);
+            fluidX(faceI, 0) = fluidZonePoints[faceI].x();
+            fluidX(faceI, 1) = fluidZonePoints[faceI].y();
+            fluidX(faceI, 2) = fluidZonePoints[faceI].z();
         }
 
-        scalar maxDist = gMax
-        (
-            mag
-            (
-                fluidZonePointsInterp
-              - fluidZonePoints
-            )
-        );
-
-        Info<< "Solid-to-fluid point interpolation error: " << maxDist
-            << endl;
-    }
-}
-
-
-void Foam::fluidSolidInterface::calcGgiInterpolator() const
-{
-    // Create ggi interpolation
-    if (ggiInterpolatorPtr_)
-    {
-        FatalErrorIn
-        (
-            "void fluidSolidInterface::"
-            "calcGgiInterpolator() const"
-        )   << "Ggi interpolator already exists"
-            << abort(FatalError);
-    }
-
-    // Remove current solid zone and points so that it will be re-created in the
-    // deformed position
-    deleteDemandDrivenData(currentSolidZonePatchPtr_);
-    deleteDemandDrivenData(currentSolidZonePointsPtr_);
-
-    Info<< "Create GGI zone-to-zone interpolator" << endl;
-
-    ggiInterpolatorPtr_ =
-        new GGIInterpolation<standAlonePatch, standAlonePatch>
-        (
-            fluid().globalPatch().globalPatch(),
-            currentSolidZonePatch(),
-            tensorField(0),
-            tensorField(0),
-            vectorField(0), // Slave-to-master separation. Bug fix
-            true,           // Patch data is complete on all processors
-            SMALL,          // Non-overlapping face tolerances
-            SMALL,
-            true,           // Rescale weighting factors
-            ggiInterpolation::BB_OCTREE
-        );
-
-
-    Info<< "Checking fluid-to-solid face interpolator" << endl;
-
-    {
-        const vectorField fluidPatchFaceCentres =
-            vectorField
-            (
-                fluidMesh().boundaryMesh()[fluidPatchIndex_].faceCentres()
-            );
-
-        const vectorField fluidZoneFaceCentres =
-            fluid().globalPatch().patchFaceToGlobal(fluidPatchFaceCentres);
-
-        const vectorField solidZoneFaceCentres =
-            ggiInterpolatorPtr_->masterToSlave
-            (
-                fluidZoneFaceCentres
-            );
-
-        const vectorField solidPatchFaceCentres =
-            solid().globalPatch().globalFaceToPatch(solidZoneFaceCentres);
-
-        scalar maxDist = gMax
-        (
-            mag
-            (
-                solidPatchFaceCentres
-              - solidMesh().boundaryMesh()[solidPatchIndex_].faceCentres()
-            )
-        );
-
-        Info<< "Fluid-to-solid face interpolation error: " << maxDist
-            << endl;
-    }
-
-    Info<< "Checking solid-to-fluid point interpolator" << endl;
-    {
-        const vectorField solidZonePointsAtFluid =
-            ggiInterpolatorPtr_->slaveToMasterPointInterpolate
-            (
-                currentSolidZonePoints()
-            );
-
-        const vectorField fluidZonePoints =
-            fluid().globalPatch().globalPatch().localPoints();
-
-        const scalar maxDist = gMax
-        (
-            mag
-            (
-                fluidZonePoints
-              - solidZonePointsAtFluid
-            )
-        );
-
-        Info<< "Solid-to-fluid point interpolation error: " << maxDist
-            << endl;
-    }
-
-    Info<< "Number of uncovered master faces: "
-        << ggiInterpolatorPtr_->uncoveredMasterFaces().size() << endl;
-
-    Info<< "Number of uncovered slave faces: "
-        << ggiInterpolatorPtr_ ->uncoveredSlaveFaces().size() << endl;
-
-    ggiInterpolatorPtr_->slavePointDistanceToIntersection();
-    ggiInterpolatorPtr_->masterPointDistanceToIntersection();
-}
-
-
-void Foam::fluidSolidInterface::calcFluidToSolidFaceMap() const
-{
-    if (fluidToSolidFaceMapPtr_.valid())
-    {
-        FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
-            << "pointer already set!" << abort(FatalError);
-    }
-
-    if
-    (
-        solid().globalPatch().globalPatch().size()
-     != fluid().globalPatch().globalPatch().size()
-    )
-    {
-        FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
-            << "Fluid and solid interfaces are not conformal!" << nl
-            << "directMap method requires conformal interfaces"
-            << abort(FatalError);
-    }
-
-    IOobject mapHeader
-    (
-        "fluidToSolidFaceMap",
-        fluid().runTime().timeName(),
-        fluidMesh(),
-        IOobject::MUST_READ
-    );
-
-    if (mapHeader.headerOk())
-    {
-        // Read map
-        Info<< "Reading fluidToSolidFaceMap from disk" << endl;
-        fluidToSolidFaceMapPtr_.set
-        (
-            new labelIOList
-            (
-                IOobject
-                (
-                    "fluidToSolidFaceMap",
-                    fluid().runTime().timeName(),
-                    fluidMesh(),
-                    IOobject::MUST_READ,
-                    IOobject::AUTO_WRITE
-                )
-            )
-        );
-    }
-    else
-    {
-        // Initialise map
-        fluidToSolidFaceMapPtr_.set
-        (
-            new labelIOList
-            (
-                IOobject
-                (
-                    "fluidToSolidFaceMap",
-                    fluid().runTime().timeName(),
-                    fluidMesh(),
-                    IOobject::NO_READ,
-                    IOobject::AUTO_WRITE
-                ),
-                labelList(solid().globalPatch().globalPatch().size(), -1)
-            )
-        );
-        labelList& fluidToSolidMap = fluidToSolidFaceMapPtr_();
-
-        // Perform N^2 search for corresponding faces
-    // We will take 0.1% of the minEdgeLength as the exact match tolerance
-
-        const vectorField& fluidCf =
-            fluid().globalPatch().globalPatch().faceCentres();
-        const vectorField& solidCf =
-            solid().globalPatch().globalPatch().faceCentres();
-
-        const scalar tol = 0.001*gMin(minEdgeLength());
-
-        forAll(solidCf, solidFaceI)
+        forAll(solidZonePoints, faceI)
         {
-            const vector& curSolidCf = solidCf[solidFaceI];
-
-            forAll(fluidCf, fluidFaceI)
-            {
-                if (mag(curSolidCf - fluidCf[fluidFaceI]) < tol)
-                {
-                    fluidToSolidMap[solidFaceI] = fluidFaceI;
-                    break;
-                }
-            }
+            solidX(faceI, 0) = solidZonePoints[faceI].x();
+            solidX(faceI, 1) = solidZonePoints[faceI].y();
+            solidX(faceI, 2) = solidZonePoints[faceI].z();
         }
-    }
 
-    if (gMin(fluidToSolidFaceMapPtr_()) == -1)
-    {
-        FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
-            << "Cannot calculate the map between interfaces" << nl
-            << "Direct mapping can only be used with conformal interfaces!"
-            << abort(FatalError);
+       rbfSolidToFluidPtrList_[i]->compute(solidX, fluidX);
+
+       Info<< "Checking solid-to-fluid interpolator" << endl;
+
+       {
+           matrix fluidPoints(fluidZonePoints.size(), 3);
+           matrix solidPoints(solidZonePoints.size(), 3);
+           vectorField fluidZonePointsInterp(fluidZonePoints.size(), vector::zero);
+
+
+           forAll(solidZonePoints, faceI)
+           {
+               solidPoints(faceI, 0) = solidZonePoints[faceI].x();
+               solidPoints(faceI, 1) = solidZonePoints[faceI].y();
+               solidPoints(faceI, 2) = solidZonePoints[faceI].z();
+           }
+
+           rbfSolidToFluidPtrList_[i]->interpolate(solidPoints, fluidPoints);
+
+           forAll(fluidZonePoints, faceI)
+           {
+               fluidZonePointsInterp[faceI].x() = fluidPoints(faceI, 0);
+               fluidZonePointsInterp[faceI].y() = fluidPoints(faceI, 1);
+               fluidZonePointsInterp[faceI].z() = fluidPoints(faceI, 2);
+           }
+
+           scalar maxDist = gMax
+           (
+               mag
+               (
+                   fluidZonePointsInterp
+                 - fluidZonePoints
+               )
+           );
+
+           Info<< "Solid-to-fluid point interpolation error: " << maxDist
+               << endl;
+        }
+
+        Info<< endl;
     }
 }
 
 
-const Foam::labelList& Foam::fluidSolidInterface::fluidToSolidFaceMap() const
+void Foam::fluidSolidInterface::calcGgiInterpolators() const
 {
-    if (fluidToSolidFaceMapPtr_.empty())
+    // Note: Remove current solid zone and points so that
+    // it will be re-created in the deformed position
+    currentSolidZonesPatchesPtrList_.clear();
+    currentSolidZonesPointsPtrList_.clear();
+
+    ggiInterpolatorsPtrList_.setSize(fluid().globalPatches().size());
+
+    forAll(fluid().globalPatches(), i)
     {
-        calcFluidToSolidFaceMap();
-    }
+        const label patchID = fluid().globalPatches()[i].patch().index();
 
-    return fluidToSolidFaceMapPtr_();
-}
-
-
-void Foam::fluidSolidInterface::calcSolidToFluidFaceMap() const
-{
-    if (solidToFluidFaceMapPtr_.valid())
-    {
-        FatalErrorIn(type() + "::calcSolidToFluidFaceMap() const")
-            << "pointer already set!" << abort(FatalError);
-    }
-
-    if
-    (
-        solid().globalPatch().globalPatch().size()
-     != fluid().globalPatch().globalPatch().size()
-    )
-    {
-        FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
-            << "Fluid and solid interfaces are not conformal!" << nl
-            << "directMap method requires conformal interfaces"
-            << abort(FatalError);
-    }
-
-    IOobject mapHeader
-    (
-        "solidToFluidFaceMap",
-        solid().runTime().timeName(),
-        solidMesh(),
-        IOobject::MUST_READ
-    );
-
-    if (mapHeader.headerOk())
-    {
-        // Read map
-        Info<< "Reading solidToFluidFaceMap from disk" << endl;
-        solidToFluidFaceMapPtr_.set
-        (
-            new labelIOList
-            (
-                IOobject
-                (
-                    "solidToFluidFaceMap",
-                    solid().runTime().timeName(),
-                    solidMesh(),
-                    IOobject::MUST_READ,
-                    IOobject::AUTO_WRITE
-                )
-            )
-        );
-    }
-    else
-    {
-        // Initialise map
-        solidToFluidFaceMapPtr_.set
-        (
-            new labelIOList
-            (
-                IOobject
-                (
-                    "solidToFluidFaceMap",
-                    solid().runTime().timeName(),
-                    solidMesh(),
-                    IOobject::NO_READ,
-                    IOobject::AUTO_WRITE
-                ),
-                labelList(fluid().globalPatch().globalPatch().size(), -1)
-            )
-        );
-        labelList& solidToFluidMap = solidToFluidFaceMapPtr_();
-
-        // Perform N^2 search for corresponding faces
-        // We will take 0.1% of the minEdgeLength as the exact match tolerance
-
-        const vectorField& fluidCf =
-            fluid().globalPatch().globalPatch().faceCentres();
-        const vectorField& solidCf =
-            solid().globalPatch().globalPatch().faceCentres();
-
-        const scalar tol = 0.001*gMin(minEdgeLength());
-
-        forAll(fluidCf, fluidFaceI)
+        // Create ggi interpolation
+        if (ggiInterpolatorsPtrList_.set(i))
         {
-            const vector& curFluidCf = fluidCf[fluidFaceI];
+            FatalErrorIn
+            (
+                "void fluidSolidInterface::"
+                "calcGgiInterpolators() const"
+            )   << "Ggi interpolator already exists for global patch: "
+                << fluidMesh().boundary()[patchID].name() << "!"
+                << abort(FatalError);
+        }
+
+        Info<< "Create GGI zone-to-zone interpolator for interface patch: "
+            << fluidMesh().boundary()[patchID].name() << endl;
+
+        ggiInterpolatorsPtrList_.set
+        (
+            i,
+            new GGIInterpolation<standAlonePatch, standAlonePatch>
+            (
+                fluid().globalPatches()[i].globalPatch(),
+                currentSolidZonesPatches()[i],
+                tensorField(0),
+                tensorField(0),
+                vectorField(0), // Slave-to-master separation. Bug fix
+                true,           // Patch data is complete on all processors
+                SMALL,          // Non-overlapping face tolerances
+                SMALL,
+                true,           // Rescale weighting factors
+                ggiInterpolation::BB_OCTREE
+            )
+        );
+
+        Info<< "Checking fluid-to-solid face interpolator" << endl;
+
+        {
+            const vectorField fluidPatchFaceCentres =
+                vectorField
+                (
+                    fluidMesh().boundaryMesh()[fluidPatchIndices()[i]].faceCentres()
+                );
+
+            const vectorField fluidZoneFaceCentres =
+                fluid().globalPatches()[i].patchFaceToGlobal(fluidPatchFaceCentres);
+
+            const vectorField solidZoneFaceCentres =
+                ggiInterpolatorsPtrList_(i)->masterToSlave
+                (
+                    fluidZoneFaceCentres
+                );
+
+            const vectorField solidPatchFaceCentres =
+                solid().globalPatches()[i].globalFaceToPatch(solidZoneFaceCentres);
+
+            scalar maxDist = gMax
+            (
+                mag
+                (
+                    solidPatchFaceCentres
+                  - solidMesh().boundaryMesh()[solidPatchIndices()[i]].faceCentres()
+                )
+            );
+
+            Info<< "Fluid-to-solid face interpolation error: " << maxDist
+                << endl;
+        }
+
+        Info<< "Checking solid-to-fluid point interpolator" << endl;
+
+        {
+            const vectorField solidZonePointsAtFluid =
+                ggiInterpolatorsPtrList_(i)->slaveToMasterPointInterpolate
+                (
+                    currentSolidZonesPoints()[i]
+                );
+
+            const vectorField fluidZonePoints =
+                fluid().globalPatches()[i].globalPatch().localPoints();
+
+            const scalar maxDist = gMax
+            (
+                mag
+                (
+                    fluidZonePoints
+                  - solidZonePointsAtFluid
+                )
+            );
+
+            Info<< "Solid-to-fluid point interpolation error: " << maxDist
+                << endl;
+        }
+
+        Info<< "Number of uncovered master faces: "
+            << ggiInterpolatorsPtrList_(i)->uncoveredMasterFaces().size() << endl;
+
+        Info<< "Number of uncovered slave faces: "
+            << ggiInterpolatorsPtrList_(i)->uncoveredSlaveFaces().size() << endl;
+
+        ggiInterpolatorsPtrList_(i)->slavePointDistanceToIntersection();
+        ggiInterpolatorsPtrList_(i)->masterPointDistanceToIntersection();
+
+        Info<< endl;
+    }
+}
+
+
+void Foam::fluidSolidInterface::calcFluidToSolidFaceMaps() const
+{
+    fluidToSolidFaceMapsPtrList_.setSize(fluid().globalPatches().size());
+
+    forAll(fluid().globalPatches(), i)
+    {
+        const label patchID = fluid().globalPatches()[i].patch().index();
+
+        if (fluidToSolidFaceMapsPtrList_.set(i))
+        {
+            FatalErrorIn(type() + "::calcFluidToSolidFaceMaps() const")
+                << "pointer already set for global patch: "
+                << fluidMesh().boundary()[patchID].name() << "!"
+                << abort(FatalError);
+        }
+
+        if
+        (
+            solid().globalPatches()[i].globalPatch().size()
+         != fluid().globalPatches()[i].globalPatch().size()
+        )
+        {
+            FatalErrorIn(type() + "::calcFluidToSolidFaceMaps() const")
+                << "Fluid and solid interfaces are not conformal for "
+                << "global patch: "
+                << fluidMesh().boundary()[patchID].name() << "!" << nl
+                << "directMap method requires conformal interfaces."
+                << abort(FatalError);
+        }
+
+        const word fluidToSolidFaceMapName
+        (
+            "fluidToSolidFaceMap"
+#if FOAMEXTEND > 40
+          + name(i)
+#else
+          + word(std::to_string(i), false)
+#endif
+        );
+
+        IOobject mapHeader
+        (
+            fluidToSolidFaceMapName,
+            fluid().runTime().timeName(),
+            fluidMesh(),
+            IOobject::MUST_READ
+        );
+
+        if (mapHeader.headerOk())
+        {
+            // Read map
+            Info<< "Reading fluidToSolidFaceMap for global patch "
+                << fluidMesh().boundary()[patchID].name()
+                << " from disk..." << endl;
+
+            fluidToSolidFaceMapsPtrList_.set
+            (
+                i,
+                new labelIOList
+                (
+                    IOobject
+                    (
+                        fluidToSolidFaceMapName,
+                        fluid().runTime().timeName(),
+                        fluidMesh(),
+                        IOobject::MUST_READ,
+                        IOobject::AUTO_WRITE
+                    )
+                )
+            );
+        }
+        else
+        {
+            // Initialise map
+            fluidToSolidFaceMapsPtrList_.set
+            (
+                i,
+                new labelIOList
+                (
+                    IOobject
+                    (
+                        fluidToSolidFaceMapName,
+                        fluid().runTime().timeName(),
+                        fluidMesh(),
+                        IOobject::NO_READ,
+                        IOobject::AUTO_WRITE
+                    ),
+                    labelList(solid().globalPatches()[i].globalPatch().size(), -1)
+                )
+            );
+            labelList& fluidToSolidMap = fluidToSolidFaceMapsPtrList_[i];
+
+            // Perform N^2 search for corresponding faces
+            // We will take 0.1% of the minEdgeLength as the exact match tolerance
+
+            const vectorField& fluidCf =
+                fluid().globalPatches()[i].globalPatch().faceCentres();
+
+            const vectorField& solidCf =
+                solid().globalPatches()[i].globalPatch().faceCentres();
+
+            const scalar tol = 0.001*gMin(minEdgeLengths()[i]);
 
             forAll(solidCf, solidFaceI)
             {
-                if (mag(curFluidCf - solidCf[solidFaceI]) < tol)
+                const vector& curSolidCf = solidCf[solidFaceI];
+
+                forAll(fluidCf, fluidFaceI)
                 {
-                    solidToFluidMap[fluidFaceI] = solidFaceI;
-                    break;
+                    if (mag(curSolidCf - fluidCf[fluidFaceI]) < tol)
+                    {
+                        fluidToSolidMap[solidFaceI] = fluidFaceI;
+                        break;
+                    }
                 }
             }
         }
-    }
 
-    if (gMin(solidToFluidFaceMapPtr_()) == -1)
-    {
-        FatalErrorIn(type() + "::calcSolidToFluidFaceMap() const")
-            << "Cannot calculate the map between interfaces" << nl
-            << "Direct mapping can only be used with conformal interfaces!"
-            << abort(FatalError);
-    }
-}
-
-
-const Foam::labelList& Foam::fluidSolidInterface::solidToFluidFaceMap() const
-{
-    if (solidToFluidFaceMapPtr_.empty())
-    {
-        calcSolidToFluidFaceMap();
-    }
-
-    return solidToFluidFaceMapPtr_();
-}
-
-
-void Foam::fluidSolidInterface::calcFluidToSolidPointMap() const
-{
-    if (fluidToSolidPointMapPtr_.valid())
-    {
-        FatalErrorIn(type() + "::calcFluidToSolidPointMap() const")
-            << "pointer already set!" << abort(FatalError);
-    }
-
-    if
-    (
-        solid().globalPatch().globalPatch().size()
-     != fluid().globalPatch().globalPatch().size()
-    )
-    {
-        FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
-            << "Fluid and solid interfaces are not conformal!" << nl
-            << "directMap method requires conformal interfaces"
-            << abort(FatalError);
-    }
-
-    IOobject mapHeader
-    (
-        "fluidToSolidPointMap",
-        fluid().runTime().timeName(),
-        fluidMesh(),
-        IOobject::MUST_READ
-    );
-
-    if (mapHeader.headerOk())
-    {
-        // Read map
-        Info<< "Reading fluidToSolidPointMap from disk" << endl;
-        fluidToSolidPointMapPtr_.set
-        (
-            new labelIOList
-            (
-                IOobject
-                (
-                    "fluidToSolidPointMap",
-                    fluid().runTime().timeName(),
-                    fluidMesh(),
-                    IOobject::MUST_READ,
-                    IOobject::AUTO_WRITE
-                )
-            )
-        );
-    }
-    else
-    {
-        // Initialise map
-        fluidToSolidPointMapPtr_.set
-        (
-            new labelIOList
-            (
-                IOobject
-                (
-                    "fluidToSolidPointMap",
-                    fluid().runTime().timeName(),
-                    fluidMesh(),
-                    IOobject::NO_READ,
-                    IOobject::AUTO_WRITE
-                ),
-                labelList(solid().globalPatch().globalPatch().nPoints(), -1)
-            )
-        );
-        labelList& fluidToSolidMap = fluidToSolidPointMapPtr_();
-
-        // Perform N^2 search for corresponding points
-        // We will take 0.1% of the minEdgeLength as the exact match tolerance
-
-        const vectorField& fluidLP =
-            fluid().globalPatch().globalPatch().localPoints();
-        const vectorField& solidLP =
-            solid().globalPatch().globalPatch().localPoints();
-
-        const scalar tol = 0.001*gMin(minEdgeLength());
-
-        forAll(solidLP, solidPointI)
+        if (gMin(fluidToSolidFaceMapsPtrList_[i]) == -1)
         {
-            const vector& curSolidLP = solidLP[solidPointI];
+            FatalErrorIn(type() + "::calcFluidToSolidFaceMaps() const")
+                << "Cannot calculate the map between interfaces for global patch "
+                << fluidMesh().boundary()[patchID].name() << "." << nl
+                << "Direct mapping can only be used with conformal interfaces!"
+                << abort(FatalError);
+        }
+    }
+}
 
-            forAll(fluidLP, fluidPointI)
+
+const Foam::PtrList<Foam::labelIOList>&
+Foam::fluidSolidInterface::fluidToSolidFaceMaps() const
+{
+    if (fluidToSolidFaceMapsPtrList_.empty())
+    {
+        calcFluidToSolidFaceMaps();
+    }
+
+    return fluidToSolidFaceMapsPtrList_;
+}
+
+
+void Foam::fluidSolidInterface::calcSolidToFluidFaceMaps() const
+{
+    solidToFluidFaceMapsPtrList_.setSize(solid().globalPatches().size());
+
+    forAll(solid().globalPatches(), i)
+    {
+        const label patchID = solid().globalPatches()[i].patch().index();
+
+        if (solidToFluidFaceMapsPtrList_.set(i))
+        {
+            FatalErrorIn(type() + "::calcSolidToFluidFaceMaps() const")
+                << "pointer already set for global patch: "
+                << solidMesh().boundary()[patchID].name() << "!"
+                << abort(FatalError);
+        }
+
+        if
+        (
+            solid().globalPatches()[i].globalPatch().size()
+         != fluid().globalPatches()[i].globalPatch().size()
+        )
+        {
+            FatalErrorIn(type() + "::calcSolidToFluidFaceMaps() const")
+                << "Solid and fluid interfaces are not conformal for "
+                << "global patch: "
+                << solidMesh().boundary()[patchID].name() << "!" << nl
+                << "directMap method requires conformal interfaces."
+                << abort(FatalError);
+        }
+
+        const word solidToFluidFaceMapName
+        (
+            "solidToFluidFaceMap"
+#if FOAMEXTEND > 40
+          + name(i)
+#else
+          + word(std::to_string(i), false)
+#endif
+        );
+
+        IOobject mapHeader
+        (
+            solidToFluidFaceMapName,
+            solid().runTime().timeName(),
+            solidMesh(),
+            IOobject::MUST_READ
+        );
+
+        if (mapHeader.headerOk())
+        {
+            // Read map
+            Info<< "Reading solidToFluidFaceMap for global patch "
+                << solidMesh().boundary()[patchID].name()
+                << " from disk..." << endl;
+
+            solidToFluidFaceMapsPtrList_.set
+            (
+                i,
+                new labelIOList
+                (
+                    IOobject
+                    (
+                        solidToFluidFaceMapName,
+                        solid().runTime().timeName(),
+                        solidMesh(),
+                        IOobject::MUST_READ,
+                        IOobject::AUTO_WRITE
+                    )
+                )
+            );
+        }
+        else
+        {
+            // Initialise map
+            solidToFluidFaceMapsPtrList_.set
+            (
+                i,
+                new labelIOList
+                (
+                    IOobject
+                    (
+                        solidToFluidFaceMapName,
+                        solid().runTime().timeName(),
+                        solidMesh(),
+                        IOobject::NO_READ,
+                        IOobject::AUTO_WRITE
+                    ),
+                    labelList(fluid().globalPatches()[i].globalPatch().size(), -1)
+                )
+            );
+            labelList& solidToFluidMap = solidToFluidFaceMapsPtrList_[i];
+
+            // Perform N^2 search for corresponding faces
+            // We will take 0.1% of the minEdgeLength as the exact match tolerance
+
+            const vectorField& fluidCf =
+                fluid().globalPatches()[i].globalPatch().faceCentres();
+
+            const vectorField& solidCf =
+                solid().globalPatches()[i].globalPatch().faceCentres();
+
+            const scalar tol = 0.001*gMin(minEdgeLengths()[i]);
+
+            forAll(fluidCf, fluidFaceI)
             {
-                if (mag(curSolidLP - fluidLP[fluidPointI]) < tol)
+                const vector& curFluidCf = fluidCf[fluidFaceI];
+
+                forAll(solidCf, solidFaceI)
                 {
-                    fluidToSolidMap[solidPointI] = fluidPointI;
-                    break;
+                    if (mag(curFluidCf - solidCf[solidFaceI]) < tol)
+                    {
+                        solidToFluidMap[fluidFaceI] = solidFaceI;
+                        break;
+                    }
                 }
             }
         }
-    }
 
-    if (gMin(fluidToSolidPointMapPtr_()) == -1)
-    {
-        FatalErrorIn(type() + "::calcFluidToSolidPointMap() const")
-            << "Cannot calculate the map between interfaces" << nl
-            << "Direct mapping can only be used with conformal interfaces!"
-            << abort(FatalError);
-    }
-}
-
-
-const Foam::labelList& Foam::fluidSolidInterface::fluidToSolidPointMap() const
-{
-    if (fluidToSolidPointMapPtr_.empty())
-    {
-        calcFluidToSolidPointMap();
-    }
-
-    return fluidToSolidPointMapPtr_();
-}
-
-
-void Foam::fluidSolidInterface::calcSolidToFluidPointMap() const
-{
-    if (solidToFluidPointMapPtr_.valid())
-    {
-        FatalErrorIn(type() + "::calcSolidToFluidPointMap() const")
-            << "pointer already set!" << abort(FatalError);
-    }
-
-    if
-    (
-        solid().globalPatch().globalPatch().size()
-     != fluid().globalPatch().globalPatch().size()
-    )
-    {
-        FatalErrorIn(type() + "::calcFluidToSolidFaceMap() const")
-            << "Fluid and solid interfaces are not conformal!" << nl
-            << "directMap method requires conformal interfaces"
-            << abort(FatalError);
-    }
-
-    IOobject mapHeader
-    (
-        "solidToFluidPointMap",
-        solid().runTime().timeName(),
-        solidMesh(),
-        IOobject::MUST_READ
-    );
-
-    if (mapHeader.headerOk())
-    {
-        // Read map
-        Info<< "Reading solidToFluidPointMap from disk" << endl;
-        solidToFluidPointMapPtr_.set
-        (
-            new labelIOList
-            (
-                IOobject
-                (
-                    "solidToFluidPointMap",
-                    solid().runTime().timeName(),
-                    solidMesh(),
-                    IOobject::MUST_READ,
-                    IOobject::AUTO_WRITE
-                )
-            )
-        );
-    }
-    else
-    {
-        // Initialise map
-        solidToFluidPointMapPtr_.set
-        (
-            new labelIOList
-            (
-                IOobject
-                (
-                    "solidToFluidPointMap",
-                    solid().runTime().timeName(),
-                    solidMesh(),
-                    IOobject::NO_READ,
-                    IOobject::AUTO_WRITE
-                ),
-                labelList(fluid().globalPatch().globalPatch().nPoints(), -1)
-            )
-        );
-        labelList& solidToFluidMap = solidToFluidPointMapPtr_();
-
-        // Perform N^2 search for corresponding points
-        // We will take 0.1% of the minEdgeLength as the exact match tolerance
-
-        const vectorField& fluidLP =
-            fluid().globalPatch().globalPatch().localPoints();
-        const vectorField& solidLP =
-            solid().globalPatch().globalPatch().localPoints();
-
-        const scalar tol = 0.001*gMin(minEdgeLength());
-
-        forAll(fluidLP, fluidPointI)
+        if (gMin(solidToFluidFaceMapsPtrList_[i]) == -1)
         {
-            const vector& curFluidLP = fluidLP[fluidPointI];
+            FatalErrorIn(type() + "::calcSolidToFluidFaceMaps() const")
+                << "Cannot calculate the map between interfaces for global patch "
+                << solidMesh().boundary()[patchID].name() << "." << nl
+                << "Direct mapping can only be used with conformal interfaces!"
+                << abort(FatalError);
+        }
+    }
+}
+
+
+const Foam::PtrList<Foam::labelIOList>&
+Foam::fluidSolidInterface::solidToFluidFaceMaps() const
+{
+    if (solidToFluidFaceMapsPtrList_.empty())
+    {
+        calcSolidToFluidFaceMaps();
+    }
+
+    return solidToFluidFaceMapsPtrList_;
+}
+
+
+void Foam::fluidSolidInterface::calcFluidToSolidPointMaps() const
+{
+    fluidToSolidPointMapsPtrList_.setSize(fluid().globalPatches().size());
+
+    forAll(fluid().globalPatches(), i)
+    {
+        const label patchID = fluid().globalPatches()[i].patch().index();
+
+        if (fluidToSolidPointMapsPtrList_.set(i))
+        {
+            FatalErrorIn(type() + "::calcFluidToSolidPointMaps() const")
+                << "pointer already set for global patch: "
+                << fluidMesh().boundary()[patchID].name() << "!"
+                << abort(FatalError);
+        }
+
+        if
+        (
+            solid().globalPatches()[i].globalPatch().size()
+         != fluid().globalPatches()[i].globalPatch().size()
+        )
+        {
+            FatalErrorIn(type() + "::calcFluidToSolidPointMaps() const")
+                << "Fluid and solid interfaces are not conformal for "
+                << "global patch: "
+                << fluidMesh().boundary()[patchID].name() << "!" << nl
+                << "directMap method requires conformal interfaces."
+                << abort(FatalError);
+        }
+
+        const word fluidToSolidPointMapName
+        (
+            "fluidToSolidPointMap"
+#if FOAMEXTEND > 40
+          + name(i)
+#else
+          + word(std::to_string(i), false)
+#endif
+        );
+
+        IOobject mapHeader
+        (
+            fluidToSolidPointMapName,
+            fluid().runTime().timeName(),
+            fluidMesh(),
+            IOobject::MUST_READ
+        );
+
+        if (mapHeader.headerOk())
+        {
+            // Read map
+            Info<< "Reading fluidToSolidPointMap for global patch "
+                << fluidMesh().boundary()[patchID].name()
+                << " from disk..." << endl;
+
+            fluidToSolidPointMapsPtrList_.set
+            (
+                i,
+                new labelIOList
+                (
+                    IOobject
+                    (
+                        fluidToSolidPointMapName,
+                        fluid().runTime().timeName(),
+                        fluidMesh(),
+                        IOobject::MUST_READ,
+                        IOobject::AUTO_WRITE
+                    )
+                )
+            );
+        }
+        else
+        {
+            // Initialise map
+            fluidToSolidPointMapsPtrList_.set
+            (
+                i,
+                new labelIOList
+                (
+                    IOobject
+                    (
+                        fluidToSolidPointMapName,
+                        fluid().runTime().timeName(),
+                        fluidMesh(),
+                        IOobject::NO_READ,
+                        IOobject::AUTO_WRITE
+                    ),
+                    labelList(solid().globalPatches()[i].globalPatch().nPoints(), -1)
+                )
+            );
+            labelList& fluidToSolidMap = fluidToSolidPointMapsPtrList_[i];
+
+            // Perform N^2 search for corresponding points
+            // We will take 0.1% of the minEdgeLength as the exact match tolerance
+
+            const vectorField& fluidLP =
+                fluid().globalPatches()[i].globalPatch().localPoints();
+
+            const vectorField& solidLP =
+                solid().globalPatches()[i].globalPatch().localPoints();
+
+            const scalar tol = 0.001*gMin(minEdgeLengths()[i]);
 
             forAll(solidLP, solidPointI)
             {
-                if (mag(curFluidLP - solidLP[solidPointI]) < tol)
+                const vector& curSolidLP = solidLP[solidPointI];
+
+                forAll(fluidLP, fluidPointI)
                 {
-                    solidToFluidMap[fluidPointI] = solidPointI;
-                    break;
+                    if (mag(curSolidLP - fluidLP[fluidPointI]) < tol)
+                    {
+                        fluidToSolidMap[solidPointI] = fluidPointI;
+                        break;
+                    }
                 }
             }
         }
-    }
 
-    if (gMin(solidToFluidPointMapPtr_()) == -1)
-    {
-        FatalErrorIn(type() + "::calcSolidToFluidPointMap() const")
-            << "Cannot calculate the map between interpoints" << nl
-            << "Direct mapping can only be used with conformal interfaces!"
-            << abort(FatalError);
+        if (gMin(fluidToSolidPointMapsPtrList_[i]) == -1)
+        {
+            FatalErrorIn(type() + "::calcFluidToSolidPointMaps() const")
+                << "Cannot calculate the map between interfaces for global patch "
+                << fluidMesh().boundary()[patchID].name() << "." << nl
+                << "Direct mapping can only be used with conformal interfaces!"
+                << abort(FatalError);
+        }
     }
 }
 
 
-const Foam::labelList& Foam::fluidSolidInterface::solidToFluidPointMap() const
+const Foam::PtrList<Foam::labelIOList>&
+Foam::fluidSolidInterface::fluidToSolidPointMaps() const
 {
-    if (solidToFluidPointMapPtr_.empty())
+    if (fluidToSolidPointMapsPtrList_.empty())
     {
-        calcSolidToFluidPointMap();
+        calcFluidToSolidPointMaps();
     }
 
-    return solidToFluidPointMapPtr_();
+    return fluidToSolidPointMapsPtrList_;
+}
+
+
+void Foam::fluidSolidInterface::calcSolidToFluidPointMaps() const
+{
+    solidToFluidPointMapsPtrList_.setSize(solid().globalPatches().size());
+
+    forAll(solid().globalPatches(), i)
+    {
+        const label patchID = solid().globalPatches()[i].patch().index();
+
+        if (solidToFluidPointMapsPtrList_.set(i))
+        {
+            FatalErrorIn(type() + "::calcSolidToFluidPointMaps() const")
+                << "pointer already set for global patch: "
+                << solidMesh().boundary()[patchID].name() << "!"
+                << abort(FatalError);
+        }
+
+        if
+        (
+            solid().globalPatches()[i].globalPatch().size()
+         != fluid().globalPatches()[i].globalPatch().size()
+        )
+        {
+            FatalErrorIn(type() + "::calcSolidToFluidPointMaps() const")
+                << "Solid and fluid interfaces are not conformal for "
+                << "global patch: "
+                << solidMesh().boundary()[patchID].name() << "!" << nl
+                << "directMap method requires conformal interfaces."
+                << abort(FatalError);
+        }
+
+        const word solidToFluidPointMapName
+        (
+            "solidToFluidPointMap"
+#if FOAMEXTEND > 40
+          + name(i)
+#else
+          + word(std::to_string(i), false)
+#endif
+        );
+
+        IOobject mapHeader
+        (
+            solidToFluidPointMapName,
+            solid().runTime().timeName(),
+            solidMesh(),
+            IOobject::MUST_READ
+        );
+
+        if (mapHeader.headerOk())
+        {
+            // Read map
+            Info<< "Reading solidToFluidPointMap for global patch "
+                << solidMesh().boundary()[patchID].name()
+                << " from disk..." << endl;
+
+            solidToFluidPointMapsPtrList_.set
+            (
+                i,
+                new labelIOList
+                (
+                    IOobject
+                    (
+                        solidToFluidPointMapName,
+                        solid().runTime().timeName(),
+                        solidMesh(),
+                        IOobject::MUST_READ,
+                        IOobject::AUTO_WRITE
+                    )
+                )
+            );
+        }
+        else
+        {
+            // Initialise map
+            solidToFluidPointMapsPtrList_.set
+            (
+                i,
+                new labelIOList
+                (
+                    IOobject
+                    (
+                        solidToFluidPointMapName,
+                        solid().runTime().timeName(),
+                        solidMesh(),
+                        IOobject::NO_READ,
+                        IOobject::AUTO_WRITE
+                    ),
+                    labelList(fluid().globalPatches()[i].globalPatch().nPoints(), -1)
+                )
+            );
+            labelList& solidToFluidMap = solidToFluidPointMapsPtrList_[i];
+
+            // Perform N^2 search for corresponding points
+            // We will take 0.1% of the minEdgeLength as the exact match tolerance
+
+            const vectorField& fluidLP =
+                fluid().globalPatches()[i].globalPatch().localPoints();
+
+            const vectorField& solidLP =
+                solid().globalPatches()[i].globalPatch().localPoints();
+
+            const scalar tol = 0.001*gMin(minEdgeLengths()[i]);
+
+            forAll(fluidLP, fluidPointI)
+            {
+                const vector& curFluidLP = fluidLP[fluidPointI];
+
+                forAll(solidLP, solidPointI)
+                {
+                    if (mag(curFluidLP - solidLP[solidPointI]) < tol)
+                    {
+                        solidToFluidMap[fluidPointI] = solidPointI;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (gMin(solidToFluidPointMapsPtrList_[i]) == -1)
+        {
+            FatalErrorIn(type() + "::calcSolidToFluidPointMaps() const")
+                << "Cannot calculate the map between interfaces for global patch "
+                << solidMesh().boundary()[patchID].name() << "." << nl
+                << "Direct mapping can only be used with conformal interfaces!"
+                << abort(FatalError);
+        }
+    }
+}
+
+
+const Foam::PtrList<Foam::labelIOList>&
+Foam::fluidSolidInterface::solidToFluidPointMaps() const
+{
+    if (solidToFluidPointMapsPtrList_.empty())
+    {
+        calcSolidToFluidPointMaps();
+    }
+
+    return solidToFluidPointMapsPtrList_;
 
 }
 
 
 void Foam::fluidSolidInterface::
-calcAccumulatedFluidInterfaceDisplacement() const
+calcAccumulatedFluidInterfacesDisplacements() const
 {
-    // Read accumulated displacement
-    if (accumulatedFluidInterfaceDisplacementPtr_)
-    {
-        FatalErrorIn
-        (
-            "void fluidSolidInterface::"
-            "calcAccumulatedFluidInterfaceDisplacement() const"
-        )   << "Accumulated displacement field already exists"
-            << abort(FatalError);
-    }
-
-    // Accumulated fluid interface displacement
-    IOobject accumulatedFluidInterfaceDisplacementHeader
+    accumulatedFluidInterfacesDisplacementsPtrList_.setSize
     (
-        "accumulatedFluidInterfaceDisplacement",
-        fluid().runTime().timeName(),
-        fluidMesh(),
-        IOobject::MUST_READ
+        fluid().globalPatches().size()
     );
 
-    if (accumulatedFluidInterfaceDisplacementHeader.headerOk())
+    forAll(fluid().globalPatches(), i)
     {
-        Pout << "Reading accumulated fluid interface displacement" << endl;
+        const label patchID = fluid().globalPatches()[i].patch().index();
 
-        accumulatedFluidInterfaceDisplacementPtr_ =
-            new vectorIOField
-            (
-                IOobject
-                (
-                    "accumulatedFluidInterfaceDisplacement",
-                    fluid().runTime().timeName(),
-                    fluidMesh(),
-                    IOobject::MUST_READ,
-                    IOobject::AUTO_WRITE
-                )
-            );
-    }
-    else
-    {
-        Pout<< "Creating accumulated fluid interface displacement" << endl;
-
-        accumulatedFluidInterfaceDisplacementPtr_ =
-            new vectorIOField
-            (
-                IOobject
-                (
-                    "accumulatedFluidInterfaceDisplacement",
-                    fluid().runTime().timeName(),
-                    fluidMesh(),
-                    IOobject::NO_READ,
-                    IOobject::AUTO_WRITE
-                ),
-                vectorField
-                (
-                    fluidMesh().boundaryMesh()[fluidPatchIndex()].nPoints(),
-                    vector::zero
-                )
-            );
-    }
-}
-
-
-void Foam::fluidSolidInterface::calcMinEdgeLength() const
-{
-    // Read accumulated displacement
-    if (minEdgeLengthPtr_)
-    {
-        FatalErrorIn
-        (
-            "void fluidSolidInterface::"
-            "calcMinEdgeLength() const"
-        )
-            << "Minimal edge lengths already exist"
-                << abort(FatalError);
-    }
-
-    minEdgeLengthPtr_ =
-        new scalarField
-        (
-            fluid().globalPatch().globalPatch().nPoints(),
-            0
-        );
-    scalarField& minEdgeLength = *minEdgeLengthPtr_;
-
-
-    const edgeList& edges =
-        fluid().globalPatch().globalPatch().edges();
-
-    const vectorField& points =
-        fluid().globalPatch().globalPatch().localPoints();
-
-    const labelListList& pointEdges =
-        fluid().globalPatch().globalPatch().pointEdges();
-
-    forAll(points, pointI)
-    {
-        const labelList& curPointEdges = pointEdges[pointI];
-
-        scalar minLength = GREAT;
-
-        forAll(curPointEdges, edgeI)
+        // Read accumulated displacement
+        if (accumulatedFluidInterfacesDisplacementsPtrList_.set(i))
         {
-            const edge& curEdge = edges[curPointEdges[edgeI]];
-
-            scalar Le = curEdge.mag(points);
-
-            if (Le < minLength)
-            {
-                minLength = Le;
-            }
+            FatalErrorIn
+            (
+                "void fluidSolidInterface::"
+                "calcAccumulatedFluidInterfacesDisplacements() const"
+            )   << "Accumulated displacement field already exists for global patch: "
+                << fluidMesh().boundary()[patchID].name()
+                << "!" << abort(FatalError);
         }
 
-        minEdgeLength[pointI] = minLength;
-    }
+        const word accumulatedFluidInterfaceDisplacementName
+        (
+            "accumulatedFluidInterfaceDisplacement"
+#if FOAMEXTEND > 40
+          + name(i)
+#else
+          + word(std::to_string(i), false)
+#endif
+        );
 
-//     Pout << "Min edge length: " << min(minEdgeLength) << endl;
-//     Pout << "gMin edge length: " << gMin(minEdgeLength) << endl;
+        // Accumulated fluid interface displacement
+        IOobject accumulatedFluidInterfaceDisplacementHeader
+        (
+            accumulatedFluidInterfaceDisplacementName,
+            fluid().runTime().timeName(),
+            fluidMesh(),
+            IOobject::MUST_READ
+        );
+
+        if (accumulatedFluidInterfaceDisplacementHeader.headerOk())
+        {
+            Pout<< "Reading accumulated fluid interface "
+                << "displacement for global patch "
+                << fluidMesh().boundary()[patchID].name()
+                << " from disk..." << endl;
+
+            accumulatedFluidInterfacesDisplacementsPtrList_.set
+            (
+                i,
+                new vectorIOField
+                (
+                    IOobject
+                    (
+                        accumulatedFluidInterfaceDisplacementName,
+                        fluid().runTime().timeName(),
+                        fluidMesh(),
+                        IOobject::MUST_READ,
+                        IOobject::AUTO_WRITE
+                    )
+                )
+            );
+        }
+        else
+        {
+            Pout<< "Creating accumulated fluid interface "
+                << "displacement for global patch "
+                << fluidMesh().boundary()[patchID].name()
+                << " from disk..." << endl;
+
+            accumulatedFluidInterfacesDisplacementsPtrList_.set
+            (
+                i,
+                new vectorIOField
+                (
+                    IOobject
+                    (
+                        accumulatedFluidInterfaceDisplacementName,
+                        fluid().runTime().timeName(),
+                        fluidMesh(),
+                        IOobject::NO_READ,
+                        IOobject::AUTO_WRITE
+                    ),
+                    vectorField
+                    (
+                        fluidMesh().boundaryMesh()[fluidPatchIndices()[i]].nPoints(),
+                        vector::zero
+                    )
+                )
+            );
+        }
+    }
 }
 
 
-Foam::vectorIOField&
-Foam::fluidSolidInterface::accumulatedFluidInterfaceDisplacement()
+Foam::PtrList<Foam::vectorIOField>&
+Foam::fluidSolidInterface::accumulatedFluidInterfacesDisplacements()
 {
-    if (!accumulatedFluidInterfaceDisplacementPtr_)
+    if (accumulatedFluidInterfacesDisplacementsPtrList_.empty())
     {
-        calcAccumulatedFluidInterfaceDisplacement();
+        calcAccumulatedFluidInterfacesDisplacements();
     }
 
-    return *accumulatedFluidInterfaceDisplacementPtr_;
+    return accumulatedFluidInterfacesDisplacementsPtrList_;
 }
 
 
-const Foam::scalarField& Foam::fluidSolidInterface::minEdgeLength() const
+void Foam::fluidSolidInterface::calcMinEdgeLengths() const
 {
-    if (!minEdgeLengthPtr_)
+    minEdgeLengthsPtrList_.setSize(fluid().globalPatches().size());
+
+    forAll(fluid().globalPatches(), i)
     {
-        calcMinEdgeLength();
+        // Read accumulated displacement
+        if (minEdgeLengthsPtrList_.set(i))
+        {
+            FatalErrorIn
+            (
+                "void fluidSolidInterface::"
+                "calcMinEdgeLengths() const"
+            )
+                << "Minimal edge length already exists for global patch: "
+                << fluidMesh().boundary()
+                   [
+                       fluid().globalPatches()[i].patch().index()
+                   ].name()
+                << "!" << abort(FatalError);
+        }
+
+        minEdgeLengthsPtrList_.set
+        (
+            i,
+            new scalarField
+            (
+                fluid().globalPatches()[i].globalPatch().nPoints(),
+                0
+            )
+        );
+        scalarField& minEdgeLength = minEdgeLengthsPtrList_[i];
+
+
+        const edgeList& edges =
+            fluid().globalPatches()[i].globalPatch().edges();
+
+        const vectorField& points =
+            fluid().globalPatches()[i].globalPatch().localPoints();
+
+        const labelListList& pointEdges =
+            fluid().globalPatches()[i].globalPatch().pointEdges();
+
+        forAll(points, pointI)
+        {
+            const labelList& curPointEdges = pointEdges[pointI];
+
+            scalar minLength = GREAT;
+
+            forAll(curPointEdges, edgeI)
+            {
+                const edge& curEdge = edges[curPointEdges[edgeI]];
+
+                scalar Le = curEdge.mag(points);
+
+                if (Le < minLength)
+                {
+                    minLength = Le;
+                }
+            }
+
+            minEdgeLength[pointI] = minLength;
+        }
+
+        // Pout << "Min edge length: " << min(minEdgeLength) << endl;
+        // Pout << "gMin edge length: " << gMin(minEdgeLength) << endl;
+    }
+}
+
+
+const Foam::PtrList<Foam::scalarField>&
+Foam::fluidSolidInterface::minEdgeLengths() const
+{
+    if (minEdgeLengthsPtrList_.empty())
+    {
+        calcMinEdgeLengths();
     }
 
-    return *minEdgeLengthPtr_;
+    return minEdgeLengthsPtrList_;
 }
 
 
@@ -1028,17 +1266,17 @@ Foam::fluidSolidInterface::fluidSolidInterface
     fsiProperties_(subDict(type + "Coeffs")),
     fluid_(fluidModel::New(runTime, "fluid")),
     solid_(solidModel::New(runTime, "solid")),
-    solidPatchIndex_(-1),
-    fluidPatchIndex_(-1),
-    currentSolidZonePointsPtr_(NULL),
-    currentSolidZonePatchPtr_(NULL),
-    rbfFluidToSolidPtr_(NULL),
-    rbfSolidToFluidPtr_(NULL),
-    ggiInterpolatorPtr_(NULL),
-    fluidToSolidFaceMapPtr_(),
-    solidToFluidFaceMapPtr_(),
-    fluidToSolidPointMapPtr_(),
-    solidToFluidPointMapPtr_(),
+    solidPatchIndices_(),
+    fluidPatchIndices_(),
+    currentSolidZonesPointsPtrList_(),
+    currentSolidZonesPatchesPtrList_(),
+    rbfFluidToSolidPtrList_(),
+    rbfSolidToFluidPtrList_(),
+    ggiInterpolatorsPtrList_(),
+    fluidToSolidFaceMapsPtrList_(),
+    solidToFluidFaceMapsPtrList_(),
+    fluidToSolidPointMapsPtrList_(),
+    solidToFluidPointMapsPtrList_(),
     outerCorrTolerance_
     (
         fsiProperties_.lookupOrDefault<scalar>("outerCorrTolerance", 1e-06)
@@ -1060,17 +1298,17 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrDefault<scalar>("interfaceDeformationLimit", 0.0)
     ),
-    fluidZonePointsDispl_(),
-    fluidZonePointsDisplRef_(),
-    fluidZonePointsDisplPrev_(),
-    solidZonePointsDispl_(),
-    solidZonePointsDisplRef_(),
-    interfacePointsDispl_(),
-    interfacePointsDisplPrev_(),
-    residual_(),
-    residualPrev_(),
-    maxResidualNorm_(0),
-    maxIntDisplNorm_(0),
+    fluidZonesPointsDispls_(),
+    fluidZonesPointsDisplsRef_(),
+    fluidZonesPointsDisplsPrev_(),
+    solidZonesPointsDispls_(),
+    solidZonesPointsDisplsRef_(),
+    interfacesPointsDispls_(),
+    interfacesPointsDisplsPrev_(),
+    residuals_(),
+    residualsPrev_(),
+    maxResidualsNorm_(),
+    maxIntsDisplsNorm_(),
     outerCorr_(0),
     writeResidualsToFile_
     (
@@ -1081,8 +1319,8 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrDefault<int>("interpolatorUpdateFrequency", 0)
     ),
-    accumulatedFluidInterfaceDisplacementPtr_(NULL),
-    minEdgeLengthPtr_(NULL),
+    accumulatedFluidInterfacesDisplacementsPtrList_(),
+    minEdgeLengthsPtrList_(),
     transferMethod_
     (
         interfaceTransferMethodNames_
@@ -1108,52 +1346,91 @@ Foam::fluidSolidInterface::fluidSolidInterface
         }
     }
 
-    // Solid patch index
-    const word solidPatchName(fsiProperties_.lookup("solidPatch"));
-    const polyPatchID solidPatch
-    (
-        solidPatchName,
-        solidMesh().boundaryMesh()
-    );
+    // Read interface patches names for regions
+    const wordList solidPatchNames(fsiProperties_.lookup("solidPatch"));
+    const wordList fluidPatchNames(fsiProperties_.lookup("fluidPatch"));
 
-    if (!solidPatch.active())
+    if
+    (
+        solidPatchNames.size() != fluidPatchNames.size()
+    )
     {
         FatalErrorIn("fluidSolidInterface::fluidSolidInterface(...)")
-            << "Solid patch name " << solidPatchName << " not found."
+            << "Defined number of coupled fluid and solid patches "
+            << "must be equal!"
             << abort(FatalError);
     }
 
-    solidPatchIndex_ = solidPatch.index();
+    solidPatchIndices_.setSize(solidPatchNames.size(), label(-1));
+    fluidPatchIndices_.setSize(fluidPatchNames.size(), label(-1));
 
-    // Create solid global patch
-    solid().makeGlobalPatch(solidPatchName);
-
-    // Fluid patch index
-    const word fluidPatchName(fsiProperties_.lookup("fluidPatch"));
-    const polyPatchID fluidPatch
-    (
-        fluidPatchName,
-        fluidMesh().boundaryMesh()
-    );
-
-    if (!fluidPatch.active())
+    // loop over all coupled patches
+    forAll(solidPatchNames, i)
     {
-        FatalErrorIn("fluidSolidInterface::fluidSolidInterface(...)")
-            << "Fluid patch name " << fluidPatchName << " not found."
-            << abort(FatalError);
-    }
-
-    fluidPatchIndex_ = fluidPatch.index();
-
-    // Create fluid global patch
-    fluid().makeGlobalPatch(fluidPatchName);
-
-    // Initialize residual
-    residual_ =
-        vectorField
+        // Solid patch index
+        const polyPatchID solidPatch
         (
-            fluid().globalPatch().globalPatch().nPoints(), vector::zero
+            solidPatchNames[i],
+            solidMesh().boundaryMesh()
         );
+
+        if (!solidPatch.active())
+        {
+            FatalErrorIn("fluidSolidInterface::fluidSolidInterface(...)")
+                << "Solid patch name " << solidPatchNames[i] << " not found."
+                << abort(FatalError);
+        }
+
+        solidPatchIndices_[i] = solidPatch.index();
+    }
+
+    // Create solid global patches
+    solid().makeGlobalPatches(solidPatchNames);
+
+    // loop over all coupled patches
+    forAll(fluidPatchNames, i)
+    {
+        // Fluid patch index
+        const polyPatchID fluidPatch
+        (
+            fluidPatchNames[i],
+            fluidMesh().boundaryMesh()
+        );
+
+        if (!fluidPatch.active())
+        {
+            FatalErrorIn("fluidSolidInterface::fluidSolidInterface(...)")
+                << "Fluid patch name " << fluidPatchNames[i] << " not found."
+                << abort(FatalError);
+        }
+
+        fluidPatchIndices_[i] = fluidPatch.index();
+    }
+
+    // Create fluid global patches
+    fluid().makeGlobalPatches(fluidPatchNames);
+
+    // set interface fields size and initialize residual
+    fluidZonesPointsDispls_.setSize(fluidPatchNames.size());
+    fluidZonesPointsDisplsRef_.setSize(fluidPatchNames.size());
+    fluidZonesPointsDisplsPrev_.setSize(fluidPatchNames.size());
+    solidZonesPointsDispls_.setSize(solidPatchNames.size());
+    solidZonesPointsDisplsRef_.setSize(solidPatchNames.size());
+    interfacesPointsDispls_.setSize(solidPatchNames.size());
+    interfacesPointsDisplsPrev_.setSize(solidPatchNames.size());
+    residuals_.setSize(fluidPatchNames.size());
+    residualsPrev_.setSize(fluidPatchNames.size());
+    maxResidualsNorm_.setSize(fluidPatchNames.size());
+    maxIntsDisplsNorm_.setSize(fluidPatchNames.size());
+
+    forAll(residuals_, i)
+    {
+        residuals_[i] =
+            vectorField
+            (
+                fluid().globalPatches()[i].globalPatch().nPoints(), vector::zero
+            );
+    }
 
     // Check if deprecated option rbfInterpolation is specified
     if (fsiProperties_.found("rbfInterpolation"))
@@ -1166,10 +1443,10 @@ Foam::fluidSolidInterface::fluidSolidInterface
     if (transferMethod_ == directMap)
     {
         // Force maps to be created, in case of restart, they need to be read
-        fluidToSolidFaceMap();
-        solidToFluidFaceMap();
-        fluidToSolidPointMap();
-        solidToFluidPointMap();
+        fluidToSolidFaceMaps();
+        solidToFluidFaceMaps();
+        fluidToSolidPointMaps();
+        solidToFluidPointMaps();
     }
 }
 
@@ -1178,11 +1455,11 @@ Foam::fluidSolidInterface::fluidSolidInterface
 
 Foam::fluidSolidInterface::~fluidSolidInterface()
 {
-    deleteDemandDrivenData(currentSolidZonePointsPtr_);
-    deleteDemandDrivenData(currentSolidZonePatchPtr_);
-    deleteDemandDrivenData(ggiInterpolatorPtr_);
-    deleteDemandDrivenData(accumulatedFluidInterfaceDisplacementPtr_);
-    deleteDemandDrivenData(minEdgeLengthPtr_);
+    currentSolidZonesPointsPtrList_.clear();
+    currentSolidZonesPatchesPtrList_.clear();
+    ggiInterpolatorsPtrList_.clear();
+    accumulatedFluidInterfacesDisplacementsPtrList_.clear();
+    minEdgeLengthsPtrList_.clear();
 }
 
 
@@ -1264,63 +1541,63 @@ Foam::OFstream& Foam::fluidSolidInterface::residualFile()
 }
 
 
-const Foam::vectorField&
-Foam::fluidSolidInterface::currentSolidZonePoints() const
+const Foam::PtrList<Foam::vectorField>&
+Foam::fluidSolidInterface::currentSolidZonesPoints() const
 {
-    if (!currentSolidZonePointsPtr_)
+    if (currentSolidZonesPointsPtrList_.empty())
     {
-        calcCurrentSolidZonePoints();
+        calcCurrentSolidZonesPoints();
     }
 
-    return *currentSolidZonePointsPtr_;
+    return currentSolidZonesPointsPtrList_;
 }
 
 
-const Foam::standAlonePatch&
-Foam::fluidSolidInterface::currentSolidZonePatch() const
+const Foam::PtrList<Foam::standAlonePatch>&
+Foam::fluidSolidInterface::currentSolidZonesPatches() const
 {
-    if (!currentSolidZonePatchPtr_)
+    if (currentSolidZonesPatchesPtrList_.empty())
     {
-        calcCurrentSolidZonePatch();
+        calcCurrentSolidZonesPatches();
     }
 
-    return *currentSolidZonePatchPtr_;
+    return currentSolidZonesPatchesPtrList_;
 }
 
 
-const std::shared_ptr<RBFInterpolation>&
+const Foam::List<std::shared_ptr<RBFInterpolation> >&
 Foam::fluidSolidInterface::rbfFluidToSolid() const
 {
-    if (!rbfFluidToSolidPtr_)
+    if (rbfFluidToSolidPtrList_.empty())
     {
-        calcRbfFluidToSolidInterpolator();
+        calcRbfFluidToSolidInterpolators();
     }
 
-    return rbfFluidToSolidPtr_;
+    return rbfFluidToSolidPtrList_;
 }
 
 
-const Foam::GGIInterpolation<standAlonePatch, standAlonePatch>&
-Foam::fluidSolidInterface::ggiInterpolator() const
-{
-    if (!ggiInterpolatorPtr_)
-    {
-        calcGgiInterpolator();
-    }
-
-    return *ggiInterpolatorPtr_;
-}
-
-
-const std::shared_ptr<RBFInterpolation>&
+const Foam::List<std::shared_ptr<RBFInterpolation> >&
 Foam::fluidSolidInterface::rbfSolidToFluid() const
 {
-    if (!rbfSolidToFluidPtr_)
+    if (rbfSolidToFluidPtrList_.empty())
     {
-        calcRbfSolidToFluidInterpolator();
+        calcRbfSolidToFluidInterpolators();
     }
 
-    return rbfSolidToFluidPtr_;
+    return rbfSolidToFluidPtrList_;
+}
+
+
+const Foam::PtrList<Foam::GGIInterpolation<standAlonePatch, standAlonePatch> >&
+Foam::fluidSolidInterface::ggiInterpolators() const
+{
+    if (ggiInterpolatorsPtrList_.empty())
+    {
+        calcGgiInterpolators();
+    }
+
+    return ggiInterpolatorsPtrList_;
 }
 
 
@@ -1333,92 +1610,95 @@ void Foam::fluidSolidInterface::setDeltaT(Time& runTime)
 
 void Foam::fluidSolidInterface::initializeFields()
 {
-    fluidZonePointsDispl_ =
-        vectorField
-        (
-            fluid().globalPatch().globalPatch().nPoints(),
-            vector::zero
-        );
-
-    fluidZonePointsDisplRef_ =
-        vectorField
-        (
-            fluid().globalPatch().globalPatch().nPoints(),
-            vector::zero
-        );
-
-    fluidZonePointsDisplPrev_ =
-        vectorField
-        (
-            fluid().globalPatch().globalPatch().nPoints(),
-            vector::zero
-        );
-
-    solidZonePointsDispl_ =
-        vectorField
-        (
-            fluid().globalPatch().globalPatch().nPoints(),
-            vector::zero
-        );
-
-    solidZonePointsDisplRef_ =
-        vectorField
-        (
-            fluid().globalPatch().globalPatch().nPoints(),
-            vector::zero
-        );
-
-    residualPrev_ = residual_;
-
-    residual_ =
-        vectorField
-        (
-            fluid().globalPatch().globalPatch().nPoints(),
-            vector::zero
-        );
-
-    maxResidualNorm_ = 0;
-
     outerCorr_ = 0;
 
-    interfacePointsDispl_ =
-        vectorField
-        (
-            fluid().globalPatch().globalPatch().nPoints(),
-            vector::zero
-        );
+    forAll(fluid().globalPatches(), i)
+    {
+        fluidZonesPointsDispls_[i] =
+            vectorField
+            (
+                fluid().globalPatches()[i].globalPatch().nPoints(),
+                vector::zero
+            );
 
-    interfacePointsDisplPrev_ =
-        vectorField
-        (
-            fluid().globalPatch().globalPatch().nPoints(),
-            vector::zero
-        );
+        fluidZonesPointsDisplsRef_[i] =
+            vectorField
+            (
+                fluid().globalPatches()[i].globalPatch().nPoints(),
+                vector::zero
+            );
+
+        fluidZonesPointsDisplsPrev_[i] =
+            vectorField
+            (
+                fluid().globalPatches()[i].globalPatch().nPoints(),
+                vector::zero
+            );
+
+        solidZonesPointsDispls_[i] =
+            vectorField
+            (
+                fluid().globalPatches()[i].globalPatch().nPoints(),
+                vector::zero
+            );
+
+        solidZonesPointsDisplsRef_[i] =
+            vectorField
+            (
+                fluid().globalPatches()[i].globalPatch().nPoints(),
+                vector::zero
+            );
+
+        residualsPrev_[i] = residuals_[i];
+
+        residuals_[i] =
+            vectorField
+            (
+                fluid().globalPatches()[i].globalPatch().nPoints(),
+                vector::zero
+            );
+
+        maxResidualsNorm_[i] = scalar(0);
+
+        interfacesPointsDispls_[i] =
+            vectorField
+            (
+                fluid().globalPatches()[i].globalPatch().nPoints(),
+                vector::zero
+            );
+
+        interfacesPointsDisplsPrev_ =
+            vectorField
+            (
+                fluid().globalPatches()[i].globalPatch().nPoints(),
+                vector::zero
+            );
+    }
 }
 
 
 void Foam::fluidSolidInterface::updateInterpolatorAndGlobalPatches()
 {
-    if (!ggiInterpolatorPtr_)
+    if (ggiInterpolatorsPtrList_.empty())
     {
-        ggiInterpolator();
+        ggiInterpolators();
     }
     else if (interpolatorUpdateFrequency_ != 0)
     {
         if (((runTime().timeIndex() - 1) % interpolatorUpdateFrequency_) == 0)
         {
-            deleteDemandDrivenData(ggiInterpolatorPtr_);
-            fluid().clearGlobalPatch();
-            solid().clearGlobalPatch();
-            fluid().makeGlobalPatch
-            (
-                fluidMesh().boundaryMesh()[fluidPatchIndex_].name()
-            );
-            solid().makeGlobalPatch
-            (
-                solidMesh().boundaryMesh()[solidPatchIndex_].name()
-            );
-            ggiInterpolator();
+            ggiInterpolatorsPtrList_.clear();
+            fluid().clearGlobalPatches();
+            solid().clearGlobalPatches();
+
+            const wordList fluidPatchNames(fsiProperties_.lookup("fluidPatch"));
+            fluid().makeGlobalPatches(fluidPatchNames);
+
+            const wordList solidPatchNames(fsiProperties_.lookup("solidPatch"));
+            solid().makeGlobalPatches(solidPatchNames);
+
+            // update ggi interpolators
+            ggiInterpolators();
         }
     }
 }
@@ -1427,84 +1707,115 @@ void Foam::fluidSolidInterface::updateInterpolatorAndGlobalPatches()
 void Foam::fluidSolidInterface::moveFluidMesh()
 {
     // Get fluid patch displacement from fluid zone displacement
-
     // Take care: these are local patch fields not global patch fields
 
-    const vectorField fluidPatchPointsDispl =
-        fluid().globalPatch().globalPointToPatch(fluidZonePointsDispl());
+    List<vectorField> fluidPatchesPointsDispls
+    (
+        fluid().globalPatches().size(), vectorField()
+    );
 
-    const vectorField fluidPatchPointsDisplPrev =
-        fluid().globalPatch().globalPointToPatch(fluidZonePointsDisplPrev());
+    List<vectorField> fluidPatchesPointsDisplsPrev
+    (
+        fluid().globalPatches().size(), vectorField()
+    );
 
-    // Patch point normals
-    const vectorField& n =
-        fluid().mesh().boundaryMesh()
-        [
-            fluid().globalPatch().patch().index()
-        ].pointNormals();
+    scalar maxDelta = 0;
 
-    // Patch deltaCoeffs
-    const scalarField fluidZoneDeltaCoeffs =
-        fluid().globalPatch().patchFaceToGlobal
-        (
-            fluidMesh().boundary()
-            [
-                fluid().globalPatch().patch().index()
-            ].deltaCoeffs()
-        );
-
-    // Zone deltaCoeffs at points
-    const scalarField fluidZonePointDeltaCoeffs =
-        fluid().globalPatch().interpolator().faceToPointInterpolate
-        (
-            fluidZoneDeltaCoeffs
-        );
-
-    // Patch deltaCoeffs at points
-    const scalarField fluidPatchPointDeltaCoeffs =
-        fluid().globalPatch().globalPointToPatch(fluidZonePointDeltaCoeffs);
-
-    const scalar delta =
-        gMax
-        (
-            mag
+    forAll(fluid().globalPatches(), i)
+    {
+        fluidPatchesPointsDispls[i] =
+            fluid().globalPatches()[i].globalPointToPatch
             (
-                n
-              & (
-                    accumulatedFluidInterfaceDisplacement()
-                  + fluidPatchPointsDispl
-                  - fluidPatchPointsDisplPrev
-                )
-            )*fluidPatchPointDeltaCoeffs
-        );
+                fluidZonesPointsDispls()[i]
+            );
+
+        fluidPatchesPointsDisplsPrev[i] =
+            fluid().globalPatches()[i].globalPointToPatch
+            (
+                fluidZonesPointsDisplsPrev()[i]
+            );
+
+        // Patch point normals
+        const vectorField& n =
+            fluid().mesh().boundaryMesh()
+            [
+                fluid().globalPatches()[i].patch().index()
+            ].pointNormals();
+
+        // Patch deltaCoeffs
+        const scalarField fluidZoneDeltaCoeffs =
+            fluid().globalPatches()[i].patchFaceToGlobal
+            (
+                fluidMesh().boundary()
+                [
+                    fluid().globalPatches()[i].patch().index()
+                ].deltaCoeffs()
+            );
+
+        // Zone deltaCoeffs at points
+        const scalarField fluidZonePointDeltaCoeffs =
+            fluid().globalPatches()[i].interpolator().faceToPointInterpolate
+            (
+                fluidZoneDeltaCoeffs
+            );
+
+        // Patch deltaCoeffs at points
+        const scalarField fluidPatchPointDeltaCoeffs =
+            fluid().globalPatches()[i].globalPointToPatch
+            (
+                fluidZonePointDeltaCoeffs
+            );
+
+        const scalar delta =
+            gMax
+            (
+                mag
+                (
+                    n
+                  & (
+                        accumulatedFluidInterfacesDisplacements()[i]
+                      + fluidPatchesPointsDispls[i]
+                      - fluidPatchesPointsDisplsPrev[i]
+                    )
+                )*fluidPatchPointDeltaCoeffs
+            );
+
+        if (delta > maxDelta)
+        {
+            maxDelta = delta;
+        }
+    }
 
     Info<< "Maximal accumulated displacement of interface points: "
-        << delta << endl;
+        << maxDelta << endl;
 
-    if (delta < interfaceDeformationLimit())
+    if (maxDelta < interfaceDeformationLimit())
     {
         // Move only interface points
         pointField newPoints = fluidMesh().allPoints();
 
-        const labelList& meshPoints =
-            fluid().globalPatch().globalPatch().meshPoints();
-
-        forAll(fluidPatchPointsDispl, pointI)
+        forAll(fluid().globalPatches(), i)
         {
-            newPoints[meshPoints[pointI]] +=
-                fluidPatchPointsDispl[pointI]
-              - fluidPatchPointsDisplPrev[pointI];
+            const labelList& meshPoints =
+                fluid().globalPatches()[i].globalPatch().meshPoints();
+
+            forAll(fluidPatchesPointsDispls[i], pointI)
+            {
+                newPoints[meshPoints[pointI]] +=
+                    fluidPatchesPointsDispls[i][pointI]
+                  - fluidPatchesPointsDisplsPrev[i][pointI];
+            }
+
+            twoDPointCorrector twoDCorrector(fluidMesh());
+            twoDCorrector.correctPoints(newPoints);
+
+            fluidMesh().movePoints(newPoints);
+
+            // Accumulate interface points displacement
+            accumulatedFluidInterfacesDisplacements()[i] +=
+                fluidPatchesPointsDispls[i]
+              - fluidPatchesPointsDisplsPrev[i];
         }
-
-        twoDPointCorrector twoDCorrector(fluidMesh());
-        twoDCorrector.correctPoints(newPoints);
-
-        fluidMesh().movePoints(newPoints);
-
-        // Accumulate interface points displacement
-        accumulatedFluidInterfaceDisplacement() +=
-            fluidPatchPointsDispl
-          - fluidPatchPointsDisplPrev;
     }
     else
     {
@@ -1534,23 +1845,26 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                     )
                 );
 
-            fixedValueTetPolyPatchVectorField& motionUFluidPatch =
-                refCast<fixedValueTetPolyPatchVectorField>
+            forAll(fluid().globalPatches(), i)
+            {
+                fixedValueTetPolyPatchVectorField& motionUFluidPatch =
+                    refCast<fixedValueTetPolyPatchVectorField>
+                    (
+                        motionU.boundaryField()[fluidPatchIndices()[i]]
+                    );
+
+                tetPolyPatchInterpolation tppi
                 (
-                    motionU.boundaryField()[fluidPatchIndex()]
+                    refCast<const faceTetPolyPatch>(motionUFluidPatch.patch())
                 );
 
-            tetPolyPatchInterpolation tppi
-            (
-                refCast<const faceTetPolyPatch>(motionUFluidPatch.patch())
-            );
-
-            motionUFluidPatch ==
-                tppi.pointToPointInterpolate
-                (
-                    accumulatedFluidInterfaceDisplacement()
-                   /fluid().runTime().deltaT().value()
-                );
+                motionUFluidPatch ==
+                    tppi.pointToPointInterpolate
+                    (
+                        accumulatedFluidInterfacesDisplacements()[i]
+                      / fluid().runTime().deltaT().value()
+                    );
+            }
         }
         else if (fvMotionSolver)
         {
@@ -1564,17 +1878,20 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                     )
                 );
 
-            fixedValuePointPatchVectorField& motionUFluidPatch =
-                refCast<fixedValuePointPatchVectorField>
-                (
-                    motionU.boundaryField()[fluidPatchIndex()]
-                );
+            forAll(fluid().globalPatches(), i)
+            {
+                fixedValuePointPatchVectorField& motionUFluidPatch =
+                    refCast<fixedValuePointPatchVectorField>
+                    (
+                        motionU.boundaryField()[fluidPatchIndices()[i]]
+                    );
 
-            motionUFluidPatch ==
-                (
-                    fluidPatchPointsDispl
-                  - fluidPatchPointsDisplPrev
-                )/fluid().runTime().deltaT().value();
+                motionUFluidPatch ==
+                    (
+                        fluidPatchesPointsDispls[i]
+                      - fluidPatchesPointsDisplsPrev[i]
+                    )/fluid().runTime().deltaT().value();
+            }
         }
         else if (isA<newSubsetMotionSolverFvMesh>(fluidMesh()))
         {
@@ -1603,21 +1920,24 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                         )
                     );
 
-                fixedValuePointPatchVectorField& motionUFluidPatch =
-                    refCast<fixedValuePointPatchVectorField>
+                forAll(fluid().globalPatches(), i)
+                {
+                    fixedValuePointPatchVectorField& motionUFluidPatch =
+                        refCast<fixedValuePointPatchVectorField>
+                        (
+                            motionU.boundaryField()[fluidPatchIndices()[i]]
+                        );
+
+                    motionUFluidPatch ==
                     (
-                        motionU.boundaryField()[fluidPatchIndex()]
-                    );
+                        fluidPatchesPointsDispls[i]
+                      - fluidPatchesPointsDisplsPrev[i]
+                    )/fluid().runTime().deltaT().value();
 
-                motionUFluidPatch ==
-                (
-                    fluidPatchPointsDispl
-                  - fluidPatchPointsDisplPrev
-                )/fluid().runTime().deltaT().value();
-
-                // FatalErrorIn("fluidSolidInterface::moveFluidMesh()")
-                //   << "subset fvMotionSolver"
-                //   << abort(FatalError);
+                    // FatalErrorIn("fluidSolidInterface::moveFluidMesh()")
+                    //   << "subset fvMotionSolver"
+                    //   << abort(FatalError);
+                }
             }
         }
         else
@@ -1632,12 +1952,15 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         fluid().fsiMeshUpdate() = true;
         fluid().fsiMeshUpdateChanged() = meshChanged;
 
-        accumulatedFluidInterfaceDisplacement() =
-            vectorField
-            (
-                accumulatedFluidInterfaceDisplacement().size(),
-                vector::zero
-            );
+        forAll(fluid().globalPatches(), i)
+        {
+            accumulatedFluidInterfacesDisplacements()[i] =
+                vectorField
+                (
+                    accumulatedFluidInterfacesDisplacements()[i].size(),
+                    vector::zero
+                );
+        }
     }
 
 
@@ -1670,39 +1993,66 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
 void Foam::fluidSolidInterface::updateForce()
 {
-    Info<< "Setting traction on solid patch" << endl;
+    Info<< "Setting traction on solid patch/patches" << endl;
 
-    const vectorField fluidZoneTraction = fluid().faceZoneViscousForce();
-
-    const scalarField fluidZonePressure = fluid().faceZonePressureForce();
-
-    // Fluid zone face normals
-    const vectorField& n = fluid().globalPatch().globalPatch().faceNormals();
-
-    // Fluid zone total traction
-    const vectorField fluidZoneTotalTraction =
-        fluidZoneTraction - fluidZonePressure*n;
-
-    // Solid zone traction is interpolated from the fluid zone
-
-    vectorField solidZoneTotalTraction
+    const List<tmp<vectorField> > faceZonesViscousForce
     (
-        solid().globalPatch().globalPatch().size(),
-        vector::zero
+        fluid().faceZonesViscousForce()
     );
+
+    const List<tmp<scalarField> > faceZonesPressureForce
+    (
+        fluid().faceZonesPressureForce()
+    );
+
+    List<vectorField> solidZonesTotalTraction
+    (
+        solid().globalPatches().size(), vectorField()
+    );
+
+    List<vectorField> fluidZonesTotalTraction
+    (
+        fluid().globalPatches().size(), vectorField()
+    );
+
+    forAll(fluid().globalPatches(), i)
+    {
+        const vectorField& fluidZoneTraction = faceZonesViscousForce[i]();
+
+        const scalarField& fluidZonePressure = faceZonesPressureForce[i]();
+
+        // Fluid zone face normals
+        const vectorField& n =
+            fluid().globalPatches()[i].globalPatch().faceNormals();
+
+        // Fluid zone total traction
+        fluidZonesTotalTraction[i] =
+            fluidZoneTraction - fluidZonePressure*n;
+
+        // Solid zone traction is to be interpolated from the fluid zone
+        solidZonesTotalTraction[i] =
+            vectorField
+            (
+                solid().globalPatches()[i].globalPatch().size(),
+                vector::zero
+            );
+    }
 
     transferFacesZoneToZone
     (
-        "fluid",                             // from region name
-        "solid",                             // to region name
-        fluid().globalPatch().globalPatch(), // from zone
-        solid().globalPatch().globalPatch(), // to zone
-        fluidZoneTotalTraction,              // from field
-        solidZoneTotalTraction               // to field
+        "fluid",                 // from region name
+        "solid",                 // to region name
+        fluid().globalPatches(), // from zones
+        solid().globalPatches(), // to zones
+        fluidZonesTotalTraction, // from fields
+        solidZonesTotalTraction  // to fields
     );
 
     // Flip traction sign after transferring from fluid to solid
-    solidZoneTotalTraction = -solidZoneTotalTraction;
+    forAll(fluid().globalPatches(), i)
+    {
+        solidZonesTotalTraction[i] = -solidZonesTotalTraction[i];
+    }
 
     // Update coupling
     if (!coupled_)
@@ -1715,269 +2065,357 @@ void Foam::fluidSolidInterface::updateForce()
     {
         solid().setTraction
         (
-            solidPatchIndex(),
-            solidZoneTotalTraction
+            solidPatchIndices(),
+            solidZonesTotalTraction
         );
 
         // Set interface pressure for elasticWallPressure
         // boundary condition
-        if
-        (
-            isA<elasticWallPressureFvPatchScalarField>
-            (
-                fluid().p().boundaryField()[fluidPatchIndex_]
-            )
-        )
+        forAll(fluid().globalPatches(), i)
         {
-            const_cast<elasticWallPressureFvPatchScalarField&>
+            if
             (
-                refCast<const elasticWallPressureFvPatchScalarField>
+                isA<elasticWallPressureFvPatchScalarField>
                 (
-                    fluid().p().boundaryField()[fluidPatchIndex_]
+                    fluid().p().boundaryField()[fluidPatchIndices()[i]]
                 )
-            ).prevPressure() = fluid().patchPressureForce(fluidPatchIndex_);
+            )
+            {
+                const_cast<elasticWallPressureFvPatchScalarField&>
+                (
+                    refCast<const elasticWallPressureFvPatchScalarField>
+                    (
+                        fluid().p().boundaryField()[fluidPatchIndices()[i]]
+                    )
+                ).prevPressure() = fluid().patchPressureForce(fluidPatchIndices()[i]);
+            }
         }
     }
     else
     {
         // Set interface pressure for elasticWallPressure
         // boundary condition
-        if
-        (
-            isA<elasticWallPressureFvPatchScalarField>
-            (
-                fluid().p().boundaryField()[fluidPatchIndex_]
-            )
-        )
+        forAll(fluid().globalPatches(), i)
         {
-            const_cast<elasticWallPressureFvPatchScalarField&>
+            if
             (
-                refCast<const elasticWallPressureFvPatchScalarField>
+                isA<elasticWallPressureFvPatchScalarField>
                 (
-                    fluid().p().boundaryField()[fluidPatchIndex_]
+                    fluid().p().boundaryField()[fluidPatchIndices()[i]]
                 )
-            ).prevPressure() = 0;
+            )
+            {
+                const_cast<elasticWallPressureFvPatchScalarField&>
+                (
+                    refCast<const elasticWallPressureFvPatchScalarField>
+                    (
+                        fluid().p().boundaryField()[fluidPatchIndices()[i]]
+                    )
+                ).prevPressure() = 0;
+            }
         }
     }
 
     // Total force at the fluid side of the interface
     {
-        const vectorField& p =
-            fluid().globalPatch().globalPatch().localPoints();
-        const faceList& f =
-            fluid().globalPatch().globalPatch().localFaces();
-
-        vectorField S(f.size(), vector::zero);
-        vectorField C(f.size(), vector::zero);
-
-        forAll(S, faceI)
+        forAll(fluid().globalPatches(), i)
         {
-            S[faceI] = f[faceI].normal(p);
-            C[faceI] = f[faceI].centre(p);
+            const vectorField& p =
+                fluid().globalPatches()[i].globalPatch().localPoints();
+            const faceList& f =
+                fluid().globalPatches()[i].globalPatch().localFaces();
+
+            vectorField S(f.size(), vector::zero);
+            vectorField C(f.size(), vector::zero);
+
+            forAll(S, faceI)
+            {
+                S[faceI] = f[faceI].normal(p);
+                C[faceI] = f[faceI].centre(p);
+            }
+
+            const vector totalTractionForce = sum(fluidZonesTotalTraction[i]*mag(S));
+
+            Info<< "Total force on interface patch "
+                << fluidMesh().boundary()
+                   [
+                       fluid().globalPatches()[i].patch().index()
+                   ].name()
+                << " (fluid) = " << totalTractionForce << endl;
         }
-
-        const vector totalTractionForce = sum(fluidZoneTotalTraction*mag(S));
-
-        Info<< "Total force (fluid) = " << totalTractionForce << endl;
     }
 
     // Total force at the solid side of the interface
     {
-        const vectorField& p =
-            solid().globalPatch().globalPatch().localPoints();
-        const faceList& f =
-            solid().globalPatch().globalPatch().localFaces();
-
-        vectorField S(f.size(), vector::zero);
-        vectorField C(f.size(), vector::zero);
-
-        forAll(S, faceI)
+        forAll(solid().globalPatches(), i)
         {
-            S[faceI] = f[faceI].normal(p);
-            C[faceI] = f[faceI].centre(p);
+            const vectorField& p =
+                solid().globalPatches()[i].globalPatch().localPoints();
+            const faceList& f =
+                solid().globalPatches()[i].globalPatch().localFaces();
+
+            vectorField S(f.size(), vector::zero);
+            vectorField C(f.size(), vector::zero);
+
+            forAll(S, faceI)
+            {
+                S[faceI] = f[faceI].normal(p);
+                C[faceI] = f[faceI].centre(p);
+            }
+
+            const vector totalTractionForce = sum(solidZonesTotalTraction[i]*mag(S));
+
+            Info<< "Total force on interface patch "
+                << solidMesh().boundary()
+                   [
+                       solid().globalPatches()[i].patch().index()
+                   ].name()
+                << " (solid) = " << totalTractionForce << endl;
         }
-
-        const vector totalTractionForce = sum(solidZoneTotalTraction*mag(S));
-
-        Info<< "Total force (solid) = " << totalTractionForce << endl;
     }
 }
 
 
 Foam::scalar Foam::fluidSolidInterface::updateResidual()
 {
-    const vectorField solidZonePointsDisplAtSolid =
-        solid().faceZonePointDisplacementIncrement();
+    List<scalar> minResidual(solid().globalPatches().size(), scalar(0));
 
-    const vectorField solidZonePointsTotDisplAtSolid =
-        solid().faceZonePointDisplacementOld();
-
-    vectorField solidZonePointsTotDispl
+    const List<tmp<vectorField> > faceZonesPointDisplacementIncrement
     (
-        solidZonePointsDispl().size(),
-        vector::zero
+        solid().faceZonesPointDisplacementIncrement()
     );
+
+    const List<tmp<vectorField> > faceZonesPointDisplacementOld
+    (
+        solid().faceZonesPointDisplacementOld()
+    );
+
+    List<vectorField> solidZonesPointsDisplsAtSolid
+    (
+        solid().globalPatches().size(),
+        vectorField()
+    );
+
+    List<vectorField> solidZonesPointsTotDisplsAtSolid
+    (
+        solid().globalPatches().size(),
+        vectorField()
+    );
+
+    List<vectorField> solidZonesPointsTotDispls
+    (
+        solid().globalPatches().size(),
+        vectorField()
+    );
+
+    forAll(solid().globalPatches(), i)
+    {
+        solidZonesPointsDisplsAtSolid[i] =
+            faceZonesPointDisplacementIncrement[i]();
+
+        solidZonesPointsTotDisplsAtSolid[i] =
+            faceZonesPointDisplacementOld[i]();
+
+        solidZonesPointsTotDispls[i] =
+            vectorField
+            (
+                solidZonesPointsDispls()[i].size(),
+                vector::zero
+            );
+    }
 
     // Transfer displacement fields from the solid to the fluid
-
     transferPointsZoneToZone
     (
-        "solid",                             // from region name
-        "fluid",                             // to region name
-        solid().globalPatch().globalPatch(), // from zone
-        fluid().globalPatch().globalPatch(), // to zone
-        solidZonePointsDisplAtSolid,         // from field
-        solidZonePointsDispl()               // to field
+        "solid",                       // from region name
+        "fluid",                       // to region name
+        solid().globalPatches(),       // from zones
+        fluid().globalPatches(),       // to zones
+        solidZonesPointsDisplsAtSolid, // from fields
+        solidZonesPointsDispls()       // to fields
     );
 
     transferPointsZoneToZone
     (
-        "solid",                             // from region name
-        "fluid",                             // to region name
-        solid().globalPatch().globalPatch(), // from zone
-        fluid().globalPatch().globalPatch(), // to zone
-        solidZonePointsTotDisplAtSolid,      // from field
-        solidZonePointsTotDispl              // to field
+        "solid",                          // from region name
+        "fluid",                          // to region name
+        solid().globalPatches(),          // from zones
+        fluid().globalPatches(),          // to zones
+        solidZonesPointsTotDisplsAtSolid, // from fields
+        solidZonesPointsTotDispls         // to fields
     );
 
-
-    // Update interface residuals
-
-    residualPrev() = residual();
-
-    residual() = solidZonePointsDispl() - fluidZonePointsDispl();
-
-    scalar residualNorm = Foam::sqrt(gSum(magSqr(residual())));
-    scalar residualNorm_2 = residualNorm;
-
-    if (residualNorm > maxResidualNorm_)
+    forAll(solid().globalPatches(), i)
     {
-        maxResidualNorm_ = residualNorm;
+        // Update interface residuals
+        residualsPrev()[i] = residuals()[i];
+
+        residuals()[i] =
+            solidZonesPointsDispls()[i] - fluidZonesPointsDispls()[i];
+
+        scalar residualNorm = Foam::sqrt(gSum(magSqr(residuals()[i])));
+        scalar residualNorm_2 = residualNorm;
+
+        if (residualNorm > maxResidualsNorm_[i])
+        {
+            maxResidualsNorm_[i] = residualNorm;
+        }
+
+        residualNorm /= maxResidualsNorm_[i] + SMALL;
+
+        Info<< "Current fsi relative residual norm ("
+            << solidMesh().boundary()
+               [
+                   solid().globalPatches()[i].patch().index()
+               ].name()
+            << "): " << residualNorm << endl;
+
+        interfacesPointsDisplsPrev_[i] = interfacesPointsDispls_[i];
+
+        interfacesPointsDispls_[i] = solidZonesPointsDispls()[i];
+
+        const vectorField intTotDispl =
+            interfacesPointsDispls_[i] + solidZonesPointsTotDispls[i];
+
+        const scalar intTotDisplNorm = Foam::sqrt(gSum(magSqr(intTotDispl)));
+
+        if (intTotDisplNorm > maxIntsDisplsNorm_[i])
+        {
+            maxIntsDisplsNorm_[i] = intTotDisplNorm;
+        }
+
+        residualNorm_2 /= maxIntsDisplsNorm_[i] + SMALL;
+
+        Info<< "Alternative fsi residual ("
+            << solidMesh().boundary()
+               [
+                   solid().globalPatches()[i].patch().index()
+               ].name()
+            << "): " << residualNorm_2 << endl;
+
+        minResidual[i] = min(residualNorm_2, residualNorm);
     }
 
-    residualNorm /= maxResidualNorm_ + SMALL;
-
-    Info<< "Current fsi relative residual norm: " << residualNorm << endl;
-
-    interfacePointsDisplPrev_ = interfacePointsDispl_;
-
-    interfacePointsDispl_ = solidZonePointsDispl();
-
-    const vectorField intTotDispl =
-        interfacePointsDispl_ + solidZonePointsTotDispl;
-    const scalar intTotDisplNorm = ::sqrt(gSum(magSqr(intTotDispl)));
-    if (intTotDisplNorm > maxIntDisplNorm_)
-    {
-        maxIntDisplNorm_ = intTotDisplNorm;
-    }
-
-    residualNorm_2 /= maxIntDisplNorm_ + SMALL;
-
-    Info<< "Alternative fsi residual: " << residualNorm_2 << endl;
-
-    return min(residualNorm_2, residualNorm);
+    return max(minResidual);
 }
 
 
 void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 {
-    if
+    const List<tmp<vectorField> > faceZonesAcceleration
     (
-        isA<movingWallPressureFvPatchScalarField>
-        (
-            fluid().p().boundaryField()[fluidPatchIndex()]
-        )
-    )
+        solid().faceZonesAcceleration()
+    );
+
+    forAll(fluid().globalPatches(), i)
     {
-        Info<< "Setting acceleration at fluid side of the interface" << endl;
-
-        const vectorField solidZoneAcceleration =
-            solid().faceZoneAcceleration();
-
-        const vectorField fluidZoneAcceleration =
-            ggiInterpolator().slaveToMaster(solidZoneAcceleration);
-
-        const vectorField fluidPatchAcceleration =
-            fluid().globalPatch().globalFaceToPatch(fluidZoneAcceleration);
-
-        const_cast<movingWallPressureFvPatchScalarField&>
+        if
         (
-            refCast<const movingWallPressureFvPatchScalarField>
+            isA<movingWallPressureFvPatchScalarField>
             (
-                fluid().p().boundaryField()
-                [
-                    fluid().globalPatch().patch().index()
-                ]
+                fluid().p().boundaryField()[fluidPatchIndices()[i]]
             )
-        ).prevAcceleration() = fluidPatchAcceleration;
+        )
+        {
+            Info<< "Setting acceleration at fluid side of the interface" << endl;
+
+            const vectorField& solidZoneAcceleration = faceZonesAcceleration[i]();
+
+            const vectorField fluidZoneAcceleration =
+                ggiInterpolators()[i].slaveToMaster(solidZoneAcceleration);
+
+            const vectorField fluidPatchAcceleration =
+                fluid().globalPatches()[i].globalFaceToPatch(fluidZoneAcceleration);
+
+            const_cast<movingWallPressureFvPatchScalarField&>
+            (
+                refCast<const movingWallPressureFvPatchScalarField>
+                (
+                    fluid().p().boundaryField()
+                    [
+                        fluid().globalPatches()[i].patch().index()
+                    ]
+                )
+            ).prevAcceleration() = fluidPatchAcceleration;
+        }
     }
 }
 
 
 void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
 {
-    // Set interface acceleration
-    if
+    const List<tmp<vectorField> > faceZonesAcceleration
     (
-        isA<elasticWallPressureFvPatchScalarField>
-        (
-            fluid().p().boundaryField()[fluidPatchIndex()]
-        )
-    )
+        solid().faceZonesAcceleration()
+    );
+
+    forAll(fluid().globalPatches(), i)
     {
-        const vectorField solidZoneAcceleration =
-            solid().faceZoneAcceleration();
-
-        const vectorField fluidZoneAcceleration =
-            ggiInterpolator().slaveToMaster(solidZoneAcceleration);
-
-        const vectorField fluidPatchAcceleration =
-            fluid().globalPatch().globalFaceToPatch(fluidZoneAcceleration);
-
-        const_cast<elasticWallPressureFvPatchScalarField&>
+        // Set interface acceleration
+        if
         (
-            refCast<const elasticWallPressureFvPatchScalarField>
+            isA<elasticWallPressureFvPatchScalarField>
             (
-                fluid().p().boundaryField()
-                [
-                    fluid().globalPatch().patch().index()
-                ]
+                fluid().p().boundaryField()[fluidPatchIndices()[i]]
             )
-        ).prevAcceleration() = fluidPatchAcceleration;
+        )
+        {
+            const vectorField& solidZoneAcceleration = faceZonesAcceleration[i]();
+
+            const vectorField fluidZoneAcceleration =
+                ggiInterpolators()[i].slaveToMaster(solidZoneAcceleration);
+
+            const vectorField fluidPatchAcceleration =
+                fluid().globalPatches()[i].globalFaceToPatch(fluidZoneAcceleration);
+
+            const_cast<elasticWallPressureFvPatchScalarField&>
+            (
+                refCast<const elasticWallPressureFvPatchScalarField>
+                (
+                    fluid().p().boundaryField()
+                    [
+                        fluid().globalPatches()[i].patch().index()
+                    ]
+                )
+            ).prevAcceleration() = fluidPatchAcceleration;
+        }
     }
 }
 
 
 void Foam::fluidSolidInterface::syncFluidZonePointsDispl
 (
-    vectorField& fluidZonePointsDispl
+    List<vectorField>& fluidZonesPointsDispls
 )
 {
     // Make sure that displacement on all processors is equal to one
     // calculated on master processor
     if (Pstream::parRun())
     {
-        if (!Pstream::master())
+        forAll(fluid().globalPatches(), i)
         {
-            fluidZonePointsDispl = vector::zero;
-        }
-
-        // pass to all procs
-        reduce(fluidZonePointsDispl, sumOp<vectorField>());
-
-        const labelList& map =
-            fluid().globalPatch().globalMasterToCurrentProcPointAddr();
-
-        if (!Pstream::master())
-        {
-            const vectorField fluidZonePointsDisplGlobal = fluidZonePointsDispl;
-
-            forAll(fluidZonePointsDisplGlobal, globalPointI)
+            if (!Pstream::master())
             {
-                const label localPoint = map[globalPointI];
+                fluidZonesPointsDispls[i] = vector::zero;
+            }
 
-                fluidZonePointsDispl[localPoint] =
-                    fluidZonePointsDisplGlobal[globalPointI];
+            // pass to all procs
+            reduce(fluidZonesPointsDispls[i], sumOp<vectorField>());
+
+            const labelList& map =
+                fluid().globalPatches()[i].globalMasterToCurrentProcPointAddr();
+
+            if (!Pstream::master())
+            {
+                const vectorField fluidZonePointsDisplGlobal = fluidZonesPointsDispls[i];
+
+                forAll(fluidZonePointsDisplGlobal, globalPointI)
+                {
+                    const label localPoint = map[globalPointI];
+
+                    fluidZonesPointsDispls[i][localPoint] =
+                        fluidZonePointsDisplGlobal[globalPointI];
+                }
             }
         }
     }

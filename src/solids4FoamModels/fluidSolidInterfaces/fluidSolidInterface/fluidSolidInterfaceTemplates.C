@@ -31,71 +31,197 @@ License
 template<class Type>
 void Foam::fluidSolidInterface::transferFacesZoneToZone
 (
-    const word& fromRegion,          // from region name
-    const word& toRegion,            // to region name
-    const standAlonePatch& fromZone, // from zone
-    const standAlonePatch& toZone,   // to zone
-    const Field<Type>& fromField,    // from field
-    Field<Type>& toField             // to field
+    const word& fromRegion,                    // from region name
+    const word& toRegion,                      // to region name
+    const PtrList<globalPolyPatch>& fromZones, // from zones
+    const PtrList<globalPolyPatch>& toZones,   // to zones
+    const List<Field<Type> >& fromFields,      // from fields
+    List<Field<Type> >& toFields               // to fields
 ) const
 {
-    // Check field sizes are correct
-
-    if (fromField.size() != fromZone.size())
+    forAll(solid().globalPatches(), i)
     {
-        FatalErrorIn
-        (
-            "Foam::tmp< Field<Type> >\n"
-            "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
-            "(\n"
-            "    const standAlonePatch& fromZone,\n"
-            "    const standAlonePatch& toZone,\n"
-            "    const Field<Type>& fromField,\n"
-            "    Field<Type>& toField\n"
-            ") const"
-        )   << "fromField is wrong size!" << nl
-            << "fromField size: " << fromField.size()
-            << ", fromZone size: " << fromZone.size()
-            << abort(FatalError);
-    }
+        const standAlonePatch& fromZone = fromZones[i].globalPatch();
+        const standAlonePatch& toZone = toZones[i].globalPatch();
 
-    if (toField.size() != toZone.size())
-    {
-        FatalErrorIn
-        (
-            "Foam::tmp< Field<Type> >\n"
-            "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
-            "(\n"
-            "    const standAlonePatch& fromZone,\n"
-            "    const standAlonePatch& toZone,\n"
-            "    const Field<Type>& fromField,\n"
-            "    Field<Type>& toField\n"
-            ") const"
-        )   << "toField is wrong size!" << nl
-            << "toField size: " << toField.size()
-            << ", toZone size: " << toZone.size()
-            << abort(FatalError);
-    }
+        const Field<Type>& fromField = fromFields[i];
+        Field<Type>& toField = toFields[i];
 
-    if (transferMethod_ == directMap)
-    {
-        if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
+        // Check field sizes are correct
+        if (fromField.size() != fromZone.size())
         {
-            const labelList& fluidToSolidMap = fluidToSolidFaceMap();
-            forAll(toField, faceI)
+            FatalErrorIn
+            (
+                "Foam::tmp< Field<Type> >\n"
+                "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
+                "(\n"
+                "    const word& fromRegion,\n"
+                "    const word& toRegion,\n"
+                "    const PtrList<globalPolyPatch>& fromZones,\n"
+                "    const PtrList<globalPolyPatch>& toZones,\n"
+                "    const List<Field<Type> >& fromFields,\n"
+                "    List<Field<Type> >& toFields\n"
+                ") const"
+            )   << "fromField is wrong size!" << nl
+                << "fromField size: " << fromField.size()
+                << ", fromZone size: " << fromZone.size()
+                << abort(FatalError);
+        }
+
+        if (toField.size() != toZone.size())
+        {
+            FatalErrorIn
+            (
+                "Foam::tmp< Field<Type> >\n"
+                "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
+                "(\n"
+                "    const word& fromRegion,\n"
+                "    const word& toRegion,\n"
+                "    const PtrList<globalPolyPatch>& fromZones,\n"
+                "    const PtrList<globalPolyPatch>& toZones,\n"
+                "    const List<Field<Type> >& fromFields,\n"
+                "    List<Field<Type> >& toFields\n"
+                ") const"
+            )   << "toField is wrong size!" << nl
+                << "toField size: " << toField.size()
+                << ", toZone size: " << toZone.size()
+                << abort(FatalError);
+        }
+
+        if (transferMethod_ == directMap)
+        {
+            Info<< "Interpolating from " << fromRegion << " to " << toRegion
+                << " using direct mapping" << endl;
+
+            if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
             {
-                toField[faceI] = fromField[fluidToSolidMap[faceI]];
+                const labelList& fluidToSolidMap = fluidToSolidFaceMaps()[i];
+                forAll(toField, faceI)
+                {
+                    toField[faceI] = fromField[fluidToSolidMap[faceI]];
+                }
+            }
+            else if
+            (
+                fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
+            )
+            {
+                const labelList& solidToFluidMap = solidToFluidFaceMaps()[i];
+                forAll(toField, faceI)
+                {
+                    toField[faceI] = fromField[solidToFluidMap[faceI]];
+                }
+            }
+            else
+            {
+                FatalErrorIn
+                (
+                    "Foam::tmp< Field<Type> >\n"
+                    "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
+                    "(\n"
+                    "    const word& fromRegion,\n"
+                    "    const word& toRegion,\n"
+                    "    const PtrList<globalPolyPatch>& fromZones,\n"
+                    "    const PtrList<globalPolyPatch>& toZones,\n"
+                    "    const List<Field<Type> >& fromFields,\n"
+                    "    List<Field<Type> >& toFields\n"
+                    ") const"
+                )   << "Unknown regions:  " << fromRegion
+                    << " and/or " << toRegion << abort(FatalError);
             }
         }
-        else if
-        (
-            fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
-        )
+        else if (transferMethod_ == RBF)
         {
-            const labelList& solidToFluidMap = solidToFluidFaceMap();
-            forAll(toField, faceI)
+            Info<< "Interpolating from " << fromRegion << " to " << toRegion
+                << " using RBF interpolation" << endl;
+
+            matrix fromRbfField(fromField.size(), int(pTraits<Type>::nComponents));
+            matrix toRbfField(toField.size(), int(pTraits<Type>::nComponents));
+
+            for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
             {
-                toField[faceI] = fromField[solidToFluidMap[faceI]];
+                const scalarField fromFieldCmptI = fromField.component(cmptI);
+
+                forAll(fromField, faceI)
+                {
+                    fromRbfField(faceI, cmptI) = fromFieldCmptI[faceI];
+                }
+            }
+
+            if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
+            {
+                rbfFluidToSolid()[i]->interpolate(fromRbfField, toRbfField);
+            }
+            else if
+            (
+                fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
+            )
+            {
+                rbfSolidToFluid()[i]->interpolate(fromRbfField, toRbfField);
+            }
+            else
+            {
+                FatalErrorIn
+                (
+                    "Foam::tmp< Field<Type> >\n"
+                    "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
+                    "(\n"
+                    "    const word& fromRegion,\n"
+                    "    const word& toRegion,\n"
+                    "    const PtrList<globalPolyPatch>& fromZones,\n"
+                    "    const PtrList<globalPolyPatch>& toZones,\n"
+                    "    const List<Field<Type> >& fromFields,\n"
+                    "    List<Field<Type> >& toFields\n"
+                    ") const"
+                )   << "Unknown regions:  " << fromRegion
+                    << " and/or " << toRegion << abort(FatalError);
+            }
+
+            for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
+            {
+                scalarField toFieldCmptI(toField.size(), 0.0);
+
+                forAll(toField, faceI)
+                {
+                    toFieldCmptI[faceI] = toRbfField(faceI, cmptI);
+                }
+
+                toField.replace(cmptI, toFieldCmptI);
+            }
+        }
+        else if (transferMethod_ == GGI)
+        {
+            Info<< "Interpolating from " << fromRegion << " to " << toRegion
+                << " using GGI/AMI interpolation" << endl;
+
+            if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
+            {
+                // fluid is the master; solid is the slave
+                toField = ggiInterpolators()[i].masterToSlave(fromField);
+            }
+            else if
+            (
+                fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
+            )
+            {
+                toField = ggiInterpolators()[i].slaveToMaster(fromField);
+            }
+            else
+            {
+                FatalErrorIn
+                (
+                    "Foam::tmp< Field<Type> >\n"
+                    "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
+                    "(\n"
+                    "    const word& fromRegion,\n"
+                    "    const word& toRegion,\n"
+                    "    const PtrList<globalPolyPatch>& fromZones,\n"
+                    "    const PtrList<globalPolyPatch>& toZones,\n"
+                    "    const List<Field<Type> >& fromFields,\n"
+                    "    List<Field<Type> >& toFields\n"
+                    ") const"
+                )   << "Unknown regions:  " << fromRegion
+                    << " and/or " << toRegion << abort(FatalError);
             }
         }
         else
@@ -105,122 +231,19 @@ void Foam::fluidSolidInterface::transferFacesZoneToZone
                 "Foam::tmp< Field<Type> >\n"
                 "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
                 "(\n"
-                "    const standAlonePatch& fromZone,\n"
-                "    const standAlonePatch& toZone,\n"
-                "    const Field<Type>& fromField,\n"
-                "    Field<Type>& toField\n"
+                "    const word& fromRegion,\n"
+                "    const word& toRegion,\n"
+                "    const PtrList<globalPolyPatch>& fromZones,\n"
+                "    const PtrList<globalPolyPatch>& toZones,\n"
+                "    const List<Field<Type> >& fromFields,\n"
+                "    List<Field<Type> >& toFields\n"
                 ") const"
-            )   << "Unknown regions:  " << fromRegion
-                << " and/or " << toRegion << abort(FatalError);
+            )   << "Unknown transferMethod:  "
+                << interfaceTransferMethodNames_[transferMethod_] << nl
+                << "Available transfer methods are: "
+                << interfaceTransferMethodNames_
+                << abort(FatalError);
         }
-    }
-    else if (transferMethod_ == RBF)
-    {
-        Info<< "Interpolating from " << fromRegion << " to " << toRegion
-            << " using RBF interpolation" << endl;
-
-        matrix fromRbfField(fromField.size(), int(pTraits<Type>::nComponents));
-        matrix toRbfField(toField.size(), int(pTraits<Type>::nComponents));
-
-        for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
-        {
-            const scalarField fromFieldCmptI = fromField.component(cmptI);
-
-            forAll(fromField, faceI)
-            {
-                fromRbfField(faceI, cmptI) = fromFieldCmptI[faceI];
-            }
-        }
-
-        if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
-        {
-            rbfFluidToSolid()->interpolate(fromRbfField, toRbfField);
-        }
-        else if
-        (
-            fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
-        )
-        {
-            rbfSolidToFluid()->interpolate(fromRbfField, toRbfField);
-        }
-        else
-        {
-            FatalErrorIn
-            (
-                "Foam::tmp< Field<Type> >\n"
-                "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
-                "(\n"
-                "    const standAlonePatch& fromZone,\n"
-                "    const standAlonePatch& toZone,\n"
-                "    const Field<Type>& fromField,\n"
-                "    Field<Type>& toField\n"
-                ") const"
-            )   << "Unknown regions:  " << fromRegion
-                << " and/or " << toRegion << abort(FatalError);
-        }
-
-        for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
-        {
-            scalarField toFieldCmptI(toField.size(), 0.0);
-
-            forAll(toField, faceI)
-            {
-                toFieldCmptI[faceI] = toRbfField(faceI, cmptI);
-            }
-
-            toField.replace(cmptI, toFieldCmptI);
-        }
-    }
-    else if (transferMethod_ == GGI)
-    {
-        Info<< "Interpolating from " << fromRegion << " to " << toRegion
-            << " using GGI/AMI interpolation" << endl;
-
-        if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
-        {
-            // fluid is the master; solid is the slave
-            toField = ggiInterpolator().masterToSlave(fromField);
-        }
-        else if
-        (
-            fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
-        )
-        {
-            toField = ggiInterpolator().slaveToMaster(fromField);
-        }
-        else
-        {
-            FatalErrorIn
-            (
-                "Foam::tmp< Field<Type> >\n"
-                "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
-                "(\n"
-                "    const standAlonePatch& fromZone,\n"
-                "    const standAlonePatch& toZone,\n"
-                "    const Field<Type>& fromField,\n"
-                "    Field<Type>& toField\n"
-                ") const"
-            )   << "Unknown regions:  " << fromRegion
-                << " and/or " << toRegion << abort(FatalError);
-        }
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            "Foam::tmp< Field<Type> >\n"
-            "Foam::fluidSolidInterface::transferFacesZoneToZone\n"
-            "(\n"
-            "    const standAlonePatch& fromZone,\n"
-            "    const standAlonePatch& toZone,\n"
-            "    const Field<Type>& fromField,\n"
-            "    Field<Type>& toField\n"
-            ") const"
-        )   << "Unknown transferMethod:  "
-            << interfaceTransferMethodNames_[transferMethod_] << nl
-            << "Available transfer methods are: "
-            << interfaceTransferMethodNames_
-            << abort(FatalError);
     }
 }
 
@@ -228,120 +251,200 @@ void Foam::fluidSolidInterface::transferFacesZoneToZone
 template<class Type>
 void Foam::fluidSolidInterface::transferPointsZoneToZone
 (
-    const word& fromRegion,          // from region name
-    const word& toRegion,            // to region name
-    const standAlonePatch& fromZone, // from zone
-    const standAlonePatch& toZone,   // to zone
-    const Field<Type>& fromField,    // from field
-    Field<Type>& toField             // to field
+    const word& fromRegion,                    // from region name
+    const word& toRegion,                      // to region name
+    const PtrList<globalPolyPatch>& fromZones, // from zones
+    const PtrList<globalPolyPatch>& toZones,   // to zones
+    const List<Field<Type> >& fromFields,      // from fields
+    List<Field<Type> >& toFields               // to fields
 ) const
 {
-    // Check field sizes are correct
-
-    if (fromField.size() != fromZone.nPoints())
+    forAll(solid().globalPatches(), i)
     {
-        FatalErrorIn
-        (
-            "Foam::tmp< Field<Type> >\n"
-            "Foam::fluidSolidInterface::transferPointsZoneToZone\n"
-            "(\n"
-            "    const standAlonePatch& fromZone,\n"
-            "    const standAlonePatch& toZone,\n"
-            "    const Field<Type>& fromField,\n"
-            "    Field<Type>& toField\n"
-            ") const"
-        )   << "fromField is wrong size!" << nl
-            << "fromField size: " << fromField.size()
-            << ", fromZone size: " << fromZone.nPoints()
-            << abort(FatalError);
-    }
+        const standAlonePatch& fromZone = fromZones[i].globalPatch();
+        const standAlonePatch& toZone = toZones[i].globalPatch();
 
-    if (toField.size() != toZone.nPoints())
-    {
-        FatalErrorIn
-        (
-            "Foam::tmp< Field<Type> >\n"
-            "Foam::fluidSolidInterface::transferPointsZoneToZone\n"
-            "(\n"
-            "    const standAlonePatch& fromZone,\n"
-            "    const standAlonePatch& toZone,\n"
-            "    const Field<Type>& fromField,\n"
-            "    Field<Type>& toField\n"
-            ") const"
-        )   << "toField is wrong size!" << nl
-            << "toField size: " << toField.size()
-            << ", toZone size: " << toZone.nPoints()
-            << abort(FatalError);
-    }
+        const Field<Type>& fromField = fromFields[i];
+        Field<Type>& toField = toFields[i];
 
-    if (transferMethod_ == directMap)
-    {
-        Info<< "Interpolating from " << fromRegion << " to " << toRegion
-            << " using direct mapping" << endl;
-
-        if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
-        {
-            const labelList& fluidToSolidMap = fluidToSolidPointMap();
-            forAll(toField, pointI)
-            {
-                toField[pointI] = fromField[fluidToSolidMap[pointI]];
-            }
-        }
-        else if
-        (
-            fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
-        )
-        {
-            const labelList& solidToFluidMap = solidToFluidPointMap();
-            forAll(toField, pointI)
-            {
-                toField[pointI] = fromField[solidToFluidMap[pointI]];
-            }
-        }
-        else
+        // Check field sizes are correct
+        if (fromField.size() != fromZone.nPoints())
         {
             FatalErrorIn
             (
                 "Foam::tmp< Field<Type> >\n"
-                "Foam::fluidSolidInterface::transferPoiubtZoneToZone\n"
+                "Foam::fluidSolidInterface::transferPointsZoneToZone\n"
                 "(\n"
-                "    const standAlonePatch& fromZone,\n"
-                "    const standAlonePatch& toZone,\n"
-                "    const Field<Type>& fromField,\n"
-                "    Field<Type>& toField\n"
+                "    const word& fromRegion,\n"
+                "    const word& toRegion,\n"
+                "    const PtrList<globalPolyPatch>& fromZones,\n"
+                "    const PtrList<globalPolyPatch>& toZones,\n"
+                "    const List<Field<Type> >& fromFields,\n"
+                "    List<Field<Type> >& toFields\n"
                 ") const"
-            )   << "Unknown regions:  " << fromRegion
-                << " and/or " << toRegion << abort(FatalError);
+            )   << "fromField is wrong size!" << nl
+                << "fromField size: " << fromField.size()
+                << ", fromZone size: " << fromZone.nPoints()
+                << abort(FatalError);
         }
-    }
-    else if (transferMethod_ == RBF)
-    {
-        Info<< "Interpolating from " << fromRegion << " to " << toRegion
-            << " using RBF interpolation" << endl;
 
-        matrix fromRbfField(fromField.size(), int(pTraits<Type>::nComponents));
-        matrix toRbfField(toField.size(), int(pTraits<Type>::nComponents));
-
-        for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
+        if (toField.size() != toZone.nPoints())
         {
-            const scalarField fromFieldCmptI = fromField.component(cmptI);
+            FatalErrorIn
+            (
+                "Foam::tmp< Field<Type> >\n"
+                "Foam::fluidSolidInterface::transferPointsZoneToZone\n"
+                "(\n"
+                "    const word& fromRegion,\n"
+                "    const word& toRegion,\n"
+                "    const PtrList<globalPolyPatch>& fromZones,\n"
+                "    const PtrList<globalPolyPatch>& toZones,\n"
+                "    const List<Field<Type> >& fromFields,\n"
+                "    List<Field<Type> >& toFields\n"
+                ") const"
+            )   << "toField is wrong size!" << nl
+                << "toField size: " << toField.size()
+                << ", toZone size: " << toZone.nPoints()
+                << abort(FatalError);
+        }
 
-            forAll(fromField, faceI)
+        if (transferMethod_ == directMap)
+        {
+            Info<< "Interpolating from " << fromRegion << " to " << toRegion
+                << " using direct mapping" << endl;
+
+            if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
             {
-                fromRbfField(faceI, cmptI) = fromFieldCmptI[faceI];
+                const labelList& fluidToSolidMap = fluidToSolidPointMaps()[i];
+                forAll(toField, pointI)
+                {
+                    toField[pointI] = fromField[fluidToSolidMap[pointI]];
+                }
+            }
+            else if
+            (
+                fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
+            )
+            {
+                const labelList& solidToFluidMap = solidToFluidPointMaps()[i];
+                forAll(toField, pointI)
+                {
+                    toField[pointI] = fromField[solidToFluidMap[pointI]];
+                }
+            }
+            else
+            {
+                FatalErrorIn
+                (
+                    "Foam::tmp< Field<Type> >\n"
+                    "Foam::fluidSolidInterface::transferPointsZoneToZone\n"
+                    "(\n"
+                    "    const word& fromRegion,\n"
+                    "    const word& toRegion,\n"
+                    "    const PtrList<globalPolyPatch>& fromZones,\n"
+                    "    const PtrList<globalPolyPatch>& toZones,\n"
+                    "    const List<Field<Type> >& fromFields,\n"
+                    "    List<Field<Type> >& toFields\n"
+                    ") const"
+                )   << "Unknown regions:  " << fromRegion
+                    << " and/or " << toRegion << abort(FatalError);
             }
         }
+        else if (transferMethod_ == RBF)
+        {
+            Info<< "Interpolating from " << fromRegion << " to " << toRegion
+                << " using RBF interpolation" << endl;
 
-        if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
-        {
-            rbfFluidToSolid()->interpolate(fromRbfField, toRbfField);
+            matrix fromRbfField(fromField.size(), int(pTraits<Type>::nComponents));
+            matrix toRbfField(toField.size(), int(pTraits<Type>::nComponents));
+
+            for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
+            {
+                const scalarField fromFieldCmptI = fromField.component(cmptI);
+
+                forAll(fromField, faceI)
+                {
+                    fromRbfField(faceI, cmptI) = fromFieldCmptI[faceI];
+                }
+            }
+
+            if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
+            {
+                rbfFluidToSolid()[i]->interpolate(fromRbfField, toRbfField);
+            }
+            else if
+            (
+                fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
+            )
+            {
+                rbfSolidToFluid()[i]->interpolate(fromRbfField, toRbfField);
+            }
+            else
+            {
+                FatalErrorIn
+                (
+                    "Foam::tmp< Field<Type> >\n"
+                    "Foam::fluidSolidInterface::transferPointsZoneToZone\n"
+                    "(\n"
+                    "    const word& fromRegion,\n"
+                    "    const word& toRegion,\n"
+                    "    const PtrList<globalPolyPatch>& fromZones,\n"
+                    "    const PtrList<globalPolyPatch>& toZones,\n"
+                    "    const List<Field<Type> >& fromFields,\n"
+                    "    List<Field<Type> >& toFields\n"
+                    ") const"
+                )   << "Unknown regions:  " << fromRegion
+                    << " and/or " << toRegion << abort(FatalError);
+            }
+
+            for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
+            {
+                scalarField toFieldCmptI(toField.size(), 0.0);
+
+                forAll(toField, faceI)
+                {
+                    toFieldCmptI[faceI] = toRbfField(faceI, cmptI);
+                }
+
+                toField.replace(cmptI, toFieldCmptI);
+            }
         }
-        else if
-        (
-            fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
-        )
+        else if (transferMethod_ == GGI)
         {
-            rbfSolidToFluid()->interpolate(fromRbfField, toRbfField);
+            Info<< "Interpolating from " << fromRegion << " to " << toRegion
+                << " using GGI/AMI interpolation" << endl;
+
+            if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
+            {
+                // fluid is the master; solid is the slave
+                toField =
+                    ggiInterpolators()[i].masterToSlavePointInterpolate(fromField);
+            }
+            else if
+            (
+                fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
+            )
+            {
+                toField =
+                    ggiInterpolators()[i].slaveToMasterPointInterpolate(fromField);
+            }
+            else
+            {
+                FatalErrorIn
+                (
+                    "Foam::tmp< Field<Type> >\n"
+                    "Foam::fluidSolidInterface::transferPointsZoneToZone\n"
+                    "(\n"
+                    "    const word& fromRegion,\n"
+                    "    const word& toRegion,\n"
+                    "    const PtrList<globalPolyPatch>& fromZones,\n"
+                    "    const PtrList<globalPolyPatch>& toZones,\n"
+                    "    const List<Field<Type> >& fromFields,\n"
+                    "    List<Field<Type> >& toFields\n"
+                    ") const"
+                )   << "Unknown regions:  " << fromRegion
+                    << " and/or " << toRegion << abort(FatalError);
+            }
         }
         else
         {
@@ -350,79 +453,19 @@ void Foam::fluidSolidInterface::transferPointsZoneToZone
                 "Foam::tmp< Field<Type> >\n"
                 "Foam::fluidSolidInterface::transferPointsZoneToZone\n"
                 "(\n"
-                "    const standAlonePatch& fromZone,\n"
-                "    const standAlonePatch& toZone,\n"
-                "    const Field<Type>& fromField,\n"
-                "    Field<Type>& toField\n"
+                "    const word& fromRegion,\n"
+                "    const word& toRegion,\n"
+                "    const PtrList<globalPolyPatch>& fromZones,\n"
+                "    const PtrList<globalPolyPatch>& toZones,\n"
+                "    const List<Field<Type> >& fromFields,\n"
+                "    List<Field<Type> >& toFields\n"
                 ") const"
-            )   << "Unknown regions:  " << fromRegion
-                << " and/or " << toRegion << abort(FatalError);
+            )   << "Unknown transferMethod:  "
+                << interfaceTransferMethodNames_[transferMethod_] << nl
+                << "Available transfer methods are: "
+                << interfaceTransferMethodNames_
+                << abort(FatalError);
         }
-
-        for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
-        {
-            scalarField toFieldCmptI(toField.size(), 0.0);
-
-            forAll(toField, faceI)
-            {
-                toFieldCmptI[faceI] = toRbfField(faceI, cmptI);
-            }
-
-            toField.replace(cmptI, toFieldCmptI);
-        }
-    }
-    else if (transferMethod_ == GGI)
-    {
-        Info<< "Interpolating from " << fromRegion << " to " << toRegion
-            << " using GGI/AMI interpolation" << endl;
-
-        if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
-        {
-            // fluid is the master; solid is the slave
-            toField =
-                ggiInterpolator().masterToSlavePointInterpolate(fromField);
-        }
-        else if
-        (
-            fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
-        )
-        {
-            toField =
-                ggiInterpolator().slaveToMasterPointInterpolate(fromField);
-        }
-        else
-        {
-            FatalErrorIn
-            (
-                "Foam::tmp< Field<Type> >\n"
-                "Foam::fluidSolidInterface::transferPointsZoneToZone\n"
-                "(\n"
-                "    const standAlonePatch& fromZone,\n"
-                "    const standAlonePatch& toZone,\n"
-                "    const Field<Type>& fromField,\n"
-                "    Field<Type>& toField\n"
-                ") const"
-            )   << "Unknown regions:  " << fromRegion
-                << " and/or " << toRegion << abort(FatalError);
-        }
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            "Foam::tmp< Field<Type> >\n"
-            "Foam::fluidSolidInterface::transferPointsZoneToZone\n"
-            "(\n"
-            "    const standAlonePatch& fromZone,\n"
-            "    const standAlonePatch& toZone,\n"
-            "    const Field<Type>& fromField,\n"
-            "    Field<Type>& toField\n"
-            ") const"
-        )   << "Unknown transferMethod:  "
-            << interfaceTransferMethodNames_[transferMethod_] << nl
-            << "Available transfer methods are: "
-            << interfaceTransferMethodNames_
-            << abort(FatalError);
     }
 }
 

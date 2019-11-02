@@ -1111,7 +1111,7 @@ Foam::solidModel::solidModel
         meshPtr_(),
         dimensionedVector("zero", dimLength, vector::zero)
     ),
-    globalPatchPtr_()
+    globalPatchesPtrList_()
 {
     // Force old time fields to be stored
     D_.oldTime().oldTime();
@@ -1225,34 +1225,50 @@ void Foam::solidModel::DDisRequired()
 }
 
 
-void Foam::solidModel::makeGlobalPatch(const word& patchName) const
+void Foam::solidModel::makeGlobalPatches(const wordList& patchNames) const
 {
-    if (globalPatchPtr_.valid())
-    {
-        FatalErrorIn(type() + "::makeGlobalPatch() const")
-            << "Pointer already set!" << abort(FatalError);
-    }
+    globalPatchesPtrList_.setSize(patchNames.size());
 
-    globalPatchPtr_.set(new globalPolyPatch(patchName, mesh()));
+    forAll(patchNames, i)
+    {
+        if (globalPatchesPtrList_.set(i))
+        {
+            FatalErrorIn
+            (
+                type() + "::makeGlobalPatches(const wordList&) const"
+            )
+                << "Pointer already set for global patch: "
+                << patchNames[i] << "!"
+                << abort(FatalError);
+        }
+
+        globalPatchesPtrList_.set
+        (
+            i,
+            new globalPolyPatch(patchNames[i], mesh())
+        );
+    }
 }
 
 
-const Foam::globalPolyPatch& Foam::solidModel::globalPatch() const
+const Foam::PtrList<Foam::globalPolyPatch>&
+Foam::solidModel::globalPatches() const
 {
-    if (globalPatchPtr_.empty())
+    if (globalPatchesPtrList_.empty())
     {
-        FatalErrorIn(type() + "::makeGlobalPatch() const")
-            << "makeGlobalPatch(...) must be called before globalPatch can be"
-            << " called!" << abort(FatalError);
+        FatalErrorIn(type() + "::globalPatches() const")
+            << "makeGlobalPatches(const wordList&) must be called "
+            << "before globalPatch can be called!"
+            << abort(FatalError);
     }
 
-    return globalPatchPtr_();
+    return globalPatchesPtrList_;
 }
 
 
-void Foam::solidModel::clearGlobalPatch() const
+void Foam::solidModel::clearGlobalPatches() const
 {
-    globalPatchPtr_.clear();
+    globalPatchesPtrList_.clear();
 }
 
 
@@ -1278,137 +1294,216 @@ Foam::vector Foam::solidModel::pointU(const label pointID) const
 }
 
 
-Foam::tmp<Foam::vectorField>
-Foam::solidModel::faceZonePointDisplacementIncrement() const
+Foam::List<Foam::tmp<Foam::vectorField> >
+Foam::solidModel::faceZonesPointDisplacementIncrement() const
 {
-    // Create patch point field
-    const vectorField patchPointDispIncr
+    List<tmp<vectorField> > tglobalPointDispIncr
     (
-        pointDD().internalField(), globalPatch().patch().meshPoints()
+        globalPatches().size()
     );
 
-    // Return the global patch field
-    return globalPatch().patchPointToGlobal(patchPointDispIncr);
-}
-
-
-Foam::tmp<Foam::vectorField>
-Foam::solidModel::faceZonePointDisplacementOld() const
-{
-    // Create patch point field
-    const vectorField patchPointDispOld
-    (
-        pointD().oldTime().internalField(), globalPatch().patch().meshPoints()
-    );
-
-    // Return the global patch field
-    return globalPatch().patchPointToGlobal(patchPointDispOld);
-}
-
-
-Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration() const
-{
-    const volVectorField a = fvc::d2dt2(D());
-
-    return globalPatch().patchFaceToGlobal
-    (
-        a.boundaryField()[globalPatch().patch().index()]
-    );
-}
-
-
-Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneVelocity() const
-{
-    return globalPatch().patchFaceToGlobal
-    (
-        U().boundaryField()[globalPatch().patch().index()]
-    );
-}
-
-
-Foam::tmp<Foam::tensorField>
-Foam::solidModel::faceZoneSurfaceGradientOfVelocity() const
-{
-    const label patchID = globalPatch().patch().index();
-
-    // Create pointU patch field
-    const vectorField pPointU =
-        mechanical().volToPoint().interpolate
+    forAll(globalPatches(), i)
+    {
+        // Create patch point field
+        const vectorField patchPointDispIncr
         (
-            mesh().boundaryMesh()[patchID],
-            U()
+            pointDD().internalField(),
+            globalPatches()[i].patch().meshPoints()
         );
 
-    // Calculate patch gradient field
-
-    const faceList& localFaces =
-        mesh().boundaryMesh()[patchID].localFaces();
-    vectorField localPoints =
-        mesh().boundaryMesh()[patchID].localPoints();
-    localPoints +=
-        pointDorPointDD().boundaryField()[patchID].patchInternalField();
-
-    PrimitivePatch<face, List, const pointField&> patch
-    (
-        localFaces,
-        localPoints
-    );
-
-    const tensorField patchGradU = fvc::fGrad(patch, pPointU);
-
-    // Return global point field
-    return globalPatch().patchPointToGlobal(patchGradU);
-}
-
-
-Foam::tmp<Foam::vectorField> Foam::solidModel::currentFaceZonePoints() const
-{
-    // Patch point displacement
-    const vectorField pointDisplacement
-    (
-        pointDorPointDD().internalField(),
-        globalPatch().patch().meshPoints()
-    );
-
-    // Return global patch deformed points
-    return
-        globalPatch().globalPatch().localPoints()
-      + globalPatch().patchPointToGlobal(pointDisplacement);
-}
-
-
-Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneNormal() const
-{
-    // Calculate deformed patch normal field
-
-    const faceList& localFaces = globalPatch().patch().localFaces();
-
-    const pointVectorField& pointD = pointDorPointDD();
-
-    // Current deformed patch points
-    vectorField localPoints = globalPatch().patch().localPoints();
-    localPoints +=
-        pointD.boundaryField()
-        [
-            globalPatch().patch().index()
-        ].patchInternalField();
-
-    PrimitivePatch<face, List, const pointField&> patch
-    (
-        localFaces,
-        localPoints
-    );
-
-    vectorField patchNormals(patch.size(), vector::zero);
-
-    forAll(patchNormals, faceI)
-    {
-        patchNormals[faceI] =
-            localFaces[faceI].normal(localPoints);
+        tglobalPointDispIncr[i] =
+            globalPatches()[i].patchPointToGlobal(patchPointDispIncr);
     }
 
-    // Global patch field
-    return globalPatch().patchFaceToGlobal(patchNormals);
+    // Return the list of global patch point field
+    return tglobalPointDispIncr;
+}
+
+
+Foam::List<Foam::tmp<Foam::vectorField> >
+Foam::solidModel::faceZonesPointDisplacementOld() const
+{
+    List<tmp<vectorField> > tglobalPointDispOld
+    (
+        globalPatches().size()
+    );
+
+    forAll(globalPatches(), i)
+    {
+        // Create patch point field
+        const vectorField patchPointDispOld
+        (
+            pointD().oldTime().internalField(),
+            globalPatches()[i].patch().meshPoints()
+        );
+
+        tglobalPointDispOld[i] =
+            globalPatches()[i].patchPointToGlobal(patchPointDispOld);
+    }
+
+    // Return the list of global patch point field
+    return tglobalPointDispOld;
+}
+
+
+Foam::List<Foam::tmp<Foam::vectorField> >
+Foam::solidModel::faceZonesAcceleration() const
+{
+    List<tmp<vectorField> > tglobalAcceleration
+    (
+        globalPatches().size()
+    );
+
+    const volVectorField a = fvc::d2dt2(D());
+
+    forAll(globalPatches(), i)
+    {
+        tglobalAcceleration[i] = globalPatches()[i].patchFaceToGlobal
+        (
+            a.boundaryField()[globalPatches()[i].patch().index()]
+        );
+    }
+
+    return tglobalAcceleration;
+}
+
+
+Foam::List<Foam::tmp<Foam::vectorField> >
+Foam::solidModel::faceZonesVelocity() const
+{
+    List<tmp<vectorField> > tglobalVelocity
+    (
+        globalPatches().size()
+    );
+
+    forAll(globalPatches(), i)
+    {
+        tglobalVelocity[i] = globalPatches()[i].patchFaceToGlobal
+        (
+            U().boundaryField()[globalPatches()[i].patch().index()]
+        );
+    }
+
+    return tglobalVelocity;
+}
+
+
+Foam::List<Foam::tmp<Foam::tensorField> >
+Foam::solidModel::faceZonesSurfaceGradientOfVelocity() const
+{
+    List<tmp<tensorField> > tglobalSurfaceGradientOfVelocity
+    (
+        globalPatches().size()
+    );
+
+    forAll(globalPatches(), i)
+    {
+        const label patchID = globalPatches()[i].patch().index();
+
+        // Create pointU patch field
+        const vectorField pPointU =
+            mechanical().volToPoint().interpolate
+            (
+                mesh().boundaryMesh()[patchID],
+                U()
+            );
+
+        // Calculate patch gradient field
+
+        const faceList& localFaces =
+            mesh().boundaryMesh()[patchID].localFaces();
+        vectorField localPoints =
+            mesh().boundaryMesh()[patchID].localPoints();
+        localPoints +=
+            pointDorPointDD().boundaryField()[patchID].patchInternalField();
+
+        PrimitivePatch<face, List, const pointField&> patch
+        (
+            localFaces,
+            localPoints
+        );
+
+        const tensorField patchGradU = fvc::fGrad(patch, pPointU);
+
+        tglobalSurfaceGradientOfVelocity[i] =
+            globalPatches()[i].patchPointToGlobal(patchGradU);
+    }
+
+    // Return the list of global point field
+    return tglobalSurfaceGradientOfVelocity;
+}
+
+
+Foam::List<Foam::tmp<Foam::vectorField> >
+Foam::solidModel::currentFaceZonesPoints() const
+{
+    List<tmp<vectorField> > tglobalPoints
+    (
+        globalPatches().size()
+    );
+
+    forAll(globalPatches(), i)
+    {
+        // Patch point displacement
+        const vectorField pointDisplacement
+        (
+            pointDorPointDD().internalField(),
+            globalPatches()[i].patch().meshPoints()
+        );
+
+        tglobalPoints[i] =
+            globalPatches()[i].globalPatch().localPoints()
+          + globalPatches()[i].patchPointToGlobal(pointDisplacement);
+    }
+
+    // Return the list of global patch deformed points
+    return tglobalPoints;
+}
+
+
+Foam::List<Foam::tmp<Foam::vectorField> >
+Foam::solidModel::faceZonesNormal() const
+{
+    List<tmp<vectorField> > tglobalFaceNormals
+    (
+        globalPatches().size()
+    );
+
+    forAll(globalPatches(), i)
+    {
+        // Calculate deformed patch normal field
+        const faceList& localFaces = globalPatches()[i].patch().localFaces();
+
+        const pointVectorField& pointD = pointDorPointDD();
+
+        // Current deformed patch points
+        vectorField localPoints = globalPatches()[i].patch().localPoints();
+        localPoints +=
+            pointD.boundaryField()
+            [
+                globalPatches()[i].patch().index()
+            ].patchInternalField();
+
+        PrimitivePatch<face, List, const pointField&> patch
+        (
+            localFaces,
+            localPoints
+        );
+
+        vectorField patchNormals(patch.size(), vector::zero);
+
+        forAll(patchNormals, faceI)
+        {
+            patchNormals[faceI] =
+                localFaces[faceI].normal(localPoints);
+        }
+
+        tglobalFaceNormals[i] =
+            globalPatches()[i].patchFaceToGlobal(patchNormals);
+    }
+
+    // Return the list of global patch field
+    return tglobalFaceNormals;
 }
 
 
@@ -1573,27 +1668,65 @@ void Foam::solidModel::setPressure
 
 void Foam::solidModel::setTraction
 (
-    const label patchID,
-    const vectorField& faceZoneTraction
+    const labelList& patchIDs,
+    const List<vectorField>& faceZonesTraction
 )
 {
-    const vectorField patchTraction =
-        globalPatch().globalFaceToPatch(faceZoneTraction);
+    forAll(globalPatches(), i)
+    {
+        const vectorField patchTraction =
+            globalPatches()[i].globalFaceToPatch(faceZonesTraction[i]);
 
-    setTraction(solutionD().boundaryField()[patchID], patchTraction);
+        setTraction(solutionD().boundaryField()[patchIDs[i]], patchTraction);
+    }
+}
+
+
+void Foam::solidModel::setTraction
+(
+    const labelList& patchIDs,
+    const PtrList<vectorIOField>& faceZonesTraction
+)
+{
+    forAll(globalPatches(), i)
+    {
+        const vectorField patchTraction =
+            globalPatches()[i].globalFaceToPatch(faceZonesTraction[i]);
+
+        setTraction(solutionD().boundaryField()[patchIDs[i]], patchTraction);
+    }
 }
 
 
 void Foam::solidModel::setPressure
 (
-    const label patchID,
-    const scalarField& faceZonePressure
+    const labelList& patchIDs,
+    const List<scalarField>& faceZonesPressure
 )
 {
-    const scalarField patchPressure =
-        globalPatch().globalFaceToPatch(faceZonePressure);
+    forAll(globalPatches(), i)
+    {
+        const scalarField patchPressure =
+            globalPatches()[i].globalFaceToPatch(faceZonesPressure[i]);
 
-    setPressure(solutionD().boundaryField()[patchID], patchPressure);
+        setPressure(solutionD().boundaryField()[patchIDs[i]], patchPressure);
+    }
+}
+
+
+void Foam::solidModel::setPressure
+(
+    const labelList& patchIDs,
+    const PtrList<scalarIOField>& faceZonesPressure
+)
+{
+    forAll(globalPatches(), i)
+    {
+        const scalarField patchPressure =
+            globalPatches()[i].globalFaceToPatch(faceZonesPressure[i]);
+
+        setPressure(solutionD().boundaryField()[patchIDs[i]], patchPressure);
+    }
 }
 
 

@@ -61,14 +61,14 @@ class weakCouplingInterface
 {
     // Private data
 
-        //- Solid zone traction (pressure + vicous)
-        vectorIOField solidZoneTraction_;
+        //- Ptr list of solid zones traction (pressure + vicous)
+        PtrList<vectorIOField> solidZonesTractionPtrList_;
 
-        //- Solid zone traction (pressure + vicous)
-        vectorField solidZoneTractionPrev_;
+        //- List of solid zones traction (pressure + vicous)
+        List<vectorField> solidZonesTractionPrev_;
 
-        //- Solid zone traction (pressure + vicous)
-        vectorIOField predictedSolidZoneTraction_;
+        //- Ptr list of solid zones traction (pressure + vicous)
+        PtrList<vectorIOField> predictedSolidZonesTractionPtrList_;
 
         //- Fixed under-relaxation factor
         const scalar relaxationFactor_;
