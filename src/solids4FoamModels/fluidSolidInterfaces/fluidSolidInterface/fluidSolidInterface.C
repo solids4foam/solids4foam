@@ -90,7 +90,7 @@ void Foam::fluidSolidInterface::calcCurrentSolidZonesPoints() const
         solid().currentFaceZonesPoints()
     );
 
-    currentSolidZonesPointsPtrList_.setSize(solid().globalPatches().size());
+    currentSolidZonesPointsPtrList_.setSize(nGlobalPatches());
 
     forAll(solid().globalPatches(), i)
     {
@@ -121,7 +121,7 @@ void Foam::fluidSolidInterface::calcCurrentSolidZonesPoints() const
 
 void Foam::fluidSolidInterface::calcCurrentSolidZonesPatches() const
 {
-    currentSolidZonesPatchesPtrList_.setSize(solid().globalPatches().size());
+    currentSolidZonesPatchesPtrList_.setSize(nGlobalPatches());
 
     forAll(solid().globalPatches(), i)
     {
@@ -156,7 +156,7 @@ void Foam::fluidSolidInterface::calcCurrentSolidZonesPatches() const
 
 void Foam::fluidSolidInterface::calcRbfFluidToSolidInterpolators() const
 {
-    rbfFluidToSolidPtrList_.setSize(fluid().globalPatches().size());
+    rbfFluidToSolidPtrList_.setSize(nGlobalPatches());
 
     forAll(fluid().globalPatches(), i)
     {
@@ -270,7 +270,7 @@ void Foam::fluidSolidInterface::calcRbfFluidToSolidInterpolators() const
 
 void Foam::fluidSolidInterface::calcRbfSolidToFluidInterpolators() const
 {
-    rbfSolidToFluidPtrList_.setSize(solid().globalPatches().size());
+    rbfSolidToFluidPtrList_.setSize(nGlobalPatches());
 
     forAll(solid().globalPatches(), i)
     {
@@ -369,7 +369,7 @@ void Foam::fluidSolidInterface::calcGgiInterpolators() const
     currentSolidZonesPatchesPtrList_.clear();
     currentSolidZonesPointsPtrList_.clear();
 
-    ggiInterpolatorsPtrList_.setSize(fluid().globalPatches().size());
+    ggiInterpolatorsPtrList_.setSize(nGlobalPatches());
 
     forAll(fluid().globalPatches(), i)
     {
@@ -483,7 +483,7 @@ void Foam::fluidSolidInterface::calcGgiInterpolators() const
 
 void Foam::fluidSolidInterface::calcFluidToSolidFaceMaps() const
 {
-    fluidToSolidFaceMapsPtrList_.setSize(fluid().globalPatches().size());
+    fluidToSolidFaceMapsPtrList_.setSize(nGlobalPatches());
 
     forAll(fluid().globalPatches(), i)
     {
@@ -625,7 +625,7 @@ Foam::fluidSolidInterface::fluidToSolidFaceMaps() const
 
 void Foam::fluidSolidInterface::calcSolidToFluidFaceMaps() const
 {
-    solidToFluidFaceMapsPtrList_.setSize(solid().globalPatches().size());
+    solidToFluidFaceMapsPtrList_.setSize(nGlobalPatches());
 
     forAll(solid().globalPatches(), i)
     {
@@ -767,7 +767,7 @@ Foam::fluidSolidInterface::solidToFluidFaceMaps() const
 
 void Foam::fluidSolidInterface::calcFluidToSolidPointMaps() const
 {
-    fluidToSolidPointMapsPtrList_.setSize(fluid().globalPatches().size());
+    fluidToSolidPointMapsPtrList_.setSize(nGlobalPatches());
 
     forAll(fluid().globalPatches(), i)
     {
@@ -909,7 +909,7 @@ Foam::fluidSolidInterface::fluidToSolidPointMaps() const
 
 void Foam::fluidSolidInterface::calcSolidToFluidPointMaps() const
 {
-    solidToFluidPointMapsPtrList_.setSize(solid().globalPatches().size());
+    solidToFluidPointMapsPtrList_.setSize(nGlobalPatches());
 
     forAll(solid().globalPatches(), i)
     {
@@ -1055,7 +1055,7 @@ calcAccumulatedFluidInterfacesDisplacements() const
 {
     accumulatedFluidInterfacesDisplacementsPtrList_.setSize
     (
-        fluid().globalPatches().size()
+        nGlobalPatches()
     );
 
     forAll(fluid().globalPatches(), i)
@@ -1162,7 +1162,7 @@ Foam::fluidSolidInterface::accumulatedFluidInterfacesDisplacements()
 
 void Foam::fluidSolidInterface::calcMinEdgeLengths() const
 {
-    minEdgeLengthsPtrList_.setSize(fluid().globalPatches().size());
+    minEdgeLengthsPtrList_.setSize(nGlobalPatches());
 
     forAll(fluid().globalPatches(), i)
     {
@@ -1268,6 +1268,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     solid_(solidModel::New(runTime, "solid")),
     solidPatchIndices_(),
     fluidPatchIndices_(),
+    nGlobalPatches_(label(1)),
     currentSolidZonesPointsPtrList_(),
     currentSolidZonesPatchesPtrList_(),
     rbfFluidToSolidPtrList_(),
@@ -1410,18 +1411,35 @@ Foam::fluidSolidInterface::fluidSolidInterface
     // Create fluid global patches
     fluid().makeGlobalPatches(fluidPatchNames);
 
-    // set interface fields size and initialize residual
-    fluidZonesPointsDispls_.setSize(fluidPatchNames.size());
-    fluidZonesPointsDisplsRef_.setSize(fluidPatchNames.size());
-    fluidZonesPointsDisplsPrev_.setSize(fluidPatchNames.size());
-    solidZonesPointsDispls_.setSize(solidPatchNames.size());
-    solidZonesPointsDisplsRef_.setSize(solidPatchNames.size());
-    interfacesPointsDispls_.setSize(solidPatchNames.size());
-    interfacesPointsDisplsPrev_.setSize(solidPatchNames.size());
-    residuals_.setSize(fluidPatchNames.size());
-    residualsPrev_.setSize(fluidPatchNames.size());
-    maxResidualsNorm_.setSize(fluidPatchNames.size());
-    maxIntsDisplsNorm_.setSize(fluidPatchNames.size());
+    // Note: perform one last check before going any further
+    // in case something goes wrong
+    if
+    (
+        fluid().globalPatches().size()
+     != solid().globalPatches().size()
+    )
+    {
+        FatalErrorIn("fluidSolidInterface::fluidSolidInterface(...)")
+            << "The number of assigned global poly patches "
+            << "differs on fluid and solid regions!"
+            << abort(FatalError);
+    }
+
+    // Set the number of global poly patches: solid or fluid
+    nGlobalPatches_ = fluid().globalPatches().size();
+
+    // Set interface fields list size and initialize residual
+    fluidZonesPointsDispls_.setSize(nGlobalPatches());
+    fluidZonesPointsDisplsRef_.setSize(nGlobalPatches());
+    fluidZonesPointsDisplsPrev_.setSize(nGlobalPatches());
+    solidZonesPointsDispls_.setSize(nGlobalPatches());
+    solidZonesPointsDisplsRef_.setSize(nGlobalPatches());
+    interfacesPointsDispls_.setSize(nGlobalPatches());
+    interfacesPointsDisplsPrev_.setSize(nGlobalPatches());
+    residuals_.setSize(nGlobalPatches());
+    residualsPrev_.setSize(nGlobalPatches());
+    maxResidualsNorm_.setSize(nGlobalPatches());
+    maxIntsDisplsNorm_.setSize(nGlobalPatches());
 
     forAll(residuals_, i)
     {
@@ -1711,12 +1729,12 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
     List<vectorField> fluidPatchesPointsDispls
     (
-        fluid().globalPatches().size(), vectorField()
+        nGlobalPatches(), vectorField()
     );
 
     List<vectorField> fluidPatchesPointsDisplsPrev
     (
-        fluid().globalPatches().size(), vectorField()
+        nGlobalPatches(), vectorField()
     );
 
     scalar maxDelta = 0;
@@ -2007,12 +2025,12 @@ void Foam::fluidSolidInterface::updateForce()
 
     List<vectorField> solidZonesTotalTraction
     (
-        solid().globalPatches().size(), vectorField()
+        nGlobalPatches(), vectorField()
     );
 
     List<vectorField> fluidZonesTotalTraction
     (
-        fluid().globalPatches().size(), vectorField()
+        nGlobalPatches(), vectorField()
     );
 
     forAll(fluid().globalPatches(), i)
@@ -2178,7 +2196,7 @@ void Foam::fluidSolidInterface::updateForce()
 
 Foam::scalar Foam::fluidSolidInterface::updateResidual()
 {
-    List<scalar> minResidual(solid().globalPatches().size(), scalar(0));
+    List<scalar> minResidual(nGlobalPatches(), scalar(0));
 
     const List<tmp<vectorField> > faceZonesPointDisplacementIncrement
     (
@@ -2192,19 +2210,19 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
     List<vectorField> solidZonesPointsDisplsAtSolid
     (
-        solid().globalPatches().size(),
+        nGlobalPatches(),
         vectorField()
     );
 
     List<vectorField> solidZonesPointsTotDisplsAtSolid
     (
-        solid().globalPatches().size(),
+        nGlobalPatches(),
         vectorField()
     );
 
     List<vectorField> solidZonesPointsTotDispls
     (
-        solid().globalPatches().size(),
+        nGlobalPatches(),
         vectorField()
     );
 

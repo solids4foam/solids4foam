@@ -72,9 +72,9 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
     ),
     couplingReuse_(fsiProperties().lookupOrDefault<int>("couplingReuse", 0)),
     predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
-    fluidPatchesPointsV_(fluid().globalPatches().size()),
-    fluidPatchesPointsW_(fluid().globalPatches().size()),
-    fluidPatchesPointsT_(fluid().globalPatches().size())
+    fluidPatchesPointsV_(nGlobalPatches()),
+    fluidPatchesPointsW_(nGlobalPatches()),
+    fluidPatchesPointsT_(nGlobalPatches())
 {}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

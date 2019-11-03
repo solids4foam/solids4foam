@@ -61,7 +61,7 @@ oneWayCouplingInterface::oneWayCouplingInterface
 )
 :
     fluidSolidInterface(typeName, runTime, region),
-    solidZonesTraction_(fluid().globalPatches().size())
+    solidZonesTraction_(nGlobalPatches())
 {
     // Initialize zone traction fields
     forAll(fluid().globalPatches(), i)
@@ -125,12 +125,12 @@ void oneWayCouplingInterface::updateTraction()
 
     List<vectorField> fluidZonesTractionAtSolid
     (
-        solid().globalPatches().size(), vectorField()
+        nGlobalPatches(), vectorField()
     );
 
     List<vectorField> fluidZonesTraction
     (
-        fluid().globalPatches().size(), vectorField()
+        nGlobalPatches(), vectorField()
     );
 
     forAll(fluid().globalPatches(), i)

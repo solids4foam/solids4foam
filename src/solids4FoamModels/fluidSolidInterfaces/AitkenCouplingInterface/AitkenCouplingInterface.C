@@ -62,7 +62,7 @@ AitkenCouplingInterface::AitkenCouplingInterface
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
     ),
     predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
-    aitkenRelaxationFactors_(fluid().globalPatches().size(), relaxationFactor_)
+    aitkenRelaxationFactors_(nGlobalPatches(), relaxationFactor_)
 {}
 
 

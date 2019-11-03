@@ -61,16 +61,16 @@ weakCouplingInterface::weakCouplingInterface
 :
     fluidSolidInterface(typeName, runTime, region),
     solidZonesTractionPtrList_(),
-    solidZonesTractionPrev_(fluid().globalPatches().size()),
+    solidZonesTractionPrev_(nGlobalPatches()),
     predictedSolidZonesTractionPtrList_(),
     relaxationFactor_
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
     )
 {
-    solidZonesTractionPtrList_.setSize(fluid().globalPatches().size());
+    solidZonesTractionPtrList_.setSize(nGlobalPatches());
 
-    predictedSolidZonesTractionPtrList_.setSize(fluid().globalPatches().size());
+    predictedSolidZonesTractionPtrList_.setSize(nGlobalPatches());
 
     forAll(fluid().globalPatches(), i)
     {
@@ -296,7 +296,7 @@ void weakCouplingInterface::initializeFields()
 
 bool weakCouplingInterface::updateWeakDisplacement()
 {
-    List<scalar> minResidual(solid().globalPatches().size(), scalar(0));
+    List<scalar> minResidual(nGlobalPatches(), scalar(0));
 
     const List<tmp<vectorField> > faceZonesPointDisplacementIncrement
     (
@@ -408,12 +408,12 @@ void weakCouplingInterface::updateWeakTraction()
 
     List<vectorField> fluidZonesTractionAtSolid
     (
-        solid().globalPatches().size(), vectorField()
+        nGlobalPatches(), vectorField()
     );
 
     List<vectorField> fluidZonesTraction
     (
-        fluid().globalPatches().size(), vectorField()
+        nGlobalPatches(), vectorField()
     );
 
     forAll(fluid().globalPatches(), i)

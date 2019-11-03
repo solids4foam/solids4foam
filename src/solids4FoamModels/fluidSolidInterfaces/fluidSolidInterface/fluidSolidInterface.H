@@ -85,6 +85,9 @@ class fluidSolidInterface
         //- Fluid interface patch indices
         labelList fluidPatchIndices_;
 
+        //- Number of global poly patches
+        label nGlobalPatches_;
+
         //- Ptr list of solid face zones current points
         mutable PtrList<vectorField> currentSolidZonesPointsPtrList_;
 
@@ -398,6 +401,12 @@ public:
             labelList fluidPatchIndices() const
             {
                 return fluidPatchIndices_;
+            }
+
+            //- Return number of global poly patches
+            const label& nGlobalPatches() const
+            {
+                return nGlobalPatches_;
             }
 
             //- Return current solid zones points
