@@ -10,37 +10,15 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fsiProperties;
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface    Aitken;
+// The is only needed to suppress "cat: No such file or directory" error in
+// foam-extend-4.1!
 
-AitkenCoeffs
-{
-    // Solid interface patch list
-    solidPatch (interface);
-
-    // Fluid interface patch list
-    fluidPatch (interface);
-
-    // Fixed under-relaxation factor for first FSI iteration
-    relaxationFactor 0.4;
-
-    // Limit for enabling fluid mesh motion solver
-    interfaceDeformationLimit 0;
-
-    // FSI loop tolerance
-    outerCorrTolerance 1e-6;
-
-    // FSI max correctors
-    nOuterCorr 20;
-
-    interpolatorUpdateFrequency 0;
-    // couplingReuse 0;
-
-    // Enable FSI coupling
-    coupled yes;
-}
+// Users need to know that the actual discretization schemes and solution
+// methods of each regions is being read from system/fluid or system/solid
+// directories.
 
 // ************************************************************************* //

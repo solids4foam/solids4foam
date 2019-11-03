@@ -20,11 +20,9 @@ fluidSolidInterface    Aitken;
 
 fixedRelaxationCoeffs
 {
-    solidPatch interface;
-    solidZone interface-zone;
+    solidPatch (interface);
 
-    fluidPatch interface;
-    fluidZone interface-zone;
+    fluidPatch (interface);
 
     relaxationFactor 0.4;
 

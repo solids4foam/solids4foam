@@ -10,37 +10,21 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fsiProperties;
+    object      mechanicalProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface    Aitken;
+planeStress no;
 
-AitkenCoeffs
-{
-    // Solid interface patch list
-    solidPatch (interface);
-
-    // Fluid interface patch list
-    fluidPatch (interface);
-
-    // Fixed under-relaxation factor for first FSI iteration
-    relaxationFactor 0.4;
-
-    // Limit for enabling fluid mesh motion solver
-    interfaceDeformationLimit 0;
-
-    // FSI loop tolerance
-    outerCorrTolerance 1e-6;
-
-    // FSI max correctors
-    nOuterCorr 20;
-
-    interpolatorUpdateFrequency 0;
-    // couplingReuse 0;
-
-    // Enable FSI coupling
-    coupled yes;
-}
+mechanical
+(
+    rubber
+    {
+        type        neoHookeanElastic;
+        rho         rho [1 -3 0 0 0 0 0] 1000;
+        E           E [1 -1 -2 0 0 0 0] 1e4;
+        nu          nu [0 0 0 0 0 0 0] 0.4;
+    }
+);
 
 // ************************************************************************* //

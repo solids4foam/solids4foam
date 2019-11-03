@@ -9,38 +9,43 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      fsiProperties;
+    class       volVectorField;
+    object      D;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface    Aitken;
+dimensions      [0 1 0 0 0 0 0];
 
-AitkenCoeffs
+internalField   uniform (0 0 0);
+
+boundaryField
 {
-    // Solid interface patch list
-    solidPatch (interface);
-
-    // Fluid interface patch list
-    fluidPatch (interface);
-
-    // Fixed under-relaxation factor for first FSI iteration
-    relaxationFactor 0.4;
-
-    // Limit for enabling fluid mesh motion solver
-    interfaceDeformationLimit 0;
-
-    // FSI loop tolerance
-    outerCorrTolerance 1e-6;
-
-    // FSI max correctors
-    nOuterCorr 20;
-
-    interpolatorUpdateFrequency 0;
-    // couplingReuse 0;
-
-    // Enable FSI coupling
-    coupled yes;
+    interface1
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    interface2
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    bottom
+    {
+       type            fixedDisplacement;
+       value           uniform (0 0 0);
+    }
+    symmetry
+    {
+       type            solidSymmetry;
+       patchType       symmetryPlane;
+       value           uniform (0 0 0);
+    }
 }
+
 
 // ************************************************************************* //

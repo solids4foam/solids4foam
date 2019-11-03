@@ -1,28 +1,26 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
-|    \\/     M anipulation  |                                                 |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fsiProperties;
+    location    "constant";
+    object      physicsProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface    oneWayCoupling;
+// type    fluid;
+// type    solid;
+type    fluidSolidInteraction;
 
-oneWayCouplingCoeffs
-{
-    // Solid patch list
-    solidPatch (interface);
+// number of fluid-solid interface patches
+nCoupledPatches 2;
 
-    // Fluid patch list
-    fluidPatch (fixedWalls);
-}
 
 // ************************************************************************* //

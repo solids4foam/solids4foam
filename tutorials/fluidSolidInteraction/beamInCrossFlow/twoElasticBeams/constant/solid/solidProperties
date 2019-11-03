@@ -10,37 +10,29 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fsiProperties;
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface    Aitken;
+//solidModel    linearGeometryTotalDisplacement;
+//solidModel    unsLinearGeometry;
+//solidModel    nonLinearGeometryTotalLagrangian;
+solidModel    nonLinearGeometryUpdatedLagrangian;
+//solidModel    unsNonLinearGeometryTotalLagrangian;
 
-AitkenCoeffs
-{
-    // Solid interface patch list
-    solidPatch (interface);
+"linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+{}
 
-    // Fluid interface patch list
-    fluidPatch (interface);
+nonLinearGeometryTotalLagrangianCoeffs
+{}
 
-    // Fixed under-relaxation factor for first FSI iteration
-    relaxationFactor 0.4;
+nonLinearGeometryUpdatedLagrangianCoeffs
+{}
 
-    // Limit for enabling fluid mesh motion solver
-    interfaceDeformationLimit 0;
+unsNonLinearGeometryTotalLagrangianCoeffs
+{}
 
-    // FSI loop tolerance
-    outerCorrTolerance 1e-6;
-
-    // FSI max correctors
-    nOuterCorr 20;
-
-    interpolatorUpdateFrequency 0;
-    // couplingReuse 0;
-
-    // Enable FSI coupling
-    coupled yes;
-}
+unsNonLinearGeometryUpdatedLagrangianCoeffs
+{}
 
 // ************************************************************************* //

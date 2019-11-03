@@ -14,15 +14,17 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface    IQNILS;
+//fluidSolidInterface    fixedRelaxation;
+fluidSolidInterface    Aitken;
+//fluidSolidInterface    IQNILS;
 
-IQNILSCoeffs
+"fixedRelaxationCoeffs|AitkenCoeffs|ISNILSCoeffs"
 {
     // Solid interface patch list
-    solidPatch         (inner-wall);
+    solidPatch (interface1 interface2);
 
     // Fluid interface patch list
-    fluidPatch         (wall);
+    fluidPatch (interface1 interface2);
 
     // Under-relaxation factor for passing the solid interface
     // displacement/velocity to the fluid interface
@@ -31,42 +33,47 @@ IQNILSCoeffs
     // then it adaptively changes
     // For IQNILS, this value is used for the first two iterations each
     // time-step, then the IQNILS procedure is used
-    relaxationFactor   0.05;
+    relaxationFactor 0.4;
 
     // Tolerance for the FSI loop within each time-step
     outerCorrTolerance 1e-6;
 
     // Maximum number of outer FSI loop correctors within each time-step
-    nOuterCorr         30;
+    nOuterCorr 20;
 
     // Enable/disable coupling from the start
-    coupled             yes;
+    coupled yes;
 
-    // Optional: if coupled is set to "no", then the couplingStartTime also you
-    // to enable coupling at specified time
+    // Method for transferring information between the interfaces
+    interfaceTransferMethod directMap;
+    //interfaceTransferMethod RBF;
+    //interfaceTransferMethod GGI;
+
+    // Optional: if coupled is set to "no", then the couplingStartTime allows
+    // you to enable coupling at a specified time
     // Defaults to 0.0
-    // couplingStartTime    0.1;
+    // couplingStartTime    2.0;
 
     // Optional (only for IQNILS): re-use modes from previous time-steps.
     // The number of modes to be re-used is specified
     // Defaults to 0 modes
-    couplingReuse       1;
+    // couplingReuse 0;
 
     // Optional: if any point on the fluid interface moves greater than the
     // interfaceDeformationLimit then the entire fluid mesh is updated; if not
     // then only the interface points are moved and the remaining fluid mesh is
-    // not. Note than interfaceDeformationLimit is a relative motion: it is the
+    // not. Note that interfaceDeformationLimit is a relative motion: it is the
     // point displacement normalised with respect to the local cell size (delta
     // coeffs are used)
     // Defaults to 0.0 i.e. the fluid mesh is always updated
-    interfaceDeformationLimit 0;
+    // interfaceDeformationLimit 0.0;
 
     // Frequency of time-step at which the fluid-solid interface interpolation
     // weights are updated
     // 0 means the interpolator is update every time-step, whereas 10 would be
     // every 10 time-steps
     // Defaults to 0
-    interpolatorUpdateFrequency 0;
+    // interpolatorUpdateFrequency 0;
 }
 
 // ************************************************************************* //

@@ -10,37 +10,50 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fsiProperties;
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface    Aitken;
-
-AitkenCoeffs
+d2dt2Schemes
 {
-    // Solid interface patch list
-    solidPatch (interface);
+    default            Euler;
+}
 
-    // Fluid interface patch list
-    fluidPatch (interface);
+ddtSchemes
+{
+    default            Euler;
+}
 
-    // Fixed under-relaxation factor for first FSI iteration
-    relaxationFactor 0.4;
+gradSchemes
+{
+    default            extendedLeastSquares 0;
+}
 
-    // Limit for enabling fluid mesh motion solver
-    interfaceDeformationLimit 0;
+divSchemes
+{
+    default            Gauss linear;
+}
 
-    // FSI loop tolerance
-    outerCorrTolerance 1e-6;
+laplacianSchemes
+{
+    default            none;
+    laplacian(DD,D)    Gauss linear corrected;
+    laplacian(DDD,DD)  Gauss linear corrected;
+}
 
-    // FSI max correctors
-    nOuterCorr 20;
+snGradSchemes
+{
+    default            none;
+    snGrad(D)          corrected;
+    snGrad(DD)         corrected;
+}
 
-    interpolatorUpdateFrequency 0;
-    // couplingReuse 0;
-
-    // Enable FSI coupling
-    coupled yes;
+interpolationSchemes
+{
+    default            none;
+    interpolate(impK)  linear;
+    interpolate(grad(D)) linear;
+    interpolate(grad(DD)) linear;
 }
 
 // ************************************************************************* //

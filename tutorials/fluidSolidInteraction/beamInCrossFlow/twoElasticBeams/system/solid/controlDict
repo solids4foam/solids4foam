@@ -10,37 +10,42 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fsiProperties;
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface    Aitken;
+application     solids4Foam;
 
-AitkenCoeffs
-{
-    // Solid interface patch list
-    solidPatch (interface);
+startFrom       latestTime;
 
-    // Fluid interface patch list
-    fluidPatch (interface);
+startTime       0;
 
-    // Fixed under-relaxation factor for first FSI iteration
-    relaxationFactor 0.4;
+stopAt          endTime;
 
-    // Limit for enabling fluid mesh motion solver
-    interfaceDeformationLimit 0;
+endTime         3;
 
-    // FSI loop tolerance
-    outerCorrTolerance 1e-6;
+deltaT          1e-3;
 
-    // FSI max correctors
-    nOuterCorr 20;
+writeControl    timeStep;
 
-    interpolatorUpdateFrequency 0;
-    // couplingReuse 0;
+writeInterval   1;
 
-    // Enable FSI coupling
-    coupled yes;
-}
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  no;
+
+maxCo           0.2;
 
 // ************************************************************************* //

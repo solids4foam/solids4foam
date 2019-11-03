@@ -20,17 +20,11 @@ fluidSolidInterface    Aitken;
 
 "fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
 {
-    // Solid interface patch
-    solidPatch interface;
+    // Solid interface patch list
+    solidPatch (interface);
 
-    // Solid interface zone
-    solidZone interface-zone;
-
-    // Fluid interface patch
-    fluidPatch interface;
-
-    // Fluid interface zone
-    fluidZone interface-zone;
+    // Fluid interface patch list
+    fluidPatch (interface);
 
     // Fixed under-relaxation factor
     // Some methods use this as the initial factor

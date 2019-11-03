@@ -18,13 +18,11 @@ fluidSolidInterface    IQNILS;
 
 IQNILSCoeffs
 {
-    // Solid interface patch and faceZone
-    solidPatch         inner-wall;
-    solidZone          inner-wall-zone;
+    // Solid interface patch list
+    solidPatch         (inner-wall);
 
-    // Fluid interface patch and faceZone
-    fluidPatch         wall;
-    fluidZone          wall-zone;
+    // Fluid interface patch list
+    fluidPatch         (wall);
 
     // Under-relaxation factor for passing the solid interface
     // displacement/velocity to the fluid interface
