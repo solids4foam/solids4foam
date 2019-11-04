@@ -515,7 +515,7 @@ void Foam::fluidSolidInterface::calcFluidToSolidFaceMaps() const
         (
             "fluidToSolidFaceMap"
 #if FOAMEXTEND > 40
-          + name(i)
+          + Foam::name(i)
 #else
           + word(std::to_string(i), false)
 #endif
@@ -657,7 +657,7 @@ void Foam::fluidSolidInterface::calcSolidToFluidFaceMaps() const
         (
             "solidToFluidFaceMap"
 #if FOAMEXTEND > 40
-          + name(i)
+          + Foam::name(i)
 #else
           + word(std::to_string(i), false)
 #endif
@@ -799,7 +799,7 @@ void Foam::fluidSolidInterface::calcFluidToSolidPointMaps() const
         (
             "fluidToSolidPointMap"
 #if FOAMEXTEND > 40
-          + name(i)
+          + Foam::name(i)
 #else
           + word(std::to_string(i), false)
 #endif
@@ -941,7 +941,7 @@ void Foam::fluidSolidInterface::calcSolidToFluidPointMaps() const
         (
             "solidToFluidPointMap"
 #if FOAMEXTEND > 40
-          + name(i)
+          + Foam::name(i)
 #else
           + word(std::to_string(i), false)
 #endif
@@ -1078,7 +1078,7 @@ calcAccumulatedFluidInterfacesDisplacements() const
         (
             "accumulatedFluidInterfaceDisplacement"
 #if FOAMEXTEND > 40
-          + name(i)
+          + Foam::name(i)
 #else
           + word(std::to_string(i), false)
 #endif

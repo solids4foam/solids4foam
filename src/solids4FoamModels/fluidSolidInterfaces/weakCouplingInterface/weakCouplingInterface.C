@@ -97,7 +97,7 @@ weakCouplingInterface::weakCouplingInterface
         (
             "solidZoneTraction"
 #if FOAMEXTEND > 40
-          + name(i)
+          + Foam::name(i)
 #else
           + word(std::to_string(i), false)
 #endif
@@ -189,7 +189,7 @@ weakCouplingInterface::weakCouplingInterface
         (
             "predictedSolidZoneTraction"
 #if FOAMEXTEND > 40
-          + name(i)
+          + Foam::name(i)
 #else
           + word(std::to_string(i), false)
 #endif
