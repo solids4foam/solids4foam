@@ -102,7 +102,7 @@ void Foam::fluidSolidInterface::calcCurrentSolidZonesPoints() const
         currentSolidZonesPointsList_.set
         (
             interfaceI,
-            new vectorField(solid().currentFaceZonesPoints(interfaceI)())
+            new vectorField(solid().currentFaceZonePoints(interfaceI))
         );
     }
 }
@@ -115,7 +115,7 @@ void Foam::fluidSolidInterface::calcCurrentSolidZonesPatches() const
         FatalErrorIn
         (
             "void fluidSolidInterface::"
-            "currentSolidZonesPatchesPtrList() const"
+            "currentSolidZonesPatches() const"
         )   << "List already exists"
             << abort(FatalError);
     }
@@ -305,7 +305,7 @@ void Foam::fluidSolidInterface::calcGgiInterpolators() const
     {
         FatalErrorIn
         (
-            "void fluidSolidInterface::calcGgiInterpolator() const"
+            "void fluidSolidInterface::calcGgiInterpolators() const"
         )   << "GGI interpolators already exists"
             << abort(FatalError);
     }
@@ -315,7 +315,7 @@ void Foam::fluidSolidInterface::calcGgiInterpolators() const
     currentSolidZonesPatchesList_.clear();
     currentSolidZonesPointsList_.clear();
 
-    Info<< "Create GGI zone-to-zone interpolators"<< endl;
+    Info<< "Create GGI zone-to-zone interpolators" << endl;
 
     ggiInterpolatorsList_.setSize(nGlobalPatches_);
 
@@ -471,7 +471,7 @@ void Foam::fluidSolidInterface::calcFluidToSolidFaceMaps() const
             // Read map
             Info<< "Reading fluidToSolidFaceMap for global patch "
                 << fluidMesh().boundary()[patchID].name()
-                << " from disk" << endl;
+                << " from disk..." << endl;
 
             fluidToSolidFaceMapsList_.set
             (
@@ -618,7 +618,7 @@ void Foam::fluidSolidInterface::calcSolidToFluidFaceMaps() const
             // Read map
             Info<< "Reading solidToFluidFaceMap for global patch "
                 << solidMesh().boundary()[patchID].name()
-                << " from disk" << endl;
+                << " from disk..." << endl;
 
             solidToFluidFaceMapsList_.set
             (
@@ -765,7 +765,7 @@ void Foam::fluidSolidInterface::calcFluidToSolidPointMaps() const
             // Read map
             Info<< "Reading fluidToSolidPointMap for global patch "
                 << fluidMesh().boundary()[patchID].name()
-                << " from disk" << endl;
+                << " from disk..." << endl;
 
             fluidToSolidPointMapsList_.set
             (
@@ -912,7 +912,7 @@ void Foam::fluidSolidInterface::calcSolidToFluidPointMaps() const
             // Read map
             Info<< "Reading solidToFluidPointMap for global patch "
                 << solidMesh().boundary()[patchID].name()
-                << " from disk" << endl;
+                << " from disk..." << endl;
 
             solidToFluidPointMapsList_.set
             (
@@ -1052,7 +1052,7 @@ calcAccumulatedFluidInterfacesDisplacements() const
             Pout<< "Reading accumulated fluid interface "
                 << "displacement for global patch "
                 << fluidMesh().boundary()[patchID].name()
-                << " from disk" << endl;
+                << " from disk..." << endl;
 
             accumulatedFluidInterfacesDisplacementsList_.set
             (
@@ -1119,7 +1119,7 @@ void Foam::fluidSolidInterface::calcMinEdgeLengths() const
         FatalErrorIn
         (
             "void fluidSolidInterface::calcMinEdgeLengths() const"
-        )   << "List a;ready exists!" << abort(FatalError);
+        )   << "List already exists!" << abort(FatalError);
     }
 
     minEdgeLengthsList_.setSize(nGlobalPatches_);
@@ -1340,9 +1340,6 @@ Foam::fluidSolidInterface::fluidSolidInterface
     solidPatchIndices_.setSize(solidPatchNames_.size(), label(-1));
     fluidPatchIndices_.setSize(fluidPatchNames_.size(), label(-1));
 
-    // Set the number of global poly patches: solid or fluid
-    nGlobalPatches_ = fluid().globalPatches().size();
-
     // loop over all coupled patches
     forAll(solidPatchNames_, interfaceI)
     {
@@ -1388,6 +1385,9 @@ Foam::fluidSolidInterface::fluidSolidInterface
 
     // Create fluid global patches
     fluid().makeGlobalPatches(fluidPatchNames_);
+
+    // Set the number of global poly patches: solid or fluid
+    nGlobalPatches_ = fluid().globalPatches().size();
 
     // Set interface fields list size and initialize residual
     fluidZonesPointsDispls_.setSize(nGlobalPatches_);
@@ -1767,9 +1767,6 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         }
     }
 
-    Info<< nl << "Maximal accumulated displacement of all interfaces: "
-        << maxDelta << endl;
-
     if (maxDelta < interfaceDeformationLimit())
     {
         // Move only interface points
@@ -1977,7 +1974,7 @@ void Foam::fluidSolidInterface::updateForce()
     }
 
     // PhilipC: we should get rid if the use of List< tmp< > >
-    // Here, I think it owuld make sense to have a loop over interfaces
+    // Here, I think it would make sense to have a loop over interfaces
     // and then perform interpolation for each interface: there is no need to
     // create lists of fields to be interpolated
     // Also, I would rather leave the transferFacesZoneToZone function as it was
@@ -1985,16 +1982,6 @@ void Foam::fluidSolidInterface::updateForce()
     // forcing it to take lists.
 
     Info<< "Setting traction on solid patch/patches" << endl;
-
-    const List<tmp<vectorField> > faceZonesViscousForce
-    (
-        fluid().faceZonesViscousForce()
-    );
-
-    const List<tmp<scalarField> > faceZonesPressureForce
-    (
-        fluid().faceZonesPressureForce()
-    );
 
     List<vectorField> solidZonesTotalTraction
     (
@@ -2008,11 +1995,11 @@ void Foam::fluidSolidInterface::updateForce()
 
     forAll(fluid().globalPatches(), interfaceI)
     {
-        const vectorField& fluidZoneTraction =
-            faceZonesViscousForce[interfaceI]();
+        const vectorField fluidZoneTraction =
+            fluid().faceZoneViscousForce(interfaceI);
 
-        const scalarField& fluidZonePressure =
-            faceZonesPressureForce[interfaceI]();
+        const scalarField fluidZonePressure =
+            fluid().faceZonePressureForce(interfaceI);
 
         // Fluid zone face normals
         const vectorField& n =
@@ -2031,7 +2018,7 @@ void Foam::fluidSolidInterface::updateForce()
             );
     }
 
-    transferFacesZoneToZone
+    transferFacesZonesToZones
     (
         "fluid",                 // from region name
         "solid",                 // to region name
@@ -2173,16 +2160,6 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 {
     List<scalar> minResidual(nGlobalPatches_, scalar(0));
 
-    const List<tmp<vectorField> > faceZonesPointDisplacementIncrement
-    (
-        solid().faceZonesPointDisplacementIncrement()
-    );
-
-    const List<tmp<vectorField> > faceZonesPointDisplacementOld
-    (
-        solid().faceZonesPointDisplacementOld()
-    );
-
     List<vectorField> solidZonesPointsDisplsAtSolid
     (
         nGlobalPatches_,
@@ -2204,10 +2181,10 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
     forAll(solid().globalPatches(), interfaceI)
     {
         solidZonesPointsDisplsAtSolid[interfaceI] =
-            faceZonesPointDisplacementIncrement[interfaceI]();
+            solid().faceZonePointDisplacementIncrement(interfaceI);
 
         solidZonesPointsTotDisplsAtSolid[interfaceI] =
-            faceZonesPointDisplacementOld[interfaceI]();
+            solid().faceZonePointDisplacementOld(interfaceI);
 
         solidZonesPointsTotDispls[interfaceI] =
             vectorField
@@ -2218,7 +2195,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
     }
 
     // Transfer displacement fields from the solid to the fluid
-    transferPointsZoneToZone
+    transferPointsZonesToZones
     (
         "solid",                       // from region name
         "fluid",                       // to region name
@@ -2228,7 +2205,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         solidZonesPointsDispls()       // to fields
     );
 
-    transferPointsZoneToZone
+    transferPointsZonesToZones
     (
         "solid",                          // from region name
         "fluid",                          // to region name
@@ -2299,11 +2276,6 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
 void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 {
-    const List<tmp<vectorField> > faceZonesAcceleration
-    (
-        solid().faceZonesAcceleration()
-    );
-
     forAll(fluid().globalPatches(), interfaceI)
     {
         if
@@ -2316,7 +2288,8 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
         {
             Info<< "Setting acceleration at fluid side of the interface" << endl;
 
-            const vectorField& solidZoneAcceleration = faceZonesAcceleration[interfaceI]();
+            const vectorField solidZoneAcceleration =
+                solid().faceZoneAcceleration(interfaceI);
 
             const vectorField fluidZoneAcceleration =
                 ggiInterpolators()[interfaceI].slaveToMaster(solidZoneAcceleration);
@@ -2341,11 +2314,6 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 
 void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
 {
-    const List<tmp<vectorField> > faceZonesAcceleration
-    (
-        solid().faceZonesAcceleration()
-    );
-
     forAll(fluid().globalPatches(), interfaceI)
     {
         // Set interface acceleration
@@ -2357,7 +2325,8 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
             )
         )
         {
-            const vectorField& solidZoneAcceleration = faceZonesAcceleration[interfaceI]();
+            const vectorField solidZoneAcceleration =
+                solid().faceZoneAcceleration(interfaceI);
 
             const vectorField fluidZoneAcceleration =
                 ggiInterpolators()[interfaceI].slaveToMaster(solidZoneAcceleration);

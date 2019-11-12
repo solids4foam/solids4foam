@@ -526,29 +526,47 @@ public:
             //  solution variable
             virtual volVectorField& solutionD() = 0;
 
-            //- Face zones point displacement increment
-            virtual List<tmp<vectorField> > faceZonesPointDisplacementIncrement() const;
-
-            //- Face zones point displacement increment
-            virtual List<tmp<vectorField> > faceZonesPointDisplacementOld() const;
-
-            //- Face zones velocity
-            virtual List<tmp<vectorField> > faceZonesAcceleration() const;
-
-            //- Face zones velocity
-            virtual List<tmp<vectorField> > faceZonesVelocity() const;
-
-            //- Face zones surface velocity gradient
-            virtual List<tmp<tensorField> > faceZonesSurfaceGradientOfVelocity() const;
-
-            //- Face zones primitive patch in current configuration
-            virtual tmp<vectorField> currentFaceZonesPoints
+            //- Face zone point displacement increment
+            virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (
                 const label interfaceI
             ) const;
 
-            //- Face zones current normal
-            virtual List<tmp<vectorField> > faceZonesNormal() const;
+            //- Face zone point displacement increment
+            virtual tmp<vectorField> faceZonePointDisplacementOld
+            (
+                const label interfaceI
+            ) const;
+
+            //- Face zone velocity
+            virtual tmp<vectorField> faceZoneAcceleration
+            (
+                const label interfaceI
+            ) const;
+
+            //- Face zone velocity
+            virtual tmp<vectorField> faceZoneVelocity
+            (
+                const label interfaceI
+            ) const;
+
+            //- Face zone surface velocity gradient
+            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
+            (
+                const label interfaceI
+            ) const;
+
+            //- Face zone primitive patch in current configuration
+            virtual tmp<vectorField> currentFaceZonePoints
+            (
+                const label interfaceI
+            ) const;
+
+            //- Face zone current normal
+            virtual tmp<vectorField> faceZoneNormal
+            (
+                const label interfaceI
+            ) const;
 
             //- Return enforceLinear switch
             const Switch& enforceLinear() const

@@ -132,11 +132,13 @@ void fixedRelaxationCouplingInterface::updateDisplacement()
     Info<< "Current fsi under-relaxation factor: "
         << relaxationFactor_ << endl;
 
-    forAll(fluid().globalPatches(), i)
+    forAll(fluid().globalPatches(), interfaceI)
     {
-        fluidZonesPointsDisplsPrev()[i] = fluidZonesPointsDispls()[i];
+        fluidZonesPointsDisplsPrev()[interfaceI] =
+            fluidZonesPointsDispls()[interfaceI];
 
-        fluidZonesPointsDispls()[i] += relaxationFactor_*residuals()[i];
+        fluidZonesPointsDispls()[interfaceI] +=
+            relaxationFactor_*residuals()[interfaceI];
     }
 
     // Update movingWallPressure boundary conditions, if found

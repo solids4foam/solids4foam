@@ -439,7 +439,7 @@ public:
             //- Transfer/map/interpolate from one zone faces to another zone
             //  faces
             template<class Type>
-            void transferFacesZoneToZone
+            void transferFacesZonesToZones
             (
                 const word& fromRegion,                    // from region name
                 const word& toRegion,                      // to region name
@@ -452,7 +452,7 @@ public:
             //- Transfer/map/interpolate from one zone points to another zone
             //  points
             template<class Type>
-            void transferPointsZoneToZone
+            void transferPointsZonesToZones
             (
                 const word& fromRegion,                    // from region name
                 const word& toRegion,                      // to region name

@@ -29,7 +29,7 @@ License
 // * * * * * * * * * * * * * Public Member Functions  * * * * * * * * * * * //
 
 template<class Type>
-void Foam::fluidSolidInterface::transferFacesZoneToZone
+void Foam::fluidSolidInterface::transferFacesZonesToZones
 (
     const word& fromRegion,                    // from region name
     const word& toRegion,                      // to region name
@@ -39,13 +39,13 @@ void Foam::fluidSolidInterface::transferFacesZoneToZone
     List<Field<Type> >& toFields               // to fields
 ) const
 {
-    forAll(solid().globalPatches(), i)
+    forAll(solid().globalPatches(), interfaceI)
     {
-        const standAlonePatch& fromZone = fromZones[i].globalPatch();
-        const standAlonePatch& toZone = toZones[i].globalPatch();
+        const standAlonePatch& fromZone = fromZones[interfaceI].globalPatch();
+        const standAlonePatch& toZone = toZones[interfaceI].globalPatch();
 
-        const Field<Type>& fromField = fromFields[i];
-        Field<Type>& toField = toFields[i];
+        const Field<Type>& fromField = fromFields[interfaceI];
+        Field<Type>& toField = toFields[interfaceI];
 
         // Check field sizes are correct
         if (fromField.size() != fromZone.size())
@@ -95,7 +95,9 @@ void Foam::fluidSolidInterface::transferFacesZoneToZone
 
             if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
             {
-                const labelList& fluidToSolidMap = fluidToSolidFaceMaps()[i];
+                const labelList& fluidToSolidMap =
+                    fluidToSolidFaceMaps()[interfaceI];
+
                 forAll(toField, faceI)
                 {
                     toField[faceI] = fromField[fluidToSolidMap[faceI]];
@@ -106,7 +108,9 @@ void Foam::fluidSolidInterface::transferFacesZoneToZone
                 fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
             )
             {
-                const labelList& solidToFluidMap = solidToFluidFaceMaps()[i];
+                const labelList& solidToFluidMap =
+                    solidToFluidFaceMaps()[interfaceI];
+
                 forAll(toField, faceI)
                 {
                     toField[faceI] = fromField[solidToFluidMap[faceI]];
@@ -150,14 +154,20 @@ void Foam::fluidSolidInterface::transferFacesZoneToZone
 
             if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
             {
-                rbfFluidToSolid()[i]->interpolate(fromRbfField, toRbfField);
+                rbfFluidToSolid()[interfaceI]->interpolate
+                (
+                    fromRbfField, toRbfField
+                );
             }
             else if
             (
                 fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
             )
             {
-                rbfSolidToFluid()[i]->interpolate(fromRbfField, toRbfField);
+                rbfSolidToFluid()[interfaceI]->interpolate
+                (
+                    fromRbfField, toRbfField
+                );
             }
             else
             {
@@ -197,14 +207,16 @@ void Foam::fluidSolidInterface::transferFacesZoneToZone
             if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
             {
                 // fluid is the master; solid is the slave
-                toField = ggiInterpolators()[i].masterToSlave(fromField);
+                toField =
+                    ggiInterpolators()[interfaceI].masterToSlave(fromField);
             }
             else if
             (
                 fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
             )
             {
-                toField = ggiInterpolators()[i].slaveToMaster(fromField);
+                toField =
+                    ggiInterpolators()[interfaceI].slaveToMaster(fromField);
             }
             else
             {
@@ -249,7 +261,7 @@ void Foam::fluidSolidInterface::transferFacesZoneToZone
 
 
 template<class Type>
-void Foam::fluidSolidInterface::transferPointsZoneToZone
+void Foam::fluidSolidInterface::transferPointsZonesToZones
 (
     const word& fromRegion,                    // from region name
     const word& toRegion,                      // to region name
@@ -259,13 +271,13 @@ void Foam::fluidSolidInterface::transferPointsZoneToZone
     List<Field<Type> >& toFields               // to fields
 ) const
 {
-    forAll(solid().globalPatches(), i)
+    forAll(solid().globalPatches(), interfaceI)
     {
-        const standAlonePatch& fromZone = fromZones[i].globalPatch();
-        const standAlonePatch& toZone = toZones[i].globalPatch();
+        const standAlonePatch& fromZone = fromZones[interfaceI].globalPatch();
+        const standAlonePatch& toZone = toZones[interfaceI].globalPatch();
 
-        const Field<Type>& fromField = fromFields[i];
-        Field<Type>& toField = toFields[i];
+        const Field<Type>& fromField = fromFields[interfaceI];
+        Field<Type>& toField = toFields[interfaceI];
 
         // Check field sizes are correct
         if (fromField.size() != fromZone.nPoints())
@@ -315,7 +327,9 @@ void Foam::fluidSolidInterface::transferPointsZoneToZone
 
             if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
             {
-                const labelList& fluidToSolidMap = fluidToSolidPointMaps()[i];
+                const labelList& fluidToSolidMap =
+                    fluidToSolidPointMaps()[interfaceI];
+
                 forAll(toField, pointI)
                 {
                     toField[pointI] = fromField[fluidToSolidMap[pointI]];
@@ -326,7 +340,9 @@ void Foam::fluidSolidInterface::transferPointsZoneToZone
                 fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
             )
             {
-                const labelList& solidToFluidMap = solidToFluidPointMaps()[i];
+                const labelList& solidToFluidMap =
+                    solidToFluidPointMaps()[interfaceI];
+
                 forAll(toField, pointI)
                 {
                     toField[pointI] = fromField[solidToFluidMap[pointI]];
@@ -370,14 +386,20 @@ void Foam::fluidSolidInterface::transferPointsZoneToZone
 
             if (fromRegion == fluidMesh().name() && toRegion == solidMesh().name())
             {
-                rbfFluidToSolid()[i]->interpolate(fromRbfField, toRbfField);
+                rbfFluidToSolid()[interfaceI]->interpolate
+                (
+                    fromRbfField, toRbfField
+                );
             }
             else if
             (
                 fromRegion == solidMesh().name() && toRegion == fluidMesh().name()
             )
             {
-                rbfSolidToFluid()[i]->interpolate(fromRbfField, toRbfField);
+                rbfSolidToFluid()[interfaceI]->interpolate
+                (
+                    fromRbfField, toRbfField
+                );
             }
             else
             {
@@ -418,7 +440,10 @@ void Foam::fluidSolidInterface::transferPointsZoneToZone
             {
                 // fluid is the master; solid is the slave
                 toField =
-                    ggiInterpolators()[i].masterToSlavePointInterpolate(fromField);
+                    ggiInterpolators()[interfaceI].masterToSlavePointInterpolate
+                    (
+                        fromField
+                    );
             }
             else if
             (
@@ -426,7 +451,10 @@ void Foam::fluidSolidInterface::transferPointsZoneToZone
             )
             {
                 toField =
-                    ggiInterpolators()[i].slaveToMasterPointInterpolate(fromField);
+                    ggiInterpolators()[interfaceI].slaveToMasterPointInterpolate
+                    (
+                        fromField
+                    );
             }
             else
             {

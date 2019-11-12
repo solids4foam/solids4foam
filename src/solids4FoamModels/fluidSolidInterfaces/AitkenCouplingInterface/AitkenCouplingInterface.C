@@ -135,30 +135,32 @@ void AitkenCouplingInterface::updateDisplacement()
         Info<< "Current fsi under-relaxation factor (fixed): "
             << relaxationFactor_ << endl;
 
-        forAll(fluid().globalPatches(), i)
+        forAll(fluid().globalPatches(), interfaceI)
         {
-            fluidZonesPointsDisplsPrev()[i] = fluidZonesPointsDispls()[i];
+            fluidZonesPointsDisplsPrev()[interfaceI] =
+                fluidZonesPointsDispls()[interfaceI];
 
-            fluidZonesPointsDispls()[i] += relaxationFactor_*residuals()[i];
+            fluidZonesPointsDispls()[interfaceI] +=
+                relaxationFactor_*residuals()[interfaceI];
         }
     }
     else
     {
-        forAll(fluid().globalPatches(), i)
+        forAll(fluid().globalPatches(), interfaceI)
         {
-            aitkenRelaxationFactors_[i] =
-                -aitkenRelaxationFactors_[i]
+            aitkenRelaxationFactors_[interfaceI] =
+                -aitkenRelaxationFactors_[interfaceI]
                *(
                     sum
                     (
-                        residualsPrev()[i]
-                      & (residuals()[i] - residualsPrev()[i])
+                        residualsPrev()[interfaceI]
+                      & (residuals()[interfaceI] - residualsPrev()[interfaceI])
                     )
                    /(
                         sum
                         (
-                            (residuals()[i] - residualsPrev()[i])
-                          & (residuals()[i] - residualsPrev()[i])
+                            (residuals()[interfaceI] - residualsPrev()[interfaceI])
+                          & (residuals()[interfaceI] - residualsPrev()[interfaceI])
                         )
                     )
                 );
@@ -167,33 +169,36 @@ void AitkenCouplingInterface::updateDisplacement()
             {
                 if (!Pstream::master())
                 {
-                    aitkenRelaxationFactors_[i] = 0.0;
+                    aitkenRelaxationFactors_[interfaceI] = 0.0;
                 }
 
                 // Pass to all procs
-                reduce(aitkenRelaxationFactors_[i], sumOp<scalar>());
+                reduce(aitkenRelaxationFactors_[interfaceI], sumOp<scalar>());
             }
 
-            aitkenRelaxationFactors_[i] = mag(aitkenRelaxationFactors_[i]);
+            aitkenRelaxationFactors_[interfaceI] =
+                mag(aitkenRelaxationFactors_[interfaceI]);
 
-            if (aitkenRelaxationFactors_[i] > 1)
+            if (aitkenRelaxationFactors_[interfaceI] > 1)
             {
                 // PC: in this case, would 1.0 be a better option?
                 // Of course, the current option is more more stable
-                //aitkenRelaxationFactors_[i] = relaxationFactor_;
-                aitkenRelaxationFactors_[i] = 1.0;
+                // aitkenRelaxationFactors_[interfaceI] = relaxationFactor_;
+                aitkenRelaxationFactors_[interfaceI] = 1.0;
             }
 
             Info<< "Current fsi under-relaxation factor (Aitken) of "
                 << fluidMesh().boundary()
                    [
-                       fluid().globalPatches()[i].patch().index()
+                       fluid().globalPatches()[interfaceI].patch().index()
                    ].name()
-                << ": " << aitkenRelaxationFactors_[i] << endl;
+                << ": " << aitkenRelaxationFactors_[interfaceI] << endl;
 
-            fluidZonesPointsDisplsPrev()[i] = fluidZonesPointsDispls()[i];
+            fluidZonesPointsDisplsPrev()[interfaceI] =
+                fluidZonesPointsDispls()[interfaceI];
 
-            fluidZonesPointsDispls()[i] += aitkenRelaxationFactors_[i]*residuals()[i];
+            fluidZonesPointsDispls()[interfaceI] +=
+                aitkenRelaxationFactors_[interfaceI]*residuals()[interfaceI];
         }
     }
 

@@ -530,43 +530,27 @@ const Foam::oversetMesh& Foam::fluidModel::osMesh() const
 }
 #endif
 
-Foam::List<Foam::tmp<Foam::vectorField> >
-Foam::fluidModel::faceZonesViscousForce() const
+Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce
+(
+    const label interfaceI
+) const
 {
-    List<tmp<vectorField> > tglobalVF
-    (
-        globalPatches().size()
-    );
+    const vectorField patchVF =
+        patchViscousForce(globalPatches()[interfaceI].patch().index());
 
-    forAll(globalPatches(), i)
-    {
-        const vectorField patchVF =
-            patchViscousForce(globalPatches()[i].patch().index());
-
-        tglobalVF[i] = globalPatches()[i].patchFaceToGlobal(patchVF);
-    }
-
-    return tglobalVF;
+    return globalPatches()[interfaceI].patchFaceToGlobal(patchVF);
 }
 
 
-Foam::List<Foam::tmp<Foam::scalarField> >
-Foam::fluidModel::faceZonesPressureForce() const
+Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce
+(
+    const label interfaceI
+) const
 {
-    List<tmp<scalarField> > tglobalPF
-    (
-        globalPatches().size()
-    );
+    const scalarField patchPF =
+        patchPressureForce(globalPatches()[interfaceI].patch().index());
 
-    forAll(globalPatches(), i)
-    {
-        const scalarField patchPF =
-            patchPressureForce(globalPatches()[i].patch().index());
-
-        tglobalPF[i] = globalPatches()[i].patchFaceToGlobal(patchPF);
-    }
-
-    return tglobalPF;
+    return globalPatches()[interfaceI].patchFaceToGlobal(patchPF);
 }
 
 

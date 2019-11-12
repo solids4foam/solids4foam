@@ -68,39 +68,42 @@ weakCouplingInterface::weakCouplingInterface
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
     )
 {
+    if (solidZonesTractionPtrList_.size())
+    {
+        FatalErrorIn
+        (
+            "weakCouplingInterface::weakCouplingInterface\n"
+            "(\n"
+            "    Time& runTime,\n"
+            "    const word& region\n"
+            ")\n"
+        )   << "solidZonesTraction List already exists"
+            << abort(FatalError);
+    }
+
     solidZonesTractionPtrList_.setSize(nGlobalPatches());
+
+    if (predictedSolidZonesTractionPtrList_.size())
+    {
+        FatalErrorIn
+        (
+            "weakCouplingInterface::weakCouplingInterface\n"
+            "(\n"
+            "    Time& runTime,\n"
+            "    const word& region\n"
+            ")\n"
+        )   << "predictedSolidZonesTraction List already exists"
+            << abort(FatalError);
+    }
 
     predictedSolidZonesTractionPtrList_.setSize(nGlobalPatches());
 
-    forAll(fluid().globalPatches(), i)
+    forAll(fluid().globalPatches(), interfaceI)
     {
-        if (solidZonesTractionPtrList_.set(i))
-        {
-            FatalErrorIn
-            (
-                "weakCouplingInterface::weakCouplingInterface\n"
-                "(\n"
-                "    Time& runTime,\n"
-                "    const word& region\n"
-                ")\n"
-            )
-                << "solidZoneTraction already set for global patch: "
-                << fluidMesh().boundary()
-                   [
-                       fluid().globalPatches()[i].patch().index()
-                   ].name()
-                << "!" << abort(FatalError);
-        }
-
         // Initialize solid zone traction fields
         const word solidZoneTractionName
         (
-            "solidZoneTraction"
-#if FOAMEXTEND > 40
-          + Foam::name(i)
-#else
-          + word(std::to_string(i), false)
-#endif
+            "solidZoneTraction" + Foam::name(interfaceI)
         );
 
         IOobject solidZoneTractionHeader
@@ -116,13 +119,13 @@ weakCouplingInterface::weakCouplingInterface
             Info<< "Reading solidZoneTraction for global patch "
                 << fluidMesh().boundary()
                    [
-                       fluid().globalPatches()[i].patch().index()
+                       fluid().globalPatches()[interfaceI].patch().index()
                    ].name()
                 << " from disk..." << endl;
 
             solidZonesTractionPtrList_.set
             (
-                i,
+                interfaceI,
                 new vectorIOField
                 (
                     IOobject
@@ -140,7 +143,7 @@ weakCouplingInterface::weakCouplingInterface
         {
             solidZonesTractionPtrList_.set
             (
-                i,
+                interfaceI,
                 new vectorIOField
                 (
                     IOobject
@@ -153,46 +156,23 @@ weakCouplingInterface::weakCouplingInterface
                     ),
                     vectorField
                     (
-                        solid().globalPatches()[i].globalPatch().size(),
+                        solid().globalPatches()[interfaceI].globalPatch().size(),
                         vector::zero
                     )
                 )
             );
         }
 
-        solidZonesTractionPrev_[i] =
+        solidZonesTractionPrev_[interfaceI] =
             vectorField
             (
-                solid().globalPatches()[i].globalPatch().size(),
+                solid().globalPatches()[interfaceI].globalPatch().size(),
                 vector::zero
             );
 
-        if (predictedSolidZonesTractionPtrList_.set(i))
-        {
-            FatalErrorIn
-            (
-                "weakCouplingInterface::weakCouplingInterface\n"
-                "(\n"
-                "    Time& runTime,\n"
-                "    const word& region\n"
-                ")\n"
-            )
-                << "predictedSolidZoneTraction already set for global patch: "
-                << fluidMesh().boundary()
-                   [
-                       fluid().globalPatches()[i].patch().index()
-                   ].name()
-                << "!" << abort(FatalError);
-        }
-
         const word predictedSolidZoneTractionName
         (
-            "predictedSolidZoneTraction"
-#if FOAMEXTEND > 40
-          + Foam::name(i)
-#else
-          + word(std::to_string(i), false)
-#endif
+            "predictedSolidZoneTraction" + Foam::name(interfaceI)
         );
 
         IOobject predictedSolidZoneTractionHeader
@@ -208,13 +188,13 @@ weakCouplingInterface::weakCouplingInterface
             Info<< "Reading predictedSolidZoneTraction for global patch "
                 << fluidMesh().boundary()
                    [
-                       fluid().globalPatches()[i].patch().index()
+                       fluid().globalPatches()[interfaceI].patch().index()
                    ].name()
                 << " from disk..." << endl;
 
             predictedSolidZonesTractionPtrList_.set
             (
-                i,
+                interfaceI,
                 new vectorIOField
                 (
                     IOobject
@@ -232,7 +212,7 @@ weakCouplingInterface::weakCouplingInterface
         {
             predictedSolidZonesTractionPtrList_.set
             (
-                i,
+                interfaceI,
                 new vectorIOField
                 (
                     IOobject
@@ -245,7 +225,7 @@ weakCouplingInterface::weakCouplingInterface
                     ),
                     vectorField
                     (
-                        solid().globalPatches()[i].globalPatch().size(),
+                        solid().globalPatches()[interfaceI].globalPatch().size(),
                         vector::zero
                     )
                 )
@@ -280,12 +260,12 @@ bool weakCouplingInterface::evolve()
 
 void weakCouplingInterface::initializeFields()
 {
-    forAll(solid().globalPatches(), i)
+    forAll(solid().globalPatches(), interfaceI)
     {
-        predictedSolidZonesTractionPtrList_[i] =
+        predictedSolidZonesTractionPtrList_[interfaceI] =
             vectorField
             (
-                solid().globalPatches()[i].globalPatch().size(),
+                solid().globalPatches()[interfaceI].globalPatch().size(),
                 vector::zero
             );
     }
@@ -298,86 +278,81 @@ bool weakCouplingInterface::updateWeakDisplacement()
 {
     List<scalar> minResidual(nGlobalPatches(), scalar(0));
 
-    const List<tmp<vectorField> > faceZonesPointDisplacementIncrement
-    (
-        solid().faceZonesPointDisplacementIncrement()
-    );
-
-    const List<tmp<vectorField> > faceZonesPointDisplacementOld
-    (
-        solid().faceZonesPointDisplacementOld()
-    );
-
-    forAll(solid().globalPatches(), i)
+    forAll(solid().globalPatches(), interfaceI)
     {
-        const vectorField& solidZonePointsDisplAtSolid =
-            faceZonesPointDisplacementIncrement[i]();
+        const vectorField solidZonePointsDisplAtSolid =
+            solid().faceZonePointDisplacementIncrement(interfaceI);
 
-        solidZonesPointsDispls()[i] =
-            ggiInterpolators()[i].slaveToMasterPointInterpolate
+        solidZonesPointsDispls()[interfaceI] =
+            ggiInterpolators()[interfaceI].slaveToMasterPointInterpolate
             (
                 solidZonePointsDisplAtSolid
             );
 
-        const vectorField& solidZonePointsTotDisplAtSolid =
-            faceZonesPointDisplacementOld[i]();
+        const vectorField solidZonePointsTotDisplAtSolid =
+            solid().faceZonePointDisplacementOld(interfaceI);
 
         const vectorField solidZonePointsTotDispl =
-            ggiInterpolators()[i].slaveToMasterPointInterpolate
+            ggiInterpolators()[interfaceI].slaveToMasterPointInterpolate
             (
                 solidZonePointsTotDisplAtSolid
             );
 
-        residualsPrev()[i] = residuals()[i];
+        residualsPrev()[interfaceI] = residuals()[interfaceI];
 
-        residuals()[i] = solidZonesPointsDispls()[i] - fluidZonesPointsDispls()[i];
+        residuals()[interfaceI] =
+            solidZonesPointsDispls()[interfaceI]
+          - fluidZonesPointsDispls()[interfaceI];
 
-        fluidZonesPointsDisplsPrev()[i] = fluidZonesPointsDispls()[i];
+        fluidZonesPointsDisplsPrev()[interfaceI] =
+            fluidZonesPointsDispls()[interfaceI];
 
-        fluidZonesPointsDispls()[i] += residuals()[i];
+        fluidZonesPointsDispls()[interfaceI] += residuals()[interfaceI];
 
         // Calculate residual norm
-        scalar residualNorm = Foam::sqrt(gSum(magSqr(residuals()[i])));
+        scalar residualNorm = Foam::sqrt(gSum(magSqr(residuals()[interfaceI])));
         scalar residualNorm_2 = residualNorm;
 
-        if (residualNorm > maxResidualsNorm()[i])
+        if (residualNorm > maxResidualsNorm()[interfaceI])
         {
-            maxResidualsNorm()[i] = residualNorm;
+            maxResidualsNorm()[interfaceI] = residualNorm;
         }
 
-        residualNorm /= maxResidualsNorm()[i] + SMALL;
+        residualNorm /= maxResidualsNorm()[interfaceI] + SMALL;
 
         Info<< "Current fsi relative residual norm ("
             << solidMesh().boundary()
                [
-                   solid().globalPatches()[i].patch().index()
+                   solid().globalPatches()[interfaceI].patch().index()
                ].name()
             << "): " << residualNorm << endl;
 
-        interfacesPointsDisplsPrev()[i] = interfacesPointsDispls()[i];
+        interfacesPointsDisplsPrev()[interfaceI] =
+            interfacesPointsDispls()[interfaceI];
 
-        interfacesPointsDispls()[i] = solidZonesPointsDispls()[i];
+        interfacesPointsDispls()[interfaceI] =
+            solidZonesPointsDispls()[interfaceI];
 
         const vectorField intTotDispl =
-            interfacesPointsDispls()[i] + solidZonePointsTotDispl;
+            interfacesPointsDispls()[interfaceI] + solidZonePointsTotDispl;
 
         const scalar intTotDisplNorm = Foam::sqrt(gSum(magSqr(intTotDispl)));
 
-        if (intTotDisplNorm > maxIntsDisplsNorm()[i])
+        if (intTotDisplNorm > maxIntsDisplsNorm()[interfaceI])
         {
-            maxIntsDisplsNorm()[i] = intTotDisplNorm;
+            maxIntsDisplsNorm()[interfaceI] = intTotDisplNorm;
         }
 
-        residualNorm_2 /= maxIntsDisplsNorm()[i] + SMALL;
+        residualNorm_2 /= maxIntsDisplsNorm()[interfaceI] + SMALL;
 
         Info<< "Alternative fsi residual ("
             << solidMesh().boundary()
                [
-                   solid().globalPatches()[i].patch().index()
+                   solid().globalPatches()[interfaceI].patch().index()
                ].name()
             << "): " << residualNorm_2 << endl;
 
-        minResidual[i] = min(residualNorm_2, residualNorm);
+        minResidual[interfaceI] = min(residualNorm_2, residualNorm);
     }
 
     // Make sure that displacement on all processors is equal to one
@@ -396,16 +371,6 @@ void weakCouplingInterface::updateWeakTraction()
 {
     Info<< "Update weak traction on solid patch/patches" << endl;
 
-    const List<tmp<vectorField> > faceZonesViscousForce
-    (
-        fluid().faceZonesViscousForce()
-    );
-
-    const List<tmp<scalarField> > faceZonesPressureForce
-    (
-        fluid().faceZonesPressureForce()
-    );
-
     List<vectorField> fluidZonesTractionAtSolid
     (
         nGlobalPatches(), vectorField()
@@ -416,18 +381,20 @@ void weakCouplingInterface::updateWeakTraction()
         nGlobalPatches(), vectorField()
     );
 
-    forAll(fluid().globalPatches(), i)
+    forAll(fluid().globalPatches(), interfaceI)
     {
         // Calc fluid traction
-        const vectorField& fluidZoneTraction = faceZonesViscousForce[i]();
+        const vectorField fluidZoneTraction =
+            fluid().faceZoneViscousForce(interfaceI);
 
-        const scalarField& fluidZonePressure = faceZonesPressureForce[i]();
+        const scalarField fluidZonePressure =
+            fluid().faceZonePressureForce(interfaceI);
 
         const vectorField& p =
-            fluid().globalPatches()[i].globalPatch().localPoints();
+            fluid().globalPatches()[interfaceI].globalPatch().localPoints();
 
         const faceList& f =
-            fluid().globalPatches()[i].globalPatch().localFaces();
+            fluid().globalPatches()[interfaceI].globalPatch().localFaces();
 
         vectorField n(f.size(), vector::zero);
         forAll(n, faceI)
@@ -436,35 +403,37 @@ void weakCouplingInterface::updateWeakTraction()
             n[faceI] /= mag(n[faceI]);
         }
 
-        fluidZonesTraction[i] =
+        fluidZonesTraction[interfaceI] =
             fluidZoneTraction - fluidZonePressure*n;
 
-        fluidZonesTractionAtSolid[i] =
+        fluidZonesTractionAtSolid[interfaceI] =
             vectorField
             (
-                solid().globalPatches()[i].globalPatch().size(),
+                solid().globalPatches()[interfaceI].globalPatch().size(),
                 vector::zero
             );
 
-        fluidZonesTractionAtSolid[i] =
-            ggiInterpolators()[i].masterToSlave
+        fluidZonesTractionAtSolid[interfaceI] =
+            ggiInterpolators()[interfaceI].masterToSlave
             (
-                -fluidZonesTraction[i]
+                -fluidZonesTraction[interfaceI]
             );
 
         const scalar beta_ = relaxationFactor_;
 
-        solidZonesTractionPrev_[i] = solidZonesTractionPtrList_[i];
+        solidZonesTractionPrev_[interfaceI] =
+            solidZonesTractionPtrList_[interfaceI];
 
-        solidZonesTractionPtrList_[i] =
-            beta_*fluidZonesTractionAtSolid[i]
-          + (1.0 - beta_)*predictedSolidZonesTractionPtrList_[i];
+        solidZonesTractionPtrList_[interfaceI] =
+            beta_*fluidZonesTractionAtSolid[interfaceI]
+          + (1.0 - beta_)*predictedSolidZonesTractionPtrList_[interfaceI];
 
         FatalError
             << "Check beta here!" << abort(FatalError);
 
-        predictedSolidZonesTractionPtrList_[i] =
-            2.0*solidZonesTractionPtrList_[i] - solidZonesTractionPrev_[i];
+        predictedSolidZonesTractionPtrList_[interfaceI] =
+            2.0*solidZonesTractionPtrList_[interfaceI]
+          - solidZonesTractionPrev_[interfaceI];
     }
 
     if (coupled())
@@ -480,13 +449,13 @@ void weakCouplingInterface::updateWeakTraction()
 
     // Total force at the fluid side of the interface
     {
-        forAll(fluid().globalPatches(), i)
+        forAll(fluid().globalPatches(), interfaceI)
         {
             const vectorField& p =
-                fluid().globalPatches()[i].globalPatch().localPoints();
+                fluid().globalPatches()[interfaceI].globalPatch().localPoints();
 
             const faceList& f =
-                fluid().globalPatches()[i].globalPatch().localFaces();
+                fluid().globalPatches()[interfaceI].globalPatch().localFaces();
 
             vectorField S(f.size(), vector::zero);
 
@@ -495,12 +464,13 @@ void weakCouplingInterface::updateWeakTraction()
                 S[faceI] = f[faceI].normal(p);
             }
 
-            const vector totalTractionForce = sum(fluidZonesTraction[i]*mag(S));
+            const vector totalTractionForce =
+                sum(fluidZonesTraction[interfaceI]*mag(S));
 
             Info<< "Total force on interface patch "
                 << fluidMesh().boundary()
                    [
-                       fluid().globalPatches()[i].patch().index()
+                       fluid().globalPatches()[interfaceI].patch().index()
                    ].name()
                 << " (fluid) = " << totalTractionForce << endl;
         }
@@ -508,12 +478,12 @@ void weakCouplingInterface::updateWeakTraction()
 
     // Total force at the solid side of the interface
     {
-        forAll(fluid().globalPatches(), i)
+        forAll(fluid().globalPatches(), interfaceI)
         {
             const vectorField& p =
-                solid().globalPatches()[i].globalPatch().localPoints();
+                solid().globalPatches()[interfaceI].globalPatch().localPoints();
             const faceList& f =
-                solid().globalPatches()[i].globalPatch().localFaces();
+                solid().globalPatches()[interfaceI].globalPatch().localFaces();
 
             vectorField S(f.size(), vector::zero);
 
@@ -522,12 +492,13 @@ void weakCouplingInterface::updateWeakTraction()
                 S[faceI] = f[faceI].normal(p);
             }
 
-            const vector totalTractionForce = sum(fluidZonesTractionAtSolid[i]*mag(S));
+            const vector totalTractionForce =
+                sum(fluidZonesTractionAtSolid[interfaceI]*mag(S));
 
             Info<< "Total force on interface patch "
                 << solidMesh().boundary()
                    [
-                       solid().globalPatches()[i].patch().index()
+                       solid().globalPatches()[interfaceI].patch().index()
                    ].name()
                 << " (solid) = " << totalTractionForce << endl;
         }

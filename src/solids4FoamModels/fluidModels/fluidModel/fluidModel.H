@@ -386,11 +386,17 @@ public:
                 const label patchID
             ) const = 0;
 
-            //- Face zones viscous force (N/m2)
-            virtual List<tmp<vectorField> > faceZonesViscousForce() const;
+            //- Face zone viscous force (N/m2)
+            virtual tmp<vectorField> faceZoneViscousForce
+            (
+                const label interfaceI
+            ) const;
 
-            //- Face zones pressure force (N/m2)
-            virtual List<tmp<scalarField> > faceZonesPressureForce() const;
+            //- Face zone pressure force (N/m2)
+            virtual tmp<scalarField> faceZonePressureForce
+            (
+                const label interfaceI
+            ) const;
 
             //- This function will check that the U field was read from disk
             virtual void UisRequired();
