@@ -31,6 +31,7 @@ Description
 Author
     Zeljko Tukovic, FSB Zagreb.  All rights reserved.
     Philip Cardiff, UCD. All rights reserved.
+    Extended to multiple interfaces by Danial Khazaei
 
 SourceFiles
     fluidSolidInterface.C
@@ -79,6 +80,12 @@ class fluidSolidInterface
         //- Solid solver
         autoPtr<solidModel> solid_;
 
+        //- Solid interface patch names
+        wordList solidPatchNames_;
+
+        //- Fluid interface patch Names
+        wordList fluidPatchNames_;
+
         //- Solid interface patch indices
         labelList solidPatchIndices_;
 
@@ -88,42 +95,41 @@ class fluidSolidInterface
         //- Number of global poly patches
         label nGlobalPatches_;
 
-        //- Ptr list of solid face zones current points
-        mutable PtrList<vectorField> currentSolidZonesPointsPtrList_;
+        //- List of solid face zones current points
+        mutable PtrList<vectorField> currentSolidZonesPointsList_;
 
-        //- Ptr list of solid face zones primitive patches in current configuration
-        mutable PtrList<standAlonePatch> currentSolidZonesPatchesPtrList_;
+        //- List of solid face zones primitive patches in current configuration
+        mutable PtrList<standAlonePatch> currentSolidZonesPatchesList_;
 
-        //- Ptr list of fluid zone to solid zone interpolators
-        mutable List<std::shared_ptr<RBFInterpolation> > rbfFluidToSolidPtrList_;
+        //- List of fluid zone to solid zone interpolators
+        mutable List<std::shared_ptr<RBFInterpolation> > rbfFluidToSolidList_;
 
-        //- Ptr list of solid zone to fluid zone interpolators
-        mutable List<std::shared_ptr<RBFInterpolation> > rbfSolidToFluidPtrList_;
+        //- List of solid zone to fluid zone interpolators
+        mutable List<std::shared_ptr<RBFInterpolation> > rbfSolidToFluidList_;
 
-        //- Ptr list of ggi zone-to-zone interpolators
-        mutable PtrList<GGIInterpolation
+        //- List of ggi zone-to-zone interpolators
+        mutable PtrList
         <
-            standAlonePatch,
-            standAlonePatch
-        > > ggiInterpolatorsPtrList_;
+            GGIInterpolation<standAlonePatch, standAlonePatch>
+        > ggiInterpolatorsList_;
 
-        //- Ptr list of face map for conformal fluid and solid interfaces
+        //- List of face map for conformal fluid and solid interfaces
         //  For each solid face, give the index of the corresponding fluid face
-        mutable PtrList<labelIOList> fluidToSolidFaceMapsPtrList_;
+        mutable PtrList<labelIOList> fluidToSolidFaceMapsList_;
 
-        //- Ptr list of face map for conformal fluid and solid interfaces
+        //- List of face map for conformal fluid and solid interfaces
         //  For each fluid face, give the index of the corresponding solid face
-        mutable PtrList<labelIOList> solidToFluidFaceMapsPtrList_;
+        mutable PtrList<labelIOList> solidToFluidFaceMapsList_;
 
-        //- Ptr list of point map for conformal fluid and solid interfaces
+        //- List of point map for conformal fluid and solid interfaces
         //  For each solid point, give the index of the corresponding fluid
         //  point
-        mutable PtrList<labelIOList> fluidToSolidPointMapsPtrList_;
+        mutable PtrList<labelIOList> fluidToSolidPointMapsList_;
 
-        //- Ptr list of point map for conformal fluid and solid interfaces
+        //- List of point map for conformal fluid and solid interfaces
         //  For each fluid point, give the index of the corresponding solid
         //  point
-        mutable PtrList<labelIOList> solidToFluidPointMapsPtrList_;
+        mutable PtrList<labelIOList> solidToFluidPointMapsList_;
 
         //- Outer correction loop stoping tolerance
         const scalar outerCorrTolerance_;
@@ -188,11 +194,12 @@ class fluidSolidInterface
         //- Interpolator update frequency
         label interpolatorUpdateFrequency_;
 
-        //- Ptr list of accumulated fluid side interfaces displacements
-        mutable PtrList<vectorIOField> accumulatedFluidInterfacesDisplacementsPtrList_;
+        //- List of accumulated fluid side interfaces displacements
+        mutable PtrList<vectorIOField>
+        accumulatedFluidInterfacesDisplacementsList_;
 
-        //- Ptr list of min edge lengths for interfaces points at fluid side
-        mutable PtrList<scalarField> minEdgeLengthsPtrList_;
+        //- List of min edge lengths for interfaces points at fluid side
+        mutable PtrList<scalarField> minEdgeLengthsList_;
 
     // Private Member Functions
 
@@ -392,13 +399,13 @@ public:
             }
 
             //- Return solid patch indices
-            labelList solidPatchIndices() const
+            const labelList& solidPatchIndices() const
             {
                 return solidPatchIndices_;
             }
 
             //- Return fluid patch indices
-            labelList fluidPatchIndices() const
+            const labelList& fluidPatchIndices() const
             {
                 return fluidPatchIndices_;
             }
@@ -416,16 +423,18 @@ public:
             const PtrList<standAlonePatch>& currentSolidZonesPatches() const;
 
             //- Return fluid to solid interpolators
-            const List<std::shared_ptr<RBFInterpolation> >& rbfFluidToSolid() const;
+            const List<std::shared_ptr<RBFInterpolation> >&
+            rbfFluidToSolid() const;
 
             //- Return fluid to solid interpolators
-            const List<std::shared_ptr<RBFInterpolation> >& rbfSolidToFluid() const;
+            const List<std::shared_ptr<RBFInterpolation> >&
+            rbfSolidToFluid() const;
 
             //- Return fluid to solid interpolators
-            const PtrList<GGIInterpolation
+            const PtrList
             <
-                standAlonePatch, standAlonePatch
-            > >& ggiInterpolators() const;
+                GGIInterpolation<standAlonePatch, standAlonePatch>
+            >& ggiInterpolators() const;
 
             //- Transfer/map/interpolate from one zone faces to another zone
             //  faces

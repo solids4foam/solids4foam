@@ -1434,30 +1434,22 @@ Foam::solidModel::faceZonesSurfaceGradientOfVelocity() const
 }
 
 
-Foam::List<Foam::tmp<Foam::vectorField> >
-Foam::solidModel::currentFaceZonesPoints() const
+Foam::tmp<Foam::vectorField> Foam::solidModel::currentFaceZonesPoints
+(
+    const label interfaceI
+) const
 {
-    List<tmp<vectorField> > tglobalPoints
+    // Patch point displacement
+    const vectorField pointDisplacement
     (
-        globalPatches().size()
+        pointDorPointDD().internalField(),
+        globalPatches()[interfaceI].patch().meshPoints()
     );
 
-    forAll(globalPatches(), i)
-    {
-        // Patch point displacement
-        const vectorField pointDisplacement
-        (
-            pointDorPointDD().internalField(),
-            globalPatches()[i].patch().meshPoints()
-        );
-
-        tglobalPoints[i] =
-            globalPatches()[i].globalPatch().localPoints()
-          + globalPatches()[i].patchPointToGlobal(pointDisplacement);
-    }
-
-    // Return the list of global patch deformed points
-    return tglobalPoints;
+    // Return global patch deformed points
+    return
+        globalPatches()[interfaceI].globalPatch().localPoints()
+      + globalPatches()[interfaceI].patchPointToGlobal(pointDisplacement);
 }
 
 

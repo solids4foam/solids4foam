@@ -542,7 +542,10 @@ public:
             virtual List<tmp<tensorField> > faceZonesSurfaceGradientOfVelocity() const;
 
             //- Face zones primitive patch in current configuration
-            virtual List<tmp<vectorField> > currentFaceZonesPoints() const;
+            virtual tmp<vectorField> currentFaceZonesPoints
+            (
+                const label interfaceI
+            ) const;
 
             //- Face zones current normal
             virtual List<tmp<vectorField> > faceZonesNormal() const;
