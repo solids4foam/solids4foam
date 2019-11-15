@@ -19,10 +19,10 @@ fluidSolidInterface    oneWayCoupling;
 oneWayCouplingCoeffs
 {
     // Solid patch list
-    solidPatch (interface);
+    solidPatch interface;
 
     // Fluid patch list
-    fluidPatch (fixedWalls);
+    fluidPatch fixedWalls;
 }
 
 // ************************************************************************* //

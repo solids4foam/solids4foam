@@ -54,6 +54,12 @@ fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
 fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
 
+interfaceToInterface = fluidSolidInterfaces/fluidSolidInterface/interfaceToInterfaceMapping
+$(interfaceToInterface)/interfaceToInterfaceMapping/interfaceToInterfaceMapping.C
+$(interfaceToInterface)/ggiInterfaceToInterfaceMapping/ggiInterfaceToInterfaceMapping.C
+$(interfaceToInterface)/directMapInterfaceToInterfaceMapping/directMapInterfaceToInterfaceMapping.C
+$(interfaceToInterface)/rbfInterfaceToInterfaceMapping/rbfInterfaceToInterfaceMapping.C
+
 materialModels/mechanicalModel/mechanicalModel.C
 materialModels/mechanicalModel/solidSubMeshes/solidSubMeshes.C
 mechanicalLaws = materialModels/mechanicalModel/mechanicalLaws

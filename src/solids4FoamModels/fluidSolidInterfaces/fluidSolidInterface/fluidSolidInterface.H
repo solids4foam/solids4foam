@@ -35,7 +35,6 @@ Author
 
 SourceFiles
     fluidSolidInterface.C
-    newFluidSolidInterface.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -50,10 +49,8 @@ SourceFiles
 #include "fluidModel.H"
 #include "solidModel.H"
 #include "dynamicFvMesh.H"
-#include "ggiInterpolation.H"
-#include "RBFInterpolation.H"
+#include "interfaceToInterfaceMapping.H"
 
-using namespace rbf;
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -72,7 +69,7 @@ class fluidSolidInterface
     // Private data
 
         //- FSI properties dictionary
-        dictionary fsiProperties_;
+        mutable dictionary fsiProperties_;
 
         //- Flow solver
         autoPtr<fluidModel> fluid_;
@@ -95,41 +92,10 @@ class fluidSolidInterface
         //- Number of global poly patches
         label nGlobalPatches_;
 
-        //- List of solid face zones current points
-        mutable PtrList<vectorField> currentSolidZonesPointsList_;
-
-        //- List of solid face zones primitive patches in current configuration
-        mutable PtrList<standAlonePatch> currentSolidZonesPatchesList_;
-
-        //- List of fluid zone to solid zone interpolators
-        mutable List<std::shared_ptr<RBFInterpolation> > rbfFluidToSolidList_;
-
-        //- List of solid zone to fluid zone interpolators
-        mutable List<std::shared_ptr<RBFInterpolation> > rbfSolidToFluidList_;
-
-        //- List of ggi zone-to-zone interpolators
-        mutable PtrList
-        <
-            GGIInterpolation<standAlonePatch, standAlonePatch>
-        > ggiInterpolatorsList_;
-
-        //- List of face map for conformal fluid and solid interfaces
-        //  For each solid face, give the index of the corresponding fluid face
-        mutable PtrList<labelIOList> fluidToSolidFaceMapsList_;
-
-        //- List of face map for conformal fluid and solid interfaces
-        //  For each fluid face, give the index of the corresponding solid face
-        mutable PtrList<labelIOList> solidToFluidFaceMapsList_;
-
-        //- List of point map for conformal fluid and solid interfaces
-        //  For each solid point, give the index of the corresponding fluid
-        //  point
-        mutable PtrList<labelIOList> fluidToSolidPointMapsList_;
-
-        //- List of point map for conformal fluid and solid interfaces
-        //  For each fluid point, give the index of the corresponding solid
-        //  point
-        mutable PtrList<labelIOList> solidToFluidPointMapsList_;
+        //- Mapping objects for passing fields between the pairs of solid and
+        //  fluid interfaces
+        //  e.g. this could be RBF or GGI or a direct map or other
+        mutable PtrList<interfaceToInterfaceMapping> interfaceToInterfaceList_;
 
         //- Outer correction loop stoping tolerance
         const scalar outerCorrTolerance_;
@@ -198,9 +164,6 @@ class fluidSolidInterface
         mutable PtrList<vectorIOField>
         accumulatedFluidInterfacesDisplacementsList_;
 
-        //- List of min edge lengths for interfaces points at fluid side
-        mutable PtrList<scalarField> minEdgeLengthsList_;
-
     // Private Member Functions
 
         //- Update the coupled switch based on the couplingStartTime
@@ -212,50 +175,14 @@ class fluidSolidInterface
         //- Calculate current solid zone primitive patches
         void calcCurrentSolidZonesPatches() const;
 
-        //- Calculate RBF fluid to solid interpolators
-        void calcRbfFluidToSolidInterpolators() const;
-
-        //- Calculate RBF fluid to solid interpolators
-        void calcRbfSolidToFluidInterpolators() const;
-
-        //- Calculate fluid-to-solid / solid-to-fluid ggi interpolators
-        void calcGgiInterpolators() const;
-
-        //- Calculate fluid to solid face maps
-        void calcFluidToSolidFaceMaps() const;
-
-        //- Return a reference to the fluid to solid face maps
-        const PtrList<labelIOList>& fluidToSolidFaceMaps() const;
-
-        //- Calculate solid to fluid face maps
-        void calcSolidToFluidFaceMaps() const;
-
-        //- Return a reference to the solid to fluid face maps
-        const PtrList<labelIOList>& solidToFluidFaceMaps() const;
-
-        //- Calculate fluid to solid point maps
-        void calcFluidToSolidPointMaps() const;
-
-        //- Return a reference to the fluid to solid point maps
-        const PtrList<labelIOList>& fluidToSolidPointMaps() const;
-
-        //- Calculate solid to fluid point maps
-        void calcSolidToFluidPointMaps() const;
-
-        //- Return a reference to the solid to fluid point maps
-        const PtrList<labelIOList>& solidToFluidPointMaps() const;
+        //- Calculate interface-to-interface list
+        void calcInterfaceToInterfaceList() const;
 
         //- Accumulated fluid interfaces displacements
         void calcAccumulatedFluidInterfacesDisplacements() const;
 
         //- Return accumulated interfaces displacements
         PtrList<vectorIOField>& accumulatedFluidInterfacesDisplacements();
-
-        //- Calculate minimal edge lengths
-        void calcMinEdgeLengths() const;
-
-        //- Return minimal edge lengths
-        const PtrList<scalarField>& minEdgeLengths() const;
 
         //- Disallow default bitwise copy construct
         fluidSolidInterface(const fluidSolidInterface&);
@@ -310,25 +237,6 @@ public:
 
         virtual ~fluidSolidInterface();
 
-
-    // Public enumerations
-
-        //- Method for transferring information between the solid and the fluid
-        //  interfaces
-        enum interfaceTransferMethod
-        {
-            directMap,
-            RBF,
-            GGI
-        };
-
-        //- interfaceTransferMethod names
-        static const NamedEnum<interfaceTransferMethod, 3>
-            interfaceTransferMethodNames_;
-
-private:
-        //- Transfer method
-        interfaceTransferMethod transferMethod_;
 
 public:
 
@@ -415,52 +323,6 @@ public:
             {
                 return nGlobalPatches_;
             }
-
-            //- Return current solid zones points
-            const PtrList<vectorField>& currentSolidZonesPoints() const;
-
-            //- Return current solid zones patches
-            const PtrList<standAlonePatch>& currentSolidZonesPatches() const;
-
-            //- Return fluid to solid interpolators
-            const List<std::shared_ptr<RBFInterpolation> >&
-            rbfFluidToSolid() const;
-
-            //- Return fluid to solid interpolators
-            const List<std::shared_ptr<RBFInterpolation> >&
-            rbfSolidToFluid() const;
-
-            //- Return fluid to solid interpolators
-            const PtrList
-            <
-                GGIInterpolation<standAlonePatch, standAlonePatch>
-            >& ggiInterpolators() const;
-
-            //- Transfer/map/interpolate from one zone faces to another zone
-            //  faces
-            template<class Type>
-            void transferFacesZonesToZones
-            (
-                const word& fromRegion,                    // from region name
-                const word& toRegion,                      // to region name
-                const PtrList<globalPolyPatch>& fromZones, // from zones
-                const PtrList<globalPolyPatch>& toZones,   // to zones
-                const List<Field<Type> >& fromFields,      // from fields
-                List<Field<Type> >& toFields               // to fields
-            ) const;
-
-            //- Transfer/map/interpolate from one zone points to another zone
-            //  points
-            template<class Type>
-            void transferPointsZonesToZones
-            (
-                const word& fromRegion,                    // from region name
-                const word& toRegion,                      // to region name
-                const PtrList<globalPolyPatch>& fromZones, // from zones
-                const PtrList<globalPolyPatch>& toZones,   // to zones
-                const List<Field<Type> >& fromFields,      // from fields
-                List<Field<Type> >& toFields               // to fields
-            ) const;
 
             //- Return outer corrector loop tolerance
             scalar outerCorrTolerance() const
@@ -597,8 +459,19 @@ public:
                 return maxIntsDisplsNorm_;
             }
 
+            //- Return const access to the interface-to-interface list
+            const PtrList<interfaceToInterfaceMapping>&
+                interfaceToInterfaceList() const;
+
 
         // Edit
+
+            //- Return the current force on the interface given the zone and
+            //  zone traction field
+            vector totalForceOnInterface
+            (
+                const standAlonePatch& zone, const vectorField& zoneTraction
+            ) const;
 
             //- Update the size of the time-step
             virtual void setDeltaT(Time& runTime);
@@ -644,11 +517,6 @@ public:
 
 } // End namespace Foam
 
-#ifdef NoRepository
-#   include "fluidSolidInterfaceTemplates.C"
-#endif
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

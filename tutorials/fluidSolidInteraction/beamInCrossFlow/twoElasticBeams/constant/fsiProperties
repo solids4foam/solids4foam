@@ -21,10 +21,10 @@ fluidSolidInterface    Aitken;
 "fixedRelaxationCoeffs|AitkenCoeffs|ISNILSCoeffs"
 {
     // Solid interface patch list
-    solidPatch (interface1 interface2);
+    solidPatches (interface1 interface2);
 
     // Fluid interface patch list
-    fluidPatch (interface1 interface2);
+    fluidPatches (interface1 interface2);
 
     // Under-relaxation factor for passing the solid interface
     // displacement/velocity to the fluid interface
@@ -45,8 +45,8 @@ fluidSolidInterface    Aitken;
     coupled yes;
 
     // Method for transferring information between the interfaces
-    interfaceTransferMethod directMap;
-    //interfaceTransferMethod RBF;
+    //interfaceTransferMethod directMap;
+    interfaceTransferMethod RBF;
     //interfaceTransferMethod GGI;
 
     // Optional: if coupled is set to "no", then the couplingStartTime allows

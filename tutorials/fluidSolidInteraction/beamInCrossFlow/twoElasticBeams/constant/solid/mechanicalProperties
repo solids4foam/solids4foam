@@ -20,7 +20,7 @@ mechanical
 (
     rubber
     {
-        type        neoHookeanElastic;
+        type        linearElastic;
         rho         rho [1 -3 0 0 0 0 0] 1000;
         E           E [1 -1 -2 0 0 0 0] 1e4;
         nu          nu [0 0 0 0 0 0 0] 0.4;

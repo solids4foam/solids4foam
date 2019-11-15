@@ -19,10 +19,10 @@ fluidSolidInterface    Aitken;
 AitkenCoeffs
 {
     // Solid interface patch list
-    solidPatch (interface);
+    solidPatch interface;
 
     // Fluid interface patch list
-    fluidPatch (interface);
+    fluidPatch interface;
 
     // Fixed under-relaxation factor for first FSI iteration
     relaxationFactor 0.4;

@@ -30,8 +30,7 @@ License
 #include "fluidSolidInterface.H"
 #include "backwardDdtScheme.H"
 #include "EulerDdtScheme.H"
-
-// #include "fvcMeshPhi.H"
+#include "fvcMeshPhi.H"
 // #include "backwardDdtScheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

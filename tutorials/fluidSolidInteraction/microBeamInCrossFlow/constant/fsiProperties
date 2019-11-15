@@ -21,10 +21,10 @@ fluidSolidInterface    Aitken;
 "fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
 {
     // Solid interface patch list
-    solidPatch (interface);
+    solidPatch interface;
 
     // Fluid interface patch list
-    fluidPatch (interface);
+    fluidPatch interface;
 
     // Fixed under-relaxation factor
     // Some methods use this as the initial factor

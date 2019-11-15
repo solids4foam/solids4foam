@@ -601,7 +601,11 @@ public:
             virtual void DDisRequired();
 
             //- Make the global poly patches
-            void makeGlobalPatches(const wordList& patchNames) const;
+            void makeGlobalPatches
+            (
+                const wordList& patchNames,
+                const bool currentConfiguration = true
+            ) const;
 
             //- Return const-access to the global poly patches
             const PtrList<globalPolyPatch>& globalPatches() const;
@@ -625,32 +629,19 @@ public:
                 const scalarField& pressure
             );
 
-            //- Set traction at specified patch
             virtual void setTraction
             (
-                const labelList& patchIDs,
-                const List<vectorField>& faceZonesTraction
-            );
-
-            //- Set traction at specified patch
-            virtual void setTraction
-            (
-                const labelList& patchIDs,
-                const PtrList<vectorIOField>& faceZonesTraction
+                const label interfaceI,
+                const label patchID,
+                const vectorField& faceZoneTraction
             );
 
             //- Set traction at specified patch
             virtual void setPressure
             (
-                const labelList& patchIDs,
-                const List<scalarField>& faceZonesPressure
-            );
-
-            //- Set traction at specified patch
-            virtual void setPressure
-            (
-                const labelList& patchIDs,
-                const PtrList<scalarIOField>& faceZonesPressure
+                const label interfaceI,
+                const label patchID,
+                const scalarField& faceZonePressure
             );
 
             //- Check if solid model is diverging using the Jacobian field

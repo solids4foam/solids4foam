@@ -113,16 +113,6 @@ void oneWayCouplingInterface::updateTraction()
 {
     Info<< "Update traction on solid patch/patches" << endl;
 
-    List<vectorField> fluidZonesTractionAtSolid
-    (
-        nGlobalPatches(), vectorField()
-    );
-
-    List<vectorField> fluidZonesTraction
-    (
-        nGlobalPatches(), vectorField()
-    );
-
     forAll(fluid().globalPatches(), interfaceI)
     {
         const vectorField fluidZoneTraction =
@@ -145,91 +135,45 @@ void oneWayCouplingInterface::updateTraction()
             n[faceI] /= mag(n[faceI]);
         }
 
-        fluidZonesTraction[interfaceI] =
+        const vectorField fluidZonesTraction =
             fluidZoneTraction - fluidZonePressure*n;
 
-        fluidZonesTractionAtSolid[interfaceI] =
-            vectorField
-            (
-                solid().globalPatches()[interfaceI].globalPatch().size(),
-                vector::zero
-            );
-
-        fluidZonesTractionAtSolid[interfaceI] =
-            ggiInterpolators()[interfaceI].masterToSlave
-            (
-                -fluidZonesTraction[interfaceI]
-            );
-
-        solidZonesTraction_[interfaceI] =
-            fluidZonesTractionAtSolid[interfaceI];
-    }
-
-    if (coupled())
-    {
-        solid().setTraction
+        interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
         (
-            solidPatchIndices(),
-            solidZonesTraction_
+            fluid().globalPatches()[interfaceI].globalPatch(), // fromZone
+            solid().globalPatches()[interfaceI].globalPatch(), // toZone
+            fluidZonesTraction,                                // fromField
+            solidZonesTraction_[interfaceI]                    // toField
         );
-    }
 
-    // Total force at the fluid side of the interface
-    {
-        forAll(fluid().globalPatches(), interfaceI)
+        // Flip the sign
+        solidZonesTraction_[interfaceI] = - solidZonesTraction_[interfaceI];
+
+        if (coupled())
         {
-            const vectorField& p =
-                fluid().globalPatches()[interfaceI].globalPatch().localPoints();
-
-            const faceList& f =
-                fluid().globalPatches()[interfaceI].globalPatch().localFaces();
-
-            vectorField S(f.size(), vector::zero);
-
-            forAll(S, faceI)
-            {
-                S[faceI] = f[faceI].normal(p);
-            }
-
-            const vector totalTractionForce =
-                sum(fluidZonesTraction[interfaceI]*mag(S));
-
-            Info<< "Total force on interface patch "
-                << fluidMesh().boundary()
-                   [
-                       fluid().globalPatches()[interfaceI].patch().index()
-                   ].name()
-                << " (fluid) = " << totalTractionForce << endl;
+            solid().setTraction
+            (
+                interfaceI,
+                solidPatchIndices()[interfaceI],
+                solidZonesTraction_[interfaceI]
+            );
         }
-    }
 
-    // Total force at the solid side of the interface
-    {
-        forAll(solid().globalPatches(), interfaceI)
-        {
-            const vectorField& p =
-                solid().globalPatches()[interfaceI].globalPatch().localPoints();
-
-            const faceList& f =
-                solid().globalPatches()[interfaceI].globalPatch().localFaces();
-
-            vectorField S(f.size(), vector::zero);
-
-            forAll(S, faceI)
-            {
-                S[faceI] = f[faceI].normal(p);
-            }
-
-            const vector totalTractionForce =
-                sum(fluidZonesTractionAtSolid[interfaceI]*mag(S));
-
-            Info<< "Total force on interface patch "
-                << solidMesh().boundary()
-                   [
-                       solid().globalPatches()[interfaceI].patch().index()
-                   ].name()
-                << " (solid) = " << totalTractionForce << endl;
-        }
+        // Print total force on solid and fluid interfaces
+        Info<< "Total force on fluid interface " << interfaceI << ": "
+            << fluidSolidInterface::totalForceOnInterface
+            (
+                fluid().globalPatches()[interfaceI].globalPatch(),
+                fluidZonesTraction
+            )
+            << nl
+            << "Total force on solid interface " << interfaceI << ": "
+            << fluidSolidInterface::totalForceOnInterface
+            (
+                solid().globalPatches()[interfaceI].globalPatch(),
+                solidZonesTraction_[interfaceI]
+            ) << nl
+            << endl;
     }
 }
 

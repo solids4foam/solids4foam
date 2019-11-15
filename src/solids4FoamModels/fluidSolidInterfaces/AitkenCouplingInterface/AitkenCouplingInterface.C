@@ -159,8 +159,14 @@ void AitkenCouplingInterface::updateDisplacement()
                    /(
                         sum
                         (
-                            (residuals()[interfaceI] - residualsPrev()[interfaceI])
-                          & (residuals()[interfaceI] - residualsPrev()[interfaceI])
+                            (
+                                residuals()[interfaceI]
+                              - residualsPrev()[interfaceI]
+                            )
+                          & (
+                                residuals()[interfaceI]
+                              - residualsPrev()[interfaceI]
+                            )
                         )
                     )
                 );

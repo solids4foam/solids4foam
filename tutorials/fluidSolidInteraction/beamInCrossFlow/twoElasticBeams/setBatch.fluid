@@ -1,3 +1,0 @@
-faceSet interface1-zone new patchToFace interface1
-faceSet interface2-zone new patchToFace interface2
-quit
