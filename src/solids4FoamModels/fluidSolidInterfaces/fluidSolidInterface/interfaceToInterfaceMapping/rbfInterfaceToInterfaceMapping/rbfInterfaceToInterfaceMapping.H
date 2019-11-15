@@ -41,7 +41,7 @@ SourceFiles
 #define rbfInterfaceToInterfaceMapping_H
 
 #include "interfaceToInterfaceMapping.H"
-#include "rbfInterpolation.H"
+#include "RBFInterpolation.H"
 
 using namespace rbf;
 
