@@ -1,6 +1,13 @@
 #!/bin/bash
 cd ${0%/*} || exit 1    # run from this directory
 
+# Check if OpenFOAM/FOAM has been sourced
+if [[ -z "${WM_PROJECT}" ]]
+then
+    echo "Please source the OpenFOAM bashrc first!"
+    exit 1
+fi
+
 # Replace files in the main foam libraries
 (cd filesToReplaceInOF && ./Allcheck)
 if [ $? -ne 0 ]
