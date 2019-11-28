@@ -1,4 +1,12 @@
-#!/bin/sh
+#!/bin/bash
+cd ${0%/*} || exit 1    # run from this directory
+
+# Check if OpenFOAM/FOAM has been sourced
+if [[ -z "${WM_PROJECT}" ]]
+then
+    echo "Please source the OpenFOAM/FOAM bashrc first!"
+    exit 1
+fi
 
 # Clean ThirdParty
 (cd ThirdParty && ./Allwclean)
