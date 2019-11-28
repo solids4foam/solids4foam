@@ -538,32 +538,8 @@ public:
                 const label interfaceI
             ) const;
 
-            //- Face zone velocity
+            //- Face zone acceleration
             virtual tmp<vectorField> faceZoneAcceleration
-            (
-                const label interfaceI
-            ) const;
-
-            //- Face zone velocity
-            virtual tmp<vectorField> faceZoneVelocity
-            (
-                const label interfaceI
-            ) const;
-
-            //- Face zone surface velocity gradient
-            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity
-            (
-                const label interfaceI
-            ) const;
-
-            //- Face zone primitive patch in current configuration
-            virtual tmp<vectorField> currentFaceZonePoints
-            (
-                const label interfaceI
-            ) const;
-
-            //- Face zone current normal
-            virtual tmp<vectorField> faceZoneNormal
             (
                 const label interfaceI
             ) const;
