@@ -72,71 +72,8 @@ class interfaceToInterfaceMapping
         //- Const reference to the globalPatchB
         const globalPolyPatch& globalPatchB_;
 
-        // //- List of fluid zone to solid zone interpolators
-        // mutable List<std::shared_ptr<RBFInterpolation> > rbfFluidToSolidList_;
-
-        // //- List of solid zone to fluid zone interpolators
-        // mutable List<std::shared_ptr<RBFInterpolation> > rbfSolidToFluidList_;
-
-        // //- List of face map for conformal fluid and solid interfaces
-        // //  For each solid face, give the index of the corresponding fluid face
-        // mutable PtrList<labelIOList> fluidToSolidFaceMapsList_;
-
-        // //- List of face map for conformal fluid and solid interfaces
-        // //  For each fluid face, give the index of the corresponding solid face
-        // mutable PtrList<labelIOList> solidToFluidFaceMapsList_;
-
-        // //- List of point map for conformal fluid and solid interfaces
-        // //  For each solid point, give the index of the corresponding fluid
-        // //  point
-        // mutable PtrList<labelIOList> fluidToSolidPointMapsList_;
-
-        // //- List of point map for conformal fluid and solid interfaces
-        // //  For each fluid point, give the index of the corresponding solid
-        // //  point
-        // mutable PtrList<labelIOList> solidToFluidPointMapsList_;
-
-        // //- List of min edge lengths for interfaces points at fluid side
-        // mutable PtrList<scalarField> minEdgeLengthsList_;
-
 
     // Private Member Functions
-
-        // //- Calculate RBF fluid to solid interpolators
-        // void calcRbfFluidToSolidInterpolators() const;
-
-        // //- Calculate RBF fluid to solid interpolators
-        // void calcRbfSolidToFluidInterpolators() const;
-
-        // //- Calculate fluid to solid face maps
-        // void calcFluidToSolidFaceMaps() const;
-
-        // //- Return a reference to the fluid to solid face maps
-        // const PtrList<labelIOList>& fluidToSolidFaceMaps() const;
-
-        // //- Calculate solid to fluid face maps
-        // void calcSolidToFluidFaceMaps() const;
-
-        // //- Return a reference to the solid to fluid face maps
-        // const PtrList<labelIOList>& solidToFluidFaceMaps() const;
-
-        // //- Calculate fluid to solid point maps
-        // void calcFluidToSolidPointMaps() const;
-
-        // //- Return a reference to the fluid to solid point maps
-        // const PtrList<labelIOList>& fluidToSolidPointMaps() const;
-
-        // //- Calculate solid to fluid point maps
-        // void calcSolidToFluidPointMaps() const;
-
-        // //- Return a reference to the solid to fluid point maps
-        // const PtrList<labelIOList>& solidToFluidPointMaps() const;
-
-        // //- Calculate minimal edge lengths
-        // void calcMinEdgeLengths() const;
-
-        // //- Return minimal edge lengths
-        // const PtrList<scalarField>& minEdgeLengths() const;
 
         //- Disallow default bitwise copy construct
         interfaceToInterfaceMapping(const interfaceToInterfaceMapping&);
@@ -202,25 +139,6 @@ public:
 
         virtual ~interfaceToInterfaceMapping();
 
-
-    // Public enumerations
-
-        //- Method for transferring information between the solid and the fluid
-        //  interfaces
-//         enum interfaceTransferMethod
-//         {
-//             directMap,
-//             RBF,
-//             GGI
-//         };
-
-//         //- interfaceTransferMethod names
-//         static const NamedEnum<interfaceTransferMethod, 3>
-//             interfaceTransferMethodNames_;
-
-// private:
-//         //- Transfer method
-//         interfaceTransferMethod transferMethod_;
 
 public:
 
@@ -330,10 +248,6 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
-
-// #ifdef NoRepository
-// #   include "interfaceToInterfaceMappingTemplates.C"
-// #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
