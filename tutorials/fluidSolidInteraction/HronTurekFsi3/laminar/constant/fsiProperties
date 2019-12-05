@@ -20,13 +20,11 @@ fluidSolidInterface    IQNILS;
 
 "fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
 {
-    // Solid interface patch and faceZone
+    // Solid interface patch list
     solidPatch           plate;
-    solidZone            plateZone;
 
-    // Fluid interface patch and faceZone
+    // Fluid interface patch list
     fluidPatch           plate;
-    fluidZone            plateZone;
 
     // Under-relaxation factor for passing the solid interface
     // displacement/velocity to the fluid interface

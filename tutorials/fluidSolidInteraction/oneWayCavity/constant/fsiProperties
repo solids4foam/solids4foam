@@ -18,13 +18,11 @@ fluidSolidInterface    oneWayCoupling;
 
 oneWayCouplingCoeffs
 {
-    // Solid patch and face zone
+    // Solid patch list
     solidPatch interface;
-    solidZone interface-zone;
 
-    // Fluid patch and face zone
+    // Fluid patch list
     fluidPatch fixedWalls;
-    fluidZone fixedWalls-zone;
 }
 
 // ************************************************************************* //

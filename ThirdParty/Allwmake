@@ -17,18 +17,18 @@ else
         # Download eigen using wget
         echo "Downloading eigen3"
         wget --no-check-certificate \
-             http://bitbucket.org/eigen/eigen/get/3.3.7.tar.gz
+            https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz
         if [ $? -ne 0 ]
         then
             echo "Download failed!"
             echo "Check your internet connection and check the following link "
-            echo "is valid: http://bitbucket.org/eigen/eigen/get/3.3.7.tar.gz"
+            echo "is valid: https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz"
             echo
             exit 1
         fi
-        \tar xvf 3.3.7.tar.gz
-        \rm -f 3.3.7.tar.gz
-        \mv eigen-eigen-323c052e1731 eigen3
+        \tar xvf eigen-3.3.7.tar.gz
+        \rm -f eigen-3.3.7.tar.gz
+        \mv eigen-3.3.7 eigen3
         (cd eigen3 && wmakeLnInclude .)
     else
         #  If EIGEN_DIR is set then then we will create a symbolic link to it

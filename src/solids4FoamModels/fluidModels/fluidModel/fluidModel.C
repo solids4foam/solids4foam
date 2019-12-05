@@ -481,7 +481,7 @@ Foam::fluidModel::fluidModel
     cumulativeContErr_(0.0),
     fsiMeshUpdate_(false),
     fsiMeshUpdateChanged_(false),
-    globalPatchPtr_()
+    globalPatchesPtrList_()
 {
     if (mesh().solutionDict().found("fieldBounds"))
     {
@@ -530,21 +530,27 @@ const Foam::oversetMesh& Foam::fluidModel::osMesh() const
 }
 #endif
 
-Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce() const
+Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce
+(
+    const label interfaceI
+) const
 {
     const vectorField patchVF =
-        patchViscousForce(globalPatch().patch().index());
+        patchViscousForce(globalPatches()[interfaceI].patch().index());
 
-    return globalPatch().patchFaceToGlobal(patchVF);
+    return globalPatches()[interfaceI].patchFaceToGlobal(patchVF);
 }
 
 
-Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce() const
+Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce
+(
+    const label interfaceI
+) const
 {
     const scalarField patchPF =
-        patchPressureForce(globalPatch().patch().index());
+        patchPressureForce(globalPatches()[interfaceI].patch().index());
 
-    return globalPatch().patchFaceToGlobal(patchPF);
+    return globalPatches()[interfaceI].patchFaceToGlobal(patchPF);
 }
 
 
@@ -570,34 +576,50 @@ void Foam::fluidModel::pisRequired()
 }
 
 
-void Foam::fluidModel::makeGlobalPatch(const word& patchName) const
+void Foam::fluidModel::makeGlobalPatches(const wordList& patchNames) const
 {
-    if (globalPatchPtr_.valid())
-    {
-        FatalErrorIn(type() + "::makeGlobalPatch() const")
-            << "Pointer already set!" << abort(FatalError);
-    }
+    globalPatchesPtrList_.setSize(patchNames.size());
 
-    globalPatchPtr_.set(new globalPolyPatch(patchName, mesh()));
+    forAll(patchNames, i)
+    {
+        if (globalPatchesPtrList_.set(i))
+        {
+            FatalErrorIn
+            (
+                type() + "::makeGlobalPatches(const wordList&) const"
+            )
+                << "Pointer already set for global patch: "
+                << patchNames[i] << "!"
+                << abort(FatalError);
+        }
+
+        globalPatchesPtrList_.set
+        (
+            i,
+            new globalPolyPatch(patchNames[i], mesh())
+        );
+    }
 }
 
 
-const Foam::globalPolyPatch& Foam::fluidModel::globalPatch() const
+const Foam::PtrList<Foam::globalPolyPatch>&
+Foam::fluidModel::globalPatches() const
 {
-    if (globalPatchPtr_.empty())
+    if (globalPatchesPtrList_.empty())
     {
-        FatalErrorIn(type() + "::makeGlobalPatch() const")
-            << "makeGlobalPatch(...) must be called before globalPatch can be"
-            << " called!" << abort(FatalError);
+        FatalErrorIn(type() + "::globalPatches() const")
+            << "makeGlobalPatches(const wordList&) must be called "
+            << "before globalPatch can be called!"
+            << abort(FatalError);
     }
 
-    return globalPatchPtr_();
+    return globalPatchesPtrList_;
 }
 
 
-void Foam::fluidModel::clearGlobalPatch() const
+void Foam::fluidModel::clearGlobalPatches() const
 {
-    globalPatchPtr_.clear();
+    globalPatchesPtrList_.clear();
 }
 
 

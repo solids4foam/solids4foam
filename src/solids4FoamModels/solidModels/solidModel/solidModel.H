@@ -44,6 +44,7 @@ SourceFiles
 #include "physicsModel.H"
 #include "dynamicFvMesh.H"
 #include "IOdictionary.H"
+#include "scalarIOField.H"
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
 #include "thermalModel.H"
@@ -188,12 +189,12 @@ class solidModel
         //- Reference D (without relaxation) field used for Quasi-Newton method
         volVectorField unrelaxedDRef_;
 
-        //- Global poly patch
+        //- Ptr list of global poly patches
         //  This is a copy of a patch which is reconstructed in full on each
         //  processor. This is convenient for interpolating between two patches
         //  in parallel, as used, for example, in the fluid-solid interaction
         //  procedure
-        mutable autoPtr<globalPolyPatch> globalPatchPtr_;
+        mutable PtrList<globalPolyPatch> globalPatchesPtrList_;
 
         //- Optional: set displacement at internal cells
         mutable autoPtr<setCellDisplacements> setCellDispsPtr_;
@@ -526,25 +527,22 @@ public:
             virtual volVectorField& solutionD() = 0;
 
             //- Face zone point displacement increment
-            virtual tmp<vectorField> faceZonePointDisplacementIncrement() const;
+            virtual tmp<vectorField> faceZonePointDisplacementIncrement
+            (
+                const label interfaceI
+            ) const;
 
             //- Face zone point displacement increment
-            virtual tmp<vectorField> faceZonePointDisplacementOld() const;
+            virtual tmp<vectorField> faceZonePointDisplacementOld
+            (
+                const label interfaceI
+            ) const;
 
-            //- Face zone velocity
-            virtual tmp<vectorField> faceZoneAcceleration() const;
-
-            //- Face zone velocity
-            virtual tmp<vectorField> faceZoneVelocity() const;
-
-            //- Face zone surface velocity gradient
-            virtual tmp<tensorField> faceZoneSurfaceGradientOfVelocity() const;
-
-            //- Face zone current normal
-            virtual tmp<vectorField> faceZoneNormal() const;
-
-            //- Face zone primitive patch in current configuration
-            virtual tmp<vectorField> currentFaceZonePoints() const;
+            //- Face zone acceleration
+            virtual tmp<vectorField> faceZoneAcceleration
+            (
+                const label interfaceI
+            ) const;
 
             //- Return enforceLinear switch
             const Switch& enforceLinear() const
@@ -578,14 +576,18 @@ public:
             //- This function will check that the DD field was read from disk
             virtual void DDisRequired();
 
-            //- Make the global poly patch
-            void makeGlobalPatch(const word& patchName) const;
+            //- Make the global poly patches
+            void makeGlobalPatches
+            (
+                const wordList& patchNames,
+                const bool currentConfiguration = true
+            ) const;
 
-            //- Return const-access to the global poly patch
-            const globalPolyPatch& globalPatch() const;
+            //- Return const-access to the global poly patches
+            const PtrList<globalPolyPatch>& globalPatches() const;
 
-            //- Clear global poly patch
-            void clearGlobalPatch() const;
+            //- Clear global poly patches
+            void clearGlobalPatches() const;
 
         // Edit
 
@@ -603,9 +605,9 @@ public:
                 const scalarField& pressure
             );
 
-            //- Set traction at specified patch
             virtual void setTraction
             (
+                const label interfaceI,
                 const label patchID,
                 const vectorField& faceZoneTraction
             );
@@ -613,6 +615,7 @@ public:
             //- Set traction at specified patch
             virtual void setPressure
             (
+                const label interfaceI,
                 const label patchID,
                 const scalarField& faceZonePressure
             );

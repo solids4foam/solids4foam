@@ -177,9 +177,9 @@ Foam::solidPointDisplacement::solidPointDisplacement
         }
 
         // More than one processor can have the point so we will take the proc
-        // with the lowest processor number
-        const int globalMinProc = returnReduce(procNo, minOp<int>());
-        if (mag(globalMinProc - procNo) > SMALL)
+        // with the highest processor number
+        const int globalMaxProc = returnReduce(procNo, maxOp<int>());
+        if (mag(globalMaxProc - procNo) > SMALL)
         {
             pointID_ = -1;
         }
@@ -189,6 +189,13 @@ Foam::solidPointDisplacement::solidPointDisplacement
             Pout<< this->name()
                 << ": distance from specified point is " << minDist
                 << endl;
+        }
+
+        if (returnReduce(pointID_, maxOp<int>()) == -1)
+        {
+            FatalErrorIn("solidPointDisplacement::solidPointDisplacement")
+                << "Something went wrong: no proc found a point!"
+                << abort(FatalError);
         }
 
         // File update

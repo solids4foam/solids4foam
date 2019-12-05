@@ -66,8 +66,8 @@ class AitkenCouplingInterface
         //- Predict solid
         const bool predictSolid_;
 
-        //- Aitken under-relaxation factor
-        scalar aitkenRelaxationFactor_;
+        //- List of Aitken under-relaxation factors
+        List<scalar> aitkenRelaxationFactors_;
 
 
     // Private Member Functions

@@ -21,12 +21,6 @@ runApplication icoFoam
 # Prepare the solid mesh
 runApplication -l log.blockMesh.solid blockMesh -region solid
 
-# Prepare the face zones to transfer the information between fluid and solid
-runApplication -l log.setSet.solid setSet -region solid -batch setBatch.solid
-runApplication -l log.setsToZones.solid setsToZones -region solid -noFlipMap
-runApplication -l log.setSet.fluid setSet -batch setBatch.fluid
-runApplication -l log.setsToZones.fluid setsToZones -noFlipMap
-
 # Create links as the solid solver expects the fluid to be a sub-region
 echo "Creating links to the fluid results"
 \ln -s ../constant constant/fluid

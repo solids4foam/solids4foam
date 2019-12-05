@@ -51,6 +51,12 @@ functions
         type          solidForcesDisplacements;
         historyPatch  right;
     }
+
+    pointDisp
+    {
+        type          solidPointDisplacement;
+        point         (0 0.5 0);
+    }
 }
 
 // ************************************************************************* //
