@@ -84,7 +84,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     const dictionary& dict
 )
 :
-    fixedValueFvPatchVectorField(p, iF, dict),
+    fixedValueFvPatchVectorField(p, iF),
     rotationAngle_(0.0),
     rotationAxis_(dict.lookup("rotationAxis")),
     rotationOrigin_(vector::zero),
@@ -97,7 +97,6 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     // Check if angle is time-varying
     if (dict.found("rotationAngleSeries"))
     {
-        Info<< "    angle is time-varying" << endl;
         angleSeries_ =
             interpolationTable<scalar>(dict.subDict("rotationAngleSeries"));
     }
@@ -109,7 +108,6 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     // Check if there is a time-varying translation
     if (dict.found("displacementSeries"))
     {
-        Info<< "    translation is time-varying" << endl;
         dispSeries_ =
             interpolationTable<vector>(dict.subDict("displacementSeries"));
     }
@@ -117,7 +115,6 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     // Check if origin is time-varying
     if (dict.found("rotationOriginSeries"))
     {
-        Info<< "    origin is time-varying" << endl;
         originSeries_ =
             interpolationTable<vector>(dict.subDict("rotationOriginSeries"));
     }
@@ -128,23 +125,27 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 
     if (dict.found("value"))
     {
-        fvPatchField<vector>::operator==
+        Field<vector>::operator==
         (
             vectorField("value", dict, p.size())
         );
     }
     else
     {
-        fvPatchField<vector>::operator==
+        Field<vector>::operator==
         (
             vectorField(p.size(), vector::zero)
         );
     }
 
+    const word& fieldName = dimensionedInternalField().name();
+
     if
     (
-        dimensionedInternalField().name() != "D"
-     && dimensionedInternalField().name() != "DD"
+        fieldName != "D" && fieldName != "DD"
+     && fieldName != "D_0" && fieldName != "DD_0"
+     && fieldName != "D_0_0" && fieldName != "DD_0_0"
+     && fieldName != "D_0_0_0" && fieldName != "DD_0_0_0"
     )
     {
         FatalErrorIn
@@ -152,6 +153,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
             "fixedRotationFvPatchVectorField::"
             "fixedRotationFvPatchVectorField(...)"
         )   << "The displacement field should be D or DD"
+            << ": current name is " << fieldName
             << abort(FatalError);
     }
 }
