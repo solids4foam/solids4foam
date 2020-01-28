@@ -42,6 +42,8 @@ fluidSolidInterface    Aitken;
 
     // Frequency at which the weights of interpolator between the fluid and
     // solid interface is updated
+    // 0 means there will be no interpolator update during simulation, whereas
+    // 10 means the interpolator will be updated every 10 time-steps
     interpolatorUpdateFrequency 0;
 
     // Re-use of the coupling

@@ -105,7 +105,7 @@ tmp<vectorField> pimpleOversetFluid::patchViscousForce(const label patchID) cons
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
-          & turbulence_->devReff()().boundaryField()[patchID]
+          & (-turbulence_->devReff()().boundaryField()[patchID])
         );
 
     // PC: why is this commented?
