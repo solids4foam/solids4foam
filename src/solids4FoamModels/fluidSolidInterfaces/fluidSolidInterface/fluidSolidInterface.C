@@ -38,6 +38,7 @@ License
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
 #include "newSubsetMotionSolverFvMesh.H"
+#include "RBFMeshMotionSolver.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -780,6 +781,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         // Check mesh motion solver type
 
+        // PC: it is not good that this is hard-coded
+        // A better way is to create an fsi point patch boundary condition that
+        // knows how to lookup the motion from the fsi class or similar
+        // For now, we will leave it
+
         // If the motionU field is in the object registry then we assume that
         // the fe motion solver is being used
         const bool feMotionSolver =
@@ -790,6 +796,14 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         const bool fvMotionSolver =
             fluidMesh().foundObject<pointVectorField>("pointMotionU");
 
+        // Check for RBF motion solver
+        const bool rbfMotionSolver =
+            isA<RBFMeshMotionSolver>
+            (
+                fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
+            );
+
+        // Set motion on FSI interface
         if (feMotionSolver)
         {
             tetPointVectorField& motionU =
@@ -895,6 +909,46 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                     )/fluid().runTime().deltaT().value();
                 }
             }
+        }
+        else if (rbfMotionSolver)
+        {
+            // Prepare list of patch motions
+            Field<vectorField> motion(fluidMesh().boundaryMesh().size());
+
+            // Initialise all fields to zero
+            forAll(fluidMesh().boundaryMesh(), patchI)
+            {
+                motion[patchI] = vectorField
+                (
+                    fluidMesh().boundaryMesh()[patchI].size(), vector::zero
+                );
+            }
+
+            // Loop through all FSI interfaces
+            forAll(fluid().globalPatches(), interfaceI)
+            {
+                // Interpolate the FSI interface point motion to the faces
+                const vectorField interfacePatchMotion =
+                    fluidPatchesPointsDispls[interfaceI]
+                  - fluidPatchesPointsDisplsPrev[interfaceI];
+
+                // Create interpolator
+                primitivePatchInterpolation interp
+                (
+                    fluidMesh().boundaryMesh()[fluidPatchIndices()[interfaceI]]
+                );
+
+                // Set motion of FSI interface
+                motion[fluidPatchIndices()[interfaceI]] =
+                    interp.pointToFaceInterpolate(interfacePatchMotion);
+            }
+
+            // Set motion field in RBF motion solver
+            // Note: take displacement as opposed to velocity
+            const_cast<RBFMeshMotionSolver&>
+            (
+                fluidMesh().lookupObject<RBFMeshMotionSolver>("dynamicMeshDict")
+            ).setMotion(motion);
         }
         else
         {
@@ -1130,10 +1184,11 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
 void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 {
-    WarningIn
-    (
-        "void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()"
-    )   << "WIP: to be implemented" << endl;
+    // Disabled
+//     WarningIn
+//     (
+//         "void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()"
+//     )   << "WIP: to be implemented" << endl;
 
     // forAll(fluid().globalPatches(), interfaceI)
     // {
@@ -1180,11 +1235,12 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 
 void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
 {
-    WarningIn
-    (
-        "void Foam::fluidSolidInterface::"
-        "updateElasticWallPressureAcceleration()"
-    )   << "WIP: to be implemented" << endl;
+    // Disabled
+//     WarningIn
+//     (
+//         "void Foam::fluidSolidInterface::"
+//         "updateElasticWallPressureAcceleration()"
+//     )   << "WIP: to be implemented" << endl;
 
     // forAll(fluid().globalPatches(), interfaceI)
     // {
