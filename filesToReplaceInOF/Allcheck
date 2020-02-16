@@ -9,6 +9,9 @@ then
         echo "No checks for versions of foam-extend greater than 4.0"
         exit 0
     fi
+else
+    echo "No checks for this version"
+    exit 0
 fi
 
 # Function for the checking and reporting how to fix file that needs to be fixed

@@ -77,7 +77,12 @@ tmp<vectorField> oneWayFsiFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-    tvF() = rho_.value()*nu_.value()*U().boundaryField()[patchID].snGrad();
+#ifdef OPENFOAMESIORFOUNDATION
+    tvF.ref() =
+#else
+    tvF() =
+#endif
+        rho_.value()*nu_.value()*U().boundaryField()[patchID].snGrad();
 
     return tvF;
 }
@@ -90,7 +95,12 @@ tmp<scalarField> oneWayFsiFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-    tpF() = rho_.value()*p().boundaryField()[patchID];
+#ifdef OPENFOAMESIORFOUNDATION
+    tpF.ref() =
+#else
+    tpF() =
+#endif
+        rho_.value()*p().boundaryField()[patchID];
 
     return tpF;
 }
@@ -121,7 +131,15 @@ bool oneWayFsiFluid::evolve()
         IOobject::MUST_READ
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if
+    (
+        Uheader.typeHeaderOk<volVectorField>(true)
+     && pheader.typeHeaderOk<volScalarField>(true)
+    )
+#else
     if (Uheader.headerOk() && pheader.headerOk())
+#endif
     {
         U() = volVectorField(Uheader, mesh());
 

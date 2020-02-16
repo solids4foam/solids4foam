@@ -83,6 +83,7 @@ class buoyantBoussinesqPimpleFluid
 {
     // Private data
 
+#ifndef OPENFOAMESIORFOUNDATION
         //- Temperature
         volScalarField T_;
 
@@ -139,6 +140,7 @@ class buoyantBoussinesqPimpleFluid
         (
             tmp<fvVectorMatrix>& UEqn
         );
+#endif
 
         //- Disallow default bitwise copy construct
         buoyantBoussinesqPimpleFluid(const buoyantBoussinesqPimpleFluid&);

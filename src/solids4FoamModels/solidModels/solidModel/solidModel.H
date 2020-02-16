@@ -54,6 +54,8 @@ SourceFiles
 #include "momentumStabilisation.H"
 #include "globalPolyPatch.H"
 #include "setCellDisplacements.H"
+#include "OFstream.H"
+#include "fvMatricesFwd.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -147,6 +149,9 @@ class solidModel
 
         //- Maximum number of momentum correctors
         const int nCorr_;
+
+        //- Minium number of momentum correctors
+        const int minCorr_;
 
         //- Number of times the maximum number of correctors was reached in the
         //  momentum equation

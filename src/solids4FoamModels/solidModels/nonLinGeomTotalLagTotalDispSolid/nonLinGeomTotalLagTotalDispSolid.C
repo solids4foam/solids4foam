@@ -141,7 +141,11 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         // Check ddt scheme for D is not steadyState
         const word ddtDScheme
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            mesh().ddtScheme("ddt(" + D().name() +')')
+#else
             mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
+#endif
         );
 
         if (ddtDScheme == "steadyState")
@@ -167,8 +171,13 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
     }
 
     int iCorr = 0;
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solverPerfD;
+    SolverPerformance<vector>::debug = 0;
+#else
     lduSolverPerformance solverPerfD;
     blockLduMatrix::debug = 0;
+#endif
 
     Info<< "Solving the total Lagrangian form of the momentum equation for D"
         << endl;
@@ -233,8 +242,21 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
        !converged
         (
             iCorr,
+#ifdef OPENFOAMESIORFOUNDATION
+            mag(solverPerfD.initialResidual()),
+            max
+            (
+                solverPerfD.nIterations()[0],
+                max
+                (
+                    solverPerfD.nIterations()[1],
+                    solverPerfD.nIterations()[2]
+                )
+            ),
+#else
             solverPerfD.initialResidual(),
             solverPerfD.nIterations(),
+#endif
             D()
         ) && ++iCorr < nCorr()
     );
@@ -248,7 +270,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
+#ifndef OPENFOAMESIORFOUNDATION
     blockLduMatrix::debug = 1;
+#endif
     
     return true;
 }

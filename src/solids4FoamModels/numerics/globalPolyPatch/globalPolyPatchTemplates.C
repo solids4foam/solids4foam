@@ -51,7 +51,11 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::patchPointToGlobal
     (
         new Field<Type>(globalPatch().nPoints(), pTraits<Type>::zero)
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    Field<Type>& gField = tgField.ref();
+#else
     Field<Type>& gField = tgField();
+#endif
 
     if (Pstream::parRun())
     {
@@ -108,7 +112,11 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::globalPointToPatch
     (
         new Field<Type>(patch().nPoints(), pTraits<Type>::zero)
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    Field<Type>& pField = tpField.ref();
+#else
     Field<Type>& pField = tpField();
+#endif
 
     if (Pstream::parRun())
     {
@@ -151,7 +159,11 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::patchFaceToGlobal
     (
         new Field<Type>(globalPatch().size(), pTraits<Type>::zero)
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    Field<Type>& gField = tgField.ref();
+#else
     Field<Type>& gField = tgField();
+#endif
 
     if (Pstream::parRun())
     {
@@ -198,13 +210,17 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::globalFaceToPatch
     (
         new Field<Type>(patch().size(), pTraits<Type>::zero)
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    Field<Type>& pField = tpField.ref();
+#else
     Field<Type>& pField = tpField();
+#endif
 
     if (Pstream::parRun())
     {
         const labelList& addr = faceToGlobalAddr();
 
-        forAll (addr, i)
+        forAll(addr, i)
         {
             pField[i] = gField[addr[i]];
         }

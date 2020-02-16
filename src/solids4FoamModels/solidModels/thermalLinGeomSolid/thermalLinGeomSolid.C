@@ -53,8 +53,13 @@ addToRunTimeSelectionTable(solidModel, thermalLinGeomSolid, dictionary);
 bool thermalLinGeomSolid::converged
 (
     const int iCorr,
+#ifdef OPENFOAMESIORFOUNDATION
+    const SolverPerformance<vector>& solverPerfD,
+    const SolverPerformance<scalar>& solverPerfT,
+#else
     const lduSolverPerformance& solverPerfD,
     const lduSolverPerformance& solverPerfT,
+#endif
     const volVectorField& D,
     const volScalarField& T
 )
@@ -64,23 +69,56 @@ bool thermalLinGeomSolid::converged
 
     // Calculate relative residuals
     const scalar absResidualT =
-        gMax(mag(T.internalField() - T.prevIter().internalField()));
+        gMax
+        (
+#ifdef OPENFOAMESIORFOUNDATION
+            DimensionedField<double, volMesh>
+            (
+                mag(T.internalField() - T.prevIter().internalField())
+            )
+#else
+            mag(T.internalField() - T.prevIter().internalField())
+#endif
+        );
     const scalar residualT =
         absResidualT
        /max
         (
-            gMax(mag(T.internalField() - T.oldTime().internalField())),
+            gMax
+            (
+#ifdef OPENFOAMESIORFOUNDATION
+                DimensionedField<double, volMesh>
+                (
+                    mag(T.internalField() - T.oldTime().internalField())
+                )
+#else
+                    mag(T.internalField() - T.oldTime().internalField())
+#endif
+            ),
             SMALL
         );
 
     const scalar residualD =
         gMax
         (
-            mag(D.internalField() - D.prevIter().internalField())
-           /max
+#ifdef OPENFOAMESIORFOUNDATION
+            DimensionedField<double, volMesh>
+#endif
             (
-                gMax(mag(D.internalField() - D.oldTime().internalField())),
-                SMALL
+                mag(D.internalField() - D.prevIter().internalField())
+               /max
+                (
+                    gMax
+                    (
+#ifdef OPENFOAMESIORFOUNDATION
+                        DimensionedField<double, volMesh>
+#endif
+                        (
+                            mag(D.internalField() - D.oldTime().internalField())
+                        )
+                    ),
+                    SMALL
+                )
             )
         );
 
@@ -98,10 +136,10 @@ bool thermalLinGeomSolid::converged
         if
         (
             (
-                solverPerfD.initialResidual() < solutionTol()
+                mag(solverPerfD.initialResidual()) < solutionTol()
              && residualD < solutionTol()
             )
-         || solverPerfD.initialResidual() < alternativeTol()
+         || mag(solverPerfD.initialResidual()) < alternativeTol()
          || residualD < alternativeTol()
         )
         {
@@ -140,7 +178,7 @@ bool thermalLinGeomSolid::converged
     {
         Info<< "    " << iCorr
             << ", " << solverPerfT.initialResidual()
-            << ", " << solverPerfD.initialResidual()
+            << ", " << mag(solverPerfD.initialResidual())
             << ", " << residualT
             << ", " << residualD
             << ", " << materialResidual
@@ -238,9 +276,15 @@ bool thermalLinGeomSolid::evolve()
     Info<< "Evolving thermal solid solver" << endl;
 
     int iCorr = 0;
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solverPerfD;
+    SolverPerformance<scalar> solverPerfT;
+    SolverPerformance<vector>::debug = 0;
+#else
     lduSolverPerformance solverPerfD;
     lduSolverPerformance solverPerfT;
     blockLduMatrix::debug = 0;
+#endif
 
     Info<< "Solving coupled energy and displacements equation for T and D"
         << endl;
@@ -335,7 +379,9 @@ bool thermalLinGeomSolid::evolve()
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();
 
+#ifndef OPENFOAMESIORFOUNDATION
     blockLduMatrix::debug = 1;
+#endif
 
     return true;
 }

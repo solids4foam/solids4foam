@@ -119,14 +119,17 @@ bool linGeomPressureDisplacementSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
 
-    // Disable default writing of linear solver residuals
-    blockLduMatrix::debug = 0;
-
     // Mesh update loop
     do
     {
         int iCorr = 0;
+#ifdef OPENFOAMESIORFOUNDATION
+        SolverPerformance<vector> solverPerfD;
+        SolverPerformance<vector>::debug = 0;
+#else
         lduSolverPerformance solverPerfD;
+        blockLduMatrix::debug = 0;
+#endif
 
         Info<< "Solving the momentum equation for D and p" << endl;
 
@@ -176,7 +179,11 @@ bool linGeomPressureDisplacementSolid::evolve()
             if (solvePressureEquationImplicitly_)
             {
                 int iInnerCorr = 0;
+#ifdef OPENFOAMESIORFOUNDATION
+                SolverPerformance<scalar> solverPerfP;
+#else
                 lduSolverPerformance solverPerfP;
+#endif
 
                 do
                 {
@@ -260,8 +267,21 @@ bool linGeomPressureDisplacementSolid::evolve()
             !converged
             (
                 iCorr,
+#ifdef OPENFOAMESIORFOUNDATION
+                mag(solverPerfD.initialResidual()),
+                max
+                (
+                    solverPerfD.nIterations()[0],
+                    max
+                    (
+                        solverPerfD.nIterations()[1],
+                        solverPerfD.nIterations()[2]
+                    )
+                ),
+#else
                 solverPerfD.initialResidual(),
                 solverPerfD.nIterations(),
+#endif
                 D()
             )
          && ++iCorr < nCorr()
@@ -281,7 +301,9 @@ bool linGeomPressureDisplacementSolid::evolve()
     }
     while (mesh().update());
 
+#ifndef OPENFOAMESIORFOUNDATION
     blockLduMatrix::debug = 1;
+#endif
 
     return true;
 }

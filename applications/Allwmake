@@ -2,4 +2,10 @@
 cd ${0%/*} || exit 1    # run from this directory
 
 wmake all solvers
-wmake all utilities
+
+if [ "$WM_PROJECT" = "foam" ]
+then
+    wmake all utilities
+else
+    echo "utilities currently not compiled for this version"
+fi

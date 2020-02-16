@@ -40,7 +40,6 @@ Author
 #ifndef transitionalParabolicVelocityFvPatchVectorField_H
 #define transitionalParabolicVelocityFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 

@@ -118,12 +118,6 @@ public:
 
         // Access
 
-            //- Density
-            const dimensionedScalar& rho()
-            {
-                return rho_;
-            }
-
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce
             (

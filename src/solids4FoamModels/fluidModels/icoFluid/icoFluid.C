@@ -70,15 +70,16 @@ icoFluid::icoFluid
         )
     ),
     nu_(transportProperties_.lookup("nu")),
-    rho_(transportProperties_.lookup("rho")),
-    pRefCell_(0),
-    pRefValue_(0)
+    rho_(transportProperties_.lookup("rho"))
 {
     UisRequired();
     pisRequired();
     
-    setRefCell(p(), piso().dict(), pRefCell_, pRefValue_);
+#ifdef OPENFOAMESIORFOUNDATION
+    mesh().setFluxRequired(p().name());
+#else
     mesh().schemesDict().setFluxRequired(p().name());
+#endif
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -91,7 +92,12 @@ tmp<vectorField> icoFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-    tvF() = rho_.value()*nu_.value()*U().boundaryField()[patchID].snGrad();
+#ifdef OPENFOAMESIORFOUNDATION
+    tvF.ref() =
+#else
+    tvF() =
+#endif
+        rho_.value()*nu_.value()*U().boundaryField()[patchID].snGrad();
 
     return tvF;
 }
@@ -104,7 +110,12 @@ tmp<scalarField> icoFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-    tpF() = rho_.value()*p().boundaryField()[patchID];
+#ifdef OPENFOAMESIORFOUNDATION
+    tpF.ref() =
+#else
+    tpF() =
+#endif
+        rho_.value()*p().boundaryField()[patchID];
 
     return tpF;
 }
@@ -114,7 +125,7 @@ bool icoFluid::evolve()
 {
     Info<< "Evolving fluid model: " << this->type() << endl;
 
-    fvMesh& mesh = this->mesh();
+    dynamicFvMesh& mesh = this->mesh();
 
     bool meshChanged = false;
     if (fluidModel::fsiMeshUpdate())
@@ -124,7 +135,7 @@ bool icoFluid::evolve()
     }
     else
     {
-        meshChanged = refCast<dynamicFvMesh>(mesh).update();
+        meshChanged = mesh.update();
         reduce(meshChanged, orOp<bool>());
     }
 
@@ -138,13 +149,13 @@ bool icoFluid::evolve()
     fvc::makeRelative(phi(), U());
 
     // CourantNo
-    {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
-        fluidModel::CourantNo(CoNum, meanCoNum, velMag);
-    }
+    fluidModel::CourantNo();
 
+    // Prepare for the pressure solution
+    label pRefCell = 0;
+    scalar pRefValue = 0.0;
+    setRefCell(p(), fluidProperties(), pRefCell, pRefValue);
+    
     // Time-derivative matrix
     fvVectorMatrix ddtUEqn(fvm::ddt(U()));
 
@@ -205,11 +216,15 @@ bool icoFluid::evolve()
              == fvc::div(phi())
             );
 
-            pEqn.setReference(pRefCell_, pRefValue_);
+            pEqn.setReference(pRefCell, pRefValue);
+#ifdef OPENFOAMESIORFOUNDATION
+            pEqn.solve();
+#else
             pEqn.solve
             (
                 mesh.solutionDict().solver(p().select(piso().finalInnerIter()))
             );
+#endif
 
             gradp() = fvc::grad(p());
 

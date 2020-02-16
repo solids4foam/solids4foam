@@ -30,7 +30,9 @@ License
 #include "emptyFvPatchFields.H"
 #include "emptyFvsPatchFields.H"
 #include "calculatedPointPatchFields.H"
+#ifndef OPENFOAMESIORFOUNDATION
 #include "globalPointPatchFields.H"
+#endif
 
 #include "symmetryFvPatch.H"
 
@@ -602,6 +604,7 @@ newFvMeshSubset::interpolate
         }
     }
 
+#ifndef OPENFOAMESIORFOUNDATION
     // Add the global patch
     if (isType<globalPointPatch>(sMesh.boundary()[sMesh.boundary().size()-1]))
     {
@@ -624,6 +627,7 @@ newFvMeshSubset::interpolate
             )
         );
     }
+#endif
 
     // Create the complete field from the pieces
     tmp<GeometricField<Type, pointPatchField, pointMesh> > tresF

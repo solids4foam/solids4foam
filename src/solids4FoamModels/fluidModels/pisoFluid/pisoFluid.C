@@ -56,7 +56,9 @@ pisoFluid::pisoFluid
     const word& region
 )
 :
-    fluidModel(typeName, runTime, region),
+    fluidModel(typeName, runTime, region)
+#ifndef OPENFOAMESIORFOUNDATION
+    ,
     laminarTransport_(U(), phi()),
     turbulence_
     (
@@ -81,12 +83,17 @@ pisoFluid::pisoFluid
     ),
     pRefCell_(0),
     pRefValue_(0)
+#endif
 {
     UisRequired();
     pisRequired();
     
+#ifndef OPENFOAMESIORFOUNDATION
     setRefCell(p(), piso().dict(), pRefCell_, pRefValue_);
     mesh().schemesDict().setFluxRequired(p().name());
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -98,12 +105,16 @@ tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tvF() =
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
           & (-turbulence_->devReff()().boundaryField()[patchID])
         );
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tvF;
 }
@@ -116,7 +127,11 @@ tmp<scalarField> pisoFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tpF() = rho_.value()*p().boundaryField()[patchID];
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tpF;
 }
@@ -124,6 +139,7 @@ tmp<scalarField> pisoFluid::patchPressureForce(const label patchID) const
 
 bool pisoFluid::evolve()
 {
+#ifndef OPENFOAMESIORFOUNDATION
     Info<< "Evolving fluid model: " << this->type() << endl;
 
     fvMesh& mesh = fluidModel::mesh();
@@ -150,12 +166,7 @@ bool pisoFluid::evolve()
     fvc::makeRelative(phi(), U());
 
     // CourantNo
-    {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
-        fluidModel::CourantNo(CoNum, meanCoNum, velMag);
-    }
+    fluidModel::CourantNo();
 
     // Time-derivative matrix
     fvVectorMatrix ddtUEqn(fvm::ddt(U()));
@@ -252,6 +263,9 @@ bool pisoFluid::evolve()
 
     // Make the fluxes absolut to the mesh motion
     fvc::makeAbsolute(phi(), U());
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return 0;
 }

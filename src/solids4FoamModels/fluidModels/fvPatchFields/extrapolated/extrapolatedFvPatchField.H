@@ -35,7 +35,6 @@ SourceFiles
 #ifndef extrapolatedFvPatchField_H
 #define extrapolatedFvPatchField_H
 
-#include "foamTime.H"
 #include "fixedGradientFvPatchField.H"
 #include "PtrList.H"
 

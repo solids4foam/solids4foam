@@ -27,7 +27,7 @@ License
 #include "newLeastSquaresVolPointInterpolation.H"
 #include "volFields.H"
 #include "pointFields.H"
-#include "globalPointPatch.H"
+//#include "globalPointPatch.H"
 #include "emptyPolyPatch.H"
 // #include "volSurfaceMapping.H"
 #include "transform.H"
@@ -58,7 +58,11 @@ void newLeastSquaresVolPointInterpolation::interpolate
     }
 
     const Field<Type>& vfI = vf.internalField();
+#ifdef OPENFOAM
+    Field<Type>& pfI = pf.primitiveFieldRef();
+#else
     Field<Type>& pfI = pf.internalField();
+#endif
 
     const vectorField& points = mesh().points();
 
@@ -1520,12 +1524,24 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceFieldData
 
 //     const labelListList& ptCells = mesh().pointCells();
 
-    const labelListList& ptBndFaces = pointBndFaces();
-
 //     const Field<Type>& vfI = vf.internalField();
 
     if (Pstream::parRun())
     {
+#ifdef OPENFOAM
+        //notImplemented("globalPointNgbProcBndFaceFieldData");
+        if (processorBoundariesExist_)
+        {
+            FatalErrorIn
+            (
+                "void newLeastSquaresVolPointInterpolation::"
+                "globalPointNgbProcBndFaceFieldData"
+            )   << "Currently only the 'none' decomposition is allowed in "
+                << "parallel" << abort(FatalError);
+        }
+#else
+        const labelListList& ptBndFaces = pointBndFaces();
+
         // Global points
         if (mesh().globalData().nGlobalPoints())
         {
@@ -1610,6 +1626,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceFieldData
                 }
             }
         }
+#endif
     }
 }
 
@@ -1629,12 +1646,24 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
             << endl;
     }
 
-    const labelListList& ptCells = mesh().pointCells();
-
-    const Field<Type>& vfI = vf.internalField();
-
     if (Pstream::parRun())
     {
+#ifdef OPENFOAM
+        // notImplemented("globalPointNgbProcCellFieldData");
+        if (processorBoundariesExist_)
+        {
+            FatalErrorIn
+            (
+                "void newLeastSquaresVolPointInterpolation::"
+                "globalPointNgbProcCellFieldData"
+            )   << "Currently only the 'none' decomposition is allowed in "
+                << "parallel" << abort(FatalError);
+        }
+#else
+        const labelListList& ptCells = mesh().pointCells();
+
+        const Field<Type>& vfI = vf.internalField();
+
         // Global points
         if (mesh().globalData().nGlobalPoints())
         {
@@ -1709,6 +1738,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
                 }
             }
         }
+#endif
     }
 }
 
@@ -1724,7 +1754,11 @@ newLeastSquaresVolPointInterpolation::procCellsFieldData
     (
         new FieldField<Field, Type>(Pstream::nProcs())
     );
+#ifdef OPENFOAM
+    FieldField<Field, Type>& procPsi = tprocPsi.ref();
+#else
     FieldField<Field, Type>& procPsi = tprocPsi();
+#endif
 
     forAll (procPsi, procI)
     {
@@ -1741,6 +1775,18 @@ newLeastSquaresVolPointInterpolation::procCellsFieldData
 
     if (Pstream::parRun())
     {
+#ifdef OPENFOAM
+        //notImplemented("procCellsFieldData");
+        if (processorBoundariesExist_)
+        {
+            FatalErrorIn
+            (
+                "void newLeastSquaresVolPointInterpolation::"
+                "procCellsFieldData"
+            )   << "Currently only the 'none' decomposition is allowed in "
+                << "parallel" << abort(FatalError);
+        }
+#else
         // Send
         for (label procI = 0; procI < Pstream::nProcs(); procI++)
         {
@@ -1800,6 +1846,7 @@ newLeastSquaresVolPointInterpolation::procCellsFieldData
                 }
             }
         }
+#endif
     }
 
     return tprocPsi;
@@ -1817,7 +1864,11 @@ newLeastSquaresVolPointInterpolation::procBndFacesFieldData
     (
         new FieldField<Field, Type>(Pstream::nProcs())
     );
+#ifdef OPENFOAM
+    FieldField<Field, Type>& procPsi = tprocPsi.ref();
+#else
     FieldField<Field, Type>& procPsi = tprocPsi();
+#endif
 
     forAll (procPsi, procI)
     {
@@ -1834,6 +1885,18 @@ newLeastSquaresVolPointInterpolation::procBndFacesFieldData
 
     if (Pstream::parRun())
     {
+#ifdef OPENFOAM
+        // notImplemented("procBndFacesFieldData");
+        if (processorBoundariesExist_)
+        {
+            FatalErrorIn
+            (
+                "void newLeastSquaresVolPointInterpolation::"
+                "procBndFacesFieldData"
+            )   << "Currently only the 'none' decomposition is allowed in "
+                << "parallel" << abort(FatalError);
+        }
+#else
         // Send
         for (label procI = 0; procI < Pstream::nProcs(); procI++)
         {
@@ -1906,6 +1969,7 @@ newLeastSquaresVolPointInterpolation::procBndFacesFieldData
                 }
             }
         }
+#endif
     }
 
     return tprocPsi;

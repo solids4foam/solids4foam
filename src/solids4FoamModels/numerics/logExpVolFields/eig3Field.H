@@ -56,11 +56,12 @@ void eig3Field
     const volSymmTensorField& A, volTensorField& V, volVectorField& d
 );
 
+#ifndef OPENFOAMESIORFOUNDATION
 void eig3Field
 (
     const volSymmTensorField& A, volTensorField& V, volDiagTensorField& d
 );
-
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

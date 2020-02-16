@@ -405,7 +405,11 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::rho() const
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
     tresult().correctBoundaryConditions();
+#endif
 
     return tresult;
 }
@@ -431,7 +435,11 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::bulkModulus() const
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
     tresult().correctBoundaryConditions();
+#endif
 
     return tresult;
 }

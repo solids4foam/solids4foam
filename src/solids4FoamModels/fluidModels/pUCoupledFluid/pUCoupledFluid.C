@@ -56,7 +56,9 @@ pUCoupledFluid::pUCoupledFluid
     const word& region
 )
 :
-    fluidModel(typeName, runTime, region),
+    fluidModel(typeName, runTime, region)
+#ifndef OPENFOAMESIORFOUNDATION
+    ,
     laminarTransport_(U(), phi()),
     turbulence_
     (
@@ -102,11 +104,16 @@ pUCoupledFluid::pUCoupledFluid
     rho_(transportProperties_.lookup("rho")),
     maxResidual_(0),
     convergenceCriterion_(0)
+#endif
 {
     UisRequired();
     pisRequired();
 
+#ifndef OPENFOAMESIORFOUNDATION
     mesh().schemesDict().setFluxRequired(p().name());
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -119,12 +126,16 @@ tmp<vectorField> pUCoupledFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tvF() =
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
           & (-turbulence_->devReff()().boundaryField()[patchID])
         );
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tvF;
 }
@@ -137,7 +148,11 @@ tmp<scalarField> pUCoupledFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tpF() = rho_.value()*p().boundaryField()[patchID];
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tpF;
 }
@@ -145,6 +160,7 @@ tmp<scalarField> pUCoupledFluid::patchPressureForce(const label patchID) const
 
 bool pUCoupledFluid::evolve()
 {
+#ifndef OPENFOAMESIORFOUNDATION
     Info<< "Evolving fluid model: " << this->type() << endl;
 
     const fvMesh& mesh = this->mesh();
@@ -264,6 +280,9 @@ bool pUCoupledFluid::evolve()
         //const_cast<Time&>(runTime()).writeAndEnd();
         Info<< "latestTime = " << runTime().timeName() << endl;
     }
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return 0;
 }

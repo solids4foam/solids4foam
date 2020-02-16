@@ -103,8 +103,13 @@ bool unsLinGeomSolid::evolve()
     Info << "Evolving solid solver" << endl;
 
     int iCorr = 0;
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solverPerfD;
+    SolverPerformance<vector>::debug = 0;
+#else
     lduSolverPerformance solverPerfD;
     blockLduMatrix::debug = 0;
+#endif
 
     Info<< "Solving the momentum equation for D" << endl;
 
@@ -154,8 +159,21 @@ bool unsLinGeomSolid::evolve()
        !converged
         (
             iCorr,
+#ifdef OPENFOAMESIORFOUNDATION
+            mag(solverPerfD.initialResidual()),
+            max
+            (
+                solverPerfD.nIterations()[0],
+                max
+                (
+                    solverPerfD.nIterations()[1],
+                    solverPerfD.nIterations()[2]
+                )
+            ),
+#else
             solverPerfD.initialResidual(),
             solverPerfD.nIterations(),
+#endif
             D()
         ) && ++iCorr < nCorr()
     );
@@ -166,7 +184,9 @@ bool unsLinGeomSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
+#ifndef OPENFOAMESIORFOUNDATION
     blockLduMatrix::debug = 1;
+#endif
     
     return true;
 }

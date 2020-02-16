@@ -43,10 +43,9 @@ Author
 #ifndef timeVaryingVelocityPointPatchVectorField_H
 #define timeVaryingVelocityPointPatchVectorField_H
 
-#ifdef OPENFOAM
+#ifdef OPENFOAMESIORFOUNDATION
     #include "fixedValuePointPatchField.H"
 #else
-    #include "foamTime.H"
     #include "FixedValuePointPatchField.H"
     #include "pointPatchField.H"
     #include "pointMesh.H"
@@ -60,7 +59,7 @@ Author
 namespace Foam
 {
 
-#ifdef OPENFOAM
+#ifdef OPENFOAMESIORFOUNDATION
     typedef fixedValuePointPatchField<vector> 
         fixedValuePointPatchVectorField;
 #else
@@ -116,7 +115,7 @@ public:
             const timeVaryingVelocityPointPatchVectorField&,
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&,
-#ifdef OPENFOAM
+#ifdef OPENFOAMESIORFOUNDATION
             const pointPatchFieldMapper&
 #else
             const PointPatchFieldMapper&
@@ -172,7 +171,7 @@ public:
             //- Map (and resize as needed) from self given a mapping object
             virtual void autoMap
             (
-#ifdef OPENFOAM
+#ifdef OPENFOAMESIORFOUNDATION
                 const pointPatchFieldMapper&
 #else
                 const PointPatchFieldMapper&

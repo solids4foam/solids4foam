@@ -42,7 +42,7 @@ namespace Foam
 
 void fixedDisplacementFvPatchVectorField::makeInterp() const
 {
-    if (interpPtr_)
+    if (interpPtr_.valid())
     {
         FatalErrorIn
         (
@@ -50,18 +50,18 @@ void fixedDisplacementFvPatchVectorField::makeInterp() const
         ) << "pointer already set" << abort(FatalError);
     }
 
-    interpPtr_ = new primitivePatchInterpolation(patch().patch());
+    interpPtr_.set(new primitivePatchInterpolation(patch().patch()));
 }
 
 
 primitivePatchInterpolation& fixedDisplacementFvPatchVectorField::interp()
 {
-    if (!interpPtr_)
+    if (interpPtr_.empty())
     {
         makeInterp();
     }
 
-    return *interpPtr_;
+    return interpPtr_();
 }
 
 
@@ -76,14 +76,22 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
     (
         mesh.foundObject<pointVectorField>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "point" + internalField().name()
+#else
             "point" + dimensionedInternalField().name()
+#endif
         )
     )
     {
         const pointVectorField& pointD =
             mesh.lookupObject<pointVectorField>
             (
+#ifdef OPENFOAMESIORFOUNDATION
+                "point" + internalField().name()
+#else
                 "point" + dimensionedInternalField().name()
+#endif
             );
 
         // Check if the boundary is fixedValue
@@ -100,7 +108,11 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
                     const_cast<pointVectorField&>
                     (
                         pointD
+#ifdef OPENFOAMESIORFOUNDATION
+                    ).boundaryFieldRef()[patch().index()]
+#else
                     ).boundaryField()[patch().index()]
+#endif
                 );
 
             // Interpolate face values to the points
@@ -121,7 +133,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     fixedValueFvPatchVectorField(p, iF),
     totalDisp_(p.size(), vector::zero),
     dispSeries_(),
-    interpPtr_(NULL)
+    interpPtr_()
 {}
 
 
@@ -134,9 +146,13 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(ptf, p, iF, mapper),
+#ifdef OPENFOAMFOUNDATION
+    totalDisp_(mapper(ptf.totalDisp_)),
+#else
     totalDisp_(ptf.totalDisp_, mapper),
+#endif
     dispSeries_(ptf.dispSeries_),
-    interpPtr_(NULL)
+    interpPtr_()
 {}
 
 
@@ -150,7 +166,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     fixedValueFvPatchVectorField(p, iF, dict),
     totalDisp_("value", dict, p.size()),
     dispSeries_(),
-    interpPtr_(NULL)
+    interpPtr_()
 {
     Info<< "Creating " << type() << " boundary condition" << endl;
 
@@ -177,7 +193,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     fixedValueFvPatchVectorField(pivpvf),
     totalDisp_(pivpvf.totalDisp_),
     dispSeries_(pivpvf.dispSeries_),
-    interpPtr_(NULL)
+    interpPtr_()
 {}
 
 
@@ -190,7 +206,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     fixedValueFvPatchVectorField(pivpvf, iF),
     totalDisp_(pivpvf.totalDisp_),
     dispSeries_(pivpvf.dispSeries_),
-    interpPtr_(NULL)
+    interpPtr_()
 {}
 
 
@@ -198,9 +214,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 
 
 fixedDisplacementFvPatchVectorField::~fixedDisplacementFvPatchVectorField()
-{
-    deleteDemandDrivenData(interpPtr_);
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -213,7 +227,11 @@ void fixedDisplacementFvPatchVectorField::autoMap
 {
     fixedValueFvPatchVectorField::autoMap(m);
 
+#ifdef OPENFOAMFOUNDATION
+    m(totalDisp_, totalDisp_);;
+#else
     totalDisp_.autoMap(m);
+#endif
 }
 
 
@@ -247,7 +265,11 @@ void fixedDisplacementFvPatchVectorField::updateCoeffs()
         disp = dispSeries_(this->db().time().timeOutputValue());
     }
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if (internalField().name() == "DD")
+#else
     if (dimensionedInternalField().name() == "DD")
+#endif
     {
         // Incremental approach, so we wil set the increment of displacement
         // Lookup the old displacement field and subtract it from the total
@@ -277,20 +299,27 @@ fixedDisplacementFvPatchVectorField::snGrad() const
     const fvPatchField<tensor>& gradField =
         patch().lookupPatchField<volTensorField, tensor>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
             "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
-    vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
+    // Unit normals
+    vectorField n = patch().nf();
 
-    //- correction vector
-    vectorField k = delta - n*(n&delta);
+    // Delta vectors
+    vectorField delta = patch().delta();
+
+    //- Non-orthogonal correction vectors
+    vectorField k = ((I - sqr(n)) & delta);
 
     return
     (
         *this
         - (patchInternalField() + (k & gradField.patchInternalField()))
-    )*this->patch().deltaCoeffs();
+    )*patch().deltaCoeffs();
 }
 
 tmp<Field<vector> >
@@ -299,18 +328,25 @@ fixedDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
     const fvPatchField<tensor>& gradField =
         patch().lookupPatchField<volTensorField, tensor>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
             "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
-    vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
+    // Unit normals
+    vectorField n = patch().nf();
 
-    //- correction vector
-    vectorField k = delta - n*(n&delta);
+    // Delta vectors
+    vectorField delta = patch().delta();
+
+    //- Non-orthogonal correction vectors
+    vectorField k = ((I - sqr(n)) & delta);
 
     return
     (
-        this->patch().deltaCoeffs()
+        patch().deltaCoeffs()
        *(*this - (k & gradField.patchInternalField()))
     );
 }

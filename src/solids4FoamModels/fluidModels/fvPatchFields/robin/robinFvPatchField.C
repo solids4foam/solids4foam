@@ -73,9 +73,15 @@ robinFvPatchField<Type>::robinFvPatchField
 )
 :
     fvPatchField<Type>(ptf, p, iF, mapper),
+#ifdef OPENFOAMFOUNDATION
+    coeff0_(mapper(ptf.coeff0_)),
+    coeff1_(mapper(ptf.coeff1_)),
+    rhs_(mapper(ptf.rhs_))
+#else
     coeff0_(ptf.coeff0_, mapper),
     coeff1_(ptf.coeff1_, mapper),
     rhs_(ptf.rhs_, mapper)
+#endif
 {}
 
 
@@ -115,9 +121,15 @@ void robinFvPatchField<Type>::autoMap
 )
 {
     fvPatchField<Type>::autoMap(m);
+#ifdef OPENFOAMFOUNDATION
+    m(coeff0_, coeff0_);
+    m(coeff1_, coeff1_);
+    m(rhs_, rhs_);
+#else
     coeff0_.autoMap(m);
     coeff1_.autoMap(m);
     rhs_.autoMap(m);
+#endif
 }
 
 
@@ -210,10 +222,17 @@ template<class Type>
 void robinFvPatchField<Type>::write(Ostream& os) const
 {
     fvPatchField<Type>::write(os);
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "coeff0", coeff0_);
+    writeEntry(os, "coeff1", coeff1_);
+    writeEntry(os, "rhs", rhs_);
+    writeEntry(os, "value", *this);
+#else
     coeff0_.writeEntry("coeff0", os);
     coeff1_.writeEntry("coeff1", os);
     rhs_.writeEntry("rhs", os);
     this->writeEntry("value", os);
+#endif
 }
 
 

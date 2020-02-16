@@ -53,8 +53,13 @@ addToRunTimeSelectionTable(solidModel, poroLinGeomSolid, dictionary);
 bool poroLinGeomSolid::converged
 (
     const int iCorr,
+#ifdef OPENFOAMESIORFOUNDATION
+    const SolverPerformance<vector>& solverPerfD,
+    const SolverPerformance<scalar>& solverPerfp,
+#else
     const lduSolverPerformance& solverPerfD,
     const lduSolverPerformance& solverPerfp,
+#endif
     const volVectorField& D,
     const volScalarField& p
 )
@@ -66,11 +71,24 @@ bool poroLinGeomSolid::converged
     const scalar residualD =
         gMax
         (
-            mag(D.internalField() - D.prevIter().internalField())
-           /max
+#ifdef OPENFOAMESIORFOUNDATION
+            DimensionedField<double, volMesh>
+#endif
             (
-                gMax(mag(D.internalField() - D.oldTime().internalField())),
-                SMALL
+                mag(D.internalField() - D.prevIter().internalField())
+               /max
+                (
+                    gMax
+                    (
+#ifdef OPENFOAMESIORFOUNDATION
+                        DimensionedField<double, volMesh>
+#endif
+                        (
+                            mag(D.internalField() - D.oldTime().internalField())
+                        )
+                    ),
+                    SMALL
+                )
             )
         );
 
@@ -78,11 +96,24 @@ bool poroLinGeomSolid::converged
     const scalar residualp =
         gMax
         (
-            mag(p.internalField() - p.prevIter().internalField())
-           /max
+#ifdef OPENFOAMESIORFOUNDATION
+            DimensionedField<double, volMesh>
+#endif
             (
-                gMax(mag(p.internalField() - p.oldTime().internalField())),
-                SMALL
+                mag(p.internalField() - p.prevIter().internalField())
+               /max
+                (
+                    gMax
+                    (
+#ifdef OPENFOAMESIORFOUNDATION
+                        DimensionedField<double, volMesh>
+#endif
+                        (
+                            mag(p.internalField() - p.oldTime().internalField())
+                        )
+                    ),
+                    SMALL
+                )
             )
         );
 
@@ -96,7 +127,7 @@ bool poroLinGeomSolid::converged
     {
         if
         (
-            solverPerfD.initialResidual() < solutionTol()
+            mag(solverPerfD.initialResidual()) < solutionTol()
          && solverPerfp.initialResidual() < solutionTol()
          && residualD < solutionTol()
          && residualp < solutionTol()
@@ -116,7 +147,7 @@ bool poroLinGeomSolid::converged
         }
         else if
         (
-            solverPerfD.initialResidual() < alternativeTol()
+            mag(solverPerfD.initialResidual()) < alternativeTol()
          && solverPerfp.initialResidual() < alternativeTol()
         )
         {
@@ -137,7 +168,7 @@ bool poroLinGeomSolid::converged
     else if (iCorr % infoFrequency() == 0 || converged)
     {
         Info<< "    " << iCorr
-            << ", " << solverPerfD.initialResidual()
+            << ", " << mag(solverPerfD.initialResidual())
             << ", " << solverPerfp.initialResidual()
             << ", " << residualD
             << ", " << residualp
@@ -222,9 +253,15 @@ bool poroLinGeomSolid::evolve()
     Info << "Evolving poro solid solver" << endl;
 
     int iCorr = 0;
-    lduSolverPerformance solverPerfp;
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solverPerfD;
+    SolverPerformance<scalar> solverPerfp;
+    SolverPerformance<vector>::debug = 0;
+#else
     lduSolverPerformance solverPerfD;
+    lduSolverPerformance solverPerfp;
     blockLduMatrix::debug = 0;
+#endif
 
     Info<< "Solving the pressure equation for p and momentum equation for D"
         << endl;
@@ -318,7 +355,9 @@ bool poroLinGeomSolid::evolve()
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();
 
+#ifndef OPENFOAMESIORFOUNDATION
     blockLduMatrix::debug = 1;
+#endif
 
     return true;
 }

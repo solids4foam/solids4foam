@@ -31,10 +31,11 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
-#include "fvcGradf.H"
-#include "BlockFvmDivSigma.H"
-
-#include "SubField.H"
+#ifdef FOAMEXTEND
+    #include "fvcGradf.H"
+    #include "BlockFvmDivSigma.H"
+    #include "SubField.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -62,6 +63,7 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid
 )
 :
     solidModel(typeName, runTime, region),
+#ifdef FOAMEXTEND
     extendedMesh_(mesh()),
     solutionVec_
     (
@@ -75,6 +77,7 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid
         ),
         vectorField(extendedMesh_.nVariables(), vector::zero)
     ),
+#endif
     sigmaf_
     (
         IOobject
@@ -116,6 +119,7 @@ coupledUnsLinGeomSolid::coupledUnsLinGeomSolid
 
 bool coupledUnsLinGeomSolid::evolve()
 {
+#ifdef FOAMEXTEND
     Info << "Evolving solid solver" << endl;
 
     int iCorr = 0;
@@ -410,6 +414,9 @@ bool coupledUnsLinGeomSolid::evolve()
 
     // Velocity
     U() = fvc::ddt(D());
+#else
+    notImplemented("Not implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return true;
 }

@@ -36,7 +36,9 @@ License
 #include "pointFields.H"
 
 #include "gaussGrad.H"
-#include "extendedLeastSquaresGrad.H"
+#ifdef FOAMEXTEND
+    #include "extendedLeastSquaresGrad.H"
+#endif
 #include "leastSquaresGrad.H"
 //#include "leastSquaresBiLinearGrad.H"
 
@@ -131,6 +133,7 @@ tmp<volVectorField> cellLimitedGrad
         )
     );
 
+#ifdef FOAMEXTEND
     if (lsCellGrad)
     {
         // Extended least squares
@@ -289,6 +292,9 @@ tmp<volVectorField> cellLimitedGrad
     g.internalField() *= limiter;
     g.correctBoundaryConditions();
     fv::gaussGrad<scalar>::correctBoundaryConditions(vsf, g);
+#else
+    notImplemented("Not implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tGrad;
 }
@@ -327,6 +333,7 @@ tmp<volTensorField> cellLimitedGrad
         )
     );
 
+#ifdef FOAMEXTEND
     if (lsCellGrad)
     {
         // // Least squares
@@ -493,6 +500,9 @@ tmp<volTensorField> cellLimitedGrad
 
     g.correctBoundaryConditions();
     fv::gaussGrad<vector>::correctBoundaryConditions(vf, g);
+#else
+    notImplemented("Not implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tGrad;
 }

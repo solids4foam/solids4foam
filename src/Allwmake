@@ -1,5 +1,5 @@
 #!/bin/bash
 cd ${0%/*} || exit 1    # run from this directory
 
-wmake libso blockCoupledSolids4FoamTools
-wmake libso solids4FoamModels
+(cd blockCoupledSolids4FoamTools && ./Allwmake)
+(cd solids4FoamModels && ./Allwmake)

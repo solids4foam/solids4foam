@@ -246,8 +246,13 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
     Info<< "Evolving solid solver" << endl;
 
     int iCorr = 0;
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solverPerfDD;
+    SolverPerformance<vector>::debug = 0;
+#else
     lduSolverPerformance solverPerfDD;
     blockLduMatrix::debug = 0;
+#endif
 
     Info<< "Solving the momentum equation for DD" << endl;
 
@@ -307,8 +312,21 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
        !converged
         (
             iCorr,
+#ifdef OPENFOAMESIORFOUNDATION
+            mag(solverPerfDD.initialResidual()),
+            max
+            (
+                solverPerfDD.nIterations()[0],
+                max
+                (
+                    solverPerfDD.nIterations()[1],
+                    solverPerfDD.nIterations()[2]
+                )
+            ),
+#else
             solverPerfDD.initialResidual(),
             solverPerfDD.nIterations(),
+#endif
             DD()
         ) && ++iCorr < nCorr()
     );
@@ -343,7 +361,9 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
+#ifndef OPENFOAMESIORFOUNDATION
     blockLduMatrix::debug = 1;
+#endif
 
     return true;
 }
@@ -404,7 +424,11 @@ void unsNonLinGeomUpdatedLagSolid::updateTotalFields()
     rho_ = rho_.oldTime()/relJ_;
 
     // Move the mesh to the deformed configuration
+#ifdef OPENFOAMESIORFOUNDATION
+    const vectorField oldPoints = mesh().points();
+#else
     const vectorField oldPoints = mesh().allPoints();
+#endif
     moveMesh(oldPoints, DD(), pointDD());
 
     solidModel::updateTotalFields();

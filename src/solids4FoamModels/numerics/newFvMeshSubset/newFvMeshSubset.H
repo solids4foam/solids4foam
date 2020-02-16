@@ -58,7 +58,11 @@ SourceFiles
 #include "fvMesh.H"
 #include "pointMesh.H"
 #include "fvPatchFieldMapper.H"
+#ifdef OPENFOAMESIORFOUNDATION
+#include "pointPatchFieldMapper.H"
+#else
 #include "PointPatchFieldMapper.H"
+#endif
 #include "GeometricField.H"
 #include "HashSet.H"
 #include "surfaceMesh.H"

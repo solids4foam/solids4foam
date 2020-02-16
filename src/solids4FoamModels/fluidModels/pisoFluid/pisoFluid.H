@@ -63,6 +63,7 @@ class pisoFluid
 {
     // Private data
 
+#ifndef OPENFOAMESIORFOUNDATION
         //- Transport model
         singlePhaseTransportModel laminarTransport_;
 
@@ -77,6 +78,7 @@ class pisoFluid
 
         //- Reference pressure value
         scalar pRefValue_;
+#endif
 
     // Private Member Functions
 
@@ -111,12 +113,6 @@ public:
     // Member Functions
 
         // Access
-
-            //- Density
-            const dimensionedScalar& rho()
-            {
-                return rho_;
-            }
 
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce

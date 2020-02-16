@@ -48,8 +48,13 @@ void eig3Field
 )
 {
     const tensorField& AI = A.internalField();
+#ifdef OPENFOAMESIORFOUNDATION
+    tensorField& VI = V.primitiveFieldRef();
+    vectorField& dI = d.primitiveFieldRef();
+#else
     tensorField& VI = V.internalField();
     vectorField& dI = d.internalField();
+#endif
 
     forAll(AI, cellI)
     {
@@ -61,8 +66,13 @@ void eig3Field
         if (A.boundaryField()[patchI].type() != "empty")
         {
             const tensorField& AB = A.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+            tensorField& VB = V.boundaryFieldRef()[patchI];
+            vectorField& dB = d.boundaryFieldRef()[patchI];
+#else
             tensorField& VB = V.boundaryField()[patchI];
             vectorField& dB = d.boundaryField()[patchI];
+#endif
 
             forAll(AB, faceI)
             {
@@ -79,8 +89,13 @@ void eig3Field
 )
 {
     const symmTensorField& AI = A.internalField();
+#ifdef OPENFOAMESIORFOUNDATION
+    tensorField& VI = V.primitiveFieldRef();
+    vectorField& dI = d.primitiveFieldRef();
+#else
     tensorField& VI = V.internalField();
     vectorField& dI = d.internalField();
+#endif
 
     forAll(AI, cellI)
     {
@@ -92,8 +107,13 @@ void eig3Field
         if (A.boundaryField()[patchI].type() != "empty")
         {
             const symmTensorField& AB = A.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+            tensorField& VB = V.boundaryFieldRef()[patchI];
+            vectorField& dB = d.boundaryFieldRef()[patchI];
+#else
             tensorField& VB = V.boundaryField()[patchI];
             vectorField& dB = d.boundaryField()[patchI];
+#endif
 
             forAll(AB, faceI)
             {
@@ -104,6 +124,7 @@ void eig3Field
 }
 
 
+#ifndef OPENFOAMESIORFOUNDATION
 void eig3Field
 (
     const volSymmTensorField& A, volTensorField& V, volDiagTensorField& d
@@ -133,7 +154,7 @@ void eig3Field
         }
     }
 }
-
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

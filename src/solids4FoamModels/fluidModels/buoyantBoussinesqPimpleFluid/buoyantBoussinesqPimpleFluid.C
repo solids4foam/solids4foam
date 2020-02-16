@@ -50,6 +50,7 @@ addToRunTimeSelectionTable(fluidModel, buoyantBoussinesqPimpleFluid, dictionary)
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
 
+#ifndef OPENFOAMESIORFOUNDATION
 tmp<fvVectorMatrix> buoyantBoussinesqPimpleFluid::solveUEqn()
 {
     // Solve the momentum equation
@@ -150,7 +151,7 @@ void buoyantBoussinesqPimpleFluid::solvePEqn
 
     fluidModel::continuityErrs();
 }
-
+#endif
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -160,7 +161,9 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
     const word& region
 )
 :
-    fluidModel(typeName, runTime, region),
+    fluidModel(typeName, runTime, region)
+#ifndef OPENFOAMESIORFOUNDATION
+    ,
     T_
     (
         IOobject
@@ -222,12 +225,17 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
     ),
     pRefCell_(0),
     pRefValue_(0)
+#endif
 {
     UisRequired();
     pisRequired();
 
+#ifndef OPENFOAMESIORFOUNDATION
     setRefCell(p(), pimple().dict(), pRefCell_, pRefValue_);
     mesh().schemesDict().setFluxRequired(p().name());
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -239,13 +247,17 @@ tmp<vectorField> buoyantBoussinesqPimpleFluid::patchViscousForce(const label pat
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tvF() =
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
           & (-turbulence_->devReff()().boundaryField()[patchID])
         );
-
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
+    
     return tvF;
 }
 
@@ -260,7 +272,11 @@ tmp<scalarField> buoyantBoussinesqPimpleFluid::patchPressureForce
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tpF() = rho_.value()*p().boundaryField()[patchID];
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tpF;
 }
@@ -268,6 +284,7 @@ tmp<scalarField> buoyantBoussinesqPimpleFluid::patchPressureForce
 
 bool buoyantBoussinesqPimpleFluid::evolve()
 {
+#ifndef OPENFOAMESIORFOUNDATION
     Info<< "Evolving fluid model: " << this->type() << endl;
 
     fvMesh& mesh = fluidModel::mesh();
@@ -294,12 +311,7 @@ bool buoyantBoussinesqPimpleFluid::evolve()
     fvc::makeRelative(phi(), U());
 
     // Calculate CourantNo
-    {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
-        CourantNo(CoNum, meanCoNum, velMag);
-    }
+    CourantNo();
 
     // Pressure-velocity corrector
     while (pimple().loop())
@@ -323,6 +335,9 @@ bool buoyantBoussinesqPimpleFluid::evolve()
 
     // Make the fluxes absolut to the mesh motion
     fvc::makeAbsolute(phi(), U());
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return 0;
 }

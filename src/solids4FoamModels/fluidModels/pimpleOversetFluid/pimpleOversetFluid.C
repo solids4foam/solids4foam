@@ -188,12 +188,7 @@ bool pimpleOversetFluid::evolve()
     fvc::makeRelative(phi(), U());
 
     // CourantNo
-    {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
-        fluidModel::oversetCourantNo(CoNum, meanCoNum, velMag);
-    }
+    fluidModel::oversetCourantNo();
 
     // --- PIMPLE loop
     while (pimple().loop())

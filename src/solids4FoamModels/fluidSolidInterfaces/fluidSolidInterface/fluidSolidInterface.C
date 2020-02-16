@@ -29,15 +29,18 @@ License
 #include "polyPatchID.H"
 #include "primitivePatchInterpolation.H"
 #include "twoDPointCorrector.H"
-#include "tetPointFields.H"
-#include "fixedValueTetPolyPatchFields.H"
-#include "tetPolyPatchInterpolation.H"
-#include "tetFemMatrices.H"
+#ifndef OPENFOAMESIORFOUNDATION
+    #include "tetPointFields.H"
+    #include "fixedValueTetPolyPatchFields.H"
+    #include "tetPolyPatchInterpolation.H"
+    #include "tetFemMatrices.H"
+    #include "newSubsetMotionSolverFvMesh.H"
+    #include "newSubsetMotionSolverFvMesh.H"
+#endif
 #include "fixedValuePointPatchFields.H"
 #include "ZoneIDs.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
-#include "newSubsetMotionSolverFvMesh.H"
 #include "RBFMeshMotionSolver.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -154,7 +157,20 @@ calcAccumulatedFluidInterfacesDisplacements() const
             IOobject::MUST_READ
         );
 
-        if (accumulatedFluidInterfaceDisplacementHeader.headerOk())
+        if
+        (
+#ifdef OPENFOAMESIORFOUNDATION
+            accumulatedFluidInterfaceDisplacementHeader.typeHeaderOk
+            <
+            vectorIOField
+            >
+            (
+                true
+            )
+#else
+            accumulatedFluidInterfaceDisplacementHeader.headerOk()
+#endif
+        )
         {
             Pout<< "Reading accumulated fluid interface "
                 << "displacement for global patch "
@@ -750,7 +766,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     if (maxDelta < interfaceDeformationLimit())
     {
         // Move only interface points
+#ifdef OPENFOAMESIORFOUNDATION
+        pointField newPoints = fluidMesh().points();
+#else
         pointField newPoints = fluidMesh().allPoints();
+#endif
 
         forAll(fluid().globalPatches(), interfaceI)
         {
@@ -788,24 +808,33 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         // If the motionU field is in the object registry then we assume that
         // the fe motion solver is being used
+#ifdef OPENFOAMESIORFOUNDATION
+        const bool feMotionSolver = false;
+#else
         const bool feMotionSolver =
             fluidMesh().foundObject<tetPointVectorField>("motionU");
+#endif
 
         // If the pointMotionU field is in the object registry then we assume
         // that the fv motion solver is being used
         const bool fvMotionSolver =
             fluidMesh().foundObject<pointVectorField>("pointMotionU");
 
+#ifndef OPENFOAMFOUNDATION
         // Check for RBF motion solver
         const bool rbfMotionSolver =
             isA<RBFMeshMotionSolver>
             (
                 fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
             );
+#endif
 
         // Set motion on FSI interface
         if (feMotionSolver)
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            notImplemented("Not implemented for this version of OpenFOAM/FOAM");
+#else
             tetPointVectorField& motionU =
                 const_cast<tetPointVectorField&>
                 (
@@ -836,6 +865,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                        /fluid().runTime().deltaT().value()
                     );
             }
+#endif
         }
         else if (fvMotionSolver)
         {
@@ -854,7 +884,14 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 fixedValuePointPatchVectorField& motionUFluidPatch =
                     refCast<fixedValuePointPatchVectorField>
                     (
+#ifdef OPENFOAMESIORFOUNDATION
+                        motionU.boundaryFieldRef()
+                        [
+                            fluidPatchIndices()[interfaceI]
+                        ]
+#else
                         motionU.boundaryField()[fluidPatchIndices()[interfaceI]]
+#endif
                     );
 
                 motionUFluidPatch ==
@@ -864,6 +901,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                     )/fluid().runTime().deltaT().value();
             }
         }
+#ifndef OPENFOAMESIORFOUNDATION
         else if (isA<newSubsetMotionSolverFvMesh>(fluidMesh()))
         {
             newSubsetMotionSolverFvMesh& dynMesh =
@@ -910,6 +948,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 }
             }
         }
+#endif
+#ifndef OPENFOAMFOUNDATION
         else if (rbfMotionSolver)
         {
             // Prepare list of patch motions
@@ -950,6 +990,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 fluidMesh().lookupObject<RBFMeshMotionSolver>("dynamicMeshDict")
             ).setMotion(motion);
         }
+#endif
         else
         {
             FatalErrorIn("fluidSolidInterface::moveFluidMesh()")

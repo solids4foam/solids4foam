@@ -108,7 +108,7 @@ protected:
         //- Return const access to the base mesh
         const fvMesh& baseMesh() const
         {
-            return mesh().db().lookupObject<fvMesh>
+            return mesh().time().lookupObject<fvMesh>
             (
                 baseMeshRegionName()
             );

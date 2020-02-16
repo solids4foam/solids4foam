@@ -97,7 +97,14 @@ extrapolatedPressureFvPatchScalarField
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void extrapolatedPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
+void extrapolatedPressureFvPatchScalarField::evaluate
+(
+#ifdef OPENFOAMESIORFOUNDATION
+    const Pstream::commsTypes commsType
+#else
+    const Pstream::commsTypes commsType
+#endif
+)
 {
     if (!this->updated())
     {
@@ -154,7 +161,11 @@ void extrapolatedPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
 void extrapolatedPressureFvPatchScalarField::write(Ostream& os) const
 {
     zeroGradientFvPatchScalarField::write(os);
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "value", *this);
+#else
     writeEntry("value", os);
+#endif
 }
 
 

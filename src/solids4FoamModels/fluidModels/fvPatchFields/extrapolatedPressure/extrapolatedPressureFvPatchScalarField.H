@@ -38,7 +38,6 @@ SourceFiles
 #ifndef extrapolatedPressureFvPatchScalarFields_H
 #define extrapolatedPressureFvPatchScalarFields_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "zeroGradientFvPatchFields.H"
 
@@ -130,7 +129,11 @@ public:
         //- Evaluate the patch field
         virtual void evaluate
         (
-            const Pstream::commsTypes commsType=Pstream::blocking
+#ifdef OPENFOAMESIORFOUNDATION
+            const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
+#else
+            const Pstream::commsTypes commsType = Pstream::blocking
+#endif
         );
 
 

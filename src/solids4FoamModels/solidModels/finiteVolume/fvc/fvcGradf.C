@@ -28,10 +28,12 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
-#include "ggiFvPatch.H"
+#ifndef OPENFOAMESIORFOUNDATION
+    #include "ggiFvPatch.H"
+#endif
 #include "wedgeFvPatch.H"
-#include "leastSquaresVolPointInterpolation.H"
 #include "fvc.H"
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -98,12 +100,21 @@ tmp
             );
 //         tGrad() = ((I - n*n) & linearInterpolate(gradVf));
 //         tGrad() += n*fvc::snGrad(vf);
+#ifdef OPENFOAMESIORFOUNDATION
+        tGrad.ref() = linearInterpolate(gradVf);
+#else
         tGrad() = linearInterpolate(gradVf);
+#endif
     }
     else
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        tGrad.ref() = fsGrad(vf, pf);
+        tGrad.ref() += n*fvc::snGrad(vf);
+#else
         tGrad() = fsGrad(vf, pf);
         tGrad() += n*fvc::snGrad(vf);
+#endif
     }
 
     return tGrad;
@@ -167,7 +178,11 @@ tmp
 
     if (!axisymmetric)
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        Field<GradType>& gradI = tGrad.ref().primitiveFieldRef();
+#else
         Field<GradType>& gradI = tGrad().internalField();
+#endif
 
         const vectorField& points = mesh.points();
         const faceList& faces = mesh.faces();
@@ -226,7 +241,11 @@ tmp
 
         forAll(tGrad().boundaryField(), patchI)
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            Field<GradType>& patchGrad = tGrad.ref().boundaryFieldRef()[patchI];
+#else
             Field<GradType>& patchGrad = tGrad().boundaryField()[patchI];
+#endif
 
             const vectorField& patchN = n.boundaryField()[patchI];
 
@@ -283,16 +302,20 @@ tmp
     }
     else
     {
-//         Info << "Axisymmetric mesh for field: " << vf.name() << endl;
-
         const GeometricField<GradType, fvPatchField, volMesh>& gradVf =
             mesh.lookupObject<GeometricField<GradType, fvPatchField, volMesh> >
             (
                 "grad(" + vf.name() + ")"
             );
         surfaceVectorField n = mesh.Sf()/mesh.magSf();
-        tGrad() = ((I - n*n) & linearInterpolate(gradVf));
 
+#ifdef OPENFOAMESIORFOUNDATION
+        tGrad.ref() = ((I - n*n) & linearInterpolate(gradVf));
+#else
+        tGrad() = ((I - n*n) & linearInterpolate(gradVf));
+#endif
+
+#ifndef OPENFOAMESIORFOUNDATION
         // Correct at ggi patch
         forAll(mesh.boundary(), patchI)
         {
@@ -305,6 +328,7 @@ tmp
                     fGrad(mesh.boundaryMesh()[patchI], ppf);
             }
         }
+#endif
     }
 
 //     // Tangential gradient mast be equal on
@@ -345,8 +369,12 @@ tmp
 template<class Type, template<class> class FaceList>
 tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
 (
-    const PrimitivePatch<face, FaceList, const pointField&>& patch,
-    const Field<Type>& ppf
+#ifdef OPENFOAMFOUNDATION
+        const PrimitivePatch<FaceList<face>, const pointField&>& patch,
+#else
+        const PrimitivePatch<face, FaceList, const pointField&>& patch,
+#endif
+        const Field<Type>& ppf
 )
 {
     typedef typename outerProduct<vector, Type>::type GradType;
@@ -359,7 +387,11 @@ tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
             pTraits<GradType>::zero
         )
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    Field<GradType>& grad = tGrad.ref();
+#else
     Field<GradType>& grad = tGrad();
+#endif
 
     const vectorField& points = patch.localPoints();
     const faceList& faces = patch.localFaces();
@@ -459,7 +491,11 @@ tmp
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    Field<GradType>& iGrad = tGrad.ref().primitiveFieldRef();
+#else
     Field<GradType>& iGrad = tGrad().internalField();
+#endif
 
     const vectorField& points = mesh.points();
 
@@ -467,8 +503,13 @@ tmp
 
     const Field<Type>& pfI = pf.internalField();
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const labelUList& owner = mesh.owner();
+    const labelUList& neighbour = mesh.neighbour();
+#else
     const unallocLabelList& owner = mesh.owner();
     const unallocLabelList& neighbour = mesh.neighbour();
+#endif
 
     scalarField V(iGrad.size(), 0.0);
 
@@ -548,10 +589,15 @@ tmp
 
     forAll(mesh.boundaryMesh(), patchI)
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        const labelUList& pFaceCells =
+            mesh.boundaryMesh()[patchI].faceCells();
+#else
         const unallocLabelList& pFaceCells =
             mesh.boundaryMesh()[patchI].faceCells();
+#endif
 
-//         GradType test = pTraits<GradType>::zero;
+        //GradType test = pTraits<GradType>::zero;
 
         forAll(mesh.boundaryMesh()[patchI], faceI)
         {
@@ -651,7 +697,11 @@ tmp
 //     iGrad = fv::gaussGrad<vector>(mesh).grad(vf)().internalField();
 
     // Extrapolate to boundary
+#ifdef OPENFOAMESIORFOUNDATION
+    tGrad.ref().correctBoundaryConditions();
+#else
     tGrad().correctBoundaryConditions();
+#endif
 
     // Calculate boundary gradient
     forAll(mesh.boundary(), patchI)
@@ -666,9 +716,15 @@ tmp
             Field<Type> ppf =
                 pf.boundaryField()[patchI].patchInternalField();
 
+#ifdef OPENFOAMESIORFOUNDATION
+            tGrad.ref().boundaryFieldRef()[patchI] ==
+                fGrad(mesh.boundaryMesh()[patchI], ppf);
+#else
             tGrad().boundaryField()[patchI] ==
                 fGrad(mesh.boundaryMesh()[patchI], ppf);
+#endif
         }
+#ifndef OPENFOAMESIORFOUNDATION
         else if (isA<ggiFvPatch>(mesh.boundary()[patchI]))
         {
             Field<Type> ppf =
@@ -677,6 +733,7 @@ tmp
             tGrad().boundaryField()[patchI] ==
                 fGrad(mesh.boundaryMesh()[patchI], ppf);
         }
+#endif
     }
 
 //     // Tangential gradient mast be equal on
@@ -718,8 +775,13 @@ tmp
         {
             vectorField n = vf.mesh().boundary()[patchi].nf();
 
-            tGrad().boundaryField()[patchi] += n*
-            (
+#ifdef OPENFOAMESIORFOUNDATION
+            tGrad.ref().boundaryFieldRef()[patchi] +=
+#else
+            tGrad().boundaryField()[patchi] +=
+#endif
+            n
+           *(
                 vf.boundaryField()[patchi].snGrad()
               - (n & tGrad().boundaryField()[patchi])
             );

@@ -62,11 +62,27 @@ scalar unsNonLinGeomTotalLagSolid::residual(const volVectorField& D) const
     return
         gMax
         (
-            mag(D.internalField() - D.prevIter().internalField())
-           /max
+#ifdef OPENFOAMESIORFOUNDATION
+            DimensionedField<double, volMesh>
+#endif
             (
-                gMax(mag(D.internalField() - D.oldTime().internalField())),
-                SMALL
+                mag(D.internalField() - D.prevIter().internalField())
+               /max
+                (
+                    gMax
+                    (
+#ifdef OPENFOAMESIORFOUNDATION
+                        DimensionedField<double, volMesh>
+#endif
+                        (
+                            mag
+                            (
+                                D.internalField() - D.oldTime().internalField()
+                            )
+                        )
+                    ),
+                    SMALL
+                )
             )
         );
 }
@@ -216,18 +232,27 @@ bool unsNonLinGeomTotalLagSolid::evolve()
 
     int iCorr = 0;
     scalar initialResidual = 0;
-    lduSolverPerformance solverPerf;
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solverPerfD;
+    SolverPerformance<vector>::debug = 0;
+#else
+    lduSolverPerformance solverPerfD;
+    blockLduMatrix::debug = 0;
+#endif
     scalar res = 1.0;
     scalar maxRes = 0;
     scalar curConvergenceTolerance = solutionTol();
-    blockLduMatrix::debug = 0;
 
     // Reset enforceLinear switch
     enforceLinear() = false;
 
     do
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        if (SolverPerformance<vector>::debug)
+#else
         if (blockLduMatrix::debug)
+#endif
         {
             Info<< "Time: " << runTime().timeName()
                 << ", outer iteration: " << iCorr << endl;
@@ -268,14 +293,14 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         DEqn.relax();
 
         // Solve the system
-        solverPerf = DEqn.solve();
+        solverPerfD = DEqn.solve();
 
         // Under-relax displacement field
         relaxField(D(), iCorr);
 
         if (iCorr == 0)
         {
-            initialResidual = solverPerf.initialResidual();
+            initialResidual = mag(solverPerfD.initialResidual());
         }
 
         // Interpolate D to pointD
@@ -323,7 +348,11 @@ bool unsNonLinGeomTotalLagSolid::evolve()
 
         if
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            SolverPerformance<vector>::debug
+#else
             blockLduMatrix::debug
+#endif
          || (iCorr % infoFrequency()) == 0
          || res < curConvergenceTolerance
          || maxIterReached() == nCorr()
@@ -361,16 +390,19 @@ bool unsNonLinGeomTotalLagSolid::evolve()
     pointDD() = pointD() - pointD().oldTime();
 
     // Print summary of residuals
-    Info<< solverPerf.solverName() << ": Solving for " << D().name()
+    Info<< solverPerfD.solverName() << ": Solving for " << D().name()
         << ", Initial residual = " << initialResidual
-        << ", Final residual = " << solverPerf.initialResidual()
+        << ", Final residual = " << solverPerfD.initialResidual()
         << ", No outer iterations = " << iCorr << nl
         << " Max relative residual = " << maxRes
         << ", Relative residual = " << res
         << ", enforceLinear = " << enforceLinear() << endl;
 
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
-    // lduMatrix::debug = 1;
+#endif
 
     if (nonLinear_ && enforceLinear())
     {
