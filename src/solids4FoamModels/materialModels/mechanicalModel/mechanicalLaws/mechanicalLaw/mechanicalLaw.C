@@ -120,9 +120,15 @@ Foam::mechanicalLaw::mechanicalLaw
     // Set the base mesh region name
     // For an FSI case, the region will be called solid, else it will be called
     // region0.
-    baseMeshRegionName_ = mesh.name();
-
-    if (mesh.name() != "solid" && mesh.name() != "region0")
+    if (mesh.db().foundObject<fvMesh>("solid"))
+    {
+        baseMeshRegionName_ = "solid";
+    }
+    else if (mesh.db().foundObject<fvMesh>("region0"))
+    {
+        baseMeshRegionName_ = "region0";
+    }
+    else
     {
         FatalErrorIn
         (
@@ -132,8 +138,7 @@ Foam::mechanicalLaw::mechanicalLaw
             "    const fvMesh& mesh,\n"
             "    const dictionary& dict\n"
             ")"
-        ) << "The solid region should be called 'solid' or 'region0'!"
-          << abort(FatalError);
+        ) << "solid region name not found" << abort(FatalError);
     }
 }
 
