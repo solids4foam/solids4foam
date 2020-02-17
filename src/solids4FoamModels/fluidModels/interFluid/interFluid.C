@@ -372,7 +372,6 @@ interFluid::interFluid
     rho1_(mixture_.rho1()),
     rho2_(mixture_.rho2()),
 #else
-    twoPhaseProperties_(U(), phi(), "alpha1"),
     alpha1_
     (
         IOobject
@@ -385,6 +384,7 @@ interFluid::interFluid
         ),
         mesh()
     ),
+    twoPhaseProperties_(U(), phi(), "alpha1"),
     interface_(alpha1_, U(), twoPhaseProperties_),
     rho1_(twoPhaseProperties_.rho1()),
     rho2_(twoPhaseProperties_.rho2()),

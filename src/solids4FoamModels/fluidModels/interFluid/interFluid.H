@@ -85,11 +85,11 @@ class interFluid
         //- Volume fraction of phase 1
         volScalarField& alpha1_;
 #else
-        //- Transport model
-        twoPhaseMixture twoPhaseProperties_;
-
         //- Volume fraction of phase 1
         volScalarField alpha1_;
+
+        //- Transport model
+        twoPhaseMixture twoPhaseProperties_;
 #endif
 
 #ifndef OPENFOAM

@@ -154,7 +154,7 @@ bool icoFluid::evolve()
     // Prepare for the pressure solution
     label pRefCell = 0;
     scalar pRefValue = 0.0;
-    setRefCell(p(), fluidProperties(), pRefCell, pRefValue);
+    setRefCell(p(), piso().dict(), pRefCell, pRefValue);
     
     // Time-derivative matrix
     fvVectorMatrix ddtUEqn(fvm::ddt(U()));
