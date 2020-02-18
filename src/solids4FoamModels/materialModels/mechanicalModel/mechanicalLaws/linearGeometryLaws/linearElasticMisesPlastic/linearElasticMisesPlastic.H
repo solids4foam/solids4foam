@@ -55,6 +55,8 @@ Author
 #define linearElasticMisesPlastic_H
 
 #include "mechanicalLaw.H"
+#include "surfaceMesh.H"
+#include "zeroGradientFvPatchFields.H"
 #include "interpolationTable.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -289,7 +291,9 @@ public:
         virtual tmp<volScalarField> impK() const;
 
         //- Return the implicit stiffness as a diagTensor
+#ifndef OPENFOAMESIORFOUNDATION
         virtual tmp<volDiagTensorField> impKdiagTensor() const;
+#endif
 
         //- Update the stress
         virtual void correct(volSymmTensorField& sigma);

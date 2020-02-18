@@ -56,7 +56,9 @@ pimpleFluid::pimpleFluid
     const word& region
 )
 :
-    fluidModel(typeName, runTime, region),
+    fluidModel(typeName, runTime, region)
+#ifndef OPENFOAMESIORFOUNDATION
+    ,
     laminarTransport_(U(), phi()),
     turbulence_
     (
@@ -81,9 +83,14 @@ pimpleFluid::pimpleFluid
     ),
     pRefCell_(0),
     pRefValue_(0)
+#endif
 {
+#ifndef OPENFOAMESIORFOUNDATION
     setRefCell(p(), pimple().dict(), pRefCell_, pRefValue_);
     mesh().schemesDict().setFluxRequired(p().name());
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -95,16 +102,16 @@ tmp<vectorField> pimpleFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tvF() =
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
-          & turbulence_->devReff()().boundaryField()[patchID]
+          & -turbulence_->devReff()().boundaryField()[patchID]
         );
-
-    // PC: why is this commented?
-    //vectorField n = mesh().boundary()[patchID].nf();
-    //tvF() -= n*(n & tvF());
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tvF;
 }
@@ -117,7 +124,11 @@ tmp<scalarField> pimpleFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tpF() = rho_.value()*p().boundaryField()[patchID];
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tpF;
 }
@@ -125,6 +136,7 @@ tmp<scalarField> pimpleFluid::patchPressureForce(const label patchID) const
 
 bool pimpleFluid::evolve()
 {
+#ifndef OPENFOAMESIORFOUNDATION
     Info<< "Evolving fluid model: " << this->type() << endl;
 
     fvMesh& mesh = fluidModel::mesh();
@@ -151,12 +163,7 @@ bool pimpleFluid::evolve()
     fvc::makeRelative(phi(), U());
 
     // CourantNo
-    {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
-        fluidModel::CourantNo(CoNum, meanCoNum, velMag);
-    }
+    fluidModel::CourantNo();
 
     // --- PIMPLE loop
     while (pimple().loop())
@@ -273,6 +280,9 @@ bool pimpleFluid::evolve()
 
     // Make the fluxes absolut to the mesh motion
     fvc::makeAbsolute(phi(), U());
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return 0;
 }

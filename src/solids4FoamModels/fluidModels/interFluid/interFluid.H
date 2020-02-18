@@ -44,9 +44,15 @@ SourceFiles
 #include "fluidModel.H"
 #include "MULES.H"
 #include "subCycle.H"
-#include "interfaceProperties.H"
-#include "twoPhaseMixture.H"
-#include "turbulenceModel.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "immiscibleIncompressibleTwoPhaseMixture.H"
+    #include "turbulentTransportModel.H"
+    //#include "gravityMeshObject.H"
+#else
+    #include "interfaceProperties.H"
+    #include "twoPhaseMixture.H"
+    #include "turbulenceModel.H"
+#endif
 #include "pimpleControl.H"
 #include "fvm.H"
 
@@ -68,14 +74,28 @@ class interFluid
 {
     // Private data
 
+#ifndef OPENFOAMFOUNDATION
         //- pd
         volScalarField pd_;
 
+#ifdef OPENFOAMESIORFOUNDATION
+        //- Transport model
+        immiscibleIncompressibleTwoPhaseMixture mixture_;
+
+        //- Volume fraction of phase 1
+        volScalarField& alpha1_;
+#else
         //- Volume fraction of phase 1
         volScalarField alpha1_;
 
         //- Transport model
         twoPhaseMixture twoPhaseProperties_;
+#endif
+
+#ifndef OPENFOAM
+        //- Interface
+        interfaceProperties interface_;
+#endif
 
         //- Density of phase 1
         const dimensionedScalar& rho1_;
@@ -94,9 +114,6 @@ class interFluid
 
         //- Gravity by face-centre field
         surfaceScalarField ghf_;
-
-        //- Interface
-        interfaceProperties interface_;
 
         //- pd reference cell index
         label pdRefCell_;
@@ -137,6 +154,7 @@ class interFluid
             const label pdRefCell,
             const scalar pdRefValue
         );
+#endif
 
         //- Disallow default bitwise copy construct
         interFluid(const interFluid&);

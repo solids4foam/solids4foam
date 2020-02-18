@@ -42,7 +42,6 @@ Author
 #ifndef fixedDisplacementFvPatchVectorField_H
 #define fixedDisplacementFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 #include "interpolationTable.H"
@@ -70,7 +69,7 @@ class fixedDisplacementFvPatchVectorField
         interpolationTable<vector> dispSeries_;
 
         //- Patch interpolator to interpolate face values to the points
-        mutable primitivePatchInterpolation* interpPtr_;
+        mutable autoPtr<primitivePatchInterpolation> interpPtr_;
 
     // Private Functions
 

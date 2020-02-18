@@ -56,7 +56,9 @@ transientSimpleFluid::transientSimpleFluid
     const word& region
 )
 :
-    fluidModel(typeName, runTime, region),
+    fluidModel(typeName, runTime, region)
+#ifndef OPENFOAMESIORFOUNDATION
+    ,
     laminarTransport_(U(), phi()),
     turbulence_
     (
@@ -79,11 +81,16 @@ transientSimpleFluid::transientSimpleFluid
             )
         ).lookup("rho")
     )
+#endif
 {
     UisRequired();
     pisRequired();
 
+#ifndef OPENFOAMESIORFOUNDATION
     mesh().schemesDict().setFluxRequired(p().name());
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -98,12 +105,16 @@ tmp<vectorField> transientSimpleFluid::patchViscousForce
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tvF() =
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
           & (-turbulence_->devReff()().boundaryField()[patchID])
         );
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tvF;
 }
@@ -119,7 +130,11 @@ tmp<scalarField> transientSimpleFluid::patchPressureForce
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tpF() = rho_.value()*p().boundaryField()[patchID];
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tpF;
 }
@@ -127,6 +142,7 @@ tmp<scalarField> transientSimpleFluid::patchPressureForce
 
 bool transientSimpleFluid::evolve()
 {
+#ifndef OPENFOAMESIORFOUNDATION
     Info<< "Evolving fluid model" << endl;
 
     fvMesh& mesh = fluidModel::mesh();
@@ -177,12 +193,7 @@ bool transientSimpleFluid::evolve()
         p().storePrevIter();
 
         // Calculate CourantNo
-        {
-            scalar CoNum = 0.0;
-            scalar meanCoNum = 0.0;
-            scalar velMag = 0.0;
-            fluidModel::CourantNo(CoNum, meanCoNum, velMag);
-        }
+        fluidModel::CourantNo();
 
         // Construct momentum equation
         fvVectorMatrix UEqn
@@ -259,6 +270,9 @@ bool transientSimpleFluid::evolve()
         // Make the fluxes absolut
         phi() += fvc::meshPhi(U());
     }
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
     
     return 0;
 }

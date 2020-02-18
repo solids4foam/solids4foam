@@ -61,15 +61,23 @@ namespace Foam
 
         public:
             // Runtime type information
-            TypeName( "RBFMeshMotionSolver" );
+            TypeName("RBFMeshMotionSolver");
 
             // Constructors
 
             // Construct from polyMesh
-            RBFMeshMotionSolver(
+            RBFMeshMotionSolver
+            (
                 const polyMesh & mesh,
+#if defined(OPENFOAMFOUNDATION)
+                const dictionary& msData
+#elif defined(OPENFOAMESI)
+                const IOdictionary& msData
+#else
                 Istream & msData
-                );
+#endif
+            );
+
 
             // Destructor
             virtual ~RBFMeshMotionSolver();
@@ -91,6 +99,10 @@ namespace Foam
 
             bool corrector;
             int k;
+
+            // movePoints needed for OpenFOAM
+            virtual void movePoints(const pointField&)
+            {}
     };
 }
 

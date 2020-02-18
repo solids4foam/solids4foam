@@ -62,7 +62,11 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
             )
         );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    volSymmTensorField& result = tresult.ref();
+#else
     volSymmTensorField& result = tresult();
+#endif
 
     // Calculate eigen values and eigen vectors
     // The OpenFOAM eigenValues/eigenVectors sometimes gives wrong results, when
@@ -114,7 +118,12 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
     const vectorField& eigenValI = eigenVal.internalField();
     const tensorField& eigenVecI = eigenVec.internalField();
     symmTensor expEigenVal = symmTensor::zero;
+
+#ifdef OPENFOAMESIORFOUNDATION
+    symmTensorField& resultI = result.primitiveFieldRef();
+#else
     symmTensorField& resultI = result.internalField();
+#endif
 
     forAll(eigenValI, cellI)
     {
@@ -140,7 +149,11 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
         {
             const vectorField& eigenValB = eigenVal.boundaryField()[patchI];
             const tensorField& eigenVecB = eigenVec.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+            symmTensorField& resultB = result.boundaryFieldRef()[patchI];
+#else
             symmTensorField& resultB = result.boundaryField()[patchI];
+#endif
 
             forAll(eigenValB, faceI)
             {

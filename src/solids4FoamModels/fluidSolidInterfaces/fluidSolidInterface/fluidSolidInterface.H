@@ -169,12 +169,6 @@ class fluidSolidInterface
         //- Update the coupled switch based on the couplingStartTime
         bool updateCoupled();
 
-        //- Calculate current solid zones points
-        void calcCurrentSolidZonesPoints() const;
-
-        //- Calculate current solid zone primitive patches
-        void calcCurrentSolidZonesPatches() const;
-
         //- Calculate interface-to-interface list
         void calcInterfaceToInterfaceList() const;
 

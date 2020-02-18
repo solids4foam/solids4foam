@@ -40,7 +40,9 @@ SourceFiles
 #define ggiInterfaceToInterfaceMapping_H
 
 #include "interfaceToInterfaceMapping.H"
-#include "ggiInterpolation.H"
+#ifdef FOAMEXTEND
+    #include "ggiInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -60,6 +62,7 @@ class ggiInterfaceToInterfaceMapping
 {
     // Private data
 
+#ifdef FOAMEXTEND
         //- GGI interpolator between two standAlone patches
         mutable autoPtr< GGIInterpolation<standAlonePatch, standAlonePatch> >
             interpolatorPtr_;
@@ -100,6 +103,7 @@ class ggiInterfaceToInterfaceMapping
             const Field<Type>& fromField,       // from field
             Field<Type>& toField               // to field
         ) const;
+#endif
 
         //- Disallow default bitwise copy construct
         ggiInterfaceToInterfaceMapping(const ggiInterfaceToInterfaceMapping&);
@@ -187,8 +191,10 @@ public:
 
 } // End namespace Foam
 
+#ifdef FOAMEXTEND
 #ifdef NoRepository
 #   include "ggiInterfaceToInterfaceMappingTemplates.C"
+#endif
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

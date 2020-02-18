@@ -73,7 +73,7 @@ timeVaryingVelocityPointPatchVectorField
     const timeVaryingVelocityPointPatchVectorField& ptf,
     const pointPatch& p,
     const DimensionedField<vector, pointMesh>& iF,
-#ifdef OPENFOAM
+#ifdef OPENFOAMESIORFOUNDATION
     const pointPatchFieldMapper& mapper
 #else
     const PointPatchFieldMapper& mapper
@@ -103,7 +103,7 @@ timeVaryingVelocityPointPatchVectorField
 
 void timeVaryingVelocityPointPatchVectorField::autoMap
 (
-#ifdef OPENFOAM
+#ifdef OPENFOAMESIORFOUNDATION
     const pointPatchFieldMapper& m
 #else
     const PointPatchFieldMapper& m

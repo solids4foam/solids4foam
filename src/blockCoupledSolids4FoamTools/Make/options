@@ -1,5 +1,5 @@
 ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
-    DISABLE_WARNING_FLAGS = -Wno-old-style-cast
+    DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-deprecated-declarations
 else
     DISABLE_WARNING_FLAGS =
 endif
@@ -7,15 +7,23 @@ endif
 ifeq ($(WM_PROJECT), foam)
     VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
     ifeq ($(VER), 1)
-        WM_VERSION_SPECIFIC = -DFOAMEXTEND=41
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
     else
-        WM_VERSION_SPECIFIC = -DFOAMEXTEND=40
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
+    endif
+else
+    VERSION_SPECIFIC_INC = -DOPENFOAM -I$(LIB_SRC)/dynamicFvMesh/lnInclude/
+    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        VERSION_SPECIFIC_INC += -DOPENFOAMESI
+    else
+        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
     endif
 endif
 
 EXE_INC = \
+    -std=c++11 \
     $(DISABLE_WARNING_FLAGS) \
-    $(WM_VERSION_SPECIFIC) \
+    $(VERSION_SPECIFIC_INC) \
     -I../../ThirdParty/eigen3 \
     -I../solids4FoamModels/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \

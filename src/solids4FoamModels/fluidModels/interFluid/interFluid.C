@@ -32,6 +32,8 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "findRefCell.H"
 #include "adjustPhi.H"
+#include "zeroGradientFvPatchFields.H"
+#include "fixedValueFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -51,6 +53,7 @@ addToRunTimeSelectionTable(fluidModel, interFluid, dictionary);
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
 
 
+#ifndef OPENFOAMFOUNDATION
 void interFluid::correctPhi
 (
     pimpleControl& pimple,
@@ -101,7 +104,11 @@ void interFluid::correctPhi
 
     adjustPhi(phi(), U(), pcorr);
 
+#ifdef OPENFOAMESIORFOUNDATION
+    mesh().setFluxRequired(pcorr.name());
+#else
     mesh().schemesDict().setFluxRequired(pcorr.name());
+#endif
 
     while (pimple.correctNonOrthogonal())
     {
@@ -122,12 +129,7 @@ void interFluid::correctPhi
     fluidModel::continuityErrs();
 
     // Courant number
-    {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
-        fluidModel::CourantNo(CoNum, meanCoNum, velMag);
-    }
+    fluidModel::CourantNo();
 
     // Recalculate rhoPhi from rho
     rhoPhi_ = fvc::interpolate(rho_)*phi();
@@ -168,7 +170,11 @@ void interFluid::solveAlphaEqnSubCycle(const pimpleControl& pimple)
         solveAlphaEqn(nAlphaCorr);
     }
 
+#ifdef OPENFOAMESIORFOUNDATION
+    mixture_.correct();
+#else
     interface_.correct();
+#endif
 
     rho_ == alpha1_*rho1_ + (scalar(1) - alpha1_)*rho2_;
 }
@@ -180,8 +186,13 @@ void interFluid::solveAlphaEqn(const label nAlphaCorr)
     const word alpharScheme("div(phirb,alpha)");
 
     surfaceScalarField phic = mag(phi()/mesh().magSf());
+#ifdef OPENFOAMESIORFOUNDATION
+    phic = min(mixture_.cAlpha()*phic, max(phic));
+    surfaceScalarField phir = phic*mixture_.nHatf();
+#else
     phic = min(interface_.cAlpha()*phic, max(phic));
     surfaceScalarField phir = phic*interface_.nHatf();
+#endif
 
     for (int aCorr=0; aCorr<nAlphaCorr; aCorr++)
     {
@@ -217,8 +228,12 @@ tmp<fvVectorMatrix> interFluid::solveUEqn(pimpleControl& pimple)
     const surfaceScalarField muEff
     (
         "muEff",
+#ifdef OPENFOAMESIORFOUNDATION
+        mixture_.muf()
+#else
         twoPhaseProperties_.muf()
-      + fvc::interpolate(rho_*turbulence_->nut())
+#endif
+      + fvc::interpolate(rho_*turbulence_().nut())
     );
 
     tmp<fvVectorMatrix> tUEqn
@@ -231,7 +246,11 @@ tmp<fvVectorMatrix> interFluid::solveUEqn(pimpleControl& pimple)
           - (fvc::grad(U()) & fvc::grad(muEff))
         )
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    fvVectorMatrix& UEqn = tUEqn.ref();
+#else
     fvVectorMatrix& UEqn = tUEqn();
+#endif
 
     UEqn.relax();
 
@@ -244,7 +263,11 @@ tmp<fvVectorMatrix> interFluid::solveUEqn(pimpleControl& pimple)
             fvc::reconstruct
             (
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    fvc::interpolate(mixture_.sigmaK())*fvc::snGrad(alpha1_)
+#else
                     fvc::interpolate(interface_.sigmaK())*fvc::snGrad(alpha1_)
+#endif
                   - ghf_*fvc::snGrad(rho_)
                   - fvc::snGrad(pd_)
                 )*mesh().magSf()
@@ -278,7 +301,11 @@ void interFluid::solvePEqn
 
     phi() = phiU +
     (
+#ifdef OPENFOAMESIORFOUNDATION
+        fvc::interpolate(mixture_.sigmaK())*fvc::snGrad(alpha1_)
+#else
         fvc::interpolate(interface_.sigmaK())*fvc::snGrad(alpha1_)
+#endif
       - ghf_*fvc::snGrad(rho_)
     )*rUAf*mesh().magSf();
 
@@ -293,7 +320,11 @@ void interFluid::solvePEqn
 
         pdEqn.solve
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            mesh().solver(pd_.select(pimple.finalInnerIter()))
+#else
             mesh().solutionDict().solver(pd_.select(pimple.finalInnerIter()))
+#endif
         );
 
         if (pimple.finalNonOrthogonalIter())
@@ -310,7 +341,7 @@ void interFluid::solvePEqn
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), U());
 }
-
+#endif
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -320,7 +351,9 @@ interFluid::interFluid
     const word& region
 )
 :
-    fluidModel(typeName, runTime, region),
+    fluidModel(typeName, runTime, region)
+#ifndef OPENFOAMFOUNDATION
+    ,
     pd_
     (
         IOobject
@@ -333,6 +366,12 @@ interFluid::interFluid
         ),
         mesh()
     ),
+#ifdef OPENFOAMESIORFOUNDATION
+    mixture_(U(), phi()),
+    alpha1_(mixture_.alpha1()),
+    rho1_(mixture_.rho1()),
+    rho2_(mixture_.rho2()),
+#else
     alpha1_
     (
         IOobject
@@ -346,8 +385,10 @@ interFluid::interFluid
         mesh()
     ),
     twoPhaseProperties_(U(), phi(), "alpha1"),
+    interface_(alpha1_, U(), twoPhaseProperties_),
     rho1_(twoPhaseProperties_.rho1()),
     rho2_(twoPhaseProperties_.rho2()),
+#endif
     rho_
     (
         IOobject
@@ -355,8 +396,7 @@ interFluid::interFluid
             "rho",
             runTime.timeName(),
             mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
+            IOobject::READ_IF_PRESENT
         ),
         alpha1_*rho1_ + (scalar(1) - alpha1_)*rho2_,
         alpha1_.boundaryField().types()
@@ -375,17 +415,22 @@ interFluid::interFluid
     ),
     gh_("gh", g() & mesh().C()),
     ghf_("gh", g() & mesh().Cf()),
-    interface_(alpha1_, U(), twoPhaseProperties_),
     pdRefCell_(0),
     pdRefValue_(0.0),
     pRefValue_(0.0),
     turbulence_
     (
+#ifdef OPENFOAMESIORFOUNDATION
+        incompressible::turbulenceModel::New(U(), phi(), mixture_)
+#else
         incompressible::turbulenceModel::New(U(), phi(), twoPhaseProperties_)
+#endif
     )
+#endif
 {
     UisRequired();
 
+#ifndef OPENFOAMFOUNDATION
     // Reset p dimensions
     Info<< "Resetting the dimensions of p" << endl;
     p().dimensions().reset(dimPressure);
@@ -394,7 +439,12 @@ interFluid::interFluid
     rho_.oldTime();
 
     setRefCell(p(), fluidProperties(), pdRefCell_, pdRefValue_);
+#ifdef OPENFOAMESIORFOUNDATION
+    mesh().setFluxRequired(pd_.name());
+    mesh().setFluxRequired(alpha1_.name());
+#else
     mesh().schemesDict().setFluxRequired(pd_.name());
+#endif
 
     if (pd_.needReference())
     {
@@ -407,6 +457,7 @@ interFluid::interFluid
             pRefValue_ - getRefCellValue(p(), pdRefCell_)
         );
     }
+#endif
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -418,11 +469,20 @@ tmp<vectorField> interFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+#ifndef OPENFOAMFOUNDATION
+
+#ifdef OPENFOAMESIORFOUNDATION
+    tvF.ref() =
+#else
     tvF() =
+#endif
         (
             mesh().boundary()[patchID].nf()
           & (-turbulence_->devReff()().boundaryField()[patchID])
         );
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tvF;
 }
@@ -435,7 +495,11 @@ tmp<scalarField> interFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tpF.ref() = p().boundaryField()[patchID];
+#else
     tpF() = p().boundaryField()[patchID];
+#endif
 
     return tpF;
 }
@@ -443,13 +507,16 @@ tmp<scalarField> interFluid::patchPressureForce(const label patchID) const
 
 bool interFluid::evolve()
 {
+#ifndef OPENFOAMFOUNDATION
     Info<< "Evolving fluid model: " << this->type() << endl;
 
-    fvMesh& mesh = fluidModel::mesh();
+    dynamicFvMesh& mesh = fluidModel::mesh();
 
     // Take a reference to the pimple control
     pimpleControl& pimple = fluidModel::pimple();
 
+    // For now, we check for FSI mesh update here; a better way will be to
+    // create a FSI dynamicFvMesh: to-do
     bool meshChanged = false;
     if (fluidModel::fsiMeshUpdate())
     {
@@ -458,10 +525,11 @@ bool interFluid::evolve()
     }
     else
     {
-        meshChanged = refCast<dynamicFvMesh>(mesh).update();
+        meshChanged = mesh.update();
         reduce(meshChanged, orOp<bool>());
     }
 
+    if (meshChanged)
     {
         const Time& runTime = fluidModel::runTime();
 #       include "volContinuity.H"
@@ -488,7 +556,11 @@ bool interFluid::evolve()
     // Pressure-velocity corrector
     while (pimple.loop())
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        mixture_.correct();
+#else
         twoPhaseProperties_.correct();
+#endif
 
         solveAlphaEqnSubCycle(pimple);
 
@@ -517,11 +589,14 @@ bool interFluid::evolve()
 
         gradU() = fvc::grad(U());
 
-        turbulence_->correct();
+        turbulence_().correct();
     }
 
     // Make the fluxes absolute for when runTime++ is called
     fvc::makeAbsolute(phi(), U());
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return 0;
 }

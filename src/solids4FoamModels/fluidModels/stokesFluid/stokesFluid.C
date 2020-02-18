@@ -56,7 +56,9 @@ stokesFluid::stokesFluid
     const word& region
 )
 :
-    fluidModel(typeName, runTime, region),
+    fluidModel(typeName, runTime, region)
+#ifndef OPENFOAMESIORFOUNDATION
+    ,
     laminarTransport_(U(), phi()),
     rho_
     (
@@ -72,6 +74,7 @@ stokesFluid::stokesFluid
             )
         ).lookup("rho")
     )
+#endif
 {
     UisRequired();
     pisRequired();
@@ -86,9 +89,13 @@ tmp<vectorField> stokesFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tvF() =
         rho_.value()*laminarTransport_.nu().boundaryField()[patchID]
        *U().boundaryField()[patchID].snGrad();
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tvF;
 }
@@ -101,7 +108,11 @@ tmp<scalarField> stokesFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
+#ifndef OPENFOAMESIORFOUNDATION
     tpF() = rho_.value()*p().boundaryField()[patchID];
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return tpF;
 }
@@ -109,6 +120,7 @@ tmp<scalarField> stokesFluid::patchPressureForce(const label patchID) const
 
 bool stokesFluid::evolve()
 {
+#ifndef OPENFOAMESIORFOUNDATION
     Info<< "Evolving fluid model: " << this->type() << endl;
 
     const fvMesh& mesh = fluidModel::mesh();
@@ -145,6 +157,9 @@ bool stokesFluid::evolve()
             phi().oldTime()
           - (fvc::snGrad(p())*runTime().deltaT()/rho_)*mesh.magSf();
     }
+#else
+    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return 0;
 }

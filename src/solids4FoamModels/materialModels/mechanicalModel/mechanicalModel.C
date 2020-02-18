@@ -24,18 +24,23 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "mechanicalModel.H"
-#include "ZoneID.H"
 #include "fvc.H"
 #include "fvcGradf.H"
 #include "gaussGrad.H"
 #include "twoDPointCorrector.H"
 #include "fixedGradientFvPatchFields.H"
 #include "wedgePolyPatch.H"
-#include "crackerFvMesh.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "ZoneIDs.H"
+#else
+    #include "ZoneID.H"
+    #include "crackerFvMesh.H"
+#endif
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 
+#ifndef OPENFOAMESIORFOUNDATION
 void Foam::mechanicalModel::makeSolSubMeshes() const
 {
     if (!solSubMeshes_.empty())
@@ -86,6 +91,7 @@ Foam::solidSubMeshes& Foam::mechanicalModel::solSubMeshes()
 
     return solSubMeshes_();
 }
+#endif
 
 
 void Foam::mechanicalModel::makeVolToPoint() const
@@ -98,7 +104,11 @@ void Foam::mechanicalModel::makeVolToPoint() const
         )   << "pointer already set" << abort(FatalError);
     }
 
+#ifdef OPENFOAMESIORFOUNDATION
+    volToPointPtr_ = new volPointInterpolation(mesh());        
+#else
     volToPointPtr_ = new newLeastSquaresVolPointInterpolation(mesh());
+#endif
 }
 
 
@@ -131,6 +141,7 @@ void Foam::mechanicalModel::calcImpKfcorr() const
 
     if (laws.size() > 1)
     {
+#ifndef OPENFOAMESIORFOUNDATION
         // To disable Rhie-Chow correction on bi-material interface, we will set
         // impKfcorr to zero on bi-material interface faces
 
@@ -180,6 +191,11 @@ void Foam::mechanicalModel::calcImpKfcorr() const
         }
 
         impKfcorrPtr_->correctBoundaryConditions();
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM"
+            << abort(FatalError);
+#endif
     }
 }
 
@@ -208,7 +224,9 @@ void Foam::mechanicalModel::clearOut()
 
     // Make sure to clear the subMeshes after (not before) clearing the subMesh
     // fields
+#ifndef OPENFOAMESIORFOUNDATION
     solSubMeshes_.clear();
+#endif
 }
 
 
@@ -237,7 +255,9 @@ Foam::mechanicalModel::mechanicalModel
     planeStress_(lookup("planeStress")),
     incremental_(incremental),
     cellZoneNames_(),
+#ifndef OPENFOAMESIORFOUNDATION
     solSubMeshes_(),
+#endif
     volToPointPtr_(),
     impKfcorrPtr_(NULL)
 {
@@ -308,6 +328,7 @@ Foam::mechanicalModel::mechanicalModel
     }
     else
     {
+#ifndef OPENFOAMESIORFOUNDATION
         forAll(laws, lawI)
         {
             if (nonLinGeom == nonLinearGeometry::LINEAR_GEOMETRY)
@@ -356,8 +377,13 @@ Foam::mechanicalModel::mechanicalModel
                     << nonLinGeom << abort(FatalError);
             }
         }
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
     }
 
+#ifndef OPENFOAMESIORFOUNDATION
     // Check: currently crackerFvMesh only works with a single material
     // The challenge here is to update the subMesh and subMesh fields when a
     // topo-change (crack) occurs in the babse mesh
@@ -368,6 +394,7 @@ Foam::mechanicalModel::mechanicalModel
             << "material in mechanicalProperties"
             << abort(FatalError);
     }
+#endif
 }
 
 
@@ -387,7 +414,11 @@ const Foam::fvMesh& Foam::mechanicalModel::mesh() const
 }
 
 
+#ifdef OPENFOAMESIORFOUNDATION
+const Foam::volPointInterpolation&
+#else
 const Foam::newLeastSquaresVolPointInterpolation&
+#endif
 Foam::mechanicalModel::volToPoint() const
 {
     if (!volToPointPtr_)
@@ -427,6 +458,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::rho() const
                 calculatedFvPatchScalarField::typeName
             )
         );
+#ifndef OPENFOAMESIORFOUNDATION
         volScalarField& result = tresult();
 
         // Accumulated subMesh fields and then map to the base mesh
@@ -446,7 +478,10 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::rho() const
 
         // Clear subMesh fields
         rhos.clear();
-
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
         return tresult;
     }
 }
@@ -480,6 +515,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::impK() const
                 calculatedFvPatchScalarField::typeName
             )
         );
+#ifndef OPENFOAMESIORFOUNDATION
         volScalarField& result = tresult();
 
         // Accumulated subMesh fields and then map to the base mesh
@@ -500,6 +536,10 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::impK() const
         // Clear subMesh fields
         impKs.clear();
 
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
         return tresult;
     }
 }
@@ -542,6 +582,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::bulkModulus() const
                 calculatedFvPatchScalarField::typeName
             )
         );
+#ifndef OPENFOAMESIORFOUNDATION
         volScalarField& result = tresult();
 
         // Accumulated subMesh fields and then map to the base mesh
@@ -562,6 +603,11 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::bulkModulus() const
         // Clear subMesh fields
         bulkModulii.clear();
 
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
+
         return tresult;
     }
 }
@@ -577,6 +623,7 @@ void Foam::mechanicalModel::correct(volSymmTensorField& sigma)
     }
     else
     {
+#ifndef OPENFOAMESIORFOUNDATION
         // Accumulate data for all fields
         forAll(laws, lawI)
         {
@@ -588,6 +635,10 @@ void Foam::mechanicalModel::correct(volSymmTensorField& sigma)
         (
             solSubMeshes().subMeshSigma(), sigma
         );
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
     }
 }
 
@@ -602,6 +653,7 @@ void Foam::mechanicalModel::correct(surfaceSymmTensorField& sigma)
     }
     else
     {
+#ifndef OPENFOAMESIORFOUNDATION
         // Reset sigma before performing the accumulatation as interface values
         // will be added for each material
         // This is not necessary for volFields as they store no value on the
@@ -619,6 +671,10 @@ void Foam::mechanicalModel::correct(surfaceSymmTensorField& sigma)
         (
             solSubMeshes().subMeshSigmaf(), sigma
         );
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
     }
 }
 
@@ -637,6 +693,7 @@ void Foam::mechanicalModel::grad
     }
     else
     {
+#ifndef OPENFOAMESIORFOUNDATION
         // Interpolate the base D to the subMesh D
         // If necessary, corrections are applied on bi-material interfaces
         solSubMeshes().interpolateDtoSubMeshD(D, true);
@@ -666,6 +723,10 @@ void Foam::mechanicalModel::grad
         (
             mesh()
         ).correctBoundaryConditions(D, gradD);
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
     }
 }
 
@@ -685,6 +746,7 @@ void Foam::mechanicalModel::grad
     }
     else
     {
+#ifndef OPENFOAMESIORFOUNDATION
         // Calculate subMesh gradient fields
         forAll(laws, lawI)
         {
@@ -714,6 +776,10 @@ void Foam::mechanicalModel::grad
         (
             mesh()
         ).correctBoundaryConditions(D, gradD);
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
     }
 }
 
@@ -733,6 +799,7 @@ void Foam::mechanicalModel::grad
     }
     else
     {
+#ifndef OPENFOAMESIORFOUNDATION
         // Calculate subMesh gradient fields
         forAll(laws, lawI)
         {
@@ -765,6 +832,10 @@ void Foam::mechanicalModel::grad
         // If we don't do this then we don't get convergence in many cases
         const surfaceVectorField n = mesh().Sf()/mesh().magSf();
         gradDf += n*fvc::snGrad(D) - (sqr(n) & gradDf);
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
     }
 }
 
@@ -786,6 +857,7 @@ void Foam::mechanicalModel::grad
     }
     else
     {
+#ifndef OPENFOAMESIORFOUNDATION
         // Calculate subMesh gradient fields
         forAll(laws, lawI)
         {
@@ -838,6 +910,10 @@ void Foam::mechanicalModel::grad
         // Correct snGrad component of gradDf
         const surfaceVectorField n = mesh().Sf()/mesh().magSf();
         gradDf += n*fvc::snGrad(D) - (sqr(n) & gradDf);
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
     }
 }
 
@@ -857,6 +933,7 @@ void Foam::mechanicalModel::interpolate
     }
     else
     {
+#ifndef OPENFOAMESIORFOUNDATION
         // Interpolate the base D to the subMesh D
         // If necessary, corrections are applied on bi-material interfaces
         solSubMeshes().interpolateDtoSubMeshD(D, useVolFieldSigma);
@@ -877,6 +954,10 @@ void Foam::mechanicalModel::interpolate
         (
             solSubMeshes().subMeshPointD(), pointD
         );
+#else
+        FatalErrorIn(type())
+            << "Not implemented for this version of OpenFOAM" << abort(FatalError);
+#endif
     }
 }
 
@@ -988,10 +1069,12 @@ Foam::scalar Foam::mechanicalModel::newDeltaT()
 
 void Foam::mechanicalModel::moveSubMeshes()
 {
+#ifndef OPENFOAMESIORFOUNDATION
     if (solSubMeshes_.valid())
     {
         solSubMeshes().moveSubMeshes();
     }
+#endif
 }
 
 // ************************************************************************* //

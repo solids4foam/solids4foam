@@ -42,9 +42,11 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "fvCFD.H"
-#include "fvBlockMatrix.H"
-#include "singlePhaseTransportModel.H"
-#include "RASModel.H"
+#ifndef OPENFOAMESIORFOUNDATION
+    #include "fvBlockMatrix.H"
+    #include "singlePhaseTransportModel.H"
+    #include "RASModel.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -63,6 +65,7 @@ class pUCoupledFluid
 {
     // Private data
 
+#ifndef OPENFOAMESIORFOUNDATION
         //- Transport properties model
         singlePhaseTransportModel laminarTransport_;
 
@@ -86,7 +89,7 @@ class pUCoupledFluid
 
         //- Convergence tolerance
         scalar convergenceCriterion_;
-
+#endif
 
     // Private Member Functions
 
@@ -122,12 +125,6 @@ public:
     // Member Functions
 
         // Access
-
-            //- Density
-            const dimensionedScalar& rho()
-            {
-                return rho_;
-            }
 
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce

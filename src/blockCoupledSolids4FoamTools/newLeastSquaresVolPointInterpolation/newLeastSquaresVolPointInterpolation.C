@@ -38,6 +38,8 @@ License
 #include "symmetryPolyPatch.H"
 #include "Map.H"
 #include "transform.H"
+#include "surfaceMesh.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -117,6 +119,11 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                  == processorPolyPatch::typeName
                 )
                 {
+#ifdef OPENFOAM
+                    FatalErrorIn("makePointFaces()")
+                        << "processor patches not allowed!"
+                        << abort(FatalError);
+#endif
                     procFaceSet.insert(faceID);
                 }
                 else if
@@ -150,12 +157,14 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
         pointBndFaces[pointI] = bndFaceSet.toc();
         pointCyclicFaces[pointI] = cyclicFaceSet.toc();
 
+#ifndef OPENFOAM
         const labelList& glPoints =
             mesh().globalData().sharedPointLabels();
 
         bool globalPoint(findIndex(glPoints, pointI) != -1);
 
         if (!globalPoint)
+#endif // OpenFOAM assumes no global points
         {
             labelList allPointProcFaces = procFaceSet.toc();
 
@@ -551,7 +560,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
 
 //                     if (curPointBndFaces.size())
 //                     {
-//                         Pout << procPatch.neighbProcNo()
+//                         Pout<< procPatch.neighbProcNo()
 //                             << ", "
 //                             << curMeshPoint
 //                             << ", "
@@ -563,25 +572,45 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
 
 //                         forAll(curPointBndFaces, fI)
 //                         {
-//                             Pout << ", " <<
+//                             Pout<< ", " <<
 //                                 mesh().boundaryMesh().whichPatch
 //                                 (
 //                                     curPointBndFaces[fI]
 //                                 );
 //                         }
-//                         Pout << endl;
+//                         Pout<< endl;
 //                     }
                 }
             }
 
             procBndFaces[procPatch.neighbProcNo()] = faceSet.toc();
 
-//             Pout << "xxxxxxxxxxxxxxxx"
+//             Pout<< "xxxxxxxxxxxxxxxx"
 //                 << procBndFaces[procPatch.neighbProcNo()] << endl;
 
             // Point face addressing
             labelList patchPoints = pointSet.toc();
+
+#ifdef OPENFOAMFOUNDATION
+            // List(SLList) in the Foundation version doesn't work, maybe only
+            // for Type = labelPair, so we will do it manually
+            List<labelPair> patchPointsFaces(pointFaceSet.size());
+            {
+                label i = 0;
+                for
+                (
+                    typename SLList<labelPair>::const_iterator iter =
+                        pointFaceSet.begin();
+                    iter != pointFaceSet.end();
+                    ++iter
+                    )
+                {
+                    patchPointsFaces[i++] = iter();
+                }
+            }
+#else
             List<labelPair> patchPointsFaces(pointFaceSet);
+#endif
 
             labelListList patchPointFaces(patchPoints.size());
 
@@ -614,7 +643,11 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
             {
                 OPstream toNeighbProc
                 (
+#ifdef OPENFOAM
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                     // size of field
                 );
@@ -628,7 +661,11 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
             {
                 IPstream fromNeighbProc
                 (
+#ifdef OPENFOAM
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                     // size of field
                 );
@@ -713,7 +750,11 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
                 {
                     OPstream toNeighbProc
                     (
+#ifdef OPENFOAM
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procI
                         // size of field
                     );
@@ -733,7 +774,11 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
                 {
                     IPstream fromNeighbProc
                     (
+#ifdef OPENFOAM
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procI
                         // size of field
                     );
@@ -861,7 +906,26 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
             // Point cell addressing
             labelList patchPoints = pointSet.toc();
+#ifdef OPENFOAMFOUNDATION
+            // List(SLList) in the Foundation version doesn't work, maybe only
+            // for Type = labelPair, so we will do it manually
+            List<labelPair> patchPointsCells(pointCellSet.size());
+            {
+                label i = 0;
+                for
+                (
+                    typename SLList<labelPair>::const_iterator iter =
+                        pointCellSet.begin();
+                    iter != pointCellSet.end();
+                    ++iter
+                    )
+                {
+                    patchPointsCells[i++] = iter();
+                }
+            }
+#else
             List<labelPair> patchPointsCells(pointCellSet);
+#endif
 
             labelListList patchPointCells(patchPoints.size());
 
@@ -898,7 +962,11 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
             {
                 OPstream toNeighbProc
                 (
+#ifdef OPENFOAM
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                     // size of field
 //                   + 2*patchPoints.size()*sizeof(label)
@@ -933,7 +1001,11 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
             {
                 IPstream fromNeighbProc
                 (
+#ifdef OPENFOAM
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                     // size of field
                 );
@@ -1019,7 +1091,11 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
                 {
                     OPstream toNeighbProc
                     (
+#ifdef OPENFOAM
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procI
                         // size of field
                     );
@@ -1039,7 +1115,11 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
                 {
                     IPstream fromNeighbProc
                     (
+#ifdef OPENFOAM
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procI
                         // size of field
                     );
@@ -1390,7 +1470,6 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
     const Map<vectorField> gPtNgbProcBndFaceCentres =
         globalPointNgbProcBndFaceCentres();
-
     const Map<vectorField> gPtNgbProcCellCentres =
         globalPointNgbProcCellCentres();
 
@@ -1972,6 +2051,18 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
             pI++;
         }
 
+        // Note: the definition of n() and m() are flipped in foam-extend-4.0
+        // and OpenFOAM... wtf
+#ifdef OPENFOAM
+        // Applying weights
+        for (label i=0; i<M.m(); i++)
+        {
+            for (label j=0; j<M.n(); j++)
+            {
+                M[i][j] *= W[i];
+            }
+        }
+#else
         // Applying weights
         for (label i=0; i<M.n(); i++)
         {
@@ -1980,8 +2071,9 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
                 M[i][j] *= W[i];
             }
         }
+#endif
 
-//         SVD svd(M, SMALL);
+        //         SVD svd(M, SMALL);
 
 //         for (label i=0; i<svd.VSinvUt().n(); i++)
 //         {
@@ -1992,13 +2084,18 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 //         }
 
 //         scalarSquareMatrix lsM(nCoeffs, 0.0);
+
         tensor lsM = tensor::zero;
 
         for (label i=0; i<3; i++)
         {
             for (label j=0; j<3; j++)
             {
+#ifdef OPENFOAM
+                for (label k=0; k<M.m(); k++)
+#else
                 for (label k=0; k<M.n(); k++)
+#endif
                 {
 //                     lsM[i][j] += M[k][i]*M[k][j];
                     lsM(i,j) += M[k][i]*M[k][j];
@@ -2042,7 +2139,11 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
         for (label i=0; i<3; i++)
         {
+#ifdef OPENFOAM
+            for (label j=0; j<M.m(); j++)
+#else
             for (label j=0; j<M.n(); j++)
+#endif
             {
                 for (label k=0; k<3; k++)
                 {
@@ -2169,6 +2270,56 @@ makeMirrorPlaneTransformation() const
     }
 }
 
+#ifdef OPENFOAM
+tensor newLeastSquaresVolPointInterpolation::hinv(const tensor& t) const
+{
+    static const scalar hinvLarge = 1e10;
+    static const scalar hinvSmall = 1e-10;
+
+    if (det(t) > hinvSmall)
+    {
+        return inv(t);
+    }
+    else
+    {
+        vector eig = eigenValues(t);
+        tensor eigVecs = eigenVectors(t);
+
+        tensor zeroInv = tensor::zero;
+
+        // Test if all eigen values are zero.
+        // If this happens then eig.z() = SMALL, and hinv(t)
+        // returns a zero tensor.
+        // Jovani Favero, 18/Nov/2009
+        // Further bug fix: replace > with == and add SMALL to zeroInv
+        // Dominik Christ, 7/Aug/2012
+        if (mag(eig.z()) == hinvLarge*mag(eig.z()))
+        {
+            // Three zero eigen values (z is largest in magnitude).
+            // Return zero inverse
+            return zeroInv;
+        }
+
+        // Compare smaller eigen values and if out of range of large
+        // consider them singular
+
+        if (mag(eig.z()) > hinvLarge*mag(eig.x()))
+        {
+            // Make a tensor out of symmTensor sqr.  HJ, 24/Oct/2009
+            zeroInv += tensor(sqr(eigVecs.x()));
+        }
+
+        if (mag(eig.z()) > hinvLarge*mag(eig.y()))
+        {
+            // Make a tensor out of symmTensor sqr.  HJ, 24/Oct/2009
+            zeroInv += tensor(sqr(eigVecs.y()));
+        }
+
+        return inv(t + zeroInv) - zeroInv;
+    }
+}
+#endif
+
 // * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * * //
 
 newLeastSquaresVolPointInterpolation::newLeastSquaresVolPointInterpolation
@@ -2176,7 +2327,11 @@ newLeastSquaresVolPointInterpolation::newLeastSquaresVolPointInterpolation
     const fvMesh& vm
 )
 :
+#ifdef OPENFOAM
+    MeshObject<fvMesh, Foam::UpdateableMeshObject, newLeastSquaresVolPointInterpolation>(vm),
+#else
     MeshObject<fvMesh, newLeastSquaresVolPointInterpolation>(vm),
+#endif
     pointBndFacesPtr_(NULL),
     pointCyclicFacesPtr_(NULL),
     pointProcFacesPtr_(NULL),
@@ -2195,7 +2350,26 @@ newLeastSquaresVolPointInterpolation::newLeastSquaresVolPointInterpolation
     originsPtr_(NULL),
     mirrorPlaneTransformationPtr_(NULL),
     invLsMatrices_(0)
-{}
+#ifdef OPENFOAM
+    ,
+    processorBoundariesExist_(false)
+#endif
+{
+#ifdef OPENFOAM
+    if (Pstream::parRun())
+    {
+        // Check there are no processor boundaries
+        forAll(mesh().boundaryMesh(), patchI)
+        {
+            if (mesh().boundaryMesh()[patchI].type() == "processor")
+            {
+                processorBoundariesExist_ = true;
+                break;
+            }
+        }
+    }
+#endif
+}
 
 
 // * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * * //
@@ -2225,7 +2399,11 @@ newLeastSquaresVolPointInterpolation::~newLeastSquaresVolPointInterpolation()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+#ifdef OPENFOAM
+bool newLeastSquaresVolPointInterpolation::movePoints()
+#else
 bool newLeastSquaresVolPointInterpolation::movePoints() const
+#endif
 {
     deleteDemandDrivenData(weightsPtr_);
     deleteDemandDrivenData(originsPtr_);
@@ -2241,7 +2419,11 @@ bool newLeastSquaresVolPointInterpolation::movePoints() const
 }
 
 
+#ifdef OPENFOAM
+void newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&)
+#else
 bool newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&) const
+#endif
 {
     deleteDemandDrivenData(pointBndFacesPtr_);
     deleteDemandDrivenData(pointCyclicFacesPtr_);
@@ -2264,9 +2446,11 @@ bool newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&) const
     deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
     invLsMatrices_.clear();
 
-//     Pout << "newLeastSquaresVolPointInterpolation::updateMesh - done" << endl;
+//     Pout<< "newLeastSquaresVolPointInterpolation::updateMesh - done" << endl;
 
+#ifndef OPENFOAM
     return true;
+#endif
 }
 
 const labelListList& newLeastSquaresVolPointInterpolation::pointBndFaces() const

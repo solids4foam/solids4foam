@@ -24,7 +24,6 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "simpleCrackerFvMesh.H"
-#include "foamTime.H"
 #include "volMesh.H"
 #include "addToRunTimeSelectionTable.H"
 #include "simpleCohesiveZoneFvPatchVectorField.H"

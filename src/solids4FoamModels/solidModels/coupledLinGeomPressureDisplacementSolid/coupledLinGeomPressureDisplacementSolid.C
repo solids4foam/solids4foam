@@ -32,8 +32,9 @@ License
 #include "linearElastic.H"
 #include "findRefCell.H"
 #include "adjustPhi.H"
-#include "fvBlockMatrix.H"
-
+#ifdef FOAMEXTEND
+    #include "fvBlockMatrix.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -85,6 +86,7 @@ coupledLinGeomPressureDisplacementSolid::coupledLinGeomPressureDisplacementSolid
         mesh()
     ),
     gradp_(fvc::grad(p_)),
+#ifdef FOAMEXTEND
     Dp_
     (
         IOobject
@@ -98,6 +100,7 @@ coupledLinGeomPressureDisplacementSolid::coupledLinGeomPressureDisplacementSolid
         mesh(),
         dimensionedVector4("zero", dimless, vector4::zero)
     ),
+#endif
     pressureRhieChowScaleFac_
     (
         solidModelDict().lookupOrDefault<scalar>
@@ -116,6 +119,7 @@ coupledLinGeomPressureDisplacementSolid::coupledLinGeomPressureDisplacementSolid
 
 bool coupledLinGeomPressureDisplacementSolid::evolve()
 {
+#ifdef FOAMEXTEND
     Info<< "Evolving solid solver" << endl;
 
     // Disable default writing of linear solver residuals
@@ -264,6 +268,9 @@ bool coupledLinGeomPressureDisplacementSolid::evolve()
     while (mesh().update());
 
     blockLduMatrix::debug = 1;
+#else
+    notImplemented("Not implemented (yet) for this version of OpenFOAM/FOAM");
+#endif
 
     return true;
 }

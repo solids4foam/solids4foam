@@ -51,8 +51,10 @@ SourceFiles
 #define coupledUnsLinGeomSolid_H
 
 #include "solidModel.H"
-#include "solidPolyMesh.H"
-#include "BlockSolverPerformance.H"
+#ifdef FOAMEXTEND
+    #include "solidPolyMesh.H"
+    #include "BlockSolverPerformance.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -74,6 +76,7 @@ class coupledUnsLinGeomSolid
 {
     // Private data
 
+#ifdef FOAMEXTEND
         //- The solidPolyMesh stores the additional addressing required for the
         //  extended implicit stencil
         solidPolyMesh extendedMesh_;
@@ -82,6 +85,7 @@ class coupledUnsLinGeomSolid
         //  This is a field containing the cell displacements followed by the
         //  boundary face displacements
         vectorIOField solutionVec_;
+#endif
 
         //- Stress surface field
         surfaceSymmTensorField sigmaf_;

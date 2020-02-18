@@ -106,7 +106,11 @@ namespace fvc
     template<class Type, template<class> class FaceList>
     tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
     (
+#ifdef OPENFOAMFOUNDATION
+        const PrimitivePatch<FaceList<face>, const pointField&>& patch,
+#else
         const PrimitivePatch<face, FaceList, const pointField&>& patch,
+#endif
         const Field<Type>& ppf
     );
 

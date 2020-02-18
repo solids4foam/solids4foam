@@ -809,6 +809,7 @@ Foam::linearElasticMisesPlastic::impK() const
 }
 
 
+#ifndef OPENFOAMESIORFOUNDATION
 Foam::tmp<Foam::volDiagTensorField>
 Foam::linearElasticMisesPlastic::impKdiagTensor() const
 {
@@ -875,6 +876,7 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
         )
     );
 }
+#endif
 
 
 void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)

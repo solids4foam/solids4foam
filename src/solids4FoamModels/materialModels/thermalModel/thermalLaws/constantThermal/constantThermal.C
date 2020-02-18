@@ -80,7 +80,11 @@ Foam::tmp<Foam::volScalarField> Foam::constantThermal::C() const
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
     tresult().correctBoundaryConditions();
+#endif
 
     return tresult;
 }
@@ -106,7 +110,11 @@ Foam::tmp<Foam::volScalarField> Foam::constantThermal::k() const
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
     tresult().correctBoundaryConditions();
+#endif
 
     return tresult;
 }

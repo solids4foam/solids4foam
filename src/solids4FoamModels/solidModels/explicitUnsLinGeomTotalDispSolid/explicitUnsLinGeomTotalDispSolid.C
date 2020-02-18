@@ -171,7 +171,11 @@ explicitUnsLinGeomTotalDispSolid::explicitUnsLinGeomTotalDispSolid
     updateStress();
 
     // Update initial acceleration
+#ifdef OPENFOAMESIORFOUNDATION
+    a_.primitiveFieldRef() =
+#else
     a_.internalField() =
+#endif
         fvc::div(sigma(), "div(sigma)")().internalField()
        /(rho().internalField());
     a_.correctBoundaryConditions();
@@ -194,8 +198,15 @@ void explicitUnsLinGeomTotalDispSolid::setDeltaT(Time& runTime)
         1.0/
         gMax
         (
-            mesh().surfaceInterpolation::deltaCoeffs().internalField()
-           *waveSpeed_.internalField()
+#ifdef OPENFOAMESIORFOUNDATION
+            DimensionedField<scalar, Foam::surfaceMesh>
+#else
+            Field<scalar>
+#endif
+            (
+                mesh().surfaceInterpolation::deltaCoeffs().internalField()
+               *waveSpeed_.internalField()
+            )
         );
 
     // Lookup the desired Courant number
@@ -242,7 +253,11 @@ bool explicitUnsLinGeomTotalDispSolid::evolve()
         // Note the inclusion of a linear bulk viscosity pressure term to
         // dissipate high frequency energies, and a Rhie-Chow term to avoid
         // checker-boarding
+#ifdef OPENFOAMESIORFOUNDATION
+        a_.primitiveFieldRef() =
+#else
         a_.internalField() =
+#endif
             (
                 fvc::div
                 (

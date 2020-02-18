@@ -103,7 +103,7 @@ namespace rbf
             int nbMovingFaceCenters;
             int fileExportIndex;
 
-            static debug::debugSwitch debug;
+            //static debug::debugSwitch debug;
     };
 }
 

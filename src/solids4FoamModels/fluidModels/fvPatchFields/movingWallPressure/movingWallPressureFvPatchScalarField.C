@@ -106,7 +106,11 @@ void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
     }
 
     const fvMesh& mesh = this->patch().boundaryMesh().mesh();
+#ifdef OPENFOAMESIORFOUNDATION
+    word fieldName = internalField().name();
+#else
     word fieldName = dimensionedInternalField().name();
+#endif
 
     const volScalarField& p =
         mesh.lookupObject<volScalarField>(fieldName);

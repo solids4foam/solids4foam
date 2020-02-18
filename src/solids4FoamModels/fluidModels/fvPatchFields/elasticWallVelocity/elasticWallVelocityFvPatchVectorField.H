@@ -35,7 +35,6 @@ SourceFiles
 #ifndef elasticWallVelocityFvPatchVectorField_H
 #define elasticWallVelocityFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 

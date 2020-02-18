@@ -26,6 +26,9 @@ License
 
 #include "directMapInterfaceToInterfaceMapping.H"
 #include "addToRunTimeSelectionTable.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "Time.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -97,7 +100,11 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBFaceMap() const
         IOobject::MUST_READ
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if (mapHeader.typeHeaderOk<labelIOList>(true))
+#else
     if (mapHeader.headerOk())
+#endif
     {
         // Read map
         Info<< "Reading " << mapName << " from disk" << endl;
@@ -214,7 +221,11 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAFaceMap() const
         IOobject::MUST_READ
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if (mapHeader.typeHeaderOk<labelIOList>(true))
+#else
     if (mapHeader.headerOk())
+#endif
     {
         // Read map
         Info<< "Reading " << mapName << "from disk" << endl;
@@ -331,7 +342,11 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBPointMap() const
         IOobject::MUST_READ
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if (mapHeader.typeHeaderOk<labelIOList>(true))
+#else
     if (mapHeader.headerOk())
+#endif
     {
         // Read map
         Info<< "Reading " << mapName << " from disk" << endl;
@@ -448,7 +463,11 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAPointMap() const
         IOobject::MUST_READ
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if (mapHeader.typeHeaderOk<labelIOList>(true))
+#else
     if (mapHeader.headerOk())
+#endif
     {
         // Read map
         Info<< "Reading " << mapName << "from disk" << endl;

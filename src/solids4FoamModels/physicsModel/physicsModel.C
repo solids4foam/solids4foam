@@ -25,6 +25,9 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "physicsModel.H"
+#ifdef OPENFOAMFOUNDATION
+    #include "Time.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

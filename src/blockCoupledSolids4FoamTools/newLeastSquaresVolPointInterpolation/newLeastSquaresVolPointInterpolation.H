@@ -63,9 +63,20 @@ class pointMesh;
                        Class newLeastSquaresVolPointInterpolation Declaration
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM
+    typedef labelUList unallocLabelList;
+#endif
+
 class newLeastSquaresVolPointInterpolation
 :
+#ifdef OPENFOAM
+    public MeshObject
+    <
+        fvMesh, UpdateableMeshObject, newLeastSquaresVolPointInterpolation
+    >
+#else
     public MeshObject<fvMesh, newLeastSquaresVolPointInterpolation>
+#endif
 {
     // Private data
 
@@ -127,6 +138,13 @@ class newLeastSquaresVolPointInterpolation
         //- Interpolation matrices
         mutable PtrList<scalarRectangularMatrix> invLsMatrices_;
 
+#ifdef OPENFOAM
+        //- Switch to check that there are processor boundaries. To run in
+        //  parallel, a decomposition like 'none' needs to be used where all
+        // the cells are on one processor so there are no procesosr boundaries
+        Switch processorBoundariesExist_;
+#endif
+
     // Private member functions
 
         //- Make point boundary face addressing
@@ -170,6 +188,11 @@ class newLeastSquaresVolPointInterpolation
 
         //- Make mirror plane noramals and transformation tensors
         void makeMirrorPlaneTransformation() const;
+
+#ifdef OPENFOAM
+        //- foam-extend-4.0 implementation of Householder inverse
+        tensor hinv(const tensor& t) const;
+#endif
 
         //- Disallow default bitwise copy construct
         newLeastSquaresVolPointInterpolation
@@ -265,11 +288,19 @@ public:
 
             //- Correct weighting factors for moving mesh.
             //  Updated for MeshObject.  HJ, 30/Aug/2010
+#ifdef OPENFOAM
+            virtual bool movePoints();
+#else
             virtual bool movePoints() const;
+#endif
 
             //- Update mesh topology using the morph engine
             //  Updated for MeshObject.  HJ, 30/Aug/2010
+#ifdef OPENFOAM
+            virtual void updateMesh(const mapPolyMesh&);
+#else
             virtual bool updateMesh(const mapPolyMesh&) const;
+#endif
 
     // Interpolation functions
 

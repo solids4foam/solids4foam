@@ -51,7 +51,9 @@ SourceFiles
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
-#include "volVectorNFields.H"
+#ifdef FOAMEXTEND
+    #include "volVectorNFields.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -100,7 +102,9 @@ class coupledLinGeomPressureDisplacementSolid
 
         //- Block vector field for displacement (first entry) and pressure
         //  (second entry)
+#ifdef FOAMEXTEND
         volVector4Field Dp_;
+#endif
 
         //- Scale factor for Rhie-Chow smoothing term in pressure calculation
         const scalar pressureRhieChowScaleFac_;

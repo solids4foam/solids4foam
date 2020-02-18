@@ -9,7 +9,8 @@
 
 namespace rbf
 {
-    Foam::debug::debugSwitch RBFCoarsening::debug( "RBFInterpolation", 0 );
+    //Foam::debug::debugSwitch RBFCoarsening::debug( "RBFInterpolation", 0 );
+    const int debug = 0;
 
     RBFCoarsening::RBFCoarsening()
         :

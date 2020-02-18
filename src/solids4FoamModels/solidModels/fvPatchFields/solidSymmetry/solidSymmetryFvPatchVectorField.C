@@ -72,8 +72,13 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-            << " of field " << this->dimensionedInternalField().name()
-            << " in file " << this->dimensionedInternalField().objectPath()
+#ifdef OPENFOAMESIORFOUNDATION
+            << " of field " << internalField().name()
+            << " in file " << internalField().objectPath()
+#else
+            << " of field " << dimensionedInternalField().name()
+            << " in file " << dimensionedInternalField().objectPath()
+#endif
             << exit(FatalIOError);
     }
 }
@@ -113,8 +118,13 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-            << " of field " << this->dimensionedInternalField().name()
-            << " in file " << this->dimensionedInternalField().objectPath()
+#ifdef OPENFOAMESIORFOUNDATION
+            << " of field " << internalField().name()
+            << " in file " << internalField().objectPath()
+#else
+            << " of field " << dimensionedInternalField().name()
+            << " in file " << dimensionedInternalField().objectPath()
+#endif
             << exit(FatalIOError);
     }
 }
@@ -157,7 +167,11 @@ tmp<Field<vector> > solidSymmetryFvPatchVectorField::snGrad() const
     const fvPatchField<tensor>& gradD =
         patch().lookupPatchField<volTensorField, tensor>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
             "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
     // Calculate the corrected patch internal field
@@ -209,7 +223,11 @@ evaluate(const Pstream::commsTypes)
     const fvPatchField<tensor>& gradD =
         patch().lookupPatchField<volTensorField, tensor>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
             "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
     // Calculate the corrected patch internal field
@@ -226,7 +244,7 @@ evaluate(const Pstream::commsTypes)
             transform
             (
                 I - sqr(nHat),
-                DP + 0.5*nGradDP/this->patch().deltaCoeffs()
+                DP + 0.5*nGradDP/patch().deltaCoeffs()
             )
         );
     }
@@ -251,7 +269,12 @@ void solidSymmetryFvPatchVectorField::write(Ostream& os) const
     fvPatchVectorField::write(os);
     os.writeKeyword("secondOrder")
         << secondOrder_ << token::END_STATEMENT << nl;
+
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "value", *this);
+#else
     writeEntry("value", os);
+#endif
 }
 
 

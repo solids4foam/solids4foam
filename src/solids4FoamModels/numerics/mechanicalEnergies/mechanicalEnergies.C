@@ -193,10 +193,15 @@ void mechanicalEnergies::checkEnergies
         internalEnergyOldTime_
       + gSum
         (
-            mesh_.V()*0.5
-           *(
-               sigma.internalField() + sigma.oldTime().internalField()
-            ) && symm(gradDD.internalField())
+#ifdef OPENFOAMESIORFOUNDATION
+            DimensionedField<scalar, volMesh>
+#endif
+            (
+                mesh_.V()*0.5
+               *(
+                   sigma.internalField() + sigma.oldTime().internalField()
+                ) && symm(gradDD.internalField())
+            )
         );
 
     // Integrate external work energy using the trapezoidal rule
@@ -222,7 +227,15 @@ void mechanicalEnergies::checkEnergies
 
     // Include gravity energy
     externalWork_ +=
-        gSum(mesh_.V()*rho.internalField()*g.value() & DD.internalField());
+        gSum
+        (
+#ifdef OPENFOAMESIORFOUNDATION
+            DimensionedField<scalar, volMesh>
+#endif
+            (
+                mesh_.V()*rho.internalField()*g.value() & DD.internalField()
+            )
+        );
 
     // Integrate linear bulk viscosity energy using the trapezoidal rule
     if (viscousPressurePtr_.valid())
@@ -231,13 +244,19 @@ void mechanicalEnergies::checkEnergies
             linearBulkViscosityEnergyOldTime_
           + gSum
             (
-                fvc::reconstruct
+#ifdef OPENFOAMESIORFOUNDATION
+                DimensionedField<scalar, volMesh>
+#endif
                 (
-                    0.5
-                   *(
-                       viscousPressurePtr_() + viscousPressurePtr_().oldTime()
-                    )*mesh_.Sf()
-                )().internalField() && gradDD.internalField()*mesh_.V()
+                    fvc::reconstruct
+                    (
+                        0.5
+                       *(
+                           viscousPressurePtr_()
+                         + viscousPressurePtr_().oldTime()
+                        )*mesh_.Sf()
+                    )().internalField() && gradDD.internalField()*mesh_.V()
+                )
             );
     }
 

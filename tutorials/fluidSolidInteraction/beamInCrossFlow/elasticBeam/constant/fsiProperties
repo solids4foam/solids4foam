@@ -70,8 +70,8 @@ fluidSolidInterface    Aitken;
 
     // Frequency of time-step at which the fluid-solid interface interpolation
     // weights are updated
-    // 0 means the interpolator is update every time-step, whereas 10 would be
-    // every 10 time-steps
+    // 0 means there will be no interpolator update during simulation, whereas
+    // 10 means the interpolator will be updated every 10 time-steps
     // Defaults to 0
     // interpolatorUpdateFrequency 0;
 }

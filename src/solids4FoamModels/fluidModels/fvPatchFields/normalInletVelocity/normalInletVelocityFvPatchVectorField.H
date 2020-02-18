@@ -35,7 +35,6 @@ SourceFiles
 #ifndef normalInletVelocityFvPatchVectorField_H
 #define normalInletVelocityFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 

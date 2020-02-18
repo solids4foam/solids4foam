@@ -42,7 +42,6 @@ SourceFiles
 #ifndef physicsModel_H
 #define physicsModel_H
 
-#include "foamTime.H"
 #include "IOdictionary.H"
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
