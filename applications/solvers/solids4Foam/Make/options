@@ -10,7 +10,8 @@ else
     VERSION_SPECIFIC_LIBS = \
         -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
         -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
-        -lradiationModels -lfvOptions
+        -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
+        -lfluidThermophysicalModels -lturbulenceModels -lcompressibleTurbulenceModels
 endif
                                                 
 ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))

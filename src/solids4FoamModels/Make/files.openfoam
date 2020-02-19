@@ -26,6 +26,7 @@ solidModels/finiteVolume/fvc/fvcCellLimitedGrad.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/buoyantBoussinesqPimpleFluid/buoyantBoussinesqPimpleFluid.C
+fluidModels/buoyantPimpleFluid/buoyantPimpleFluid.C
 fluidModels/icoFluid/icoFluid.C
 fluidModels/interFluid/interFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
