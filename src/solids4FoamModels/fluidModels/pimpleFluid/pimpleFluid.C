@@ -518,6 +518,8 @@ bool pimpleFluid::evolve()
         }
 
 #ifdef OPENFOAMESIORFOUNDATION
+        tUEqn.clear();
+
         laminarTransport_.correct();
 #endif
         turbulence_->correct();
