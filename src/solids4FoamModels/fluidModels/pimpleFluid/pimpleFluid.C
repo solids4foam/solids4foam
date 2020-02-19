@@ -32,6 +32,9 @@ License
     #include "CorrectPhi.H"
     #include "constrainHbyA.H"
     #include "constrainPressure.H"
+#else
+    #include "fvc.H"
+    #include "fvm.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -168,8 +171,8 @@ void pimpleFluid::solvePEqn
 void pimpleFluid::solveUEqn
 (
     const scalar& UUrf,
-    fvVectorMatrix& ddtUEqn,
-    fvVectorMatrix& HUEqn
+    const fvVectorMatrix& ddtUEqn,
+    const fvVectorMatrix& HUEqn
 )
 {
     if (pimple().momentumPredictor())
@@ -183,7 +186,7 @@ void pimpleFluid::solveUEqn
           + relax(HUEqn, UUrf)
          ==
           - fvc::grad(p()),
-            mesh.solutionDict().solver((U().select(pimple().finalIter())))
+            mesh().solutionDict().solver((U().select(pimple().finalIter())))
         );
 #endif
     }
@@ -228,7 +231,7 @@ void pimpleFluid::solvePEqn
     U().storePrevIter();
 
     U() = HUEqn.H()/aU_;
-    phi() = (fvc::interpolate(U()) & mesh.Sf());
+    phi() = (fvc::interpolate(U()) & mesh().Sf());
 #endif
 
     adjustPhi(phi(), U(), p());
@@ -254,7 +257,7 @@ void pimpleFluid::solvePEqn
         pEqn.setReference(pRefCell_, pRefValue_);
         pEqn.solve
         (
-            mesh.solutionDict().solver
+            mesh().solutionDict().solver
             (
                 p().select(pimple().finalInnerIter())
             )

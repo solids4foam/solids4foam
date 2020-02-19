@@ -31,6 +31,9 @@ License
 #ifdef OPENFOAMESIORFOUNDATION
     #include "constrainHbyA.H"
     #include "constrainPressure.H"
+#else
+    #include "fvc.H"
+    #include "fvm.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

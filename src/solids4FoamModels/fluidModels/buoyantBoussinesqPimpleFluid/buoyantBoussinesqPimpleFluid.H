@@ -71,7 +71,6 @@ SourceFiles
     #include "turbulenceModel.H"
 #endif
 #include "pimpleControl.H"
-#include "fvm.H"
 #include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

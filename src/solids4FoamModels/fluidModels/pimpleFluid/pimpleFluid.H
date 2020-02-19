@@ -122,16 +122,16 @@ class pimpleFluid
         void solveUEqn
         (
             const scalar& UUrf,
-            fvVectorMatrix& ddtUEqn,
-            fvVectorMatrix& HUEqn
+            const fvVectorMatrix& ddtUEqn,
+            const fvVectorMatrix& HUEqn
         );
 
         //- Solve pressure equation
         void solvePEqn
         (
             const scalar& UUrf,
-            fvVectorMatrix& ddtUEqn,
-            fvVectorMatrix& HUEqn
+            const fvVectorMatrix& ddtUEqn,
+            const fvVectorMatrix& HUEqn
         );
 #endif
 
