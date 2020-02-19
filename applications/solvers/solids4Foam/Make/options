@@ -9,7 +9,8 @@ ifeq ($(WM_PROJECT), foam)
 else
     VERSION_SPECIFIC_LIBS = \
         -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
-        -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers
+        -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
+        -lradiationModels -lfvOptions
 endif
                                                 
 ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
