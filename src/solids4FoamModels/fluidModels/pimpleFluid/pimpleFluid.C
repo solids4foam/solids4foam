@@ -54,9 +54,13 @@ addToRunTimeSelectionTable(fluidModel, pimpleFluid, dictionary);
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
 
-#ifdef OPENFOAMESIORFOUNDATION
 void pimpleFluid::correctPhi()
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    // Calculate absolute flux
+    // from the mapped surface velocity
+    phi() = mesh().Sf() & Uf_();
+
     CorrectPhi
     (
         U(),
@@ -67,31 +71,41 @@ void pimpleFluid::correctPhi()
         pimple(),
         true
     );
+#else
+    volScalarField pcorr("pcorr", p());
+    pcorr *= 0;
+
+    // Initialise flux with interpolated velocity
+    phi() = fvc::interpolate(U) & mesh.Sf();
+
+    adjustPhi(phi(), U(), pcorr);
+
+    mesh().schemesDict().setFluxRequired(pcorr.name());
+
+    while (pimple().correctNonOrthogonal())
+    {
+        fvScalarMatrix pcorrEqn
+        (
+#if FOAMEXTEND > 40
+            fvm::laplacian(rAU_, pcorr)
+#else
+            fvm::laplacian(1/aU_, pcorr)
+#endif
+         == fvc::div(phi())
+        );
+
+        pcorrEqn.setReference(pRefCell_, pRefValue_);
+        pcorrEqn.solve();
+
+        if (pimple().finalNonOrthogonalIter())
+        {
+            phi() -= pcorrEqn.flux();
+        }
+    }
+#endif
 
     fluidModel::continuityErrs();
 }
-#endif
-
-#ifdef OPENFOAMESIORFOUNDATION
-tmp<fvVectorMatrix> pimpleFluid::solveUEqn(tmp<fvVectorMatrix> totalUEqn)
-{
-    tmp<fvVectorMatrix> tUEqn(totalUEqn);
-    fvVectorMatrix& UEqn = tUEqn.ref();
-
-    UEqn.relax();
-
-    fvOptions_.constrain(UEqn);
-
-    if (pimple().momentumPredictor())
-    {
-        solve(UEqn == -fvc::grad(p()));
-
-        fvOptions_.correct(U());
-    }
-
-    return tUEqn;
-}
-#endif
 
 #ifdef OPENFOAMESIORFOUNDATION
 void pimpleFluid::solvePEqn
@@ -164,39 +178,6 @@ void pimpleFluid::solvePEqn
 
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), U());
-}
-#endif
-
-#ifndef OPENFOAMESIORFOUNDATION
-void pimpleFluid::solveUEqn
-(
-    const scalar& UUrf,
-    const fvVectorMatrix& ddtUEqn,
-    const fvVectorMatrix& HUEqn
-)
-{
-    if (pimple().momentumPredictor())
-    {
-#if FOAMEXTEND > 40
-        solve(relax(ddtUEqn + HUEqn) == -fvc::grad(p()));
-#else
-        solve
-        (
-            ddtUEqn
-          + relax(HUEqn, UUrf)
-         ==
-          - fvc::grad(p()),
-            mesh().solutionDict().solver((U().select(pimple().finalIter())))
-        );
-#endif
-    }
-    else
-    {
-        // Explicit update
-        U() =
-            (ddtUEqn.H() + HUEqn.H() - fvc::grad(p()))/(HUEqn.A() + ddtUEqn.A());
-        U().correctBoundaryConditions();
-    }
 }
 #endif
 
@@ -327,30 +308,35 @@ pimpleFluid::pimpleFluid
 #else
 #if FOAMEXTEND > 40
     rAU_
-#else
-    aU_
-#endif
     (
         IOobject
         (
-#if FOAMEXTEND > 40
             "rAU",
-#else
-            "aU",
-#endif
             runTime.timeName(),
             mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
         mesh(),
-#if FOAMEXTEND > 40
         runTime.deltaT(),
-#else
-        1/runTime.deltaT(),
-#endif
         zeroGradientFvPatchScalarField::typeName
     ),
+#else
+    aU_
+    (
+        IOobject
+        (
+            "aU",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        1/runTime.deltaT(),
+        zeroGradientFvPatchScalarField::typeName
+    ),
+#endif
 #endif
     pRefCell_(0),
     pRefValue_(0)
@@ -450,16 +436,10 @@ bool pimpleFluid::evolve()
 #       include "volContinuity.H"
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
     if (meshChanged)
     {
-        // Calculate absolute flux
-        // from the mapped surface velocity
-        phi() = mesh.Sf() & Uf_();
-
         correctPhi();
     }
-#endif
     
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), U());
@@ -487,7 +467,19 @@ bool pimpleFluid::evolve()
         );
 
 #ifdef OPENFOAMESIORFOUNDATION
-        tmp<fvVectorMatrix> tUEqn = solveUEqn(ddtUEqn + HUEqn);
+        tmp<fvVectorMatrix> tUEqn(ddtUEqn + HUEqn);
+        fvVectorMatrix& UEqn = tUEqn.ref();
+
+        UEqn.relax();
+
+        fvOptions_.constrain(UEqn);
+
+        if (pimple().momentumPredictor())
+        {
+            solve(UEqn == -fvc::grad(p()));
+
+            fvOptions_.correct(U());
+        }
 #else
 #if FOAMEXTEND < 41
         // Get under-relaxation factor
@@ -496,11 +488,28 @@ bool pimpleFluid::evolve()
             (
                 U().select(pimple().finalIter())
             );
-
-        solveUEqn(UUrf, ddtUEqn, HUEqn);
-#else
-        solveUEqn(scalar(1), ddtUEqn, HUEqn);
 #endif
+        if (pimple().momentumPredictor())
+        {
+#if FOAMEXTEND > 40
+            solve(relax(ddtUEqn + HUEqn) == -fvc::grad(p()));
+#else
+            solve
+            (
+                ddtUEqn
+              + relax(HUEqn, UUrf)
+             ==
+              - fvc::grad(p()),
+                mesh.solutionDict().solver((U().select(pimple().finalIter())))
+            );
+#endif
+        }
+        else
+        {
+            // Explicit update
+            U() = (ddtUEqn.H() + HUEqn.H() - fvc::grad(p()))/(HUEqn.A() + ddtUEqn.A());
+            U().correctBoundaryConditions();
+        }
 #endif
 
         // --- PISO loop
@@ -509,10 +518,10 @@ bool pimpleFluid::evolve()
 #ifdef OPENFOAMESIORFOUNDATION
             solvePEqn(tUEqn.ref());
 #else
-#if FOAMEXTEND < 41
-            solvePEqn(UUrf, ddtUEqn, HUEqn);
-#else
+#if FOAMEXTEND > 40
             solvePEqn(scalar(1), ddtUEqn, HUEqn);
+#else
+            solvePEqn(UUrf, ddtUEqn, HUEqn);
 #endif
 #endif
         }

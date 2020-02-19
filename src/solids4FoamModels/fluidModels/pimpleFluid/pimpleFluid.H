@@ -102,30 +102,16 @@ class pimpleFluid
 
     // Private Member Functions
 
-#ifdef OPENFOAMESIORFOUNDATION
         //- Correct phi
         void correctPhi();
 
-        //- Solve velocity equation
-        tmp<fvVectorMatrix> solveUEqn
-        (
-            tmp<fvVectorMatrix> totalUEqn
-        );
-
+#ifdef OPENFOAMESIORFOUNDATION
         //- Solve pressure equation
         void solvePEqn
         (
             const fvVectorMatrix& UEqn
         );
 #else
-        //- Solve velocity equation
-        void solveUEqn
-        (
-            const scalar& UUrf,
-            const fvVectorMatrix& ddtUEqn,
-            const fvVectorMatrix& HUEqn
-        );
-
         //- Solve pressure equation
         void solvePEqn
         (
