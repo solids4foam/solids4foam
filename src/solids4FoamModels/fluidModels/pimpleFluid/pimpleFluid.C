@@ -76,7 +76,7 @@ void pimpleFluid::correctPhi()
     pcorr *= 0;
 
     // Initialise flux with interpolated velocity
-    phi() = fvc::interpolate(U) & mesh.Sf();
+    phi() = fvc::interpolate(U()) & mesh().Sf();
 
     adjustPhi(phi(), U(), pcorr);
 
