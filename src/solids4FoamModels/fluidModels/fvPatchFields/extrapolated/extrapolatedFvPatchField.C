@@ -323,10 +323,17 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
 //     const vectorField& faceCentres = mesh.faceCentres();
     const vectorField& cellCentres = mesh.cellCentres();
 
+#ifdef OPENFOAMFOUNDATION
+    const Field<Type>& phiI = this->primitiveField();
+
+    word fieldName =
+        this->internalField().name();
+#else
     const Field<Type>& phiI = this->internalField();
 
     word fieldName =
         this->dimensionedInternalField().name();
+#endif
 
     const GeometricField<Type, fvPatchField, volMesh>& phi =
         mesh.lookupObject<GeometricField<Type, fvPatchField, volMesh> >
@@ -644,7 +651,11 @@ void extrapolatedFvPatchField<Type>::write(Ostream& os) const
 {
     fixedGradientFvPatchField<Type>::write(os);
 
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "value", *this);
+#else
     this->writeEntry("value", os);
+#endif
 
     os.writeKeyword("zeroGradient")
         << zeroGradient_ << token::END_STATEMENT << nl;

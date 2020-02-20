@@ -160,7 +160,11 @@ public:
             //- Evaluate the patch field
             virtual void evaluate
             (
+#ifdef OPENFOAMFOUNDATION
+                const Pstream::commsTypes commsType=Pstream::commsTypes::blocking
+#else
                 const Pstream::commsTypes commsType=Pstream::blocking
+#endif
             );
 
         //- Write

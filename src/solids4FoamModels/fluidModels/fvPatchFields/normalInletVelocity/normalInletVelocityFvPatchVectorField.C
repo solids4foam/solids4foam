@@ -70,8 +70,13 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 {
 //     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
+// #ifdef OPENFOAMFOUNDATION
+//     const fvMesh& mesh = internalField().mesh();
+//     const pointField& points = mesh.points();
+// #else
 //     const fvMesh& mesh = dimensionedInternalField().mesh();
 //     const pointField& points = mesh.allPoints();
+// #endif
 
 //     forAll(Fc_, i)
 //     {
@@ -111,10 +116,15 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 //         return;
 //     }
 
+// #ifdef OPENFOAMFOUNDATION
+//     const fvMesh& mesh = internalField().mesh();
+//     const pointField& points = mesh.points();
+// #else
 //     const fvMesh& mesh = dimensionedInternalField().mesh();
+//     const pointField& points = mesh.allPoints();
+// #endif
 //     const fvPatch& p = patch();
 //     const polyPatch& pp = p.patch();
-//     const pointField& points = mesh.allPoints();
 
 //     vectorField Up(p.size(), vector::zero);
 
@@ -221,7 +231,11 @@ snGrad() const
 
     bool secondOrder_ = false;
 
+#ifdef OPENFOAMFOUNDATION
+    word UName = this->internalField().name();
+#else
     word UName = this->dimensionedInternalField().name();
+#endif
 
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>
@@ -243,7 +257,11 @@ snGrad() const
             new vectorField(this->patch().size(), vector::zero)
         );
 
+#ifdef OPENFOAMFOUNDATION
+        tnGradU.ref() =
+#else
         tnGradU() =
+#endif
             2
            *(
                 *this
@@ -278,7 +296,11 @@ snGrad() const
         new vectorField(this->patch().size(), vector::zero)
     );
 
+#ifdef OPENFOAMFOUNDATION
+    tnGradU.ref() =
+#else
     tnGradU() =
+#endif
         (
             *this
           - (patchInternalField() + dUP)
@@ -305,7 +327,11 @@ gradientBoundaryCoeffs() const
 
     bool secondOrder_ = false;
 
+#ifdef OPENFOAMFOUNDATION
+    word UName = this->internalField().name();
+#else
     word UName = this->dimensionedInternalField().name();
+#endif
 
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>

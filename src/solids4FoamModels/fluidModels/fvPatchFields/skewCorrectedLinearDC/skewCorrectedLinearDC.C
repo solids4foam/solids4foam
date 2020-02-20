@@ -51,7 +51,11 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
             dimensioned<Type>(vf.name(), vf.dimensions(), pTraits<Type>::zero)
         )
     );
+#ifdef OPENFOAMFOUNDATION
+    GeometricField<Type, fvsPatchField, surfaceMesh>& sf = tsf.ref();
+#else
     GeometricField<Type, fvsPatchField, surfaceMesh>& sf = tsf();
+#endif
 
     const labelList& owner = mesh.owner();
     const labelList& neighbour = mesh.neighbour();
@@ -88,7 +92,11 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
         mesh,
         dimensionedVector("0", dimLength, vector::zero)
     );
+#ifdef OPENFOAMFOUNDATION
+    vectorField& kPI = kP.primitiveFieldRef();
+#else
     vectorField& kPI = kP.internalField();
+#endif
 
     surfaceVectorField kN
     (
@@ -103,10 +111,19 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
         mesh,
         dimensionedVector("0", dimLength, vector::zero)
     );
+#ifdef OPENFOAMFOUNDATION
+    vectorField& kNI = kN.primitiveFieldRef();
+#else
     vectorField& kNI = kN.internalField();
+#endif
 
+#ifdef OPENFOAMFOUNDATION
+    const vectorField& Sf = mesh.Sf().primitiveField();
+    const scalarField& magSf = mesh.magSf().primitiveField();
+#else
     const vectorField& Sf = mesh.Sf().internalField();
     const scalarField& magSf = mesh.magSf().internalField();
+#endif
 
     vectorField nf = Sf/magSf;
 
@@ -120,11 +137,19 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
     {
         if (kP.boundaryField()[patchI].coupled())
         {
+#ifdef OPENFOAMFOUNDATION
+            kP.boundaryFieldRef()[patchI] =
+#else
             kP.boundaryField()[patchI] =
+#endif
                 mesh.boundary()[patchI].Cf()
               - mesh.boundary()[patchI].Cn();
 
+#ifdef OPENFOAMFOUNDATION
+            kP.boundaryFieldRef()[patchI] -=
+#else
             kP.boundaryField()[patchI] -=
+#endif
                 mesh.boundary()[patchI].Sf()
                *(
                     mesh.boundary()[patchI].Sf()
@@ -132,14 +157,22 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
                 )
                /sqr(mesh.boundary()[patchI].magSf());
 
+#ifdef OPENFOAMFOUNDATION
+            kN.boundaryFieldRef()[patchI] =
+#else
             kN.boundaryField()[patchI] =
+#endif
                 mesh.Cf().boundaryField()[patchI]
               - (
                     mesh.boundary()[patchI].Cn()
                   + mesh.boundary()[patchI].delta()
                 );
 
+#ifdef OPENFOAMFOUNDATION
+            kN.boundaryFieldRef()[patchI] -=
+#else
             kN.boundaryField()[patchI] -=
+#endif
                 mesh.boundary()[patchI].Sf()
                *(
                     mesh.boundary()[patchI].Sf()
@@ -152,11 +185,20 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
 
     // Perform skew-corrected interpolation
 
+#ifdef OPENFOAMFOUNDATION
+    Field<Type>& sfI = sf.primitiveFieldRef();
+    const Field<Type>& vfI = vf.primitiveField();
+#else
     Field<Type>& sfI = sf.internalField();
     const Field<Type>& vfI = vf.internalField();
+#endif
 
     const surfaceScalarField& w = mesh.surfaceInterpolation::weights();
+#ifdef OPENFOAMFOUNDATION
+    const scalarField& wI = w.primitiveField();
+#else
     const scalarField& wI = w.internalField();
+#endif
 
     forAll(sfI, faceI)
     {
@@ -190,11 +232,19 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
                   & gradVf.boundaryField()[patchI].patchNeighbourField()
                 );
 
+#ifdef OPENFOAMFOUNDATION
+            sf.boundaryFieldRef()[patchI] = pw*(vfOwn - vfNei) + vfNei;
+#else
             sf.boundaryField()[patchI] = pw*(vfOwn - vfNei) + vfNei;
+#endif
         }
         else
         {
+#ifdef OPENFOAMFOUNDATION
+            sf.boundaryFieldRef()[patchI] = vf.boundaryField()[patchI];
+#else
             vf.boundaryField()[patchI].patchInterpolate(sf, pw);
+#endif
         }
     }
 
