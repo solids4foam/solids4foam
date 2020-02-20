@@ -25,13 +25,15 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "pisoFluid.H"
-#include "volFields.H"
 #include "fvm.H"
 #include "fvc.H"
-#include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "findRefCell.H"
 #include "adjustPhi.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "constrainHbyA.H"
+    #include "constrainPressure.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -56,9 +58,7 @@ pisoFluid::pisoFluid
     const word& region
 )
 :
-    fluidModel(typeName, runTime, region)
-#ifndef OPENFOAMESIORFOUNDATION
-    ,
+    fluidModel(typeName, runTime, region),
     laminarTransport_(U(), phi()),
     turbulence_
     (
@@ -69,30 +69,25 @@ pisoFluid::pisoFluid
     ),
     rho_
     (
-        IOdictionary
-        (
-            IOobject
-            (
-                "transportProperties",
-                runTime.constant(),
-                mesh(),
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        ).lookup("rho")
+        laminarTransport_.lookup("rho")
     ),
+#ifdef OPENFOAMESIORFOUNDATION
+    fvOptions_(fv::options::New(mesh())),
+#endif
     pRefCell_(0),
     pRefValue_(0)
-#endif
 {
     UisRequired();
     pisRequired();
     
-#ifndef OPENFOAMESIORFOUNDATION
     setRefCell(p(), piso().dict(), pRefCell_, pRefValue_);
-    mesh().schemesDict().setFluxRequired(p().name());
+
+#ifdef OPENFOAMESIORFOUNDATION
+    turbulence_->validate();
+
+    mesh().setFluxRequired(p().name());
 #else
-    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+    mesh().schemesDict().setFluxRequired(p().name());
 #endif
 }
 
@@ -105,16 +100,16 @@ tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    tvF.ref() =
+#else
     tvF() =
+#endif
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
           & (-turbulence_->devReff()().boundaryField()[patchID])
         );
-#else
-    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
-#endif
 
     return tvF;
 }
@@ -127,11 +122,12 @@ tmp<scalarField> pisoFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-#ifndef OPENFOAMESIORFOUNDATION
-    tpF() = rho_.value()*p().boundaryField()[patchID];
+#ifdef OPENFOAMESIORFOUNDATION
+    tpF.ref() =
 #else
-    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
+    tpF() =
 #endif
+        rho_.value()*p().boundaryField()[patchID];
 
     return tpF;
 }
@@ -139,10 +135,9 @@ tmp<scalarField> pisoFluid::patchPressureForce(const label patchID) const
 
 bool pisoFluid::evolve()
 {
-#ifndef OPENFOAMESIORFOUNDATION
     Info<< "Evolving fluid model: " << this->type() << endl;
 
-    fvMesh& mesh = fluidModel::mesh();
+    dynamicFvMesh& mesh = this->mesh();
 
     bool meshChanged = false;
     if (fluidModel::fsiMeshUpdate())
@@ -152,7 +147,7 @@ bool pisoFluid::evolve()
     }
     else
     {
-        meshChanged = refCast<dynamicFvMesh>(mesh).update();
+        meshChanged = mesh.update();
         reduce(meshChanged, orOp<bool>());
     }
 
@@ -175,26 +170,51 @@ bool pisoFluid::evolve()
     fvVectorMatrix HUEqn
     (
         fvm::div(phi(), U())
+#ifndef OPENFOAMESIORFOUNDATION
       + turbulence_->divDevReff()
+#else
+      + turbulence_->divDevReff(U())
+     ==
+        fvOptions_(U())
+#endif
     );
+
+#if (defined(OPENFOAMESIORFOUNDATION) || FOAMEXTEND < 41)
+    fvVectorMatrix UEqn(ddtUEqn + HUEqn);
+#endif
+
+#ifdef OPENFOAMESIORFOUNDATION
+    UEqn.relax();
+
+    fvOptions_.constrain(UEqn);
+#endif
 
     if (piso().momentumPredictor())
     {
+#if (defined(OPENFOAMESIORFOUNDATION) || FOAMEXTEND < 41)
+        solve(UEqn == -fvc::grad(p()));
+#else
         solve(ddtUEqn + HUEqn == -fvc::grad(p()));
+#endif
+
+#ifdef OPENFOAMESIORFOUNDATION
+        fvOptions_.correct(U());
+#endif
     }
 
     // --- PISO loop
-
-#if FOAMEXTEND > 40
-    // Prepare clean 1/a_p without time derivative contribution
-    volScalarField rAU = 1.0/HUEqn.A();
-#else
-    volScalarField rAU = 1.0/(HUEqn.A() + ddtUEqn.A());
-    surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
-#endif
-
     while (piso().correct())
     {
+#if FOAMEXTEND > 40
+        // Prepare clean 1/a_p without time derivative contribution
+        volScalarField rAU(1.0/HUEqn.A());
+#else
+        volScalarField rAU(1.0/UEqn.A());
+#ifndef OPENFOAMESIORFOUNDATION
+        surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
+#endif
+#endif
+
 #if FOAMEXTEND > 40
         // Calculate U from convection-diffusion matrix
         U() = rAU*HUEqn.H();
@@ -202,13 +222,31 @@ bool pisoFluid::evolve()
         // Consistently calculate flux
         piso().calcTransientConsistentFlux(phi(), U(), rAU, ddtUEqn);
 #else
+#ifdef OPENFOAMESIORFOUNDATION
+        volVectorField HbyA(constrainHbyA(rAU*UEqn.H(), U(), p()));
+
+        surfaceScalarField phiHbyA
+        (
+            "phiHbyA",
+            fvc::flux(HbyA)
+          + fvc::interpolate(rAU)*fvc::ddtCorr(U(), phi())
+        );
+#else
         // Calculate U from convection-diffusion matrix
-        U() = rAU*(HUEqn.H() + ddtUEqn.H());
+        U() = rAU*UEqn.H();
 
         phi() = (fvc::interpolate(U()) & mesh.Sf());
 #endif
+#endif
 
+#ifdef OPENFOAMESIORFOUNDATION
+        adjustPhi(phiHbyA, U(), p());
+
+        // Update the pressure BCs to ensure flux consistency
+        constrainPressure(p(), U(), phiHbyA, rAU);
+#else
         adjustPhi(phi(), U(), p());
+#endif
 
         // Non-orthogonal pressure corrector loop
         while (piso().correctNonOrthogonal())
@@ -222,23 +260,40 @@ bool pisoFluid::evolve()
                     p(),
                     "laplacian(rAU," + p().name() + ')'
 #else
+#ifdef OPENFOAMESIORFOUNDATION
+                    rAU, p()
+#else
                     rAUf, p(), "laplacian((1|A(U)),p)"
 #endif
+#endif
                 )
+#ifdef OPENFOAMESIORFOUNDATION
+             == fvc::div(phiHbyA)
+#else
              == fvc::div(phi())
+#endif
             );
 
             pEqn.setReference(pRefCell_, pRefValue_);
+
+#ifdef OPENFOAMESIORFOUNDATION
+            pEqn.solve();
+#else
             pEqn.solve
             (
                 mesh.solutionDict().solver(p().select(piso().finalInnerIter()))
             );
+#endif
 
             gradp() = fvc::grad(p());
 
             if (piso().finalNonOrthogonalIter())
             {
+#ifdef OPENFOAMESIORFOUNDATION
+                phi() = phiHbyA - pEqn.flux();
+#else
                 phi() -= pEqn.flux();
+#endif
             }
         }
 
@@ -252,20 +307,25 @@ bool pisoFluid::evolve()
         // Make the fluxes relative to the mesh motion
         fvc::makeRelative(phi(), U());
 
+#ifdef OPENFOAMESIORFOUNDATION
+        U() = HbyA - rAU*fvc::grad(p());
+        U().correctBoundaryConditions();
+        fvOptions_.correct(U());
+#else
         U() -= rAU*gradp();
         U().correctBoundaryConditions();
 #endif
-
+#endif
         gradU() = fvc::grad(U());
     }
 
+#ifdef OPENFOAMESIORFOUNDATION
+    laminarTransport_.correct();
+#endif
     turbulence_->correct();
 
     // Make the fluxes absolut to the mesh motion
     fvc::makeAbsolute(phi(), U());
-#else
-    notImplemented("Not yet implemented for this version of OpenFOAM/FOAM");
-#endif
 
     return 0;
 }
