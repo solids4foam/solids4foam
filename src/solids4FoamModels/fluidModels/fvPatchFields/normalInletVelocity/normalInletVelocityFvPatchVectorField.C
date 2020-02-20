@@ -70,7 +70,7 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 {
 //     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
-// #ifdef OPENFOAMFOUNDATION
+// #ifdef OPENFOAMESIORFOUNDATION
 //     const fvMesh& mesh = internalField().mesh();
 //     const pointField& points = mesh.points();
 // #else
@@ -116,7 +116,7 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 //         return;
 //     }
 
-// #ifdef OPENFOAMFOUNDATION
+// #ifdef OPENFOAMESIORFOUNDATION
 //     const fvMesh& mesh = internalField().mesh();
 //     const pointField& points = mesh.points();
 // #else
@@ -231,7 +231,7 @@ snGrad() const
 
     bool secondOrder_ = false;
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
     word UName = this->internalField().name();
 #else
     word UName = this->dimensionedInternalField().name();
@@ -257,7 +257,7 @@ snGrad() const
             new vectorField(this->patch().size(), vector::zero)
         );
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
         tnGradU.ref() =
 #else
         tnGradU() =
@@ -296,7 +296,7 @@ snGrad() const
         new vectorField(this->patch().size(), vector::zero)
     );
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
     tnGradU.ref() =
 #else
     tnGradU() =
@@ -327,7 +327,7 @@ gradientBoundaryCoeffs() const
 
     bool secondOrder_ = false;
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
     word UName = this->internalField().name();
 #else
     word UName = this->dimensionedInternalField().name();

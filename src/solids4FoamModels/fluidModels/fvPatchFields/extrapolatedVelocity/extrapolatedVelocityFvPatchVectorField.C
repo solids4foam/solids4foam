@@ -136,7 +136,7 @@ void extrapolatedVelocityFvPatchVectorField::evaluate(const Pstream::commsTypes)
 //     // Otherwise assume the variable is the static pressure.
 //     if
 //     (
-// #ifdef OPENFOAMFOUNDATION
+// #ifdef OPENFOAMESIORFOUNDATION
 //         internalField().name() == "p_rgh"
 //      || internalField().name() == "pd"
 // #else

@@ -70,7 +70,7 @@ outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 {
 //     fvPatchScalarField::operator=(scalarField("value", dict, p.size()));
 
-// #ifdef OPENFOAMFOUNDATION
+// #ifdef OPENFOAMESIORFOUNDATION
 //     const fvMesh& mesh = internalField().mesh();
 //     const pointField& points = mesh.points();
 // #else
@@ -119,7 +119,7 @@ void outflowPressureFvPatchScalarField::updateCoeffs()
 
     scalarField pp(this->patch().size(), 0);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
     const fvMesh& mesh = internalField().mesh();
 #else
     const fvMesh& mesh = dimensionedInternalField().mesh();

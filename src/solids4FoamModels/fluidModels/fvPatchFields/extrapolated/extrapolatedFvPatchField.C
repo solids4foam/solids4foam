@@ -323,7 +323,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
 //     const vectorField& faceCentres = mesh.faceCentres();
     const vectorField& cellCentres = mesh.cellCentres();
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
     const Field<Type>& phiI = this->primitiveField();
 
     word fieldName =

@@ -143,7 +143,7 @@ void extrapolatedPressureFvPatchScalarField::evaluate
 //     // Otherwise assume the variable is the static pressure.
 //     if
 //     (
-// #ifdef OPENFOAMFOUNDATION
+// #ifdef OPENFOAMESIORFOUNDATION
 //         internalField().name() == "p_rgh"
 //      || internalField().name() == "pd"
 // #else

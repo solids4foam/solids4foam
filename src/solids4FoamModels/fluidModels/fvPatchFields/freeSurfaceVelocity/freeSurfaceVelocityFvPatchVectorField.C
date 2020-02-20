@@ -130,7 +130,7 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::updateCoeffs()
 
 //     gradient() = (pfs/(2*nu.value()))*n;
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
         word UName = this->internalField().name();
 #else
         word UName = this->dimensionedInternalField().name();
@@ -178,7 +178,7 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::evaluate
         vectorField delta = patch().delta();
         vectorField k = delta - n*(n&delta);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
         word UName = this->internalField().name();
 #else
         word UName = this->dimensionedInternalField().name();
@@ -253,7 +253,7 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::evaluate
         )
             << "dimensions of phi are incorrect\n"
             << "    on patch " << this->patch().name()
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
             << " of field " << this->internalField().name()
             << " in file " << this->internalField().objectPath()
 #else

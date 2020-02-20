@@ -144,7 +144,7 @@ void Foam::freeSurfacePressureFvPatchScalarField::updateCoeffs()
 Foam::tmp<Foam::Field<Foam::scalar> >
 Foam::freeSurfacePressureFvPatchScalarField::snGrad() const
 {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
     word pName = this->internalField().name();
 #else
     word pName = this->dimensionedInternalField().name();
@@ -186,7 +186,7 @@ Foam::freeSurfacePressureFvPatchScalarField::snGrad() const
 Foam::tmp<Foam::Field<Foam::scalar> >
 Foam::freeSurfacePressureFvPatchScalarField::gradientBoundaryCoeffs() const
 {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
     word pName = this->internalField().name();
 #else
     word pName = this->dimensionedInternalField().name();
