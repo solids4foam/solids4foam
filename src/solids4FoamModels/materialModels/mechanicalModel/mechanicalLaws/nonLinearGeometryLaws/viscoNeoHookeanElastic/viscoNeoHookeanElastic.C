@@ -30,6 +30,9 @@ License
 #include "fvc.H"
 #include "fvm.H"
 #include "fixedGradientFvPatchFields.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "zeroGradientFvPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -543,7 +546,11 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::rho() const
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
     tresult().correctBoundaryConditions();
+#endif
 
     return tresult;
 }
@@ -684,9 +691,15 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     const volTensorField Cbar = pow(J, -2.0/3.0)*C;
 
     // Take references to the internal fields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+    const tensorField& CI = C.primitiveField();
+    const scalarField& JI = J.primitiveField();
+    symmTensorField& transformNeededI = transformNeeded_.primitiveFieldRef();
+#else
     const tensorField& CI = C.internalField();
     const scalarField& JI = J.internalField();
     symmTensorField& transformNeededI = transformNeeded_.internalField();
+#endif
 
     // Partial derive of WBar(CBar), internalField operation
 
@@ -725,8 +738,13 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
         // Take references to the patch fields for efficiency
         const tensorField& CP = C.boundaryField()[patchI];
         const scalarField& JP = J.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+        symmTensorField& transformNeededP =
+            transformNeeded_.boundaryFieldRef()[patchI];
+#else
         symmTensorField& transformNeededP =
             transformNeeded_.boundaryField()[patchI];
+#endif
 
         forAll(CP, faceI)
         {
@@ -880,9 +898,15 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     const surfaceTensorField Cbar = pow(J, -2.0/3.0)*C;
 
     // Take references to the internal fields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+    const tensorField& CI = C.primitiveField();
+    const scalarField& JI = J.primitiveField();
+    symmTensorField& transformNeededI = transformNeededf_.primitiveFieldRef();
+#else
     const tensorField& CI = C.internalField();
     const scalarField& JI = J.internalField();
     symmTensorField& transformNeededI = transformNeededf_.internalField();
+#endif
 
     // Partial derive of WBar(CBar), internalField operation
 
@@ -921,8 +945,13 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         // Take references to the patch fields for efficiency
         const tensorField& CP = C.boundaryField()[patchI];
         const scalarField& JP = J.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+        symmTensorField& transformNeededP =
+            transformNeededf_.boundaryFieldRef()[patchI];
+#else
         symmTensorField& transformNeededP =
             transformNeededf_.boundaryField()[patchI];
+#endif
 
         forAll(CP, faceI)
         {

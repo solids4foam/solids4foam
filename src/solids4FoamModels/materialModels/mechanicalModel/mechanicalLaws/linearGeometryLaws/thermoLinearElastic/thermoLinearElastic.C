@@ -169,7 +169,11 @@ bool Foam::thermoLinearElastic::readTField()
             IOobject::MUST_READ
         );
 
+#ifdef OPENFOAMESIORFOUNDATION
+        if (Theader.typeHeaderOk<volScalarField>())
+#else
         if (Theader.headerOk())
+#endif
         {
             Info<< nl << "Reading T field from time = "
                 << Tmesh().time().timePath() << nl << endl;
@@ -201,10 +205,18 @@ bool Foam::thermoLinearElastic::readTField()
                 );
 
                 // Copy internal and boundary fields
+#ifdef OPENFOAMESIORFOUNDATION
+                TPtr_().primitiveFieldRef() = TField.primitiveField();
+#else
                 TPtr_().internalField() = TField.internalField();
+#endif
                 forAll(TField.boundaryField(), patchI)
                 {
+#ifdef OPENFOAMESIORFOUNDATION
+                    TPtr_().boundaryFieldRef()[patchI] =
+#else
                     TPtr_().boundaryField()[patchI] =
+#endif
                         scalarField(TField.boundaryField()[patchI]);
                 }
             }
@@ -226,10 +238,18 @@ bool Foam::thermoLinearElastic::readTField()
                 );
 
                 // Copy internal and boundary fields
+#ifdef OPENFOAMESIORFOUNDATION
+                TbaseMesh.primitiveFieldRef() = TField.primitiveField();
+#else
                 TbaseMesh.internalField() = TField.internalField();
+#endif
                 forAll(TField.boundaryField(), patchI)
                 {
+#ifdef OPENFOAMESIORFOUNDATION
+                    TbaseMesh.boundaryFieldRef()[patchI] =
+#else
                     TbaseMesh.boundaryField()[patchI] =
+#endif
                         scalarField(TField.boundaryField()[patchI]);
                 }
 
@@ -239,6 +259,12 @@ bool Foam::thermoLinearElastic::readTField()
                 (
                     new volScalarField
                     (
+#ifdef OPENFOAMESIORFOUNDATION
+                        baseMesh().lookupObject<mechanicalModel>
+                        (
+                            "mechanicalProperties"
+                        ).mesh().lookupObject<volScalarField>("TbaseMesh")
+#else
                         baseMesh().lookupObject<mechanicalModel>
                         (
                             "mechanicalProperties"
@@ -246,6 +272,7 @@ bool Foam::thermoLinearElastic::readTField()
                         (
                             "TbaseMesh", mesh()
                         )()
+#endif
                     )
                 );
             }

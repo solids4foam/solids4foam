@@ -25,6 +25,9 @@ License
 
 #include "viscousHookeanElastic.H"
 #include "addToRunTimeSelectionTable.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "zeroGradientFvPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -315,7 +318,11 @@ Foam::tmp<Foam::volScalarField> Foam::viscousHookeanElastic::rho() const
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
     tresult().correctBoundaryConditions();
+#endif
 
     return tresult;
 }
@@ -580,7 +587,7 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
 
     if
     (
-        mesh().db().lookupObject<fvMesh>
+        mesh().time().lookupObject<fvMesh>
         (
             baseMeshRegionName()
         ).foundObject<surfaceTensorField>("Ff")
@@ -596,14 +603,23 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
                     (
                         mag
                         (
+#ifdef OPENFOAMESIORFOUNDATION
+                            hf_[MaxwellModelI].primitiveField()
+                          - hf_[MaxwellModelI].prevIter().primitiveField()
+#else
                             hf_[MaxwellModelI].internalField()
                           - hf_[MaxwellModelI].prevIter().internalField()
+#endif
                         )
                     )
                    /gMax
                     (
                         SMALL
+#ifdef OPENFOAMESIORFOUNDATION
+                      + mag(hf_[MaxwellModelI].prevIter().primitiveField())
+#else
                       + mag(hf_[MaxwellModelI].prevIter().internalField())
+#endif
                     )
                 );
         }
@@ -622,14 +638,23 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
                     (
                         mag
                         (
+#ifdef OPENFOAMESIORFOUNDATION
+                            h_[MaxwellModelI].primitiveField()
+                          - h_[MaxwellModelI].prevIter().primitiveField()
+#else
                             h_[MaxwellModelI].internalField()
                           - h_[MaxwellModelI].prevIter().internalField()
+#endif
                         )
                     )
                    /gMax
                     (
                         SMALL
+#ifdef OPENFOAMESIORFOUNDATION
+                      + mag(h_[MaxwellModelI].prevIter().primitiveField())
+#else
                       + mag(h_[MaxwellModelI].prevIter().internalField())
+#endif
                     )
                 );
         }

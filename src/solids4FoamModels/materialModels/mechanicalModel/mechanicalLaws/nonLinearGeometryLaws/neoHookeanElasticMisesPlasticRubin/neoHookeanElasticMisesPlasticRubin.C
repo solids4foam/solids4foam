@@ -28,6 +28,9 @@ License
 #include "transformGeometricField.H"
 #include "logVolFields.H"
 #include "fvc.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "zeroGradientFvPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -210,11 +213,19 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlasticRubin::Ibar
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    volScalarField& Ibar = tIbar.ref();
+
+    // Take reference to internal fields for efficiency
+    scalarField& IbarI = Ibar.primitiveFieldRef();
+    const symmTensorField devBEbarI = devBEbar.primitiveField();
+#else
     volScalarField& Ibar = tIbar();
 
     // Take reference to internal fields for efficiency
     scalarField& IbarI = Ibar.internalField();
     const symmTensorField devBEbarI = devBEbar.internalField();
+#endif
 
     // Calculate internal field
     forAll(IbarI, cellI)
@@ -256,7 +267,11 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlasticRubin::Ibar
         )
         {
             // Take reference to patch fields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+            scalarField& IbarP = Ibar.boundaryFieldRef()[patchI];
+#else
             scalarField& IbarP = Ibar.boundaryField()[patchI];
+#endif
             const symmTensorField& devBEbarP =
                 devBEbar.boundaryField()[patchI];
 
@@ -660,6 +675,16 @@ Foam::scalar Foam::neoHookeanElasticMisesPlasticRubin::residual()
     // Note: we remove mag(I) when we normalise the residual so that the
     // residual is like a strain residual
     return
+#ifdef OPENFOAMESIORFOUNDATION
+        gMax
+        (
+            mag
+            (
+                lambda_.primitiveField()
+              - lambda_.prevIter().primitiveField()
+            )
+        )/0.1;
+#else
         gMax
         (
             mag
@@ -668,6 +693,7 @@ Foam::scalar Foam::neoHookeanElasticMisesPlasticRubin::residual()
               - lambda_.prevIter().internalField()
             )
         )/0.1;
+#endif
 }
 
 
@@ -678,8 +704,13 @@ void Foam::neoHookeanElasticMisesPlasticRubin::updateTotalFields()
     // Count cells actively yielding
     int numCellsYielding = 0;
 
+#ifdef OPENFOAMESIORFOUNDATION
+    scalarField& activeYieldI = activeYield_.primitiveFieldRef();
+    const scalarField& lambdaI = lambda_.primitiveField();
+#else
     scalarField& activeYieldI = activeYield_.internalField();
     const scalarField& lambdaI = lambda_.internalField();
+#endif
 
     forAll(activeYieldI, cellI)
     {
@@ -700,7 +731,11 @@ void Foam::neoHookeanElasticMisesPlasticRubin::updateTotalFields()
     {
         if (!activeYield_.boundaryField()[patchI].coupled())
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            scalarField& activeYieldP = activeYield_.boundaryFieldRef()[patchI];
+#else
             scalarField& activeYieldP = activeYield_.boundaryField()[patchI];
+#endif
             const scalarField& lambdaP = lambda_.boundaryField()[patchI];
 
             forAll(activeYieldP, faceI)
