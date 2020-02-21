@@ -31,6 +31,9 @@ Author
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "surfaceFields.H"
+#endif
 #include "boundBox.H"
 #include "polyPatchID.H"
 #include "fixedValueFvPatchFields.H"
@@ -83,7 +86,11 @@ bool Foam::setInletVelocity::setVelocity()
         fixedValueFvPatchVectorField& inletU =
             refCast<fixedValueFvPatchVectorField>
             (
+#ifdef OPENFOAMESIORFOUNDATION
+                U.boundaryFieldRef()[inletPatchIndex]
+#else
                 U.boundaryField()[inletPatchIndex]
+#endif
             );
 
         const vectorField& Cf = mesh.Cf().boundaryField()[inletPatchIndex];
@@ -165,5 +172,13 @@ bool Foam::setInletVelocity::read(const dictionary& dict)
 
     return true;
 }
+
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::setInletVelocity::write()
+{
+    return setVelocity();
+}
+#endif
 
 // ************************************************************************* //

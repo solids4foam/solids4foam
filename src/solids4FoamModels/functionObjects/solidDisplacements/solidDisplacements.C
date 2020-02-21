@@ -239,4 +239,12 @@ bool Foam::solidDisplacements::read(const dictionary& dict)
     return true;
 }
 
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::solidDisplacements::write()
+{
+    return writeData();
+}
+#endif
+
 // ************************************************************************* //

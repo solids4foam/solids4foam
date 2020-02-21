@@ -28,7 +28,11 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
-#include "newLeastSquaresVolPointInterpolation.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "volPointInterpolation.H"
+#else
+    #include "newLeastSquaresVolPointInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -84,10 +88,17 @@ bool Foam::solidPointTemperature::writeData()
             dimensionedScalar("zero", T.dimensions(), 0.0)
         );
 
+#ifdef OPENFOAMESIORFOUNDATION
+        mesh.lookupObject<volPointInterpolation>
+        (
+            "volPointInterpolation"
+        ).interpolate(T, pointT);
+#else
         mesh.lookupObject<newLeastSquaresVolPointInterpolation>
         (
             "newLeastSquaresVolPointInterpolation"
         ).interpolate(T, pointT);
+#endif
 
         scalar pointTValue = 0.0;
         if (pointID_ > -1)
@@ -249,5 +260,13 @@ bool Foam::solidPointTemperature::read(const dictionary& dict)
 {
     return true;
 }
+
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::solidPointTemperature::write()
+{
+    return writeData();
+}
+#endif
 
 // ************************************************************************* //
