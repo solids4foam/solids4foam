@@ -171,7 +171,7 @@ $(fluidFvPatchFields)/skewCorrectedLinearDC/skewCorrectedLinearDC.C
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
 
 fluidModels/pointPatchFields/timeVaryingVelocity/timeVaryingVelocityPointPatchVectorField.C
-/*
+
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/setInletVelocity/setInletVelocity.C
 functionObjects/solidForces/solidForces.C
@@ -188,7 +188,7 @@ functionObjects/solidTractions/solidTractions.C
 functionObjects/centrifugalBodyForce/centrifugalBodyForce.C
 functionObjects/patchAvgTractionHistory/patchAvgTractionHistory.C
 functionObjects/pointHistory/pointHistory.C
-
+/*
 dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
 dynamicFvMesh/crackerFvMesh/crackerFvMesh.C
 
