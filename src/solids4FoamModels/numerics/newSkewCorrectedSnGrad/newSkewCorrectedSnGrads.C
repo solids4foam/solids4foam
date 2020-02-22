@@ -31,13 +31,19 @@ Description
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+#ifdef OPENFOAMESIORFOUNDATION
+makeSnGradScheme(newSkewCorrectedSnGrad)
+#endif
+
 namespace Foam
 {
 
 namespace fv
 {
 
+#ifndef OPENFOAMESIORFOUNDATION
 makeSnGradScheme(newSkewCorrectedSnGrad)
+#endif
 
 template<>
 tmp<GeometricField<scalar, fvsPatchField, surfaceMesh> >
@@ -65,23 +71,40 @@ newSkewCorrectedSnGrad<scalar>::correction
             vf.dimensions()*mesh.deltaCoeffs().dimensions()
         )
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    GeometricField<scalar, fvsPatchField, surfaceMesh>& ssf = tssf.ref();
+#else
     GeometricField<scalar, fvsPatchField, surfaceMesh>& ssf = tssf();
+#endif
 
     ssf = dimensioned<scalar>("0", ssf.dimensions(), 0);
 
     const unallocLabelList& owner = mesh.owner();
     const unallocLabelList& neighbour = mesh.neighbour();
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const vectorField& Sf = mesh.Sf().primitiveField();
+//     const scalarField& magSf = mesh.magSf().primitiveField();
+#else
     const vectorField& Sf = mesh.Sf().internalField();
 //     const scalarField& magSf = mesh.magSf().internalField();
+#endif
 
     vectorField nf = Sf/mag(Sf);
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const vectorField& Cf = mesh.Cf().primitiveField();
+    const vectorField& C = mesh.C().primitiveField();
+
+    const scalarField& deltaCoeffs =
+        mesh.deltaCoeffs().primitiveField();
+#else
     const vectorField& Cf = mesh.Cf().internalField();
     const vectorField& C = mesh.C().internalField();
 
     const scalarField& deltaCoeffs =
         mesh.deltaCoeffs().internalField();
+#endif
 
     surfaceVectorField kP
     (
@@ -96,7 +119,11 @@ newSkewCorrectedSnGrad<scalar>::correction
         mesh,
         dimensionedVector("0", dimLength, vector::zero)
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    vectorField& kPI = kP.primitiveFieldRef();
+#else
     vectorField& kPI = kP.internalField();
+#endif
 
     surfaceVectorField kN
     (
@@ -111,14 +138,18 @@ newSkewCorrectedSnGrad<scalar>::correction
         mesh,
         dimensionedVector("0", dimLength, vector::zero)
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    vectorField& kNI = kN.primitiveFieldRef();
+#else
     vectorField& kNI = kN.internalField();
+#endif
 
     kPI = Cf - vectorField(C, owner);
-    kPI -= Sf*(Sf&kPI)/magSqr(Sf);
+    kPI -= Sf*(Sf & kPI)/magSqr(Sf);
 //     kPI -= Sf*(Sf&kPI)/sqr(magSf);
 
     kNI = Cf - vectorField(C, neighbour);
-    kNI -= Sf*(Sf&kNI)/magSqr(Sf);
+    kNI -= Sf*(Sf & kNI)/magSqr(Sf);
 //     kNI -= Sf*(Sf&kNI)/sqr(magSf);
 
 //     vectorField delta =
@@ -132,11 +163,19 @@ newSkewCorrectedSnGrad<scalar>::correction
     {
         if (kP.boundaryField()[patchI].coupled())
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            kP.boundaryFieldRef()[patchI] =
+#else
             kP.boundaryField()[patchI] =
+#endif
                 mesh.boundary()[patchI].Cf()
               - mesh.boundary()[patchI].Cn();
 
+#ifdef OPENFOAMESIORFOUNDATION
+            kP.boundaryFieldRef()[patchI] -=
+#else
             kP.boundaryField()[patchI] -=
+#endif
                 mesh.boundary()[patchI].Sf()
                *(
                     mesh.boundary()[patchI].Sf()
@@ -144,14 +183,22 @@ newSkewCorrectedSnGrad<scalar>::correction
                 )
                /sqr(mesh.boundary()[patchI].magSf());
 
+#ifdef OPENFOAMESIORFOUNDATION
+            kN.boundaryFieldRef()[patchI] =
+#else
             kN.boundaryField()[patchI] =
+#endif
                 mesh.Cf().boundaryField()[patchI]
               - (
                     mesh.boundary()[patchI].Cn()
                   + mesh.boundary()[patchI].delta()
                 );
 
+#ifdef OPENFOAMESIORFOUNDATION
+            kN.boundaryFieldRef()[patchI] -=
+#else
             kN.boundaryField()[patchI] -=
+#endif
                 mesh.boundary()[patchI].Sf()
                *(
                     mesh.boundary()[patchI].Sf()
@@ -174,8 +221,13 @@ newSkewCorrectedSnGrad<scalar>::correction
 //                   + kP.boundaryField()[patchI]
 //                 )/2.0;
 
+// #ifdef OPENFOAMESIORFOUNDATION
+//             kP.boundaryFieldRef()[patchI] += delta;
+//             kN.boundaryFieldRef()[patchI] += delta;
+// #else
 //             kP.boundaryField()[patchI] += delta;
 //             kN.boundaryField()[patchI] += delta;
+// #endif
         }
     }
 
@@ -198,7 +250,11 @@ newSkewCorrectedSnGrad<scalar>::correction
                 gradScheme<scalar>::New
                 (
                     mesh,
+#ifdef OPENFOAMESIORFOUNDATION
+                    mesh.gradScheme(ssf.name())
+#else
                     mesh.schemesDict().gradScheme(ssf.name())
+#endif
                 )()
                .grad(vf)
             );
@@ -208,10 +264,14 @@ newSkewCorrectedSnGrad<scalar>::correction
 
     const volVectorField& gradVf = *gradVfPtr;
 
+#ifdef OPENFOAMESIORFOUNDATION
+    ssf.primitiveFieldRef() =
+#else
     ssf.internalField() =
+#endif
         (
-            (kNI&Field<vector>(gradVf, neighbour))
-          - (kPI&Field<vector>(gradVf, owner))
+            (kNI & Field<vector>(gradVf, neighbour))
+          - (kPI & Field<vector>(gradVf, owner))
         )
        *deltaCoeffs;
 
@@ -219,7 +279,11 @@ newSkewCorrectedSnGrad<scalar>::correction
     {
         if (ssf.boundaryField()[patchI].coupled())
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            ssf.boundaryFieldRef()[patchI] =
+#else
             ssf.boundaryField()[patchI] =
+#endif
             (
                 (
                     (
@@ -261,9 +325,15 @@ newSkewCorrectedSnGrad<scalar>::correction
 
     if (fv::debug)
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        Info<< "limitedSnGrad :: limiter min: " << min(limiter.primitiveField())
+            << " max: "<< max(limiter.primitiveField())
+            << " avg: " << average(limiter.primitiveField()) << endl;
+#else
         Info<< "limitedSnGrad :: limiter min: " << min(limiter.internalField())
             << " max: "<< max(limiter.internalField())
             << " avg: " << average(limiter.internalField()) << endl;
+#endif
     }
 
     ssf *= limiter;
@@ -303,23 +373,40 @@ newSkewCorrectedSnGrad<vector>::correction
             vf.dimensions()*mesh.deltaCoeffs().dimensions()
         )
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    GeometricField<vector, fvsPatchField, surfaceMesh>& ssf = tssf.ref();
+#else
     GeometricField<vector, fvsPatchField, surfaceMesh>& ssf = tssf();
+#endif
 
     ssf = dimensioned<vector>("0", ssf.dimensions(), vector::zero);
 
     const unallocLabelList& owner = mesh.owner();
     const unallocLabelList& neighbour = mesh.neighbour();
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const vectorField& Sf = mesh.Sf().primitiveField();
+//     const scalarField& magSf = mesh.magSf().primitiveField();
+#else
     const vectorField& Sf = mesh.Sf().internalField();
 //     const scalarField& magSf = mesh.magSf().internalField();
+#endif
 
     vectorField nf = Sf/mag(Sf);
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const vectorField& Cf = mesh.Cf().primitiveField();
+    const vectorField& C = mesh.C().primitiveField();
+
+    const scalarField& deltaCoeffs =
+        mesh.deltaCoeffs().primitiveField();
+#else
     const vectorField& Cf = mesh.Cf().internalField();
     const vectorField& C = mesh.C().internalField();
 
     const scalarField& deltaCoeffs =
         mesh.deltaCoeffs().internalField();
+#endif
 
     surfaceVectorField kP
     (
@@ -334,7 +421,11 @@ newSkewCorrectedSnGrad<vector>::correction
         mesh,
         dimensionedVector("0", dimLength, vector::zero)
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    vectorField& kPI = kP.primitiveFieldRef();
+#else
     vectorField& kPI = kP.internalField();
+#endif
 
     surfaceVectorField kN
     (
@@ -349,15 +440,19 @@ newSkewCorrectedSnGrad<vector>::correction
         mesh,
         dimensionedVector("0", dimLength, vector::zero)
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    vectorField& kNI = kN.primitiveFieldRef();
+#else
     vectorField& kNI = kN.internalField();
+#endif
 
     kPI = Cf - vectorField(C, owner);
-    kPI -= Sf*(Sf&kPI)/magSqr(Sf);
-//     kPI -= Sf*(Sf&kPI)/sqr(magSf);
+    kPI -= Sf*(Sf & kPI)/magSqr(Sf);
+//     kPI -= Sf*(Sf & kPI)/sqr(magSf);
 
     kNI = Cf - vectorField(C, neighbour);
-    kNI -= Sf*(Sf&kNI)/magSqr(Sf);
-//     kNI -= Sf*(Sf&kNI)/sqr(magSf);
+    kNI -= Sf*(Sf & kNI)/magSqr(Sf);
+//     kNI -= Sf*(Sf & kNI)/sqr(magSf);
 
     // non-uniformity correction
     if (false)
@@ -374,11 +469,19 @@ newSkewCorrectedSnGrad<vector>::correction
     {
         if (kP.boundaryField()[patchI].coupled())
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            kP.boundaryFieldRef()[patchI] =
+#else
             kP.boundaryField()[patchI] =
+#endif
                 mesh.boundary()[patchI].Cf()
               - mesh.boundary()[patchI].Cn();
 
+#ifdef OPENFOAMESIORFOUNDATION
+            kP.boundaryFieldRef()[patchI] -=
+#else
             kP.boundaryField()[patchI] -=
+#endif
                 mesh.boundary()[patchI].Sf()
                *(
                     mesh.boundary()[patchI].Sf()
@@ -386,14 +489,22 @@ newSkewCorrectedSnGrad<vector>::correction
                 )
                /sqr(mesh.boundary()[patchI].magSf());
 
+#ifdef OPENFOAMESIORFOUNDATION
+            kN.boundaryFieldRef()[patchI] =
+#else
             kN.boundaryField()[patchI] =
+#endif
                 mesh.Cf().boundaryField()[patchI]
               - (
                     mesh.boundary()[patchI].Cn()
                   + mesh.boundary()[patchI].delta()
                 );
 
+#ifdef OPENFOAMESIORFOUNDATION
+            kN.boundaryFieldRef()[patchI] -=
+#else
             kN.boundaryField()[patchI] -=
+#endif
                 mesh.boundary()[patchI].Sf()
                *(
                     mesh.boundary()[patchI].Sf()
@@ -417,8 +528,13 @@ newSkewCorrectedSnGrad<vector>::correction
 //                   + kP.boundaryField()[patchI]
 //                 )/2.0;
 
+// #ifdef OPENFOAMESIORFOUNDATION
+//             kP.boundaryFieldRef()[patchI] += delta;
+//             kN.boundaryFieldRef()[patchI] += delta;
+// #else
 //             kP.boundaryField()[patchI] += delta;
 //             kN.boundaryField()[patchI] += delta;
+// #endif
         }
     }
 
@@ -441,7 +557,11 @@ newSkewCorrectedSnGrad<vector>::correction
                 gradScheme<vector>::New
                 (
                     mesh,
+#ifdef OPENFOAMESIORFOUNDATION
+                    mesh.gradScheme(ssf.name())
+#else
                     mesh.schemesDict().gradScheme(ssf.name())
+#endif
                 )()
                .grad(vf)
             );
@@ -451,10 +571,14 @@ newSkewCorrectedSnGrad<vector>::correction
 
     const volTensorField& gradVf = *gradVfPtr;
 
+#ifdef OPENFOAMESIORFOUNDATION
+    ssf.primitiveFieldRef() =
+#else
     ssf.internalField() =
+#endif
         (
-            (kNI&Field<tensor>(gradVf, neighbour))
-          - (kPI&Field<tensor>(gradVf, owner))
+            (kNI & Field<tensor>(gradVf, neighbour))
+          - (kPI & Field<tensor>(gradVf, owner))
         )
        *deltaCoeffs;
 
@@ -462,7 +586,11 @@ newSkewCorrectedSnGrad<vector>::correction
     {
         if (ssf.boundaryField()[patchI].coupled())
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            ssf.boundaryFieldRef()[patchI] =
+#else
             ssf.boundaryField()[patchI] =
+#endif
             (
                 (
                     (
@@ -504,9 +632,15 @@ newSkewCorrectedSnGrad<vector>::correction
 
     if (fv::debug)
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        Info<< "limitedSnGrad :: limiter min: " << min(limiter.primitiveField())
+            << " max: "<< max(limiter.primitiveField())
+            << " avg: " << average(limiter.primitiveField()) << endl;
+#else
         Info<< "limitedSnGrad :: limiter min: " << min(limiter.internalField())
             << " max: "<< max(limiter.internalField())
             << " avg: " << average(limiter.internalField()) << endl;
+#endif
     }
 
     ssf *= limiter;

@@ -234,7 +234,10 @@ numerics/amiZoneInterpolation/amiZoneInterpolation.C
 numerics/mechanicalEnergies/mechanicalEnergies.C
 /*
 numerics/newGGIInterpolation/newGGIInterpolationName.C
+*/
+numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/newSkewCorrectedSnGrad/newSkewCorrectedSnGrads.C
+/*
 numerics/newFvMeshSubset/newFvMeshSubset.C
 */
 numerics/logExpVolFields/eig3/eig3.C
