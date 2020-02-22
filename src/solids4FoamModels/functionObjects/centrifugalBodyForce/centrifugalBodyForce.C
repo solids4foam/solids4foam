@@ -121,4 +121,12 @@ bool Foam::centrifugalBodyForce::read(const dictionary& dict)
     return true;
 }
 
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::centrifugalBodyForce::write()
+{
+    return setBodyForce();
+}
+#endif
+
 // ************************************************************************* //

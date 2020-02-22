@@ -299,4 +299,12 @@ bool Foam::pointHistory::read(const dictionary& dict)
     return true;
 }
 
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::pointHistory::write()
+{
+    return writeData();
+}
+#endif
+
 // ************************************************************************* //

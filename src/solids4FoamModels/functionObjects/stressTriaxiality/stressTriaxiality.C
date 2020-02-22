@@ -136,4 +136,12 @@ bool Foam::stressTriaxiality::read(const dictionary& dict)
     return true;
 }
 
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::stressTriaxiality::write()
+{
+    return writeData();
+}
+#endif
+
 // ************************************************************************* //

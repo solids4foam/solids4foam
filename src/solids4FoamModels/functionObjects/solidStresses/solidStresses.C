@@ -225,4 +225,12 @@ bool Foam::solidStresses::read(const dictionary& dict)
     return true;
 }
 
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::solidStresses::write()
+{
+    return writeData();
+}
+#endif
+
 // ************************************************************************* //

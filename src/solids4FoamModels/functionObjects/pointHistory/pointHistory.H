@@ -135,6 +135,12 @@ public:
         //- Read and set the function object if its data has changed
         virtual bool read(const dictionary& dict);
 
+#ifdef OPENFOAMESIORFOUNDATION
+        //- Write
+        virtual bool write();
+#endif
+
+#ifndef OPENFOAMESIORFOUNDATION
         //- Update for changes of mesh
         virtual void updateMesh(const mapPolyMesh&)
         {}
@@ -142,6 +148,7 @@ public:
         //- Update for changes of mesh
         virtual void movePoints(const pointField&)
         {}
+#endif
 };
 
 
