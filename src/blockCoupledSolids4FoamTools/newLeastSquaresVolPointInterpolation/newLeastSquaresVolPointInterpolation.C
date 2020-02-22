@@ -157,7 +157,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
         pointBndFaces[pointI] = bndFaceSet.toc();
         pointCyclicFaces[pointI] = cyclicFaceSet.toc();
 
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef FOAMEXTEND
         const labelList& glPoints =
             mesh().globalData().sharedPointLabels();
 
