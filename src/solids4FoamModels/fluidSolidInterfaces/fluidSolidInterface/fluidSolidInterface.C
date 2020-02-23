@@ -566,7 +566,11 @@ Foam::vector Foam::fluidSolidInterface::totalForceOnInterface
     vectorField S(localFaces.size(), vector::zero);
     forAll(S, faceI)
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        S[faceI] = localFaces[faceI].area(localPoints);
+#else
         S[faceI] = localFaces[faceI].normal(localPoints);
+#endif
     }
 
     // No need for global sum as the zone is already global
