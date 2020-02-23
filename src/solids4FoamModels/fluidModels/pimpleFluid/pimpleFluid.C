@@ -54,59 +54,6 @@ addToRunTimeSelectionTable(fluidModel, pimpleFluid, dictionary);
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
 
-void pimpleFluid::correctPhi()
-{
-#ifdef OPENFOAMESIORFOUNDATION
-    // Calculate absolute flux
-    // from the mapped surface velocity
-    phi() = mesh().Sf() & Uf_();
-
-    CorrectPhi
-    (
-        U(),
-        phi(),
-        p(),
-        dimensionedScalar("rAUf", dimTime, 1),
-        geometricZeroField(),
-        pimple(),
-        true
-    );
-#else
-    volScalarField pcorr("pcorr", p());
-    pcorr *= 0;
-
-    // Initialise flux with interpolated velocity
-    phi() = fvc::interpolate(U()) & mesh().Sf();
-
-    adjustPhi(phi(), U(), pcorr);
-
-    mesh().schemesDict().setFluxRequired(pcorr.name());
-
-    while (pimple().correctNonOrthogonal())
-    {
-        fvScalarMatrix pcorrEqn
-        (
-#if FOAMEXTEND > 40
-            fvm::laplacian(rAU_, pcorr)
-#else
-            fvm::laplacian(1/aU_, pcorr)
-#endif
-         == fvc::div(phi())
-        );
-
-        pcorrEqn.setReference(pRefCell_, pRefValue_);
-        pcorrEqn.solve();
-
-        if (pimple().finalNonOrthogonalIter())
-        {
-            phi() -= pcorrEqn.flux();
-        }
-    }
-#endif
-
-    fluidModel::continuityErrs();
-}
-
 #ifdef OPENFOAMESIORFOUNDATION
 void pimpleFluid::solvePEqn
 (
@@ -182,6 +129,41 @@ void pimpleFluid::solvePEqn
 #endif
 
 #ifndef OPENFOAMESIORFOUNDATION
+void pimpleFluid::CorrectPhi()
+{
+    volScalarField pcorr("pcorr", p());
+    pcorr *= 0;
+
+    // Initialise flux with interpolated velocity
+    phi() = fvc::interpolate(U()) & mesh().Sf();
+
+    adjustPhi(phi(), U(), pcorr);
+
+    mesh().schemesDict().setFluxRequired(pcorr.name());
+
+    while (pimple().correctNonOrthogonal())
+    {
+        fvScalarMatrix pcorrEqn
+        (
+#if FOAMEXTEND > 40
+            fvm::laplacian(rAU_, pcorr)
+#else
+            fvm::laplacian(1/aU_, pcorr)
+#endif
+         == fvc::div(phi())
+        );
+
+        pcorrEqn.setReference(pRefCell_, pRefValue_);
+        pcorrEqn.solve();
+
+        if (pimple().finalNonOrthogonalIter())
+        {
+            phi() -= pcorrEqn.flux();
+        }
+    }
+}
+
+
 void pimpleFluid::solvePEqn
 (
     const scalar& UUrf,
@@ -436,9 +418,32 @@ bool pimpleFluid::evolve()
 #       include "volContinuity.H"
     }
 
-    if (meshChanged)
+    bool correctPhi
+    (
+        pimple().dict().lookupOrDefault("correctPhi", false)
+    );
+
+    if (correctPhi && meshChanged)
     {
-        correctPhi();
+#ifdef OPENFOAMESIORFOUNDATION
+        // Calculate absolute flux
+        // from the mapped surface velocity
+        phi() = mesh.Sf() & Uf_();
+
+        CorrectPhi
+        (
+            U(),
+            phi(),
+            p(),
+            dimensionedScalar("rAUf", dimTime, 1),
+            geometricZeroField(),
+            pimple(),
+            true
+        );
+#else
+        CorrectPhi();
+#endif
+        fluidModel::continuityErrs();
     }
     
     // Make the fluxes relative to the mesh motion
