@@ -185,6 +185,7 @@ void Foam::amiZoneInterpolation::calcSourcePointAddressing() const
     }
 }
 
+
 void Foam::amiZoneInterpolation::calcSourcePointWeights() const
 {
     // Find source point weights

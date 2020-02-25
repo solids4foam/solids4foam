@@ -220,6 +220,7 @@ $(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
 numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
+numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
