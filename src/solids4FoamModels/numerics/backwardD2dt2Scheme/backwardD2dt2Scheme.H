@@ -75,10 +75,10 @@ class backwardD2dt2Scheme
         ) const;
 
         //- Disallow default bitwise copy construct
-        backwardD2dt2Scheme(const backwardD2dt2Scheme&);
+        backwardD2dt2Scheme(const backwardD2dt2Scheme&) = delete;
 
         //- Disallow default bitwise assignment
-        void operator=(const backwardD2dt2Scheme&);
+        void operator=(const backwardD2dt2Scheme&) = delete;
 
 
 public:
