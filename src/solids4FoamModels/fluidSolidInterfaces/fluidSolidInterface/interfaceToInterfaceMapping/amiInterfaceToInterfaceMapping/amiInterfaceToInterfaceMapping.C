@@ -24,6 +24,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAMESIORFOUNDATION
+
 #include "amiInterfaceToInterfaceMapping.H"
 #include "addToRunTimeSelectionTable.H"
 #include "FieldField.H"
@@ -685,5 +687,7 @@ void amiInterfaceToInterfaceMapping::transferPointsZoneToZone
 } // End namespace interfaceToInterfaceMappings
 
 } // End namespace Foam
+
+#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
 // ************************************************************************* //

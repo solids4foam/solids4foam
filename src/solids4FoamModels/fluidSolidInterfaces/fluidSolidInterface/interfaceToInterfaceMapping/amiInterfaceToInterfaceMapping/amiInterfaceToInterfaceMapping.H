@@ -36,6 +36,8 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAMESIORFOUNDATION
+
 #ifndef amiInterfaceToInterfaceMapping_H
 #define amiInterfaceToInterfaceMapping_H
 
@@ -231,7 +233,6 @@ public:
 
 } // End namespace interfaceToInterfaceMappings
 
-
 } // End namespace Foam
 
 #ifdef NoRepository
@@ -241,5 +242,7 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
+
+#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
 // ************************************************************************* //
