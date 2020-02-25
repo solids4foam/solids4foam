@@ -236,6 +236,8 @@ numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
 */
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
+numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
+numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
 numerics/newSkewCorrectedSnGrad/newSkewCorrectedSnGrads.C
 /*
 numerics/newFvMeshSubset/newFvMeshSubset.C
