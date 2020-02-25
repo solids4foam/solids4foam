@@ -277,6 +277,7 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
         << nIncorrectPoints << "/" << zoneAPointAddr.size() << endl;
 }
 
+
 void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
 {
     if (zoneAPointWeightsPtr_)
@@ -322,7 +323,11 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
             // Intersection point
             const point I = P + n*(n&(t.a() - P));
 
+#ifdef OPENFOAMESI
             zoneAPointWeights[pointI] = List<scalar>(3);
+#else
+            zoneAPointWeights.set(pointI, new scalarField(3));
+#endif
 
             // zoneAPointWeights[pointI][0] = t.Ni(0, I);
             // zoneAPointWeights[pointI][1] = t.Ni(1, I);
@@ -334,7 +339,11 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
         }
         else
         {
+#ifdef OPENFOAMESI
             zoneAPointWeights[pointI] = List<scalar>(0);
+#else
+            zoneAPointWeights.set(pointI, new scalarField(0));
+#endif
         }
     }
 }
@@ -524,7 +533,11 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
             // Intersection point
             const point I = P + n*(n&(t.a() - P));
 
+#ifdef OPENFOAMESI
             zoneBPointWeights[pointI] = List<scalar>(3);
+#else
+            zoneBPointWeights.set(pointI, new scalarField(3));
+#endif
 
             // zoneBPointWeights[pointI][0] = t.Ni(0, I);
             // zoneBPointWeights[pointI][1] = t.Ni(1, I);
@@ -536,7 +549,11 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
         }
         else
         {
+#ifdef OPENFOAMESI
             zoneBPointWeights[pointI] = List<scalar>(0);
+#else
+            zoneBPointWeights.set(pointI, new scalarField(0));
+#endif
         }
     }
 }
@@ -605,11 +622,11 @@ amiInterfaceToInterfaceMapping::amiInterfaceToInterfaceMapping
     (
         type, dict, patchA, patchB, globalPatchA, globalPatchB
     ),
-    interpolatorPtr_(),
-    zoneAPointAddressingPtr_(),
-    zoneAPointWeightsPtr_(),
-    zoneBPointAddressingPtr_(),
-    zoneBPointWeightsPtr_()
+    interpolatorPtr_(nullptr),
+    zoneAPointAddressingPtr_(nullptr),
+    zoneAPointWeightsPtr_(nullptr),
+    zoneBPointAddressingPtr_(nullptr),
+    zoneBPointWeightsPtr_(nullptr)
 {}
 
 
