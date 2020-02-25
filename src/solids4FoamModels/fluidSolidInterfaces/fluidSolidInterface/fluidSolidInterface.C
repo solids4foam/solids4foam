@@ -90,6 +90,7 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
     {
         dictionary emptyDict;
         fsiProperties_.add("GGICoeffs", emptyDict);
+        fsiProperties_.add("AMICoeffs", emptyDict);
         fsiProperties_.add("RBFCoeffs", emptyDict);
         fsiProperties_.add("directMapCoeffs", emptyDict);
     }

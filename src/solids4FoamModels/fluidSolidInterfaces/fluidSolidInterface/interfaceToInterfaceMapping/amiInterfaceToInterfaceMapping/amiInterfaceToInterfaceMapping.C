@@ -47,7 +47,6 @@ addToRunTimeSelectionTable
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-#ifdef OPENFOAMESI
 void amiInterfaceToInterfaceMapping::makeInterpolator() const
 {
     if (interpolatorPtr_.valid())
@@ -63,7 +62,11 @@ void amiInterfaceToInterfaceMapping::makeInterpolator() const
 
     interpolatorPtr_.set
     (
+#ifdef OPENFOAMESI
         new AMIInterpolation<standAlonePatch, standAlonePatch>
+#else
+        new newAMIInterpolation<standAlonePatch, standAlonePatch>
+#endif
         (
             zoneA(),
             zoneB(),
@@ -80,7 +83,12 @@ void amiInterfaceToInterfaceMapping::makeInterpolator() const
     //checkZoneBToZoneAError();
 }
 
+
+#ifdef OPENFOAMESI
 const AMIInterpolation<standAlonePatch, standAlonePatch>&
+#else
+const newAMIInterpolation<standAlonePatch, standAlonePatch>&
+#endif
 amiInterfaceToInterfaceMapping::interpolator() const
 {
     if (interpolatorPtr_.empty())
@@ -269,6 +277,7 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
         << nIncorrectPoints << "/" << zoneAPointAddr.size() << endl;
 }
 
+
 void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
 {
     if (zoneAPointWeightsPtr_)
@@ -314,7 +323,11 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
             // Intersection point
             const point I = P + n*(n&(t.a() - P));
 
+#ifdef OPENFOAMESI
             zoneAPointWeights[pointI] = List<scalar>(3);
+#else
+            zoneAPointWeights.set(pointI, new scalarField(3));
+#endif
 
             // zoneAPointWeights[pointI][0] = t.Ni(0, I);
             // zoneAPointWeights[pointI][1] = t.Ni(1, I);
@@ -326,7 +339,11 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
         }
         else
         {
+#ifdef OPENFOAMESI
             zoneAPointWeights[pointI] = List<scalar>(0);
+#else
+            zoneAPointWeights.set(pointI, new scalarField(0));
+#endif
         }
     }
 }
@@ -516,7 +533,11 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
             // Intersection point
             const point I = P + n*(n&(t.a() - P));
 
+#ifdef OPENFOAMESI
             zoneBPointWeights[pointI] = List<scalar>(3);
+#else
+            zoneBPointWeights.set(pointI, new scalarField(3));
+#endif
 
             // zoneBPointWeights[pointI][0] = t.Ni(0, I);
             // zoneBPointWeights[pointI][1] = t.Ni(1, I);
@@ -528,7 +549,11 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
         }
         else
         {
+#ifdef OPENFOAMESI
             zoneBPointWeights[pointI] = List<scalar>(0);
+#else
+            zoneBPointWeights.set(pointI, new scalarField(0));
+#endif
         }
     }
 }
@@ -579,7 +604,7 @@ amiInterfaceToInterfaceMapping::zoneBPointWeights() const
 
     return *zoneBPointWeightsPtr_;
 }
-#endif
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -596,11 +621,12 @@ amiInterfaceToInterfaceMapping::amiInterfaceToInterfaceMapping
     interfaceToInterfaceMapping
     (
         type, dict, patchA, patchB, globalPatchA, globalPatchB
-    )
-#ifdef OPENFOAMESI
-    ,
-    interpolatorPtr_()
-#endif
+    ),
+    interpolatorPtr_(nullptr),
+    zoneAPointAddressingPtr_(nullptr),
+    zoneAPointWeightsPtr_(nullptr),
+    zoneBPointAddressingPtr_(nullptr),
+    zoneBPointWeightsPtr_(nullptr)
 {}
 
 
@@ -614,11 +640,7 @@ void amiInterfaceToInterfaceMapping::transferFacesZoneToZone
     Field<scalar>& toField           // to field
 ) const
 {
-#ifdef OPENFOAMESI
     transferFacesZoneToZone<scalar>(fromZone, toZone, fromField, toField);
-#else
-    notImplemented("Not implemented for this version of OpenFOAM/FOAM");
-#endif
 }
 
 
@@ -630,11 +652,7 @@ void amiInterfaceToInterfaceMapping::transferPointsZoneToZone
     Field<scalar>& toField           // to field
 ) const
 {
-#ifdef OPENFOAMESI
     transferPointsZoneToZone<scalar>(fromZone, toZone, fromField, toField);
-#else
-    notImplemented("Not implemented for this version of OpenFOAM/FOAM");
-#endif
 }
 
 
@@ -646,11 +664,7 @@ void amiInterfaceToInterfaceMapping::transferFacesZoneToZone
     Field<vector>& toField           // to field
 ) const
 {
-#ifdef OPENFOAMESI
     transferFacesZoneToZone<vector>(fromZone, toZone, fromField, toField);
-#else
-    notImplemented("Not implemented for this version of OpenFOAM/FOAM");
-#endif
 }
 
 
@@ -662,11 +676,7 @@ void amiInterfaceToInterfaceMapping::transferPointsZoneToZone
     Field<vector>& toField           // to field
 ) const
 {
-#ifdef OPENFOAMESI
     transferPointsZoneToZone<vector>(fromZone, toZone, fromField, toField);
-#else
-    notImplemented("Not implemented for this version of OpenFOAM/FOAM");
-#endif
 }
 
 

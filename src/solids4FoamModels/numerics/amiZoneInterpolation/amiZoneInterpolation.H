@@ -41,7 +41,11 @@ SourceFiles
 #ifndef amiZoneInterpolation_H
 #define amiZoneInterpolation_H
 
-#include "AMIInterpolation.H"
+#ifdef OPENFOAMESI
+    #include "AMIInterpolation.H"
+#else
+    #include "newAMIInterpolation.H"
+#endif
 #include "PrimitivePatch.H"
 #include "face.H"
 #include "SubList.H"
@@ -58,6 +62,9 @@ class amiZoneInterpolation
 #ifdef OPENFOAMESI
 :
     public AMIInterpolation<standAlonePatch, standAlonePatch>
+#else
+:
+    public newAMIInterpolation<standAlonePatch, standAlonePatch>
 #endif
 {
     // Private Data
@@ -99,7 +106,6 @@ class amiZoneInterpolation
 
     // Private Member Functions
 
-#ifdef OPENFOAMESI
         //- Calculate point weights
         void calcSourcePointAddressing() const;
 
@@ -111,7 +117,6 @@ class amiZoneInterpolation
 
         //- Calculate point weights
         void calcTargetPointWeights() const;
-#endif
 
         //- Disallow default bitwise copy construct
         amiZoneInterpolation(const amiZoneInterpolation&);
@@ -131,13 +136,11 @@ public:
         (
             const standAlonePatch& srcPatch,
             const standAlonePatch& tgtPatch,
-#ifdef OPENFOAMESI
             const faceAreaIntersect::triangulationMode& triMode,
             const bool requireMatch = true,
             const interpolationMethod& method = imFaceAreaWeight,
             const scalar lowWeightCorrection = -1,
             const bool reverseTarget = false,
-#endif
             const bool useGlobalPolyPatch = false
         );
 
@@ -149,7 +152,6 @@ public:
 
         // Evaluation
 
-#ifdef OPENFOAMESI
             //- Return reference to point addressing
             const List<labelPair>& sourcePointAddr() const;
 
@@ -197,17 +199,14 @@ public:
             (
                 const Field<Type>& pf
             ) const;
-#endif
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
 
-#ifdef OPENFOAMESI
 #ifdef NoRepository
 #   include "amiZoneInterpolationTemplates.C"
-#endif
 #endif
 
 #endif

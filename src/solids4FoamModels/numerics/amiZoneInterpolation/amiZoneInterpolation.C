@@ -32,6 +32,13 @@ License
     #include "mapNearestAMI.H"
     #include "faceAreaWeightAMI.H"
     #include "partialFaceAreaWeightAMI.H"
+#else
+    #include "newAMIMethod.H"
+    #include "newDirectAMI.H"
+    #include "newMapNearestAMI.H"
+    #include "newFaceAreaWeightAMI.H"
+    #include "newPartialFaceAreaWeightAMI.H"
+    #include "newSweptFaceAreaWeightAMI.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -46,12 +53,18 @@ namespace Foam
     makeAMIMethodType(amiZoneInterpolation, mapNearestAMI);
     makeAMIMethodType(amiZoneInterpolation, faceAreaWeightAMI);
     makeAMIMethodType(amiZoneInterpolation, partialFaceAreaWeightAMI);
+#else
+    makeAMIMethod(amiZoneInterpolation);
+    makeAMIMethodType(amiZoneInterpolation, newDirectAMI);
+    makeAMIMethodType(amiZoneInterpolation, newMapNearestAMI);
+    makeAMIMethodType(amiZoneInterpolation, newFaceAreaWeightAMI);
+    makeAMIMethodType(amiZoneInterpolation, newPartialFaceAreaWeightAMI);
+    makeAMIMethodType(amiZoneInterpolation, newSweptFaceAreaWeightAMI);
 #endif
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-#ifdef OPENFOAMESI
 void Foam::amiZoneInterpolation::calcSourcePointAddressing() const
 {
     // Find source points addressing
@@ -437,7 +450,7 @@ void Foam::amiZoneInterpolation::calcTargetPointWeights() const
         }
     }
 }
-#endif
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -445,18 +458,19 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
 (
     const standAlonePatch& srcPatch,
     const standAlonePatch& tgtPatch,
-#ifdef OPENFOAMESI
     const faceAreaIntersect::triangulationMode& triMode,
     const bool requireMatch,
     const interpolationMethod& method,
     const scalar lowWeightCorrection,
     const bool reverseTarget,
-#endif
     const bool useGlobalPolyPatch
 )
 :
 #ifdef OPENFOAMESI
     AMIInterpolation<standAlonePatch, standAlonePatch>
+#else
+    newAMIInterpolation<standAlonePatch, standAlonePatch>
+#endif
     (
         srcPatch,
         tgtPatch,
@@ -467,17 +481,16 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
         false,
         useGlobalPolyPatch
     ),
-#endif
     sourcePatch_(srcPatch),
     targetPatch_(tgtPatch),
     sourcePatchInterp_(sourcePatch_),
     targetPatchInterp_(targetPatch_),
-    sourcePointAddressingPtr_(NULL),
-    sourcePointWeightsPtr_(NULL),
-    sourcePointDistancePtr_(NULL),
-    targetPointAddressingPtr_(NULL),
-    targetPointWeightsPtr_(NULL),
-    targetPointDistancePtr_(NULL)
+    sourcePointAddressingPtr_(nullptr),
+    sourcePointWeightsPtr_(nullptr),
+    sourcePointDistancePtr_(nullptr),
+    targetPointAddressingPtr_(nullptr),
+    targetPointWeightsPtr_(nullptr),
+    targetPointDistancePtr_(nullptr)
 {}
 
 
@@ -496,7 +509,6 @@ Foam::amiZoneInterpolation::~amiZoneInterpolation()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-#ifdef OPENFOAMESI
 const Foam::List<Foam::labelPair>&
 Foam::amiZoneInterpolation::sourcePointAddr() const
 {
@@ -567,8 +579,6 @@ Foam::amiZoneInterpolation::targetPointDistanceToIntersection() const
 
     return *targetPointDistancePtr_;
 }
-
-#endif
 
 #endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
