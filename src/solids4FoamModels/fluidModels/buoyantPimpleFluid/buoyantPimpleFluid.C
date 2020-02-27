@@ -471,7 +471,7 @@ bool buoyantPimpleFluid::evolve()
 
         fluidModel::continuityErrs();
 
-	tUEqn.clear();
+        tUEqn.clear();
 
         gradU() = fvc::grad(U());
 
