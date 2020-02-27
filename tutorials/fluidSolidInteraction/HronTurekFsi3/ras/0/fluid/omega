@@ -1,7 +1,7 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     4.1                                |
+|  \\    /   O peration     | Version:     4.0                                |
 |   \\  /    A nd           | Web:         http://www.foam-extend.org         |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
@@ -11,42 +11,68 @@ FoamFile
     format      ascii;
     class       volScalarField;
     location    "0";
-    object      epsilon;
+    object      omega;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 2 -3 0 0 0 0];
+dimensions      [0 0 -1 0 0 0 0];
 
-internalField   uniform 0.01;
+internalField   uniform 0.65;
 
 boundaryField
 {
-    floor
+    plate
     {
-        type            epsilonWallFunction;
+        type            omegaWallFunction;
         refValue        uniform 0;
-        value           uniform 0.01;
+        value           uniform 0.65;
         Cmu             0.09;
         kappa           0.41;
         E               9.8;
+        beta1           0.075;
     }
-    ceiling
+    outlet
     {
-        type            epsilonWallFunction;
-        refValue        uniform 0;
-        value           uniform 0.01;
-        Cmu             0.09;
-        kappa           0.41;
-        E               9.8;
+        type            zeroGradient;
     }
-    fixedWalls
+    inlet
     {
-        type            epsilonWallFunction;
+        type            fixedValue;
+        value           uniform 0.65;
+    }
+    cylinder
+    {
+        type            omegaWallFunction;
         refValue        uniform 0;
-        value           uniform 0.01;
+        value           uniform 0.65;
         Cmu             0.09;
         kappa           0.41;
         E               9.8;
+        beta1           0.075;
+    }
+    bottom
+    {
+        type            omegaWallFunction;
+        refValue        uniform 0;
+        value           uniform 0.65;
+        Cmu             0.09;
+        kappa           0.41;
+        E               9.8;
+        beta1           0.075;
+    }
+    top
+    {
+        type            omegaWallFunction;
+        refValue        uniform 0;
+        value           uniform 0.65;
+        Cmu             0.09;
+        kappa           0.41;
+        E               9.8;
+        beta1           0.075;
+    }
+    frontAndBackPlanes
+    {
+        type            empty;
     }
 }
 
