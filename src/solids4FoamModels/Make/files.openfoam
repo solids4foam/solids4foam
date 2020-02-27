@@ -71,10 +71,9 @@ $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
 
 linGeomLaws = $(mechanicalLaws)/linearGeometryLaws
 $(linGeomLaws)/linearElastic/linearElastic.C
-/*
 $(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
 $(linGeomLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
-$(linGeomLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C
+/*$(linGeomLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C*/
 $(linGeomLaws)/poroLinearElastic/poroLinearElastic.C
 $(linGeomLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
 $(linGeomLaws)/thermoLinearElastic/thermoLinearElastic.C
@@ -87,9 +86,8 @@ $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlasticRubin/neoHookeanElasticMisesPlasticRubin.C
 $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
-$(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
+/*$(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C*/
 $(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
-*/
 
 materialModels/thermalModel/thermalModel.C
 thermalLaws = materialModels/thermalModel/thermalLaws

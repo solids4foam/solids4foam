@@ -89,7 +89,7 @@ void Foam::linearElasticCt::setYoungsModulusFromCt()
 
         //filepath location of CT image slices
 
-        fileName ctFilePath = (dict().lookup("ctImagesFilePath"));
+        const fileName ctFilePath(dict().lookup("ctImagesFilePath"));
 
         Info<< "z: max " << slices*pixelSliceSpacing + pixelSliceOffset
             << " min " << pixelSliceOffset << nl
@@ -183,12 +183,21 @@ void Foam::linearElasticCt::setYoungsModulusFromCt()
 
         // Set the E field
 
+#ifdef OPENFOAMESIORFOUNDATION
+        scalarField& E_I = E_.primitiveFieldRef();
+        scalarField& HuI = Hu.primitiveFieldRef();
+        scalarField& relRhoI = relRho.primitiveFieldRef();
+
+        // Take a copy of the cell centres field as we may rotate them
+        vectorField CI = mesh().C().primitiveField();
+#else
         scalarField& E_I = E_.internalField();
         scalarField& HuI = Hu.internalField();
         scalarField& relRhoI = relRho.internalField();
 
         // Take a copy of the cell centres field as we may rotate them
         vectorField CI = mesh().C().internalField();
+#endif
 
         if (useRotationMatrix_)
         {
@@ -333,9 +342,14 @@ void Foam::linearElasticCt::setYoungsModulusFromCt()
             {
                 Info<< "    iteration " << i << endl;
 
+#ifdef OPENFOAMESIORFOUNDATION
+                scalarField& E_I = E_.primitiveFieldRef();
+                const vectorField& CI = mesh().C().primitiveField();
+#else
                 scalarField& E_I = E_.internalField();
-                const labelListList& cellCells = mesh().cellCells();
                 const vectorField& CI = mesh().C().internalField();
+#endif
+                const labelListList& cellCells = mesh().cellCells();
 
                 forAll(E_I, cellI)
                 {
@@ -492,8 +506,6 @@ Foam::linearElasticCt::linearElasticCt
 }
 
 
-
-
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::linearElasticCt::~linearElasticCt()
@@ -521,7 +533,13 @@ Foam::tmp<Foam::volScalarField> Foam::linearElasticCt::rho() const
             zeroGradientFvPatchScalarField::typeName
         )
     );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
     tresult().correctBoundaryConditions();
+#endif
+
     return tresult;
 
 }
@@ -542,8 +560,9 @@ Foam::tmp<Foam::volScalarField> Foam::linearElasticCt::impK() const
                 IOobject::NO_WRITE
             ),
             2*mu_ + lambda_
-            )
+        )
     );
+
     return tresult;
 }
 
