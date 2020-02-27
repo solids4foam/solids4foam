@@ -140,7 +140,7 @@ Foam::solidPointDisplacement::solidPointDisplacement
     name_(name),
     time_(t),
     pointID_(-1),
-    historyFilePtr_(NULL)
+    historyFilePtr_()
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 

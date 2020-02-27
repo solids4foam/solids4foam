@@ -48,7 +48,9 @@ SourceFiles
 #include "fluidModel.H"
 #include "rhoThermo.H"
 #include "turbulentFluidThermoModel.H"
-#include "radiationModel.H"
+#ifdef OPENFOAMFOUNDATION
+    #include "radiationModel.H"
+#endif
 #include "fvOptions.H"
 #include "pimpleControl.H"
 #include "uniformDimensionedFields.H"
@@ -113,8 +115,10 @@ class buoyantPimpleFluid
         //- Turbulent Transport model
         autoPtr<compressible::turbulenceModel> turbulence_;
 
+#ifdef OPENFOAMFOUNDATION
         //- Create radiation model
         autoPtr<radiationModel> radiation_;
+#endif
 
         //- Reference pressure cell
         label pRefCell_;

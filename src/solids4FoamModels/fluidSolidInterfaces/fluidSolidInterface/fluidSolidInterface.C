@@ -567,7 +567,7 @@ Foam::vector Foam::fluidSolidInterface::totalForceOnInterface
     vectorField S(localFaces.size(), vector::zero);
     forAll(S, faceI)
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
         S[faceI] = localFaces[faceI].area(localPoints);
 #else
         S[faceI] = localFaces[faceI].normal(localPoints);

@@ -115,10 +115,13 @@ void buoyantBoussinesqPimpleFluid::solveTEqn()
         fvm::ddt(T_)
       + fvm::div(phi(), T_)
       - fvm::laplacian(alphaEff_, T_)
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
      ==
         radiation_->ST(rhoCpRef_, T_)
       + fvOptions_(T_)
+#elif OPENFOAMESI
+     ==
+        fvOptions_(T_)
 #endif
     );
 
@@ -130,9 +133,11 @@ void buoyantBoussinesqPimpleFluid::solveTEqn()
 
     TEqn.solve();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
     radiation_->correct();
+#endif
 
+#ifdef OPENFOAMESIORFOUNDATION
     fvOptions_.correct(T_);
 #endif
 
@@ -327,7 +332,7 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
         ),
         1.0 - beta_*(T_ - TRef_)
     ),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
     radiation_(radiationModel::New(T_)),
     rhoCpRef_
     (
@@ -335,6 +340,8 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
         dimDensity*dimEnergy/dimMass/dimTemperature,
         1.0
     ),
+#endif
+#ifdef OPENFOAMESIORFOUNDATION
     fvOptions_(fv::options::New(mesh())),
 #endif
     pRefCell_(0),
@@ -354,6 +361,7 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
     setRefCell(p(), p_rgh_, pimple().dict(), pRefCell_, pRefValue_);
     mesh().setFluxRequired(p_rgh_.name());
 
+    #ifdef OPENFOAMFOUNDATION
     if (!isType<radiationModels::noRadiation>(radiation_()))
     {
         IOdictionary transportProperties
@@ -385,7 +393,7 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
 
         rhoCpRef_ = rhoRef*CpRef;
     }
-
+    #endif
     // Check if any finite volume option is present
     if (!fvOptions_.optionList::size())
     {

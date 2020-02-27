@@ -129,7 +129,9 @@ void buoyantPimpleFluid::solveEEqn()
       - fvm::laplacian(turbulence_->alphaEff(), he)
      ==
         rho_*(U() & g_)
+#ifdef OPENFOAMFOUNDATION
       + radiation_->Sh(thermo_, he)
+#endif
       + fvOptions_(rho_, he)
     );
 
@@ -142,7 +144,9 @@ void buoyantPimpleFluid::solveEEqn()
     fvOptions_.correct(he);
 
     thermo_.correct();
+#ifdef OPENFOAMFOUNDATION
     radiation_->correct();
+#endif
 }
 
 
@@ -333,7 +337,9 @@ buoyantPimpleFluid::buoyantPimpleFluid
             rho_, U(), phi(), thermo_
         )
     ),
+#ifdef OPENFOAMFOUNDATION
     radiation_(radiationModel::New(thermo_.T())),
+#endif
     pRefCell_(0),
     pRefValue_(0)
 {

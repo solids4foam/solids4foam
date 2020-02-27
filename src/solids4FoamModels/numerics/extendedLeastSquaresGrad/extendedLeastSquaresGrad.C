@@ -98,8 +98,13 @@ extendedLeastSquaresGrad<Type>::calcGrad
     const surfaceVectorField& ownLs = lsv.pVectors();
     const surfaceVectorField& neiLs = lsv.nVectors();
 
+#ifdef OPENFOAMESI
+    const labelList& owner = mesh.owner();
+    const labelList& neighbour = mesh.neighbour();
+#else
     const unallocLabelList& owner = mesh.owner();
     const unallocLabelList& neighbour = mesh.neighbour();
+#endif
 
     forAll(owner, facei)
     {
@@ -117,8 +122,13 @@ extendedLeastSquaresGrad<Type>::calcGrad
     {
         const fvsPatchVectorField& patchOwnLs = ownLs.boundaryField()[patchi];
 
+#ifdef OPENFOAMESI
+        const labelList& faceCells =
+            lsGrad.boundaryField()[patchi].patch().faceCells();
+#else
         const unallocLabelList& faceCells =
             lsGrad.boundaryField()[patchi].patch().faceCells();
+#endif
 
         if (vsf.boundaryField()[patchi].coupled())
         {

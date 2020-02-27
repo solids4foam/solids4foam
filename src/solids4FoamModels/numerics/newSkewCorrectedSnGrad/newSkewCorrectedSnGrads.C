@@ -79,8 +79,13 @@ newSkewCorrectedSnGrad<scalar>::correction
 
     ssf = dimensioned<scalar>("0", ssf.dimensions(), 0);
 
+#ifdef OPENFOAMESI
+    const labelList& owner = mesh.owner();
+    const labelList& neighbour = mesh.neighbour();
+#else
     const unallocLabelList& owner = mesh.owner();
     const unallocLabelList& neighbour = mesh.neighbour();
+#endif
 
 #ifdef OPENFOAMESIORFOUNDATION
     const vectorField& Sf = mesh.Sf().primitiveField();
@@ -381,8 +386,13 @@ newSkewCorrectedSnGrad<vector>::correction
 
     ssf = dimensioned<vector>("0", ssf.dimensions(), vector::zero);
 
+#ifdef OPENFOAMESI
+    const labelList& owner = mesh.owner();
+    const labelList& neighbour = mesh.neighbour();
+#else
     const unallocLabelList& owner = mesh.owner();
     const unallocLabelList& neighbour = mesh.neighbour();
+#endif
 
 #ifdef OPENFOAMESIORFOUNDATION
     const vectorField& Sf = mesh.Sf().primitiveField();

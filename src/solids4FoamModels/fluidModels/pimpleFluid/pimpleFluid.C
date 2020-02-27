@@ -334,17 +334,20 @@ pimpleFluid::pimpleFluid
     {
         Info<< "Constructing face velocity Uf\n" << endl;
 
-        Uf_ = new surfaceVectorField
+        Uf_.set
         (
-            IOobject
+            new surfaceVectorField
             (
-                "Uf",
-                runTime.timeName(),
-                mesh(),
-                IOobject::READ_IF_PRESENT,
-                IOobject::AUTO_WRITE
-            ),
-            fvc::interpolate(U())
+                IOobject
+                (
+                    "Uf",
+                    runTime.timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::AUTO_WRITE
+                ),
+                fvc::interpolate(U())
+            )
         );
     }
 #else
@@ -437,8 +440,11 @@ bool pimpleFluid::evolve()
             p(),
             dimensionedScalar("rAUf", dimTime, 1),
             geometricZeroField(),
-            pimple(),
+            pimple()
+            #ifdef OPENFOAMFOUNDATION
+            ,
             true
+            #endif
         );
 #else
         CorrectPhi();

@@ -93,8 +93,13 @@ newSkewCorrectedSnGrad<Type>::correction
         outerProduct<vector, typename pTraits<Type>::cmptType>::type 
         CmptGradType;
 
+#ifdef OPENFOAMESI
+    const labelList& owner = mesh.owner();
+    const labelList& neighbour = mesh.neighbour();
+#else
     const unallocLabelList& owner = mesh.owner();
     const unallocLabelList& neighbour = mesh.neighbour();
+#endif
 
 #ifdef OPENFOAMESIORFOUNDATION
     const vectorField& Sf = mesh.Sf().primitiveField();

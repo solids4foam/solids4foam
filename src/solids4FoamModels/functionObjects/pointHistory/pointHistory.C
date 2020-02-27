@@ -140,17 +140,9 @@ Foam::pointHistory::pointHistory
     refHistoryPoint_(dict.lookup("refHistoryPoint")),
     writeVelocity_(false),
     processor_(-1),
-    historyFilePtr_(NULL)
+    historyFilePtr_()
 {
-    Info << "Creating " << this->name() << " function object." << endl;
-
-//     if (Pstream::parRun())
-//     {
-//         FatalErrorIn("pointHistory::pointHistory(...)")
-//             << "pointHistory objec function "
-//                 << "is not implemented for parallel run"
-//                 << abort(FatalError);
-//     }
+    Info<< "Creating " << this->name() << " function object." << endl;
 
     if (dict.found("region"))
     {

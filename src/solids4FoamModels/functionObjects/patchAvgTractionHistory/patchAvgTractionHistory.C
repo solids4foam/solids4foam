@@ -146,7 +146,7 @@ Foam::patchAvgTractionHistory::patchAvgTractionHistory
     name_(name),
     time_(t),
     regionName_(polyMesh::defaultRegion),
-    historyFilePtr_(NULL),
+    historyFilePtr_(),
     patchName_(dict.lookup("patchName")),
     patchIndex_(-1)
 {

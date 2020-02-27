@@ -120,7 +120,7 @@ Foam::solidDisplacements::solidDisplacements
     time_(t),
     historyPatchID_(-1),
     patchFound_(false),
-    historyFilePtr_(NULL)
+    historyFilePtr_()
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 

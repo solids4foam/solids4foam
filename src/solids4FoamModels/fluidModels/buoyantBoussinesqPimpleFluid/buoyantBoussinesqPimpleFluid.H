@@ -65,10 +65,12 @@ SourceFiles
 #include "singlePhaseTransportModel.H"
 #ifdef OPENFOAMESIORFOUNDATION
     #include "turbulentTransportModel.H"
-    #include "noRadiation.H"
     #include "fvOptions.H"
 #else
     #include "turbulenceModel.H"
+#endif
+#ifdef OPENFOAMFOUNDATION
+    #include "noRadiation.H"
 #endif
 #include "pimpleControl.H"
 #include "uniformDimensionedFields.H"
@@ -139,12 +141,14 @@ class buoyantBoussinesqPimpleFluid
         //- Kinematic density for buoyancy force
         volScalarField rhok_;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
         // Create incompressible radiation model
         autoPtr<radiationModel> radiation_;
 
         dimensionedScalar rhoCpRef_;
+#endif
 
+#ifdef OPENFOAMESIORFOUNDATION
         //- Create finite volume options
         fv::options& fvOptions_;
 #endif
