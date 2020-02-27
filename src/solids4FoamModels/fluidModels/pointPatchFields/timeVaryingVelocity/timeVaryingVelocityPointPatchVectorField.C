@@ -27,6 +27,9 @@ License
 #include "pointPatchFields.H"
 #include "addToRunTimeSelectionTable.H"
 #include "polyMesh.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "Time.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -154,7 +157,11 @@ void timeVaryingVelocityPointPatchVectorField::write(Ostream& os) const
 {
     pointPatchField<vector>::write(os);
     timeSeries_.write(os);
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "value", *this);
+#else
     writeEntry("value", os);
+#endif
 }
 
 

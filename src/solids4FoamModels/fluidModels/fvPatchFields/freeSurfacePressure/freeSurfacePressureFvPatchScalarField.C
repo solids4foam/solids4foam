@@ -144,7 +144,11 @@ void Foam::freeSurfacePressureFvPatchScalarField::updateCoeffs()
 Foam::tmp<Foam::Field<Foam::scalar> >
 Foam::freeSurfacePressureFvPatchScalarField::snGrad() const
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    word pName = this->internalField().name();
+#else
     word pName = this->dimensionedInternalField().name();
+#endif
 
     const fvPatchField<vector>& gradp =
         patch().lookupPatchField<volVectorField, vector>
@@ -182,7 +186,11 @@ Foam::freeSurfacePressureFvPatchScalarField::snGrad() const
 Foam::tmp<Foam::Field<Foam::scalar> >
 Foam::freeSurfacePressureFvPatchScalarField::gradientBoundaryCoeffs() const
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    word pName = this->internalField().name();
+#else
     word pName = this->dimensionedInternalField().name();
+#endif
 
     const fvPatchField<vector>& gradp =
         patch().lookupPatchField<volVectorField, vector>

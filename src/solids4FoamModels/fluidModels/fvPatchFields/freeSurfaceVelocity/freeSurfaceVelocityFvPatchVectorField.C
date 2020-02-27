@@ -130,7 +130,11 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::updateCoeffs()
 
 //     gradient() = (pfs/(2*nu.value()))*n;
 
+#ifdef OPENFOAMESIORFOUNDATION
+        word UName = this->internalField().name();
+#else
         word UName = this->dimensionedInternalField().name();
+#endif
         const fvPatchField<tensor>& gradU =
             patch().lookupPatchField<volTensorField, tensor>
             (
@@ -174,7 +178,11 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::evaluate
         vectorField delta = patch().delta();
         vectorField k = delta - n*(n&delta);
 
+#ifdef OPENFOAMESIORFOUNDATION
+        word UName = this->internalField().name();
+#else
         word UName = this->dimensionedInternalField().name();
+#endif
 
         const fvPatchField<tensor>& gradU =
             patch().lookupPatchField<volTensorField, tensor>
@@ -233,7 +241,7 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::evaluate
         }
 
         const fvPatchField<scalar>& rhop =
-            lookupPatchField<volScalarField, scalar>(rhoName_);
+            patch().lookupPatchField<volScalarField, scalar>(rhoName_);
 
         operator==(*this - n*(n & *this) + n*phip/(rhop*magS));
     }
@@ -245,8 +253,13 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::evaluate
         )
             << "dimensions of phi are incorrect\n"
             << "    on patch " << this->patch().name()
+#ifdef OPENFOAMESIORFOUNDATION
+            << " of field " << this->internalField().name()
+            << " in file " << this->internalField().objectPath()
+#else
             << " of field " << this->dimensionedInternalField().name()
             << " in file " << this->dimensionedInternalField().objectPath()
+#endif
             << exit(FatalError);
     }
 
@@ -267,7 +280,11 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::write(Ostream& os) const
         os.writeKeyword("rho") << rhoName_ << token::END_STATEMENT << nl;
     }
 
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "value", *this);
+#else
     writeEntry("value", os);
+#endif
 }
 
 

@@ -26,7 +26,7 @@ Class
     pimpleFluid
 
 Description
-    pisoFoam fluid model
+    pimpleFoam fluid model
 
 Author
     Hrvoje Jasak, Wikki Ltd.  All rights reserved.
@@ -43,7 +43,12 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#include "turbulenceModel.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "turbulentTransportModel.H"
+    #include "fvOptions.H"
+#else
+    #include "turbulenceModel.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -63,24 +68,58 @@ class pimpleFluid
 {
     // Private data
 
-#ifndef OPENFOAMESIORFOUNDATION
         //- Transport model
         singlePhaseTransportModel laminarTransport_;
 
         //- Turbulence model
         autoPtr<incompressible::turbulenceModel> turbulence_;
 
-        //- Density
+        //- Fluid density [kg/m3]
         dimensionedScalar rho_;
+
+#ifdef OPENFOAMESIORFOUNDATION
+        //- Creates and initialises the velocity field Uf if required
+        autoPtr<surfaceVectorField> Uf_;
+
+        //- Create finite volume options
+        fv::options& fvOptions_;
+#else
+#if FOAMEXTEND > 40
+        //- rAU field
+        volScalarField rAU_;
+#else
+        //- aU field
+        volScalarField aU_;
+#endif
+#endif
 
         //- Reference pressure cell
         label pRefCell_;
 
         //- Reference pressure value
         scalar pRefValue_;
-#endif
+
 
     // Private Member Functions
+
+#ifdef OPENFOAMESIORFOUNDATION
+        //- Solve pressure equation
+        void solvePEqn
+        (
+            const fvVectorMatrix& UEqn
+        );
+#else
+        //- Correct phi
+        void CorrectPhi();
+
+        //- Solve pressure equation
+        void solvePEqn
+        (
+            const scalar& UUrf,
+            const fvVectorMatrix& ddtUEqn,
+            const fvVectorMatrix& HUEqn
+        );
+#endif
 
         //- Disallow default bitwise copy construct
         pimpleFluid(const pimpleFluid&);

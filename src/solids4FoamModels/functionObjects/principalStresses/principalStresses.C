@@ -211,10 +211,17 @@ bool Foam::principalStresses::writeData()
         );
 
         // References to internalFields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+        const symmTensorField& sigmaI = sigma.primitiveField();
+        vectorField& sigmaMaxI = sigmaMax.primitiveFieldRef();
+        vectorField& sigmaMidI = sigmaMid.primitiveFieldRef();
+        vectorField& sigmaMinI = sigmaMin.primitiveFieldRef();
+#else
         const symmTensorField& sigmaI = sigma.internalField();
         vectorField& sigmaMaxI = sigmaMax.internalField();
         vectorField& sigmaMidI = sigmaMid.internalField();
         vectorField& sigmaMinI = sigmaMin.internalField();
+#endif
 
         forAll (sigmaI, cellI)
         {
@@ -236,9 +243,15 @@ bool Foam::principalStresses::writeData()
             )
             {
                 const symmTensorField& pSigma = sigma.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+                vectorField& pSigmaMax = sigmaMax.boundaryFieldRef()[patchI];
+                vectorField& pSigmaMid = sigmaMid.boundaryFieldRef()[patchI];
+                vectorField& pSigmaMin = sigmaMin.boundaryFieldRef()[patchI];
+#else
                 vectorField& pSigmaMax = sigmaMax.boundaryField()[patchI];
                 vectorField& pSigmaMid = sigmaMid.boundaryField()[patchI];
                 vectorField& pSigmaMin = sigmaMin.boundaryField()[patchI];
+#endif
 
                 forAll(pSigmaMax, faceI)
                 {
@@ -323,5 +336,13 @@ bool Foam::principalStresses::read(const dictionary& dict)
 {
     return true;
 }
+
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::principalStresses::write()
+{
+    return writeData();
+}
+#endif
 
 // ************************************************************************* //

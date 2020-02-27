@@ -162,10 +162,15 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
 
     const cellList& cells = mesh.cells();
 
+#ifdef OPENFOAMESI
+    const labelList& owner = mesh.owner();
+    const labelList& neighbour = mesh.neighbour();
+    const labelList& patchCells = this->patch().faceCells();
+#else
     const unallocLabelList& owner = mesh.owner();
     const unallocLabelList& neighbour = mesh.neighbour();
-
     const unallocLabelList& patchCells = this->patch().faceCells();
+#endif
 
     const surfaceScalarField& weights = mesh.weights();
     const vectorField& faceCentres = mesh.faceCentres();
@@ -216,9 +221,13 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
+#ifdef OPENFOAMESI
+                    const labelList& cycPatchCells =
+                        mesh.boundaryMesh()[patchID].faceCells();
+#else
                     const unallocLabelList& cycPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
-
+#endif
                     label sizeby2 = cycPatchCells.size()/2;
 
                     if (localFaceID < sizeby2)
@@ -267,8 +276,13 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
+#ifdef OPENFOAMESI
+                    const labelList& procPatchCells =
+                        mesh.boundaryMesh()[patchID].faceCells();
+#else
                     const unallocLabelList& procPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
+#endif
 
                     iPoints_[faceI].append
                     (
@@ -314,19 +328,31 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
 
     const cellList& cells = mesh.cells();
 
+#ifdef OPENFOAMESI
+    const labelList& owner = mesh.owner();
+    const labelList& neighbour = mesh.neighbour();
+    const labelList& patchCells = this->patch().faceCells();
+#else
     const unallocLabelList& owner = mesh.owner();
     const unallocLabelList& neighbour = mesh.neighbour();
-
     const unallocLabelList& patchCells = this->patch().faceCells();
+#endif
 
     const surfaceScalarField& weights = mesh.weights();
 //     const vectorField& faceCentres = mesh.faceCentres();
     const vectorField& cellCentres = mesh.cellCentres();
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const Field<Type>& phiI = this->primitiveField();
+
+    word fieldName =
+        this->internalField().name();
+#else
     const Field<Type>& phiI = this->internalField();
 
     word fieldName =
         this->dimensionedInternalField().name();
+#endif
 
     const GeometricField<Type, fvPatchField, volMesh>& phi =
         mesh.lookupObject<GeometricField<Type, fvPatchField, volMesh> >
@@ -392,8 +418,13 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
+#ifdef OPENFOAMESI
+                    const labelList& cycPatchCells =
+                        mesh.boundaryMesh()[patchID].faceCells();
+#else
                     const unallocLabelList& cycPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
+#endif
 
                     label sizeby2 = cycPatchCells.size()/2;
 
@@ -463,8 +494,13 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
+#ifdef OPENFOAMESI
+                    const labelList& procPatchCells =
+                        mesh.boundaryMesh()[patchID].faceCells();
+#else
                     const unallocLabelList& procPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
+#endif
 
                     iPhi.append
                     (
@@ -644,7 +680,11 @@ void extrapolatedFvPatchField<Type>::write(Ostream& os) const
 {
     fixedGradientFvPatchField<Type>::write(os);
 
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "value", *this);
+#else
     this->writeEntry("value", os);
+#endif
 
     os.writeKeyword("zeroGradient")
         << zeroGradient_ << token::END_STATEMENT << nl;

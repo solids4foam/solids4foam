@@ -32,6 +32,9 @@ Author
 #include "pointFields.H"
 #include "boundBox.H"
 #include "polyPatchID.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "surfaceFields.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -143,7 +146,7 @@ Foam::patchAvgTractionHistory::patchAvgTractionHistory
     name_(name),
     time_(t),
     regionName_(polyMesh::defaultRegion),
-    historyFilePtr_(NULL),
+    historyFilePtr_(),
     patchName_(dict.lookup("patchName")),
     patchIndex_(-1)
 {
@@ -242,5 +245,13 @@ bool Foam::patchAvgTractionHistory::read(const dictionary& dict)
 
     return true;
 }
+
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::patchAvgTractionHistory::write()
+{
+    return writeData();
+}
+#endif
 
 // ************************************************************************* //

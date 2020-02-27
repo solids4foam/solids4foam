@@ -77,7 +77,11 @@ bool Foam::hotCylinderAnalyticalSolution::writeData()
         )/dimensionedScalar("one", dimLength, 1)
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if (gMin(radii.primitiveField()) < SMALL)
+#else
     if (gMin(radii.internalField()) < SMALL)
+#endif
     {
         FatalErrorIn("bool Foam::hotCylinderAnalyticalSolution::writeData()")
             << "The minimum pipe radius in zero: this is not allowed!"
@@ -223,5 +227,13 @@ bool Foam::hotCylinderAnalyticalSolution::read(const dictionary& dict)
 {
     return true;
 }
+
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::hotCylinderAnalyticalSolution::write()
+{
+    return writeData();
+}
+#endif
 
 // ************************************************************************* //

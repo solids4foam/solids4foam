@@ -28,6 +28,9 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "surfaceFields.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -168,7 +171,7 @@ Foam::solidForces::solidForces
     time_(t),
     historyPatchID_(-1),
     patchFound_(false),
-    historyFilePtr_(NULL)
+    historyFilePtr_()
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 
@@ -278,5 +281,13 @@ bool Foam::solidForces::read(const dictionary& dict)
 {
     return true;
 }
+
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::solidForces::write()
+{
+    return writeData();
+}
+#endif
 
 // ************************************************************************* //

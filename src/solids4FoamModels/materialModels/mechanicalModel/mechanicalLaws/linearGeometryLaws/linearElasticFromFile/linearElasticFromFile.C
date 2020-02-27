@@ -131,7 +131,11 @@ Foam::tmp<Foam::volScalarField> Foam::linearElasticFromFile::rho() const
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
     tresult().correctBoundaryConditions();
+#endif
 
     return tresult;
 }

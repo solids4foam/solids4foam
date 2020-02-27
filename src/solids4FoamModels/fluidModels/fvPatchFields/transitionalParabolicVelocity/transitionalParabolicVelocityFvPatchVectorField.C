@@ -169,7 +169,11 @@ void transitionalParabolicVelocityFvPatchVectorField::write(Ostream& os) const
         << boundBoxMin_ << token::END_STATEMENT << nl;
     os.writeKeyword("boundBoxMax")
         << boundBoxMax_ << token::END_STATEMENT << nl;
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "value", *this);
+#else
     writeEntry("value", os);
+#endif
 }
 
 

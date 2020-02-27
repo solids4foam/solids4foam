@@ -56,6 +56,9 @@ Author
 
 #include "mechanicalLaw.H"
 #include "interpolationTable.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "surfaceFields.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
