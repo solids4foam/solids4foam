@@ -43,7 +43,12 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#include "turbulenceModel.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "turbulentTransportModel.H"
+    #include "fvOptions.H"
+#else
+    #include "turbulenceModel.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -63,7 +68,6 @@ class pisoFluid
 {
     // Private data
 
-#ifndef OPENFOAMESIORFOUNDATION
         //- Transport model
         singlePhaseTransportModel laminarTransport_;
 
@@ -73,12 +77,16 @@ class pisoFluid
         //- Density
         dimensionedScalar rho_;
 
+#ifdef OPENFOAMESIORFOUNDATION
+        //- Create finite volume options
+        fv::options& fvOptions_;
+#endif
+
         //- Reference pressure cell
         label pRefCell_;
 
         //- Reference pressure value
         scalar pRefValue_;
-#endif
 
     // Private Member Functions
 

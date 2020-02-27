@@ -36,6 +36,8 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAMESIORFOUNDATION
+
 #ifndef amiInterfaceToInterfaceMapping_H
 #define amiInterfaceToInterfaceMapping_H
 
@@ -61,10 +63,14 @@ class amiInterfaceToInterfaceMapping
 {
     // Private data
 
-#ifdef OPENFOAMESI
         //- AMI interpolator between two standAlone patches
-        mutable autoPtr< AMIInterpolation<standAlonePatch, standAlonePatch> >
+#ifdef OPENFOAMESI
+        mutable autoPtr<AMIInterpolation<standAlonePatch, standAlonePatch>>
             interpolatorPtr_;
+#else
+        mutable autoPtr<newAMIInterpolation<standAlonePatch, standAlonePatch>>
+            interpolatorPtr_;
+#endif
 
             //- zoneB face into which each point of zoneA is projected
             mutable List<labelPair>* zoneAPointAddressingPtr_;
@@ -84,8 +90,13 @@ class amiInterfaceToInterfaceMapping
         void makeInterpolator() const;
 
         //- Return a const access to the AMI interpolator
+#ifdef OPENFOAMESI
         const AMIInterpolation<standAlonePatch, standAlonePatch>&
             interpolator() const;
+#else
+        const newAMIInterpolation<standAlonePatch, standAlonePatch>&
+            interpolator() const;
+#endif
 
         //- Check zoneA to zoneB face interpolation error
         void checkZoneAToZoneBError() const;
@@ -138,7 +149,6 @@ class amiInterfaceToInterfaceMapping
             const Field<Type>& fromField,       // from field
             Field<Type>& toField               // to field
         ) const;
-#endif
 
         //- Disallow default bitwise copy construct
         amiInterfaceToInterfaceMapping(const amiInterfaceToInterfaceMapping&);
@@ -223,17 +233,16 @@ public:
 
 } // End namespace interfaceToInterfaceMappings
 
-
 } // End namespace Foam
 
-#ifdef OPENFOAMESI
 #ifdef NoRepository
 #   include "amiInterfaceToInterfaceMappingTemplates.C"
-#endif
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
+
+#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
 // ************************************************************************* //

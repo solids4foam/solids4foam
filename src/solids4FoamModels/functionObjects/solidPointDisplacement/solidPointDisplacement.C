@@ -28,7 +28,11 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
-#include "newLeastSquaresVolPointInterpolation.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "volPointInterpolation.H"
+#else
+    #include "newLeastSquaresVolPointInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -84,10 +88,17 @@ bool Foam::solidPointDisplacement::writeData()
             dimensionedVector("zero", D.dimensions(), vector::zero)
         );
 
+#ifdef OPENFOAMESIORFOUNDATION
+        mesh.lookupObject<volPointInterpolation>
+        (
+            "volPointInterpolation"
+        ).interpolate(D, pointD);
+#else
         mesh.lookupObject<newLeastSquaresVolPointInterpolation>
         (
             "newLeastSquaresVolPointInterpolation"
         ).interpolate(D, pointD);
+#endif
 
         vector pointDValue = vector::zero;
         if (pointID_ > -1)
@@ -129,7 +140,7 @@ Foam::solidPointDisplacement::solidPointDisplacement
     name_(name),
     time_(t),
     pointID_(-1),
-    historyFilePtr_(NULL)
+    historyFilePtr_()
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 
@@ -262,5 +273,13 @@ bool Foam::solidPointDisplacement::read(const dictionary& dict)
 {
     return true;
 }
+
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::solidPointDisplacement::write()
+{
+    return writeData();
+}
+#endif
 
 // ************************************************************************* //

@@ -90,6 +90,7 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
     {
         dictionary emptyDict;
         fsiProperties_.add("GGICoeffs", emptyDict);
+        fsiProperties_.add("AMICoeffs", emptyDict);
         fsiProperties_.add("RBFCoeffs", emptyDict);
         fsiProperties_.add("directMapCoeffs", emptyDict);
     }
@@ -566,7 +567,11 @@ Foam::vector Foam::fluidSolidInterface::totalForceOnInterface
     vectorField S(localFaces.size(), vector::zero);
     forAll(S, faceI)
     {
+#ifdef OPENFOAMFOUNDATION
+        S[faceI] = localFaces[faceI].area(localPoints);
+#else
         S[faceI] = localFaces[faceI].normal(localPoints);
+#endif
     }
 
     // No need for global sum as the zone is already global

@@ -114,7 +114,7 @@ Foam::solidStresses::solidStresses
     time_(t),
     historyPatchID_(-1),
     patchFound_(false),
-    historyFilePtr_(NULL)
+    historyFilePtr_()
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 
@@ -224,5 +224,13 @@ bool Foam::solidStresses::read(const dictionary& dict)
 {
     return true;
 }
+
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::solidStresses::write()
+{
+    return writeData();
+}
+#endif
 
 // ************************************************************************* //

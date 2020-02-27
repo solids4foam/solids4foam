@@ -139,4 +139,12 @@ bool Foam::hydrostaticPressure::read(const dictionary& dict)
     return true;
 }
 
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::hydrostaticPressure::write()
+{
+    return writeData();
+}
+#endif
+
 // ************************************************************************* //

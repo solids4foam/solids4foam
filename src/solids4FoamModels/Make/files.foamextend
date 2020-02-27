@@ -26,6 +26,7 @@ solidModels/finiteVolume/fvc/fvcCellLimitedGrad.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/buoyantBoussinesqPimpleFluid/buoyantBoussinesqPimpleFluid.C
+fluidModels/buoyantPimpleFluid/buoyantPimpleFluid.C
 fluidModels/icoFluid/icoFluid.C
 fluidModels/interFluid/interFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
@@ -219,6 +220,10 @@ $(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
 numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
+numerics/newAMIInterpolation/newAMIInterpolationName.C
+numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
+numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
+numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
 numerics/newSkewCorrectedSnGrad/newSkewCorrectedSnGrads.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
 numerics/logExpVolFields/eig3/eig3.C

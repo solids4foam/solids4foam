@@ -143,8 +143,13 @@ void extrapolatedPressureFvPatchScalarField::evaluate
 //     // Otherwise assume the variable is the static pressure.
 //     if
 //     (
+// #ifdef OPENFOAMESIORFOUNDATION
+//         internalField().name() == "p_rgh"
+//      || internalField().name() == "pd"
+// #else
 //         dimensionedInternalField().name() == "p_rgh"
 //      || dimensionedInternalField().name() == "pd"
+// #endif
 //     )
 //     {
 //         gradient() = -rho.snGrad()*(g.value() & patch().Cf());
