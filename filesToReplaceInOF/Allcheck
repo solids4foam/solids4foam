@@ -65,6 +65,12 @@ checkAndReport \
     "$FOAM_SRC/foam"
 if [ $? -ne 0 ]; then result=1; fi
 
+checkAndReport \
+    "findRefCell.C" \
+    "$FOAM_SRC/finiteVolume/cfdTools/general/findRefCell" \
+    "$FOAM_SRC/finiteVolume"
+if [ $? -ne 0 ]; then result=1; fi
+
 # disabled: as it may have other unintended consequences; however, this is
 # needed when using layer addition removal
 #checkAndReport \
