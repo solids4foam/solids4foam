@@ -27,7 +27,6 @@ License
 #include "buoyantBoussinesqPimpleFluid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "findRefCell.H"
-#include "adjustPhi.H"
 #ifdef OPENFOAMESIORFOUNDATION
     #include "constrainHbyA.H"
     #include "constrainPressure.H"
@@ -178,8 +177,6 @@ void buoyantBoussinesqPimpleFluid::solvePEqn
 #ifdef OPENFOAMESIORFOUNDATION
     // Update the pressure BCs to ensure flux consistency
     constrainPressure(p_rgh_, U(), phiHbyA, rAUf);
-#else
-    adjustPhi(phiHbyA, U(), p_rgh_);
 #endif
 
     while (pimple().correctNonOrthogonal())
@@ -235,6 +232,9 @@ void buoyantBoussinesqPimpleFluid::solvePEqn
         );
         p_rgh_ = p() - rhok_*gh_;
     }
+
+    // Make the fluxes relative to the mesh motion
+    fvc::makeRelative(phi(), U());
 }
 
 
@@ -516,9 +516,6 @@ bool buoyantBoussinesqPimpleFluid::evolve()
             solvePEqn(tUEqn());
 #endif
         }
-
-        // Make the fluxes relative to the mesh motion
-        fvc::makeRelative(phi(), U());
 
         tUEqn.clear();
 
