@@ -679,6 +679,7 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::newAMIInterpolation
     const interpolationMethod& method,
     const scalar lowWeightCorrection,
     const bool reverseTarget,
+    const bool useGlobalPolyPatch,
     const bool report
 )
 :
@@ -695,7 +696,8 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::newAMIInterpolation
     tgtWeightsSum_(),
     triMode_(triMode),
     srcMapPtr_(nullptr),
-    tgtMapPtr_(nullptr)
+    tgtMapPtr_(nullptr),
+    useGlobalPolyPatch_(useGlobalPolyPatch)
 {
     update(srcPatch, tgtPatch, report);
 }
@@ -711,6 +713,7 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::newAMIInterpolation
     const word& methodName,
     const scalar lowWeightCorrection,
     const bool reverseTarget,
+    const bool useGlobalPolyPatch,
     const bool report
 )
 :
@@ -727,7 +730,8 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::newAMIInterpolation
     tgtWeightsSum_(),
     triMode_(triMode),
     srcMapPtr_(nullptr),
-    tgtMapPtr_(nullptr)
+    tgtMapPtr_(nullptr),
+    useGlobalPolyPatch_(useGlobalPolyPatch)
 {
     update(srcPatch, tgtPatch, report);
 }
@@ -744,6 +748,7 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::newAMIInterpolation
     const interpolationMethod& method,
     const scalar lowWeightCorrection,
     const bool reverseTarget,
+    const bool useGlobalPolyPatch,
     const bool report
 )
 :
@@ -760,7 +765,8 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::newAMIInterpolation
     tgtWeightsSum_(),
     triMode_(triMode),
     srcMapPtr_(nullptr),
-    tgtMapPtr_(nullptr)
+    tgtMapPtr_(nullptr),
+    useGlobalPolyPatch_(useGlobalPolyPatch)
 {
     constructFromSurface(srcPatch, tgtPatch, surfPtr, report);
 }
@@ -777,6 +783,7 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::newAMIInterpolation
     const word& methodName,
     const scalar lowWeightCorrection,
     const bool reverseTarget,
+    const bool useGlobalPolyPatch,
     const bool report
 )
 :
@@ -793,7 +800,8 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::newAMIInterpolation
     tgtWeightsSum_(),
     triMode_(triMode),
     srcMapPtr_(nullptr),
-    tgtMapPtr_(nullptr)
+    tgtMapPtr_(nullptr),
+    useGlobalPolyPatch_(useGlobalPolyPatch)
 {
     constructFromSurface(srcPatch, tgtPatch, surfPtr, report);
 }
@@ -821,7 +829,8 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::newAMIInterpolation
     tgtWeightsSum_(),
     triMode_(fineAMI.triMode_),
     srcMapPtr_(nullptr),
-    tgtMapPtr_(nullptr)
+    tgtMapPtr_(nullptr),
+    useGlobalPolyPatch_(false)
 {
     label sourceCoarseSize =
     (
@@ -958,6 +967,13 @@ void Foam::newAMIInterpolation<SourcePatch, TargetPatch>::update
 
     // Calculate if patches present on multiple processors
     singlePatchProc_ = calcDistribution(srcPatch, tgtPatch);
+
+    if (useGlobalPolyPatch_)
+    {
+        Info<< indent
+            << "AMI: using globalPolyPatch" << endl;
+        singlePatchProc_ = Pstream::myProcNo();
+    }
 
     if (singlePatchProc_ == -1)
     {
