@@ -64,6 +64,10 @@ void Foam::thermoLinearElastic::makeTrunTime()
             "system",
             "constant",
             true
+#ifdef OPENFOAMESI
+            ,
+            true
+#endif
         )
     );
 

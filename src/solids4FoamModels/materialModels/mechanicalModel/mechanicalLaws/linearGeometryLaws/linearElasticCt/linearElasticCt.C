@@ -89,7 +89,7 @@ void Foam::linearElasticCt::setYoungsModulusFromCt()
 
         //filepath location of CT image slices
 
-        fileName ctFilePath = (dict().lookup("ctImagesFilePath"));
+        const fileName ctFilePath(dict().lookup("ctImagesFilePath"));
 
         Info<< "z: max " << slices*pixelSliceSpacing + pixelSliceOffset
             << " min " << pixelSliceOffset << nl

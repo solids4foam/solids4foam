@@ -208,7 +208,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             (
                 IOobject
                 (
-                    "h" + name(MaxwellModelI),
+                    "h" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -226,7 +226,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             (
                 IOobject
                 (
-                    "hf" + name(MaxwellModelI),
+                    "hf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,

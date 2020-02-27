@@ -816,8 +816,13 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     scalarField& activeYieldI = activeYield_.internalField();
 #endif
 
+#ifdef OPENFOAMESI
+    const labelList& faceOwner = mesh().faceOwner();
+    const labelList& faceNeighbour = mesh().faceNeighbour();
+#else
     const unallocLabelList& faceOwner = mesh().faceOwner();
     const unallocLabelList& faceNeighbour = mesh().faceNeighbour();
+#endif
 
     // Correct sigma internal field
     forAll(sigmaI, faceI)

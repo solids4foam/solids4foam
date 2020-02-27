@@ -387,7 +387,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "transformH" + name(MaxwellModelI),
+                    "transformH" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -405,7 +405,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "transformHf" + name(MaxwellModelI),
+                    "transformHf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -432,7 +432,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "h" + name(MaxwellModelI),
+                    "h" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -450,7 +450,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "hf" + name(MaxwellModelI),
+                    "hf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -479,7 +479,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "H" + name(MaxwellModelI),
+                    "H" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -497,7 +497,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "Hf" + name(MaxwellModelI),
+                    "Hf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
