@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
   =========                 |
   \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
-   \\    /   O peration     | Website:  https://openfoam.org
-    \\  /    A nd           | Copyright (C) 2011-2019 OpenFOAM Foundation
-     \\/     M anipulation  |
+   \\    /   O peration     |
+    \\  /    A nd           | Copyright (C) 2011-2017 OpenFOAM Foundation
+     \\/     M anipulation  | Copyright (C) 2016-2018 OpenCFD Ltd.
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -22,7 +22,7 @@ License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::newAMIInterpolation
+    Foam::AMIInterpolation
 
 Description
     Interpolation class dealing with transfer of data between two
@@ -40,16 +40,14 @@ Description
 
 
 SourceFiles
-    newAMIInterpolation.C
-    newAMIInterpolationName.C
-    newAMIInterpolationParallelOps.C
+    AMIInterpolation.C
+    AMIInterpolationName.C
+    AMIInterpolationParallelOps.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMFOUNDATION
-
-#ifndef newAMIInterpolation_H
-#define newAMIInterpolation_H
+#ifndef AMIInterpolation_H
+#define AMIInterpolation_H
 
 #include "className.H"
 #include "searchableSurface.H"
@@ -59,6 +57,7 @@ SourceFiles
 #include "faceAreaIntersect.H"
 #include "globalIndex.H"
 #include "ops.H"
+#include "Enum.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -66,31 +65,22 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                    Class newAMIInterpolationName Declaration
+                    Class AMIInterpolationName Declaration
 \*---------------------------------------------------------------------------*/
 
-TemplateName(newAMIInterpolation);
+TemplateName(AMIInterpolation);
 
 
 /*---------------------------------------------------------------------------*\
-                      Class newAMIInterpolation Declaration
+                      Class AMIInterpolation Declaration
 \*---------------------------------------------------------------------------*/
 
 template<class SourcePatch, class TargetPatch>
-class newAMIInterpolation
+class AMIInterpolation
 :
-    public newAMIInterpolationName
+    public AMIInterpolationName
 {
 public:
-
-    // Public typedefs
-
-        // Typedef to SourcePatch type this newAMIInterplation is instantiated on
-        typedef SourcePatch sourcePatchType;
-
-        // Typedef to TargetPatch type this newAMIInterplation is instantiated on
-        typedef TargetPatch targetPatchType;
-
 
     // Public data types
 
@@ -100,21 +90,12 @@ public:
             imDirect,
             imMapNearest,
             imFaceAreaWeight,
-            imPartialFaceAreaWeight,
-            imSweptFaceAreaWeight
+            imPartialFaceAreaWeight
         };
 
-        //- Convert interpolationMethod to word representation
-        static word interpolationMethodToWord
-        (
-            const interpolationMethod& method
-        );
+        static const Enum<interpolationMethod> interpolationMethodNames_;
 
-        //- Convert word to interpolationMethod
-        static interpolationMethod wordTointerpolationMethod
-        (
-            const word& method
-        );
+        static bool cacheIntersections_;
 
         //- Calculate the patch face magnitudes for the given tri-mode
         template<class Patch>
@@ -127,21 +108,21 @@ public:
 
 private:
 
-    // Private Data
+    // Private data
 
         //- Interpolation method
         const word methodName_;
 
         //- Flag to indicate that the two patches are co-directional and
-        //  that the orientation of the target patch should be reversed
+        //- that the orientation of the target patch should be reversed
         const bool reverseTarget_;
 
         //- Flag to indicate that the two patches must be matched/an overlap
-        //  exists between them
+        //- exists between them
         const bool requireMatch_;
 
         //- Index of processor that holds all of both sides. -1 in all other
-        //  cases
+        //- cases
         label singlePatchProc_;
 
         //- Threshold weight below which interpolation is deactivated
@@ -151,7 +132,7 @@ private:
         // Source patch
 
             //- Source face areas
-            scalarField srcMagSf_;
+            scalarList srcMagSf_;
 
             //- Addresses of target faces per source face
             labelListList srcAddress_;
@@ -166,7 +147,7 @@ private:
         // Target patch
 
             //- Target face areas
-            scalarField tgtMagSf_;
+            scalarList tgtMagSf_;
 
             //- Addresses of source faces per target face
             labelListList tgtAddress_;
@@ -187,9 +168,18 @@ private:
         //- Target map pointer - parallel running only
         autoPtr<mapDistribute> tgtMapPtr_;
 
-        //- Patches are globalPolyPatches
-        //  same copy of global patches on all processors
+        //- Patches are globalPolyPatches (same copy of global patch on all
+        //  processors
         const bool useGlobalPolyPatch_;
+
+
+    // Private Member Functions
+
+        //- No copy construct
+        AMIInterpolation(const AMIInterpolation&) = delete;
+
+        //- No copy assignment
+        void operator=(const AMIInterpolation&) = delete;
 
 
         // Parallel functionality
@@ -245,46 +235,23 @@ private:
             ) const;
 
 
-        // Manipulation
+        // Evaluation
 
-            //- Sum the weights for each face
-            static void sumWeights
+            //- Normalise the (area) weights - suppresses numerical error in
+            //- weights calculation
+            //  NOTE: if area weights are incorrect by 'a significant amount'
+            //     normalisation may stabilise the solution, but will introduce
+            //     numerical error!
+            static void normaliseWeights
             (
-                const scalarListList& wght,
-                scalarField& wghtSum
-            );
-
-            //- As above, but for multiple sets of weights
-            static void sumWeights
-            (
-                const UPtrList<scalarListList>& wghts,
-                scalarField& wghtSum
-            );
-
-            //- Print out information relating to the weights sum. Values close
-            //  to one are ideal. This information acts as a measure of the
-            //  quality of the AMI.
-            static void reportSumWeights
-            (
-                const scalarField& patchAreas,
+                const scalarList& patchAreas,
                 const word& patchName,
-                const scalarField& wghtSum,
-                const scalar lowWeightTol
-            );
-
-            //- Normalise the weights so that they sum to one for each face.
-            //  This may stabilise the solution at the expense of accuracy.
-            static void normaliseWeights
-            (
+                const labelListList& addr,
                 scalarListList& wght,
-                const scalarField& wghtSum
-            );
-
-            //- As above but for multiple sets of weights
-            static void normaliseWeights
-            (
-                UPtrList<scalarListList>& wghts,
-                const scalarField& wghtSum
+                scalarField& wghtSum,
+                const bool conformal,
+                const bool output,
+                const scalar lowWeightTol
             );
 
 
@@ -293,14 +260,14 @@ private:
             static void agglomerate
             (
                 const autoPtr<mapDistribute>& targetMap,
-                const scalarField& fineSrcMagSf,
+                const scalarList& fineSrcMagSf,
                 const labelListList& fineSrcAddress,
                 const scalarListList& fineSrcWeights,
 
                 const labelList& sourceRestrictAddressing,
                 const labelList& targetRestrictAddressing,
 
-                scalarField& srcMagSf,
+                scalarList& srcMagSf,
                 labelListList& srcAddress,
                 scalarListList& srcWeights,
                 scalarField& srcWeightsSum,
@@ -311,8 +278,7 @@ private:
             (
                 const SourcePatch& srcPatch,
                 const TargetPatch& tgtPatch,
-                const autoPtr<searchableSurface>& surfPtr,
-                const bool report
+                const autoPtr<searchableSurface>& surfPtr
             );
 
 public:
@@ -320,7 +286,7 @@ public:
     // Constructors
 
         //- Construct from components
-        newAMIInterpolation
+        AMIInterpolation
         (
             const SourcePatch& srcPatch,
             const TargetPatch& tgtPatch,
@@ -329,27 +295,25 @@ public:
             const interpolationMethod& method = imFaceAreaWeight,
             const scalar lowWeightCorrection = -1,
             const bool reverseTarget = false,
-            const bool useGlobalPolyPatch = false,
-            const bool report = true
+            const bool useGlobalPolyPatch = false
         );
 
         //- Construct from components
-        newAMIInterpolation
+        AMIInterpolation
         (
             const SourcePatch& srcPatch,
             const TargetPatch& tgtPatch,
             const faceAreaIntersect::triangulationMode& triMode,
             const bool requireMatch = true,
             const word& methodName =
-                interpolationMethodToWord(imFaceAreaWeight),
+                interpolationMethodNames_[imFaceAreaWeight],
             const scalar lowWeightCorrection = -1,
             const bool reverseTarget = false,
-            const bool useGlobalPolyPatch = false,
-            const bool report = true
+            const bool useGlobalPolyPatch = false
         );
 
         //- Construct from components, with projection surface
-        newAMIInterpolation
+        AMIInterpolation
         (
             const SourcePatch& srcPatch,
             const TargetPatch& tgtPatch,
@@ -359,12 +323,11 @@ public:
             const interpolationMethod& method = imFaceAreaWeight,
             const scalar lowWeightCorrection = -1,
             const bool reverseTarget = false,
-            const bool useGlobalPolyPatch = false,
-            const bool report = true
+            const bool useGlobalPolyPatch = false
         );
 
         //- Construct from components, with projection surface
-        newAMIInterpolation
+        AMIInterpolation
         (
             const SourcePatch& srcPatch,
             const TargetPatch& tgtPatch,
@@ -372,30 +335,30 @@ public:
             const faceAreaIntersect::triangulationMode& triMode,
             const bool requireMatch = true,
             const word& methodName =
-                interpolationMethodToWord(imFaceAreaWeight),
+                interpolationMethodNames_[imFaceAreaWeight],
             const scalar lowWeightCorrection = -1,
             const bool reverseTarget = false,
-            const bool useGlobalPolyPatch = false,
-            const bool report = true
+            const bool useGlobalPolyPatch = false
         );
 
-        //- Construct from agglomeration of newAMIInterpolation.
-        //  Agglomeration passed in as new coarse size and addressing from fine
-        //  from coarse
-        newAMIInterpolation
+        //- Construct from agglomeration of AMIInterpolation. Agglomeration
+        //  passed in as new coarse size and addressing from fine from coarse
+        AMIInterpolation
         (
-            const newAMIInterpolation<SourcePatch, TargetPatch>& fineAMI,
+            const AMIInterpolation<SourcePatch, TargetPatch>& fineAMI,
             const labelList& sourceRestrictAddressing,
-            const labelList& neighbourRestrictAddressing,
-            const bool report = false
+            const labelList& neighbourRestrictAddressing
         );
-
-        //- Disallow default bitwise copy construction
-        newAMIInterpolation(const newAMIInterpolation&) = delete;
 
 
     //- Destructor
-    ~newAMIInterpolation();
+    ~AMIInterpolation();
+
+    // Typedef to SourcePatch type this AMIInterpolation is instantiated on
+    typedef SourcePatch sourcePatchType;
+
+    // Typedef to TargetPatch type this AMIInterpolation is instantiated on
+    typedef TargetPatch targetPatchType;
 
 
     // Member Functions
@@ -403,7 +366,7 @@ public:
         // Access
 
             //- Set to -1, or the processor holding all faces (both sides) of
-            //  the AMI
+            //- the AMI
             inline label singlePatchProc() const;
 
             //- Threshold weight below which interpolation is deactivated
@@ -416,10 +379,16 @@ public:
             // Source patch
 
                 //- Return const access to source patch face areas
-                inline const scalarField& srcMagSf() const;
+                inline const List<scalar>& srcMagSf() const;
+
+                //- Return access to source patch face areas
+                inline List<scalar>& srcMagSf();
 
                 //- Return const access to source patch addressing
                 inline const labelListList& srcAddress() const;
+
+                //- Return access to source patch addressing
+                inline labelListList& srcAddress();
 
                 //- Return const access to source patch weights
                 inline const scalarListList& srcWeights() const;
@@ -428,26 +397,32 @@ public:
                 inline scalarListList& srcWeights();
 
                 //- Return const access to normalisation factor of source
-                //  patch weights (i.e. the sum before normalisation)
+                //- patch weights (i.e. the sum before normalisation)
                 inline const scalarField& srcWeightsSum() const;
 
                 //- Return access to normalisation factor of source
-                //  patch weights (i.e. the sum before normalisation)
+                //- patch weights (i.e. the sum before normalisation)
                 inline scalarField& srcWeightsSum();
 
                 //- Source map pointer - valid only if singlePatchProc = -1
-                //  This gets source data into a form to be consumed by
-                //  tgtAddress, tgtWeights
+                //- This gets source data into a form to be consumed by
+                //- tgtAddress, tgtWeights
                 inline const mapDistribute& srcMap() const;
 
 
             // Target patch
 
                 //- Return const access to target patch face areas
-                inline const scalarField& tgtMagSf() const;
+                inline const List<scalar>& tgtMagSf() const;
+
+                //- Return access to target patch face areas
+                inline List<scalar>& tgtMagSf();
 
                 //- Return const access to target patch addressing
                 inline const labelListList& tgtAddress() const;
+
+                //- Return access to target patch addressing
+                inline labelListList& tgtAddress();
 
                 //- Return const access to target patch weights
                 inline const scalarListList& tgtWeights() const;
@@ -456,16 +431,16 @@ public:
                 inline scalarListList& tgtWeights();
 
                 //- Return const access to normalisation factor of target
-                //  patch weights (i.e. the sum before normalisation)
+                //- patch weights (i.e. the sum before normalisation)
                 inline const scalarField& tgtWeightsSum() const;
 
                 //- Return access to normalisation factor of target
-                //  patch weights (i.e. the sum before normalisation)
+                //- patch weights (i.e. the sum before normalisation)
                 inline scalarField& tgtWeightsSum();
 
                 //- Target map pointer -  valid only if singlePatchProc=-1.
-                //  This gets target data into a form to be consumed by
-                //  srcAddress, srcWeights
+                //- This gets target data into a form to be consumed by
+                //- srcAddress, srcWeights
                 inline const mapDistribute& tgtMap() const;
 
 
@@ -475,41 +450,18 @@ public:
             void update
             (
                 const SourcePatch& srcPatch,
-                const TargetPatch& tgtPatch,
-                const bool report
+                const TargetPatch& tgtPatch
             );
 
-            //- Sum the weights on both sides of an AMI
-            static void sumWeights
+            //- Append additional addressing and weights
+            void append
             (
-                newAMIInterpolation<SourcePatch, TargetPatch>& AMI
+                const SourcePatch& srcPatch,
+                const TargetPatch& tgtPatch
             );
 
-            //- As above, but for multiple AMI-s
-            static void sumWeights
-            (
-                PtrList<newAMIInterpolation<SourcePatch, TargetPatch>>& AMIs
-            );
-
-            //- Print out information relating to the weights sum. Values close
-            //  to one are ideal. This information acts as a measure of the
-            //  quality of the AMI.
-            static void reportSumWeights
-            (
-                newAMIInterpolation<SourcePatch, TargetPatch>& AMI
-            );
-
-            //- Normalise the weights on both sides of an AMI
-            static void normaliseWeights
-            (
-                newAMIInterpolation<SourcePatch, TargetPatch>& AMI
-            );
-
-            //- As above, but for multiple AMI-s
-            static void normaliseWeights
-            (
-                UPtrList<newAMIInterpolation<SourcePatch, TargetPatch>>& AMIs
-            );
+            //- Normalise the weights
+            void normaliseWeights(const bool conformal, const bool output);
 
 
         // Evaluation
@@ -517,7 +469,7 @@ public:
             // Low-level
 
                 //- Interpolate from target to source with supplied op
-                //  to combine existing value with remote value and weight
+                //- to combine existing value with remote value and weight
                 template<class Type, class CombineOp>
                 void interpolateToSource
                 (
@@ -528,7 +480,7 @@ public:
                 ) const;
 
                 //- Interpolate from source to target with supplied op
-                //  to combine existing value with remote value and weight
+                //- to combine existing value with remote value and weight
                 template<class Type, class CombineOp>
                 void interpolateToTarget
                 (
@@ -642,12 +594,6 @@ public:
                 const TargetPatch& tgtPatch,
                 const labelListList& srcAddress
             ) const;
-
-
-    // Member Operators
-
-        //- Disallow default bitwise assignment
-        void operator=(const newAMIInterpolation&) = delete;
 };
 
 
@@ -657,19 +603,17 @@ public:
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#include "newAMIInterpolationI.H"
+#include "AMIInterpolationI.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #ifdef NoRepository
-    #include "newAMIInterpolation.C"
-    #include "newAMIInterpolationParallelOps.C"
+    #include "AMIInterpolation.C"
+    #include "AMIInterpolationParallelOps.C"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
-
-#endif // end of #ifdef OPENFOAMFOUNDATION
 
 // ************************************************************************* //
