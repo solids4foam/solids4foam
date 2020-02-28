@@ -187,6 +187,10 @@ private:
         //- Target map pointer - parallel running only
         autoPtr<mapDistribute> tgtMapPtr_;
 
+        //- Patches are globalPolyPatches
+        //  same copy of global patches on all processors
+        const bool useGlobalPolyPatch_;
+
 
         // Parallel functionality
 
@@ -325,6 +329,7 @@ public:
             const interpolationMethod& method = imFaceAreaWeight,
             const scalar lowWeightCorrection = -1,
             const bool reverseTarget = false,
+            const bool useGlobalPolyPatch = false,
             const bool report = true
         );
 
@@ -339,6 +344,7 @@ public:
                 interpolationMethodToWord(imFaceAreaWeight),
             const scalar lowWeightCorrection = -1,
             const bool reverseTarget = false,
+            const bool useGlobalPolyPatch = false,
             const bool report = true
         );
 
@@ -353,6 +359,7 @@ public:
             const interpolationMethod& method = imFaceAreaWeight,
             const scalar lowWeightCorrection = -1,
             const bool reverseTarget = false,
+            const bool useGlobalPolyPatch = false,
             const bool report = true
         );
 
@@ -368,6 +375,7 @@ public:
                 interpolationMethodToWord(imFaceAreaWeight),
             const scalar lowWeightCorrection = -1,
             const bool reverseTarget = false,
+            const bool useGlobalPolyPatch = false,
             const bool report = true
         );
 
