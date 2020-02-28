@@ -64,11 +64,7 @@ void amiInterfaceToInterfaceMapping::makeInterpolator() const
 
     interpolatorPtr_.set
     (
-#ifdef OPENFOAMESI
-        new AMIInterpolation<standAlonePatch, standAlonePatch>
-#else
-        new newAMIInterpolation<standAlonePatch, standAlonePatch>
-#endif
+        new amiZoneInterpolation
         (
             zoneA(),
             zoneB(),
@@ -86,11 +82,7 @@ void amiInterfaceToInterfaceMapping::makeInterpolator() const
 }
 
 
-#ifdef OPENFOAMESI
-const AMIInterpolation<standAlonePatch, standAlonePatch>&
-#else
-const newAMIInterpolation<standAlonePatch, standAlonePatch>&
-#endif
+const amiZoneInterpolation&
 amiInterfaceToInterfaceMapping::interpolator() const
 {
     if (interpolatorPtr_.empty())

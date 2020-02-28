@@ -63,14 +63,8 @@ class amiInterfaceToInterfaceMapping
 {
     // Private data
 
-        //- AMI interpolator between two standAlone patches
-#ifdef OPENFOAMESI
-        mutable autoPtr<AMIInterpolation<standAlonePatch, standAlonePatch>>
-            interpolatorPtr_;
-#else
-        mutable autoPtr<newAMIInterpolation<standAlonePatch, standAlonePatch>>
-            interpolatorPtr_;
-#endif
+            //- AMI interpolator between two standAlone patches
+            mutable autoPtr<amiZoneInterpolation> interpolatorPtr_;
 
             //- zoneB face into which each point of zoneA is projected
             mutable List<labelPair>* zoneAPointAddressingPtr_;
@@ -90,13 +84,7 @@ class amiInterfaceToInterfaceMapping
         void makeInterpolator() const;
 
         //- Return a const access to the AMI interpolator
-#ifdef OPENFOAMESI
-        const AMIInterpolation<standAlonePatch, standAlonePatch>&
-            interpolator() const;
-#else
-        const newAMIInterpolation<standAlonePatch, standAlonePatch>&
-            interpolator() const;
-#endif
+        const amiZoneInterpolation& interpolator() const;
 
         //- Check zoneA to zoneB face interpolation error
         void checkZoneAToZoneBError() const;
