@@ -12,7 +12,8 @@ ifeq ($(WM_PROJECT), foam)
         VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
     endif
 else
-    VERSION_SPECIFIC_INC = -DOPENFOAM -I$(LIB_SRC)/dynamicFvMesh/lnInclude/
+    VERSION_SPECIFIC_INC = \
+        -DOPENFOAMESIORFOUNDATION -I$(LIB_SRC)/dynamicFvMesh/lnInclude/
     ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
         VERSION_SPECIFIC_INC += -DOPENFOAMESI
     else
