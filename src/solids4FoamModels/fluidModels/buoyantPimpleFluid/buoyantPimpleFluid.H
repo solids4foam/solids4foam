@@ -27,10 +27,11 @@ Class
 
 Description
     Transient solver for buoyant, turbulent flow of compressible fluids for
-    ventilation and heat-transfer.
+    ventilation and heat-transfer, with optional mesh motion and
+    mesh topology changes.
 
-    Turbulence is modelled using a run-time selectable compressible RAS or
-    LES model.
+    Uses the flexible PIMPLE (PISO-SIMPLE) solution for time-resolved
+    simulations.
 
 Author
     Danial Khazaei, NIT. All rights reserved.
@@ -46,14 +47,16 @@ SourceFiles
 #define buoyantPimpleFluid_H
 
 #include "fluidModel.H"
-#include "rhoThermo.H"
+#include "fluidThermo.H"
 #include "turbulentFluidThermoModel.H"
 #ifdef OPENFOAMFOUNDATION
     #include "radiationModel.H"
 #endif
-#include "fvOptions.H"
 #include "pimpleControl.H"
 #include "uniformDimensionedFields.H"
+#include "pressureControl.H"
+#include "fvOptions.H"
+#include "fvcSmooth.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -77,10 +80,10 @@ class buoyantPimpleFluid
         volScalarField p_rgh_;
 
         //- Thermophysical model
-        autoPtr<rhoThermo> pThermo_;
+        autoPtr<fluidThermo> pThermo_;
 
         //- Ref. of thermophysical model
-        rhoThermo& thermo_;
+        fluidThermo& thermo_;
 
         //- Fluid density
         volScalarField rho_;
@@ -93,6 +96,9 @@ class buoyantPimpleFluid
 
         //- Kinetic energy field
         volScalarField K_;
+
+        //- Creates and initialises the velocity field Uf if required
+        autoPtr<surfaceVectorField> rhoUf_;
 
         //- Gravitional acceleration
         const uniformDimensionedVectorField g_;
@@ -121,10 +127,7 @@ class buoyantPimpleFluid
 #endif
 
         //- Reference pressure cell
-        label pRefCell_;
-
-        //- Reference pressure value
-        scalar pRefValue_;
+        pressureControl pressureControl_;
 
 
     // Private Member Functions
