@@ -129,8 +129,14 @@ class buoyantPimpleFluid
         //- Reference pressure cell
         pressureControl pressureControl_;
 
+        //- Cumulative continuity error
+        scalar cumulativeContErr_;
+
 
     // Private Member Functions
+
+        //- Calculates and prints the continuity errors
+        void compressibleContinuityErrs();
 
         //- Solve density equation
         void solveRhoEqn();

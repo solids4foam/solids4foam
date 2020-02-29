@@ -49,6 +49,25 @@ addToRunTimeSelectionTable(fluidModel, buoyantPimpleFluid, dictionary);
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
 
+void buoyantPimpleFluid::compressibleContinuityErrs()
+{
+    dimensionedScalar totalMass = fvc::domainIntegrate(rho_);
+
+    scalar sumLocalContErr =
+        (fvc::domainIntegrate(mag(rho_ - thermo_.rho()))/totalMass).value();
+
+    scalar globalContErr =
+        (fvc::domainIntegrate(rho_ - thermo_.rho())/totalMass).value();
+
+    cumulativeContErr_ += globalContErr;
+
+    Info<< "time step continuity errors : sum local = " << sumLocalContErr
+        << ", global = " << globalContErr
+        << ", cumulative = " << cumulativeContErr_
+        << endl;
+}
+
+
 void buoyantPimpleFluid::solveRhoEqn()
 {
     fvScalarMatrix rhoEqn
@@ -370,7 +389,8 @@ buoyantPimpleFluid::buoyantPimpleFluid
 #ifdef OPENFOAMFOUNDATION
     radiation_(radiationModel::New(thermo_.T())),
 #endif
-    pressureControl_(p(), rho_, pimple().dict(), false)
+    pressureControl_(p(), rho_, pimple().dict(), false),
+    cumulativeContErr_(0)
 {
     UisRequired();
     pisRequired();
@@ -563,7 +583,7 @@ bool buoyantPimpleFluid::evolve()
             solvePEqn(tUEqn());
         }
 
-        fluidModel::continuityErrs();
+        compressibleContinuityErrs();
 
         tUEqn.clear();
 
