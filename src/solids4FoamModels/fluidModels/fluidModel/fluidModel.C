@@ -200,7 +200,15 @@ void Foam::fluidModel::CourantNo
 {
     if (mesh().nInternalFaces())
     {
-        const surfaceScalarField magPhi = mag(phi());
+        surfaceScalarField magPhi = mag(phi());
+
+        if (phi().dimensions() == dimVelocity*dimArea*dimDensity)
+        {
+            const volScalarField& rho =
+                mesh().lookupObject<volScalarField>("rho");
+
+            magPhi /= fvc::interpolate(rho);
+        }
 
         const surfaceScalarField SfUfbyDelta =
             mesh().surfaceInterpolation::deltaCoeffs()*magPhi;
