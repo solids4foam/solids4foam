@@ -206,6 +206,8 @@ void buoyantPimpleFluid::solvePEqn
     // Update the pressure BCs to ensure flux consistency
     constrainPressure(p_rgh_, rho_, U(), phiHbyA, rhorAUf);
 
+    fvc::makeRelative(phiHbyA, rho_, U());
+
     fvScalarMatrix p_rghDDtEqn
     (
         fvc::ddt(rho_) + psi_*correction(fvm::ddt(p_rgh_))
@@ -265,9 +267,6 @@ void buoyantPimpleFluid::solvePEqn
     {
         rho_ = thermo_.rho();
     }
-
-    // Make the fluxes relative to the mesh motion
-    fvc::makeRelative(phi(), rho_, U());
 
     solveRhoEqn();
 
