@@ -10,3 +10,5 @@ cleanCase solid
 \rm -rf constant/solid/polyMesh/boundary
 \rm -rf constant/solid/polyMesh/[c-z]*
 \rm -rf case.foam residuals
+foamCleanPolyMesh -region fluid
+foamCleanPolyMesh -region solid
