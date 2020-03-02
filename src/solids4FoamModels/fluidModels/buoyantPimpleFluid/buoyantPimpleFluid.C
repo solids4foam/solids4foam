@@ -412,17 +412,20 @@ buoyantPimpleFluid::buoyantPimpleFluid
     {
         Info<< "Constructing face momentum rhoUf" << endl;
 
-        rhoUf_ = new surfaceVectorField
+        rhoUf_.set
         (
-            IOobject
+            new surfaceVectorField
             (
-                "rhoUf",
-                runTime.timeName(),
-                mesh(),
-                IOobject::READ_IF_PRESENT,
-                IOobject::AUTO_WRITE
-            ),
-            fvc::interpolate(rho_*U())
+                IOobject
+                (
+                    "rhoUf",
+                    runTime.timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::AUTO_WRITE
+                ),
+                fvc::interpolate(rho_*U())
+            )
         );
     }
 
@@ -506,10 +509,13 @@ bool buoyantPimpleFluid::evolve()
     autoPtr<volScalarField> divrhoU;
     if (correctPhi)
     {
-        divrhoU = new volScalarField
+        divrhoU.set
         (
-            "divrhoU",
-            fvc::div(phi())
+            new volScalarField
+            (
+                "divrhoU",
+                fvc::div(phi())
+            )
         );
     }
 
@@ -522,13 +528,17 @@ bool buoyantPimpleFluid::evolve()
     // Pressure-velocity corrector
     while (pimple().loop())
     {
+#ifdef OPENFOAMESI
+        if (pimple().firstIter())
+#else
         if (pimple().firstPimpleIter())
+#endif
         {
             // Store momentum to set rhoUf for introduced faces.
             autoPtr<volVectorField> rhoU;
             if (rhoUf_.valid())
             {
-                rhoU = new volVectorField("rhoU", rho_*U());
+                rhoU.set(new volVectorField("rhoU", rho_*U()));
             }
 
             if (meshChanged)
@@ -551,8 +561,11 @@ bool buoyantPimpleFluid::evolve()
                         psi_,
                         dimensionedScalar("rAUf", dimTime, 1),
                         divrhoU(),
-                        pimple(),
+                        pimple()
+#ifndef OPENFOAMESI
+                        ,
                         true
+#endif
                     );
 
                     // Make the fluxes relative to the mesh-motion
