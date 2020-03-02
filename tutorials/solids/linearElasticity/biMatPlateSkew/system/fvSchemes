@@ -37,7 +37,7 @@ divSchemes
 laplacianSchemes
 {
     default            none;
-    laplacian(DD,D)    Gauss linear newSkewCorrected 1;
+    laplacian(DD,D)    Gauss linear skewCorrected 1;
     //laplacian(DD,D)    Gauss linear corrected;
     //laplacian(DDD,DD)  Gauss linear corrected;
 }
@@ -45,7 +45,7 @@ laplacianSchemes
 snGradSchemes
 {
     default            none;
-    snGrad(D)          newSkewCorrected 1;
+    snGrad(D)          skewCorrected 1;
     //snGrad(D)          corrected;
     //snGrad(DD)         corrected;
 }

@@ -2,16 +2,18 @@
   =========                 |
   \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
    \\    /   O peration     |
-    \\  /    A nd           | Copyright held by original author
+    \\  /    A nd           | www.openfoam.com
      \\/     M anipulation  |
+-------------------------------------------------------------------------------
+    Copyright (C) 2019 Zeljko Tukovic, FSB Zagreb.
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
 
-    OpenFOAM is free software; you can redistribute it and/or modify it
-    under the terms of the GNU General Public License as published by the
-    Free Software Foundation; either version 2 of the License, or (at your
-    option) any later version.
+    OpenFOAM is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
     OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
     ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -19,23 +21,26 @@ License
     for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM; if not, write to the Free Software Foundation,
-    Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::fv::newSkewCorrectedSnGrad
+    Foam::fv::skewCorrectedSnGrad
+
+Group
+    grpFvSnGradSchemes
 
 Description
-    Simple central-difference snGrad scheme with skewness and
-    non-orthogonal correction.
+    Simple central-difference snGrad scheme with non-orthogonal correction.
 
 SourceFiles
-    newSkewCorrectedSnGrad.C
+    skewCorrectedSnGrad.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef newSkewCorrectedSnGrad_H
-#define newSkewCorrectedSnGrad_H
+#ifdef OPENFOAMESIORFOUNDATION
+
+#ifndef skewCorrectedSnGrad_H
+#define skewCorrectedSnGrad_H
 
 #include "snGradScheme.H"
 
@@ -50,61 +55,44 @@ namespace fv
 {
 
 /*---------------------------------------------------------------------------*\
-                       Class newSkewCorrectedSnGrad Declaration
+                     Class skewCorrectedSnGrad Declaration
 \*---------------------------------------------------------------------------*/
 
 template<class Type>
-class newSkewCorrectedSnGrad
+class skewCorrectedSnGrad
 :
     public snGradScheme<Type>
 {
-    // Private data
-
-        scalar limitCoeff_;
-
     // Private Member Functions
 
-        //- Disallow default bitwise assignment
-        void operator=(const newSkewCorrectedSnGrad&);
+        //- No copy assignment
+        void operator=(const skewCorrectedSnGrad&) = delete;
 
 
 public:
 
     //- Runtime type information
-    TypeName("newSkewCorrected");
+    TypeName("skewCorrected");
 
 
     // Constructors
 
         //- Construct from mesh
-        newSkewCorrectedSnGrad(const fvMesh& mesh)
+        skewCorrectedSnGrad(const fvMesh& mesh)
         :
             snGradScheme<Type>(mesh)
         {}
 
 
         //- Construct from mesh and data stream
-        newSkewCorrectedSnGrad(const fvMesh& mesh, Istream& is)
+        skewCorrectedSnGrad(const fvMesh& mesh, Istream&)
         :
-            snGradScheme<Type>(mesh),
-            limitCoeff_(readScalar(is))
-        {
-            if (limitCoeff_ < 0 || limitCoeff_ > 1)
-            {
-                FatalIOErrorIn
-                (
-                    "newSkewCorrectedSnGrad(const fvMesh& mesh, Istream& is) : ",
-                    is
-                )   << "limitCoeff is specified as " << limitCoeff_
-                    << " but should be >= 0 && <= 1"
-                    << exit(FatalIOError);
-            }
-        }
+            snGradScheme<Type>(mesh)
+        {}
 
 
-    // Destructor
-
-        virtual ~newSkewCorrectedSnGrad();
+    //- Destructor
+    virtual ~skewCorrectedSnGrad() = default;
 
 
     // Member Functions
@@ -115,38 +103,45 @@ public:
             const GeometricField<Type, fvPatchField, volMesh>&
         ) const
         {
-            return this->mesh().deltaCoeffs();
+            return this->mesh().nonOrthDeltaCoeffs();
         }
 
         //- Return true if this scheme uses an explicit correction
         virtual bool corrected() const
         {
             return true;
-//             return !this->mesh().orthogonal();
         }
 
-        //- Return the explicit correction to the newSkewCorrectedSnGrad
-        //  for the given field
-        virtual tmp<GeometricField<Type, fvsPatchField, surfaceMesh> >
+        //- Return the explicit correction to the skewCorrectedSnGrad
+        //- for the given field using the gradient of the field
+        tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>
+        fullGradCorrection
+        (
+            const GeometricField<Type, fvPatchField, volMesh>&
+        ) const;
+
+        //- Return the explicit correction to the skewCorrectedSnGrad
+        //- for the given field using the gradients of the field components
+        virtual tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>
         correction(const GeometricField<Type, fvPatchField, volMesh>&) const;
 };
 
 
-// * * * * * * * * * * * Template Specialisations  * * * * * * * * * * * * * //
+// * * * * * * * * Template Member Function Specialisations  * * * * * * * * //
 
 template<>
-tmp<GeometricField<scalar, fvsPatchField, surfaceMesh> >
-newSkewCorrectedSnGrad<scalar>::correction
+tmp<surfaceScalarField> skewCorrectedSnGrad<scalar>::correction
 (
-    const GeometricField<scalar, fvPatchField, volMesh>&
+    const volScalarField& vsf
 ) const;
 
+
 template<>
-tmp<GeometricField<vector, fvsPatchField, surfaceMesh> >
-newSkewCorrectedSnGrad<vector>::correction
+tmp<surfaceVectorField> skewCorrectedSnGrad<vector>::correction
 (
-    const GeometricField<vector, fvPatchField, volMesh>&
+    const volVectorField& vvf
 ) const;
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -159,11 +154,13 @@ newSkewCorrectedSnGrad<vector>::correction
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #ifdef NoRepository
-#   include "newSkewCorrectedSnGrad.C"
+    #include "skewCorrectedSnGrad.C"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
+
+#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
 // ************************************************************************* //

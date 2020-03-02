@@ -28,7 +28,7 @@ License
 
 #include "buoyantPimpleFluid.H"
 #include "addToRunTimeSelectionTable.H"
-#include "findRefCell.H"
+#include "CorrectPhi.H"
 #include "constrainHbyA.H"
 #include "constrainPressure.H"
 
@@ -48,6 +48,25 @@ addToRunTimeSelectionTable(fluidModel, buoyantPimpleFluid, dictionary);
 
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
+
+void buoyantPimpleFluid::compressibleContinuityErrs()
+{
+    dimensionedScalar totalMass = fvc::domainIntegrate(rho_);
+
+    scalar sumLocalContErr =
+        (fvc::domainIntegrate(mag(rho_ - thermo_.rho()))/totalMass).value();
+
+    scalar globalContErr =
+        (fvc::domainIntegrate(rho_ - thermo_.rho())/totalMass).value();
+
+    cumulativeContErr_ += globalContErr;
+
+    Info<< "time step continuity errors : sum local = " << sumLocalContErr
+        << ", global = " << globalContErr
+        << ", cumulative = " << cumulativeContErr_
+        << endl;
+}
+
 
 void buoyantPimpleFluid::solveRhoEqn()
 {
@@ -155,7 +174,14 @@ void buoyantPimpleFluid::solvePEqn
     const fvVectorMatrix& UEqn
 )
 {
+#ifdef OPENFOAMFOUNDATION
+    if (!pimple().simpleRho())
+    {
+        rho_ = thermo_.rho();
+    }
+#else
     rho_ = thermo_.rho();
+#endif
 
     // Thermodynamic density needs to be updated by psi*d(p) after the
     // pressure solution
@@ -172,13 +198,15 @@ void buoyantPimpleFluid::solvePEqn
         "phiHbyA",
         (
             fvc::interpolate(rho_)*fvc::flux(HbyA)
-          + rhorAUf*fvc::ddtCorr(rho_, U(), phi())
+          + rhorAUf*fvc::ddtCorr(rho_, U(), phi(), rhoUf_)
         )
       + phig
     );
 
     // Update the pressure BCs to ensure flux consistency
     constrainPressure(p_rgh_, rho_, U(), phiHbyA, rhorAUf);
+
+    fvc::makeRelative(phiHbyA, rho_, U());
 
     fvScalarMatrix p_rghDDtEqn
     (
@@ -196,13 +224,11 @@ void buoyantPimpleFluid::solvePEqn
           - fvm::laplacian(rhorAUf, p_rgh_)
         );
 
-        if (thermo_.incompressible())
-        {
-            p_rghEqn.setReference
-            (
-                pRefCell_, getRefCellValue(p_rgh_, pRefCell_)
-            );
-        }
+        p_rghEqn.setReference
+        (
+            pressureControl_.refCell(),
+            pressureControl_.refValue()
+        );
 
         p_rghEqn.solve();
 
@@ -227,18 +253,42 @@ void buoyantPimpleFluid::solvePEqn
 
     p() = p_rgh_ + rho_*gh_;
 
+    bool limitedp = pressureControl_.limit(p());
+
+    if (limitedp)
+    {
+        p_rgh_ = p() - rho_*gh_;
+    }
+
     // Thermodynamic density update
     thermo_.correctRho(psi_*p() - psip0);
+
+    if (limitedp)
+    {
+        rho_ = thermo_.rho();
+    }
+
+    solveRhoEqn();
+
+#ifdef OPENFOAMFOUNDATION
+    if (pimple().simpleRho())
+    {
+        rho_ = thermo_.rho();
+    }
+#endif
+
+    // Correct rhoUf if the mesh is moving
+    fvc::correctRhoUf(rhoUf_, rho_, U(), phi());
 
     if (thermo_.dpdt())
     {
         dpdt_ = fvc::ddt(p());
+
+        if (mesh().moving())
+        {
+            dpdt_ -= fvc::div(fvc::meshPhi(rho_, U()), p());
+        }
     }
-
-    // Make the fluxes relative to the mesh motion
-    fvc::makeRelative(phi(), rho_, U());
-
-    solveRhoEqn();
 }
 
 
@@ -263,7 +313,7 @@ buoyantPimpleFluid::buoyantPimpleFluid
         ),
         mesh()
     ),
-    pThermo_(rhoThermo::New(mesh())),
+    pThermo_(fluidThermo::New(mesh())),
     thermo_(pThermo_()),
     rho_
     (
@@ -284,9 +334,7 @@ buoyantPimpleFluid::buoyantPimpleFluid
         (
             "dpdt",
             runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
+            mesh()
         ),
         mesh(),
         dimensionedScalar("zero", p().dimensions()/dimTime, 0)
@@ -340,8 +388,8 @@ buoyantPimpleFluid::buoyantPimpleFluid
 #ifdef OPENFOAMFOUNDATION
     radiation_(radiationModel::New(thermo_.T())),
 #endif
-    pRefCell_(0),
-    pRefValue_(0)
+    pressureControl_(p(), rho_, pimple().dict(), false),
+    cumulativeContErr_(0)
 {
     UisRequired();
     pisRequired();
@@ -353,24 +401,33 @@ buoyantPimpleFluid::buoyantPimpleFluid
     phi().dimensions().reset(dimVelocity*dimArea*dimDensity);
     phi() = linearInterpolate(rho_*U()) & mesh().Sf();
 
-    if (thermo_.incompressible())
-    {
-        setRefCell
-        (
-            p(),
-            p_rgh_,
-            pimple().dict(),
-            pRefCell_,
-            pRefValue_
-        );
-    }
-
     mesh().setFluxRequired(p_rgh_.name());
 
     // Force p_rgh to be consistent with p
     p_rgh_ = p() - rho_*gh_;
 
     turbulence_->validate();
+
+    if (mesh().dynamic())
+    {
+        Info<< "Constructing face momentum rhoUf" << endl;
+
+        rhoUf_.set
+        (
+            new surfaceVectorField
+            (
+                IOobject
+                (
+                    "rhoUf",
+                    runTime.timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::AUTO_WRITE
+                ),
+                fvc::interpolate(rho_*U())
+            )
+        );
+    }
 
     // Check if any finite volume option is present
     if (!fvOptions_.optionList::size())
@@ -441,15 +498,29 @@ bool buoyantPimpleFluid::evolve()
 #       include "volContinuity.H"
     }
 
-    // Update gh fields as the mesh may have moved
-    gh_ = (g_ & mesh.C()) - ghRef_;
-    ghf_ = (g_ & mesh.Cf()) - ghRef_;
+    bool correctPhi
+    (
+        pimple().dict().lookupOrDefault("correctPhi", mesh.dynamic())
+    );
+
+    // Store divrhoU from the previous mesh so that it can be mapped
+    // and used in correctPhi to ensure the corrected phi has the
+    // same divergence
+    autoPtr<volScalarField> divrhoU;
+    if (correctPhi)
+    {
+        divrhoU.set
+        (
+            new volScalarField
+            (
+                "divrhoU",
+                fvc::div(phi())
+            )
+        );
+    }
 
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), rho_, U());
-
-    // Density equation
-    solveRhoEqn();
 
     // Calculate CourantNo
     fluidModel::CourantNo();
@@ -457,6 +528,61 @@ bool buoyantPimpleFluid::evolve()
     // Pressure-velocity corrector
     while (pimple().loop())
     {
+#ifdef OPENFOAMESI
+        if (pimple().firstIter())
+#else
+        if (pimple().firstPimpleIter())
+#endif
+        {
+            // Store momentum to set rhoUf for introduced faces.
+            autoPtr<volVectorField> rhoU;
+            if (rhoUf_.valid())
+            {
+                rhoU.set(new volVectorField("rhoU", rho_*U()));
+            }
+
+            if (meshChanged)
+            {
+                gh_ = (g_ & mesh.C()) - ghRef_;
+                ghf_ = (g_ & mesh.Cf()) - ghRef_;
+
+                if (correctPhi)
+                {
+                    // Calculate absolute flux
+                    // from the mapped surface velocity
+                    phi() = mesh.Sf() & rhoUf_();
+
+                    CorrectPhi
+                    (
+                        U(),
+                        phi(),
+                        p_rgh_,
+                        rho_,
+                        psi_,
+                        dimensionedScalar("rAUf", dimTime, 1),
+                        divrhoU(),
+                        pimple()
+#ifndef OPENFOAMESI
+                        ,
+                        true
+#endif
+                    );
+
+                    // Make the fluxes relative to the mesh-motion
+                    fvc::makeRelative(phi(), rho_, U());
+                }
+            }
+
+#ifdef OPENFOAMFOUNDATION
+            if (!pimple().simpleRho())
+            {
+                solveRhoEqn();
+            }
+#else
+            solveRhoEqn();
+#endif
+        }
+
         // Momentum equation
         tmp<fvVectorMatrix> tUEqn = solveUEqn();
 
@@ -469,13 +595,16 @@ bool buoyantPimpleFluid::evolve()
             solvePEqn(tUEqn());
         }
 
-        fluidModel::continuityErrs();
+        compressibleContinuityErrs();
 
         tUEqn.clear();
 
         gradU() = fvc::grad(U());
 
-        turbulence_->correct();
+        if (pimple().turbCorr())
+        {
+            turbulence_->correct();
+        }
     }
 
     rho_ = thermo_.rho();

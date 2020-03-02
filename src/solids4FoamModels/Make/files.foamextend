@@ -224,7 +224,7 @@ numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
-numerics/newSkewCorrectedSnGrad/newSkewCorrectedSnGrads.C
+numerics/skewCorrectedSnGrad/skewCorrectedSnGrads.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
 numerics/logExpVolFields/eig3/eig3.C
 numerics/logExpVolFields/eig3Field.C
