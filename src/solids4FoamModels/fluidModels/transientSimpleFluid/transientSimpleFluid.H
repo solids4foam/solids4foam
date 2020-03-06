@@ -41,8 +41,6 @@ SourceFiles
 #define transientSimpleFluid_H
 
 #include "fluidModel.H"
-#include "singlePhaseTransportModel.H"
-#include "turbulenceModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -60,19 +58,6 @@ class transientSimpleFluid
 :
     public fluidModel
 {
-    // Private data
-
-#ifndef OPENFOAMESIORFOUNDATION
-        //- Transport model
-        singlePhaseTransportModel laminarTransport_;
-
-        //- Turbulence model
-        autoPtr<incompressible::turbulenceModel> turbulence_;
-
-        //- Density
-        dimensionedScalar rho_;
-#endif
-
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
