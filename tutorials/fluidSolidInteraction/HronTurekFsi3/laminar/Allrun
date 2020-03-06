@@ -9,15 +9,17 @@ runApplication -l log.setsToZones.solid setsToZones -region solid -noFlipMap
 runApplication -l log.blockMesh.fluid blockMesh -region fluid
 runApplication -l log.setsToZones.fluid setsToZones -region fluid -noFlipMap
 
-# Run serial
-runApplication solids4Foam
-
-# Run parallel
-#runApplication -l log.decomposePar.fluid decomposePar -region fluid
-#runApplication -l log.decomposePar.solid decomposePar -region solid
-#runParallel solids4Foam 4
-#runApplication -l log.reconstructPar.fluid reconstructPar -region fluid
-#runApplication -l log.reconstructPar.solid reconstructPar -region solid
+if [[ "$1" == "parallel" ]]; then
+    # Run parallel
+    runApplication -l log.decomposePar.fluid decomposePar -region fluid
+    runApplication -l log.decomposePar.solid decomposePar -region solid
+    runParallel solids4Foam 4
+    runApplication -l log.reconstructPar.fluid reconstructPar -region fluid
+    runApplication -l log.reconstructPar.solid reconstructPar -region solid
+else
+    # Run serial
+    runApplication solids4Foam
+fi
 
 
 # ----------------------------------------------------------------- end-of-file
