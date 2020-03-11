@@ -98,6 +98,7 @@ $(solidFvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvP
 $(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
+$(solidFvPatchFields)/extrapolatedPressureValue/extrapolatedPressureValueFvPatchScalarField.C
 $(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
 $(solidFvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
 $(solidFvPatchFields)/fixedTemperatureGradient/fixedTemperatureGradientFvPatchScalarField.C
