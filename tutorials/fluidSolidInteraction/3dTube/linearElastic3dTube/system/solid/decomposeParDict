@@ -18,7 +18,6 @@ numberOfSubdomains 3;
 
 method          simple;
 
-globalFaceZones ( inner-wall-zone );
 
 simpleCoeffs
 {
