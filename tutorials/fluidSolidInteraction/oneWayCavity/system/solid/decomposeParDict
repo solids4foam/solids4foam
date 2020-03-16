@@ -18,7 +18,6 @@ numberOfSubdomains 8;
 
 method          metis;
 
-globalFaceZones ( interface-zone );
 
 simpleCoeffs
 {

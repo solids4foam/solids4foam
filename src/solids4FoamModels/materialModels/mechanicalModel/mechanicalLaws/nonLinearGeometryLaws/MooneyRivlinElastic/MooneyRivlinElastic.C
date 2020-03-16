@@ -23,28 +23,28 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "neoHookeanElastic.H"
+#include "MooneyRivlinElastic.H"
 #include "addToRunTimeSelectionTable.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(neoHookeanElastic, 0);
+    defineTypeNameAndDebug(MooneyRivlinElastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, neoHookeanElastic, nonLinGeomMechLaw
+        mechanicalLaw, MooneyRivlinElastic, nonLinGeomMechLaw
     );
 }
 
 
 // * * * * * * * * * * *  Private Member Funtcions * * * * * * * * * * * * * //
 
-void Foam::neoHookeanElastic::makeF()
+void Foam::MooneyRivlinElastic::makeF()
 {
     if (FPtr_)
     {
-        FatalErrorIn("void Foam::neoHookeanElastic::makeF()")
+        FatalErrorIn("void Foam::MooneyRivlinElastic::makeF()")
             << "pointer already set" << abort(FatalError);
     }
 
@@ -65,7 +65,7 @@ void Foam::neoHookeanElastic::makeF()
 }
 
 
-Foam::volTensorField& Foam::neoHookeanElastic::F()
+Foam::volTensorField& Foam::MooneyRivlinElastic::F()
 {
     if (!FPtr_)
     {
@@ -76,11 +76,11 @@ Foam::volTensorField& Foam::neoHookeanElastic::F()
 }
 
 
-void Foam::neoHookeanElastic::makeFf()
+void Foam::MooneyRivlinElastic::makeFf()
 {
     if (FfPtr_)
     {
-        FatalErrorIn("void Foam::neoHookeanElastic::makeFf()")
+        FatalErrorIn("void Foam::MooneyRivlinElastic::makeFf()")
             << "pointer already set" << abort(FatalError);
     }
 
@@ -101,7 +101,7 @@ void Foam::neoHookeanElastic::makeFf()
 }
 
 
-Foam::surfaceTensorField& Foam::neoHookeanElastic::Ff()
+Foam::surfaceTensorField& Foam::MooneyRivlinElastic::Ff()
 {
     if (!FfPtr_)
     {
@@ -115,7 +115,7 @@ Foam::surfaceTensorField& Foam::neoHookeanElastic::Ff()
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
-Foam::neoHookeanElastic::neoHookeanElastic
+Foam::MooneyRivlinElastic::MooneyRivlinElastic
 (
     const word& name,
     const fvMesh& mesh,
@@ -125,53 +125,25 @@ Foam::neoHookeanElastic::neoHookeanElastic
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
-    mu_("mu", dimPressure, 0.0),
-    K_("K", dimPressure, 0.0),
+    mu1_(dict.lookup("mu1")),
+    mu2_(dict.lookup("mu2")),
+    K_(dict.lookup("K")),
     FPtr_(NULL),
     FfPtr_(NULL)
 {
-    // Read mechanical properties
-    if
-    (
-        dict.found("E") && dict.found("nu")
-     && !dict.found("mu") && !dict.found("K")
-    )
+    if (planeStress())
     {
-        const dimensionedScalar E = dimensionedScalar(dict.lookup("E"));
-        const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
-
-        mu_ = (E/(2.0*(1.0 + nu)));
-
-        if (planeStress())
-        {
-            K_ = (nu*E/((1.0 + nu)*(1.0 - nu))) + (2.0/3.0)*mu_;
-        }
-        else
-        {
-            K_ = (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*mu_;
-        }
-    }
-    else if
-    (
-        dict.found("mu") && dict.found("K")
-     && !dict.found("E") && !dict.found("nu")
-    )
-    {
-        mu_ = dimensionedScalar(dict.lookup("mu"));
-        K_ = dimensionedScalar(dict.lookup("K"));
-    }
-    else
-    {
-        FatalErrorIn(type())
-            << "Either E and nu or mu and K should be specified"
-            << abort(FatalError);
+        notImplemented
+        (
+            type() + " mechanical law is not implemented for planeStress"
+        );
     }
 }
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
-Foam::neoHookeanElastic::~neoHookeanElastic()
+Foam::MooneyRivlinElastic::~MooneyRivlinElastic()
 {
     deleteDemandDrivenData(FPtr_);
     deleteDemandDrivenData(FfPtr_);
@@ -180,7 +152,7 @@ Foam::neoHookeanElastic::~neoHookeanElastic()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::rho() const
+Foam::tmp<Foam::volScalarField> Foam::MooneyRivlinElastic::rho() const
 {
     return tmp<volScalarField>
     (
@@ -202,8 +174,10 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::rho() const
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
+Foam::tmp<Foam::volScalarField> Foam::MooneyRivlinElastic::impK() const
 {
+    const dimensionedScalar mu = mu1_ + mu2_;
+
     return tmp<volScalarField>
     (
         new volScalarField
@@ -217,13 +191,13 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
                 IOobject::NO_WRITE
             ),
             mesh(),
-            (4.0/3.0)*mu_ + K_ // == 2*mu + lambda
+            (4.0/3.0)*mu + K_ // == 2*mu + lambda
         )
     );
 }
 
 
-void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
+void Foam::MooneyRivlinElastic::correct(volSymmTensorField& sigma)
 {
     // Check if the mathematical model is in total or updated Lagrangian form
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
@@ -249,14 +223,16 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
         {
             WarningIn
             (
-                "void Foam::neoHookeanElastic::"
+                "void Foam::MooneyRivlinElastic::"
                 "correct(volSymmTensorField& sigma)"
             )   << "Material linearity enforced for stability!" << endl;
+
+            const dimensionedScalar mu = mu1_ + mu2_;
 
             // Calculate stress using Hooke's law
             sigma =
                 sigma.oldTime()
-              + 2.0*mu_*symm(gradDD) + (K_ - (2.0/3.0)*mu_)*tr(gradDD)*I;
+              + 2.0*mu*symm(gradDD) + (K_ - (2.0/3.0)*mu)*tr(gradDD)*I;
 
             return;
         }
@@ -280,14 +256,16 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
             {
                 WarningIn
                 (
-                    "void Foam::neoHookeanElastic::"
+                    "void Foam::MooneyRivlinElastic::"
                     "correct(volSymmTensorField& sigma)"
                 )   << "Material linearity enforced for stability!" << endl;
+
+                const dimensionedScalar mu = mu1_ + mu2_;
 
                 // Calculate stress using Hooke's law
                 sigma =
                     sigma.oldTime()
-                  + 2.0*mu_*dev(symm(gradDD)) + K_*tr(gradDD)*I;
+                  + 2.0*mu*dev(symm(gradDD)) + K_*tr(gradDD)*I;
 
                 return;
             }
@@ -308,12 +286,14 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
             {
                 WarningIn
                 (
-                    "void Foam::neoHookeanElastic::"
+                    "void Foam::MooneyRivlinElastic::"
                     "correct(volSymmTensorField& sigma)"
                 )   << "Material linearity enforced for stability!" << endl;
 
+                const dimensionedScalar mu = mu1_ + mu2_;
+
                 // Calculate stress using Hooke's law
-                sigma = 2.0*mu_*dev(symm(gradD)) + K_*tr(gradD)*I;
+                sigma = 2.0*mu*dev(symm(gradD)) + K_*tr(gradD)*I;
 
                 return;
             }
@@ -323,7 +303,7 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
     {
         FatalErrorIn
         (
-            "void Foam::neoHookeanElastic::"
+            "void Foam::MooneyRivlinElastic::"
             "correct(volSymmTensorField& sigma)"
         )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
     }
@@ -331,18 +311,27 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
     // Calculate the Jacobian of the deformation gradient
     const volScalarField J = det(F());
 
-    // Calculate the volume preserving left Cauchy Green strain
-    const volSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(F() & F().T());
+    // Calculate the left Cauchy Green strain
+    const volSymmTensorField b = symm(F() & F().T());
 
-    // Calculate the deviatoric stress
-    const volSymmTensorField s = mu_*dev(bEbar);
+    // Calculate hydrostatic pressure term
+    const volScalarField p = -K_*(J - 1.0);
+
+    // Calculate deviatoric stress term
+    const volSymmTensorField s =
+        (mu1_/pow(J, 5.0/3.0))*dev(b)
+      + (mu2_/pow(J, 7.0/3.0))
+       *symm
+        (
+           tr(b)*b - pow(tr(b), 2)*I/3.0 - (b & b) + (b && b)*I/3
+        );
 
     // Calculate the Cauchy stress
-    sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
+    sigma = s - p*I;
 }
 
 
-void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
+void Foam::MooneyRivlinElastic::correct(surfaceSymmTensorField& sigma)
 {
     // Check if the mathematical model is in total or updated Lagrangian form
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
@@ -368,13 +357,15 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         {
             WarningIn
             (
-                "void Foam::neoHookeanElastic::"
+                "void Foam::MooneyRivlinElastic::"
                 "correct(surfaceSymmTensorField& sigma)"
             )   << "Material linearity enforced for stability!" << endl;
 
+            const dimensionedScalar mu = mu1_ + mu2_;
+
             // Calculate stress using Hooke's law
             sigma =
-                sigma.oldTime() + 2.0*mu_*dev(symm(gradDD)) + K_*tr(gradDD)*I;
+                sigma.oldTime() + 2.0*mu*dev(symm(gradDD)) + K_*tr(gradDD)*I;
 
             return;
         }
@@ -398,14 +389,16 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
             {
                 WarningIn
                 (
-                    "void Foam::neoHookeanElastic::"
+                    "void Foam::MooneyRivlinElastic::"
                     "correct(surfaceSymmTensorField& sigma)"
                 )   << "Material linearity enforced for stability!" << endl;
+
+                const dimensionedScalar mu = mu1_ + mu2_;
 
                 // Calculate stress using Hooke's law
                 sigma =
                     sigma.oldTime()
-                  + 2.0*mu_*dev(symm(gradDD)) + K_*tr(gradDD)*I;
+                  + 2.0*mu*dev(symm(gradDD)) + K_*tr(gradDD)*I;
 
                 return;
             }
@@ -426,12 +419,14 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
             {
                 WarningIn
                 (
-                    "void Foam::neoHookeanElastic::"
+                    "void Foam::MooneyRivlinElastic::"
                     "correct(surfaceSymmTensorField& sigma)"
                 )   << "Material linearity enforced for stability!" << endl;
 
+                const dimensionedScalar mu = mu1_ + mu2_;
+
                 // Calculate stress using Hooke's law
-                sigma = 2.0*mu_*dev(symm(gradD)) + K_*tr(gradD)*I;
+                sigma = 2.0*mu*dev(symm(gradD)) + K_*tr(gradD)*I;
 
                 return;
             }
@@ -441,7 +436,7 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     {
         FatalErrorIn
         (
-            "void Foam::neoHookeanElastic::"
+            "void Foam::MooneyRivlinElastic::"
             "correct(surfaceSymmTensorField& sigma)"
         )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
     }
@@ -449,14 +444,23 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J = det(Ff());
 
-    // Calculate left Cauchy Green strain tensor with volumetric term removed
-    const surfaceSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(Ff() & Ff().T());
+    // Calculate the left Cauchy Green strain
+    const surfaceSymmTensorField b = symm(Ff() & Ff().T());
 
-    // Calculate deviatoric stress
-    const surfaceSymmTensorField s = mu_*dev(bEbar);
+    // Calculate hydrostatic pressure term
+    const surfaceScalarField p = -K_*(J - 1.0);
+
+    // Calculate deviatoric stress term
+    const surfaceSymmTensorField s =
+        (mu1_/pow(J, 5.0/3.0))*dev(b)
+      + (mu2_/pow(J, 7.0/3.0))
+       *symm
+        (
+           tr(b)*b - pow(tr(b), 2)*I/3.0 - (b & b) + (b && b)*I/3
+        );
 
     // Calculate the Cauchy stress
-    sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
+    sigma = s - p*I;
 }
 
 

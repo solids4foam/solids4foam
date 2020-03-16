@@ -126,18 +126,53 @@ Foam::StVenantKirchhoffElastic::StVenantKirchhoffElastic
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
-    lambda_
-    (
-        planeStress()
-      ? (nu_*E_)/((1.0 + nu_)*(1.0 - nu_))
-      : (nu_*E_)/((1.0 + nu_)*(1.0 - 2.0*nu_))
-    ),
-    mu_(E_/(2.0*(1.0 + nu_))),
+    lambda_("lambda", dimPressure, 0.0),
+    mu_("mu", dimPressure, 0.0),
     FPtr_(NULL),
     FfPtr_(NULL)
-{}
+{
+    // Read mechanical properties
+    dimensionedScalar E("E", dimPressure, 0.0);
+    dimensionedScalar nu("nu", dimless, 0.0);
+    if
+    (
+        dict.found("E") && dict.found("nu")
+     && !dict.found("mu") && !dict.found("K")
+    )
+    {
+        E = dimensionedScalar(dict.lookup("E"));
+        nu = dimensionedScalar(dict.lookup("nu"));
+
+        mu_ = (E/(2.0*(1.0 + nu)));
+    }
+    else if
+    (
+        dict.found("mu") && dict.found("K")
+     && !dict.found("E") && !dict.found("nu")
+    )
+    {
+        mu_ = dimensionedScalar(dict.lookup("mu"));
+        const dimensionedScalar K = dimensionedScalar(dict.lookup("K"));
+
+        E = 9*K*mu_/(3*K + mu_);
+        nu = (3*K - 2*mu_)/(2*(3*K + mu_));
+    }
+    else
+    {
+        FatalErrorIn(type())
+            << "Either E and nu or mu and K should be specified"
+            << abort(FatalError);
+    }
+
+    if (planeStress())
+    {
+        lambda_ = nu*E/((1 + nu)*(1 - nu));
+    }
+    else
+    {
+        lambda_ = nu*E/((1 + nu)*(1 - 2.0*nu));
+    }
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //

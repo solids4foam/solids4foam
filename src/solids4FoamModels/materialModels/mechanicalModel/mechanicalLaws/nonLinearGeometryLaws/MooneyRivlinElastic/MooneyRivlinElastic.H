@@ -22,32 +22,40 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    StVenantKirchhoffElastic
+    MooneyRivlinElastic
 
 Description
-    St. Venant Kirchhoff Hyperelastic law, where the 2nd Piola Kirchhoff stress
-    is given as:
+    Mooney Rivlin hyper-elasticity, for example, as described at: https://www.\
+    brown.edu/Departments/Engineering/Courses/En221/Notes/Elasticity/\
+    Elasticity.htm. The Cauchy stress is given as:
 
-        S = 2*mu*G + lambda*tr(G)*I
+        sigma =
+            K*(J - 1)*I
+          + (mu1/J^(5/3))*(b - tr(b)*I/3)
+          + (mu2/J^(7/3))*(tr(b)*b - (tr(b)^2)*I/3 - (b & b) + (b && b)*I/3)
 
     where
-    G        Green strain
-    lambda   first Lame parameter
-    mu       second Lame parameter (shear modulus)
+    K        material property
+    mu1      material property
+    mu2      material property
+    J        Jacobian of the deformation gradient
+    I        indentity tensor
+    b        left Cauchy–Green deformation tensor = F & F.T()
+    F        deformation gradient
 
-    Either E (Young's modulus) and nu (Poisson's ratio) can be provided or mu
-    (shear modulus) and K (bulk modulus)
+    In the limit of small strains, the shear modulus is mu = mu1 + mu2 and K is
+    the bulk modulus.
 
 SourceFiles
-    StVenantKirchhoffElastic.C
+    MooneyRivlinElastic.C
 
 Author
     Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef StVenantKirchhoffElastic_H
-#define StVenantKirchhoffElastic_H
+#ifndef MooneyRivlinElastic_H
+#define MooneyRivlinElastic_H
 
 #include "mechanicalLaw.H"
 #include "surfaceFields.H"
@@ -61,7 +69,7 @@ namespace Foam
                          Class linearElastic Declaration
 \*---------------------------------------------------------------------------*/
 
-class StVenantKirchhoffElastic
+class MooneyRivlinElastic
 :
     public mechanicalLaw
 {
@@ -70,11 +78,14 @@ class StVenantKirchhoffElastic
         // Initial density
         const dimensionedScalar rho_;
 
-        // First Lame parameter
-        dimensionedScalar lambda_;
+        // Shear modulus parameter 1
+        const dimensionedScalar mu1_;
 
-        // Second Lame parameter (shear modulus)
-        dimensionedScalar mu_;
+        // Shear modulus paramter 2
+        const dimensionedScalar mu2_;
+
+        // Bulk modulus parameter
+        const dimensionedScalar K_;
 
         // Total deformation gradient volField
         volTensorField* FPtr_;
@@ -97,15 +108,15 @@ class StVenantKirchhoffElastic
         surfaceTensorField& Ff();
 
         //- Disallow default bitwise copy construct
-        StVenantKirchhoffElastic(const StVenantKirchhoffElastic&);
+        MooneyRivlinElastic(const MooneyRivlinElastic&);
 
         //- Disallow default bitwise assignment
-        void operator=(const StVenantKirchhoffElastic&);
+        void operator=(const MooneyRivlinElastic&);
 
 public:
 
     //- Runtime type information
-    TypeName("StVenantKirchhoffElastic");
+    TypeName("MooneyRivlinElastic");
 
     // Static data members
 
@@ -113,7 +124,7 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        StVenantKirchhoffElastic
+        MooneyRivlinElastic
         (
             const word& name,
             const fvMesh& mesh,
@@ -124,7 +135,7 @@ public:
 
     // Destructor
 
-        virtual ~StVenantKirchhoffElastic();
+        virtual ~MooneyRivlinElastic();
 
 
     // Member Functions

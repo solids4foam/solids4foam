@@ -81,6 +81,7 @@ $(linGeomLaws)/linearElasticCt/linearElasticCt.C
 $(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
 
 nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
+$(nonLinGeomLaws)/MooneyRivlinElastic/MooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlasticRubin/neoHookeanElasticMisesPlasticRubin.C
@@ -98,6 +99,7 @@ $(solidFvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvP
 $(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
+$(solidFvPatchFields)/extrapolatedPressureValue/extrapolatedPressureValueFvPatchScalarField.C
 $(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
 $(solidFvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
 $(solidFvPatchFields)/fixedTemperatureGradient/fixedTemperatureGradientFvPatchScalarField.C
