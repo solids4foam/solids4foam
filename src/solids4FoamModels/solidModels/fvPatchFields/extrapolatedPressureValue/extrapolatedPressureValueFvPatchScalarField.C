@@ -113,49 +113,71 @@ void extrapolatedPressureValueFvPatchScalarField::updateCoeffs()
 
 tmp<Foam::Field<scalar> > extrapolatedPressureValueFvPatchScalarField::snGrad() const
 {
-    // Lookup gradient of temperature from the solver
-    const fvPatchField<vector>& gradField =
-        patch().lookupPatchField<volVectorField, vector>
+    // Name of the gradient field
+    const word gradFieldName("grad(" + dimensionedInternalField().name() + ")");
+
+    // If available, use the gradient for non-orthogonal correction 
+    if (db().foundObject<volVectorField>(gradFieldName))
+    {
+        // Lookup gradient of the field
+        const fvPatchField<vector>& gradField =
+            patch().lookupPatchField<volVectorField, vector>(gradFieldName);
+
+        // Unit normals
+        const vectorField n = patch().nf();
+
+        // Delta vectors
+        const vectorField delta = patch().delta();
+
+        // Correction vectors
+        const vectorField k = (I - sqr(n)) & delta;
+
+        // Surface normal gradient using non-orthogonal correction
+        return
         (
-            "grad(" + dimensionedInternalField().name() + ")"
-        );
-
-    // Unit normals
-    const vectorField n = patch().nf();
-
-    // Delta vectors
-    const vectorField delta = patch().delta();
-
-    // Correction vectors
-    const vectorField k = (I - sqr(n)) & delta;
-
-    // Correction sngrad
-    return
-    (
-        *this - (patchInternalField() + (k & gradField.patchInternalField()))
-    )*patch().deltaCoeffs();
+            *this - (patchInternalField() + (k & gradField.patchInternalField()))
+        )*patch().deltaCoeffs();
+    }
+    else
+    {
+        // Surface normal gradient without non-orthogonal correction
+        return
+        (
+            *this - patchInternalField()
+        )*patch().deltaCoeffs();
+    }
 }
 
 tmp<Field<scalar> > extrapolatedPressureValueFvPatchScalarField::
 gradientBoundaryCoeffs() const
 {
-    // Lookup gradoent of temperature from the solver
-    const fvPatchField<vector>& gradField =
-        patch().lookupPatchField<volVectorField, vector>
-        (
-            "grad(" + dimensionedInternalField().name() + ")"
-        );
+    // Name of the gradient field
+    const word gradFieldName("grad(" + dimensionedInternalField().name() + ")");
 
-    // Unit normals
-    const vectorField n = patch().nf();
+    // If available, use the gradient for non-orthogonal correction 
+    if (db().foundObject<volVectorField>(gradFieldName))
+    {
+        // Lookup gradoent of the field
+        const fvPatchField<vector>& gradField =
+            patch().lookupPatchField<volVectorField, vector>(gradFieldName);
 
-    // Delta vectors
-    const vectorField delta = patch().delta();
+        // Unit normals
+        const vectorField n = patch().nf();
 
-    // Correction vectors
-    const vectorField k = (I - sqr(n)) & delta;
+        // Delta vectors
+        const vectorField delta = patch().delta();
 
-    return patch().deltaCoeffs()*(*this - (k & gradField.patchInternalField()));
+        // Correction vectors
+        const vectorField k = (I - sqr(n)) & delta;
+
+        // Coefficients with non-orthogonal correction
+        return patch().deltaCoeffs()*(*this - (k & gradField.patchInternalField()));
+    }
+    else
+    {
+        // Coefficients without non-orthogonal correction
+        return patch().deltaCoeffs()*(*this);
+    }
 }
 
 void extrapolatedPressureValueFvPatchScalarField::write(Ostream& os) const

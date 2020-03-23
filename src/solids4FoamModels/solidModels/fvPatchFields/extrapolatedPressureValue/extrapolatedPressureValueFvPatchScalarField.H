@@ -38,6 +38,7 @@ Author
 #ifndef extrapolatedPressureValueFvPatchScalarField_H
 #define extrapolatedPressureValueFvPatchScalarField_H
 
+#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 
