@@ -323,7 +323,11 @@ void solidTractionFvPatchVectorField::evaluate
 
 void solidTractionFvPatchVectorField::write(Ostream& os) const
 {
-    fixedGradientFvPatchVectorField::write(os);
+    // Bug-fix: courtesy of Michael@UW at https://www.cfd-online.com/Forums/
+    // openfoam-cc-toolkits-fluid-structure-interaction/221892-solved-paraview
+    // -cant-read-solids-files-duplicate-entries-keyword-value.html#post762325
+    //fixedGradientFvPatchVectorField::write(os);
+    fvPatchVectorField::write(os);
 
     if (tractionSeries_.size())
     {
