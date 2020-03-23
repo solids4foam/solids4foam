@@ -65,6 +65,9 @@ Author
 #ifndef solidRigidContactFvPatchVectorField_H
 #define solidRigidContactFvPatchVectorField_H
 
+#ifdef FOAMEXTEND
+    #include "foamTime.H"
+#endif
 #include "fvPatchFields.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "normalContactModel.H"
