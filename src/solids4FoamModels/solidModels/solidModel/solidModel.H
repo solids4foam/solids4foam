@@ -263,9 +263,6 @@ protected:
         //- Return non-const reference to the mechanical model
         mechanicalModel& mechanical();
 
-        //- Return const-reference to the density
-        const volScalarField& rho() const;
-
         //- Return non-const reference to the density
         volScalarField& rho();
 
@@ -418,6 +415,9 @@ public:
             {
                 return solidProperties_;
             }
+
+            //- Return const-reference to the density
+            const volScalarField& rho() const;
 
             //- Return const reference to solidModelCoeffs dictionary
             const dictionary& solidModelDict() const;

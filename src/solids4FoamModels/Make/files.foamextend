@@ -166,6 +166,7 @@ functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/setInletVelocity/setInletVelocity.C
 functionObjects/solidForces/solidForces.C
 functionObjects/solidForcesDisplacements/solidForcesDisplacements.C
+functionObjects/solidKineticEnergy/solidKineticEnergy.C
 functionObjects/solidStresses/solidStresses.C
 functionObjects/solidDisplacements/solidDisplacements.C
 functionObjects/solidPointDisplacement/solidPointDisplacement.C
