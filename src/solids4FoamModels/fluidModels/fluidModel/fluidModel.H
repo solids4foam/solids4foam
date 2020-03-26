@@ -165,15 +165,15 @@ class fluidModel
 
         //- Make the pimple control
         void makePisoControl() const;
-  
+
         //- Make the pimple control
         void makePimpleControl() const;
 
         //- Read g field from disk, if it exists, otherwise return zero field
 #ifdef OPENFOAMESI
-        meshObjects::gravity readG() const;
+        meshObjects::gravity readG(const Time& runTime) const;
 #else
-        uniformDimensionedVectorField readG() const;
+        uniformDimensionedVectorField readG(const Time& runTime) const;
 #endif
 
         //- Disallow default bitwise copy construct
@@ -305,7 +305,7 @@ public:
 
             //- Return non-const acess to the pimple control
             pisoControl& piso();
-  
+
             //- Return non-const acess to the pimple control
             pimpleControl& pimple();
 
