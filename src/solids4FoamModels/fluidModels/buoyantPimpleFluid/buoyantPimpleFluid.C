@@ -147,7 +147,7 @@ void buoyantPimpleFluid::solveEEqn()
         )
       - fvm::laplacian(turbulence_->alphaEff(), he)
      ==
-        rho_*(U() & g_)
+        rho_*(U() & g())
 #ifdef OPENFOAMFOUNDATION
       + radiation_->Sh(thermo_, he)
 #endif
@@ -351,17 +351,6 @@ buoyantPimpleFluid::buoyantPimpleFluid
         ),
         0.5*magSqr(U())
     ),
-    g_
-    (
-        IOobject
-        (
-            "g",
-            runTime.constant(),
-            mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        )
-    ),
     hRef_
     (
         IOobject
@@ -374,9 +363,9 @@ buoyantPimpleFluid::buoyantPimpleFluid
         ),
         dimensionedScalar("zero", dimLength, 0)
     ),
-    ghRef_(-mag(g_)*hRef_),
-    gh_("gh", (g_ & mesh().C()) - ghRef_),
-    ghf_("ghf", (g_ & mesh().Cf()) - ghRef_),
+    ghRef_(-mag(g())*hRef_),
+    gh_("gh", (g() & mesh().C()) - ghRef_),
+    ghf_("ghf", (g() & mesh().Cf()) - ghRef_),
     fvOptions_(fv::options::New(mesh())),
     turbulence_
     (
@@ -543,8 +532,8 @@ bool buoyantPimpleFluid::evolve()
 
             if (meshChanged)
             {
-                gh_ = (g_ & mesh.C()) - ghRef_;
-                ghf_ = (g_ & mesh.Cf()) - ghRef_;
+                gh_ = (g() & mesh.C()) - ghRef_;
+                ghf_ = (g() & mesh.Cf()) - ghRef_;
 
                 if (correctPhi)
                 {

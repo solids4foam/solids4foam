@@ -123,9 +123,6 @@ class buoyantBoussinesqPimpleFluid
         //- Effective fluid thermal diffusivity
         volScalarField alphaEff_;
 
-        //- Gravitional acceleration
-        const uniformDimensionedVectorField g_;
-
         //- Reference height field
         uniformDimensionedScalarField hRef_;
 
