@@ -100,9 +100,6 @@ class buoyantPimpleFluid
         //- Creates and initialises the velocity field Uf if required
         autoPtr<surfaceVectorField> rhoUf_;
 
-        //- Gravitional acceleration
-        const uniformDimensionedVectorField g_;
-
         //- Reference height field
         uniformDimensionedScalarField hRef_;
 

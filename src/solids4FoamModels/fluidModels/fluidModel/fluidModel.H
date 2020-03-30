@@ -165,7 +165,7 @@ class fluidModel
 
         //- Make the pimple control
         void makePisoControl() const;
-  
+
         //- Make the pimple control
         void makePimpleControl() const;
 
@@ -305,7 +305,7 @@ public:
 
             //- Return non-const acess to the pimple control
             pisoControl& piso();
-  
+
             //- Return non-const acess to the pimple control
             pimpleControl& pimple();
 
