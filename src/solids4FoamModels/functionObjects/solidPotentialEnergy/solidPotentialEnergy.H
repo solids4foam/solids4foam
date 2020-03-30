@@ -23,21 +23,24 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    solidKineticEnergy
+    solidPotentialEnergy
 
 Description
-    FunctionObject reports the kinetic energy of a solid.
+    FunctionObject reports the potential energy of a solid.
+
+    The reference point (coordinate at which the potential energy is zero) must
+    be specified.
 
 Author
     Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
-    solidKineticEnergy.C
+    solidPotentialEnergy.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef solidKineticEnergy_H
-#define solidKineticEnergy_H
+#ifndef solidPotentialEnergy_H
+#define solidPotentialEnergy_H
 
 #include "functionObject.H"
 #include "dictionary.H"
@@ -50,10 +53,10 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class solidKineticEnergy Declaration
+                        Class solidPotentialEnergy Declaration
 \*---------------------------------------------------------------------------*/
 
-class solidKineticEnergy
+class solidPotentialEnergy
 :
     public functionObject
 {
@@ -65,6 +68,9 @@ class solidKineticEnergy
         //- Reference to main object registry
         const Time& time_;
 
+        //- Reference point (coordinate at which the potential energy is zero)
+        const vector refPoint_;
+
         //- History file ptr
         autoPtr<OFstream> historyFilePtr_;
 
@@ -74,25 +80,25 @@ class solidKineticEnergy
         bool writeData();
 
         //- Disallow default bitwise copy construct
-        solidKineticEnergy
+        solidPotentialEnergy
         (
-            const solidKineticEnergy&
+            const solidPotentialEnergy&
         );
 
         //- Disallow default bitwise assignment
-        void operator=(const solidKineticEnergy&);
+        void operator=(const solidPotentialEnergy&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("solidKineticEnergy");
+    TypeName("solidPotentialEnergy");
 
 
     // Constructors
 
         //- Construct from components
-        solidKineticEnergy
+        solidPotentialEnergy
         (
             const word& name,
             const Time&,

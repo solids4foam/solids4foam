@@ -245,9 +245,6 @@ protected:
 
     // Protected member functions
 
-        //- Return nonlinear geometry enumerator
-        virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
-
         //- Return non-const reference to solid properties dictionary
         IOdictionary& solidProperties()
         {
@@ -283,12 +280,6 @@ protected:
             const GeometricField<Type, fvPatchField, volMesh>& vf,
             const bool writeResiduals = true
         );
-
-        //- Return const reference to the gravitational acceleration
-        const uniformDimensionedVectorField& g() const
-        {
-            return g_;
-        }
 
         //- Return solution standard tolerance
         scalar solutionTol() const
@@ -525,6 +516,15 @@ public:
             virtual const volSymmTensorField& sigma() const
             {
                 return sigma_;
+            }
+
+            //- Return nonlinear geometry enumerator
+            virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
+
+            //- Return const reference to the gravitational acceleration
+            const uniformDimensionedVectorField& g() const
+            {
+                return g_;
             }
 
             //- Each solidModel must indicate whether D or DD is the primary
