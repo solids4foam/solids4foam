@@ -171,9 +171,9 @@ class fluidModel
 
         //- Read g field from disk, if it exists, otherwise return zero field
 #ifdef OPENFOAMESI
-        meshObjects::gravity readG(const Time& runTime) const;
+        meshObjects::gravity readG() const;
 #else
-        uniformDimensionedVectorField readG(const Time& runTime) const;
+        uniformDimensionedVectorField readG() const;
 #endif
 
         //- Disallow default bitwise copy construct

@@ -355,15 +355,9 @@ void Foam::fluidModel::boundPU
 }
 
 #ifdef OPENFOAMESI
-Foam::meshObjects::gravity Foam::fluidModel::readG
-(
-    const Time& runTime
-) const
+Foam::meshObjects::gravity Foam::fluidModel::readG() const
 #else
-Foam::uniformDimensionedVectorField Foam::fluidModel::readG
-(
-    const Time& runTime
-) const
+Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
 #endif
 {
     // Note: READ_IF_PRESENT is incorreclty implemented within the
@@ -374,7 +368,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG
     IOobject wavePropertiesHeader
     (
         "waveProperties",
-        runTime.caseConstant(),
+        runTime().caseConstant(),
         mesh(),
         IOobject::MUST_READ,
         IOobject::NO_WRITE,
@@ -385,7 +379,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG
     IOobject gHeader
     (
         "g",
-        runTime.caseConstant(),
+        runTime().caseConstant(),
         mesh(),
         IOobject::MUST_READ,
         IOobject::NO_WRITE,
@@ -402,7 +396,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG
     if (wavePropertiesHeader.headerOk() && !gHeader.headerOk())
 #endif
     {
-        FatalErrorIn(type() + "::readG(const Time&) const")
+        FatalErrorIn(type() + "::readG() const")
             << "g field not found in the constant directory: the g field "
             << "must be specified when the waveProperties dictionary is "
             << "present!" << abort(FatalError);
@@ -425,7 +419,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG
 #ifdef OPENFOAMESI
         return meshObjects::gravity
         (
-            runTime,
+            runTime(),
 #else
         return uniformDimensionedVectorField
         (
@@ -433,7 +427,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG
             IOobject
             (
                 "g",
-                runTime.caseConstant(),
+                runTime().caseConstant(),
                 mesh(),
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE
@@ -447,11 +441,11 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG
 #ifdef OPENFOAMESI
         return meshObjects::gravity
         (
-            runTime,
+            runTime(),
             IOobject
             (
                 "g",
-                runTime.caseConstant(),
+                runTime().caseConstant(),
                 mesh(),
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
@@ -463,7 +457,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG
             IOobject
             (
                 "g",
-                runTime.caseConstant(),
+                runTime().caseConstant(),
                 mesh(),
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
@@ -528,7 +522,7 @@ Foam::fluidModel::fluidModel
             IOobject::NO_WRITE
         )
     ),
-    g_(readG(runTime)),
+    g_(readG()),
     Uheader_("U", runTime.timeName(), mesh(), IOobject::MUST_READ),
     pheader_("p", runTime.timeName(), mesh(), IOobject::MUST_READ),
     U_
