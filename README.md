@@ -9,6 +9,11 @@ solids4foam is toolbox for OpenFOAM with capabilities for solid mechanics and
 fluid solid interactions.
 
 
+### Where do I start? ###
+
+Start with the [solids4foam documentation](documentation/solids4foamDocumentation), located in the documentation directory.
+
+
 ### How do I get set up? ###
 
 To get setup, you must first install foam-extend-4.0 or foam-extend-4.1,
