@@ -222,20 +222,26 @@ void IQNILSCouplingInterface::updateDisplacement()
             // Reference has been set in the first coupling iteration
             fluidPatchesPointsV_[interfaceI].append
             (
+                vectorField
                 (
-                    solidZonesPointsDispls()[interfaceI]
-                  - fluidZonesPointsDispls()[interfaceI]
-                )
-              - (
-                    solidZonesPointsDisplsRef()[interfaceI]
-                  - fluidZonesPointsDisplsRef()[interfaceI]
+                    (
+                        solidZonesPointsDispls()[interfaceI]
+                      - fluidZonesPointsDispls()[interfaceI]
+                    )
+                  - (
+                        solidZonesPointsDisplsRef()[interfaceI]
+                      - fluidZonesPointsDisplsRef()[interfaceI]
+                    )
                 )
             );
 
             fluidPatchesPointsW_[interfaceI].append
             (
-                solidZonesPointsDispls()[interfaceI]
-              - solidZonesPointsDisplsRef()[interfaceI]
+                vectorField
+                (
+                    solidZonesPointsDispls()[interfaceI]
+                  - solidZonesPointsDisplsRef()[interfaceI]
+                )
             );
 
             fluidPatchesPointsT_[interfaceI].append
