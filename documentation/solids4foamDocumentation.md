@@ -26,4 +26,6 @@ The documentation is now maintained by Philip Cardiff. If you find errors or hav
     - #### Running the Case
     - #### Structure
 
+- ### [Running More Solid Cases](tutorials/more_solid_cases)
+
 - ### [References & Acknowledgement](tutorials/references)
