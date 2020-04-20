@@ -110,7 +110,7 @@ class viscoNeoHookeanElastic
 
         //- Relaxed (long term) and unrelaxed (short term) bulk modulus
         //  Only the deviatoric component of stress is viscous
-        dimensionedScalar k_;
+        dimensionedScalar K_;
 
 
         //- Internal stress variables for each Maxwell model
@@ -146,26 +146,7 @@ class viscoNeoHookeanElastic
         surfaceSymmTensorField transformNeededf_;
         surfaceSymmTensorField transformFbarf_;
 
-        //- Total deformation gradient volField
-        volTensorField* FPtr_;
-
-        //- Total deformation gradient surfaceField
-        surfaceTensorField* FfPtr_;
-
-
     // Private Member Functions
-
-        //- Make the F field
-        void makeF();
-
-        //- Return a reference to the F field
-        volTensorField& F();
-
-        //- Make the Ff field
-        void makeFf();
-
-        //- Return a reference to the Ff field
-        surfaceTensorField& Ff();
 
         //- Disallow default bitwise copy construct
         viscoNeoHookeanElastic(const viscoNeoHookeanElastic&);

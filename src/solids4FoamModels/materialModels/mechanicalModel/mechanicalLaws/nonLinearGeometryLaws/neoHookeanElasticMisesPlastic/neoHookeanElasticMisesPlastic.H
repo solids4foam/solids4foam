@@ -96,12 +96,6 @@ class neoHookeanElasticMisesPlastic
         //- Jacobian of the toal deformation gradient surfaceField
         surfaceScalarField* JfPtr_;
 
-        //- Total deformation gradient volField
-        volTensorField* FPtr_;
-
-        //- Total deformation gradient surfaceField
-        surfaceTensorField* FfPtr_;
-
         //- Table of post-yield stress versus plastic strain
         //  For large strain total Lagrangian models, it expects
         //  the true stress and true plastic strain.
@@ -243,18 +237,6 @@ class neoHookeanElasticMisesPlastic
 
         //- Return a reference to the Jf field
         surfaceScalarField& Jf();
-
-        //- Make the F field
-        void makeF();
-
-        //- Return a reference to the F field
-        volTensorField& F();
-
-        //- Make the Ff field
-        void makeFf();
-
-        //- Return a reference to the Ff field
-        surfaceTensorField& Ff();
 
         //- Return the current Kirchhoff yield stress
         scalar curYieldStress

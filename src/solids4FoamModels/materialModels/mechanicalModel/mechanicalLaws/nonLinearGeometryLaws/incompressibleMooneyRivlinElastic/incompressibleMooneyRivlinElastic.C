@@ -27,6 +27,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
 #include "fvm.H"
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -50,6 +51,10 @@ void Foam::incompressibleMooneyRivlinElastic::calculateHydrostaticStress
 {
     if (solvePressureEqn_)
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        SolverPerformance<scalar>::debug = 0;
+#endif
+
         // Store previous iteration to allow relaxation, if needed
         sigmaHyd.storePrevIter();
 

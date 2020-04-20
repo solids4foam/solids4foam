@@ -50,6 +50,15 @@ Description
     modulus (penalty) term should be set orders of magnitude greater than the
     shear modulus parameters.
 
+    The bulk modulus acts as a penalty parameter, assuring that the
+    incompressibility condition is satisfied. To ensure this, its value
+    should be 'large enough' relative to the shear modulus parameters, but how
+    large is subject to numerical experimentation. References below recommend it
+    to be around 1e3 to 1e7 times the largest material parameter of the model
+    (c01, c10, or c11). Based on numerical experiments, a value of 1e3 times the
+    small-strain shear modulus of the Mooney-Rivlin model (mu = 2*(c01 + c10))
+    should be enough for the current implementation.
+
     Optionally: a Poisson's equation can be solved to calculate sigmaHyd. This
     is required as incompressibility is approached.
 

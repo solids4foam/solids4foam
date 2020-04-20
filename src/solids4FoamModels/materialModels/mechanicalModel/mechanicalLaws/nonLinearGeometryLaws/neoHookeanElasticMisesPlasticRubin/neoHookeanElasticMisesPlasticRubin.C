@@ -28,9 +28,7 @@ License
 #include "transformGeometricField.H"
 #include "logVolFields.H"
 #include "fvc.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "zeroGradientFvPatchFields.H"
-#endif
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -128,45 +126,6 @@ Foam::volScalarField& Foam::neoHookeanElasticMisesPlasticRubin::J()
     }
 
     return *JPtr_;
-}
-
-
-void Foam::neoHookeanElasticMisesPlasticRubin::makeF()
-{
-    if (FPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlasticRubin::makeF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "lawF",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-
-    // Store the old-time
-    FPtr_->oldTime();
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElasticMisesPlasticRubin::F()
-{
-    if (!FPtr_)
-    {
-        makeF();
-    }
-
-    return *FPtr_;
 }
 
 
@@ -349,7 +308,6 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
     K_(dict.lookup("hardeningModulus")),
     relFPtr_(NULL),
     JPtr_(NULL),
-    FPtr_(NULL),
     P_
     (
         IOobject
@@ -480,7 +438,6 @@ Foam::neoHookeanElasticMisesPlasticRubin::~neoHookeanElasticMisesPlasticRubin()
 {
     deleteDemandDrivenData(relFPtr_);
     deleteDemandDrivenData(JPtr_);
-    deleteDemandDrivenData(FPtr_);
 }
 
 
@@ -537,51 +494,12 @@ void Foam::neoHookeanElasticMisesPlasticRubin::correct
     volSymmTensorField& sigma
 )
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateF(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        // Update the relative deformation gradient
-        relF() = I + gradDD.T();
-
-        // Update the total deformation gradient
-        F() = relF() & F().oldTime();
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        // Update the total deformation gradient
-        F() = I + gradD.T();
-
-        // Update the relative deformation gradient
-        relF() = F() & inv(F().oldTime());
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            type() + "::correct(volSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Update the Jacobian of the total deformation gradient

@@ -39,80 +39,6 @@ namespace Foam
 }
 
 
-// * * * * * * * * * * *  Private Member Funtcions * * * * * * * * * * * * * //
-
-void Foam::StVenantKirchhoffElastic::makeF()
-{
-    if (FPtr_)
-    {
-        FatalErrorIn("void Foam::StVenantKirchhoffElastic::makeF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "F",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::volTensorField& Foam::StVenantKirchhoffElastic::F()
-{
-    if (!FPtr_)
-    {
-        makeF();
-    }
-
-    return *FPtr_;
-}
-
-
-void Foam::StVenantKirchhoffElastic::makeFf()
-{
-    if (FfPtr_)
-    {
-        FatalErrorIn("void Foam::StVenantKirchhoffElastic::makeFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "Ff",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::surfaceTensorField& Foam::StVenantKirchhoffElastic::Ff()
-{
-    if (!FfPtr_)
-    {
-        makeFf();
-    }
-
-    return *FfPtr_;
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -128,8 +54,7 @@ Foam::StVenantKirchhoffElastic::StVenantKirchhoffElastic
     rho_(dict.lookup("rho")),
     lambda_("lambda", dimPressure, 0.0),
     mu_("mu", dimPressure, 0.0),
-    FPtr_(NULL),
-    FfPtr_(NULL)
+    K_("K", dimPressure, 0.0)
 {
     // Read mechanical properties
     dimensionedScalar E("E", dimPressure, 0.0);
@@ -152,10 +77,10 @@ Foam::StVenantKirchhoffElastic::StVenantKirchhoffElastic
     )
     {
         mu_ = dimensionedScalar(dict.lookup("mu"));
-        const dimensionedScalar K = dimensionedScalar(dict.lookup("K"));
+        K_ = dimensionedScalar(dict.lookup("K"));
 
-        E = 9*K*mu_/(3*K + mu_);
-        nu = (3*K - 2*mu_)/(2*(3*K + mu_));
+        E = 9*K_*mu_/(3*K_ + mu_);
+        nu = (3*K_ - 2*mu_)/(2*(3*K_ + mu_));
     }
     else
     {
@@ -172,16 +97,16 @@ Foam::StVenantKirchhoffElastic::StVenantKirchhoffElastic
     {
         lambda_ = nu*E/((1 + nu)*(1 - 2.0*nu));
     }
+
+    // Set bulk modulus
+    K_ = lambda_ + (2.0/3.0)*mu_;
 }
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::StVenantKirchhoffElastic::~StVenantKirchhoffElastic()
-{
-    deleteDemandDrivenData(FPtr_);
-    deleteDemandDrivenData(FfPtr_);
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -231,81 +156,12 @@ Foam::tmp<Foam::volScalarField> Foam::StVenantKirchhoffElastic::impK() const
 
 void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateF(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        // Update the relative deformation gradient: not needed
-        const volTensorField relF = I + gradDD.T();
-
-        // Update the total deformation gradient
-        F() = relF & F().oldTime();
-
-        if (enforceLinear())
-        {
-            WarningIn
-            (
-                "void Foam::StVenantKirchhoffElastic::"
-                "correct(volSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
-
-            // Calculate stress using Hooke's law
-            sigma =
-                sigma.oldTime() + 2.0*mu_*symm(gradDD) + lambda_*tr(gradDD)*I;
-
-            return;
-        }
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        // Update the total deformation gradient
-        F() = I + gradD.T();
-
-        // Update the relative deformation gradient: not needed
-        //relF() = F() & inv(F().oldTime());
-
-        if (enforceLinear())
-        {
-            WarningIn
-            (
-                "void Foam::StVenantKirchhoffElastic::"
-                "correct(volSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
-
-            // Calculate stress using Hooke's law
-            sigma = 2.0*mu_*symm(gradD) + lambda_*tr(gradD)*I;
-
-            return;
-        }
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            "void Foam::StVenantKirchhoffElastic::"
-            "correct(volSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Calculate the right Cauchy–Green deformation tensor
@@ -328,81 +184,12 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
 
 void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateFf(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-        // Update the relative deformation gradient: not needed
-        const surfaceTensorField relF = I + gradDD.T();
-
-        // Update the total deformation gradient
-        Ff() = relF & Ff().oldTime();
-
-        if (enforceLinear())
-        {
-            WarningIn
-            (
-                "void Foam::StVenantKirchhoffElastic::"
-                "correct(surfaceSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
-
-            // Calculate stress using Hooke's law
-            sigma =
-                sigma.oldTime() + 2.0*mu_*symm(gradDD) + lambda_*tr(gradDD)*I;
-
-            return;
-        }
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement
-        const surfaceTensorField& gradD =
-            mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-        // Update the total deformation gradient
-        Ff() = I + gradD.T();
-
-        // Update the relative deformation gradient: not needed
-        //relF() = F() & inv(F().oldTime());
-
-        if (enforceLinear())
-        {
-            WarningIn
-            (
-                "void Foam::StVenantKirchhoffElastic::"
-                "correct(surfaceSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
-
-            // Calculate stress using Hooke's law
-            sigma = 2.0*mu_*symm(gradD) + lambda_*tr(gradD)*I;
-
-            return;
-        }
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            "void Foam::StVenantKirchhoffElastic::"
-            "correct(surfaceSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Calculate the right Cauchy–Green deformation tensor

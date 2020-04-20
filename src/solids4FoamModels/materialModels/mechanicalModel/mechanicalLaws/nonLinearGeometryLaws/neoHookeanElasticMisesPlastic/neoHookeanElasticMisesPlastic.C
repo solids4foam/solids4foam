@@ -213,84 +213,6 @@ Foam::surfaceScalarField& Foam::neoHookeanElasticMisesPlastic::Jf()
 }
 
 
-void Foam::neoHookeanElasticMisesPlastic::makeF()
-{
-    if (FPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "lawF",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-
-    // Store the old-time
-    FPtr_->oldTime();
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElasticMisesPlastic::F()
-{
-    if (!FPtr_)
-    {
-        makeF();
-    }
-
-    return *FPtr_;
-}
-
-
-void Foam::neoHookeanElasticMisesPlastic::makeFf()
-{
-    if (FfPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "lawFf",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-
-    // Store the old-time
-    FfPtr_->oldTime();
-}
-
-
-Foam::surfaceTensorField& Foam::neoHookeanElasticMisesPlastic::Ff()
-{
-    if (!FfPtr_)
-    {
-        makeFf();
-    }
-
-    return *FfPtr_;
-}
-
-
 Foam::scalar Foam::neoHookeanElasticMisesPlastic::curYieldStress
 (
     const scalar curEpsilonPEq,    // Current equivalent plastic strain
@@ -720,8 +642,6 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     relFfPtr_(NULL),
     JPtr_(NULL),
     JfPtr_(NULL),
-    FPtr_(NULL),
-    FfPtr_(NULL),
     stressPlasticStrainSeries_(dict),
     sigmaHyd_
     (
@@ -1119,8 +1039,6 @@ Foam::neoHookeanElasticMisesPlastic::~neoHookeanElasticMisesPlastic()
     deleteDemandDrivenData(relFfPtr_);
     deleteDemandDrivenData(JPtr_);
     deleteDemandDrivenData(JfPtr_);
-    deleteDemandDrivenData(FPtr_);
-    deleteDemandDrivenData(FfPtr_);
 }
 
 
@@ -1190,60 +1108,12 @@ Foam::neoHookeanElasticMisesPlastic::impK() const
 
 void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateF(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        // Update the relative deformation gradient
-        relF() = I + gradDD.T();
-
-        // Update the total deformation gradient
-        F() = relF() & F().oldTime();
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            // Lookup gradient of displacement increment
-            const volTensorField& gradDD =
-                mesh().lookupObject<volTensorField>("grad(DD)");
-
-            // Update the total deformation gradient
-            // Note: grad is wrt reference configuration
-            F() = F().oldTime() + gradDD.T();
-
-            // Update the relative deformation gradient
-            relF() = F() & inv(F().oldTime());
-        }
-        else
-        {
-            // Lookup gradient of displacement
-            const volTensorField& gradD =
-                mesh().lookupObject<volTensorField>("grad(D)");
-
-            // Update the total deformation gradient
-            F() = I + gradD.T();
-
-            // Update the relative deformation gradient
-            relF() = F() & inv(F().oldTime());
-        }
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            type() + "::correct(volSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Update the Jacobian of the total deformation gradient
@@ -1518,60 +1388,12 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 
 void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateFf(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-        // Update the relative deformation gradient
-        relFf() = I + gradDD.T();
-
-        // Update the total deformation gradient
-        Ff() = relFf() & Ff().oldTime();
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            // Lookup gradient of displacement increment
-            const surfaceTensorField& gradDD =
-                mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-            // Update the total deformation gradient
-            // Note: grad is wrt reference configuration
-            Ff() = Ff().oldTime() + gradDD.T();
-
-            // Update the relative deformation gradient
-            relFf() = Ff() & inv(Ff().oldTime());
-        }
-        else
-        {
-            // Lookup gradient of displacement
-            const surfaceTensorField& gradD =
-                mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-            // Update the total deformation gradient
-            Ff() = I + gradD.T();
-
-            // Update the relative deformation gradient
-            relFf() = Ff() & inv(Ff().oldTime());
-        }
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            type() + "::correct(surfaceSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Update the Jacobian of the total deformation gradient
