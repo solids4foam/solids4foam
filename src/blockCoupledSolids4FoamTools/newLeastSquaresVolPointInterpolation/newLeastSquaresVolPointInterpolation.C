@@ -493,11 +493,11 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
 
     pointProcBndFacesPtr_.set
     (
-	new List<List<labelPair> >
-    	(
-        	mesh().points().size(),
-        	List<labelPair>(0)
-    	)
+    new List<List<labelPair> >
+        (
+            mesh().points().size(),
+            List<labelPair>(0)
+        )
     );
     List<List<labelPair> >& pointProcBndFaces = pointProcBndFacesPtr_();
 
@@ -2386,26 +2386,7 @@ newLeastSquaresVolPointInterpolation::newLeastSquaresVolPointInterpolation
 // * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * * //
 
 newLeastSquaresVolPointInterpolation::~newLeastSquaresVolPointInterpolation()
-{
-    //deleteDemandDrivenData(pointBndFacesPtr_);
-    //deleteDemandDrivenData(pointCyclicFacesPtr_);
-    //deleteDemandDrivenData(pointProcFacesPtr_);
-    //deleteDemandDrivenData(axisEdgesPtr_);
-    //deleteDemandDrivenData(pointAxisEdgesPtr_);
-    //deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
-    //deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
-    //deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
-    //deleteDemandDrivenData(procBndFacesPtr_);
-    //deleteDemandDrivenData(pointProcBndFacesPtr_);
-    //deleteDemandDrivenData(procBndFaceCentresPtr_);
-    //deleteDemandDrivenData(procCellsPtr_);
-    //deleteDemandDrivenData(pointProcCellsPtr_);
-    //deleteDemandDrivenData(procCellCentresPtr_);
-    //deleteDemandDrivenData(weightsPtr_);
-    //deleteDemandDrivenData(originsPtr_);
-    //deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
-    //invLsMatrices_.clear();
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -2416,14 +2397,14 @@ bool newLeastSquaresVolPointInterpolation::movePoints()
 bool newLeastSquaresVolPointInterpolation::movePoints() const
 #endif
 {
-    //deleteDemandDrivenData(weightsPtr_);
-    //deleteDemandDrivenData(originsPtr_);
-    //deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
-//     deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
-    //deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
-    //deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
-    //deleteDemandDrivenData(procCellCentresPtr_);
-    //deleteDemandDrivenData(procBndFaceCentresPtr_);
+    // Clear all fields that depend on the mesh coordinates
+    globalPointNgbProcBndFaceCentresPtr_.clear();
+    globalPointNgbProcCellCentresPtr_.clear();
+    procBndFaceCentresPtr_.clear();
+    procCellCentresPtr_.clear();
+    weightsPtr_.clear();
+    originsPtr_.clear();
+    mirrorPlaneTransformationPtr_.clear();
     invLsMatrices_.clear();
 
     return true;
@@ -2436,28 +2417,24 @@ void newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&)
 bool newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&) const
 #endif
 {
-    //deleteDemandDrivenData(pointBndFacesPtr_);
-    //deleteDemandDrivenData(pointCyclicFacesPtr_);
-    //deleteDemandDrivenData(pointProcFacesPtr_);
-    //deleteDemandDrivenData(axisEdgesPtr_);
-    //deleteDemandDrivenData(pointAxisEdgesPtr_);
-//     deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
-    //deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
-    //deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
-
-    //deleteDemandDrivenData(procBndFacesPtr_);
-    //deleteDemandDrivenData(procBndFaceCentresPtr_);
-    //deleteDemandDrivenData(pointProcBndFacesPtr_);
-
-    //deleteDemandDrivenData(procCellsPtr_);
-    //deleteDemandDrivenData(pointProcCellsPtr_);
-    //deleteDemandDrivenData(procCellCentresPtr_);
-    //deleteDemandDrivenData(weightsPtr_);
-    //deleteDemandDrivenData(originsPtr_);
-    //deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
+    // Clear all fields that depend on the mesh addressing
+    pointBndFacesPtr_.clear();
+    pointCyclicFacesPtr_.clear();
+    pointProcFacesPtr_.clear();
+    axisEdgesPtr_.clear();
+    pointAxisEdgesPtr_.clear();
+    globalPointNgbProcBndFaceCentresPtr_.clear();
+    globalPointNgbProcCellCentresPtr_.clear();
+    procBndFacesPtr_.clear();
+    procBndFaceCentresPtr_.clear();
+    pointProcBndFacesPtr_.clear();
+    procCellsPtr_.clear();
+    pointProcCellsPtr_.clear();
+    procCellCentresPtr_.clear();
+    weightsPtr_.clear();
+    originsPtr_.clear();
+    mirrorPlaneTransformationPtr_.clear();
     invLsMatrices_.clear();
-
-//     Pout<< "newLeastSquaresVolPointInterpolation::updateMesh - done" << endl;
 
 #ifdef FOAMEXTEND
     return true;
