@@ -1,5 +1,5 @@
 #!/bin/bash
 cd ${0%/*} || exit 1    # run from this directory
 
-wclean lib meshSmoothers
+wclean lib simpleMeshSmoothers
 wclean

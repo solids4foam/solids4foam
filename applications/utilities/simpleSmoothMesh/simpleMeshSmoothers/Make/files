@@ -5,8 +5,4 @@ volumeSmoother/volumeSmoother.C
 implicitVolumeSmoother/implicitVolumeSmoother.C
 explicitVolumeSmoother/explicitVolumeSmoother.C
 
-numerics/newFvMeshSubset/newFvMeshSubset.C
-numerics/newLeastSquaresVolPointInterpolation/newLeastSquaresVolPointInterpolation.C
-numerics/globalPolyPatch/globalPolyPatch.C
-
-LIB = $(FOAM_USER_LIBBIN)/libmeshSmoothers
+LIB = $(FOAM_USER_LIBBIN)/libsimpleMeshSmoothers
