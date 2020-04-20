@@ -93,9 +93,6 @@ class neoHookeanElasticMisesPlasticRubin
         //- Jacobian of the toal deformation gradient volField
         volScalarField* JPtr_;
 
-        //- Total deformation gradient volField
-        volTensorField* FPtr_;
-
         //- Hydrostatic pressure == -hydrostatic stress
         volScalarField P_;
 
@@ -158,18 +155,6 @@ class neoHookeanElasticMisesPlasticRubin
 
         //- Return a reference to the Jf field
         surfaceScalarField& Jf();
-
-        //- Make the F field
-        void makeF();
-
-        //- Return a reference to the F field
-        volTensorField& F();
-
-        //- Make the Ff field
-        void makeFf();
-
-        //- Return a reference to the Ff field
-        surfaceTensorField& Ff();
 
         //- Calcualte Ibar such that det(bEbar) == 1
         tmp<volScalarField> Ibar

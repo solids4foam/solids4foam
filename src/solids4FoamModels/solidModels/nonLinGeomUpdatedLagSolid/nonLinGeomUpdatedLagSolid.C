@@ -178,7 +178,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
           - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           + fvc::div(relJ_*relFinv_ & sigma(), "div(sigma)")
           + rho_*g()
-          + mechanical().RhieChowCorrection(DD(), gradDD())
+          + stabilisation().stabilisation(DD(), gradDD(), impK_)
         );
 
         // Under-relax the linear system

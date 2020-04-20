@@ -149,7 +149,7 @@ bool nonLinGeomTotalLagSolid::evolve()
           - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           + fvc::div(J_*Finv_ & sigma(), "div(sigma)")
           + rho()*g()
-          + mechanical().RhieChowCorrection(DD(), gradDD())
+          + stabilisation().stabilisation(DD(), gradDD(), impK_)
         );
 
         // Enforce linear to improve convergence

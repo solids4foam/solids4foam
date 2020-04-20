@@ -196,7 +196,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
           + fvc::div(J_*Finv_ & sigma(), "div(sigma)")
           + rho()*g()
-          + mechanical().RhieChowCorrection(D(), gradD())
+          + stabilisation().stabilisation(DD(), gradDD(), impK_)
         );
 
         // Under-relax the linear system
