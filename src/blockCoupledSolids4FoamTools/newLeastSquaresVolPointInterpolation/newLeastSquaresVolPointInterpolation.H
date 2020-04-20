@@ -81,58 +81,58 @@ class newLeastSquaresVolPointInterpolation
     // Private data
 
         //- Point boundary face addressig
-        mutable labelListList* pointBndFacesPtr_;
+        mutable autoPtr<labelListList> pointBndFacesPtr_;
 
         //- Point cyclic boundary face addressig
-        mutable labelListList* pointCyclicFacesPtr_;
+        mutable autoPtr<labelListList> pointCyclicFacesPtr_;
 
         //- Point boundary face addressig
-        mutable labelListList* pointProcFacesPtr_;
+        mutable autoPtr<labelListList> pointProcFacesPtr_;
 
         //- Axis edges for axisymmetric cases
-        mutable labelList* axisEdgesPtr_;
+        mutable autoPtr<labelList> axisEdgesPtr_;
 
         //- Point ngb processor boundary face centres
-        mutable Map<labelList>* pointAxisEdgesPtr_;
+        mutable autoPtr<Map<labelList> > pointAxisEdgesPtr_;
 
 //         //- Point ngb processor boundary face centres
 //         mutable Map<Field<vector> >* pointNgbProcBndFaceCentresPtr_;
 
         //- Global point ngb processor boundary face centres
-        mutable Map<Field<vector> >* globalPointNgbProcBndFaceCentresPtr_;
+        mutable autoPtr<Map<Field<vector> > > globalPointNgbProcBndFaceCentresPtr_;
 
         //- Global point ngb processor cell centres
-        mutable Map<Field<vector> >* globalPointNgbProcCellCentresPtr_;
+        mutable autoPtr<Map<Field<vector> > > globalPointNgbProcCellCentresPtr_;
 
         //- Locel boundary faces needed by neighbour processors
-        mutable labelListList* procBndFacesPtr_;
+        mutable autoPtr<labelListList> procBndFacesPtr_;
 
         //- Centres of boundary faces from neigbour processores
-        mutable FieldField<Field, vector>* procBndFaceCentresPtr_;
+        mutable autoPtr<FieldField<Field, vector> > procBndFaceCentresPtr_;
 
 //         //- Point ngb processor boundary faces addressing
 //         mutable Map<List<labelPair> >* pointProcBndFacesPtr_;
 
         //- Point ngb processor boundary faces addressing
-        mutable List<List<labelPair> >* pointProcBndFacesPtr_;
+        mutable autoPtr<List<List<labelPair> > > pointProcBndFacesPtr_;
 
         //- Locel processor cells needed by neighbour processors
-        mutable labelListList* procCellsPtr_;
+        mutable autoPtr<labelListList> procCellsPtr_;
 
         //- Point ngb processor cell addressing
-        mutable Map<List<labelPair> >* pointProcCellsPtr_;
+        mutable autoPtr<Map<List<labelPair> > > pointProcCellsPtr_;
 
         //- Centres of cells from neigbour processores
-        mutable FieldField<Field, vector>* procCellCentresPtr_;
+        mutable autoPtr<FieldField<Field, vector> > procCellCentresPtr_;
 
         //- Weighting factors
-        mutable FieldField<Field, scalar>* weightsPtr_;
+        mutable autoPtr<FieldField<Field, scalar> > weightsPtr_;
 
         //- Local origin
-        mutable Field<vector>* originsPtr_;
+        mutable autoPtr<Field<vector> > originsPtr_;
 
         //- Mirror plane normals and transformation tensors
-        mutable List<Tuple2<vector, tensor> >* mirrorPlaneTransformationPtr_;
+        mutable autoPtr<List<Tuple2<vector, tensor> > > mirrorPlaneTransformationPtr_;
 //         mutable Map<Tuple2<vector, tensor> >* mirrorPlaneTransformationPtr_;
 
         //- Interpolation matrices

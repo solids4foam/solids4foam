@@ -64,7 +64,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (pointBndFacesPtr_ || pointProcFacesPtr_)
+    if (!pointBndFacesPtr_.empty() || !pointProcFacesPtr_.empty())
     {
         FatalErrorIn
         (
@@ -79,16 +79,16 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
     const labelListList& pointPoints = mesh().pointPoints();
 
     // Allocate storage for addressing
-    pointBndFacesPtr_ = new labelListList(points.size());
-    labelListList& pointBndFaces = *pointBndFacesPtr_;
+    pointBndFacesPtr_.set(new labelListList(points.size()));
+    labelListList& pointBndFaces = pointBndFacesPtr_();
 
     // Allocate storage for addressing
-    pointCyclicFacesPtr_ = new labelListList(points.size());
-    labelListList& pointCyclicFaces = *pointCyclicFacesPtr_;
+    pointCyclicFacesPtr_.set(new labelListList(points.size()));
+    labelListList& pointCyclicFaces = pointCyclicFacesPtr_();
 
     // Allocate storage for addressing
-    pointProcFacesPtr_ = new labelListList(points.size());
-    labelListList& pointProcFaces = *pointProcFacesPtr_;
+    pointProcFacesPtr_.set(new labelListList(points.size()));
+    labelListList& pointProcFaces = pointProcFacesPtr_();
 
     forAll(pointBndFaces, pointI)
     {
@@ -236,7 +236,7 @@ void newLeastSquaresVolPointInterpolation::makeAxisEdges() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (axisEdgesPtr_)
+    if (!axisEdgesPtr_.empty())
     {
         FatalErrorIn
         (
@@ -302,7 +302,7 @@ void newLeastSquaresVolPointInterpolation::makeAxisEdges() const
         }
     }
 
-    axisEdgesPtr_ = new labelList(axisEdgeSet.toc());
+    axisEdgesPtr_.set(new labelList(axisEdgeSet.toc()));
 }
 
 void newLeastSquaresVolPointInterpolation::makePointAxisEdges() const
@@ -317,7 +317,7 @@ void newLeastSquaresVolPointInterpolation::makePointAxisEdges() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (pointAxisEdgesPtr_)
+    if (!pointAxisEdgesPtr_.empty())
     {
         FatalErrorIn
         (
@@ -328,10 +328,10 @@ void newLeastSquaresVolPointInterpolation::makePointAxisEdges() const
             << abort(FatalError);
     }
 
-    pointAxisEdgesPtr_ = new Map<labelList>();
+    pointAxisEdgesPtr_.set(new Map<labelList>());
 
     Map<labelList>& pointAxisEdges =
-        *pointAxisEdgesPtr_;
+        pointAxisEdgesPtr_();
 
     const edgeList& edges = mesh().edges();
 
@@ -405,7 +405,7 @@ makeGlobalPointNgbProcBndFaceCentres() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (globalPointNgbProcBndFaceCentresPtr_)
+    if (!globalPointNgbProcBndFaceCentresPtr_.empty())
     {
         FatalErrorIn
         (
@@ -416,10 +416,10 @@ makeGlobalPointNgbProcBndFaceCentres() const
                 << abort(FatalError);
     }
 
-    globalPointNgbProcBndFaceCentresPtr_ = new Map<vectorField>();
+    globalPointNgbProcBndFaceCentresPtr_.set(new Map<vectorField>());
 
     Map<vectorField>& globalPointNgbProcBndFaceCentres =
-        *globalPointNgbProcBndFaceCentresPtr_;
+        globalPointNgbProcBndFaceCentresPtr_();
 
     globalPointNgbProcBndFaceFieldData
     (
@@ -441,7 +441,7 @@ makeGlobalPointNgbProcCellCentres() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (globalPointNgbProcCellCentresPtr_)
+    if (!globalPointNgbProcCellCentresPtr_.empty())
     {
         FatalErrorIn
         (
@@ -452,10 +452,10 @@ makeGlobalPointNgbProcCellCentres() const
                 << abort(FatalError);
     }
 
-    globalPointNgbProcCellCentresPtr_ = new Map<vectorField>();
+    globalPointNgbProcCellCentresPtr_.set(new Map<vectorField>());
 
     Map<vectorField>& globalPointNgbProcCellCentres =
-        *globalPointNgbProcCellCentresPtr_;
+        globalPointNgbProcCellCentresPtr_();
 
     globalPointNgbProcCellFieldData(mesh().C(), globalPointNgbProcCellCentres);
 }
@@ -473,7 +473,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (procBndFacesPtr_)
+    if (!procBndFacesPtr_.empty())
     {
         FatalErrorIn
         (
@@ -484,19 +484,22 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
                 << abort(FatalError);
     }
 
-    procBndFacesPtr_ = new labelListList(Pstream::nProcs());
-    labelListList& procBndFaces = *procBndFacesPtr_;
+    procBndFacesPtr_.set(new labelListList(Pstream::nProcs()));
+    labelListList& procBndFaces = procBndFacesPtr_();
     forAll(procBndFaces, procI)
     {
         procBndFaces[procI] = labelList(0);
     }
 
-    pointProcBndFacesPtr_ = new List<List<labelPair> >
+    pointProcBndFacesPtr_.set
     (
-        mesh().points().size(),
-        List<labelPair>(0)
+	new List<List<labelPair> >
+    	(
+        	mesh().points().size(),
+        	List<labelPair>(0)
+    	)
     );
-    List<List<labelPair> >& pointProcBndFaces = *pointProcBndFacesPtr_;
+    List<List<labelPair> >& pointProcBndFaces = pointProcBndFacesPtr_();
 
 //     pointProcBndFacesPtr_ = new Map<List<labelPair> >();
 //     Map<List<labelPair> >& pointProcBndFaces = *pointProcBndFacesPtr_;
@@ -719,7 +722,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (procBndFaceCentresPtr_)
+    if (!procBndFaceCentresPtr_.empty())
     {
         FatalErrorIn
         (
@@ -729,12 +732,14 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
                 << abort(FatalError);
     }
 
-    procBndFaceCentresPtr_ =
+    procBndFaceCentresPtr_.set
+    (
         new FieldField<Field, vector>
         (
             Pstream::nProcs()
-        );
-    FieldField<Field, vector>& procBndFaceCentres = *procBndFaceCentresPtr_;
+        )
+    );
+    FieldField<Field, vector>& procBndFaceCentres = procBndFaceCentresPtr_();
 
     const vectorField& Cf = mesh().faceCentres();
 
@@ -815,7 +820,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (procCellsPtr_)
+    if (!procCellsPtr_.empty())
     {
         FatalErrorIn
         (
@@ -825,15 +830,15 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                 << abort(FatalError);
     }
 
-    procCellsPtr_ = new labelListList(Pstream::nProcs());
-    labelListList& procCells = *procCellsPtr_;
+    procCellsPtr_.set(new labelListList(Pstream::nProcs()));
+    labelListList& procCells = procCellsPtr_();
     forAll(procCells, procI)
     {
         procCells[procI] = labelList(0);
     }
 
-    pointProcCellsPtr_ = new Map<List<labelPair> >();
-    Map<List<labelPair> >& pointProcCells = *pointProcCellsPtr_;
+    pointProcCellsPtr_.set(new Map<List<labelPair> >());
+    Map<List<labelPair> >& pointProcCells = pointProcCellsPtr_();
 
     const labelListList& pointCells = mesh().pointCells();
 
@@ -1059,7 +1064,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (procCellCentresPtr_)
+    if (!procCellCentresPtr_.empty())
     {
         FatalErrorIn
         (
@@ -1069,12 +1074,14 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
                 << abort(FatalError);
     }
 
-    procCellCentresPtr_ =
+    procCellCentresPtr_.set
+    (
         new FieldField<Field, vector>
         (
             Pstream::nProcs()
-        );
-    FieldField<Field, vector>& procCellCentres = *procCellCentresPtr_;
+        )
+    );
+    FieldField<Field, vector>& procCellCentres = procCellCentresPtr_();
 
 //     const vectorField& CI = mesh().C().internalField();
     const vectorField& CI = mesh().cellCentres();
@@ -1156,7 +1163,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (weightsPtr_)
+    if (!weightsPtr_.empty())
     {
         FatalErrorIn
         (
@@ -1166,9 +1173,11 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
             << abort(FatalError);
     }
 
-    weightsPtr_ =
-        new FieldField<Field, scalar>(mesh().points().size());
-    FieldField<Field, scalar>& weights = *weightsPtr_;
+    weightsPtr_.set
+    (
+        new FieldField<Field, scalar>(mesh().points().size())
+    );
+    FieldField<Field, scalar>& weights = weightsPtr_();
 
     const vectorField& p = mesh().points();
     const vectorField& C = mesh().cellCentres();
@@ -1441,7 +1450,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (originsPtr_)
+    if (!originsPtr_.empty())
     {
         FatalErrorIn
         (
@@ -1451,8 +1460,8 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
             << abort(FatalError);
     }
 
-    originsPtr_ = new vectorField(mesh().points().size(), vector::zero);
-    vectorField& origins = *originsPtr_;
+    originsPtr_.set(new vectorField(mesh().points().size(), vector::zero));
+    vectorField& origins = originsPtr_();
 
     const FieldField<Field, scalar>& w = weights();
 
@@ -2169,7 +2178,7 @@ makeMirrorPlaneTransformation() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (mirrorPlaneTransformationPtr_)
+    if (!mirrorPlaneTransformationPtr_.empty())
     {
         FatalErrorIn
         (
@@ -2180,14 +2189,16 @@ makeMirrorPlaneTransformation() const
                 << abort(FatalError);
     }
 
-    mirrorPlaneTransformationPtr_ =
+    mirrorPlaneTransformationPtr_.set
+    (
         new List<Tuple2<vector, tensor> >
         (
             mesh().points().size(),
             Tuple2<vector, tensor>(vector::zero, tensor::zero)
-        );
+        )
+    );
     List<Tuple2<vector, tensor> >& mirrorPlaneTransformation =
-        *mirrorPlaneTransformationPtr_;
+        mirrorPlaneTransformationPtr_();
 
 //     mirrorPlaneTransformationPtr_ = new Map<Tuple2<vector, tensor> >();
 //     Map<Tuple2<vector, tensor> >& mirrorPlaneTransformation =
@@ -2376,23 +2387,23 @@ newLeastSquaresVolPointInterpolation::newLeastSquaresVolPointInterpolation
 
 newLeastSquaresVolPointInterpolation::~newLeastSquaresVolPointInterpolation()
 {
-    deleteDemandDrivenData(pointBndFacesPtr_);
-    deleteDemandDrivenData(pointCyclicFacesPtr_);
-    deleteDemandDrivenData(pointProcFacesPtr_);
-    deleteDemandDrivenData(axisEdgesPtr_);
-    deleteDemandDrivenData(pointAxisEdgesPtr_);
+    //deleteDemandDrivenData(pointBndFacesPtr_);
+    //deleteDemandDrivenData(pointCyclicFacesPtr_);
+    //deleteDemandDrivenData(pointProcFacesPtr_);
+    //deleteDemandDrivenData(axisEdgesPtr_);
+    //deleteDemandDrivenData(pointAxisEdgesPtr_);
     //deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
-    deleteDemandDrivenData(procBndFacesPtr_);
-    deleteDemandDrivenData(pointProcBndFacesPtr_);
-    deleteDemandDrivenData(procBndFaceCentresPtr_);
-    deleteDemandDrivenData(procCellsPtr_);
-    deleteDemandDrivenData(pointProcCellsPtr_);
-    deleteDemandDrivenData(procCellCentresPtr_);
-    deleteDemandDrivenData(weightsPtr_);
-    deleteDemandDrivenData(originsPtr_);
-    deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
+    //deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
+    //deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
+    //deleteDemandDrivenData(procBndFacesPtr_);
+    //deleteDemandDrivenData(pointProcBndFacesPtr_);
+    //deleteDemandDrivenData(procBndFaceCentresPtr_);
+    //deleteDemandDrivenData(procCellsPtr_);
+    //deleteDemandDrivenData(pointProcCellsPtr_);
+    //deleteDemandDrivenData(procCellCentresPtr_);
+    //deleteDemandDrivenData(weightsPtr_);
+    //deleteDemandDrivenData(originsPtr_);
+    //deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
     //invLsMatrices_.clear();
 }
 
@@ -2405,14 +2416,14 @@ bool newLeastSquaresVolPointInterpolation::movePoints()
 bool newLeastSquaresVolPointInterpolation::movePoints() const
 #endif
 {
-    deleteDemandDrivenData(weightsPtr_);
-    deleteDemandDrivenData(originsPtr_);
-    deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
+    //deleteDemandDrivenData(weightsPtr_);
+    //deleteDemandDrivenData(originsPtr_);
+    //deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
 //     deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
-    deleteDemandDrivenData(procCellCentresPtr_);
-    deleteDemandDrivenData(procBndFaceCentresPtr_);
+    //deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
+    //deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
+    //deleteDemandDrivenData(procCellCentresPtr_);
+    //deleteDemandDrivenData(procBndFaceCentresPtr_);
     invLsMatrices_.clear();
 
     return true;
@@ -2425,25 +2436,25 @@ void newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&)
 bool newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&) const
 #endif
 {
-    deleteDemandDrivenData(pointBndFacesPtr_);
-    deleteDemandDrivenData(pointCyclicFacesPtr_);
-    deleteDemandDrivenData(pointProcFacesPtr_);
-    deleteDemandDrivenData(axisEdgesPtr_);
-    deleteDemandDrivenData(pointAxisEdgesPtr_);
+    //deleteDemandDrivenData(pointBndFacesPtr_);
+    //deleteDemandDrivenData(pointCyclicFacesPtr_);
+    //deleteDemandDrivenData(pointProcFacesPtr_);
+    //deleteDemandDrivenData(axisEdgesPtr_);
+    //deleteDemandDrivenData(pointAxisEdgesPtr_);
 //     deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
+    //deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
+    //deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
 
-    deleteDemandDrivenData(procBndFacesPtr_);
-    deleteDemandDrivenData(procBndFaceCentresPtr_);
-    deleteDemandDrivenData(pointProcBndFacesPtr_);
+    //deleteDemandDrivenData(procBndFacesPtr_);
+    //deleteDemandDrivenData(procBndFaceCentresPtr_);
+    //deleteDemandDrivenData(pointProcBndFacesPtr_);
 
-    deleteDemandDrivenData(procCellsPtr_);
-    deleteDemandDrivenData(pointProcCellsPtr_);
-    deleteDemandDrivenData(procCellCentresPtr_);
-    deleteDemandDrivenData(weightsPtr_);
-    deleteDemandDrivenData(originsPtr_);
-    deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
+    //deleteDemandDrivenData(procCellsPtr_);
+    //deleteDemandDrivenData(pointProcCellsPtr_);
+    //deleteDemandDrivenData(procCellCentresPtr_);
+    //deleteDemandDrivenData(weightsPtr_);
+    //deleteDemandDrivenData(originsPtr_);
+    //deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
     invLsMatrices_.clear();
 
 //     Pout<< "newLeastSquaresVolPointInterpolation::updateMesh - done" << endl;
@@ -2455,45 +2466,45 @@ bool newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&) const
 
 const labelListList& newLeastSquaresVolPointInterpolation::pointBndFaces() const
 {
-    if (!pointBndFacesPtr_)
+    if (pointBndFacesPtr_.empty())
     {
         makePointFaces();
     }
 
-    return *pointBndFacesPtr_;
+    return pointBndFacesPtr_();
 }
 
 const labelListList& newLeastSquaresVolPointInterpolation
 ::pointCyclicFaces() const
 {
-    if (!pointCyclicFacesPtr_)
+    if (pointCyclicFacesPtr_.empty())
     {
         makePointFaces();
     }
 
-    return *pointCyclicFacesPtr_;
+    return pointCyclicFacesPtr_();
 }
 
 const labelList& newLeastSquaresVolPointInterpolation
 ::axisEdges() const
 {
-    if (!axisEdgesPtr_)
+    if (axisEdgesPtr_.empty())
     {
         makeAxisEdges();
     }
 
-    return *axisEdgesPtr_;
+    return axisEdgesPtr_();
 }
 
 const Map<labelList>&
 newLeastSquaresVolPointInterpolation::pointAxisEdges() const
 {
-    if (!pointAxisEdgesPtr_)
+    if (pointAxisEdgesPtr_.empty())
     {
         makePointAxisEdges();
     }
 
-    return *pointAxisEdgesPtr_;
+    return pointAxisEdgesPtr_();
 }
 
 // const Map<Field<vector> >&
@@ -2510,129 +2521,129 @@ newLeastSquaresVolPointInterpolation::pointAxisEdges() const
 const Map<Field<vector> >&
 newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceCentres() const
 {
-    if (!globalPointNgbProcBndFaceCentresPtr_)
+    if (globalPointNgbProcBndFaceCentresPtr_.empty())
     {
         makeGlobalPointNgbProcBndFaceCentres();
     }
 
-    return *globalPointNgbProcBndFaceCentresPtr_;
+    return globalPointNgbProcBndFaceCentresPtr_();
 }
 
 const Map<Field<vector> >&
 newLeastSquaresVolPointInterpolation::globalPointNgbProcCellCentres() const
 {
-    if (!globalPointNgbProcCellCentresPtr_)
+    if (globalPointNgbProcCellCentresPtr_.empty())
     {
         makeGlobalPointNgbProcCellCentres();
     }
 
-    return *globalPointNgbProcCellCentresPtr_;
+    return globalPointNgbProcCellCentresPtr_();
 }
 
 const labelListList& newLeastSquaresVolPointInterpolation::pointProcFaces() const
 {
-    if (!pointProcFacesPtr_)
+    if (pointProcFacesPtr_.empty())
     {
         makePointFaces();
     }
 
-    return *pointProcFacesPtr_;
+    return pointProcFacesPtr_();
 }
 
 const labelListList& newLeastSquaresVolPointInterpolation::procBndFaces() const
 {
-    if (!procBndFacesPtr_)
+    if (procBndFacesPtr_.empty())
     {
         makeProcBndFaces();
     }
 
-    return *procBndFacesPtr_;
+    return procBndFacesPtr_();
 }
 
 const FieldField<Field, vector>&
 newLeastSquaresVolPointInterpolation::procBndFaceCentres() const
 {
-    if (!procBndFaceCentresPtr_)
+    if (procBndFaceCentresPtr_.empty())
     {
         makeProcBndFaceCentres();
     }
 
-    return *procBndFaceCentresPtr_;
+    return procBndFaceCentresPtr_();
 }
 
 const List<List<labelPair> >& newLeastSquaresVolPointInterpolation::
 pointProcBndFaces() const
 {
-    if (!pointProcBndFacesPtr_)
+    if (pointProcBndFacesPtr_.empty())
     {
         makeProcBndFaces();
     }
 
-    return *pointProcBndFacesPtr_;
+    return pointProcBndFacesPtr_();
 }
 
 const labelListList& newLeastSquaresVolPointInterpolation::procCells() const
 {
-    if (!procCellsPtr_)
+    if (procCellsPtr_.empty())
     {
         makeProcCells();
     }
 
-    return *procCellsPtr_;
+    return procCellsPtr_();
 }
 
 const Map<List<labelPair> >& newLeastSquaresVolPointInterpolation::
 pointProcCells() const
 {
-    if (!pointProcCellsPtr_)
+    if (pointProcCellsPtr_.empty())
     {
         makeProcCells();
     }
 
-    return *pointProcCellsPtr_;
+    return pointProcCellsPtr_();
 }
 
 const FieldField<Field, vector>&
 newLeastSquaresVolPointInterpolation::procCellCentres() const
 {
-    if (!procCellCentresPtr_)
+    if (procCellCentresPtr_.empty())
     {
         makeProcCellCentres();
     }
 
-    return *procCellCentresPtr_;
+    return procCellCentresPtr_();
 }
 
 const FieldField<Field, scalar>&
 newLeastSquaresVolPointInterpolation::weights() const
 {
-    if (!weightsPtr_)
+    if (weightsPtr_.empty())
     {
         makeWeights();
     }
 
-    return *weightsPtr_;
+    return weightsPtr_();
 }
 
 const vectorField& newLeastSquaresVolPointInterpolation::origins() const
 {
-    if (!originsPtr_)
+    if (originsPtr_.empty())
     {
         makeOrigins();
     }
 
-    return *originsPtr_;
+    return originsPtr_();
 }
 
 const List<Tuple2<vector, tensor> >& newLeastSquaresVolPointInterpolation::
 mirrorPlaneTransformation() const
 {
-    if (!mirrorPlaneTransformationPtr_)
+    if (mirrorPlaneTransformationPtr_.empty())
     {
         makeMirrorPlaneTransformation();
     }
 
-    return *mirrorPlaneTransformationPtr_;
+    return mirrorPlaneTransformationPtr_();
 }
 
 // const Map<Tuple2<vector, tensor> >& newLeastSquaresVolPointInterpolation::
