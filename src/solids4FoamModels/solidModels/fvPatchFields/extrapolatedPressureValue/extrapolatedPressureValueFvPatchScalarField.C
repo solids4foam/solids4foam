@@ -102,10 +102,41 @@ void extrapolatedPressureValueFvPatchScalarField::updateCoeffs()
         return;
     }
 
-    fvPatchField<scalar>::operator==
-    (
-        (1.0 - relaxFac_)*(*this) + relaxFac_*patchInternalField()
-    );
+    // Name of the gradient field
+    const word gradFieldName("grad(" + dimensionedInternalField().name() + ")");
+
+    // If available, use the gradient for non-orthogonal correction
+    if (db().foundObject<volVectorField>(gradFieldName))
+    {
+        // Lookup gradient of the field
+        const fvPatchField<vector>& gradField =
+            patch().lookupPatchField<volVectorField, vector>(gradFieldName);
+
+        // Unit normals
+        const vectorField n = patch().nf();
+
+        // Delta vectors
+        const vectorField delta = patch().delta();
+
+        // Linearly extrapolate from the internal field and apply
+        // under-relaxation
+        fvPatchField<scalar>::operator==
+        (
+            (1.0 - relaxFac_)*(*this)
+          + relaxFac_
+           *(
+               patchInternalField() + (delta & gradField.patchInternalField())
+            )
+        );
+    }
+    else
+    {
+        // Zero gradient
+        fvPatchField<scalar>::operator==
+        (
+            (1.0 - relaxFac_)*(*this) + relaxFac_*patchInternalField()
+        );
+    }
 
     fixedValueFvPatchScalarField::updateCoeffs();
 }
@@ -116,7 +147,7 @@ tmp<Foam::Field<scalar> > extrapolatedPressureValueFvPatchScalarField::snGrad() 
     // Name of the gradient field
     const word gradFieldName("grad(" + dimensionedInternalField().name() + ")");
 
-    // If available, use the gradient for non-orthogonal correction 
+    // If available, use the gradient for non-orthogonal correction
     if (db().foundObject<volVectorField>(gradFieldName))
     {
         // Lookup gradient of the field
@@ -154,7 +185,7 @@ gradientBoundaryCoeffs() const
     // Name of the gradient field
     const word gradFieldName("grad(" + dimensionedInternalField().name() + ")");
 
-    // If available, use the gradient for non-orthogonal correction 
+    // If available, use the gradient for non-orthogonal correction
     if (db().foundObject<volVectorField>(gradFieldName))
     {
         // Lookup gradoent of the field

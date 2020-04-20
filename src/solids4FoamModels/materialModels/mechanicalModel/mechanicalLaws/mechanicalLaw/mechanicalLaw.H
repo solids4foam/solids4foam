@@ -72,8 +72,20 @@ class mechanicalLaw
         //- Nonlinear geometry enumerator
         const nonLinearGeometry::nonLinearType nonLinGeom_;
 
+        // Total deformation gradient volField
+        autoPtr<volTensorField> FPtr_;
+
+        // Total deformation gradient surfaceField
+        autoPtr<surfaceTensorField> FfPtr_;
+
 
     // Private Member Functions
+
+        //- Make the F field
+        void makeF();
+
+        //- Make the Ff field
+        void makeFf();
 
         //- Disallow copy construct
         mechanicalLaw(const mechanicalLaw&);
@@ -113,6 +125,34 @@ protected:
                 baseMeshRegionName()
             );
         }
+
+        //- Return a reference to the F field
+        volTensorField& F();
+
+        //- Return a reference to the Ff field
+        surfaceTensorField& Ff();
+
+        //- Update the deformation gradient
+        //  The lienarised shear and bulk modulii are used to enforce linear
+        //  elasticity in the case that the enforceLinear flag is tripped by the
+        //  solid model
+        //  true is returned if enforceLinear is true (linear elasticity is
+        //  enforced)
+        bool updateF
+        (
+            volSymmTensorField& sigma,
+            const dimensionedScalar& mu,
+            const dimensionedScalar& K
+        );
+
+        //- Equivalent to the updateF function, except instead for the Ff
+        //  surface field
+        bool updateFf
+        (
+            surfaceSymmTensorField& sigma,
+            const dimensionedScalar& mu,
+            const dimensionedScalar& K
+        );
 
         //- Lookup the enforceLinear Switch in the solidModel
         const Switch& enforceLinear() const;
