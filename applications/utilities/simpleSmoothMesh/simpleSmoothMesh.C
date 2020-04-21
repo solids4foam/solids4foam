@@ -23,13 +23,13 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Application
-    smoothMesh
+    simpleSmoothMesh
 
 Description
     Smoothing mesh based on smoothMeshDict in system directory.
     Fields are also mapped.
 
-    Example smoothMeshDict:
+    Example simpleSmoothMeshDict:
 
     // Smoothing method
     type                  implicitVolume;
@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
     (
         IOobject
         (
-            "smoothMeshDict",
+            "simpleSmoothMeshDict",
             mesh.time().system(),
             mesh,
             IOobject::MUST_READ,
