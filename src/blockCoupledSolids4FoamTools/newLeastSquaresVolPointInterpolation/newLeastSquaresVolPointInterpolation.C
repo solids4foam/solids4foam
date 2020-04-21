@@ -3708,6 +3708,39 @@ const labelListList& newLeastSquaresVolPointInterpolation
     return pointCyclicFacesPtr_();
 }
 
+const labelListList& newLeastSquaresVolPointInterpolation
+::pointCyclicBndFaces() const
+{
+    if (pointCyclicBndFacesPtr_.empty())
+    {
+        makePointFaces();
+    }
+
+    return pointCyclicBndFacesPtr_();
+}
+
+const labelListList& newLeastSquaresVolPointInterpolation
+::pointCyclicGgiFaces() const
+{
+    if (pointCyclicGgiFacesPtr_.empty())
+    {
+        makePointFaces();
+    }
+
+    return pointCyclicGgiFacesPtr_();
+}
+
+const labelListList& newLeastSquaresVolPointInterpolation
+::pointCyclicGgiBndFaces() const
+{
+    if (pointCyclicGgiBndFacesPtr_.empty())
+    {
+        makePointFaces();
+    }
+
+    return pointCyclicGgiBndFacesPtr_();
+}
+
 const labelList& newLeastSquaresVolPointInterpolation
 ::axisEdges() const
 {
