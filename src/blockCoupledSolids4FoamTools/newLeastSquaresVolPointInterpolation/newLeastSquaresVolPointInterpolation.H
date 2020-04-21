@@ -56,11 +56,10 @@ namespace Foam
 {
 
 class fvMesh;
-// class faMesh;
 class pointMesh;
 
 /*---------------------------------------------------------------------------*\
-                       Class newLeastSquaresVolPointInterpolation Declaration
+           Class newLeastSquaresVolPointInterpolation Declaration
 \*---------------------------------------------------------------------------*/
 
 #if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
@@ -85,7 +84,16 @@ class newLeastSquaresVolPointInterpolation
 
         //- Point cyclic boundary face addressig
         mutable autoPtr<labelListList> pointCyclicFacesPtr_;
-
+    
+        //- Point boundary face addressig
+        mutable autoPtr<labelListList> pointCyclicBndFacesPtr_;
+    
+        //- Point cyclic ggi boundary face addressig
+        mutable autoPtr<labelListList> pointCyclicGgiFacesPtr_;
+    
+        //- Point cyclic ggi boundary face addressig
+        mutable autoPtr<labelListList> pointCyclicGgiBndFacesPtr_;
+    
         //- Point boundary face addressig
         mutable autoPtr<labelListList> pointProcFacesPtr_;
 
@@ -130,6 +138,9 @@ class newLeastSquaresVolPointInterpolation
 
         //- Interpolation matrices
         mutable PtrList<scalarRectangularMatrix> invLsMatrices_;
+
+        //- Interpolatin stencil size
+        mutable autoPtr<scalarField> refLPtr_;
 
 #if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         //- Switch to check that there are processor boundaries. To run in
@@ -224,6 +235,15 @@ public:
             //- Get point boundary face addressing
             const labelListList& pointCyclicFaces() const;
 
+            //- Get point boundary face addressing
+            const labelListList& pointCyclicBndFaces() const;
+    
+            //- Get point boundary face addressing
+            const labelListList& pointCyclicGgiFaces() const;
+    
+            //- Get point boundary face addressing
+            const labelListList& pointCyclicGgiBndFaces() const;
+
             //- Get point processor boundary face addressing
             const labelListList& pointProcFaces() const;
 
@@ -270,6 +290,9 @@ public:
 
             //- Get interpolation matrices
             const PtrList<scalarRectangularMatrix>& invLsMatrices() const;
+
+            //- Get interpolation stencil size
+            const scalarField& refL() const;
 
             //- Get mirror plane normals
             const List<Tuple2<vector, tensor> >&
