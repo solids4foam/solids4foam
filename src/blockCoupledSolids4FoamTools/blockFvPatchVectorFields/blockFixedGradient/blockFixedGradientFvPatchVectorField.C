@@ -153,6 +153,7 @@ void blockFixedGradientFvPatchVectorField::insertBlockCoeffs
         solidMesh.volToPointInterp();
 
     const vectorField& origins = volToPointInterp.origins();
+    const scalarField& refL = volToPointInterp.refL();
     const FieldField<Field, scalar>& weights = volToPointInterp.weights();
     const PtrList<scalarRectangularMatrix>& invMatrices =
         volToPointInterp.invLsMatrices();
@@ -341,8 +342,8 @@ void blockFixedGradientFvPatchVectorField::insertBlockCoeffs
 
                 // Vector between current point and the average
                 // position of the neighbours
-                vector dr = points[sePointID] - origins[sePointID];
-                //vector dr = vector::zero;
+                const vector dr =
+                    (points[sePointID] - origins[sePointID])/refL[sePointID];
 
                 // Least square inverse matrix terms
                 const scalarRectangularMatrix& curInvMatrix =

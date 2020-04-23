@@ -2588,8 +2588,10 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
         origins[pointI] /= sum(sqr(W));
 
-        boundBox bb(allPoints, false);
-        refL[pointI] = mag(bb.max() - bb.min())/2;
+        // PC, for now, disable as it negatively affects the coupled solver
+        //boundBox bb(allPoints, false);
+        //refL[pointI] = mag(bb.max() - bb.min())/2;
+        refL[pointI] = 1.0;
     }
 }
 
@@ -3364,13 +3366,13 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
         }
 
         // Calculate inverse
-//         scalarSquareMatrix invLsM = lsM.LUinvert();
-
         D[pointI] = det(lsM);
 
-        if (mag(D[pointI]) > SMALL)
+        // PC, for now, disable as it negatively affects the coupled solver
+        // if (mag(D[pointI]) > SMALL)
         {
-            tensor invLsM = hinv(lsM); // hinv(lsM)
+            tensor invLsM = hinv(lsM);
+            //tensor invLsM = inv(lsM);
 
             for (label i=0; i<3; i++)
             {
@@ -3387,18 +3389,18 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
                 }
             }
         }
-        else
-        {
-            Pout << "Det: " << D[pointI] << endl;
+        // else
+        // {
+        //     Pout<< "Det: " << D[pointI] << endl;
 
-            for (label i=0; i<3; i++)
-            {
-                for (label j=0; j<M.n(); j++)
-                {
-                    curMatrix[i][j] = 0;
-                }
-            }
-        }
+        //     for (label i=0; i<3; i++)
+        //     {
+        //         for (label j=0; j<M.n(); j++)
+        //         {
+        //             curMatrix[i][j] = 0;
+        //         }
+        //     }
+        // }
     }
 }
 
