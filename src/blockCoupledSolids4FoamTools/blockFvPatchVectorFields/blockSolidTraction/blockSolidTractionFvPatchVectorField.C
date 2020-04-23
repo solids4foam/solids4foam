@@ -240,7 +240,8 @@ void blockSolidTractionFvPatchVectorField::insertBlockCoeffs
     const newLeastSquaresVolPointInterpolation& volToPointInterp =
         solidMesh.volToPointInterp();
 
-    const vectorField& origins = volToPointInterp.origins();
+    const vectorField& origins = volToPointInterp.origins(); 
+    const scalarField& refL = volToPointInterp.refL(); 
     const FieldField<Field, scalar>& weights = volToPointInterp.weights();
     const PtrList<scalarRectangularMatrix>& invMatrices =
         volToPointInterp.invLsMatrices();
@@ -522,7 +523,8 @@ void blockSolidTractionFvPatchVectorField::insertBlockCoeffs
 
                 // Vector between current point and the average
                 // position of the neighbours
-                const vector dr = points[sePointID] - origins[sePointID];
+                const vector dr =
+                    (points[sePointID] - origins[sePointID])/refL[sePointID];
 
                 // Least square inverse matrix terms
                 const scalarRectangularMatrix& curInvMatrix =
