@@ -120,10 +120,6 @@ class unsNonLinGeomUpdatedLagSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- Stabilise hydrostatic pressure
-        //  Apply smoothing to the relative Jacobian calculation
-        const Switch stabilisePressure_;
-
 
     // Private Member Functions
 

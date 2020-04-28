@@ -100,6 +100,59 @@ void Foam::mechanicalLaw::makeFf()
     );
 }
 
+void Foam::mechanicalLaw::makeRelF()
+{
+    if (relFPtr_.valid())
+    {
+        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeRelF()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    relFPtr_.set
+    (
+        new volTensorField
+        (
+            IOobject
+            (
+                "relF_" + type(),
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, I)
+        )
+    );
+}
+
+
+void Foam::mechanicalLaw::makeRelFf()
+{
+    if (relFfPtr_.valid())
+    {
+        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeRelFf()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    relFfPtr_.set
+    (
+        new surfaceTensorField
+        (
+            IOobject
+            (
+                "relFf_" + type(),
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, I)
+        )
+    );
+}
+
 
 // * * * * * * * * * * * * * * Protected Members * * * * * * * * * * * * * * //
 
@@ -161,6 +214,28 @@ Foam::surfaceTensorField& Foam::mechanicalLaw::Ff()
 }
 
 
+Foam::volTensorField& Foam::mechanicalLaw::relF()
+{
+    if (relFPtr_.empty())
+    {
+        makeRelF();
+    }
+
+    return relFPtr_();
+}
+
+
+Foam::surfaceTensorField& Foam::mechanicalLaw::relFf()
+{
+    if (relFfPtr_.empty())
+    {
+        makeRelFf();
+    }
+
+    return relFfPtr_();
+}
+
+
 bool Foam::mechanicalLaw::updateF
 (
     volSymmTensorField& sigma,
@@ -183,10 +258,10 @@ bool Foam::mechanicalLaw::updateF
             mesh().lookupObject<volTensorField>("grad(DD)");
 
         // Calculate the relative deformation gradient
-        const volTensorField relF = I + gradDD.T();
+        relF() = I + gradDD.T();
 
         // Update the total deformation gradient
-        F() = relF & F().oldTime();
+        F() = relF() & F().oldTime();
 
         if (enforceLinear())
         {
@@ -217,7 +292,7 @@ bool Foam::mechanicalLaw::updateF
             F() = F().oldTime() + gradDD.T();
 
             // Update the relative deformation gradient: not needed
-            //relF() = F() & inv(F().oldTime());
+            relF() = F() & inv(F().oldTime());
 
             if (enforceLinear())
             {
@@ -244,7 +319,7 @@ bool Foam::mechanicalLaw::updateF
             F() = I + gradD.T();
 
             // Update the relative deformation gradient: not needed
-            //relF() = F() & inv(F().oldTime());
+            relF() = F() & inv(F().oldTime());
 
             if (enforceLinear())
             {
@@ -295,10 +370,10 @@ bool Foam::mechanicalLaw::updateFf
             mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
         // Update the relative deformation gradient: not needed
-        const surfaceTensorField relF = I + gradDD.T();
+        relFf() = I + gradDD.T();
 
         // Update the total deformation gradient
-        Ff() = relF & Ff().oldTime();
+        Ff() = relFf() & Ff().oldTime();
 
         if (enforceLinear())
         {
@@ -327,7 +402,7 @@ bool Foam::mechanicalLaw::updateFf
             Ff() = Ff().oldTime() + gradDD.T();
 
             // Update the relative deformation gradient: not needed
-            //relFf() = Ff() & inv(Ff().oldTime());
+            relFf() = Ff() & inv(Ff().oldTime());
 
             if (enforceLinear())
             {
@@ -355,7 +430,7 @@ bool Foam::mechanicalLaw::updateFf
             Ff() = I + gradD.T();
 
             // Update the relative deformation gradient: not needed
-            //relF() = F() & inv(F().oldTime());
+            relFf() = Ff() & inv(Ff().oldTime());
 
             if (enforceLinear())
             {
@@ -419,7 +494,9 @@ Foam::mechanicalLaw::mechanicalLaw
     baseMeshRegionName_(),
     nonLinGeom_(nonLinGeom),
     FPtr_(),
-    FfPtr_()
+    FfPtr_(),
+    relFPtr_(),
+    relFfPtr_()
 {
     // Set the base mesh region name
     // For an FSI case, the region will be called solid, else it will be called

@@ -84,17 +84,11 @@ class neoHookeanElasticMisesPlastic
         //- Bulk modulus
         dimensionedScalar K_;
 
-        //- Relative deformation gradient volField
-        volTensorField* relFPtr_;
-
-        //- Relative deformation gradient surfaceField
-        surfaceTensorField* relFfPtr_;
-
         //- Jacobian of the toal deformation gradient volField
-        volScalarField* JPtr_;
+        autoPtr<volScalarField> JPtr_;
 
         //- Jacobian of the toal deformation gradient surfaceField
-        surfaceScalarField* JfPtr_;
+        autoPtr<surfaceScalarField> JfPtr_;
 
         //- Table of post-yield stress versus plastic strain
         //  For large strain total Lagrangian models, it expects
@@ -213,18 +207,6 @@ class neoHookeanElasticMisesPlastic
 
         //- Disallow default bitwise assignment
         void operator=(const neoHookeanElasticMisesPlastic&);
-
-        //- Make the relF field
-        void makeRelF();
-
-        //- Return a reference to the relF field
-        volTensorField& relF();
-
-        //- Make the relFf field
-        void makeRelFf();
-
-        //- Return a reference to the relFf field
-        surfaceTensorField& relFf();
 
         //- Make the J field
         void makeJ();

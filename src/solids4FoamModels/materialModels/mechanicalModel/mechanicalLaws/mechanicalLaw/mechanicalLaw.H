@@ -78,6 +78,11 @@ class mechanicalLaw
         // Total deformation gradient surfaceField
         autoPtr<surfaceTensorField> FfPtr_;
 
+        //- Relative deformation gradient volField
+        autoPtr<volTensorField> relFPtr_;
+
+        //- Relative deformation gradient surfaceField
+        autoPtr<surfaceTensorField> relFfPtr_;
 
     // Private Member Functions
 
@@ -86,6 +91,12 @@ class mechanicalLaw
 
         //- Make the Ff field
         void makeFf();
+
+        //- Make the F field
+        void makeRelF();
+
+        //- Make the Ff field
+        void makeRelFf();
 
         //- Disallow copy construct
         mechanicalLaw(const mechanicalLaw&);
@@ -131,6 +142,12 @@ protected:
 
         //- Return a reference to the Ff field
         surfaceTensorField& Ff();
+
+        //- Return a reference to the relF field
+        volTensorField& relF();
+
+        //- Return a reference to the relFf field
+        surfaceTensorField& relFf();
 
         //- Update the deformation gradient
         //  The lienarised shear and bulk modulii are used to enforce linear

@@ -29,9 +29,7 @@ License
 #include "logVolFields.H"
 #include "fvc.H"
 #include "fvm.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "zeroGradientFvPatchFields.H"
-#endif
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -62,88 +60,16 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-
-void Foam::neoHookeanElasticMisesPlastic::makeRelF()
-{
-    if (relFPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeRelF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    relFPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "relF",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElasticMisesPlastic::relF()
-{
-    if (!relFPtr_)
-    {
-        makeRelF();
-    }
-
-    return *relFPtr_;
-}
-
-
-void Foam::neoHookeanElasticMisesPlastic::makeRelFf()
-{
-    if (relFfPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeRelFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    relFfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "relFf",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::surfaceTensorField& Foam::neoHookeanElasticMisesPlastic::relFf()
-{
-    if (!relFfPtr_)
-    {
-        makeRelFf();
-    }
-
-    return *relFfPtr_;
-}
-
-
 void Foam::neoHookeanElasticMisesPlastic::makeJ()
 {
-    if (JPtr_)
+    if (JPtr_.valid())
     {
         FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeJ()")
             << "pointer already set" << abort(FatalError);
     }
 
-    JPtr_ =
+    JPtr_.set
+    (
         new volScalarField
         (
             IOobject
@@ -156,33 +82,35 @@ void Foam::neoHookeanElasticMisesPlastic::makeJ()
             ),
             mesh(),
             dimensionedScalar("one", dimless, 1.0)
-        );
+        )
+    );
 
     // Store the old-time
-    JPtr_->oldTime();
+    JPtr_().oldTime();
 }
 
 
 Foam::volScalarField& Foam::neoHookeanElasticMisesPlastic::J()
 {
-    if (!JPtr_)
+    if (JPtr_.empty())
     {
         makeJ();
     }
 
-    return *JPtr_;
+    return JPtr_();
 }
 
 
 void Foam::neoHookeanElasticMisesPlastic::makeJf()
 {
-    if (JfPtr_)
+    if (JfPtr_.valid())
     {
         FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeJf()")
             << "pointer already set" << abort(FatalError);
     }
 
-    JfPtr_ =
+    JfPtr_.set
+    (
         new surfaceScalarField
         (
             IOobject
@@ -195,21 +123,22 @@ void Foam::neoHookeanElasticMisesPlastic::makeJf()
             ),
             mesh(),
             dimensionedScalar("one", dimless, 1.0)
-        );
+        )
+    );
 
     // Store the old-time
-    JfPtr_->oldTime();
+    JfPtr_().oldTime();
 }
 
 
 Foam::surfaceScalarField& Foam::neoHookeanElasticMisesPlastic::Jf()
 {
-    if (!JfPtr_)
+    if (JfPtr_.empty())
     {
         makeJf();
     }
 
-    return *JfPtr_;
+    return JfPtr_();
 }
 
 
@@ -638,10 +567,8 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
-    relFPtr_(NULL),
-    relFfPtr_(NULL),
-    JPtr_(NULL),
-    JfPtr_(NULL),
+    JPtr_(),
+    JfPtr_(),
     stressPlasticStrainSeries_(dict),
     sigmaHyd_
     (
@@ -1034,12 +961,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::neoHookeanElasticMisesPlastic::~neoHookeanElasticMisesPlastic()
-{
-    deleteDemandDrivenData(relFPtr_);
-    deleteDemandDrivenData(relFfPtr_);
-    deleteDemandDrivenData(JPtr_);
-    deleteDemandDrivenData(JfPtr_);
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -1774,15 +1696,15 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
     // in large deformation finite element analysis, Finite Elements in
     // Analysis and Design 16 (1994) 99-139.
 
-    // Update the total deformatio gradient
-    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
-    {
-        F() = fvc::average(relFf()) & F().oldTime();
-    }
-    else
-    {
-        F() = relF() & F().oldTime();
-    }
+    // Update the total deformatio gradient: already done by updateF
+    // if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    // {
+    //     F() = fvc::average(relFf()) & F().oldTime();
+    // }
+    // else
+    // {
+    //     F() = relF() & F().oldTime();
+    // }
 
     // Calculate the total true (Hencky) strain
     const volSymmTensorField epsilon = 0.5*log(symm(F().T() & F()));
