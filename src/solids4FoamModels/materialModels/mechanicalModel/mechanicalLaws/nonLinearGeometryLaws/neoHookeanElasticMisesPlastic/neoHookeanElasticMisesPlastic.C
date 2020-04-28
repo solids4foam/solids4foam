@@ -1288,13 +1288,13 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
         sigmaHyd_.storePrevIter();
 
         // Under-relax the linear system
-        sigmaHydEqn.relax(0.7);
+        sigmaHydEqn.relax();
 
         // Solve the pressure equation
         sigmaHydEqn.solve();
 
         // Under-relax the pressure field
-        sigmaHyd_.relax(0.2);
+        sigmaHyd_.relax();
     }
     else
     {

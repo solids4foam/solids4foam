@@ -26,7 +26,7 @@ boundaryField
         type           fixedDisplacement;
         displacementSeries
         {
-            fileName       "$FOAM_CASE/constant/timeVsDispUpdLag";
+            fileName       "$FOAM_CASE/constant/timeVsDisp";
             outOfBounds    clamp;
         }
         value          uniform ( 0 0 0 );
