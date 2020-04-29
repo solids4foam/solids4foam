@@ -117,32 +117,7 @@ class incompressibleMooneyRivlinElastic
         // Bulk modulus
         const dimensionedScalar K_;
 
-        //- Switch to enable solution of pressure Laplacian equation
-        //  This can help quell oscillations in the hydrostatic stress
-        Switch solvePressureEqn_;
-
-        //- Optional: it is possible to scale the amount of smoothing in the
-        //  pressure equation with this coefficient
-        scalar pressureSmoothingCoeff_;
-
-        // Hydrostatic stress
-        // Note: sigmaHyd == -p
-        // where p is the indeterminate hydrostatic pressure
-        volScalarField sigmaHyd_;
-
-        //- Gradient of the sigmaHyd field that may be used for boundary
-        //  non-orthogonal corrections
-        volVectorField gradSigmaHyd_;
-
-
     // Private Member Functions
-
-        //- Calculate hydrostatic component of the stress tensor
-        void calculateHydrostaticStress
-        (
-            volScalarField& sigmaHyd,
-            const volScalarField& Jacobian
-        );
 
         //- Disallow default bitwise copy construct
         incompressibleMooneyRivlinElastic(const incompressibleMooneyRivlinElastic&);

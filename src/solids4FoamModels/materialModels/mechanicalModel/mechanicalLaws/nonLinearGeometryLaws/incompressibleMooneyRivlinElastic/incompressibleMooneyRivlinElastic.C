@@ -40,98 +40,6 @@ namespace Foam
     );
 }
 
-
-// * * * * * * * * * * *  Private Member Funtcions * * * * * * * * * * * * * //
-
-void Foam::incompressibleMooneyRivlinElastic::calculateHydrostaticStress
-(
-    volScalarField& sigmaHyd,
-    const volScalarField& Jacobian
-)
-{
-    if (solvePressureEqn_)
-    {
-#ifdef OPENFOAMESIORFOUNDATION
-        SolverPerformance<scalar>::debug = 0;
-#endif
-
-        // Store previous iteration to allow relaxation, if needed
-        sigmaHyd.storePrevIter();
-
-        // Lookup the momentum equation inverse diagonal field
-        const volScalarField* ADPtr = NULL;
-        if (mesh().foundObject<volScalarField>("DEqnA"))
-        {
-            ADPtr = &mesh().lookupObject<volScalarField>("DEqnA");
-        }
-        else if (mesh().foundObject<volScalarField>("DDEqnA"))
-        {
-            ADPtr = &mesh().lookupObject<volScalarField>("DDEqnA");
-        }
-        else
-        {
-            FatalErrorIn
-            (
-                "void Foam::incompressibleMooneyRivlinElastic::"
-                "calculateHydrostaticStress\n"
-                "(\n"
-                "    volScalarField& sigmaHyd,\n"
-                "    const volScalarField& trEpsilon\n"
-                ")"
-            )   << "Cannot find the DEqnA or DDEqnA field: this should be "
-                << "stored in the solidModel" << abort(FatalError);
-        }
-        const volScalarField& AD = *ADPtr;
-
-        // Pressure diffusivity field multiple by (4.0/3.0)*mu + K, which is
-        // equivalent to (2*mu + lambda)
-        // Note: we can scale this coefficient by pressureSmoothingCoeff to
-        // provide greater smoothing
-        const surfaceScalarField rDAf
-        (
-            "rDAf",
-            pressureSmoothingCoeff_
-           *fvc::interpolate
-            (
-                ((4.0/3.0)*mu_ + K_)/AD, "interpolate(grad(sigmaHyd))"
-            )
-        );
-
-        const dimensionedScalar one("one", dimless, 1.0);
-
-        // Solve pressure laplacian
-        // Note: the the laplacian and div terms combine to produce a
-        // third-order smoothing/dissipation term
-        // If we only used the laplacian term then the smoothing/dissipation
-        // would be second-order.
-        // It would be interesting to see how this compares to the JST 4th
-        // order dissipation term
-        fvScalarMatrix sigmaHydEqn
-        (
-            fvm::Sp(one, sigmaHyd)
-          - fvm::laplacian(rDAf, sigmaHyd, "laplacian(DA,sigmaHyd)")
-         ==
-            0.5*K_*(pow(Jacobian, 2.0) - 1.0)
-          - fvc::div(rDAf*fvc::interpolate(gradSigmaHyd_) & mesh().Sf())
-        );
-
-        // Solve the pressure equation
-        sigmaHydEqn.solve();
-
-        // Relax the pressure field
-        sigmaHyd.relax();
-    }
-    else
-    {
-        // Directly calculate hydrostatic stress from displacement field
-        sigmaHyd = 0.5*K_*(pow(Jacobian, 2.0) - 1.0);
-    }
-
-    // Update the gradient
-    gradSigmaHyd_ = fvc::grad(sigmaHyd_);
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -149,51 +57,8 @@ Foam::incompressibleMooneyRivlinElastic::incompressibleMooneyRivlinElastic
     c01_(dict.lookup("c01")),
     c11_(dict.lookup("c11")),
     mu_(2*(c10_ + c01_)),
-    K_(dict.lookup("K")),
-    solvePressureEqn_
-    (
-        dict.lookupOrDefault<Switch>("solvePressureEqn", false)
-    ),
-    pressureSmoothingCoeff_
-    (
-        dict.lookupOrDefault<scalar>("pressureSmoothingCoeff", 1.0)
-    ),
-    sigmaHyd_
-    (
-        IOobject
-        (
-            "sigmaHyd",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0.0),
-        zeroGradientFvPatchScalarField::typeName
-    ),
-    gradSigmaHyd_
-    (
-        IOobject
-        (
-            "grad(" + sigmaHyd_.name() + ")",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedVector("zero", dimPressure/dimLength, vector::zero),
-        calculatedFvPatchScalarField::typeName
-    )
+    K_(dict.lookup("K"))
 {
-    if (solvePressureEqn_)
-    {
-        Info<< "    Laplacian equation will be solved for pressure" << nl
-            << "    pressureSmoothingCoeff: " << pressureSmoothingCoeff_
-            << endl;
-    }
-
     if (planeStress())
     {
         notImplemented
@@ -201,7 +66,6 @@ Foam::incompressibleMooneyRivlinElastic::incompressibleMooneyRivlinElastic
             type() + " mechanical law is not implemented for planeStress"
         );
     }
-
 }
 
 
@@ -274,7 +138,11 @@ void Foam::incompressibleMooneyRivlinElastic::correct
     const volScalarField J = det(F());
 
     // Calculate the hydrostatic stress
-    calculateHydrostaticStress(sigmaHyd_, J);
+    updateSigmaHyd
+    (
+        0.5*K_*(pow(J, 2.0) - 1.0),
+        (4.0/3.0)*mu_ + K_
+    );
 
     // Calculate the left Cauchy-Green deformation tensor
     const volSymmTensorField B = symm(F() & F().T());
@@ -301,7 +169,7 @@ void Foam::incompressibleMooneyRivlinElastic::correct
     // The last RHS term is the initial hydrostatic pressure field
     // This term is important to assure the underformed configuration
     // to be stress-free
-    sigma = sigmaHyd_*I + s - 2.0*(c10_ + 2.0*c01_)*I;
+    sigma = sigmaHyd()*I + s - 2.0*(c10_ + 2.0*c01_)*I;
 }
 
 
@@ -318,17 +186,9 @@ void Foam::incompressibleMooneyRivlinElastic::correct(surfaceSymmTensorField& si
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J = det(Ff());
 
-    // To-do: interpolate from vol field
-    if (solvePressureEqn_)
-    {
-        notImplemented
-        (
-            "solvePressureEqn cannot currently be used with 'uns' solid models"
-        );
-    }
-
     // Calculate pressure field with bulk modulus to approximate
     // incompressibility
+    // Note: updateSigmaHyd is not used
     const surfaceScalarField sigmaHydf = 0.5*K_*(pow(J, 2.0) - 1.0);
 
     // Calculate the left Cauchy-Green deformation tensor

@@ -95,15 +95,6 @@ class neoHookeanElasticMisesPlastic
         //  the true stress and true plastic strain.
         interpolationTable<scalar> stressPlasticStrainSeries_;
 
-        //- Hydrostatic stress
-        //  Note: sigmaHyd_ == tr(sigma)/3.0 == -p,
-        //  where p is the hydrostatic pressure
-        volScalarField sigmaHyd_;
-
-        //- Switch to enable solution of a pressure equation, which ensures a
-        //  smooth sigmaHyd field
-        Switch smoothPressure_;
-
         //- Cauchy yield stress
         volScalarField sigmaY_;
 
