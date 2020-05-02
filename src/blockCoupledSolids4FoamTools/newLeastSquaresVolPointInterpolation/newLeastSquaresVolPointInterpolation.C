@@ -33,7 +33,9 @@ License
 // #include "processorFaPatch.H"
 // #include "areaFields.H"
 #include "cyclicPolyPatch.H"
-#include "cyclicGgiPolyPatch.H"
+#ifdef FOAMEXTEND
+    #include "cyclicGgiPolyPatch.H"
+#endif
 #include "cyclicFvPatch.H"
 #include "processorPolyPatch.H"
 #include "wedgePolyPatch.H"
@@ -92,6 +94,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
     pointCyclicBndFacesPtr_.set(new labelListList(points.size()));
     labelListList& pointCyclicBndFaces = pointCyclicBndFacesPtr_();
     
+#ifdef FOAMEXTEND
     // Allocate storage for addressing
     pointCyclicGgiFacesPtr_.set(new labelListList(points.size()));
     labelListList& pointCyclicGgiFaces = pointCyclicGgiFacesPtr_();
@@ -99,7 +102,8 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
     // Allocate storage for addressing
     pointCyclicGgiBndFacesPtr_.set(new labelListList(points.size()));
     labelListList& pointCyclicGgiBndFaces = pointCyclicGgiBndFacesPtr_();
-    
+#endif
+
     // Allocate storage for addressing
     pointProcFacesPtr_.set(new labelListList(points.size()));
     labelListList& pointProcFaces = pointProcFacesPtr_();
@@ -110,7 +114,9 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
 
         labelHashSet bndFaceSet;
         labelHashSet cyclicFaceSet;
+#ifdef FOAMEXTEND
         labelHashSet cyclicGgiFaceSet;
+#endif
         labelHashSet procFaceSet;
 
         forAll(curPointFaces, faceI)
@@ -128,6 +134,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                 {
                     cyclicFaceSet.insert(faceID);
                 }
+#ifdef FOAMEXTEND
                 else if
                 (
                     mesh().boundaryMesh()[patchID].type()
@@ -136,6 +143,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                 {
                     cyclicGgiFaceSet.insert(faceID);
                 }
+#endif
                 else if
                 (
                     mesh().boundaryMesh()[patchID].type()
@@ -179,9 +187,10 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
 
         pointBndFaces[pointI] = bndFaceSet.toc();
         pointCyclicFaces[pointI] = cyclicFaceSet.toc();
-        pointCyclicGgiFaces[pointI] = cyclicGgiFaceSet.toc();
 
 #ifdef FOAMEXTEND
+        pointCyclicGgiFaces[pointI] = cyclicGgiFaceSet.toc();
+
         const labelList& glPoints =
             mesh().globalData().sharedPointLabels();
 
@@ -304,6 +313,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
         }
     }
 
+#ifdef FOAMEXTEND
     // Find cyclicGgi boundary faces
     forAll(pointCyclicGgiBndFaces, pointI)
     {
@@ -434,6 +444,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
             }
         }
     }
+#endif
 }
 
 void newLeastSquaresVolPointInterpolation::makeAxisEdges() const
@@ -1396,8 +1407,10 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
     const labelListList& ptCyclicBndFaces = pointCyclicBndFaces();
+#ifdef FOAMEXTEND
     const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
     const labelListList& ptCyclicGgiBndFaces = pointCyclicGgiBndFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
 //     const Map<vectorField>& ptNgbProcBndFaceCentres =
@@ -1424,8 +1437,10 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
         const labelList& interpCyclicBndFaces = ptCyclicBndFaces[pointI];
+#ifdef FOAMEXTEND
         const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
         const labelList& interpCyclicGgiBndFaces = ptCyclicGgiBndFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
 //         vectorField interpNgbProcBndFaceCentres(0);
@@ -1504,10 +1519,12 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
           + interpBndFaces.size()
           + interpCyclicFaces.size()
           + interpCyclicBndFaces.size()
+#ifdef FOAMEXTEND
           + interpCyclicGgiFaces.size()
           + interpCyclicGgiBndFaces.size()
+#endif
           + interpProcFaces.size()
-//           + interpNgbProcBndFaceCentres.size()
+//        + interpNgbProcBndFaceCentres.size()
           + glInterpNgbProcBndFaceCentres.size()
           + glInterpNgbProcCellCentres.size()
           + interpNgbProcCellCentres.size()
@@ -1715,6 +1732,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
             }
         }
 
+#ifdef FOAMEXTEND
         // Cyclic ggi boundary faces
         for (label i=0; i<interpCyclicGgiFaces.size(); i++)
         {
@@ -1860,6 +1878,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
                 }
             }
         }
+#endif
 
         // Processor boundary faces
         for (label i=0; i<interpProcFaces.size(); i++)
@@ -1986,8 +2005,10 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
     const labelListList& ptCyclicBndFaces = pointCyclicBndFaces();
+#ifdef FOAMEXTEND
     const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
     const labelListList& ptCyclicGgiBndFaces = pointCyclicGgiBndFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
 //     const Map<vectorField> ptNgbProcBndFaceCentres =
@@ -2012,8 +2033,10 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
         const labelList& interpCyclicBndFaces = ptCyclicBndFaces[pointI];
+#ifdef FOAMEXTEND
         const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
         const labelList& interpCyclicGgiBndFaces = ptCyclicGgiBndFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
 //         vectorField interpNgbProcBndFaceCentres(0);
@@ -2092,8 +2115,10 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
           + interpBndFaces.size()
           + interpCyclicFaces.size()
           + interpCyclicBndFaces.size()
+#ifdef FOAMEXTEND
           + interpCyclicGgiFaces.size()
           + interpCyclicGgiBndFaces.size()
+#endif
           + interpProcFaces.size()
 //           + interpNgbProcBndFaceCentres.size()
           + glInterpNgbProcBndFaceCentres.size()
@@ -2355,6 +2380,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
             }
         }
 
+#ifdef FOAMEXTEND
         // Cyclic ggi boundary faces
         for (label i=0; i<interpCyclicGgiFaces.size(); i++)
         {
@@ -2509,6 +2535,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
                 }
             }
         }
+#endif
 
         // Processor boundary faces
         for (label i=0; i<interpProcFaces.size(); i++)
@@ -2626,8 +2653,10 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
     const labelListList& ptCyclicBndFaces = pointCyclicBndFaces();
+#ifdef FOAMEXTEND
     const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
     const labelListList& ptCyclicGgiBndFaces = pointCyclicGgiBndFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
 //     const Map<vectorField>& ptNgbProcBndFaceCentres =
@@ -2661,8 +2690,10 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
         const labelList& interpCyclicBndFaces = ptCyclicBndFaces[pointI];
+#ifdef FOAMEXTEND
         const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
         const labelList& interpCyclicGgiBndFaces = ptCyclicGgiBndFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
 //         vectorField interpNgbProcBndFaceCentres(0);// = vectorField::null();
@@ -2741,8 +2772,10 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
           + interpBndFaces.size()
           + interpCyclicFaces.size()
           + interpCyclicBndFaces.size()
+#ifdef FOAMEXTEND
           + interpCyclicGgiFaces.size()
           + interpCyclicGgiBndFaces.size()
+#endif
           + interpProcFaces.size()
 //           + interpNgbProcBndFaceCentres.size()
           + glInterpNgbProcBndFaceCentres.size()
@@ -3004,6 +3037,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
             }
         }
 
+#ifdef FOAMEXTEND
         // Cyclic ggi boundary faces
         for (label i=0; i<interpCyclicGgiFaces.size(); i++)
         {
@@ -3158,6 +3192,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
                 }
             }
         }
+#endif
 
         // Processor boundary faces
         for (label i=0; i<interpProcFaces.size(); i++)

@@ -34,6 +34,7 @@ InClass
 #include "solidModel.H"
 #include "fvm.H"
 #include "fvc.H"
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

@@ -27,14 +27,14 @@ License
 #include "newLeastSquaresVolPointInterpolation.H"
 #include "volFields.H"
 #include "pointFields.H"
-//#include "globalPointPatch.H"
 #include "emptyPolyPatch.H"
 #include "wedgePolyPatch.H"
 #include "cyclicFvPatch.H"
-#include "cyclicGgiPolyPatch.H"
-#include "cyclicGgiFvPatchFields.H"
-// #include "volSurfaceMapping.H"
 #include "transform.H"
+#ifdef FOAMEXTEND
+    #include "cyclicGgiPolyPatch.H"
+    #include "cyclicGgiFvPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -77,8 +77,10 @@ void newLeastSquaresVolPointInterpolation::interpolate
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
     const labelListList& ptCyclicBndFaces = pointCyclicBndFaces();
+#ifdef FOAMEXTEND
     const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
     const labelListList& ptCyclicGgiBndFaces = pointCyclicGgiBndFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
     Map<Field<Type> > gPtNgbProcBndFaceFieldData;
@@ -87,6 +89,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
     Map<Field<Type> > gPtNgbProcCellFieldData;
     globalPointNgbProcCellFieldData(vf, gPtNgbProcCellFieldData);
 
+#ifdef FOAMEXTEND
     // Cyclic GGI neighbour fields
     FieldField<Field, Type> cyclicGgiNgbFields(mesh().boundary().size());
     forAll(vf.boundaryField(), patchI)
@@ -100,6 +103,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
             );
         }
     }
+#endif
 
     const Map<List<labelPair> >& ptProcCells = pointProcCells();
 
@@ -123,8 +127,10 @@ void newLeastSquaresVolPointInterpolation::interpolate
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
         const labelList& interpCyclicBndFaces = ptCyclicBndFaces[pointI];
+#ifdef FOAMEXTEND
         const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
         const labelList& interpCyclicGgiBndFaces = ptCyclicGgiBndFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
         Field<Type> glInterpNgbProcBndFaceData(0);
@@ -187,8 +193,10 @@ void newLeastSquaresVolPointInterpolation::interpolate
           + interpBndFaces.size()
           + interpCyclicFaces.size()
           + interpCyclicBndFaces.size()
+#ifdef FOAMEXTEND
           + interpCyclicGgiFaces.size()
           + interpCyclicGgiBndFaces.size()
+#endif
           + interpProcFaces.size()
           + glInterpNgbProcBndFaceData.size()
           + glInterpNgbProcCellData.size()
@@ -346,6 +354,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
             }
         }
 
+#ifdef FOAMEXTEND
         for (label i=0; i<interpCyclicGgiFaces.size(); i++)
         {
             label faceID = interpCyclicGgiFaces[i];
@@ -499,6 +508,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
                 }
             }
         }
+#endif
 
         for (label i=0; i<interpProcFaces.size(); i++)
         {
@@ -684,7 +694,9 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
     const labelListList& ptCells = mesh().pointCells();
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
+#ifdef FOAMEXTEND
     const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
     Map<Field<Type> > gPtNgbProcBndFaceFieldData;
@@ -716,7 +728,9 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
         const labelList& interpCells = ptCells[pointI];
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
+#ifdef FOAMEXTEND
         const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
         Field<Type> glInterpNgbProcBndFaceData(0);
@@ -778,7 +792,9 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
             interpCells.size()
           + interpBndFaces.size()
           + interpCyclicFaces.size()
+#ifdef FOAMEXTEND
           + interpCyclicGgiFaces.size()
+#endif
           + interpProcFaces.size()
           + glInterpNgbProcBndFaceData.size()
           + glInterpNgbProcCellData.size()
@@ -1176,7 +1192,9 @@ Type newLeastSquaresVolPointInterpolation::interpolate
     const labelListList& ptCells = mesh().pointCells();
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
+#ifdef FOAMEXTEND
     const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
     Map<Field<Type> > gPtNgbProcBndFaceFieldData;
@@ -1208,7 +1226,9 @@ Type newLeastSquaresVolPointInterpolation::interpolate
         const labelList& interpCells = ptCells[pointI];
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
+#ifdef FOAMEXTEND
         const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
         Field<Type> glInterpNgbProcBndFaceData(0);
@@ -1270,7 +1290,9 @@ Type newLeastSquaresVolPointInterpolation::interpolate
             interpCells.size()
           + interpBndFaces.size()
           + interpCyclicFaces.size()
+#ifdef FOAMEXTEND
           + interpCyclicGgiFaces.size()
+#endif
           + interpProcFaces.size()
           + glInterpNgbProcBndFaceData.size()
           + glInterpNgbProcCellData.size()
