@@ -27,7 +27,7 @@ boundaryField
         displacementSeries
         {
             outOfBounds     clamp;
-            fileName        "$FOAM_CASE/constant/timeVsDisp";
+            "fileName|file"        "$FOAM_CASE/constant/timeVsDisp";
         }
         value           uniform (0 0 0);
     }
