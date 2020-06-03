@@ -7,3 +7,6 @@ cleanCase
 \rm -rf constant/polyMesh/sets constant/polyMesh/*Zones*
 \rm -rf VTK case.foam history
 \rm -rf system/*Subset probe energies.dat
+
+# Convert case version to FOAM EXTEND
+solids4Foam::convertCaseFormatFoamExtend .

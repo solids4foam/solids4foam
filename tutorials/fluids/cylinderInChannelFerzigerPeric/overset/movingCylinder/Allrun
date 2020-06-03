@@ -10,6 +10,9 @@ then
         echo "Tutorial not compatible with this version of OpenFOAM"
         exit 0
     fi
+else
+    echo; echo "This case currently only runs in foam-extend"; echo
+    exit 0
 fi
 
 runApplication fluentMeshToFoam -writeZones CIC.msh

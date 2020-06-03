@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+if [[ "${WM_PROJECT}" == "foam" ]]
+then
+    runApplication -l log.blockMesh.solid blockMesh -region solid
+
+    # fluent3DMeshToFoam does not have a region option so we need to workaround
+    # it
+
+    mkdir constant/fluid/polyMesh
+    runApplication fluent3DMeshToFoam fluid.msh
+    \mv constant/polyMesh/* constant/fluid/polyMesh/
+    cp ./constant/fluid/boundary ./constant/fluid/polyMesh
+
+    runApplication solids4Foam
+else
+    runApplication -s solid blockMesh -region solid
+
+    # fluent3DMeshToFoam does not have a region option so we need to workaround
+    # it
+    mkdir constant/fluid/polyMesh
+    runApplication -s fluid fluent3DMeshToFoam fluid.msh
+    \mv constant/polyMesh/* constant/fluid/polyMesh/
+    cp ./constant/fluid/boundary ./constant/fluid/polyMesh
+
+    solids4Foam -noFunctionObjects &> log.solids4Foam
+fi
+
+# ----------------------------------------------------------------- end-of-file
+

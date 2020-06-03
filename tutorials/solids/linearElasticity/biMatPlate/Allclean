@@ -6,3 +6,6 @@
 cleanCase
 \rm -f constant/polyMesh/boundary case.foam
 \rm -rf system/*Subset
+
+# Convert case version to FOAM EXTEND
+solids4Foam::convertCaseFormatFoamExtend .

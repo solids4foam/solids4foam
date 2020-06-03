@@ -4,3 +4,6 @@
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
 cleanCase
+
+# Convert case version to FOAM EXTEND
+solids4Foam::convertCaseFormatFoamExtend .

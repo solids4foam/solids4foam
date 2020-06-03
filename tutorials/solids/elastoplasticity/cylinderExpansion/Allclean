@@ -5,3 +5,6 @@
 
 cleanCase
 \rm -rf case.foam contact history
+
+# Convert case version to FOAM EXTEND
+solids4Foam::convertCaseFormatFoamExtend .

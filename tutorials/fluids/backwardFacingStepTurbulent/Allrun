@@ -3,6 +3,12 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+if [[ $WM_PROJECT != "foam" ]]
+then
+    echo; echo "This case currently only runs in foam-extend"; echo
+    exit 0
+fi
+
 runApplication blockMesh
 runApplication solids4Foam
 

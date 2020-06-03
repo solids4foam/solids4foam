@@ -1,0 +1,84 @@
+/*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  7
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+Build  : 7-1ff648926f77
+Exec   : blockMesh -region solid
+Date   : Jun 03 2020
+Time   : 21:06:39
+Host   : "dbc53414e686"
+PID    : 1359
+I/O    : uncollated
+Case   : /home/openfoam/solids4foam-release/tutorials/fluidSolidInteraction/3dTube/linearElastic3dTube
+nProcs : 1
+sigFpe : Enabling floating point exception trapping (FOAM_SIGFPE).
+fileModificationChecking : Monitoring run-time modified files using timeStampMaster (fileModificationSkew 10)
+allowSystemOperations : Allowing user-supplied system call operations
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+Create time
+
+
+Generating mesh for region solid
+Deleting polyMesh directory
+    "/home/openfoam/solids4foam-release/tutorials/fluidSolidInteraction/3dTube/linearElastic3dTube/constant/solid/polyMesh"
+Creating block mesh from
+    "/home/openfoam/solids4foam-release/tutorials/fluidSolidInteraction/3dTube/linearElastic3dTube/system/solid/blockMeshDict"
+Creating block edges
+No non-planar block faces defined
+Creating topology blocks
+Creating topology patches
+
+Reading patches section
+
+Creating block mesh topology
+
+Reading physicalType from existing boundary file
+
+Default patch type set to empty
+
+Check topology
+
+	Basic statistics
+		Number of internal faces : 0
+		Number of boundary faces : 6
+		Number of defined boundary faces : 6
+		Number of undefined boundary faces : 0
+	Checking patch -> block consistency
+
+Creating block offsets
+Creating merge list .
+
+Creating polyMesh from blockMesh
+Creating patches
+Creating cells
+Creating points with scale 1
+    Block 0 cell size :
+        i : 0.00025 .. 0.00025 0.000249993 .. 0.000249993 0.00025 .. 0.00025 0.000249993 .. 0.000249993 
+        j : 0.000392632 .. 0.000392632 0.00041226 .. 0.00041226 0.000392632 .. 0.000392632 0.00041226 .. 0.00041226 
+        k : 0.000625 .. 0.000625
+
+Writing polyMesh
+----------------
+Mesh Information
+----------------
+  boundingBox: (0 0 0) (0.006 0.006 0.05)
+  nPoints: 8505
+  nCells: 6400
+  nFaces: 21200
+  nInternalFaces: 17200
+----------------
+Patches
+----------------
+  patch 0 (start: 17200 size: 80) name: inlet
+  patch 1 (start: 17280 size: 80) name: outlet
+  patch 2 (start: 17360 size: 1600) name: inner-wall
+  patch 3 (start: 18960 size: 1600) name: outer-wall
+  patch 4 (start: 20560 size: 320) name: symmetry-x
+  patch 5 (start: 20880 size: 320) name: symmetry-y
+
+End
+

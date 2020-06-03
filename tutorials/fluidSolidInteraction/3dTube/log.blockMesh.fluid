@@ -1,0 +1,91 @@
+/*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  7
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+Build  : 7-1ff648926f77
+Exec   : blockMesh -region fluid
+Date   : Jun 03 2020
+Time   : 21:06:39
+Host   : "dbc53414e686"
+PID    : 1360
+I/O    : uncollated
+Case   : /home/openfoam/solids4foam-release/tutorials/fluidSolidInteraction/3dTube/linearElastic3dTube
+nProcs : 1
+sigFpe : Enabling floating point exception trapping (FOAM_SIGFPE).
+fileModificationChecking : Monitoring run-time modified files using timeStampMaster (fileModificationSkew 10)
+allowSystemOperations : Allowing user-supplied system call operations
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+Create time
+
+
+Generating mesh for region fluid
+Deleting polyMesh directory
+    "/home/openfoam/solids4foam-release/tutorials/fluidSolidInteraction/3dTube/linearElastic3dTube/constant/fluid/polyMesh"
+Creating block mesh from
+    "/home/openfoam/solids4foam-release/tutorials/fluidSolidInteraction/3dTube/linearElastic3dTube/system/fluid/blockMeshDict"
+Creating block edges
+No non-planar block faces defined
+Creating topology blocks
+Creating topology patches
+
+Reading patches section
+
+Creating block mesh topology
+
+Reading physicalType from existing boundary file
+
+Default patch type set to empty
+
+Check topology
+
+	Basic statistics
+		Number of internal faces : 3
+		Number of boundary faces : 12
+		Number of defined boundary faces : 12
+		Number of undefined boundary faces : 0
+	Checking patch -> block consistency
+
+Creating block offsets
+Creating merge list .
+
+Creating polyMesh from blockMesh
+Creating patches
+Creating cells
+Creating points with scale 1
+    Block 0 cell size :
+        i : 0.0003414 .. 0.0003414 0.000335591 0.0003414 .. 0.0003414 0.000335591 .. 0.000335591 
+        j : 0.0003414 .. 0.0003414 0.000335591 .. 0.000335591 0.0003414 .. 0.0003414 0.000335591 .. 0.000335591 
+        k : 0.000625 .. 0.000625
+    Block 1 cell size :
+        i : 0.0003172 .. 0.0003172 0.000326524 .. 0.000326524 0.0003172 .. 0.0003172 0.000326524 .. 0.000326524 
+        j : 0.000288808 .. 0.000288808 0.000308771 .. 0.000301081 0.000288808 .. 0.000288808 0.000308771 .. 0.000301081 
+        k : 0.000625 .. 0.000625
+    Block 2 cell size :
+        i : 0.000288808 .. 0.000288808 0.000308771 .. 0.000301081 0.000288808 .. 0.000288808 0.000308771 .. 0.000301081 
+        j : 0.0003172 .. 0.0003172 0.000326524 .. 0.000326524 0.0003172 .. 0.0003172 0.000326524 .. 0.000326524 
+        k : 0.000625 .. 0.000625
+
+Writing polyMesh
+----------------
+Mesh Information
+----------------
+  boundingBox: (0 0 0) (0.005 0.005 0.05)
+  nPoints: 18306
+  nCells: 16000
+  nFaces: 50200
+  nInternalFaces: 45800
+----------------
+Patches
+----------------
+  patch 0 (start: 45800 size: 200) name: outlet
+  patch 1 (start: 46000 size: 200) name: inlet
+  patch 2 (start: 46200 size: 1600) name: wall
+  patch 3 (start: 47800 size: 1200) name: symmetry-x
+  patch 4 (start: 49000 size: 1200) name: symmetry-y
+
+End
+
