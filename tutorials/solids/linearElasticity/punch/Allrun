@@ -3,8 +3,6 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# Get application name
-application=`getApplication`
 
 # Create top mesh
 \cp system/punch_top/meshDict system/meshDict

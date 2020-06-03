@@ -3,8 +3,6 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# Get application name
-application=`getApplication`
 
 # Create cylinder mesh
 runApplication cartesianMesh
