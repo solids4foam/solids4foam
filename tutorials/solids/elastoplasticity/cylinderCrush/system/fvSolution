@@ -11,46 +11,44 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "system";
-    object      controlDict;
+    object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     solids4Foam;
-
-startFrom       startTime;
-
-startTime       0;
-
-stopAt          endTime;
-
-endTime         1;
-
-deltaT          0.01;
-
-writeControl    timeStep;
-
-writeInterval   1; //250;
-
-cycleWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression uncompressed;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable no;
-
-functions
+solvers
 {
-    forceDisp
+    "D|DD"
     {
-        type          solidForcesDisplacements;
-        historyPatch  pipeContact;
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-09;
+        relTol          0.1;
+    }
+
+    sigmaHyd
+    {
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-09;
+        relTol          0.1;
+    }
+}
+
+relaxationFactors
+{
+    // Under-relaxating the D equation by 0.99-0.9999 can improve convergence in
+    // some cases, in particular when there are solidContact boundaries
+    equations
+    {
+        //DD    0.999;
+    }
+
+    // Under-relaxating the D field by 0.1-0.9 can improve convergence in some
+    // cases
+    fields
+    {
+        //DD       0.7;
+        sigmaHyd    0.5;
     }
 }
 

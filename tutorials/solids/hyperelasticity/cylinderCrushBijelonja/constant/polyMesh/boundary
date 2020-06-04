@@ -15,43 +15,49 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-6
+7
 (
-    top
-    {
-        type            patch;
-        nFaces          9;
-        startFace       54;
-    }
-    left
-    {
-        type            symmetryPlane;
-        nFaces          9;
-        startFace       63;
-    }
-    right
-    {
-        type            patch;
-        nFaces          9;
-        startFace       72;
-    }
-    bottom
-    {
-        type            symmetryPlane;
-        nFaces          9;
-        startFace       81;
-    }
     front
     {
-        type            patch;
-        nFaces          9;
-        startFace       90;
+        type            empty;
+        nFaces          535;
+        startFace       1019;
     }
     back
     {
+        type            empty;
+        nFaces          535;
+        startFace       1554;
+    }
+    cylinderContact
+    {
+        type            patch;
+        nFaces          30;
+        startFace       2089;
+    }
+    topContact
+    {
+        type            patch;
+        nFaces          10;
+        startFace       2119;
+    }
+    topLoading
+    {
+        type            patch;
+        nFaces          11;
+        startFace       2129;
+    }
+    symmetry-x
+    {
         type            symmetryPlane;
-        nFaces          9;
-        startFace       99;
+        nFaces          26;
+        startFace       2140;
+    }
+    symmetry-y
+    {
+        type            symmetryPlane;
+        nFaces          25;
+        startFace       2166;
     }
 )
 

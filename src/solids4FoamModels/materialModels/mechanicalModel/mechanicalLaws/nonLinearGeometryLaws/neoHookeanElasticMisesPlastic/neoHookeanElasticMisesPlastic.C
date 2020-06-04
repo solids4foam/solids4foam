@@ -29,9 +29,7 @@ License
 #include "logVolFields.H"
 #include "fvc.H"
 #include "fvm.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "zeroGradientFvPatchFields.H"
-#endif
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -62,88 +60,16 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-
-void Foam::neoHookeanElasticMisesPlastic::makeRelF()
-{
-    if (relFPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeRelF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    relFPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "relF",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElasticMisesPlastic::relF()
-{
-    if (!relFPtr_)
-    {
-        makeRelF();
-    }
-
-    return *relFPtr_;
-}
-
-
-void Foam::neoHookeanElasticMisesPlastic::makeRelFf()
-{
-    if (relFfPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeRelFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    relFfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "relFf",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::surfaceTensorField& Foam::neoHookeanElasticMisesPlastic::relFf()
-{
-    if (!relFfPtr_)
-    {
-        makeRelFf();
-    }
-
-    return *relFfPtr_;
-}
-
-
 void Foam::neoHookeanElasticMisesPlastic::makeJ()
 {
-    if (JPtr_)
+    if (JPtr_.valid())
     {
         FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeJ()")
             << "pointer already set" << abort(FatalError);
     }
 
-    JPtr_ =
+    JPtr_.set
+    (
         new volScalarField
         (
             IOobject
@@ -156,33 +82,35 @@ void Foam::neoHookeanElasticMisesPlastic::makeJ()
             ),
             mesh(),
             dimensionedScalar("one", dimless, 1.0)
-        );
+        )
+    );
 
     // Store the old-time
-    JPtr_->oldTime();
+    JPtr_().oldTime();
 }
 
 
 Foam::volScalarField& Foam::neoHookeanElasticMisesPlastic::J()
 {
-    if (!JPtr_)
+    if (JPtr_.empty())
     {
         makeJ();
     }
 
-    return *JPtr_;
+    return JPtr_();
 }
 
 
 void Foam::neoHookeanElasticMisesPlastic::makeJf()
 {
-    if (JfPtr_)
+    if (JfPtr_.valid())
     {
         FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeJf()")
             << "pointer already set" << abort(FatalError);
     }
 
-    JfPtr_ =
+    JfPtr_.set
+    (
         new surfaceScalarField
         (
             IOobject
@@ -195,21 +123,22 @@ void Foam::neoHookeanElasticMisesPlastic::makeJf()
             ),
             mesh(),
             dimensionedScalar("one", dimless, 1.0)
-        );
+        )
+    );
 
     // Store the old-time
-    JfPtr_->oldTime();
+    JfPtr_().oldTime();
 }
 
 
 Foam::surfaceScalarField& Foam::neoHookeanElasticMisesPlastic::Jf()
 {
-    if (!JfPtr_)
+    if (JfPtr_.empty())
     {
         makeJf();
     }
 
-    return *JfPtr_;
+    return JfPtr_();
 }
 
 
@@ -638,26 +567,9 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
-    relFPtr_(NULL),
-    relFfPtr_(NULL),
-    JPtr_(NULL),
-    JfPtr_(NULL),
+    JPtr_(),
+    JfPtr_(),
     stressPlasticStrainSeries_(dict),
-    sigmaHyd_
-    (
-        IOobject
-        (
-            "sigmaHyd",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0.0),
-        zeroGradientFvPatchScalarField::typeName
-    ),
-    smoothPressure_(dict.lookupOrDefault<Switch>("smoothPressure", true)),
     sigmaY_
     (
         IOobject
@@ -956,8 +868,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     plasticN_.oldTime();
     bEbar_.oldTime();
 
-    Info<< "    smoothPressure: " << smoothPressure_ << nl
-        << "    updateBEbarConsistent: " << updateBEbarConsistent_ << endl;
+    Info<< "    updateBEbarConsistent: " << updateBEbarConsistent_ << endl;
 
     // Read elastic parameters
     // The user can specify E and nu or mu and K
@@ -1034,12 +945,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::neoHookeanElasticMisesPlastic::~neoHookeanElasticMisesPlastic()
-{
-    deleteDemandDrivenData(relFPtr_);
-    deleteDemandDrivenData(relFfPtr_);
-    deleteDemandDrivenData(JPtr_);
-    deleteDemandDrivenData(JfPtr_);
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -1330,59 +1236,14 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     }
 
     // Update hydrostatic stress (negative of pressure)
-    if (smoothPressure_)
-    {
-        // Calculate the hydrostatic pressure by solving a Laplace equation;
-        // this ensures smoothness of the field and quells oscillations
-
-        // Lookup the momentum equation inverse diagonal field
-        const volScalarField AD = mesh().lookupObject<volScalarField>("DEqnA");
-
-        // Pressure diffusivity field
-        // Note: (4.0/3.0)*mu + K == 2*mu + lambda
-        const surfaceScalarField rDAf
-        (
-            "rDAf",
-            fvc::interpolate
-            (
-                ((4.0/3.0)*mu_ + K_)/AD, "interpolate(grad(sigmaHyd))"
-            )
-        );
-
-        const dimensionedScalar one("one", dimless, 1.0);
-        //const dimensionedScalar fac(dict().lookup("smoothFactor"));
-
-        // Construct the pressure equation
-        fvScalarMatrix sigmaHydEqn
-        (
-            fvm::Sp(one, sigmaHyd_)
-          - fvm::laplacian(rDAf, sigmaHyd_, "laplacian(DDD,DD)")
-         ==
-            0.5*K_*(pow(J(), 2.0) - 1.0)
-          - fvc::div(rDAf*fvc::interpolate(fvc::grad(sigmaHyd_)) & mesh().Sf())
-        );
-
-        // Store the pressue field to allow under-relaxation
-        sigmaHyd_.storePrevIter();
-
-        // Under-relax the linear system
-        sigmaHydEqn.relax(0.7);
-
-        // Solve the pressure equation
-        sigmaHydEqn.solve();
-
-        // Under-relax the pressure field
-        sigmaHyd_.relax(0.2);
-    }
-    else
-    {
-        // Calculate the hydrostatic pressure directly from the displacement
-        // field
-        sigmaHyd_ = 0.5*K_*(pow(J(), 2.0) - 1.0);
-    }
+    updateSigmaHyd
+    (
+        0.5*K_*(pow(J(), 2.0) - 1.0),
+        (4.0/3.0)*mu_ + K_
+    );
 
     // Update the Cauchy stress
-    sigma = (1.0/J())*(sigmaHyd_*I + s);
+    sigma = (1.0/J())*(sigmaHyd()*I + s);
 }
 
 
@@ -1621,6 +1482,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     }
 
     // Update the Cauchy stress
+    // Note: updayeSigmaHyd is not implemented for surface fields
     sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
 }
 
@@ -1774,15 +1636,15 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
     // in large deformation finite element analysis, Finite Elements in
     // Analysis and Design 16 (1994) 99-139.
 
-    // Update the total deformatio gradient
-    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
-    {
-        F() = fvc::average(relFf()) & F().oldTime();
-    }
-    else
-    {
-        F() = relF() & F().oldTime();
-    }
+    // Update the total deformatio gradient: already done by updateF
+    // if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    // {
+    //     F() = fvc::average(relFf()) & F().oldTime();
+    // }
+    // else
+    // {
+    //     F() = relF() & F().oldTime();
+    // }
 
     // Calculate the total true (Hencky) strain
     const volSymmTensorField epsilon = 0.5*log(symm(F().T() & F()));

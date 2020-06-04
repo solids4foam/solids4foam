@@ -51,45 +51,6 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-
-void Foam::neoHookeanElasticMisesPlasticRubin::makeRelF()
-{
-    if (relFPtr_)
-    {
-        FatalErrorIn
-        (
-            "void Foam::neoHookeanElasticMisesPlasticRubin::makeRelF()"
-        )   << "pointer already set" << abort(FatalError);
-    }
-
-    relFPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "lawRelF",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElasticMisesPlasticRubin::relF()
-{
-    if (!relFPtr_)
-    {
-        makeRelF();
-    }
-
-    return *relFPtr_;
-}
-
-
 void Foam::neoHookeanElasticMisesPlasticRubin::makeJ()
 {
     if (JPtr_)
@@ -306,7 +267,6 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
         dimensionedScalar(dict.lookup("initialYieldStress"))
     ),
     K_(dict.lookup("hardeningModulus")),
-    relFPtr_(NULL),
     JPtr_(NULL),
     P_
     (
@@ -436,7 +396,6 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
 
 Foam::neoHookeanElasticMisesPlasticRubin::~neoHookeanElasticMisesPlasticRubin()
 {
-    deleteDemandDrivenData(relFPtr_);
     deleteDemandDrivenData(JPtr_);
 }
 

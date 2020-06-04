@@ -23,9 +23,9 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         1;
+endTime         30;
 
-deltaT          0.01;
+deltaT          1; //0.001;
 
 writeControl    timeStep;
 
@@ -45,13 +45,13 @@ timePrecision   6;
 
 runTimeModifiable no;
 
-functions
-{
-    forceDisp
-    {
-        type          solidForcesDisplacements;
-        historyPatch  pipeContact;
-    }
-}
+/*functions*/
+/*{*/
+/*    forceDisp*/
+/*    {*/
+/*        type          solidForcesDisplacements;*/
+/*        historyPatch  topContact;*/
+/*    }*/
+/*}*/
 
 // ************************************************************************* //

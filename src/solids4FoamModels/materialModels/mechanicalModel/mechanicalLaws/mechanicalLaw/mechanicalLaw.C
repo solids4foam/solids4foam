@@ -32,6 +32,9 @@ InClass
 #include "IOdictionary.H"
 #include "lookupSolidModel.H"
 #include "solidModel.H"
+#include "fvm.H"
+#include "fvc.H"
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -100,6 +103,104 @@ void Foam::mechanicalLaw::makeFf()
     );
 }
 
+void Foam::mechanicalLaw::makeRelF()
+{
+    if (relFPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeRelF()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    relFPtr_.set
+    (
+        new volTensorField
+        (
+            IOobject
+            (
+                "relF_" + type(),
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, I)
+        )
+    );
+}
+
+
+void Foam::mechanicalLaw::makeRelFf()
+{
+    if (relFfPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeRelFf()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    relFfPtr_.set
+    (
+        new surfaceTensorField
+        (
+            IOobject
+            (
+                "relFf_" + type(),
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, I)
+        )
+    );
+}
+
+
+void Foam::mechanicalLaw::makeSigmaHyd()
+{
+    if (sigmaHydPtr_.valid() || gradSigmaHydPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeSigmaHyd()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    sigmaHydPtr_.set
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "sigmaHyd",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimPressure, 0.0),
+            zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+    gradSigmaHydPtr_.set
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "grad(sigmaHyd)",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedVector("zero", dimPressure/dimLength, vector::zero)
+        )
+    );
+}
+
 
 // * * * * * * * * * * * * * * Protected Members * * * * * * * * * * * * * * //
 
@@ -161,6 +262,50 @@ Foam::surfaceTensorField& Foam::mechanicalLaw::Ff()
 }
 
 
+Foam::volTensorField& Foam::mechanicalLaw::relF()
+{
+    if (relFPtr_.empty())
+    {
+        makeRelF();
+    }
+
+    return relFPtr_();
+}
+
+
+Foam::surfaceTensorField& Foam::mechanicalLaw::relFf()
+{
+    if (relFfPtr_.empty())
+    {
+        makeRelFf();
+    }
+
+    return relFfPtr_();
+}
+
+
+Foam::volScalarField& Foam::mechanicalLaw::sigmaHyd()
+{
+    if (sigmaHydPtr_.empty())
+    {
+        makeSigmaHyd();
+    }
+
+    return sigmaHydPtr_();
+}
+
+
+Foam::volVectorField& Foam::mechanicalLaw::gradSigmaHyd()
+{
+    if (gradSigmaHydPtr_.empty())
+    {
+        makeSigmaHyd();
+    }
+
+    return gradSigmaHydPtr_();
+}
+
+
 bool Foam::mechanicalLaw::updateF
 (
     volSymmTensorField& sigma,
@@ -183,10 +328,10 @@ bool Foam::mechanicalLaw::updateF
             mesh().lookupObject<volTensorField>("grad(DD)");
 
         // Calculate the relative deformation gradient
-        const volTensorField relF = I + gradDD.T();
+        relF() = I + gradDD.T();
 
         // Update the total deformation gradient
-        F() = relF & F().oldTime();
+        F() = relF() & F().oldTime();
 
         if (enforceLinear())
         {
@@ -217,7 +362,7 @@ bool Foam::mechanicalLaw::updateF
             F() = F().oldTime() + gradDD.T();
 
             // Update the relative deformation gradient: not needed
-            //relF() = F() & inv(F().oldTime());
+            relF() = F() & inv(F().oldTime());
 
             if (enforceLinear())
             {
@@ -244,7 +389,7 @@ bool Foam::mechanicalLaw::updateF
             F() = I + gradD.T();
 
             // Update the relative deformation gradient: not needed
-            //relF() = F() & inv(F().oldTime());
+            relF() = F() & inv(F().oldTime());
 
             if (enforceLinear())
             {
@@ -295,10 +440,10 @@ bool Foam::mechanicalLaw::updateFf
             mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
         // Update the relative deformation gradient: not needed
-        const surfaceTensorField relF = I + gradDD.T();
+        relFf() = I + gradDD.T();
 
         // Update the total deformation gradient
-        Ff() = relF & Ff().oldTime();
+        Ff() = relFf() & Ff().oldTime();
 
         if (enforceLinear())
         {
@@ -327,7 +472,7 @@ bool Foam::mechanicalLaw::updateFf
             Ff() = Ff().oldTime() + gradDD.T();
 
             // Update the relative deformation gradient: not needed
-            //relFf() = Ff() & inv(Ff().oldTime());
+            relFf() = Ff() & inv(Ff().oldTime());
 
             if (enforceLinear())
             {
@@ -355,7 +500,7 @@ bool Foam::mechanicalLaw::updateFf
             Ff() = I + gradD.T();
 
             // Update the relative deformation gradient: not needed
-            //relF() = F() & inv(F().oldTime());
+            relFf() = Ff() & inv(Ff().oldTime());
 
             if (enforceLinear())
             {
@@ -382,6 +527,84 @@ bool Foam::mechanicalLaw::updateFf
 
     // linearised elasticity was not enforced
     return false;
+}
+
+
+void Foam::mechanicalLaw::updateSigmaHyd
+(
+    const volScalarField& sigmaHydExplicit,
+    const dimensionedScalar& impK
+)
+{
+    if (solvePressureEqn_)
+    {
+#ifdef OPENFOAMESIORFOUNDATION
+        SolverPerformance<scalar>::debug = 0;
+#endif
+
+        // Store previous iteration to allow relaxation, if needed
+        sigmaHyd().storePrevIter();
+
+        // Lookup the momentum equation inverse diagonal field
+        const volScalarField* ADPtr = NULL;
+        if (mesh().foundObject<volScalarField>("DEqnA"))
+        {
+            ADPtr = &mesh().lookupObject<volScalarField>("DEqnA");
+        }
+        else if (mesh().foundObject<volScalarField>("DDEqnA"))
+        {
+            ADPtr = &mesh().lookupObject<volScalarField>("DDEqnA");
+        }
+        else
+        {
+            FatalErrorIn
+            (
+                "void " + type() + "updateSigmaHyd(...)\n"
+            )   << "Cannot find the DEqnA or DDEqnA field: this should be "
+                << "stored in the solidModel" << abort(FatalError);
+        }
+        const volScalarField& AD = *ADPtr;
+
+        // Pressure diffusivity field
+        const surfaceScalarField rDAf
+        (
+            "rDAf",
+            pressureSmoothingScaleFactor_*fvc::interpolate
+            (
+                impK/AD, "interpolate(" + gradSigmaHyd().name() + ")"
+            )
+        );
+        const dimensionedScalar one("one", dimless, 1.0);
+
+        // Solve pressure laplacian
+        // Note: the fvm and fvc laplacian terms cancel at convergence and the
+        // laplacian - div(grad) term produce a smoothing/diffusion to quell
+        // oscillations
+        fvScalarMatrix sigmaHydEqn
+        (
+            fvm::Sp(one, sigmaHyd())
+          - fvm::laplacian(rDAf, sigmaHyd(), "laplacian(rDA,sigmaHyd)")
+         ==
+            sigmaHydExplicit
+          - fvc::div(rDAf*fvc::interpolate(gradSigmaHyd()) & mesh().Sf())
+        );
+
+        // Solve the pressure equation
+        sigmaHydEqn.solve();
+
+        // Relax the pressure field
+        sigmaHyd().relax();
+    }
+    else
+    {
+        // Explicitly calculate hydrostatic stress
+        // We use 1.0* to overwritting the field IOobject attributes e.g. its
+        // name and writeOpt
+        sigmaHyd() = 1.0*sigmaHydExplicit;
+    }
+
+    // Update the gradient
+    gradSigmaHyd() = fvc::grad(sigmaHyd());
 }
 
 
@@ -419,7 +642,19 @@ Foam::mechanicalLaw::mechanicalLaw
     baseMeshRegionName_(),
     nonLinGeom_(nonLinGeom),
     FPtr_(),
-    FfPtr_()
+    FfPtr_(),
+    relFPtr_(),
+    relFfPtr_(),
+    solvePressureEqn_
+    (
+        dict.lookupOrDefault<Switch>("solvePressureEqn", true)
+    ),
+    pressureSmoothingScaleFactor_
+    (
+        dict.lookupOrDefault<scalar>("pressureSmoothingScaleFactor", 100.0)
+    ),
+    sigmaHydPtr_(),
+    gradSigmaHydPtr_()
 {
     // Set the base mesh region name
     // For an FSI case, the region will be called solid, else it will be called
@@ -443,6 +678,14 @@ Foam::mechanicalLaw::mechanicalLaw
             "    const dictionary& dict\n"
             ")"
         ) << "solid region name not found" << abort(FatalError);
+    }
+
+    if (solvePressureEqn_)
+    {
+        Info<< "    Laplacian equation will be solved for pressure" << nl
+            << "    pressureSmoothingScaleFactor: "
+            << pressureSmoothingScaleFactor_
+            << endl;
     }
 }
 

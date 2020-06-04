@@ -1161,40 +1161,6 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                         )()
                     );
 
-                // TESTING
-                // For faces partly in contact, the traction field is not
-                // interpolated correctly so we must correct these faces
-                // TIAN to check!
-                // {
-                //     // Calculate the master areaInContact
-                //     const faceList& masterPatchLocalFaces =
-                //         patch().patch().localFaces();
-                //     const pointField& masterPatchLocalPoints =
-                //         patch().patch().localPoints();
-
-                //     scalarField masterAreaInContactFraction
-                //     (
-                //         masterPatchLocalFaces.size(), 0.0
-                //     );
-                //     forAll(masterPatchLocalFaces, faceI)
-                //     {
-                //         masterAreaInContactFraction[faceI] =
-                //             masterPatchLocalFaces[faceI].areaInContact
-                //             (
-                //                 masterPatchLocalPoints,
-                //                 zone().globalPointToPatch
-                //                 (
-                //                     zoneToZones()
-                //                     [
-                //                         shadPatchI
-                //                     ].masterPointDistanceToIntersection()
-                //                 )
-                //             );
-                //     }
-
-                //     tractionForThisShadow *= masterAreaInContactFraction;
-                // }
-
                 // Accumulate the traction on the master patch
                 traction() += tractionForThisShadow;
 
