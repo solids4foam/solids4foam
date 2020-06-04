@@ -44,7 +44,7 @@ function solids4Foam::convertCaseFormat()
     if [[ $WM_PROJECT = "foam" ]]
     then
         echo "FOAM EXTEND loaded: no changes made"; echo
-        exit 0
+        return 0
     fi
 
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
