@@ -647,7 +647,7 @@ Foam::mechanicalLaw::mechanicalLaw
     relFfPtr_(),
     solvePressureEqn_
     (
-        dict.lookupOrDefault<Switch>("solvePressureEqn", true)
+        dict.lookupOrDefault<Switch>("solvePressureEqn", false)
     ),
     pressureSmoothingScaleFactor_
     (
