@@ -417,13 +417,10 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
     {
         Info<< "Reading g from constant directory" << endl;
 #ifdef OPENFOAMESI
-        return meshObjects::gravity
-        (
-            runTime(),
+        return meshObjects::gravity(runTime());
 #else
         return uniformDimensionedVectorField
         (
-#endif
             IOobject
             (
                 "g",
@@ -433,24 +430,14 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
                 IOobject::NO_WRITE
             )
         );
+#endif
     }
     else
     {
         Info<< "g field not found in constant directory: initialising to zero"
             << endl;
 #ifdef OPENFOAMESI
-        return meshObjects::gravity
-        (
-            runTime(),
-            IOobject
-            (
-                "g",
-                runTime().caseConstant(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            )
-        );
+        return meshObjects::gravity(runTime());
 #else
         return uniformDimensionedVectorField
         (

@@ -24,6 +24,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#if OPENFOAM != 1912
+
 #include "interFluid.H"
 #include "volFields.H"
 #include "fvm.H"
@@ -606,5 +608,7 @@ bool interFluid::evolve()
 
 } // End namespace fluidModels
 } // End namespace Foam
+
+#endif
 
 // ************************************************************************* //
