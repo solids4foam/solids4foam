@@ -30,11 +30,11 @@ License
 #include "emptyPolyPatch.H"
 #include "wedgePolyPatch.H"
 #include "cyclicFvPatch.H"
+#include "transform.H"
 #ifdef FOAMEXTEND
     #include "cyclicGgiPolyPatch.H"
     #include "cyclicGgiFvPatchFields.H"
 #endif
-#include "transform.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -60,7 +60,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
             << endl;
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     const Field<Type>& vfI = vf.primitiveField();
     Field<Type>& pfI = pf.primitiveFieldRef();
 #else
@@ -77,8 +77,10 @@ void newLeastSquaresVolPointInterpolation::interpolate
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
     const labelListList& ptCyclicBndFaces = pointCyclicBndFaces();
+#ifdef FOAMEXTEND
     const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
     const labelListList& ptCyclicGgiBndFaces = pointCyclicGgiBndFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
     Map<Field<Type> > gPtNgbProcBndFaceFieldData;
@@ -87,9 +89,9 @@ void newLeastSquaresVolPointInterpolation::interpolate
     Map<Field<Type> > gPtNgbProcCellFieldData;
     globalPointNgbProcCellFieldData(vf, gPtNgbProcCellFieldData);
 
+#ifdef FOAMEXTEND
     // Cyclic GGI neighbour fields
     FieldField<Field, Type> cyclicGgiNgbFields(mesh().boundary().size());
-#ifdef FOAMEXTEND
     forAll(vf.boundaryField(), patchI)
     {
         if (isA<cyclicGgiFvPatchField<Type> >(vf.boundaryField()[patchI]))
@@ -125,8 +127,10 @@ void newLeastSquaresVolPointInterpolation::interpolate
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
         const labelList& interpCyclicBndFaces = ptCyclicBndFaces[pointI];
+#ifdef FOAMEXTEND
         const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
         const labelList& interpCyclicGgiBndFaces = ptCyclicGgiBndFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
         Field<Type> glInterpNgbProcBndFaceData(0);
@@ -189,8 +193,10 @@ void newLeastSquaresVolPointInterpolation::interpolate
           + interpBndFaces.size()
           + interpCyclicFaces.size()
           + interpCyclicBndFaces.size()
+#ifdef FOAMEXTEND
           + interpCyclicGgiFaces.size()
           + interpCyclicGgiBndFaces.size()
+#endif
           + interpProcFaces.size()
           + glInterpNgbProcBndFaceData.size()
           + glInterpNgbProcCellData.size()
@@ -348,6 +354,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
             }
         }
 
+#ifdef FOAMEXTEND
         for (label i=0; i<interpCyclicGgiFaces.size(); i++)
         {
             label faceID = interpCyclicGgiFaces[i];
@@ -362,7 +369,6 @@ void newLeastSquaresVolPointInterpolation::interpolate
             pointID++;
         }
 
-#ifdef FOAMEXTEND
         if (interpCyclicGgiBndFaces.size())
         {
             label cycGgiFaceID = interpCyclicGgiFaces[0];
@@ -658,7 +664,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
             << endl;
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     const Field<Type>& vfI = vf.primitiveField();
 #else
     const Field<Type>& vfI = vf.internalField();
@@ -672,7 +678,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
             pTraits<Type>::zero
         )
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     Field<Type>& ppf = tppf.ref();
 #else
     Field<Type>& ppf = tppf();
@@ -688,7 +694,9 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
     const labelListList& ptCells = mesh().pointCells();
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
+#ifdef FOAMEXTEND
     const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
     Map<Field<Type> > gPtNgbProcBndFaceFieldData;
@@ -720,7 +728,9 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
         const labelList& interpCells = ptCells[pointI];
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
+#ifdef FOAMEXTEND
         const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
         Field<Type> glInterpNgbProcBndFaceData(0);
@@ -782,7 +792,9 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
             interpCells.size()
           + interpBndFaces.size()
           + interpCyclicFaces.size()
+#ifdef FOAMEXTEND
           + interpCyclicGgiFaces.size()
+#endif
           + interpProcFaces.size()
           + glInterpNgbProcBndFaceData.size()
           + glInterpNgbProcCellData.size()
@@ -947,7 +959,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 
 //     Info << "patch cell to point interpolation" << endl;
 
-// #ifdef OPENFOAMESIORFOUNDATION
+// #if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
 //     const Field<Type>& vfI = vf.primitiveField();
 // #else
 //     const Field<Type>& vfI = vf.internalField();
@@ -961,7 +973,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 //             pTraits<Type>::zero
 //         )
 //     );
-// #ifdef OPENFOAMESIORFOUNDATION
+// #if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
 //     Field<Type>& ppf = tppf.ref();
 // #else
 //     Field<Type>& ppf = tppf();
@@ -1164,7 +1176,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
             << endl;
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     const Field<Type>& vfI = vf.primitiveField();
 #else
     const Field<Type>& vfI = vf.internalField();
@@ -1180,7 +1192,9 @@ Type newLeastSquaresVolPointInterpolation::interpolate
     const labelListList& ptCells = mesh().pointCells();
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
+#ifdef FOAMEXTEND
     const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
     Map<Field<Type> > gPtNgbProcBndFaceFieldData;
@@ -1212,7 +1226,9 @@ Type newLeastSquaresVolPointInterpolation::interpolate
         const labelList& interpCells = ptCells[pointI];
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
+#ifdef FOAMEXTEND
         const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
         Field<Type> glInterpNgbProcBndFaceData(0);
@@ -1274,7 +1290,9 @@ Type newLeastSquaresVolPointInterpolation::interpolate
             interpCells.size()
           + interpBndFaces.size()
           + interpCyclicFaces.size()
+#ifdef FOAMEXTEND
           + interpCyclicGgiFaces.size()
+#endif
           + interpProcFaces.size()
           + glInterpNgbProcBndFaceData.size()
           + glInterpNgbProcCellData.size()
@@ -1437,7 +1455,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //             << endl;
 //     }
 
-// #ifdef OPENFOAMESIORFOUNDATION
+// #if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
 //     const Field<Type>& vfI = vf.primitiveField();
 // #else
 //     const Field<Type>& vfI = vf.internalField();
@@ -1860,7 +1878,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceFieldData
 
     if (Pstream::parRun())
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         //notImplemented("globalPointNgbProcBndFaceFieldData");
         if (processorBoundariesExist_)
         {
@@ -1980,7 +1998,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
 
     if (Pstream::parRun())
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         // notImplemented("globalPointNgbProcCellFieldData");
         if (processorBoundariesExist_)
         {
@@ -1994,7 +2012,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
 #else
         const labelListList& ptCells = mesh().pointCells();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         const Field<Type>& vfI = vf.primitiveField();
 #else
         const Field<Type>& vfI = vf.internalField();
@@ -2090,7 +2108,7 @@ newLeastSquaresVolPointInterpolation::procCellsFieldData
     (
         new FieldField<Field, Type>(Pstream::nProcs())
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     FieldField<Field, Type>& procPsi = tprocPsi.ref();
 #else
     FieldField<Field, Type>& procPsi = tprocPsi();
@@ -2111,7 +2129,7 @@ newLeastSquaresVolPointInterpolation::procCellsFieldData
 
     if (Pstream::parRun())
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         //notImplemented("procCellsFieldData");
         if (processorBoundariesExist_)
         {
@@ -2200,7 +2218,7 @@ newLeastSquaresVolPointInterpolation::procBndFacesFieldData
     (
         new FieldField<Field, Type>(Pstream::nProcs())
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     FieldField<Field, Type>& procPsi = tprocPsi.ref();
 #else
     FieldField<Field, Type>& procPsi = tprocPsi();
@@ -2221,7 +2239,7 @@ newLeastSquaresVolPointInterpolation::procBndFacesFieldData
 
     if (Pstream::parRun())
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         // notImplemented("procBndFacesFieldData");
         if (processorBoundariesExist_)
         {
