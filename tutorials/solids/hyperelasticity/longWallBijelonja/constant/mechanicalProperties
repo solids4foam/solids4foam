@@ -32,7 +32,7 @@ mechanical
 		solvePressureEqn		yes;
 
 		// Pressure smoothing coefficient
-		pressureSmoothingCoeff	1.0;
+		pressureSmoothingCoeff	100.0;
     }
 );
 
