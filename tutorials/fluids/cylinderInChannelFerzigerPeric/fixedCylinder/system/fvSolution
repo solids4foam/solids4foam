@@ -35,7 +35,7 @@ solvers
         minIter         1;
     }
 
-    U
+    "U|UFinal"
     {
         solver          PBiCG;
         preconditioner  DILU;
@@ -58,11 +58,17 @@ PIMPLE
     nNonOrthogonalCorrectors 1;
 }
 
-// relaxationFactors
-// {
-//     U    0.7;
-//     UFinal 0.7;
-//     p    0.3;
-// }
+relaxationFactors
+{
+    equations
+    {
+        U    0.7;
+        UFinal 0.7;
+    }
+    fields
+    {
+        p    0.3;
+    }
+}
 
 // ************************************************************************* //

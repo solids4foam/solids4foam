@@ -6,34 +6,33 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+if [ "$WM_PROJECT" == "foam" ]
+then
+    if (( $(echo "$WM_PROJECT_VERSION < 4.1" |bc -l) ))
+    then
+        echo "Tutorial not compatible with this version of OpenFOAM"
+        exit 0
+    fi
+else
+    echo; echo "This case currently only runs in foam-extend"; echo
+    exit 0
+fi
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-if [[ "${WM_PROJECT}" == "foam" ]]
-then
-    runApplication -l log.blockMesh.solid blockMesh -region solid
+# Cerate solid mesh
+runApplication -l log.blockMesh.solid blockMesh -region solid
 
-    # fluent3DMeshToFoam does not have a region option so we need to workaround
-    # it
+# Create fluid mesh
+# fluent3DMeshToFoam does not have a region option so we need to workaround
+# it
+mkdir constant/fluid/polyMesh
+runApplication fluent3DMeshToFoam fluid.msh
+\mv constant/polyMesh/* constant/fluid/polyMesh/
+cp ./constant/fluid/boundary ./constant/fluid/polyMesh
 
-    mkdir constant/fluid/polyMesh
-    runApplication fluent3DMeshToFoam fluid.msh
-    \mv constant/polyMesh/* constant/fluid/polyMesh/
-    cp ./constant/fluid/boundary ./constant/fluid/polyMesh
-
-    runApplication solids4Foam
-else
-    runApplication -s solid blockMesh -region solid
-
-    # fluent3DMeshToFoam does not have a region option so we need to workaround
-    # it
-    mkdir constant/fluid/polyMesh
-    runApplication -s fluid fluent3DMeshToFoam fluid.msh
-    \mv constant/polyMesh/* constant/fluid/polyMesh/
-    cp ./constant/fluid/boundary ./constant/fluid/polyMesh
-
-    solids4Foam -noFunctionObjects &> log.solids4Foam
-fi
+runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 
