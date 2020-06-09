@@ -420,10 +420,6 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
         return meshObjects::gravity
         (
             runTime(),
-#else
-        return uniformDimensionedVectorField
-        (
-#endif
             IOobject
             (
                 "g",
@@ -433,6 +429,19 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
                 IOobject::NO_WRITE
             )
         );
+#else
+        return uniformDimensionedVectorField
+        (
+            IOobject
+            (
+                "g",
+                runTime().caseConstant(),
+                mesh(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+#endif
     }
     else
     {

@@ -31,8 +31,8 @@ mechanical
 		// To solve pressure Poisson equation
 		solvePressureEqn		yes;
 
-		// Pressure smoothing coefficient
-		pressureSmoothingCoeff	1.0;
+		// Pressure smoothing scale factor
+		pressureSmoothingScaleFactor 100;
     }
 );
 
