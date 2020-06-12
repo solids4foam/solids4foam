@@ -63,7 +63,7 @@ $> docker pull philippic/solids4foam-ubuntu18.04
 
 - Create a solids4foam container (macOS and linux terminal):
 ```
-$> docker run -itd -v="~":/home/app/foam/app-4.0/sharedRun --name solids4foam.ubuntu18.04  philippic/solids4foam-ubuntu18.04 /bin/bash
+$> docker run -itd -v="${HOME}":/home/app/foam/app-4.0/sharedRun --name solids4foam.ubuntu18.04  philippic/solids4foam-ubuntu18.04 /bin/bash
 ```
 - Create a solids4foam container (Windows powershell terminal):
 ```
