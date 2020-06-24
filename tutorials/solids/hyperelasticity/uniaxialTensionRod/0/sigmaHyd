@@ -9,44 +9,45 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      fvSchemes;
+    class       volScalarField;
+    object      sigmaHyd;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            steadyState;
-}
+dimensions      [1 -1 -2 0 0 0 0];
 
-ddtSchemes
-{
-    default            steadyState;
-}
+internalField   uniform 0;
 
-gradSchemes
+boundaryField
 {
-    default            extendedLeastSquares 0;
-}
-
-divSchemes
-{
-    default            Gauss linear;
-}
-
-laplacianSchemes
-{
-    default            Gauss linear skewCorrected 1;
-}
-
-snGradSchemes
-{
-    default            skewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default            linear;
+    tracFree
+    {
+        type            zeroGradient;
+    }
+    symmPlane
+    {
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform 0;
+    }
+   	loading
+    {
+        type            extrapolatedPressureValue;
+		relaxFactor		0.5;
+		value			uniform 0;
+    }
+    front
+    {
+		type            solidWedge;	
+		patchType       wedge;	
+		value           uniform 0;	
+    }
+    back
+    {
+		type            solidWedge;	
+		patchType       wedge;	
+		value           uniform 0;	
+    }
 }
 
 // ************************************************************************* //

@@ -24,6 +24,7 @@ boundaryField
     loading
     {
         type            fixedDisplacement;
+        //type            fixedDisplacementZeroShear;
         displacementSeries
         {
             "fileName|file"        "$FOAM_CASE/constant/timeVsDisp";
