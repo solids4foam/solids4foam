@@ -419,7 +419,9 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
 #ifdef OPENFOAMESI
         return meshObjects::gravity
         (
-            runTime(),
+            runTime()
+#if OPENFOAM < 1912
+	    ,
             IOobject
             (
                 "g",
@@ -428,6 +430,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE
             )
+#endif
         );
 #else
         return uniformDimensionedVectorField
@@ -450,7 +453,9 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
 #ifdef OPENFOAMESI
         return meshObjects::gravity
         (
-            runTime(),
+            runTime()
+#if OPENFOAM < 1912
+	    ,
             IOobject
             (
                 "g",
@@ -459,6 +464,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             )
+#endif
         );
 #else
         return uniformDimensionedVectorField
