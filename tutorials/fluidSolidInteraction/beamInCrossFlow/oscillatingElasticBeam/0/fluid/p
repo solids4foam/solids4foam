@@ -22,8 +22,7 @@ boundaryField
 {
     interface
     {
-        type extrapolatedPressure;
-        value uniform 0;
+        type zeroGradient;
     }
     outlet
     {
@@ -32,23 +31,19 @@ boundaryField
     }
     inlet
     {
-        type extrapolatedPressure;
-        value uniform 0;
+        type zeroGradient;
     }
     bottom
     {
-        type extrapolatedPressure;
-        value uniform 0;
+        type zeroGradient;
     }
     top
     {
-        type extrapolatedPressure;
-        value uniform 0;
+        type zeroGradient;
     }
     left
     {
-        type extrapolatedPressure;
-        value uniform 0;
+        type zeroGradient;
     }
     symmetry
     {

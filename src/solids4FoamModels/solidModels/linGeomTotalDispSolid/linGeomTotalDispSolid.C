@@ -84,6 +84,13 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 {
     DisRequired();
 
+mechanical().grad(D(), gradD());
+DD().oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE; 
+D().oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;    
+
+
+
+
     if (predictor_)
     {
         // Check ddt scheme for D is not steadyState
