@@ -51,7 +51,11 @@ SourceFiles
 #include "runTimeSelectionTables.H"
 #include "pimpleControl.H"
 #include "pisoControl.H"
-#include "uniformDimensionedFields.H"
+#ifdef OPENFOAMESI
+        #include "gravityMeshObject.H"
+#else
+    #include "uniformDimensionedFields.H"
+#endif
 #include "globalPolyPatch.H"
 #if FOAMEXTEND > 40
     #include "oversetMesh.H"
@@ -90,7 +94,11 @@ class fluidModel
         const IOdictionary waveProperties_;
 
         //- Gravitional acceleration
+#ifdef OPENFOAMESI
+        const meshObjects::gravity g_;
+#else
         const uniformDimensionedVectorField g_;
+#endif
 
         //- Velocity field header
         IOobject Uheader_;
@@ -157,12 +165,16 @@ class fluidModel
 
         //- Make the pimple control
         void makePisoControl() const;
-  
+
         //- Make the pimple control
         void makePimpleControl() const;
 
         //- Read g field from disk, if it exists, otherwise return zero field
+#ifdef OPENFOAMESI
+        meshObjects::gravity readG() const;
+#else
         uniformDimensionedVectorField readG() const;
+#endif
 
         //- Disallow default bitwise copy construct
         fluidModel(const fluidModel&);
@@ -193,12 +205,18 @@ protected:
         //- Calculate the Courant number
         void CourantNo(scalar& CoNum, scalar& meanCoNum, scalar& velMag) const;
 
+        //- Calculate the Courant number
+        void CourantNo() const;
+
 #if FOAMEXTEND > 40
         //- Calculate the Courant number
         void oversetCourantNo
         (
             scalar& CoNum, scalar& meanCoNum, scalar& velMag
         ) const;
+
+        //- Calculate the Courant number
+        void oversetCourantNo() const;
 #endif
 
         //- Continuity errors
@@ -287,7 +305,7 @@ public:
 
             //- Return non-const acess to the pimple control
             pisoControl& piso();
-  
+
             //- Return non-const acess to the pimple control
             pimpleControl& pimple();
 
@@ -297,7 +315,11 @@ public:
 #endif
 
             //- Return const gravity field
+#ifdef OPENFOAMESI
+            virtual const meshObjects::gravity& g() const
+#else
             virtual const uniformDimensionedVectorField& g() const
+#endif
             {
                 return g_;
             }

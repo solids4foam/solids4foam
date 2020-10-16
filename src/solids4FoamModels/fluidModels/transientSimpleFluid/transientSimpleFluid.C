@@ -26,12 +26,8 @@ License
 
 #include "transientSimpleFluid.H"
 #include "volFields.H"
-#include "fvm.H"
-#include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
-#include "findRefCell.H"
-#include "adjustPhi.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -56,34 +52,12 @@ transientSimpleFluid::transientSimpleFluid
     const word& region
 )
 :
-    fluidModel(typeName, runTime, region),
-    laminarTransport_(U(), phi()),
-    turbulence_
-    (
-        incompressible::turbulenceModel::New
-        (
-            U(), phi(), laminarTransport_
-        )
-    ),
-    rho_
-    (
-        IOdictionary
-        (
-            IOobject
-            (
-                "transportProperties",
-                runTime.constant(),
-                mesh(),
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        ).lookup("rho")
-    )
+    fluidModel(typeName, runTime, region)
 {
-    UisRequired();
-    pisRequired();
-
-    mesh().schemesDict().setFluxRequired(p().name());
+    notImplemented
+    (
+        "transientSimpleFluid is now deprecated: please use pimpleFluid instead"
+    );
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -98,12 +72,10 @@ tmp<vectorField> transientSimpleFluid::patchViscousForce
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-    tvF() =
-        rho_.value()
-       *(
-            mesh().boundary()[patchID].nf()
-          & (-turbulence_->devReff()().boundaryField()[patchID])
-        );
+    notImplemented
+    (
+        "transientSimpleFluid is now deprecated: please use pimpleFluid instead"
+    );
 
     return tvF;
 }
@@ -119,7 +91,10 @@ tmp<scalarField> transientSimpleFluid::patchPressureForce
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-    tpF() = rho_.value()*p().boundaryField()[patchID];
+    notImplemented
+    (
+        "transientSimpleFluid is now deprecated: please use pimpleFluid instead"
+    );
 
     return tpF;
 }
@@ -127,138 +102,10 @@ tmp<scalarField> transientSimpleFluid::patchPressureForce
 
 bool transientSimpleFluid::evolve()
 {
-    Info<< "Evolving fluid model" << endl;
-
-    fvMesh& mesh = fluidModel::mesh();
-
-    bool meshChanged = false;
-    if (fluidModel::fsiMeshUpdate())
-    {
-        // The FSI interface is in charge of calling mesh.update()
-        meshChanged = fluidModel::fsiMeshUpdateChanged();
-    }
-    else
-    {
-        meshChanged = refCast<dynamicFvMesh>(mesh).update();
-        reduce(meshChanged, orOp<bool>());
-    }
-
-    if (meshChanged)
-    {
-        const Time& runTime = fluidModel::runTime();
-#       include "volContinuity.H"
-    }
-    
-    const int nNonOrthCorr =
-        readInt(fluidProperties().lookup("nNonOrthogonalCorrectors"));
-
-    const int nOuterCorr =
-        readInt(fluidProperties().lookup("nOuterCorrectors"));
-
-    scalar convergenceCriterion = 0;
-    fluidProperties().readIfPresent("convergence", convergenceCriterion);
-
-    // Prepare for the pressure solution
-    label pRefCell = 0;
-    scalar pRefValue = 0.0;
-    setRefCell(p(), fluidProperties(), pRefCell, pRefValue);
-
-    phi().oldTime();
-
-    if (mesh.moving())
-    {
-        // Make the fluxes relative
-        phi() -= fvc::meshPhi(U());
-    }
-        
-    for (int oCorr = 0; oCorr < nOuterCorr; oCorr++)
-    {
-        scalar eqnResidual = 1, maxResidual = 0;
-        p().storePrevIter();
-
-        // Calculate CourantNo
-        {
-            scalar CoNum = 0.0;
-            scalar meanCoNum = 0.0;
-            scalar velMag = 0.0;
-            fluidModel::CourantNo(CoNum, meanCoNum, velMag);
-        }
-
-        // Construct momentum equation
-        fvVectorMatrix UEqn
-        (
-            fvm::ddt(U())
-          + fvm::div(phi(), U())
-          + turbulence_->divDevReff()
-        );
-
-        UEqn.relax();
-
-        // Solve momentum equation
-        eqnResidual =
-            solve(UEqn == -gradp()).initialResidual();
-        maxResidual = max(eqnResidual, maxResidual);
-
-        volScalarField aU = UEqn.A();
-
-        U() = UEqn.H()/aU;
-        phi() = (fvc::interpolate(U()) & mesh.Sf());
-
-#       include "adjustPhi.H"
-
-        for (int nonOrth = 0; nonOrth <= nNonOrthCorr; nonOrth++)
-        {
-            // Construct pressure equation
-            fvScalarMatrix pEqn
-            (
-                fvm::laplacian(1/aU, p()) == fvc::div(phi())
-            );
-
-            // Solve pressure equation
-
-            pEqn.setReference(pRefCell, pRefValue);
-
-            pEqn.solve();
-
-            if (nonOrth == nNonOrthCorr)
-            {
-                phi() -= pEqn.flux();
-            }
-        }
-
-        // Calculate Continuity error
-        fluidModel::continuityErrs();
-
-        // Explicitly relax pressure for momentum corrector
-        p().relax();
-
-        gradp() = fvc::grad(p());
-
-        U() -= gradp()/aU;
-        U().correctBoundaryConditions();
-
-        if (mesh.moving())
-        {
-            // Make the fluxes relative
-            phi() -= fvc::meshPhi(U());
-        }
-
-        turbulence_->correct();
-        
-        if (maxResidual < convergenceCriterion)
-        {
-            Info<< "reached convergence criterion: "
-                << convergenceCriterion << endl;
-            Info<< "Number of iterations: " << oCorr << endl;
-            break;
-        }
-    }
-
-    if (mesh.moving())
-    {
-        // Make the fluxes absolut
-        phi() += fvc::meshPhi(U());
-    }
+    notImplemented
+    (
+        "transientSimpleFluid is now deprecated: please use pimpleFluid instead"
+    );
     
     return 0;
 }

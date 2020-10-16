@@ -29,6 +29,7 @@ License
 #include "logVolFields.H"
 #include "fvc.H"
 #include "fvm.H"
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -59,88 +60,16 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-
-void Foam::neoHookeanElasticMisesPlastic::makeRelF()
-{
-    if (relFPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeRelF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    relFPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "relF",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElasticMisesPlastic::relF()
-{
-    if (!relFPtr_)
-    {
-        makeRelF();
-    }
-
-    return *relFPtr_;
-}
-
-
-void Foam::neoHookeanElasticMisesPlastic::makeRelFf()
-{
-    if (relFfPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeRelFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    relFfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "relFf",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::surfaceTensorField& Foam::neoHookeanElasticMisesPlastic::relFf()
-{
-    if (!relFfPtr_)
-    {
-        makeRelFf();
-    }
-
-    return *relFfPtr_;
-}
-
-
 void Foam::neoHookeanElasticMisesPlastic::makeJ()
 {
-    if (JPtr_)
+    if (JPtr_.valid())
     {
         FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeJ()")
             << "pointer already set" << abort(FatalError);
     }
 
-    JPtr_ =
+    JPtr_.set
+    (
         new volScalarField
         (
             IOobject
@@ -153,33 +82,35 @@ void Foam::neoHookeanElasticMisesPlastic::makeJ()
             ),
             mesh(),
             dimensionedScalar("one", dimless, 1.0)
-        );
+        )
+    );
 
     // Store the old-time
-    JPtr_->oldTime();
+    JPtr_().oldTime();
 }
 
 
 Foam::volScalarField& Foam::neoHookeanElasticMisesPlastic::J()
 {
-    if (!JPtr_)
+    if (JPtr_.empty())
     {
         makeJ();
     }
 
-    return *JPtr_;
+    return JPtr_();
 }
 
 
 void Foam::neoHookeanElasticMisesPlastic::makeJf()
 {
-    if (JfPtr_)
+    if (JfPtr_.valid())
     {
         FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeJf()")
             << "pointer already set" << abort(FatalError);
     }
 
-    JfPtr_ =
+    JfPtr_.set
+    (
         new surfaceScalarField
         (
             IOobject
@@ -192,99 +123,22 @@ void Foam::neoHookeanElasticMisesPlastic::makeJf()
             ),
             mesh(),
             dimensionedScalar("one", dimless, 1.0)
-        );
+        )
+    );
 
     // Store the old-time
-    JfPtr_->oldTime();
+    JfPtr_().oldTime();
 }
 
 
 Foam::surfaceScalarField& Foam::neoHookeanElasticMisesPlastic::Jf()
 {
-    if (!JfPtr_)
+    if (JfPtr_.empty())
     {
         makeJf();
     }
 
-    return *JfPtr_;
-}
-
-
-void Foam::neoHookeanElasticMisesPlastic::makeF()
-{
-    if (FPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "lawF",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-
-    // Store the old-time
-    FPtr_->oldTime();
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElasticMisesPlastic::F()
-{
-    if (!FPtr_)
-    {
-        makeF();
-    }
-
-    return *FPtr_;
-}
-
-
-void Foam::neoHookeanElasticMisesPlastic::makeFf()
-{
-    if (FfPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlastic::makeFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "lawFf",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-
-    // Store the old-time
-    FfPtr_->oldTime();
-}
-
-
-Foam::surfaceTensorField& Foam::neoHookeanElasticMisesPlastic::Ff()
-{
-    if (!FfPtr_)
-    {
-        makeFf();
-    }
-
-    return *FfPtr_;
+    return JfPtr_();
 }
 
 
@@ -442,11 +296,19 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    volScalarField& Ibar = tIbar.ref();
+
+    // Take reference to internal fields for efficiency
+    scalarField& IbarI = Ibar.primitiveFieldRef();
+    const symmTensorField devBEbarI = devBEbar.primitiveField();
+#else
     volScalarField& Ibar = tIbar();
 
     // Take reference to internal fields for efficiency
     scalarField& IbarI = Ibar.internalField();
     const symmTensorField devBEbarI = devBEbar.internalField();
+#endif
 
     // Calculate internal field
     forAll(IbarI, cellI)
@@ -488,7 +350,11 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
         )
         {
             // Take reference to patch fields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+            scalarField& IbarP = Ibar.boundaryFieldRef()[patchI];
+#else
             scalarField& IbarP = Ibar.boundaryField()[patchI];
+#endif
             const symmTensorField& devBEbarP =
                 devBEbar.boundaryField()[patchI];
 
@@ -578,11 +444,19 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    surfaceScalarField& Ibar = tIbar.ref();
+
+    // Take reference to internal fields for efficiency
+    scalarField& IbarI = Ibar.primitiveFieldRef();
+    const symmTensorField devBEbarI = devBEbar.primitiveField();
+#else
     surfaceScalarField& Ibar = tIbar();
 
     // Take reference to internal fields for efficiency
     scalarField& IbarI = Ibar.internalField();
     const symmTensorField devBEbarI = devBEbar.internalField();
+#endif
 
     // Calculate internal field
     forAll(IbarI, cellI)
@@ -624,7 +498,11 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
         )
         {
             // Take reference to patch fields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+            scalarField& IbarP = Ibar.boundaryFieldRef()[patchI];
+#else
             scalarField& IbarP = Ibar.boundaryField()[patchI];
+#endif
             const symmTensorField& devBEbarP =
                 devBEbar.boundaryField()[patchI];
 
@@ -665,7 +543,9 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
         }
     }
 
+#ifndef OPENFOAMESIORFOUNDATION
     Ibar.correctBoundaryConditions();
+#endif
 
     return tIbar;
 }
@@ -687,28 +567,9 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
-    relFPtr_(NULL),
-    relFfPtr_(NULL),
-    JPtr_(NULL),
-    JfPtr_(NULL),
-    FPtr_(NULL),
-    FfPtr_(NULL),
+    JPtr_(),
+    JfPtr_(),
     stressPlasticStrainSeries_(dict),
-    sigmaHyd_
-    (
-        IOobject
-        (
-            "sigmaHyd",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0.0),
-        zeroGradientFvPatchScalarField::typeName
-    ),
-    smoothPressure_(dict.lookupOrDefault<Switch>("smoothPressure", true)),
     sigmaY_
     (
         IOobject
@@ -1007,8 +868,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     plasticN_.oldTime();
     bEbar_.oldTime();
 
-    Info<< "    smoothPressure: " << smoothPressure_ << nl
-        << "    updateBEbarConsistent: " << updateBEbarConsistent_ << endl;
+    Info<< "    updateBEbarConsistent: " << updateBEbarConsistent_ << endl;
 
     // Read elastic parameters
     // The user can specify E and nu or mu and K
@@ -1085,14 +945,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::neoHookeanElasticMisesPlastic::~neoHookeanElasticMisesPlastic()
-{
-    deleteDemandDrivenData(relFPtr_);
-    deleteDemandDrivenData(relFfPtr_);
-    deleteDemandDrivenData(JPtr_);
-    deleteDemandDrivenData(JfPtr_);
-    deleteDemandDrivenData(FPtr_);
-    deleteDemandDrivenData(FfPtr_);
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -1161,60 +1014,12 @@ Foam::neoHookeanElasticMisesPlastic::impK() const
 
 void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateF(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        // Update the relative deformation gradient
-        relF() = I + gradDD.T();
-
-        // Update the total deformation gradient
-        F() = relF() & F().oldTime();
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            // Lookup gradient of displacement increment
-            const volTensorField& gradDD =
-                mesh().lookupObject<volTensorField>("grad(DD)");
-
-            // Update the total deformation gradient
-            // Note: grad is wrt reference configuration
-            F() = F().oldTime() + gradDD.T();
-
-            // Update the relative deformation gradient
-            relF() = F() & inv(F().oldTime());
-        }
-        else
-        {
-            // Lookup gradient of displacement
-            const volTensorField& gradD =
-                mesh().lookupObject<volTensorField>("grad(D)");
-
-            // Update the total deformation gradient
-            F() = I + gradD.T();
-
-            // Update the relative deformation gradient
-            relF() = F() & inv(F().oldTime());
-        }
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            type() + "::correct(volSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Update the Jacobian of the total deformation gradient
@@ -1245,7 +1050,11 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     DEpsilonP_.storePrevIter();
 
     // Normalise residual in Newton method with respect to mag(bE)
+#ifdef OPENFOAMESIORFOUNDATION
+    const scalar maxMagBE = max(gMax(mag(bEbarTrial_.primitiveField())), SMALL);
+#else
     const scalar maxMagBE = max(gMax(mag(bEbarTrial_.internalField())), SMALL);
+#endif
 
     // Trial yield function
     // sigmaY is the Cauchy yield stress so we scale it by J
@@ -1255,6 +1064,17 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     const scalar magHp = mag(Hp_);
 
     // Take references to the internal fields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+    const scalarField& fTrialI = fTrial.primitiveField();
+    const symmTensorField& sTrialI = sTrial.primitiveField();
+    symmTensorField& plasticNI = plasticN_.primitiveFieldRef();
+    scalarField& DSigmaYI = DSigmaY_.primitiveFieldRef();
+    scalarField& DLambdaI = DLambda_.primitiveFieldRef();
+    const scalarField& muBarI = muBar.primitiveField();
+    const scalarField& JI = J().primitiveField();
+    const scalarField& sigmaYI = sigmaY_.primitiveField();
+    const scalarField& epsilonPEqOldI = epsilonPEq_.oldTime().primitiveField();
+#else
     const scalarField& fTrialI = fTrial.internalField();
     const symmTensorField& sTrialI = sTrial.internalField();
     symmTensorField& plasticNI = plasticN_.internalField();
@@ -1264,6 +1084,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     const scalarField& JI = J().internalField();
     const scalarField& sigmaYI = sigmaY_.internalField();
     const scalarField& epsilonPEqOldI = epsilonPEq_.oldTime().internalField();
+#endif
 
     // Calculate DLambda_ and plasticN_
     forAll(fTrialI, cellI)
@@ -1325,9 +1146,15 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
         // Take references to the boundary patch fields for efficiency
         const scalarField& fTrialP = fTrial.boundaryField()[patchI];
         const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+        symmTensorField& plasticNP = plasticN_.boundaryFieldRef()[patchI];
+        scalarField& DSigmaYP = DSigmaY_.boundaryFieldRef()[patchI];
+        scalarField& DLambdaP = DLambda_.boundaryFieldRef()[patchI];
+#else
         symmTensorField& plasticNP = plasticN_.boundaryField()[patchI];
         scalarField& DSigmaYP = DSigmaY_.boundaryField()[patchI];
         scalarField& DLambdaP = DLambda_.boundaryField()[patchI];
+#endif
         const scalarField& muBarP = muBar.boundaryField()[patchI];
         const scalarField& JP = J().boundaryField()[patchI];
         const scalarField& sigmaYP = sigmaY_.boundaryField()[patchI];
@@ -1409,118 +1236,25 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     }
 
     // Update hydrostatic stress (negative of pressure)
-    if (smoothPressure_)
-    {
-        // Calculate the hydrostatic pressure by solving a Laplace equation;
-        // this ensures smoothness of the field and quells oscillations
-
-        // Lookup the momentum equation inverse diagonal field
-        const volScalarField AD = mesh().lookupObject<volScalarField>("DEqnA");
-
-        // Pressure diffusivity field
-        // Note: (4.0/3.0)*mu + K == 2*mu + lambda
-        const surfaceScalarField rDAf
-        (
-            "rDAf",
-            fvc::interpolate
-            (
-                ((4.0/3.0)*mu_ + K_)/AD, "interpolate(grad(sigmaHyd))"
-            )
-        );
-
-        const dimensionedScalar one("one", dimless, 1.0);
-        //const dimensionedScalar fac(dict().lookup("smoothFactor"));
-
-        // Construct the pressure equation
-        fvScalarMatrix sigmaHydEqn
-        (
-            fvm::Sp(one, sigmaHyd_)
-          - fvm::laplacian(rDAf, sigmaHyd_, "laplacian(DDD,DD)")
-         ==
-            0.5*K_*(pow(J(), 2.0) - 1.0)
-          - fvc::div(rDAf*fvc::interpolate(fvc::grad(sigmaHyd_)) & mesh().Sf())
-        );
-
-        // Store the pressue field to allow under-relaxation
-        sigmaHyd_.storePrevIter();
-
-        // Under-relax the linear system
-        sigmaHydEqn.relax(0.7);
-
-        // Solve the pressure equation
-        sigmaHydEqn.solve();
-
-        // Under-relax the pressure field
-        sigmaHyd_.relax(0.2);
-    }
-    else
-    {
-        // Calculate the hydrostatic pressure directly from the displacement
-        // field
-        sigmaHyd_ = 0.5*K_*(pow(J(), 2.0) - 1.0);
-    }
+    updateSigmaHyd
+    (
+        0.5*K_*(pow(J(), 2.0) - 1.0),
+        (4.0/3.0)*mu_ + K_
+    );
 
     // Update the Cauchy stress
-    sigma = (1.0/J())*(sigmaHyd_*I + s);
+    sigma = (1.0/J())*(sigmaHyd()*I + s);
 }
 
 
 void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateFf(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-        // Update the relative deformation gradient
-        relFf() = I + gradDD.T();
-
-        // Update the total deformation gradient
-        Ff() = relFf() & Ff().oldTime();
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            // Lookup gradient of displacement increment
-            const surfaceTensorField& gradDD =
-                mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-            // Update the total deformation gradient
-            // Note: grad is wrt reference configuration
-            Ff() = Ff().oldTime() + gradDD.T();
-
-            // Update the relative deformation gradient
-            relFf() = Ff() & inv(Ff().oldTime());
-        }
-        else
-        {
-            // Lookup gradient of displacement
-            const surfaceTensorField& gradD =
-                mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-            // Update the total deformation gradient
-            Ff() = I + gradD.T();
-
-            // Update the relative deformation gradient
-            relFf() = Ff() & inv(Ff().oldTime());
-        }
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            type() + "::correct(surfaceSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Update the Jacobian of the total deformation gradient
@@ -1551,7 +1285,11 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     DEpsilonPf_.storePrevIter();
 
     // Normalise residual in Newton method with respect to mag(bE)
+#ifdef OPENFOAMESIORFOUNDATION
+    const scalar maxMagBE = max(gMax(mag(bEbarTrialf_.primitiveField())), SMALL);
+#else
     const scalar maxMagBE = max(gMax(mag(bEbarTrialf_.internalField())), SMALL);
+#endif
 
     // Trial yield function
     // sigmaY is the Cauchy yield stress so we scale it by J
@@ -1562,6 +1300,17 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     const scalar magHp = mag(Hp_);
 
     // Take references to the internal fields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+    const scalarField& fTrialI = fTrial.primitiveField();
+    const symmTensorField& sTrialI = sTrial.primitiveField();
+    symmTensorField& plasticNI = plasticNf_.primitiveFieldRef();
+    scalarField& DSigmaYI = DSigmaYf_.primitiveFieldRef();
+    scalarField& DLambdaI = DLambdaf_.primitiveFieldRef();
+    const scalarField& muBarI = muBar.primitiveField();
+    const scalarField& JI = Jf().primitiveField();
+    const scalarField& sigmaYI = sigmaYf_.primitiveField();
+    const scalarField& epsilonPEqOldI = epsilonPEqf_.oldTime().primitiveField();
+#else
     const scalarField& fTrialI = fTrial.internalField();
     const symmTensorField& sTrialI = sTrial.internalField();
     symmTensorField& plasticNI = plasticNf_.internalField();
@@ -1571,7 +1320,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     const scalarField& JI = Jf().internalField();
     const scalarField& sigmaYI = sigmaYf_.internalField();
     const scalarField& epsilonPEqOldI = epsilonPEqf_.oldTime().internalField();
-
+#endif
 
     // Calculate DLambdaf_ and plasticNf_
     forAll(fTrialI, faceI)
@@ -1636,9 +1385,15 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
             // Take references to the boundary patch fields for efficiency
             const scalarField& fTrialP = fTrial.boundaryField()[patchI];
             const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+            symmTensorField& plasticNP = plasticNf_.boundaryFieldRef()[patchI];
+            scalarField& DSigmaYP = DSigmaYf_.boundaryFieldRef()[patchI];
+            scalarField& DLambdaP = DLambdaf_.boundaryFieldRef()[patchI];
+#else
             symmTensorField& plasticNP = plasticNf_.boundaryField()[patchI];
             scalarField& DSigmaYP = DSigmaYf_.boundaryField()[patchI];
             scalarField& DLambdaP = DLambdaf_.boundaryField()[patchI];
+#endif
             const scalarField& muBarP = muBar.boundaryField()[patchI];
             const scalarField& JP = Jf().boundaryField()[patchI];
             const scalarField& sigmaYP = sigmaYf_.boundaryField()[patchI];
@@ -1701,9 +1456,11 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
         }
     }
 
+#ifndef OPENFOAMESIORFOUNDATION
     DSigmaYf_.correctBoundaryConditions();
     DLambdaf_.correctBoundaryConditions();
     plasticNf_.correctBoundaryConditions();
+#endif
 
     // Update DEpsilonP and DEpsilonPEq
     DEpsilonPEqf_ = sqrtTwoOverThree_*DLambdaf_;
@@ -1725,6 +1482,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     }
 
     // Update the Cauchy stress
+    // Note: updayeSigmaHyd is not implemented for surface fields
     sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
 }
 
@@ -1734,13 +1492,23 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::residual()
     // Calculate residual based on change in plastic strain increment
     if
     (
-        mesh().db().lookupObject<fvMesh>
+        mesh().time().lookupObject<fvMesh>
         (
             baseMeshRegionName()
         ).foundObject<surfaceTensorField>("Ff")
     )
     {
         return
+#ifdef OPENFOAMESIORFOUNDATION
+            gMax
+            (
+                mag
+                (
+                    DEpsilonPf_.primitiveField()
+                  - DEpsilonPf_.prevIter().primitiveField()
+                )
+            )/gMax(SMALL + mag(DEpsilonPf_.prevIter().primitiveField()));
+#else
             gMax
             (
                 mag
@@ -1749,10 +1517,21 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::residual()
                   - DEpsilonPf_.prevIter().internalField()
                 )
             )/gMax(SMALL + mag(DEpsilonPf_.prevIter().internalField()));
+#endif
     }
     else
     {
         return
+#ifdef OPENFOAMESIORFOUNDATION
+            gMax
+            (
+                mag
+                (
+                    DEpsilonP_.primitiveField()
+                  - DEpsilonP_.prevIter().primitiveField()
+                )
+            )/gMax(SMALL + mag(DEpsilonP_.prevIter().primitiveField()));
+#else
             gMax
             (
                 mag
@@ -1761,6 +1540,7 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::residual()
                   - DEpsilonP_.prevIter().internalField()
                 )
             )/gMax(SMALL + mag(DEpsilonP_.prevIter().internalField()));
+#endif
     }
 }
 
@@ -1780,6 +1560,20 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
     // Count cells actively yielding
     int numCellsYielding = 0;
 
+#ifdef OPENFOAMESIORFOUNDATION
+    forAll(activeYield_.primitiveField(), celli)
+    {
+        if (DEpsilonPEq_.primitiveField()[celli] > SMALL)
+        {
+            activeYield_.primitiveFieldRef()[celli] = 1.0;
+            numCellsYielding++;
+        }
+        else
+        {
+            activeYield_.primitiveFieldRef()[celli] = 0.0;
+        }
+    }
+#else
     forAll(activeYield_.internalField(), celli)
     {
         if (DEpsilonPEq_.internalField()[celli] > SMALL)
@@ -1792,6 +1586,7 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
             activeYield_.internalField()[celli] = 0.0;
         }
     }
+#endif
 
     reduce(numCellsYielding, sumOp<int>());
 
@@ -1803,11 +1598,19 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
             {
                 if (DEpsilonPEq_.boundaryField()[patchi][facei] > SMALL)
                 {
+#ifdef OPENFOAMESIORFOUNDATION
+                    activeYield_.boundaryFieldRef()[patchi][facei] = 1.0;
+#else
                     activeYield_.boundaryField()[patchi][facei] = 1.0;
+#endif
                 }
                 else
                 {
+#ifdef OPENFOAMESIORFOUNDATION
+                    activeYield_.boundaryFieldRef()[patchi][facei] = 0.0;
+#else
                     activeYield_.boundaryField()[patchi][facei] = 0.0;
+#endif
                 }
             }
         }
@@ -1833,15 +1636,15 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
     // in large deformation finite element analysis, Finite Elements in
     // Analysis and Design 16 (1994) 99-139.
 
-    // Update the total deformatio gradient
-    if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
-    {
-        F() = fvc::average(relFf()) & F().oldTime();
-    }
-    else
-    {
-        F() = relF() & F().oldTime();
-    }
+    // Update the total deformatio gradient: already done by updateF
+    // if (mesh().foundObject<surfaceTensorField>("grad(DD)f"))
+    // {
+    //     F() = fvc::average(relFf()) & F().oldTime();
+    // }
+    // else
+    // {
+    //     F() = relF() & F().oldTime();
+    // }
 
     // Calculate the total true (Hencky) strain
     const volSymmTensorField epsilon = 0.5*log(symm(F().T() & F()));
@@ -1850,10 +1653,17 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
     const volScalarField epsilonEq = sqrt((2.0/3.0)*magSqr(dev(epsilon)));
 
     // Take reference to internal fields
+#ifdef OPENFOAMESIORFOUNDATION
+    const symmTensorField& DEpsilonPI = DEpsilonP_.primitiveField();
+    const symmTensorField& plasticNI = plasticN_.primitiveField();
+    const symmTensorField& plasticNIold = plasticN_.oldTime().primitiveField();
+    const scalarField& epsilonEqI = epsilonEq.primitiveField();
+#else
     const symmTensorField& DEpsilonPI = DEpsilonP_.internalField();
     const symmTensorField& plasticNI = plasticN_.internalField();
     const symmTensorField& plasticNIold = plasticN_.oldTime().internalField();
     const scalarField& epsilonEqI = epsilonEq.internalField();
+#endif
 
     // Calculate error field
     const symmTensorField DEpsilonPErrorI =

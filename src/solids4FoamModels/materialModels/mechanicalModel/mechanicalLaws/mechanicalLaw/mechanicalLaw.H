@@ -72,8 +72,49 @@ class mechanicalLaw
         //- Nonlinear geometry enumerator
         const nonLinearGeometry::nonLinearType nonLinGeom_;
 
+        // Total deformation gradient volField
+        autoPtr<volTensorField> FPtr_;
+
+        // Total deformation gradient surfaceField
+        autoPtr<surfaceTensorField> FfPtr_;
+
+        //- Relative deformation gradient volField
+        autoPtr<volTensorField> relFPtr_;
+
+        //- Relative deformation gradient surfaceField
+        autoPtr<surfaceTensorField> relFfPtr_;
+
+        //- Switch to enable solution of pressure Laplacian equation
+        //  This can help quell oscillations in the hydrostatic stress
+        const Switch solvePressureEqn_;
+
+        //- Optional: it is possible to scale the amount of smoothing in the
+        //  pressure equation with this coefficient
+        const scalar pressureSmoothingScaleFactor_;
+
+        // Hydrostatic stress (negative of hydrostatic pressure) volField
+        autoPtr<volScalarField> sigmaHydPtr_;
+
+        // Gradient of the hydrostatic stress field
+        autoPtr<volVectorField> gradSigmaHydPtr_;
+
 
     // Private Member Functions
+
+        //- Make the F field
+        void makeF();
+
+        //- Make the Ff field
+        void makeFf();
+
+        //- Make the relF field
+        void makeRelF();
+
+        //- Make the relFf field
+        void makeRelFf();
+
+        //- Make the sigmaHyd field
+        void makeSigmaHyd();
 
         //- Disallow copy construct
         mechanicalLaw(const mechanicalLaw&);
@@ -108,11 +149,62 @@ protected:
         //- Return const access to the base mesh
         const fvMesh& baseMesh() const
         {
-            return mesh().db().lookupObject<fvMesh>
+            return mesh().time().lookupObject<fvMesh>
             (
                 baseMeshRegionName()
             );
         }
+
+        //- Return a reference to the F field
+        volTensorField& F();
+
+        //- Return a reference to the Ff field
+        surfaceTensorField& Ff();
+
+        //- Return a reference to the relF field
+        volTensorField& relF();
+
+        //- Return a reference to the relFf field
+        surfaceTensorField& relFf();
+
+        //- Return a reference to the sigmaHyd field
+        volScalarField& sigmaHyd();
+
+        //- Return a reference to the gradSigmaHyd field
+        volVectorField& gradSigmaHyd();
+
+        //- Update the deformation gradient
+        //  The lienarised shear and bulk modulii are used to enforce linear
+        //  elasticity in the case that the enforceLinear flag is tripped by the
+        //  solid model
+        //  true is returned if enforceLinear is true (linear elasticity is
+        //  enforced)
+        bool updateF
+        (
+            volSymmTensorField& sigma,
+            const dimensionedScalar& mu,
+            const dimensionedScalar& K
+        );
+
+        //- Equivalent to the updateF function, except instead for the Ff
+        //  surface field
+        bool updateFf
+        (
+            surfaceSymmTensorField& sigma,
+            const dimensionedScalar& mu,
+            const dimensionedScalar& K
+        );
+
+        //- Update the hydrostatic stress field by solving a diffusion equation.
+        //  An explicit calculation of sigmaHyd is passed as an argument.
+        //  Passing a zero will enforce incompressibility, although for
+        //  covergence it may be better to pass a penalty calculation of
+        //  sigmaHyd
+        void updateSigmaHyd
+        (
+            const volScalarField& sigmaHydExplicit,
+            const dimensionedScalar& impK
+        );
 
         //- Lookup the enforceLinear Switch in the solidModel
         const Switch& enforceLinear() const;

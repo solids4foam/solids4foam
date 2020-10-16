@@ -196,78 +196,6 @@ Foam::StVenantKirchhoffOrthotropicElastic::elasticCf() const
 }
 
 
-void Foam::StVenantKirchhoffOrthotropicElastic::makeF()
-{
-    if (FPtr_)
-    {
-        FatalErrorIn("void Foam::StVenantKirchhoffOrthotropicElastic::makeF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "F",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::volTensorField& Foam::StVenantKirchhoffOrthotropicElastic::F()
-{
-    if (!FPtr_)
-    {
-        makeF();
-    }
-
-    return *FPtr_;
-}
-
-
-void Foam::StVenantKirchhoffOrthotropicElastic::makeFf()
-{
-    if (FfPtr_)
-    {
-        FatalErrorIn("void Foam::StVenantKirchhoffOrthotropicElastic::makeFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "Ff",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::surfaceTensorField& Foam::StVenantKirchhoffOrthotropicElastic::Ff()
-{
-    if (!FfPtr_)
-    {
-        makeFf();
-    }
-
-    return *FfPtr_;
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -293,6 +221,8 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
     G12_(dict.lookup("G12")),
     G23_(dict.lookup("G23")),
     G31_(dict.lookup("G31")),
+    mu_("mu", dimPressure, 0.0),
+    K_("K", dimPressure, 0.0),
     elasticCPtr_(NULL),
     elasticCfPtr_(NULL),
     matDir_
@@ -338,9 +268,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
                 )
             )
         )
-    ),
-    FPtr_(NULL),
-    FfPtr_(NULL)
+    )
 {
     if (planeStress())
     {
@@ -444,6 +372,11 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
 
     // Normalise the direction vectors
     matDir_ /= mag(matDir_);
+
+    // Initialise mu and K
+    mu_ = (G12_ + G23_ + G31_)/3.0;
+    const dimensionedScalar averageE = (E1_ + E2_ + E3_)/3.0;
+    K_ = averageE*mu_/(3*(3*mu_ - averageE));
 }
 
 
@@ -454,8 +387,6 @@ Foam::StVenantKirchhoffOrthotropicElastic::
 {
     deleteDemandDrivenData(elasticCPtr_);
     deleteDemandDrivenData(elasticCfPtr_);
-    deleteDemandDrivenData(FPtr_);
-    deleteDemandDrivenData(FfPtr_);
 }
 
 
@@ -520,51 +451,12 @@ void Foam::StVenantKirchhoffOrthotropicElastic::correct
     volSymmTensorField& sigma
 )
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateF(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        // Calculate the relative deformation gradient
-        const volTensorField relF = I + gradDD.T();
-
-        // Update the total deformation gradient
-        F() = relF & F().oldTime();
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        // Update the total deformation gradient
-        F() = I + gradD.T();
-
-        // Calculate the relative deformation gradient: not needed
-        //relF = F() & inv(F().oldTime());
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            type() + "::correct(volSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Calculate the right Cauchy–Green deformation tensor
@@ -590,51 +482,12 @@ void Foam::StVenantKirchhoffOrthotropicElastic::correct
     surfaceSymmTensorField& sigma
 )
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateFf(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-        // Calculate the relative deformation gradient
-        const surfaceTensorField relFf = I + gradDD.T();
-
-        // Update the total deformation gradient
-        Ff() = relFf & Ff().oldTime();
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement
-        const surfaceTensorField& gradD =
-            mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-        // Update the total deformation gradient
-        Ff() = I + gradD.T();
-
-        // Calculate the relative deformation gradient: not needed
-        //relFf() = Ff() & inv(Ff().oldTime());
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            type() + "::correct(surfaceSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Calculate the right Cauchy–Green deformation tensor

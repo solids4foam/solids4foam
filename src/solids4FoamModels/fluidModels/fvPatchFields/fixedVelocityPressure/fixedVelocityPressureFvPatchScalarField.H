@@ -36,7 +36,6 @@ SourceFiles
 #ifndef fixedVelocityPressureFvPatchScalarFields_H
 #define fixedVelocityPressureFvPatchScalarFields_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
 
@@ -131,7 +130,11 @@ public:
 //         //- Evaluate the patch field
 //         virtual void evaluate
 //         (
-//             const Pstream::commsTypes commsType=Pstream::blocking
+// #ifdef OPENFOAMESIORFOUNDATION
+//             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
+// #else
+//             const Pstream::commsTypes commsType = Pstream::blocking
+// #endif
 //         );
 
 

@@ -119,8 +119,14 @@ bool nonLinGeomTotalLagSolid::evolve()
     Info<< "Evolving solid solver" << endl;
 
     int iCorr = 0;
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solverPerfDD;
+    SolverPerformance<vector>::debug = 0;
+#else
     lduSolverPerformance solverPerfDD;
     blockLduMatrix::debug = 0;
+#endif
+
 
     Info<< "Solving the total Lagrangian form of the momentum equation for DD"
         << endl;
@@ -143,7 +149,7 @@ bool nonLinGeomTotalLagSolid::evolve()
           - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           + fvc::div(J_*Finv_ & sigma(), "div(sigma)")
           + rho()*g()
-          + mechanical().RhieChowCorrection(DD(), gradDD())
+          + stabilisation().stabilisation(DD(), gradDD(), impK_)
         );
 
         // Enforce linear to improve convergence
@@ -210,8 +216,21 @@ bool nonLinGeomTotalLagSolid::evolve()
        !converged
         (
             iCorr,
+#ifdef OPENFOAMESIORFOUNDATION
+            mag(solverPerfDD.initialResidual()),
+            max
+            (
+                solverPerfDD.nIterations()[0],
+                max
+                (
+                    solverPerfDD.nIterations()[1],
+                    solverPerfDD.nIterations()[2]
+                )
+            ),
+#else
             solverPerfDD.initialResidual(),
             solverPerfDD.nIterations(),
+#endif
             DD()
         ) && ++iCorr < nCorr()
     );
@@ -228,7 +247,9 @@ bool nonLinGeomTotalLagSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
+#ifndef OPENFOAMESIORFOUNDATION
     blockLduMatrix::debug = 1;
+#endif
 
     return true;
 }

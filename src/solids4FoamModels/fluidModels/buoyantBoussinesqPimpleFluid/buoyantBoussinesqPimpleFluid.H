@@ -50,6 +50,9 @@ Author
     Philip Cardiff, UCD. All rights reserved.
     Zeljko Tukovic, FSB Zagreb.  All rights reserved.
 
+Modified by
+    Danial Khazaei, NIT. All rights reserved.
+
 SourceFiles
     buoyantBoussinesqPimpleFluid.C
 
@@ -60,9 +63,16 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#include "turbulenceModel.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "turbulentTransportModel.H"
+    #include "fvOptions.H"
+#else
+    #include "turbulenceModel.H"
+#endif
+#ifdef OPENFOAMFOUNDATION
+    #include "noRadiation.H"
+#endif
 #include "pimpleControl.H"
-#include "fvm.H"
 #include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -83,11 +93,17 @@ class buoyantBoussinesqPimpleFluid
 {
     // Private data
 
-        //- Temperature
+        //- Pressure field
+        volScalarField p_rgh_;
+
+        //- Temperature field
         volScalarField T_;
 
         //- Transport model
         singlePhaseTransportModel laminarTransport_;
+
+        //- Fluid density [kg/m3]
+        dimensionedScalar rho_;
 
         //- Thermal expansion coefficient [1/K]
         dimensionedScalar beta_;
@@ -104,20 +120,35 @@ class buoyantBoussinesqPimpleFluid
         //- Turbulent Transport model
         autoPtr<incompressible::turbulenceModel> turbulence_;
 
-        //- Effective fluid conductivity
-        volScalarField kappaEff_;
+        //- Effective fluid thermal diffusivity
+        volScalarField alphaEff_;
 
-        //- Density
-        dimensionedScalar rho_;
+        //- Reference height field
+        uniformDimensionedScalarField hRef_;
 
-        //- Gravitional acceleration
-        const uniformDimensionedVectorField g_;
+        //- gravity*reference height
+        dimensionedScalar ghRef_;
 
-        //- Beta*(g*h) field
-        surfaceScalarField betaghf_;
+        //- gravity*height
+        volScalarField gh_;
+
+        //- gravity*height: face-interpolated
+        surfaceScalarField ghf_;
 
         //- Kinematic density for buoyancy force
         volScalarField rhok_;
+
+#ifdef OPENFOAMFOUNDATION
+        // Create incompressible radiation model
+        autoPtr<radiationModel> radiation_;
+
+        dimensionedScalar rhoCpRef_;
+#endif
+
+#ifdef OPENFOAMESIORFOUNDATION
+        //- Create finite volume options
+        fv::options& fvOptions_;
+#endif
 
         //- Reference pressure cell
         label pRefCell_;
@@ -137,7 +168,7 @@ class buoyantBoussinesqPimpleFluid
         //- Solve pressure equation
         void solvePEqn
         (
-            tmp<fvVectorMatrix>& UEqn
+            const fvVectorMatrix& UEqn
         );
 
         //- Disallow default bitwise copy construct

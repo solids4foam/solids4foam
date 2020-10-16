@@ -56,7 +56,11 @@ addToRunTimeSelectionTable(solidModel, weakThermalLinGeomSolid, dictionary);
 bool weakThermalLinGeomSolid::converged
 (
     const int iCorr,
+#ifdef OPENFOAMESIORFOUNDATION
+    const SolverPerformance<scalar>& solverPerfT,
+#else
     const lduSolverPerformance& solverPerfT,
+#endif
     const volScalarField& T
 )
 {
@@ -65,16 +69,29 @@ bool weakThermalLinGeomSolid::converged
 
     // Calculate relative residuals
     const scalar absResidualT =
-        gMax(mag(T.internalField() - T.oldTime().internalField()));
-    const scalar residualT =
         gMax
         (
-            mag(T.internalField() - T.prevIter().internalField())
-           /max
+#ifdef OPENFOAMESIORFOUNDATION
+            DimensionedField<double, volMesh>
+#endif
             (
-                gMax(mag(T.internalField() - T.oldTime().internalField())),
-                SMALL
+                mag(T.internalField() - T.prevIter().internalField())
             )
+        );
+    const scalar residualT =
+        absResidualT
+       /max
+        (
+            gMax
+            (
+#ifdef OPENFOAMESIORFOUNDATION
+                DimensionedField<double, volMesh>
+#endif
+                (
+                    mag(T.internalField() - T.oldTime().internalField())
+                )
+            ),
+            SMALL
         );
 
     // If one of the residuals has converged to an order of magnitude
@@ -216,8 +233,13 @@ bool weakThermalLinGeomSolid::evolve()
     Info << "Evolving thermal solid solver" << endl;
 
     int iCorr = 0;
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<scalar> solverPerfT;
+    SolverPerformance<vector>::debug = 0;
+#else
     lduSolverPerformance solverPerfT;
     blockLduMatrix::debug = 0;
+#endif
 
     Info<< "Solving the energy equation for T" << endl;
 
@@ -253,7 +275,11 @@ bool weakThermalLinGeomSolid::evolve()
     // thermal stress is to be included in the momentum equation.
     linGeomTotalDispSolid::evolve();
 
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<scalar>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
+#endif
 
     return true;
 }

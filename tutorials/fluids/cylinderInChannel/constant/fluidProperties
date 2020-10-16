@@ -15,26 +15,10 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 fluidModel icoFluid;
-// fluidModel pisoFluid;
+//fluidModel pisoFluid;
+//fluidModel pimpleFluid;
 
-// fluidModel transientSimpleFluid;
-
-icoFluidCoeffs
+"icoFluidCoeffs|pisoFluidCoeffs|pimpleFluidCoeffs"
 {}
-
-pisoFluidCoeffs
-{}
-
-transientSimpleFluidCoeffs
-{
-    nOuterCorrectors 200;
-    nNonOrthogonalCorrectors 0;
-    pRefCell        0;
-    pRefValue       0;
-
-    convergence 1e-7;
-
-    consistencyByJasak no;
-}
 
 // ************************************************************************* //

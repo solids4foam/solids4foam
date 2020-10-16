@@ -1,36 +1,66 @@
-#!/bin/sh
+#!/bin/bash
 
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# Create solid mesh
-\cp system/solid/meshDict system/
-runApplication -l log.cartesian2DMesh.solid cartesian2DMesh
-mkdir constant/solid/polyMesh
-\mv constant/polyMesh/* constant/solid/polyMesh/
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
 
-# Create fluid mesh
-\cp system/fluid/meshDict system/
-runApplication -l log.cartesian2DMesh.fluid cartesian2DMesh 
-mkdir constant/fluid/polyMesh
-\mv constant/polyMesh/* constant/fluid/polyMesh/
+# Check case version is correct
+solids4Foam::convertCaseFormat .
 
-# Correct patch types
-runApplication -l log.createPatch.fluid createPatch -overwrite -region fluid
-runApplication -l log.createPatch.solid createPatch -overwrite -region solid
+if [[ "${WM_PROJECT}" == "foam" ]]
+then
+    # Create solid mesh
+    \cp system/solid/meshDict system/
+    runApplication -l log.cartesian2DMesh.solid cartesian2DMesh
+    mkdir constant/solid/polyMesh
+    \mv constant/polyMesh/* constant/solid/polyMesh/
 
-# Scale from microns to metres
-echo "Running transformPoints on the fluid"
-transformPoints -scale "(1e-6 1e-6 1e-6)" -region fluid > log.transformPoints.fluid
-echo "Running transformPoints on the solid"
-transformPoints -scale "(1e-6 1e-6 1e-6)" -region solid > log.transformPoints.solid
+    # Create fluid mesh
+    \cp system/fluid/meshDict system/
+    runApplication -l log.cartesian2DMesh.fluid cartesian2DMesh 
+    mkdir constant/fluid/polyMesh
+    \mv constant/polyMesh/* constant/fluid/polyMesh/
 
-# Create face zones for FSI interfaces
-runApplication -l log.setsToZones.fluid setsToZones -region fluid -noFlipMap
-runApplication -l log.setsToZones.solid setsToZones -region solid -noFlipMap
+    # Correct patch types
+    runApplication -l log.createPatch.fluid createPatch -overwrite -region fluid
+    runApplication -l log.createPatch.solid createPatch -overwrite -region solid
 
-# Run the solver
-runApplication solids4Foam
+    # Scale from microns to metres
+    echo "Running transformPoints on the fluid"
+    transformPoints -scale "(1e-6 1e-6 1e-6)" -region fluid > log.transformPoints.fluid
+    echo "Running transformPoints on the solid"
+    transformPoints -scale "(1e-6 1e-6 1e-6)" -region solid > log.transformPoints.solid
+
+    # Run the solver
+    runApplication solids4Foam
+else
+    # Create solid mesh
+    \cp system/solid/meshDict system/
+    runApplication -s solid cartesian2DMesh
+    mkdir constant/solid/polyMesh
+    \mv constant/polyMesh/* constant/solid/polyMesh/
+
+    # Create fluid mesh
+    \cp system/fluid/meshDict system/
+    runApplication -s fluid cartesian2DMesh 
+    mkdir constant/fluid/polyMesh
+    \mv constant/polyMesh/* constant/fluid/polyMesh/
+
+    # Correct patch types
+    runApplication -s fluid createPatch -overwrite -region fluid
+    runApplication -s solid createPatch -overwrite -region solid
+
+    # Scale from microns to metres
+    echo "Running transformPoints on the fluid"
+    transformPoints -scale "(1e-6 1e-6 1e-6)" -region fluid > log.transformPoints.fluid
+    echo "Running transformPoints on the solid"
+    transformPoints -scale "(1e-6 1e-6 1e-6)" -region solid > log.transformPoints.solid
+
+    # Run the solver
+    solids4Foam -noFunctionObjects &> log.solids4Foam
+fi
 
 # ----------------------------------------------------------------- end-of-file
 

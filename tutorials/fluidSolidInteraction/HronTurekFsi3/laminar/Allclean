@@ -1,18 +1,24 @@
-#!/bin/sh
+#!/bin/bash
 
 # Source tutorial clean functions
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
 cleanCase
 cleanCase fluid
 cleanCase solid
-foamClearPolyMesh -region fluid
-foamClearPolyMesh -region solid
-\rm -f constant/polyMesh/boundary
+if [[ $WM_PROJECT == "foam" ]]
+then
+    foamClearPolyMesh -region fluid
+    foamClearPolyMesh -region solid
+else
+    foamCleanPolyMesh -region fluid
+    foamCleanPolyMesh -region solid
+fi
 \rm -rf history
+\rm -rf case.foam residuals
 
-\rm -f constant/solid/polyMesh/boundary
-\rm -rf constant/solid/polyMesh/[c-z]*
-\rm -rf case.foam
-
-\rm *.ps
+# Convert case version to FOAM EXTEND
+solids4Foam::convertCaseFormatFoamExtend .

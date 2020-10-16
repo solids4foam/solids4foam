@@ -44,7 +44,11 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF),
+#ifdef OPENFOAMESIORFOUNDATION
+    myTimeIndex_(internalField().mesh().time().timeIndex()),
+#else
     myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
+#endif
     Fc_(p.patch().size(),vector::zero),
     oldFc_(p.patch().size(),vector::zero),
     oldOldFc_(p.patch().size(),vector::zero)
@@ -83,8 +87,13 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const fvMesh& mesh = internalField().mesh();
+    const pointField& points = mesh.points();
+#else
     const fvMesh& mesh = dimensionedInternalField().mesh();
     const pointField& points = mesh.allPoints();
+#endif
 
     forAll(Fc_, i)
     {
@@ -134,10 +143,16 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
         return;
     }
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const fvMesh& mesh = internalField().mesh();
+    const pointField& points = mesh.points();
+#else
     const fvMesh& mesh = dimensionedInternalField().mesh();
+    const pointField& points = mesh.allPoints();
+#endif
+
     const fvPatch& p = patch();
     const polyPatch& pp = p.patch();
-    const pointField& points = mesh.allPoints();
 
     vectorField Up(p.size(), vector::zero);
 
@@ -145,12 +160,20 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     const volVectorField& U =
         mesh.lookupObject<volVectorField>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            internalField().name()
+#else
             dimensionedInternalField().name()
+#endif
         );
 
     word ddtScheme
     (
+#ifdef OPENFOAMESIORFOUNDATION
+        mesh.ddtScheme("ddt(" + U.name() +')')
+#else
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
+#endif
     );
 
     if (ddtScheme == fv::backwardDdtScheme<vector>::typeName)
@@ -278,7 +301,11 @@ snGrad() const
 {
     bool secondOrder_ = false;
 
-    word UName = this->dimensionedInternalField().name();
+#ifdef OPENFOAMESIORFOUNDATION
+    word UName = internalField().name();
+#else
+    word UName = dimensionedInternalField().name();
+#endif
 
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>
@@ -301,15 +328,27 @@ snGrad() const
             new vectorField(this->patch().size(), vector::zero)
         );
 
+#ifdef OPENFOAMESIORFOUNDATION
+        tnGradU.ref() =
+            2
+           *(
+                *this
+              - (patchInternalField() + dUP)
+            )*patch().deltaCoeffs()
+          - nGradUP;
+
+        tnGradU.ref() -= (sqr(n) & tnGradU());
+#else
         tnGradU() =
             2
            *(
                 *this
               - (patchInternalField() + dUP)
-            )*this->patch().deltaCoeffs()
+            )*patch().deltaCoeffs()
           - nGradUP;
 
-        tnGradU() -= n*(n&tnGradU());
+        tnGradU() -= (sqr(n) & tnGradU());
+#endif
 
         return tnGradU;
 
@@ -331,13 +370,23 @@ snGrad() const
         new vectorField(this->patch().size(), vector::zero)
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tnGradU.ref() =
+        (
+            *this
+          - (patchInternalField() + dUP)
+        )*patch().deltaCoeffs();
+
+    tnGradU.ref() -= (sqr(n) & tnGradU());
+#else
     tnGradU() =
         (
             *this
           - (patchInternalField() + dUP)
-        )*this->patch().deltaCoeffs();
+        )*patch().deltaCoeffs();
 
-    tnGradU() -= n*(n&tnGradU());
+    tnGradU() -= (sqr(n) & tnGradU());
+#endif
 
     return tnGradU;
 
@@ -354,7 +403,11 @@ gradientBoundaryCoeffs() const
 {
     bool secondOrder_ = false;
 
-    word UName = this->dimensionedInternalField().name();
+#ifdef OPENFOAMESIORFOUNDATION
+    word UName = internalField().name();
+#else
+    word UName = dimensionedInternalField().name();
+#endif
 
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>
@@ -428,7 +481,11 @@ gradientBoundaryCoeffs() const
 void elasticWallVelocityFvPatchVectorField::write(Ostream& os) const
 {
     fvPatchVectorField::write(os);
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "value", *this);
+#else
     writeEntry("value", os);
+#endif
 }
 
 

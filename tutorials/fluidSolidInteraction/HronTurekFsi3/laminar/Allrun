@@ -1,24 +1,46 @@
-#!/bin/sh
+#!/bin/bash
 
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-runApplication -l log.blockMesh.solid blockMesh -region solid
-runApplication -l log.setsToZones.solid setsToZones -region solid -noFlipMap
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
 
-runApplication -l log.blockMesh.fluid blockMesh -region fluid
-runApplication -l log.setsToZones.fluid setsToZones -region fluid -noFlipMap
+# Check case version is correct
+solids4Foam::convertCaseFormat .
 
-# Run serial
-runApplication solids4Foam
+if [[ "${WM_PROJECT}" == "foam" ]]
+then
+    runApplication -l log.blockMesh.solid blockMesh -region solid
+    runApplication -l log.blockMesh.fluid blockMesh -region fluid
 
-# Run parallel
-#runApplication -l log.decomposePar.fluid decomposePar -region fluid
-#runApplication -l log.decomposePar.solid decomposePar -region solid
-#runParallel solids4Foam 4
-#runApplication -l log.reconstructPar.fluid reconstructPar -region fluid
-#runApplication -l log.reconstructPar.solid reconstructPar -region solid
+    if [[ "$1" == "parallel" ]]; then
+        # Run parallel
+        runApplication -l log.decomposePar.fluid decomposePar -region fluid
+        runApplication -l log.decomposePar.solid decomposePar -region solid
+        runParallel solids4Foam 4
+        runApplication -l log.reconstructPar.fluid reconstructPar -region fluid
+        runApplication -l log.reconstructPar.solid reconstructPar -region solid
+    else
+        # Run serial
+        runApplication solids4Foam
+    fi
+else
+    runApplication -s solid blockMesh -region solid
+    runApplication -s fluid blockMesh -region fluid
 
+    if [[ "$1" == "parallel" ]]; then
+        # Run parallel
+        runApplication -s fluid decomposePar -region fluid
+        runApplication -s solid decomposePar -region solid
+        mpirun -np 4 solids4Foam -parallel -noFunctionObjects &> log.solids4Foam
+        runApplication -s fluid reconstructPar -region fluid
+        runApplication -s solid reconstructPar -region solid
+    else
+        # Run serial
+        solids4Foam -noFunctionObjects runApplication solids4Foam -noFunctionObjects> log.solids4Foam
+    fi
+fi
 
 # ----------------------------------------------------------------- end-of-file
 

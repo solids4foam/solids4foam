@@ -63,12 +63,13 @@ class stokesFluid
 {
     // Private data
 
+#ifndef OPENFOAMESIORFOUNDATION
         //- Transport model
         singlePhaseTransportModel laminarTransport_;
 
         //- Density
         dimensionedScalar rho_;
-
+#endif
 
     // Private Member Functions
 
@@ -103,12 +104,6 @@ public:
     // Member Functions
 
         // Access
-
-            //- Density
-            const dimensionedScalar& rho()
-            {
-                return rho_;
-            }
 
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce

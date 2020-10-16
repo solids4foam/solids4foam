@@ -55,6 +55,9 @@ Author
 #define linearElasticMohrCoulombPlastic_H
 
 #include "mechanicalLaw.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "surfaceFields.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

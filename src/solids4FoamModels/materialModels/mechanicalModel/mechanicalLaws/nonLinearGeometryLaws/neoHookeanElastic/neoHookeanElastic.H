@@ -25,19 +25,23 @@ Class
     neoHookeanElastic
 
 Description
-    Neo-Hookean elasticity, similar to model proposed in Simo & Hughes (1998)
-    in Eqn 9.2.6:
+    Neo-Hookean hyper-elasticity, similar to model proposed in Simo & Hughes
+    (1998) in Eqn 9.2.6, where the Cauchy stress is given as:
 
-        tau = J*p*I + mu*dev(J^(-2.0/3.0)*(F & F.T()))
+        sigma = 0.5*K*I*(J^2 - 1)/J + mu*dev(J^(-2.0/3.0)*B)/J
 
     where
+    K        bulk modulus
     J        Jacobian of the deformation gradient
-    p        hydrostatic pressure
     I        indentity tensor
     mu       shear modulus
+    B        left Cauchy–Green deformation tensor = F & F.T()
     F        deformation gradient
 
     If thermal stresses are active then 3.0*K*alpha*deltaT*I is added.
+
+    Either E (Young's modulus) and nu (Poisson's ratio) can be provided or mu
+    (shear modulus) and K (bulk modulus)
 
     Reference
     Simo & Hughes, Computational Inelasticity, 1998, Springer.
@@ -55,6 +59,9 @@ Author
 #define neoHookeanElastic_H
 
 #include "mechanicalLaw.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "surfaceFields.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -74,37 +81,13 @@ class neoHookeanElastic
         // Initial density
         const dimensionedScalar rho_;
 
-        // Young's modulus
-        const dimensionedScalar E_;
-
-        // Poisson's ratio
-        const dimensionedScalar nu_;
-
         // Shear modulus
-        const dimensionedScalar mu_;
+        dimensionedScalar mu_;
 
         // Bulk modulus
-        const dimensionedScalar K_;
-
-        // Total deformation gradient volField
-        volTensorField* FPtr_;
-
-        // Total deformation gradient surfaceField
-        surfaceTensorField* FfPtr_;
+        dimensionedScalar K_;
 
     // Private Member Functions
-
-        //- Make the F field
-        void makeF();
-
-        //- Return a reference to the F field
-        volTensorField& F();
-
-        //- Make the Ff field
-        void makeFf();
-
-        //- Return a reference to the Ff field
-        surfaceTensorField& Ff();
 
         //- Disallow default bitwise copy construct
         neoHookeanElastic(const neoHookeanElastic&);

@@ -61,7 +61,7 @@ autoPtr<thermalLaw> thermalLaw::New
     const dictionary& dict
 )
 {
-    word thermalTypeName = dict.lookup("type");
+    const word thermalTypeName(dict.lookup("type"));
 
     Info<< "Selecting thermal model " << thermalTypeName << endl;
 

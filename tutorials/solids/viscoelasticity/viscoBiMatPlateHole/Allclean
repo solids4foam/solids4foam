@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Source tutorial clean functions
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
@@ -7,3 +7,6 @@ cleanCase
 \rm -f constant/polyMesh/boundary case.foam
 \rm -rf system/*Subset
 \rm -rf constant/*Subset
+
+# Convert case version to FOAM EXTEND
+solids4Foam::convertCaseFormatFoamExtend .

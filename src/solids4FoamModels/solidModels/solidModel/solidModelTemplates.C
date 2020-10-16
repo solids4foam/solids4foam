@@ -47,13 +47,44 @@ bool Foam::solidModel::converged
     bool converged = false;
 
     // Calculate displacement residual based on the relative change of vf
-    scalar denom = gMax(mag(vf.internalField() - vf.oldTime().internalField()));
+    scalar denom = gMax
+    (
+#ifdef OPENFOAMESIORFOUNDATION
+        DimensionedField<scalar, volMesh>
+#else
+        Field<scalar>
+#endif
+        (
+            mag(vf.internalField() - vf.oldTime().internalField())
+        )
+    );
     if (denom < SMALL)
     {
-        denom = max(gMax(mag(vf.internalField())), SMALL);
+        denom = max
+        (
+            gMax
+            (
+#ifdef OPENFOAMESIORFOUNDATION
+                DimensionedField<scalar, volMesh>(mag(vf.internalField()))
+#else
+                mag(vf.internalField())
+#endif
+            ),
+            SMALL
+        );
     }
     const scalar residualvf =
-        gMax(mag(vf.internalField() - vf.prevIter().internalField()))/denom;
+        gMax
+        (
+#ifdef OPENFOAMESIORFOUNDATION
+            DimensionedField<scalar, volMesh>
+            (
+                mag(vf.internalField() - vf.prevIter().internalField())
+            )
+#else
+            mag(vf.internalField() - vf.prevIter().internalField())
+#endif
+        )/denom;
 
     // Calculate material residual
     const scalar materialResidual = mechanical().residual();

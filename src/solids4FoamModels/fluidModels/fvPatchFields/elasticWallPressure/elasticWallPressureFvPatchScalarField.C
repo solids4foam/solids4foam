@@ -47,7 +47,11 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 )
 :
     robinFvPatchScalarField(p, iF),
+#ifdef OPENFOAMESIORFOUNDATION
+    timeIndex_(internalField().mesh().time().timeIndex()),
+#else
     timeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
+#endif
     prevPressure_(p.patch().size(), 0),
     prevAcceleration_(p.patch().size(), vector::zero),
     Fc_(p.patch().size(),vector::zero),
@@ -88,7 +92,11 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 )
 :
     robinFvPatchScalarField(p, iF),
+#ifdef OPENFOAMESIORFOUNDATION
+    timeIndex_(internalField().mesh().time().timeIndex()),
+#else
     timeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
+#endif
     prevPressure_(p.patch().size(), 0),
     prevAcceleration_(p.patch().size(), vector::zero),
     Fc_(p.patch().size(),vector::zero),
@@ -106,8 +114,13 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     this->coeff0() = 1.0;
     this->coeff1() = 1.0;
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const fvMesh& mesh = internalField().mesh();
+    const pointField& points = mesh.points();
+#else
     const fvMesh& mesh = dimensionedInternalField().mesh();
     const pointField& points = mesh.allPoints();
+#endif
 
     forAll(Fc_, i)
     {
@@ -183,11 +196,18 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         return;
     }
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const fvMesh& mesh = internalField().mesh();
+#else
     const fvMesh& mesh = dimensionedInternalField().mesh();
+#endif
 
     // Looking up fsi solver
     const fluidSolidInterface& fsi =
-        mesh.parent().lookupObject<fluidSolidInterface>("fsiProperties");
+        mesh.objectRegistry::parent().lookupObject<fluidSolidInterface>
+        (
+            "fsiProperties"
+        );
 
     // Solid properties
     // PC: hmnn what if the solidModel does not use mu and lambda...
@@ -238,7 +258,11 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
 
     const fvPatch& p = patch();
     const polyPatch& pp = p.patch();
+#ifdef OPENFOAMESIORFOUNDATION
+    const pointField& points = mesh.points();
+#else
     const pointField& points = mesh.allPoints();
+#endif
 
     const volVectorField& U =
         mesh.lookupObject<volVectorField>
@@ -254,7 +278,11 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
 
     const word ddtScheme
     (
+#ifdef OPENFOAMESIORFOUNDATION
+        mesh.ddtScheme("ddt(" + U.name() +')')
+#else
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
+#endif
     );
 
     if (ddtScheme == fv::EulerDdtScheme<vector>::typeName)
@@ -307,7 +335,11 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
 
 //     Info << ap << endl;
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const word fieldName = internalField().name();
+#else
     const word fieldName = dimensionedInternalField().name();
+#endif
 
     const volScalarField& pressure =
         mesh.lookupObject<volScalarField>(fieldName);
@@ -381,8 +413,11 @@ void elasticWallPressureFvPatchScalarField::patchFlux
 {
     const label patchI = this->patch().index();
 
-    const fvMesh& mesh =
-        dimensionedInternalField().mesh();
+#ifdef OPENFOAMESIORFOUNDATION
+    const fvMesh& mesh = internalField().mesh();
+#else
+    const fvMesh& mesh = dimensionedInternalField().mesh();
+#endif
 
     const fvsPatchField<scalar>& rAU =
         patch().lookupPatchField<surfaceScalarField, scalar>
@@ -390,7 +425,11 @@ void elasticWallPressureFvPatchScalarField::patchFlux
             "rAUf"
         );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    flux.boundaryFieldRef()[patchI] =
+#else
     flux.boundaryField()[patchI] =
+#endif
         rAU*this->snGrad()
        *mesh.magSf().boundaryField()[patchI];
 }

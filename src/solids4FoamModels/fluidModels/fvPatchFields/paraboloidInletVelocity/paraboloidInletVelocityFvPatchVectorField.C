@@ -169,7 +169,11 @@ snGrad() const
 
     bool secondOrder_ = false;
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const word& UName = internalField().name();
+#else
     const word& UName = dimensionedInternalField().name();
+#endif
 
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>
@@ -191,7 +195,11 @@ snGrad() const
             new vectorField(this->patch().size(), vector::zero)
         );
 
+#ifdef OPENFOAMESIORFOUNDATION
+        tnGradU.ref() =
+#else
         tnGradU() =
+#endif
             2
            *(
                 *this
@@ -210,7 +218,11 @@ snGrad() const
         new vectorField(this->patch().size(), vector::zero)
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tnGradU.ref() =
+#else
      tnGradU() =
+#endif
         (
             *this
           - (patchInternalField() + dUP)
@@ -225,7 +237,11 @@ gradientBoundaryCoeffs() const
 {
     bool secondOrder_ = false;
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const word& UName = internalField().name();
+#else
     const word& UName = dimensionedInternalField().name();
+#endif
 
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>

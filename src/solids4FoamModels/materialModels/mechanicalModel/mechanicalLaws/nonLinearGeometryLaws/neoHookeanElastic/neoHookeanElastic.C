@@ -37,81 +37,6 @@ namespace Foam
     );
 }
 
-
-// * * * * * * * * * * *  Private Member Funtcions * * * * * * * * * * * * * //
-
-void Foam::neoHookeanElastic::makeF()
-{
-    if (FPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElastic::makeF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "F",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElastic::F()
-{
-    if (!FPtr_)
-    {
-        makeF();
-    }
-
-    return *FPtr_;
-}
-
-
-void Foam::neoHookeanElastic::makeFf()
-{
-    if (FfPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElastic::makeFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "Ff",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::surfaceTensorField& Foam::neoHookeanElastic::Ff()
-{
-    if (!FfPtr_)
-    {
-        makeFf();
-    }
-
-    return *FfPtr_;
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -125,27 +50,52 @@ Foam::neoHookeanElastic::neoHookeanElastic
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
     rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
-    mu_(E_/(2.0*(1.0 + nu_))),
-    K_
+    mu_("mu", dimPressure, 0.0),
+    K_("K", dimPressure, 0.0)
+{
+    // Read mechanical properties
+    if
     (
-        planeStress()
-      ? (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_
-      : (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_
-    ),
-    FPtr_(NULL),
-    FfPtr_(NULL)
-{}
+        dict.found("E") && dict.found("nu")
+     && !dict.found("mu") && !dict.found("K")
+    )
+    {
+        const dimensionedScalar E = dimensionedScalar(dict.lookup("E"));
+        const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
+
+        mu_ = (E/(2.0*(1.0 + nu)));
+
+        if (planeStress())
+        {
+            K_ = (nu*E/((1.0 + nu)*(1.0 - nu))) + (2.0/3.0)*mu_;
+        }
+        else
+        {
+            K_ = (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*mu_;
+        }
+    }
+    else if
+    (
+        dict.found("mu") && dict.found("K")
+     && !dict.found("E") && !dict.found("nu")
+    )
+    {
+        mu_ = dimensionedScalar(dict.lookup("mu"));
+        K_ = dimensionedScalar(dict.lookup("K"));
+    }
+    else
+    {
+        FatalErrorIn(type())
+            << "Either E and nu or mu and K should be specified"
+            << abort(FatalError);
+    }
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::neoHookeanElastic::~neoHookeanElastic()
-{
-    deleteDemandDrivenData(FPtr_);
-    deleteDemandDrivenData(FfPtr_);
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -195,107 +145,12 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 
 void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateF(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        // Calculate the relative deformation gradient
-        const volTensorField relF = I + gradDD.T();
-
-        // Update the total deformation gradient
-        F() = relF & F().oldTime();
-
-        if (enforceLinear())
-        {
-            WarningIn
-            (
-                "void Foam::neoHookeanElastic::"
-                "correct(volSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
-
-            // Calculate stress using Hooke's law
-            sigma =
-                sigma.oldTime()
-              + 2.0*mu_*symm(gradDD) + (K_ - (2.0/3.0)*mu_)*tr(gradDD)*I;
-
-            return;
-        }
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            // Lookup gradient of displacement increment
-            const volTensorField& gradDD =
-                mesh().lookupObject<volTensorField>("grad(DD)");
-
-            // Update the total deformation gradient
-            // Note: grad is wrt reference configuration
-            F() = F().oldTime() + gradDD.T();
-
-            // Update the relative deformation gradient: not needed
-            //relF() = F() & inv(F().oldTime());
-
-            if (enforceLinear())
-            {
-                WarningIn
-                (
-                    "void Foam::neoHookeanElastic::"
-                    "correct(volSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
-
-                // Calculate stress using Hooke's law
-                sigma =
-                    sigma.oldTime()
-                  + 2.0*mu_*dev(symm(gradDD)) + K_*tr(gradDD)*I;
-
-                return;
-            }
-        }
-        else
-        {
-            // Lookup gradient of displacement
-            const volTensorField& gradD =
-                mesh().lookupObject<volTensorField>("grad(D)");
-
-            // Update the total deformation gradient
-            F() = I + gradD.T();
-
-            // Update the relative deformation gradient: not needed
-            //relF() = F() & inv(F().oldTime());
-
-            if (enforceLinear())
-            {
-                WarningIn
-                (
-                    "void Foam::neoHookeanElastic::"
-                    "correct(volSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
-
-                // Calculate stress using Hooke's law
-                sigma = 2.0*mu_*dev(symm(gradD)) + K_*tr(gradD)*I;
-
-                return;
-            }
-        }
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            "void Foam::neoHookeanElastic::"
-            "correct(volSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Calculate the Jacobian of the deformation gradient
@@ -314,106 +169,12 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 
 void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateFf(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-        // Update the relative deformation gradient: not needed
-        const surfaceTensorField relF = I + gradDD.T();
-
-        // Update the total deformation gradient
-        Ff() = relF & Ff().oldTime();
-
-        if (enforceLinear())
-        {
-            WarningIn
-            (
-                "void Foam::neoHookeanElastic::"
-                "correct(surfaceSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
-
-            // Calculate stress using Hooke's law
-            sigma =
-                sigma.oldTime() + 2.0*mu_*dev(symm(gradDD)) + K_*tr(gradDD)*I;
-
-            return;
-        }
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            // Lookup gradient of displacement increment
-            const surfaceTensorField& gradDD =
-                mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-            // Update the total deformation gradient
-            // Note: grad is wrt reference configuration
-            Ff() = Ff().oldTime() + gradDD.T();
-
-            // Update the relative deformation gradient: not needed
-            //relFf() = Ff() & inv(Ff().oldTime());
-
-            if (enforceLinear())
-            {
-                WarningIn
-                (
-                    "void Foam::neoHookeanElastic::"
-                    "correct(surfaceSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
-
-                // Calculate stress using Hooke's law
-                sigma =
-                    sigma.oldTime()
-                  + 2.0*mu_*dev(symm(gradDD)) + K_*tr(gradDD)*I;
-
-                return;
-            }
-        }
-        else
-        {
-            // Lookup gradient of displacement
-            const surfaceTensorField& gradD =
-                mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-            // Update the total deformation gradient
-            Ff() = I + gradD.T();
-
-            // Update the relative deformation gradient: not needed
-            //relF() = F() & inv(F().oldTime());
-
-            if (enforceLinear())
-            {
-                WarningIn
-                (
-                    "void Foam::neoHookeanElastic::"
-                    "correct(surfaceSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
-
-                // Calculate stress using Hooke's law
-                sigma = 2.0*mu_*dev(symm(gradD)) + K_*tr(gradD)*I;
-
-                return;
-            }
-        }
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            "void Foam::neoHookeanElastic::"
-            "correct(surfaceSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Calculate the Jacobian of the deformation gradient

@@ -39,7 +39,7 @@ boundaryField
         cylinderRadius      1.0;
         cylinderCentre
         {
-            fileName        "$FOAM_CASE/constant/timeVsCylinderCentre";
+            "fileName|file"        "$FOAM_CASE/constant/timeVsCylinderCentre";
             outOfBounds     clamp;
         }
         penaltyStiffness    1e9;

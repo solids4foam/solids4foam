@@ -43,7 +43,12 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#include "turbulenceModel.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "turbulentTransportModel.H"
+    #include "fvOptions.H"
+#else
+    #include "turbulenceModel.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -71,6 +76,11 @@ class pisoFluid
 
         //- Density
         dimensionedScalar rho_;
+
+#ifdef OPENFOAMESIORFOUNDATION
+        //- Create finite volume options
+        fv::options& fvOptions_;
+#endif
 
         //- Reference pressure cell
         label pRefCell_;
@@ -111,12 +121,6 @@ public:
     // Member Functions
 
         // Access
-
-            //- Density
-            const dimensionedScalar& rho()
-            {
-                return rho_;
-            }
 
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce

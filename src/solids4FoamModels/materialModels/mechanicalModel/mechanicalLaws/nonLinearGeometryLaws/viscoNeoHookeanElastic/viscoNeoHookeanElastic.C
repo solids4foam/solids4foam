@@ -30,6 +30,7 @@ License
 #include "fvc.H"
 #include "fvm.H"
 #include "fixedGradientFvPatchFields.H"
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -41,81 +42,6 @@ namespace Foam
         mechanicalLaw, viscoNeoHookeanElastic, nonLinGeomMechLaw
     );
 }
-
-// * * * * * * * * * * *  Private Member Funtcions * * * * * * * * * * * * * //
-
-void Foam::viscoNeoHookeanElastic::makeF()
-{
-    if (FPtr_)
-    {
-        FatalErrorIn("void Foam::viscoNeoHookeanElastic::makeF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "F",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::volTensorField& Foam::viscoNeoHookeanElastic::F()
-{
-    if (!FPtr_)
-    {
-        makeF();
-    }
-
-    return *FPtr_;
-}
-
-
-void Foam::viscoNeoHookeanElastic::makeFf()
-{
-    if (FfPtr_)
-    {
-        FatalErrorIn("void Foam::viscoNeoHookeanElastic::makeFf()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FfPtr_ =
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "Ff",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::surfaceTensorField& Foam::viscoNeoHookeanElastic::Ff()
-{
-    if (!FfPtr_)
-    {
-        makeFf();
-    }
-
-    return *FfPtr_;
-}
-
-
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -143,7 +69,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
     mu2_(dict.lookup("mu2")),
     alpha_(dict.lookup("alpha")),
     beta_(dict.lookup("beta")),
-    k_(dict.lookup("k")),
+    K_(dict.lookup("k")),
     h_(),
     hf_(),
     H_(),
@@ -227,9 +153,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
         ),
         mesh,
         dimensionedSymmTensor("I", dimPressure, I)
-    ),
-    FPtr_(NULL),
-    FfPtr_(NULL)
+    )
 {
     // Check for physical Poisson's ratio
     if (nu_.value() < -1.0 || nu_.value() > 0.5)
@@ -254,7 +178,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
 
         // Set lambda and k to GREAT
         lambda_.value() = GREAT;
-        k_.value() = GREAT;
+        K_.value() = GREAT;
 
         if (dict.found("k"))
         {
@@ -270,7 +194,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                 << "Young's/shear modulii!" << abort(FatalError);
 
             // PC: what is going on here?
-            k_ = dimensionedScalar(dict.lookup("k"));
+            K_ = dimensionedScalar(dict.lookup("k"));
         }
     }
     else
@@ -284,7 +208,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             lambda_ = nu_*EInf_/((1.0 + nu_)*(1.0 - 2.0*nu_));
         }
 
-        k_ = lambda_ + (2.0/3.0)*mu_;
+        K_ = lambda_ + (2.0/3.0)*mu_;
 
         if (dict.found("k"))
         {
@@ -300,7 +224,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                 << "it is not calculated from mu and lambda" << endl;
 
             // PC: what is going on here?
-            k_ = dimensionedScalar(dict.lookup("k"));
+            K_ = dimensionedScalar(dict.lookup("k"));
         }
     }
 
@@ -384,7 +308,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "transformH" + name(MaxwellModelI),
+                    "transformH" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -402,7 +326,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "transformHf" + name(MaxwellModelI),
+                    "transformHf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -429,7 +353,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "h" + name(MaxwellModelI),
+                    "h" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -447,7 +371,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "hf" + name(MaxwellModelI),
+                    "hf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -476,7 +400,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "H" + name(MaxwellModelI),
+                    "H" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -494,7 +418,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             (
                 IOobject
                 (
-                    "Hf" + name(MaxwellModelI),
+                    "Hf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
                     IOobject::NO_READ,
@@ -515,10 +439,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::viscoNeoHookeanElastic::~viscoNeoHookeanElastic()
-{
-    deleteDemandDrivenData(FPtr_);
-    deleteDemandDrivenData(FfPtr_);
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -543,7 +464,11 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::rho() const
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
     tresult().correctBoundaryConditions();
+#endif
 
     return tresult;
 }
@@ -566,7 +491,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::impK() const
                     IOobject::NO_WRITE
                 ),
                 mesh(),
-                //k_      // Previous:  (2.0*mu_)
+                //K_      // Previous:  (2.0*mu_)
                 // PC: this is for convergence and does/should not affect
                 // the results
                 2.0*mu_
@@ -588,10 +513,10 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::impK() const
                     IOobject::NO_WRITE
                 ),
                 mesh(),
-                //k_        // Previous : (2.0*mu_ + lambda_)
+                //K_        // Previous : (2.0*mu_ + lambda_)
                 // PC: this is for convergence and does/should not affect
                 // the results
-                2.0*mu_ + (4.0/3.0)*k_
+                2.0*mu_ + (4.0/3.0)*K_
             )
         );
     }
@@ -614,7 +539,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::K() const
                 IOobject::NO_WRITE
             ),
             mesh(),
-            k_
+            K_
         )
     );
 }
@@ -622,51 +547,12 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::K() const
 
 void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateF(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        // Calculate the relative deformation gradient
-        const volTensorField relF = I + gradDD.T();
-
-        // Update the total deformation gradient
-        F() = relF & F().oldTime();
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        // Update the total deformation gradient
-        F() = I + gradD.T();
-
-        // Calculate the relative deformation gradient: not needed
-        //relF() = F() & inv(F().oldTime());
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            type() + "::correct(volSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Calculate the Jacobian of the deformation gradient
@@ -684,9 +570,15 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     const volTensorField Cbar = pow(J, -2.0/3.0)*C;
 
     // Take references to the internal fields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+    const tensorField& CI = C.primitiveField();
+    const scalarField& JI = J.primitiveField();
+    symmTensorField& transformNeededI = transformNeeded_.primitiveFieldRef();
+#else
     const tensorField& CI = C.internalField();
     const scalarField& JI = J.internalField();
     symmTensorField& transformNeededI = transformNeeded_.internalField();
+#endif
 
     // Partial derive of WBar(CBar), internalField operation
 
@@ -725,8 +617,13 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
         // Take references to the patch fields for efficiency
         const tensorField& CP = C.boundaryField()[patchI];
         const scalarField& JP = J.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+        symmTensorField& transformNeededP =
+            transformNeeded_.boundaryFieldRef()[patchI];
+#else
         symmTensorField& transformNeededP =
             transformNeeded_.boundaryField()[patchI];
+#endif
 
         forAll(CP, faceI)
         {
@@ -800,7 +697,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
 
     // Calculate hydrostatic pressure, defined in (G. A. HOLZAPFEL,1996)
     const volScalarField pressure_ =
-        k_*(1.0/(beta_.value()*J))*(1 - pow(J, -beta_.value()));
+        K_*(1.0/(beta_.value()*J))*(1 - pow(J, -beta_.value()));
 
     sigma += J*pressure_*I + gRelax*sigma;
 
@@ -818,51 +715,12 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
 
 void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateFf(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-        // Calculate the relative deformation gradient
-        const surfaceTensorField relFf = I + gradDD.T();
-
-        // Update the total deformation gradient
-        Ff() = relFf & Ff().oldTime();
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            FatalErrorIn(type() + "::correct(surfaceSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement
-        const surfaceTensorField& gradD =
-            mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-        // Update the total deformation gradient
-        Ff() = I + gradD.T();
-
-        // Update the relative deformation gradient: not needed
-        //relFf() = Ff() & inv(Ff().oldTime());
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            type() + "::correct(surfaceSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Calculate the Jacobian of the deformation gradient
@@ -880,9 +738,15 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     const surfaceTensorField Cbar = pow(J, -2.0/3.0)*C;
 
     // Take references to the internal fields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+    const tensorField& CI = C.primitiveField();
+    const scalarField& JI = J.primitiveField();
+    symmTensorField& transformNeededI = transformNeededf_.primitiveFieldRef();
+#else
     const tensorField& CI = C.internalField();
     const scalarField& JI = J.internalField();
     symmTensorField& transformNeededI = transformNeededf_.internalField();
+#endif
 
     // Partial derive of WBar(CBar), internalField operation
 
@@ -921,8 +785,13 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         // Take references to the patch fields for efficiency
         const tensorField& CP = C.boundaryField()[patchI];
         const scalarField& JP = J.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+        symmTensorField& transformNeededP =
+            transformNeededf_.boundaryFieldRef()[patchI];
+#else
         symmTensorField& transformNeededP =
             transformNeededf_.boundaryField()[patchI];
+#endif
 
         forAll(CP, faceI)
         {
@@ -996,7 +865,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 
     // Calculate hydrostatic pressure, defined in (G. A. HOLZAPFEL,1996)
     const surfaceScalarField pressure_ =
-        k_*(1.0/(beta_.value()*J))*(1 - pow(J, -beta_.value()));
+        K_*(1.0/(beta_.value()*J))*(1 - pow(J, -beta_.value()));
 
     sigma += J*pressure_*I + gRelax*sigma;
 

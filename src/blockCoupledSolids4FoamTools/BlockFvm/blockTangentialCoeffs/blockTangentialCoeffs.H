@@ -84,6 +84,7 @@ namespace fv
         const vector& faceK,
         const vectorField& points,
         const vectorField& origins,
+        const scalarField& refL,
         const PtrList<scalarRectangularMatrix>& invMatrices,
         const FieldField<Field, scalar>& weights,
         const bool enforcePointConstraints,

@@ -111,6 +111,7 @@ void Foam::fv::blockFvmInsertCoeffsTang
     // Least squares vol-to-point interpolation data
     // There is something not right when using least squares weights
     const vectorField& origins = volToPointInterp.origins();
+    const scalarField& refL = volToPointInterp.refL();
     const FieldField<Field, scalar>& weights = volToPointInterp.weights();
     const PtrList<scalarRectangularMatrix>& invMatrices =
         volToPointInterp.invLsMatrices();
@@ -293,6 +294,7 @@ void Foam::fv::blockFvmInsertCoeffsTang
                     faceKPtr(),
                     points,
                     origins,
+                    refL,
                     invMatrices,
                     weights,
                     enforcePointConstraints,
@@ -349,6 +351,7 @@ void Foam::fv::blockFvmInsertCoeffsTangForFace
     const vector& faceK,
     const vectorField& points,
     const vectorField& origins,
+    const scalarField& refL,
     const PtrList<scalarRectangularMatrix>& invMatrices,
     const FieldField<Field, scalar>& weights,
     const bool enforcePointConstraints,
@@ -444,7 +447,8 @@ void Foam::fv::blockFvmInsertCoeffsTangForFace
 
             // Vector between current point and the average
             // position of the neighbours
-            vector dr = points[sePointID] - origins[sePointID];
+            const vector dr =
+                (points[sePointID] - origins[sePointID])/refL[sePointID];
 
             // Least square inverse matrix terms
             const scalarRectangularMatrix& curInvMatrix =

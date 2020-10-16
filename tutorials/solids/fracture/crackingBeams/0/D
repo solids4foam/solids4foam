@@ -48,7 +48,7 @@ boundaryField
         type            fixedDisplacement;
         displacementSeries
         {
-            fileName    "$FOAM_CASE/constant/timeVsTopDisp";
+            "fileName|file"    "$FOAM_CASE/constant/timeVsTopDisp";
             outOfBounds clamp;
         }
         value           uniform (0 0 0);
@@ -58,7 +58,7 @@ boundaryField
         type            fixedDisplacement;
         displacementSeries
         {
-            fileName    "$FOAM_CASE/constant/timeVsBottomDisp";
+            "fileName|file"    "$FOAM_CASE/constant/timeVsBottomDisp";
             outOfBounds clamp;
         }
         value           uniform (0 0 0);

@@ -30,11 +30,13 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
-#include "blockSolidTractionFvPatchVectorField.H"
-#include "fvcGradf.H"
-#include "BlockFvmDivSigma.H"
 #include "linearElastic.H"
-#include "blockFixedDisplacementZeroShearFvPatchVectorField.H"
+#ifdef FOAMEXTEND
+    #include "blockSolidTractionFvPatchVectorField.H"
+    #include "fvcGradf.H"
+    #include "BlockFvmDivSigma.H"
+    #include "blockFixedDisplacementZeroShearFvPatchVectorField.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -85,6 +87,7 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
 )
 :
     solidModel(typeName, runTime, region),
+#ifdef FOAMEXTEND
     extendedMesh_(mesh()),
     solutionVec_
     (
@@ -98,6 +101,7 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
         ),
         vectorField(extendedMesh_.nVariables(), vector::zero)
     ),
+#endif
     muf_
     (
         IOobject
@@ -167,6 +171,7 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
 
 bool coupledUnsLinGeomLinearElasticSolid::evolve()
 {
+#ifdef FOAMEXTEND
     Info << "Evolving solid solver" << endl;
 
     BlockSolverPerformance<vector> solverPerfD("undefined", "blockD");
@@ -355,6 +360,9 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
 
     // Velocity
     U() = fvc::ddt(D());
+#else
+    notImplemented("Not implemented for this version of OpenFOAM/FOAM");
+#endif
 
     return true;
 }

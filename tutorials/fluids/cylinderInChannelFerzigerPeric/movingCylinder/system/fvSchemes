@@ -22,24 +22,24 @@ ddtSchemes
 
 gradSchemes
 {
-    default leastSquares;
+    default         leastSquares;
 }
 
 divSchemes
 {
     default         none;
-    
     div(phi,U)      Gauss linearUpwind cellLimited leastSquares 1;
     div((nuEff*dev(grad(U).T()))) Gauss linear;
+    div((nuEff*dev(T(grad(U))))) Gauss linear;
 }
 
 laplacianSchemes
 {
     default         none;
-
     laplacian(nu,U) Gauss linear corrected;
     laplacian(nuEff,U) Gauss linear corrected;
     laplacian(rAU,p) Gauss linear corrected;
+    laplacian((1|A(U)),p) Gauss linear corrected;
     laplacian(diffusivity,cellMotionU) Gauss linear corrected;
 }
 

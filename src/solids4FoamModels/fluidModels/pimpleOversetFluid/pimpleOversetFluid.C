@@ -105,12 +105,8 @@ tmp<vectorField> pimpleOversetFluid::patchViscousForce(const label patchID) cons
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
-          & turbulence_->devReff()().boundaryField()[patchID]
+          & (-turbulence_->devReff()().boundaryField()[patchID])
         );
-
-    // PC: why is this commented?
-    //vectorField n = mesh().boundary()[patchID].nf();
-    //tvF() -= n*(n & tvF());
 
     return tvF;
 }
@@ -188,12 +184,7 @@ bool pimpleOversetFluid::evolve()
     fvc::makeRelative(phi(), U());
 
     // CourantNo
-    {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
-        fluidModel::oversetCourantNo(CoNum, meanCoNum, velMag);
-    }
+    fluidModel::oversetCourantNo();
 
     // --- PIMPLE loop
     while (pimple().loop())

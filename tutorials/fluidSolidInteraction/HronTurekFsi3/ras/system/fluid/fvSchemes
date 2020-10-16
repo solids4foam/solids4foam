@@ -57,7 +57,7 @@ interpolationSchemes
 
 snGradSchemes
 {
-    default newSkewCorrected 1;
+    default skewCorrected 1;
 }
 
 fluxRequired

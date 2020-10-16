@@ -50,8 +50,10 @@ SourceFiles
 #define coupledUnsLinGeomLinearElasticSolid_H
 
 #include "solidModel.H"
-#include "solidPolyMesh.H"
-#include "BlockSolverPerformance.H"
+#ifdef FOAMEXTEND
+    #include "solidPolyMesh.H"
+    #include "BlockSolverPerformance.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -73,6 +75,7 @@ class coupledUnsLinGeomLinearElasticSolid
 {
     // Private data
 
+#ifdef FOAMEXTEND
         //- The solidPolyMesh stores the additional addressing required for the
         //  extended implicit stencil
         solidPolyMesh extendedMesh_;
@@ -81,13 +84,13 @@ class coupledUnsLinGeomLinearElasticSolid
         //  This is a field containing the cell displacements followed by the
         //  boundary face displacements
         vectorIOField solutionVec_;
+#endif
 
         //- Hooke's law second Lame parameter, aka shear modulus
         surfaceScalarField muf_;
 
         //- Hooke's law first Lame parameter
         surfaceScalarField lambdaf_;
-
 
     // Private Member Functions
 

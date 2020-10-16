@@ -41,8 +41,6 @@ SourceFiles
 #define transientSimpleFluid_H
 
 #include "fluidModel.H"
-#include "singlePhaseTransportModel.H"
-#include "turbulenceModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -60,18 +58,6 @@ class transientSimpleFluid
 :
     public fluidModel
 {
-    // Private data
-
-        //- Transport model
-        singlePhaseTransportModel laminarTransport_;
-
-        //- Turbulence model
-        autoPtr<incompressible::turbulenceModel> turbulence_;
-
-        //- Density
-        dimensionedScalar rho_;
-
-
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -104,12 +90,6 @@ public:
     // Member Functions
 
         // Access
-
-            //- Density
-            const dimensionedScalar& rho()
-            {
-                return rho_;
-            }
 
             //- Patch viscous force (N/m2)
             virtual tmp<vectorField> patchViscousForce

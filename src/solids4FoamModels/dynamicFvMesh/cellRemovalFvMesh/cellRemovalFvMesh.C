@@ -24,7 +24,6 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "cellRemovalFvMesh.H"
-#include "foamTime.H"
 #include "regionSplit.H"
 #include "mapPolyMesh.H"
 #include "volMesh.H"

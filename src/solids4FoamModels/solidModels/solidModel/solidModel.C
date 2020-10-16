@@ -30,7 +30,11 @@ License
 #include "twoDPointCorrector.H"
 #include "RectangularMatrix.H"
 #include "solidTractionFvPatchVectorField.H"
-#include "blockSolidTractionFvPatchVectorField.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "primitivePatchInterpolation.H"
+#else
+    #include "blockSolidTractionFvPatchVectorField.H"
+#endif
 #include "fvcGradf.H"
 #include "wedgePolyPatch.H"
 
@@ -298,17 +302,6 @@ Foam::mechanicalModel& Foam::solidModel::mechanical()
 }
 
 
-const Foam::volScalarField& Foam::solidModel::rho() const
-{
-    if (rhoPtr_.empty())
-    {
-        makeRho();
-    }
-
-    return rhoPtr_();
-}
-
-
 Foam::volScalarField& Foam::solidModel::rho()
 {
     if (rhoPtr_.empty())
@@ -355,11 +348,19 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
             // Fixed under-relaxation is applied on the first iteration
             aitkenAlpha_ = 1.0;
 
+#ifdef OPENFOAMESIORFOUNDATION
+            if (mesh().relaxField(D.name()))
+            {
+                aitkenAlpha_ =
+                    mesh().fieldRelaxationFactor(D.name());
+            }
+#else
             if (mesh().solutionDict().relaxField(D.name()))
             {
                 aitkenAlpha_ =
                     mesh().solutionDict().fieldRelaxationFactor(D.name());
             }
+#endif
         }
         else
         {
@@ -526,9 +527,14 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
                     (
                         Q[i]
                       & (
+#ifdef OPENFOAMESIORFOUNDATION
+                          D.prevIter().primitiveField()
+                        - D.primitiveField()
+#else
                           D.prevIter().internalField()
                         - D.internalField()
-                      )
+#endif
+                        )
                     );
             }
 
@@ -572,7 +578,11 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
             // Update D
             for (label i = 0; i < cols; i++)
             {
+#ifdef OPENFOAMESIORFOUNDATION
+                D.primitiveFieldRef() += QuasiNewtonW_[i]*C[cols - 1 - i][0];
+#else
                 D.internalField() += QuasiNewtonW_[i]*C[cols - 1 - i][0];
+#endif
             }
 
             D.correctBoundaryConditions();
@@ -653,8 +663,8 @@ Foam::solidModel::solidModel
         )
     ),
     type_(type),
-    thermalPtr_(NULL),
-    mechanicalPtr_(NULL),
+    thermalPtr_(),
+    mechanicalPtr_(),
     Dheader_("D", runTime.timeName(), mesh(), IOobject::MUST_READ),
     DDheader_("DD", runTime.timeName(), mesh(), IOobject::MUST_READ),
     D_
@@ -762,7 +772,7 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
-    rhoPtr_(NULL),
+    rhoPtr_(),
     g_
     (
         IOobject
@@ -792,8 +802,9 @@ Foam::solidModel::solidModel
         solidModelDict().lookupOrDefault<int>("infoFrequency", 100)
     ),
     nCorr_(solidModelDict().lookupOrDefault<int>("nCorrectors", 10000)),
+    minCorr_(solidModelDict().lookupOrDefault<int>("minCorrectors", 1)),
     maxIterReached_(0),
-    residualFilePtr_(NULL),
+    residualFilePtr_(),
     writeResidualField_
     (
         solidModelDict().lookupOrDefault<Switch>("writeResidualField", false)
@@ -932,6 +943,16 @@ Foam::solidModel::~solidModel()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+const Foam::volScalarField& Foam::solidModel::rho() const
+{
+    if (rhoPtr_.empty())
+    {
+        makeRho();
+    }
+
+    return rhoPtr_();
+}
+
 const Foam::thermalModel& Foam::solidModel::thermal() const
 {
     if (thermalPtr_.empty())
@@ -956,7 +977,11 @@ const Foam::mechanicalModel& Foam::solidModel::mechanical() const
 
 void Foam::solidModel::DisRequired()
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    if (!Dheader_.typeHeaderOk<volVectorField>(true))
+#else
     if (!Dheader_.headerOk())
+#endif
     {
         FatalErrorIn(type() + "::DisRequired()")
             << "This solidModel requires the 'D' field to be specified!"
@@ -967,7 +992,11 @@ void Foam::solidModel::DisRequired()
 
 void Foam::solidModel::DDisRequired()
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    if (!DDheader_.typeHeaderOk<volVectorField>(true))
+#else
     if (!DDheader_.headerOk())
+#endif
     {
         FatalErrorIn(type() + "::DDisRequired()")
             << "This solidModel requires the 'DD' field to be specified!"
@@ -991,8 +1020,7 @@ void Foam::solidModel::makeGlobalPatches
             FatalErrorIn
             (
                 type() + "::makeGlobalPatches(const wordList&) const"
-            )
-                << "Pointer already set for global patch: "
+            )   << "Pointer already set for global patch: "
                 << patchNames[i] << "!"
                 << abort(FatalError);
         }
@@ -1028,13 +1056,12 @@ void Foam::solidModel::makeGlobalPatches
             // Move the mesh to deformed position
             // const_cast is justified as it is not our intention to permanently
             // move the mesh; however, it would be better if we did not need it
-            //mesh().V();
+            mesh().V();
             const_cast<dynamicFvMesh&>(mesh()).movePoints(newPoints);
-            //const_cast<dynamicFvMesh&>(mesh()).V();
-            //const_cast<dynamicFvMesh&>(mesh()).V0();
-            //const_cast<dynamicFvMesh&>(mesh()).V00();
             const_cast<dynamicFvMesh&>(mesh()).moving(false);
+#ifndef OPENFOAMESIORFOUNDATION
             const_cast<dynamicFvMesh&>(mesh()).changing(false);
+#endif
             const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
                 IOobject::NO_WRITE;
 
@@ -1050,10 +1077,11 @@ void Foam::solidModel::makeGlobalPatches
 
             // Move the mesh back
             const_cast<dynamicFvMesh&>(mesh()).movePoints(pointsBackup);
-            const_cast<dynamicFvMesh&>(mesh()).V();
-            //const_cast<dynamicFvMesh&>(mesh()).V00();
+            mesh().V();
             const_cast<dynamicFvMesh&>(mesh()).moving(false);
+#ifndef OPENFOAMESIORFOUNDATION
             const_cast<dynamicFvMesh&>(mesh()).changing(false);
+#endif
             const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
                 IOobject::NO_WRITE;
         }
@@ -1246,6 +1274,7 @@ void Foam::solidModel::setTraction
 
         patchD.traction() = traction;
     }
+#ifndef OPENFOAMESIORFOUNDATION
     else if
     (
         tractionPatch.type() == blockSolidTractionFvPatchVectorField::typeName
@@ -1256,6 +1285,7 @@ void Foam::solidModel::setTraction
 
         patchD.traction() = traction;
     }
+#endif
     else
     {
         FatalErrorIn
@@ -1270,8 +1300,10 @@ void Foam::solidModel::setTraction
             << " for patch " << tractionPatch.patch().name()
             << " should instead be type "
             << solidTractionFvPatchVectorField::typeName
+#ifndef OPENFOAMESIORFOUNDATION
             << " or "
             << blockSolidTractionFvPatchVectorField::typeName
+#endif
             << abort(FatalError);
     }
 }
@@ -1290,6 +1322,7 @@ void Foam::solidModel::setPressure
 
         patchD.pressure() = pressure;
     }
+#ifndef OPENFOAMESIORFOUNDATION
     else if
     (
         pressurePatch.type() == blockSolidTractionFvPatchVectorField::typeName
@@ -1300,6 +1333,7 @@ void Foam::solidModel::setPressure
 
         patchD.pressure() = pressure;
     }
+#endif
     else
     {
         FatalErrorIn
@@ -1314,8 +1348,10 @@ void Foam::solidModel::setPressure
             << "for patch" << pressurePatch.patch().name()
             << " should instead be type "
             << solidTractionFvPatchVectorField::typeName
+#ifndef OPENFOAMESIORFOUNDATION
             << " or "
             << blockSolidTractionFvPatchVectorField::typeName
+#endif
             << abort(FatalError);
     }
 }
@@ -1331,7 +1367,11 @@ void Foam::solidModel::setTraction
     const vectorField patchTraction =
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction);
 
+#ifdef OPENFOAMESIORFOUNDATION
+    setTraction(solutionD().boundaryFieldRef()[patchID], patchTraction);
+#else
     setTraction(solutionD().boundaryField()[patchID], patchTraction);
+#endif
 }
 
 
@@ -1345,7 +1385,11 @@ void Foam::solidModel::setPressure
     const scalarField patchPressure =
         globalPatches()[interfaceI].globalFaceToPatch(faceZonePressure);
 
+#ifdef OPENFOAMESIORFOUNDATION
+    setPressure(solutionD().boundaryFieldRef()[patchID], patchPressure);
+#else
     setPressure(solutionD().boundaryField()[patchID], patchPressure);
+#endif
 }
 
 
@@ -1424,12 +1468,21 @@ void Foam::solidModel::writeFields(const Time& runTime)
     if (writeResidualField_)
     {
         const volVectorField& D = solutionD();
+#ifdef OPENFOAMESIORFOUNDATION
+        scalar denom =
+            gMax(mag(D.primitiveField() - D.oldTime().primitiveField()));
+        if (denom < SMALL)
+        {
+            denom = max(gMax(mag(D.primitiveField())), SMALL);
+        }
+#else
         scalar denom =
             gMax(mag(D.internalField() - D.oldTime().internalField()));
         if (denom < SMALL)
         {
             denom = max(gMax(mag(D.internalField())), SMALL);
         }
+#endif
 
         const volVectorField residualD
         (
@@ -1447,7 +1500,11 @@ void Foam::solidModel::writeFields(const Time& runTime)
 
 Foam::scalar Foam::solidModel::newDeltaT()
 {
-    return mechanical().newDeltaT();
+    return min
+    (
+        runTime().deltaTValue(),
+        mechanical().newDeltaT()
+    );
 }
 
 void Foam::solidModel::moveMesh
@@ -1472,7 +1529,11 @@ void Foam::solidModel::moveMesh
     // Something strange is happening here
     pointDD.correctBoundaryConditions();
 
+#ifdef OPENFOAMESIORFOUNDATION
+    vectorField& pointDDI = pointDD.primitiveFieldRef();
+#else
     vectorField& pointDDI = pointDD.internalField();
+#endif
 
     vectorField newPoints = oldPoints;
 
@@ -1566,11 +1627,15 @@ void Foam::solidModel::moveMesh
     mesh().movePoints(newPoints);
     mesh().V00();
     mesh().moving(false);
+#ifndef OPENFOAMESIORFOUNDATION
     mesh().changing(false);
+#endif
     mesh().setPhi().writeOpt() = IOobject::NO_WRITE;
 
+#ifndef OPENFOAMESIORFOUNDATION
     // Tell the mechanical model to move the subMeshes, if they exist
     mechanical().moveSubMeshes();
+#endif
 }
 
 

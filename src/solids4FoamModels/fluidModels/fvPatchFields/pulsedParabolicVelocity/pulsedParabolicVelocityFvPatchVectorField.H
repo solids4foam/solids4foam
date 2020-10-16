@@ -51,7 +51,6 @@ Author
 #ifndef pulsedParabolicVelocityFvPatchVectorField_H
 #define pulsedParabolicVelocityFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "fixedValueFvPatchFields.H"
 

@@ -33,11 +33,17 @@ License
 // #include "processorFaPatch.H"
 // #include "areaFields.H"
 #include "cyclicPolyPatch.H"
+#ifdef FOAMEXTEND
+    #include "cyclicGgiPolyPatch.H"
+#endif
+#include "cyclicFvPatch.H"
 #include "processorPolyPatch.H"
 #include "wedgePolyPatch.H"
 #include "symmetryPolyPatch.H"
 #include "Map.H"
 #include "transform.H"
+#include "surfaceMesh.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -62,7 +68,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (pointBndFacesPtr_ || pointProcFacesPtr_)
+    if (!pointBndFacesPtr_.empty() || !pointProcFacesPtr_.empty())
     {
         FatalErrorIn
         (
@@ -77,16 +83,30 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
     const labelListList& pointPoints = mesh().pointPoints();
 
     // Allocate storage for addressing
-    pointBndFacesPtr_ = new labelListList(points.size());
-    labelListList& pointBndFaces = *pointBndFacesPtr_;
+    pointBndFacesPtr_.set(new labelListList(points.size()));
+    labelListList& pointBndFaces = pointBndFacesPtr_();
 
     // Allocate storage for addressing
-    pointCyclicFacesPtr_ = new labelListList(points.size());
-    labelListList& pointCyclicFaces = *pointCyclicFacesPtr_;
+    pointCyclicFacesPtr_.set(new labelListList(points.size()));
+    labelListList& pointCyclicFaces = pointCyclicFacesPtr_();
 
     // Allocate storage for addressing
-    pointProcFacesPtr_ = new labelListList(points.size());
-    labelListList& pointProcFaces = *pointProcFacesPtr_;
+    pointCyclicBndFacesPtr_.set(new labelListList(points.size()));
+    labelListList& pointCyclicBndFaces = pointCyclicBndFacesPtr_();
+    
+#ifdef FOAMEXTEND
+    // Allocate storage for addressing
+    pointCyclicGgiFacesPtr_.set(new labelListList(points.size()));
+    labelListList& pointCyclicGgiFaces = pointCyclicGgiFacesPtr_();
+    
+    // Allocate storage for addressing
+    pointCyclicGgiBndFacesPtr_.set(new labelListList(points.size()));
+    labelListList& pointCyclicGgiBndFaces = pointCyclicGgiBndFacesPtr_();
+#endif
+
+    // Allocate storage for addressing
+    pointProcFacesPtr_.set(new labelListList(points.size()));
+    labelListList& pointProcFaces = pointProcFacesPtr_();
 
     forAll(pointBndFaces, pointI)
     {
@@ -94,6 +114,9 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
 
         labelHashSet bndFaceSet;
         labelHashSet cyclicFaceSet;
+#ifdef FOAMEXTEND
+        labelHashSet cyclicGgiFaceSet;
+#endif
         labelHashSet procFaceSet;
 
         forAll(curPointFaces, faceI)
@@ -111,12 +134,27 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                 {
                     cyclicFaceSet.insert(faceID);
                 }
+#ifdef FOAMEXTEND
+                else if
+                (
+                    mesh().boundaryMesh()[patchID].type()
+                 == cyclicGgiPolyPatch::typeName
+                )
+                {
+                    cyclicGgiFaceSet.insert(faceID);
+                }
+#endif
                 else if
                 (
                     mesh().boundaryMesh()[patchID].type()
                  == processorPolyPatch::typeName
                 )
                 {
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                    FatalErrorIn("makePointFaces()")
+                        << "processor patches not allowed!"
+                        << abort(FatalError);
+#endif
                     procFaceSet.insert(faceID);
                 }
                 else if
@@ -150,12 +188,16 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
         pointBndFaces[pointI] = bndFaceSet.toc();
         pointCyclicFaces[pointI] = cyclicFaceSet.toc();
 
+#ifdef FOAMEXTEND
+        pointCyclicGgiFaces[pointI] = cyclicGgiFaceSet.toc();
+
         const labelList& glPoints =
             mesh().globalData().sharedPointLabels();
 
         bool globalPoint(findIndex(glPoints, pointI) != -1);
 
         if (!globalPoint)
+#endif // OpenFOAM assumes no global points
         {
             labelList allPointProcFaces = procFaceSet.toc();
 
@@ -172,7 +214,6 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                 allCentres[faceI] =
                     mesh().C().boundaryField()[patchID][localFaceID];
             }
-
 
             boundBox bb(vectorField(points, pointPoints[pointI]), false);
             scalar tol = 0.001*mag(bb.max() - bb.min());
@@ -213,6 +254,197 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
             pointProcFaces[pointI].setSize(nCentres);
         }
     }
+
+    // Find cyclic boundary faces
+    forAll(pointCyclicBndFaces, pointI)
+    {
+        if (pointCyclicFaces[pointI].size())
+        {
+            if (pointBndFaces[pointI].size())
+            {
+                label faceID = pointCyclicFaces[pointI][0];
+                label patchID = mesh().boundaryMesh().whichPatch(faceID);
+
+                label start = mesh().boundaryMesh()[patchID].start();
+                label localFaceID = faceID - start;
+
+                const cyclicPolyPatch& cycPatch =
+                    refCast<const cyclicPolyPatch>
+                    (
+                        mesh().boundaryMesh()[patchID]
+                    );
+
+                const edgeList& coupledPoints = cycPatch.coupledPoints();
+                const labelList& meshPoints = cycPatch.meshPoints();
+
+                label sizeby2 = cycPatch.size()/2;
+
+//                 label ngbCycPointI = -1;
+                forAll(coupledPoints, pI)
+                {
+                    if (localFaceID < sizeby2)
+                    {
+                        if ( pointI == meshPoints[coupledPoints[pI][0]] )
+                        {
+                            pointCyclicBndFaces[pointI] =
+                                pointBndFaces
+                                [
+                                    meshPoints[coupledPoints[pI][1]]
+                                ];
+//                             ngbCycPointI = meshPoints[coupledPoints[pI][1]];
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        if ( pointI == meshPoints[coupledPoints[pI][1]] )
+                        {
+                            pointCyclicBndFaces[pointI] =
+                                pointBndFaces
+                                [
+                                    meshPoints[coupledPoints[pI][0]]
+                                ];
+//                             ngbCycPointI = meshPoints[coupledPoints[pI][0]];
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+#ifdef FOAMEXTEND
+    // Find cyclicGgi boundary faces
+    forAll(pointCyclicGgiBndFaces, pointI)
+    {
+        if (pointCyclicGgiFaces[pointI].size())
+        {
+            if (pointBndFaces[pointI].size())
+            {
+                label faceID = pointCyclicGgiFaces[pointI][0];
+                label patchID = mesh().boundaryMesh().whichPatch(faceID);
+
+                label start = mesh().boundaryMesh()[patchID].start();
+                label localFaceID = faceID - start;
+
+                const cyclicGgiPolyPatch& cycGgiPatch =
+                    refCast<const cyclicGgiPolyPatch>
+                    (
+                        mesh().boundaryMesh()[patchID]
+                    );
+
+                const labelListList& addr
+                    (
+                        cycGgiPatch.master() ?
+                        cycGgiPatch.patchToPatch().masterAddr()
+                      : cycGgiPatch.patchToPatch().slaveAddr()
+                    );
+
+                const labelList& zoneAddr =
+                    cycGgiPatch.zoneAddressing();
+
+                label zoneLocalFaceID =
+                    zoneAddr[localFaceID];
+
+                label ngbZoneLocalFaceID =
+                    addr[zoneLocalFaceID][0];
+
+                label ngbLocalFaceID =
+                    findIndex
+                    (
+                        cycGgiPatch.shadow().zoneAddressing(),
+                        ngbZoneLocalFaceID
+                    );
+
+                if (ngbLocalFaceID == -1)
+                {
+                    FatalErrorIn
+                    (
+                        "leastSquaresVolPointInterpolation"
+                        "::makePointFaces() const"
+                    )
+                        << "Can not find cyclic ggi patch ngb face id "
+                            << mesh().boundaryMesh()[patchID].name()
+                            << abort(FatalError);
+                }
+
+                const face& ngbFace =
+                    cycGgiPatch.shadow().localFaces()[ngbLocalFaceID];
+
+                const vectorField& p =
+                    cycGgiPatch.shadow().localPoints();
+                const labelList& meshPoints =
+                    cycGgiPatch.shadow().meshPoints();
+
+                scalar S = ngbFace.mag(p);
+                scalar L = ::sqrt(S);
+
+                label ngbPointI = -1;
+                scalar minDist = GREAT;
+                label minPointI = -1;
+                forAll(ngbFace, pI)
+                {
+                    vector transCurPoint = points[pointI];
+
+                    if (!cycGgiPatch.parallel())
+                    {
+                        transCurPoint =
+                            transform
+                            (
+                                cycGgiPatch.reverseT()[0],
+                                transCurPoint
+                            );
+                    }
+
+                    if (cycGgiPatch.separated())
+                    {
+                        transCurPoint += cycGgiPatch.separationOffset();
+                    }
+
+                    scalar dist =
+                        mag
+                        (
+                            p[ngbFace[pI]]
+                          - transCurPoint
+                        );
+
+                    if (dist < 1e-2*L)
+                    {
+                        ngbPointI = meshPoints[ngbFace[pI]];
+                        break;
+                    }
+
+                    if (dist < minDist)
+                    {
+                        minDist = dist;
+                        minPointI = meshPoints[ngbFace[pI]];
+                    }
+                }
+
+                if (ngbPointI == -1)
+                {
+                    FatalErrorIn
+                    (
+                        "leastSquaresVolPointInterpolation"
+                        "::makePointFaces() const"
+                    )
+                        << "Can not find cyclic ggi patch ngb point "
+                            << S << " " << L << " " << minDist << " "
+                            << mesh().boundaryMesh()[patchID].name() << " "
+                            << cycGgiPatch.master() << " "
+                            << cycGgiPatch.faceCentres()[localFaceID] << " "
+                            << cycGgiPatch.shadow().faceCentres()[ngbLocalFaceID] << " "
+                            << points[pointI] << " " << points[minPointI] << " "
+                            << transform(cycGgiPatch.reverseT()[0], points[pointI]) << " "
+                            << transform(cycGgiPatch.reverseT()[0], cycGgiPatch.faceCentres()[localFaceID])
+                            << abort(FatalError);
+                }
+
+                pointCyclicGgiBndFaces[pointI] = pointBndFaces[ngbPointI];
+            }
+        }
+    }
+#endif
 }
 
 void newLeastSquaresVolPointInterpolation::makeAxisEdges() const
@@ -227,7 +459,7 @@ void newLeastSquaresVolPointInterpolation::makeAxisEdges() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (axisEdgesPtr_)
+    if (!axisEdgesPtr_.empty())
     {
         FatalErrorIn
         (
@@ -293,7 +525,7 @@ void newLeastSquaresVolPointInterpolation::makeAxisEdges() const
         }
     }
 
-    axisEdgesPtr_ = new labelList(axisEdgeSet.toc());
+    axisEdgesPtr_.set(new labelList(axisEdgeSet.toc()));
 }
 
 void newLeastSquaresVolPointInterpolation::makePointAxisEdges() const
@@ -308,7 +540,7 @@ void newLeastSquaresVolPointInterpolation::makePointAxisEdges() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (pointAxisEdgesPtr_)
+    if (!pointAxisEdgesPtr_.empty())
     {
         FatalErrorIn
         (
@@ -319,10 +551,10 @@ void newLeastSquaresVolPointInterpolation::makePointAxisEdges() const
             << abort(FatalError);
     }
 
-    pointAxisEdgesPtr_ = new Map<labelList>();
+    pointAxisEdgesPtr_.set(new Map<labelList>());
 
     Map<labelList>& pointAxisEdges =
-        *pointAxisEdgesPtr_;
+        pointAxisEdgesPtr_();
 
     const edgeList& edges = mesh().edges();
 
@@ -396,7 +628,7 @@ makeGlobalPointNgbProcBndFaceCentres() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (globalPointNgbProcBndFaceCentresPtr_)
+    if (!globalPointNgbProcBndFaceCentresPtr_.empty())
     {
         FatalErrorIn
         (
@@ -407,10 +639,10 @@ makeGlobalPointNgbProcBndFaceCentres() const
                 << abort(FatalError);
     }
 
-    globalPointNgbProcBndFaceCentresPtr_ = new Map<vectorField>();
+    globalPointNgbProcBndFaceCentresPtr_.set(new Map<vectorField>());
 
     Map<vectorField>& globalPointNgbProcBndFaceCentres =
-        *globalPointNgbProcBndFaceCentresPtr_;
+        globalPointNgbProcBndFaceCentresPtr_();
 
     globalPointNgbProcBndFaceFieldData
     (
@@ -432,7 +664,7 @@ makeGlobalPointNgbProcCellCentres() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (globalPointNgbProcCellCentresPtr_)
+    if (!globalPointNgbProcCellCentresPtr_.empty())
     {
         FatalErrorIn
         (
@@ -443,10 +675,10 @@ makeGlobalPointNgbProcCellCentres() const
                 << abort(FatalError);
     }
 
-    globalPointNgbProcCellCentresPtr_ = new Map<vectorField>();
+    globalPointNgbProcCellCentresPtr_.set(new Map<vectorField>());
 
     Map<vectorField>& globalPointNgbProcCellCentres =
-        *globalPointNgbProcCellCentresPtr_;
+        globalPointNgbProcCellCentresPtr_();
 
     globalPointNgbProcCellFieldData(mesh().C(), globalPointNgbProcCellCentres);
 }
@@ -464,7 +696,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (procBndFacesPtr_)
+    if (!procBndFacesPtr_.empty())
     {
         FatalErrorIn
         (
@@ -475,19 +707,22 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
                 << abort(FatalError);
     }
 
-    procBndFacesPtr_ = new labelListList(Pstream::nProcs());
-    labelListList& procBndFaces = *procBndFacesPtr_;
+    procBndFacesPtr_.set(new labelListList(Pstream::nProcs()));
+    labelListList& procBndFaces = procBndFacesPtr_();
     forAll(procBndFaces, procI)
     {
         procBndFaces[procI] = labelList(0);
     }
 
-    pointProcBndFacesPtr_ = new List<List<labelPair> >
+    pointProcBndFacesPtr_.set
     (
-        mesh().points().size(),
-        List<labelPair>(0)
+        new List<List<labelPair> >
+        (
+            mesh().points().size(),
+            List<labelPair>(0)
+        )
     );
-    List<List<labelPair> >& pointProcBndFaces = *pointProcBndFacesPtr_;
+    List<List<labelPair> >& pointProcBndFaces = pointProcBndFacesPtr_();
 
 //     pointProcBndFacesPtr_ = new Map<List<labelPair> >();
 //     Map<List<labelPair> >& pointProcBndFaces = *pointProcBndFacesPtr_;
@@ -551,7 +786,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
 
 //                     if (curPointBndFaces.size())
 //                     {
-//                         Pout << procPatch.neighbProcNo()
+//                         Pout<< procPatch.neighbProcNo()
 //                             << ", "
 //                             << curMeshPoint
 //                             << ", "
@@ -563,25 +798,42 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
 
 //                         forAll(curPointBndFaces, fI)
 //                         {
-//                             Pout << ", " <<
+//                             Pout<< ", " <<
 //                                 mesh().boundaryMesh().whichPatch
 //                                 (
 //                                     curPointBndFaces[fI]
 //                                 );
 //                         }
-//                         Pout << endl;
+//                         Pout<< endl;
 //                     }
                 }
             }
 
             procBndFaces[procPatch.neighbProcNo()] = faceSet.toc();
 
-//             Pout << "xxxxxxxxxxxxxxxx"
-//                 << procBndFaces[procPatch.neighbProcNo()] << endl;
-
             // Point face addressing
             labelList patchPoints = pointSet.toc();
+
+#ifdef OPENFOAMFOUNDATION
+            // List(SLList) in the Foundation version doesn't work, maybe only
+            // for Type = labelPair, so we will do it manually
+            List<labelPair> patchPointsFaces(pointFaceSet.size());
+            {
+                label i = 0;
+                for
+                (
+                    typename SLList<labelPair>::const_iterator iter =
+                        pointFaceSet.begin();
+                    iter != pointFaceSet.end();
+                    ++iter
+                    )
+                {
+                    patchPointsFaces[i++] = iter();
+                }
+            }
+#else
             List<labelPair> patchPointsFaces(pointFaceSet);
+#endif
 
             labelListList patchPointFaces(patchPoints.size());
 
@@ -614,7 +866,11 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
             {
                 OPstream toNeighbProc
                 (
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                     // size of field
                 );
@@ -628,7 +884,11 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
             {
                 IPstream fromNeighbProc
                 (
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                     // size of field
                 );
@@ -682,7 +942,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (procBndFaceCentresPtr_)
+    if (!procBndFaceCentresPtr_.empty())
     {
         FatalErrorIn
         (
@@ -692,12 +952,14 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
                 << abort(FatalError);
     }
 
-    procBndFaceCentresPtr_ =
+    procBndFaceCentresPtr_.set
+    (
         new FieldField<Field, vector>
         (
             Pstream::nProcs()
-        );
-    FieldField<Field, vector>& procBndFaceCentres = *procBndFaceCentresPtr_;
+        )
+    );
+    FieldField<Field, vector>& procBndFaceCentres = procBndFaceCentresPtr_();
 
     const vectorField& Cf = mesh().faceCentres();
 
@@ -713,7 +975,11 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
                 {
                     OPstream toNeighbProc
                     (
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procI
                         // size of field
                     );
@@ -733,7 +999,11 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
                 {
                     IPstream fromNeighbProc
                     (
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procI
                         // size of field
                     );
@@ -770,7 +1040,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (procCellsPtr_)
+    if (!procCellsPtr_.empty())
     {
         FatalErrorIn
         (
@@ -780,15 +1050,15 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                 << abort(FatalError);
     }
 
-    procCellsPtr_ = new labelListList(Pstream::nProcs());
-    labelListList& procCells = *procCellsPtr_;
+    procCellsPtr_.set(new labelListList(Pstream::nProcs()));
+    labelListList& procCells = procCellsPtr_();
     forAll(procCells, procI)
     {
         procCells[procI] = labelList(0);
     }
 
-    pointProcCellsPtr_ = new Map<List<labelPair> >();
-    Map<List<labelPair> >& pointProcCells = *pointProcCellsPtr_;
+    pointProcCellsPtr_.set(new Map<List<labelPair> >());
+    Map<List<labelPair> >& pointProcCells = pointProcCellsPtr_();
 
     const labelListList& pointCells = mesh().pointCells();
 
@@ -861,7 +1131,26 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
             // Point cell addressing
             labelList patchPoints = pointSet.toc();
+#ifdef OPENFOAMFOUNDATION
+            // List(SLList) in the Foundation version doesn't work, maybe only
+            // for Type = labelPair, so we will do it manually
+            List<labelPair> patchPointsCells(pointCellSet.size());
+            {
+                label i = 0;
+                for
+                (
+                    typename SLList<labelPair>::const_iterator iter =
+                        pointCellSet.begin();
+                    iter != pointCellSet.end();
+                    ++iter
+                    )
+                {
+                    patchPointsCells[i++] = iter();
+                }
+            }
+#else
             List<labelPair> patchPointsCells(pointCellSet);
+#endif
 
             labelListList patchPointCells(patchPoints.size());
 
@@ -898,7 +1187,11 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
             {
                 OPstream toNeighbProc
                 (
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                     // size of field
 //                   + 2*patchPoints.size()*sizeof(label)
@@ -933,7 +1226,11 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
             {
                 IPstream fromNeighbProc
                 (
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                     // size of field
                 );
@@ -987,7 +1284,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (procCellCentresPtr_)
+    if (!procCellCentresPtr_.empty())
     {
         FatalErrorIn
         (
@@ -997,12 +1294,14 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
                 << abort(FatalError);
     }
 
-    procCellCentresPtr_ =
+    procCellCentresPtr_.set
+    (
         new FieldField<Field, vector>
         (
             Pstream::nProcs()
-        );
-    FieldField<Field, vector>& procCellCentres = *procCellCentresPtr_;
+        )
+    );
+    FieldField<Field, vector>& procCellCentres = procCellCentresPtr_();
 
 //     const vectorField& CI = mesh().C().internalField();
     const vectorField& CI = mesh().cellCentres();
@@ -1019,7 +1318,11 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
                 {
                     OPstream toNeighbProc
                     (
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procI
                         // size of field
                     );
@@ -1039,7 +1342,11 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
                 {
                     IPstream fromNeighbProc
                     (
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procI
                         // size of field
                     );
@@ -1076,7 +1383,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (weightsPtr_)
+    if (!weightsPtr_.empty())
     {
         FatalErrorIn
         (
@@ -1086,9 +1393,11 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
             << abort(FatalError);
     }
 
-    weightsPtr_ =
-        new FieldField<Field, scalar>(mesh().points().size());
-    FieldField<Field, scalar>& weights = *weightsPtr_;
+    weightsPtr_.set
+    (
+        new FieldField<Field, scalar>(mesh().points().size())
+    );
+    FieldField<Field, scalar>& weights = weightsPtr_();
 
     const vectorField& p = mesh().points();
     const vectorField& C = mesh().cellCentres();
@@ -1097,6 +1406,11 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
     const labelListList& ptCells = mesh().pointCells();
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
+    const labelListList& ptCyclicBndFaces = pointCyclicBndFaces();
+#ifdef FOAMEXTEND
+    const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
+    const labelListList& ptCyclicGgiBndFaces = pointCyclicGgiBndFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
 //     const Map<vectorField>& ptNgbProcBndFaceCentres =
@@ -1122,6 +1436,11 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
         const labelList& interpCells = ptCells[pointI];
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
+        const labelList& interpCyclicBndFaces = ptCyclicBndFaces[pointI];
+#ifdef FOAMEXTEND
+        const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
+        const labelList& interpCyclicGgiBndFaces = ptCyclicGgiBndFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
 //         vectorField interpNgbProcBndFaceCentres(0);
@@ -1199,8 +1518,13 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
             interpCells.size()
           + interpBndFaces.size()
           + interpCyclicFaces.size()
+          + interpCyclicBndFaces.size()
+#ifdef FOAMEXTEND
+          + interpCyclicGgiFaces.size()
+          + interpCyclicGgiBndFaces.size()
+#endif
           + interpProcFaces.size()
-//           + interpNgbProcBndFaceCentres.size()
+//        + interpNgbProcBndFaceCentres.size()
           + glInterpNgbProcBndFaceCentres.size()
           + glInterpNgbProcCellCentres.size()
           + interpNgbProcCellCentres.size()
@@ -1236,31 +1560,325 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
             const unallocLabelList& faceCells =
                 mesh().boundary()[patchID].faceCells();
 
+            const cyclicFvPatch& cycPatch =
+                refCast<const cyclicFvPatch>(mesh().boundary()[patchID]);
+
             label sizeby2 = faceCells.size()/2;
 
-            if (localFaceID < sizeby2)
+            if (cycPatch.parallel())
             {
-                vector delta =
-                    C[faceCells[localFaceID + sizeby2]]
-                  - mesh().Cf().boundaryField()[patchID]
-                    [
-                        localFaceID + sizeby2
-                    ];
+                if (localFaceID < sizeby2)
+                {
+                    vector deltaNgb = //dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID + sizeby2
+                        ]
+                      - C[faceCells[localFaceID + sizeby2]];
 
-                allPoints[pointID++] = Cf[faceID] + delta;
+                    vector deltaOwn = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta = deltaOwn - deltaNgb;
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+                }
+                else
+                {
+                    vector deltaNgb = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID - sizeby2
+                        ]
+                      - C[faceCells[localFaceID - sizeby2]];
+
+                    vector deltaOwn = //dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta = deltaNgb - deltaOwn;
+                    delta *= -1;
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+                }
             }
             else
             {
-                vector delta =
-                    C[faceCells[localFaceID - sizeby2]]
-                  - mesh().Cf().boundaryField()[patchID]
-                    [
-                        localFaceID - sizeby2
-                    ];
+                if (localFaceID < sizeby2)
+                {
+                    vector deltaNgb = // dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID + sizeby2
+                        ]
+                      - C[faceCells[localFaceID + sizeby2]];
 
-                allPoints[pointID++] = Cf[faceID] + delta;
+                    vector deltaOwn = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta =
+                        deltaOwn
+                      - transform(cycPatch.forwardT()[0], deltaNgb);
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+                }
+                else
+                {
+                    vector deltaNgb = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID - sizeby2
+                        ]
+                      - C[faceCells[localFaceID - sizeby2]];
+
+                    vector deltaOwn = //dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta =
+                        deltaNgb
+                      - transform(cycPatch.forwardT()[0], deltaOwn);
+
+                    delta = -transform(cycPatch.reverseT()[0], delta);
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+                }
             }
         }
+
+        for (label i=0; i<interpCyclicBndFaces.size(); i++)
+        {
+            label cycFaceID = interpCyclicFaces[0];
+            label cycPatchID = mesh().boundaryMesh().whichPatch(cycFaceID);
+            label cycStart = mesh().boundaryMesh()[cycPatchID].start();
+            label cycLocalFaceID = cycFaceID - cycStart;
+
+            const cyclicFvPatch& cycPatch =
+                refCast<const cyclicFvPatch>(mesh().boundary()[cycPatchID]);
+
+            const cyclicPolyPatch& cycPolyPatch =
+                refCast<const cyclicPolyPatch>
+                (
+                    mesh().boundaryMesh()[cycPatchID]
+                );
+
+            label faceID = interpCyclicBndFaces[i];
+
+            const edgeList& coupledPoints = cycPolyPatch.coupledPoints();
+            const labelList& meshPoints = cycPolyPatch.meshPoints();
+
+            label sizeby2 = cycPolyPatch.size()/2;
+
+            label ngbCycPointI = -1;
+            forAll(coupledPoints, pI)
+            {
+                if (cycLocalFaceID < sizeby2)
+                {
+                    if ( pointI == meshPoints[coupledPoints[pI][0]] )
+                    {
+                        ngbCycPointI = meshPoints[coupledPoints[pI][1]];
+                        break;
+                    }
+                }
+                else
+                {
+                    if ( pointI == meshPoints[coupledPoints[pI][1]] )
+                    {
+                        ngbCycPointI = meshPoints[coupledPoints[pI][0]];
+                        break;
+                    }
+                }
+            }
+
+            if (cycPatch.parallel())
+            {
+                vector deltaNgb = //dni
+                    Cf[faceID] - p[ngbCycPointI];
+
+                allPoints[pointID++] = p[pointI] + deltaNgb;
+            }
+            else
+            {
+                vector deltaNgb = //dni
+                    Cf[faceID] - p[ngbCycPointI];
+
+
+                if (cycLocalFaceID < sizeby2)
+                {
+                    allPoints[pointID++] =
+                        p[pointI]
+                      + transform(cycPatch.forwardT()[0], deltaNgb);
+                }
+                else
+                {
+                    allPoints[pointID++] =
+                        p[pointI]
+                      + transform(cycPatch.reverseT()[0], deltaNgb);
+                }
+            }
+        }
+
+#ifdef FOAMEXTEND
+        // Cyclic ggi boundary faces
+        for (label i=0; i<interpCyclicGgiFaces.size(); i++)
+        {
+            label faceID = interpCyclicGgiFaces[i];
+            label patchID = mesh().boundaryMesh().whichPatch(faceID);
+
+            label start = mesh().boundaryMesh()[patchID].start();
+            label localFaceID = faceID - start;
+
+            const cyclicGgiPolyPatch& cycGgiPatch =
+                refCast<const cyclicGgiPolyPatch>
+                (
+                    mesh().boundaryMesh()[patchID]
+                );
+
+            const vectorField& rfcc =
+                cycGgiPatch.reconFaceCellCentres();
+
+            allPoints[pointID++] = rfcc[localFaceID];
+        }
+
+        if (interpCyclicGgiBndFaces.size())
+        {
+            label cycGgiFaceID = interpCyclicGgiFaces[0];
+            label cycGgiPatchID =
+                mesh().boundaryMesh().whichPatch(cycGgiFaceID);
+            label cycGgiStart = mesh().boundaryMesh()[cycGgiPatchID].start();
+            label cycGgiLocalFaceID = cycGgiFaceID - cycGgiStart;
+
+            const cyclicGgiPolyPatch& cycGgiPatch =
+                refCast<const cyclicGgiPolyPatch>
+                (
+                    mesh().boundaryMesh()[cycGgiPatchID]
+                );
+
+            const labelListList& addr
+                (
+                    cycGgiPatch.master() ?
+                    cycGgiPatch.patchToPatch().masterAddr()
+                  : cycGgiPatch.patchToPatch().slaveAddr()
+                );
+
+            const labelList& zoneAddr =
+                cycGgiPatch.zoneAddressing();
+
+            label zoneLocalFaceID = zoneAddr[cycGgiLocalFaceID];
+
+            label ngbZoneLocalFaceID = addr[zoneLocalFaceID][0];
+
+            label ngbLocalFaceID =
+                findIndex
+                (
+                    cycGgiPatch.shadow().zoneAddressing(),
+                    ngbZoneLocalFaceID
+                );
+            if (ngbLocalFaceID == -1)
+            {
+                FatalErrorIn
+                (
+                    "leastSquaresVolPointInterpolation"
+                    "::makeWeights() const"
+                )
+                    << "Can not find cyclic ggi patch ngb face id"
+                        << abort(FatalError);
+            }
+
+            const face& ngbFace =
+                cycGgiPatch.shadow().localFaces()[ngbLocalFaceID];
+
+            const vectorField& lp =
+                cycGgiPatch.shadow().localPoints();
+            const labelList& meshPoints =
+                cycGgiPatch.shadow().meshPoints();
+
+            scalar S = ngbFace.mag(lp);
+            scalar L = ::sqrt(S);
+
+            label ngbPointI = -1;
+            forAll(ngbFace, pI)
+            {
+                vector transCurPoint = p[pointI];
+
+                if (!cycGgiPatch.parallel())
+                {
+                    transCurPoint =
+                        transform
+                        (
+                            cycGgiPatch.reverseT()[0],
+                            transCurPoint
+                        );
+                }
+
+                if (cycGgiPatch.separated())
+                {
+                    transCurPoint += cycGgiPatch.separationOffset();
+                }
+
+                scalar dist =
+                    mag
+                    (
+                        lp[ngbFace[pI]]
+                      - transCurPoint
+                    );
+
+                if (dist < 1e-2*L)
+                {
+                    ngbPointI = meshPoints[ngbFace[pI]];
+                    break;
+                }
+            }
+
+            if (ngbPointI == -1)
+            {
+                FatalErrorIn
+                (
+                    "leastSquaresVolPointInterpolation"
+                    "::makeWeights() const"
+                )
+                    << "Can not find cyclic ggi patch ngb point"
+                        << abort(FatalError);
+            }
+
+
+            for (label i=0; i<interpCyclicGgiBndFaces.size(); i++)
+            {
+                label faceID = interpCyclicGgiBndFaces[i];
+
+                if (cycGgiPatch.parallel())
+                {
+                    vector deltaNgb = //dni
+                        Cf[faceID] - p[ngbPointI];
+
+                    allPoints[pointID++] = p[pointI] + deltaNgb;
+                }
+                else
+                {
+                    vector deltaNgb = //dni
+                        Cf[faceID] - p[ngbPointI];
+
+                    allPoints[pointID++] =
+                        p[pointI]
+                      + transform(cycGgiPatch.forwardT()[0], deltaNgb);
+                }
+            }
+        }
+#endif
 
         // Processor boundary faces
         for (label i=0; i<interpProcFaces.size(); i++)
@@ -1361,7 +1979,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (originsPtr_)
+    if (!originsPtr_.empty())
     {
         FatalErrorIn
         (
@@ -1371,9 +1989,12 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
             << abort(FatalError);
     }
 
-    originsPtr_ = new vectorField(mesh().points().size(), vector::zero);
-    vectorField& origins = *originsPtr_;
-
+    originsPtr_.set(new vectorField(mesh().points().size(), vector::zero));
+    vectorField& origins = originsPtr_();
+    
+    refLPtr_.set(new scalarField(mesh().points().size(), 0));
+    scalarField& refL = refLPtr_();
+    
     const FieldField<Field, scalar>& w = weights();
 
     const vectorField& p = mesh().points();
@@ -1383,6 +2004,11 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
     const labelListList& ptCells = mesh().pointCells();
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
+    const labelListList& ptCyclicBndFaces = pointCyclicBndFaces();
+#ifdef FOAMEXTEND
+    const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
+    const labelListList& ptCyclicGgiBndFaces = pointCyclicGgiBndFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
 //     const Map<vectorField> ptNgbProcBndFaceCentres =
@@ -1390,7 +2016,6 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
     const Map<vectorField> gPtNgbProcBndFaceCentres =
         globalPointNgbProcBndFaceCentres();
-
     const Map<vectorField> gPtNgbProcCellCentres =
         globalPointNgbProcCellCentres();
 
@@ -1407,6 +2032,11 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
         const labelList& interpCells = ptCells[pointI];
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
+        const labelList& interpCyclicBndFaces = ptCyclicBndFaces[pointI];
+#ifdef FOAMEXTEND
+        const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
+        const labelList& interpCyclicGgiBndFaces = ptCyclicGgiBndFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
 //         vectorField interpNgbProcBndFaceCentres(0);
@@ -1484,6 +2114,11 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
             interpCells.size()
           + interpBndFaces.size()
           + interpCyclicFaces.size()
+          + interpCyclicBndFaces.size()
+#ifdef FOAMEXTEND
+          + interpCyclicGgiFaces.size()
+          + interpCyclicGgiBndFaces.size()
+#endif
           + interpProcFaces.size()
 //           + interpNgbProcBndFaceCentres.size()
           + glInterpNgbProcBndFaceCentres.size()
@@ -1521,40 +2156,386 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
             const unallocLabelList& faceCells =
                 mesh().boundary()[patchID].faceCells();
 
+            const cyclicFvPatch& cycPatch =
+                refCast<const cyclicFvPatch>(mesh().boundary()[patchID]);
+
             label sizeby2 = faceCells.size()/2;
 
-            if (localFaceID < sizeby2)
+            if (cycPatch.parallel())
             {
-                vector delta =
-                    C[faceCells[localFaceID + sizeby2]]
-                  - mesh().Cf().boundaryField()[patchID]
-                    [
-                        localFaceID + sizeby2
-                    ];
+                if (localFaceID < sizeby2)
+                {
+                    vector deltaNgb = //dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID + sizeby2
+                        ]
+                      - C[faceCells[localFaceID + sizeby2]];
 
-                allPoints[pointID++] = Cf[faceID] + delta;
+                    vector deltaOwn = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta = deltaOwn - deltaNgb;
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+                }
+                else
+                {
+                    vector deltaNgb = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID - sizeby2
+                        ]
+                      - C[faceCells[localFaceID - sizeby2]];
+
+                    vector deltaOwn = //dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta = deltaNgb - deltaOwn;
+                    delta *= -1;
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+                }
             }
             else
             {
-                vector delta =
-                    C[faceCells[localFaceID - sizeby2]]
-                  - mesh().Cf().boundaryField()[patchID]
-                    [
-                        localFaceID - sizeby2
-                    ];
+                if (localFaceID < sizeby2)
+                {
+                    vector deltaNgb = // dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID + sizeby2
+                        ]
+                      - C[faceCells[localFaceID + sizeby2]];
 
-                allPoints[pointID++] = Cf[faceID] + delta;
+                    vector deltaOwn = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta =
+                        deltaOwn
+                      - transform(cycPatch.forwardT()[0], deltaNgb);
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+
+//                     Info << "own: " <<
+//                         mesh().Cf().boundaryField()[patchID]
+//                         [
+//                             localFaceID
+//                         ] << ", "
+//                         << C[faceCells[localFaceID]]
+//                         << ", " << C[faceCells[localFaceID]] + delta
+//                         << endl;
+                }
+                else
+                {
+                    vector deltaNgb = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID - sizeby2
+                        ]
+                      - C[faceCells[localFaceID - sizeby2]];
+
+                    vector deltaOwn = //dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta =
+                        deltaNgb
+                      - transform(cycPatch.forwardT()[0], deltaOwn);
+
+                    delta = -transform(cycPatch.reverseT()[0], delta);
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+
+//                     Info << "ngb: " <<
+//                         mesh().Cf().boundaryField()[patchID]
+//                         [
+//                             localFaceID
+//                         ] << ", "
+//                         << C[faceCells[localFaceID]]
+//                         << ", " << C[faceCells[localFaceID]] + delta
+//                         << endl;
+                }
             }
+
+//             label faceID = interpCyclicFaces[i];
+//             label patchID = mesh().boundaryMesh().whichPatch(faceID);
+
+//             label start = mesh().boundaryMesh()[patchID].start();
+//             label localFaceID = faceID - start;
+
+//             const unallocLabelList& faceCells =
+//                 mesh().boundary()[patchID].faceCells();
+
+//             label sizeby2 = faceCells.size()/2;
 
 //             if (localFaceID < sizeby2)
 //             {
-//                 allPoints[pointID++] = C[faceCells[localFaceID + sizeby2]];
+//                 vector delta =
+//                     C[faceCells[localFaceID + sizeby2]]
+//                   - mesh().Cf().boundaryField()[patchID]
+//                     [
+//                         localFaceID + sizeby2
+//                     ];
+
+//                 allPoints[pointID++] = Cf[faceID] + delta;
 //             }
 //             else
 //             {
-//                 allPoints[pointID++] = C[faceCells[localFaceID - sizeby2]];
+//                 vector delta =
+//                     C[faceCells[localFaceID - sizeby2]]
+//                   - mesh().Cf().boundaryField()[patchID]
+//                     [
+//                         localFaceID - sizeby2
+//                     ];
+
+//                 allPoints[pointID++] = Cf[faceID] + delta;
 //             }
         }
+
+        for (label i=0; i<interpCyclicBndFaces.size(); i++)
+        {
+            label cycFaceID = interpCyclicFaces[0];
+            label cycPatchID = mesh().boundaryMesh().whichPatch(cycFaceID);
+            label cycStart = mesh().boundaryMesh()[cycPatchID].start();
+            label cycLocalFaceID = cycFaceID - cycStart;
+
+            const cyclicFvPatch& cycPatch =
+                refCast<const cyclicFvPatch>(mesh().boundary()[cycPatchID]);
+
+            const cyclicPolyPatch& cycPolyPatch =
+                refCast<const cyclicPolyPatch>
+                (
+                    mesh().boundaryMesh()[cycPatchID]
+                );
+
+            label faceID = interpCyclicBndFaces[i];
+
+            const edgeList& coupledPoints = cycPolyPatch.coupledPoints();
+            const labelList& meshPoints = cycPolyPatch.meshPoints();
+
+            label sizeby2 = cycPolyPatch.size()/2;
+
+            label ngbCycPointI = -1;
+            forAll(coupledPoints, pI)
+            {
+                if (cycLocalFaceID < sizeby2)
+                {
+                    if ( pointI == meshPoints[coupledPoints[pI][0]] )
+                    {
+                        ngbCycPointI = meshPoints[coupledPoints[pI][1]];
+                        break;
+                    }
+                }
+                else
+                {
+                    if ( pointI == meshPoints[coupledPoints[pI][1]] )
+                    {
+                        ngbCycPointI = meshPoints[coupledPoints[pI][0]];
+                        break;
+                    }
+                }
+            }
+
+            if (cycPatch.parallel())
+            {
+                vector deltaNgb = //dni
+                    Cf[faceID] - p[ngbCycPointI];
+
+                allPoints[pointID++] = p[pointI] + deltaNgb;
+            }
+            else
+            {
+                vector deltaNgb = //dni
+                    Cf[faceID] - p[ngbCycPointI];
+
+
+                if (cycLocalFaceID < sizeby2)
+                {
+                    allPoints[pointID++] =
+                        p[pointI]
+                      + transform(cycPatch.forwardT()[0], deltaNgb);
+                }
+                else
+                {
+                    allPoints[pointID++] =
+                        p[pointI]
+                      + transform(cycPatch.reverseT()[0], deltaNgb);
+                }
+            }
+        }
+
+#ifdef FOAMEXTEND
+        // Cyclic ggi boundary faces
+        for (label i=0; i<interpCyclicGgiFaces.size(); i++)
+        {
+            label faceID = interpCyclicGgiFaces[i];
+            label patchID = mesh().boundaryMesh().whichPatch(faceID);
+
+            label start = mesh().boundaryMesh()[patchID].start();
+            label localFaceID = faceID - start;
+
+            const cyclicGgiPolyPatch& cycGgiPatch =
+                refCast<const cyclicGgiPolyPatch>
+                (
+                    mesh().boundaryMesh()[patchID]
+                );
+
+            const vectorField& rfcc =
+                cycGgiPatch.reconFaceCellCentres();
+
+            allPoints[pointID++] = rfcc[localFaceID];
+        }
+
+        if (interpCyclicGgiBndFaces.size())
+        {
+            label cycGgiFaceID = interpCyclicGgiFaces[0];
+            label cycGgiPatchID =
+                mesh().boundaryMesh().whichPatch(cycGgiFaceID);
+            label cycGgiStart = mesh().boundaryMesh()[cycGgiPatchID].start();
+            label cycGgiLocalFaceID = cycGgiFaceID - cycGgiStart;
+
+            const cyclicGgiPolyPatch& cycGgiPatch =
+                refCast<const cyclicGgiPolyPatch>
+                (
+                    mesh().boundaryMesh()[cycGgiPatchID]
+                );
+
+            const labelListList& addr
+                (
+                    cycGgiPatch.master() ?
+                    cycGgiPatch.patchToPatch().masterAddr()
+                  : cycGgiPatch.patchToPatch().slaveAddr()
+                );
+
+            const labelList& zoneAddr =
+                cycGgiPatch.zoneAddressing();
+
+            label zoneLocalFaceID = zoneAddr[cycGgiLocalFaceID];
+
+            label ngbZoneLocalFaceID = addr[zoneLocalFaceID][0];
+
+            label ngbLocalFaceID =
+                findIndex
+                (
+                    cycGgiPatch.shadow().zoneAddressing(),
+                    ngbZoneLocalFaceID
+                );
+            if (ngbLocalFaceID == -1)
+            {
+                FatalErrorIn
+                (
+                    "leastSquaresVolPointInterpolation"
+                    "::makeOrigins() const"
+                )
+                    << "Can not find cyclic ggi patch ngb face id"
+                        << abort(FatalError);
+            }
+
+            const face& ngbFace =
+                cycGgiPatch.shadow().localFaces()[ngbLocalFaceID];
+
+            const vectorField& lp =
+                cycGgiPatch.shadow().localPoints();
+            const labelList& meshPoints =
+                cycGgiPatch.shadow().meshPoints();
+
+            scalar S = ngbFace.mag(lp);
+            scalar L = ::sqrt(S);
+
+            label ngbPointI = -1;
+            forAll(ngbFace, pI)
+            {
+                vector transCurPoint = p[pointI];
+
+                if (!cycGgiPatch.parallel())
+                {
+                    transCurPoint =
+                        transform
+                        (
+                            cycGgiPatch.reverseT()[0],
+                            transCurPoint
+                        );
+                }
+
+                if (cycGgiPatch.separated())
+                {
+                    transCurPoint += cycGgiPatch.separationOffset();
+                }
+
+                scalar dist =
+                    mag
+                    (
+                        lp[ngbFace[pI]]
+                      - transCurPoint
+                    );
+
+//                 scalar dist =
+//                     mag
+//                     (
+//                         lp[ngbFace[pI]]
+//                       - transform
+//                         (
+//                             cycGgiPatch.reverseT()[0],
+//                             p[pointI]
+//                         )
+//                     );
+                if (dist < 1e-2*L)
+                {
+                    ngbPointI = meshPoints[ngbFace[pI]];
+                    break;
+                }
+            }
+            if (ngbPointI == -1)
+            {
+                FatalErrorIn
+                (
+                    "leastSquaresVolPointInterpolation"
+                    "::makeOrigins() const"
+                )
+                    << "Can not find cyclic ggi patch ngb point"
+                        << abort(FatalError);
+            }
+
+
+            for (label i=0; i<interpCyclicGgiBndFaces.size(); i++)
+            {
+                label faceID = interpCyclicGgiBndFaces[i];
+
+                if (cycGgiPatch.parallel())
+                {
+                    vector deltaNgb = //dni
+                        Cf[faceID] - p[ngbPointI];
+
+                    allPoints[pointID++] = p[pointI] + deltaNgb;
+                }
+                else
+                {
+                    vector deltaNgb = //dni
+                        Cf[faceID] - p[ngbPointI];
+
+                    allPoints[pointID++] =
+                        p[pointI]
+                      + transform(cycGgiPatch.forwardT()[0], deltaNgb);
+                }
+            }
+        }
+#endif
 
         // Processor boundary faces
         for (label i=0; i<interpProcFaces.size(); i++)
@@ -1633,6 +2614,11 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
         }
 
         origins[pointI] /= sum(sqr(W));
+
+        // PC, for now, disable as it negatively affects the coupled solver
+        //boundBox bb(allPoints, false);
+        //refL[pointI] = mag(bb.max() - bb.min())/2;
+        refL[pointI] = 1.0;
     }
 }
 
@@ -1666,6 +2652,11 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
     const labelListList& ptCells = mesh().pointCells();
     const labelListList& ptBndFaces = pointBndFaces();
     const labelListList& ptCyclicFaces = pointCyclicFaces();
+    const labelListList& ptCyclicBndFaces = pointCyclicBndFaces();
+#ifdef FOAMEXTEND
+    const labelListList& ptCyclicGgiFaces = pointCyclicGgiFaces();
+    const labelListList& ptCyclicGgiBndFaces = pointCyclicGgiBndFaces();
+#endif
     const labelListList& ptProcFaces = pointProcFaces();
 
 //     const Map<vectorField>& ptNgbProcBndFaceCentres =
@@ -1687,13 +2678,22 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
     const FieldField<Field, scalar>& w = weights();
     const vectorField& o = origins();
 
+    const scalarField& L = refL();
+
     label nCoeffs = 3;
+
+    scalarField D(invLsMatrices_.size(), 0);
 
     forAll(invLsMatrices_, pointI)
     {
         const labelList& interpCells = ptCells[pointI];
         const labelList& interpBndFaces = ptBndFaces[pointI];
         const labelList& interpCyclicFaces = ptCyclicFaces[pointI];
+        const labelList& interpCyclicBndFaces = ptCyclicBndFaces[pointI];
+#ifdef FOAMEXTEND
+        const labelList& interpCyclicGgiFaces = ptCyclicGgiFaces[pointI];
+        const labelList& interpCyclicGgiBndFaces = ptCyclicGgiBndFaces[pointI];
+#endif
         const labelList& interpProcFaces = ptProcFaces[pointI];
 
 //         vectorField interpNgbProcBndFaceCentres(0);// = vectorField::null();
@@ -1771,6 +2771,11 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
             interpCells.size()
           + interpBndFaces.size()
           + interpCyclicFaces.size()
+          + interpCyclicBndFaces.size()
+#ifdef FOAMEXTEND
+          + interpCyclicGgiFaces.size()
+          + interpCyclicGgiBndFaces.size()
+#endif
           + interpProcFaces.size()
 //           + interpNgbProcBndFaceCentres.size()
           + glInterpNgbProcBndFaceCentres.size()
@@ -1808,40 +2813,386 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
             const unallocLabelList& faceCells =
                 mesh().boundary()[patchID].faceCells();
 
+            const cyclicFvPatch& cycPatch =
+                refCast<const cyclicFvPatch>(mesh().boundary()[patchID]);
+
             label sizeby2 = faceCells.size()/2;
 
-            if (localFaceID < sizeby2)
+            if (cycPatch.parallel())
             {
-                vector delta =
-                    C[faceCells[localFaceID + sizeby2]]
-                  - mesh().Cf().boundaryField()[patchID]
-                    [
-                        localFaceID + sizeby2
-                    ];
+                if (localFaceID < sizeby2)
+                {
+                    vector deltaNgb = //dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID + sizeby2
+                        ]
+                      - C[faceCells[localFaceID + sizeby2]];
 
-                allPoints[pointID++] = Cf[faceID] + delta;
+                    vector deltaOwn = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta = deltaOwn - deltaNgb;
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+                }
+                else
+                {
+                    vector deltaNgb = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID - sizeby2
+                        ]
+                      - C[faceCells[localFaceID - sizeby2]];
+
+                    vector deltaOwn = //dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta = deltaNgb - deltaOwn;
+                    delta *= -1;
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+                }
             }
             else
             {
-                vector delta =
-                    C[faceCells[localFaceID - sizeby2]]
-                  - mesh().Cf().boundaryField()[patchID]
-                    [
-                        localFaceID - sizeby2
-                    ];
+                if (localFaceID < sizeby2)
+                {
+                    vector deltaNgb = // dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID + sizeby2
+                        ]
+                      - C[faceCells[localFaceID + sizeby2]];
 
-                allPoints[pointID++] = Cf[faceID] + delta;
+                    vector deltaOwn = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta =
+                        deltaOwn
+                      - transform(cycPatch.forwardT()[0], deltaNgb);
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+
+//                     Info << "own: " <<
+//                         mesh().Cf().boundaryField()[patchID]
+//                         [
+//                             localFaceID
+//                         ] << ", "
+//                         << C[faceCells[localFaceID]]
+//                         << ", " << C[faceCells[localFaceID]] + delta
+//                         << endl;
+                }
+                else
+                {
+                    vector deltaNgb = //ddi
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID - sizeby2
+                        ]
+                      - C[faceCells[localFaceID - sizeby2]];
+
+                    vector deltaOwn = //dni
+                        mesh().Cf().boundaryField()[patchID]
+                        [
+                            localFaceID
+                        ]
+                      - C[faceCells[localFaceID]];
+
+                    vector delta =
+                        deltaNgb
+                      - transform(cycPatch.forwardT()[0], deltaOwn);
+
+                    delta = -transform(cycPatch.reverseT()[0], delta);
+
+                    allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
+
+//                     Info << "ngb: " <<
+//                         mesh().Cf().boundaryField()[patchID]
+//                         [
+//                             localFaceID
+//                         ] << ", "
+//                         << C[faceCells[localFaceID]]
+//                         << ", " << C[faceCells[localFaceID]] + delta
+//                         << endl;
+                }
             }
+
+//             label faceID = interpCyclicFaces[i];
+//             label patchID = mesh().boundaryMesh().whichPatch(faceID);
+
+//             label start = mesh().boundaryMesh()[patchID].start();
+//             label localFaceID = faceID - start;
+
+//             const unallocLabelList& faceCells =
+//                 mesh().boundary()[patchID].faceCells();
+
+//             label sizeby2 = faceCells.size()/2;
 
 //             if (localFaceID < sizeby2)
 //             {
-//                 allPoints[pointID++] = C[faceCells[localFaceID + sizeby2]];
+//                 vector delta =
+//                     C[faceCells[localFaceID + sizeby2]]
+//                   - mesh().Cf().boundaryField()[patchID]
+//                     [
+//                         localFaceID + sizeby2
+//                     ];
+
+//                 allPoints[pointID++] = Cf[faceID] + delta;
 //             }
 //             else
 //             {
-//                 allPoints[pointID++] = C[faceCells[localFaceID - sizeby2]];
+//                 vector delta =
+//                     C[faceCells[localFaceID - sizeby2]]
+//                   - mesh().Cf().boundaryField()[patchID]
+//                     [
+//                         localFaceID - sizeby2
+//                     ];
+
+//                 allPoints[pointID++] = Cf[faceID] + delta;
 //             }
         }
+
+        for (label i=0; i<interpCyclicBndFaces.size(); i++)
+        {
+            label cycFaceID = interpCyclicFaces[0];
+            label cycPatchID = mesh().boundaryMesh().whichPatch(cycFaceID);
+            label cycStart = mesh().boundaryMesh()[cycPatchID].start();
+            label cycLocalFaceID = cycFaceID - cycStart;
+
+            const cyclicFvPatch& cycPatch =
+                refCast<const cyclicFvPatch>(mesh().boundary()[cycPatchID]);
+
+            const cyclicPolyPatch& cycPolyPatch =
+                refCast<const cyclicPolyPatch>
+                (
+                    mesh().boundaryMesh()[cycPatchID]
+                );
+
+            label faceID = interpCyclicBndFaces[i];
+
+            const edgeList& coupledPoints = cycPolyPatch.coupledPoints();
+            const labelList& meshPoints = cycPolyPatch.meshPoints();
+
+            label sizeby2 = cycPolyPatch.size()/2;
+
+            label ngbCycPointI = -1;
+            forAll(coupledPoints, pI)
+            {
+                if (cycLocalFaceID < sizeby2)
+                {
+                    if ( pointI == meshPoints[coupledPoints[pI][0]] )
+                    {
+                        ngbCycPointI = meshPoints[coupledPoints[pI][1]];
+                        break;
+                    }
+                }
+                else
+                {
+                    if ( pointI == meshPoints[coupledPoints[pI][1]] )
+                    {
+                        ngbCycPointI = meshPoints[coupledPoints[pI][0]];
+                        break;
+                    }
+                }
+            }
+
+            if (cycPatch.parallel())
+            {
+                vector deltaNgb = //dni
+                    Cf[faceID] - p[ngbCycPointI];
+
+                allPoints[pointID++] = p[pointI] + deltaNgb;
+            }
+            else
+            {
+                vector deltaNgb = //dni
+                    Cf[faceID] - p[ngbCycPointI];
+
+
+                if (cycLocalFaceID < sizeby2)
+                {
+                    allPoints[pointID++] =
+                        p[pointI]
+                      + transform(cycPatch.forwardT()[0], deltaNgb);
+                }
+                else
+                {
+                    allPoints[pointID++] =
+                        p[pointI]
+                      + transform(cycPatch.reverseT()[0], deltaNgb);
+                }
+            }
+        }
+
+#ifdef FOAMEXTEND
+        // Cyclic ggi boundary faces
+        for (label i=0; i<interpCyclicGgiFaces.size(); i++)
+        {
+            label faceID = interpCyclicGgiFaces[i];
+            label patchID = mesh().boundaryMesh().whichPatch(faceID);
+
+            label start = mesh().boundaryMesh()[patchID].start();
+            label localFaceID = faceID - start;
+
+            const cyclicGgiPolyPatch& cycGgiPatch =
+                refCast<const cyclicGgiPolyPatch>
+                (
+                    mesh().boundaryMesh()[patchID]
+                );
+
+            const vectorField& rfcc =
+                cycGgiPatch.reconFaceCellCentres();
+
+            allPoints[pointID++] = rfcc[localFaceID];
+        }
+
+        if (interpCyclicGgiBndFaces.size())
+        {
+            label cycGgiFaceID = interpCyclicGgiFaces[0];
+            label cycGgiPatchID =
+                mesh().boundaryMesh().whichPatch(cycGgiFaceID);
+            label cycGgiStart = mesh().boundaryMesh()[cycGgiPatchID].start();
+            label cycGgiLocalFaceID = cycGgiFaceID - cycGgiStart;
+
+            const cyclicGgiPolyPatch& cycGgiPatch =
+                refCast<const cyclicGgiPolyPatch>
+                (
+                    mesh().boundaryMesh()[cycGgiPatchID]
+                );
+
+            const labelListList& addr
+                (
+                    cycGgiPatch.master() ?
+                    cycGgiPatch.patchToPatch().masterAddr()
+                  : cycGgiPatch.patchToPatch().slaveAddr()
+                );
+
+            const labelList& zoneAddr =
+                cycGgiPatch.zoneAddressing();
+
+            label zoneLocalFaceID = zoneAddr[cycGgiLocalFaceID];
+
+            label ngbZoneLocalFaceID = addr[zoneLocalFaceID][0];
+
+            label ngbLocalFaceID =
+                findIndex
+                (
+                    cycGgiPatch.shadow().zoneAddressing(),
+                    ngbZoneLocalFaceID
+                );
+            if (ngbLocalFaceID == -1)
+            {
+                FatalErrorIn
+                (
+                    "leastSquaresVolPointInterpolation"
+                    "::makeInvLsMatrices() const"
+                )
+                    << "Can not find cyclic ggi patch ngb face id"
+                        << abort(FatalError);
+            }
+
+            const face& ngbFace =
+                cycGgiPatch.shadow().localFaces()[ngbLocalFaceID];
+
+            const vectorField& lp =
+                cycGgiPatch.shadow().localPoints();
+            const labelList& meshPoints =
+                cycGgiPatch.shadow().meshPoints();
+
+            scalar S = ngbFace.mag(lp);
+            scalar L = ::sqrt(S);
+
+            label ngbPointI = -1;
+            forAll(ngbFace, pI)
+            {
+                vector transCurPoint = p[pointI];
+
+                if (!cycGgiPatch.parallel())
+                {
+                    transCurPoint =
+                        transform
+                        (
+                            cycGgiPatch.reverseT()[0],
+                            transCurPoint
+                        );
+                }
+
+                if (cycGgiPatch.separated())
+                {
+                    transCurPoint += cycGgiPatch.separationOffset();
+                }
+
+                scalar dist =
+                    mag
+                    (
+                        lp[ngbFace[pI]]
+                      - transCurPoint
+                    );
+
+//                 scalar dist =
+//                     mag
+//                     (
+//                         lp[ngbFace[pI]]
+//                       - transform
+//                         (
+//                             cycGgiPatch.reverseT()[0],
+//                             p[pointI]
+//                         )
+//                     );
+
+                if (dist < 1e-2*L)
+                {
+                    ngbPointI = meshPoints[ngbFace[pI]];
+                    break;
+                }
+            }
+            if (ngbPointI == -1)
+            {
+                FatalErrorIn
+                (
+                    "leastSquaresVolPointInterpolation"
+                    "::makeInvLsMatrices() const"
+                )
+                    << "Can not find cyclic ggi patch ngb point"
+                        << abort(FatalError);
+            }
+
+            for (label i=0; i<interpCyclicGgiBndFaces.size(); i++)
+            {
+                label faceID = interpCyclicGgiBndFaces[i];
+
+                if (cycGgiPatch.parallel())
+                {
+                    vector deltaNgb = //dni
+                        Cf[faceID] - p[ngbPointI];
+
+                    allPoints[pointID++] = p[pointI] + deltaNgb;
+                }
+                else
+                {
+                    vector deltaNgb = //dni
+                        Cf[faceID] - p[ngbPointI];
+
+                    allPoints[pointID++] =
+                        p[pointI]
+                      + transform(cycGgiPatch.forwardT()[0], deltaNgb);
+                }
+            }
+        }
+#endif
 
         // Processor boundary faces
         for (label i=0; i<interpProcFaces.size(); i++)
@@ -1908,6 +3259,14 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
         if (allPoints.size() + allMirrorPoints.size() < nCoeffs)
         {
+            Pout << pointI << ", "
+                << interpCells.size() << ", "
+                << interpBndFaces.size() << ", "
+                << interpCyclicFaces.size() << ", "
+                << interpCyclicBndFaces.size() << ", "
+                << interpProcFaces.size() << ", "
+                << interpNgbProcCellCentres.size() << endl;
+
             FatalErrorIn
             (
                 "newLeastSquaresVolPointInterpolation::makeInvInvMatrices()"
@@ -1951,9 +3310,9 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
         label pI = 0;
         for (label i=0; i<allPoints.size(); i++)
         {
-            scalar X = allPoints[i].x() - o[pointI].x();
-            scalar Y = allPoints[i].y() - o[pointI].y();
-            scalar Z = allPoints[i].z() - o[pointI].z();
+            scalar X = (allPoints[i].x() - o[pointI].x())/L[pointI];
+            scalar Y = (allPoints[i].y() - o[pointI].y())/L[pointI];
+            scalar Z = (allPoints[i].z() - o[pointI].z())/L[pointI];
 
             M[pI][0] = X;
             M[pI][1] = Y;
@@ -1962,9 +3321,9 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
         }
         for (label i=0; i<allMirrorPoints.size(); i++)
         {
-            scalar X = allMirrorPoints[i].x() - o[pointI].x();
-            scalar Y = allMirrorPoints[i].y() - o[pointI].y();
-            scalar Z = allMirrorPoints[i].z() - o[pointI].z();
+            scalar X = (allMirrorPoints[i].x() - o[pointI].x())/L[pointI];
+            scalar Y = (allMirrorPoints[i].y() - o[pointI].y())/L[pointI];
+            scalar Z = (allMirrorPoints[i].z() - o[pointI].z())/L[pointI];
 
             M[pI][0] = X;
             M[pI][1] = Y;
@@ -1972,6 +3331,18 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
             pI++;
         }
 
+        // Note: the definition of n() and m() are flipped in foam-extend-4.0
+        // and OpenFOAM... wtf
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+        // Applying weights
+        for (label i=0; i<M.m(); i++)
+        {
+            for (label j=0; j<M.n(); j++)
+            {
+                M[i][j] *= W[i];
+            }
+        }
+#else
         // Applying weights
         for (label i=0; i<M.n(); i++)
         {
@@ -1980,8 +3351,9 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
                 M[i][j] *= W[i];
             }
         }
+#endif
 
-//         SVD svd(M, SMALL);
+        //         SVD svd(M, SMALL);
 
 //         for (label i=0; i<svd.VSinvUt().n(); i++)
 //         {
@@ -1992,13 +3364,18 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 //         }
 
 //         scalarSquareMatrix lsM(nCoeffs, 0.0);
+
         tensor lsM = tensor::zero;
 
         for (label i=0; i<3; i++)
         {
             for (label j=0; j<3; j++)
             {
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                for (label k=0; k<M.m(); k++)
+#else
                 for (label k=0; k<M.n(); k++)
+#endif
                 {
 //                     lsM[i][j] += M[k][i]*M[k][j];
                     lsM(i,j) += M[k][i]*M[k][j];
@@ -2024,33 +3401,41 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
         }
 
         // Calculate inverse
-//         scalarSquareMatrix invLsM = lsM.LUinvert();
-        //tensor invLsM = inv(lsM);
-        tensor invLsM = hinv(lsM);
-        //tensor invLsM = tensor::zero;
-        // scalar detLsM = det(lsM);
-        // if (detLsM > SMALL)
-        // {
-        //     invLsM = inv(lsM);
-        // }
-        // else
-        // {
-        //     Warning
-        //         << "singular least squares matrixL using hinv" << endl;
-        //     invLsM = hinv(lsM);
-        // }
+        D[pointI] = det(lsM);
 
-        for (label i=0; i<3; i++)
+        // PC, for now, disable as it negatively affects the coupled solver
+        // if (mag(D[pointI]) > SMALL)
         {
-            for (label j=0; j<M.n(); j++)
+            tensor invLsM = hinv(lsM);
+            //tensor invLsM = inv(lsM);
+
+            for (label i=0; i<3; i++)
             {
-                for (label k=0; k<3; k++)
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+                for (label j=0; j<M.m(); j++)
+#else
+                for (label j=0; j<M.n(); j++)
+#endif
                 {
-//                     curMatrix[i][j] += invLsM[i][k]*M[j][k]*W[j];
-                    curMatrix[i][j] += invLsM(i,k)*M[j][k]*W[j];
+                    for (label k=0; k<3; k++)
+                    {
+                        curMatrix[i][j] += invLsM(i,k)*M[j][k]*W[j];
+                    }
                 }
             }
         }
+        // else
+        // {
+        //     Pout<< "Det: " << D[pointI] << endl;
+
+        //     for (label i=0; i<3; i++)
+        //     {
+        //         for (label j=0; j<M.n(); j++)
+        //         {
+        //             curMatrix[i][j] = 0;
+        //         }
+        //     }
+        // }
     }
 }
 
@@ -2068,7 +3453,7 @@ makeMirrorPlaneTransformation() const
 
     // It is an error to attempt to recalculate
     // if the pointer is already set
-    if (mirrorPlaneTransformationPtr_)
+    if (!mirrorPlaneTransformationPtr_.empty())
     {
         FatalErrorIn
         (
@@ -2079,14 +3464,16 @@ makeMirrorPlaneTransformation() const
                 << abort(FatalError);
     }
 
-    mirrorPlaneTransformationPtr_ =
+    mirrorPlaneTransformationPtr_.set
+    (
         new List<Tuple2<vector, tensor> >
         (
             mesh().points().size(),
             Tuple2<vector, tensor>(vector::zero, tensor::zero)
-        );
+        )
+    );
     List<Tuple2<vector, tensor> >& mirrorPlaneTransformation =
-        *mirrorPlaneTransformationPtr_;
+        mirrorPlaneTransformationPtr_();
 
 //     mirrorPlaneTransformationPtr_ = new Map<Tuple2<vector, tensor> >();
 //     Map<Tuple2<vector, tensor> >& mirrorPlaneTransformation =
@@ -2169,6 +3556,56 @@ makeMirrorPlaneTransformation() const
     }
 }
 
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+tensor newLeastSquaresVolPointInterpolation::hinv(const tensor& t) const
+{
+    static const scalar hinvLarge = 1e10;
+    static const scalar hinvSmall = 1e-10;
+
+    if (det(t) > hinvSmall)
+    {
+        return inv(t);
+    }
+    else
+    {
+        vector eig = eigenValues(t);
+        tensor eigVecs = eigenVectors(t);
+
+        tensor zeroInv = tensor::zero;
+
+        // Test if all eigen values are zero.
+        // If this happens then eig.z() = SMALL, and hinv(t)
+        // returns a zero tensor.
+        // Jovani Favero, 18/Nov/2009
+        // Further bug fix: replace > with == and add SMALL to zeroInv
+        // Dominik Christ, 7/Aug/2012
+        if (mag(eig.z()) == hinvLarge*mag(eig.z()))
+        {
+            // Three zero eigen values (z is largest in magnitude).
+            // Return zero inverse
+            return zeroInv;
+        }
+
+        // Compare smaller eigen values and if out of range of large
+        // consider them singular
+
+        if (mag(eig.z()) > hinvLarge*mag(eig.x()))
+        {
+            // Make a tensor out of symmTensor sqr.  HJ, 24/Oct/2009
+            zeroInv += tensor(sqr(eigVecs.x()));
+        }
+
+        if (mag(eig.z()) > hinvLarge*mag(eig.y()))
+        {
+            // Make a tensor out of symmTensor sqr.  HJ, 24/Oct/2009
+            zeroInv += tensor(sqr(eigVecs.y()));
+        }
+
+        return inv(t + zeroInv) - zeroInv;
+    }
+}
+#endif
+
 // * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * * //
 
 newLeastSquaresVolPointInterpolation::newLeastSquaresVolPointInterpolation
@@ -2176,140 +3613,191 @@ newLeastSquaresVolPointInterpolation::newLeastSquaresVolPointInterpolation
     const fvMesh& vm
 )
 :
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+    MeshObject<fvMesh, Foam::UpdateableMeshObject, newLeastSquaresVolPointInterpolation>(vm),
+#else
     MeshObject<fvMesh, newLeastSquaresVolPointInterpolation>(vm),
-    pointBndFacesPtr_(NULL),
-    pointCyclicFacesPtr_(NULL),
-    pointProcFacesPtr_(NULL),
-    axisEdgesPtr_(NULL),
-    pointAxisEdgesPtr_(NULL),
-//     pointNgbProcBndFaceCentresPtr_(NULL),
-    globalPointNgbProcBndFaceCentresPtr_(NULL),
-    globalPointNgbProcCellCentresPtr_(NULL),
-    procBndFacesPtr_(NULL),
-    procBndFaceCentresPtr_(NULL),
-    pointProcBndFacesPtr_(NULL),
-    procCellsPtr_(NULL),
-    pointProcCellsPtr_(NULL),
-    procCellCentresPtr_(NULL),
-    weightsPtr_(NULL),
-    originsPtr_(NULL),
-    mirrorPlaneTransformationPtr_(NULL),
-    invLsMatrices_(0)
-{}
+#endif
+    pointBndFacesPtr_(),
+    pointCyclicFacesPtr_(),
+    pointCyclicBndFacesPtr_(),
+    pointCyclicGgiFacesPtr_(),
+    pointCyclicGgiBndFacesPtr_(),
+    pointProcFacesPtr_(),
+    axisEdgesPtr_(),
+    pointAxisEdgesPtr_(),
+    globalPointNgbProcBndFaceCentresPtr_(),
+    globalPointNgbProcCellCentresPtr_(),
+    procBndFacesPtr_(),
+    procBndFaceCentresPtr_(),
+    pointProcBndFacesPtr_(),
+    procCellsPtr_(),
+    pointProcCellsPtr_(),
+    procCellCentresPtr_(),
+    weightsPtr_(),
+    originsPtr_(),
+    mirrorPlaneTransformationPtr_(),
+    invLsMatrices_(0),
+    refLPtr_()
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+    ,
+    processorBoundariesExist_(false)
+#endif
+{
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+    if (Pstream::parRun())
+    {
+        // Check there are no processor boundaries
+        forAll(mesh().boundaryMesh(), patchI)
+        {
+            if (mesh().boundaryMesh()[patchI].type() == "processor")
+            {
+                processorBoundariesExist_ = true;
+                break;
+            }
+        }
+    }
+#endif
+}
 
 
 // * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * * //
 
 newLeastSquaresVolPointInterpolation::~newLeastSquaresVolPointInterpolation()
-{
-    deleteDemandDrivenData(pointBndFacesPtr_);
-    deleteDemandDrivenData(pointCyclicFacesPtr_);
-    deleteDemandDrivenData(pointProcFacesPtr_);
-    deleteDemandDrivenData(axisEdgesPtr_);
-    deleteDemandDrivenData(pointAxisEdgesPtr_);
-    //deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
-    deleteDemandDrivenData(procBndFacesPtr_);
-    deleteDemandDrivenData(pointProcBndFacesPtr_);
-    deleteDemandDrivenData(procBndFaceCentresPtr_);
-    deleteDemandDrivenData(procCellsPtr_);
-    deleteDemandDrivenData(pointProcCellsPtr_);
-    deleteDemandDrivenData(procCellCentresPtr_);
-    deleteDemandDrivenData(weightsPtr_);
-    deleteDemandDrivenData(originsPtr_);
-    deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
-    //invLsMatrices_.clear();
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+bool newLeastSquaresVolPointInterpolation::movePoints()
+#else
 bool newLeastSquaresVolPointInterpolation::movePoints() const
+#endif
 {
-    deleteDemandDrivenData(weightsPtr_);
-    deleteDemandDrivenData(originsPtr_);
-    deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
-//     deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
-    deleteDemandDrivenData(procCellCentresPtr_);
-    deleteDemandDrivenData(procBndFaceCentresPtr_);
+    // Clear all fields that depend on the mesh coordinates
+    globalPointNgbProcBndFaceCentresPtr_.clear();
+    globalPointNgbProcCellCentresPtr_.clear();
+    procBndFaceCentresPtr_.clear();
+    procCellCentresPtr_.clear();
+    weightsPtr_.clear();
+    originsPtr_.clear();
+    mirrorPlaneTransformationPtr_.clear();
     invLsMatrices_.clear();
+    refLPtr_.clear();
 
     return true;
 }
 
 
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+void newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&)
+#else
 bool newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&) const
+#endif
 {
-    deleteDemandDrivenData(pointBndFacesPtr_);
-    deleteDemandDrivenData(pointCyclicFacesPtr_);
-    deleteDemandDrivenData(pointProcFacesPtr_);
-    deleteDemandDrivenData(axisEdgesPtr_);
-    deleteDemandDrivenData(pointAxisEdgesPtr_);
-//     deleteDemandDrivenData(pointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcBndFaceCentresPtr_);
-    deleteDemandDrivenData(globalPointNgbProcCellCentresPtr_);
-
-    deleteDemandDrivenData(procBndFacesPtr_);
-    deleteDemandDrivenData(procBndFaceCentresPtr_);
-    deleteDemandDrivenData(pointProcBndFacesPtr_);
-
-    deleteDemandDrivenData(procCellsPtr_);
-    deleteDemandDrivenData(pointProcCellsPtr_);
-    deleteDemandDrivenData(procCellCentresPtr_);
-    deleteDemandDrivenData(weightsPtr_);
-    deleteDemandDrivenData(originsPtr_);
-    deleteDemandDrivenData(mirrorPlaneTransformationPtr_);
+    // Clear all fields that depend on the mesh addressing
+    pointBndFacesPtr_.clear();
+    pointCyclicFacesPtr_.clear();
+    pointCyclicBndFacesPtr_.clear();
+    pointCyclicGgiFacesPtr_.clear();
+    pointCyclicGgiBndFacesPtr_.clear();
+    pointProcFacesPtr_.clear();
+    axisEdgesPtr_.clear();
+    pointAxisEdgesPtr_.clear();
+    globalPointNgbProcBndFaceCentresPtr_.clear();
+    globalPointNgbProcCellCentresPtr_.clear();
+    procBndFacesPtr_.clear();
+    procBndFaceCentresPtr_.clear();
+    pointProcBndFacesPtr_.clear();
+    procCellsPtr_.clear();
+    pointProcCellsPtr_.clear();
+    procCellCentresPtr_.clear();
+    weightsPtr_.clear();
+    originsPtr_.clear();
+    mirrorPlaneTransformationPtr_.clear();
     invLsMatrices_.clear();
+    refLPtr_.clear();
 
-//     Pout << "newLeastSquaresVolPointInterpolation::updateMesh - done" << endl;
-
+#ifndef OPENFOAMESIORFOUNDATION
     return true;
+#endif
 }
 
 const labelListList& newLeastSquaresVolPointInterpolation::pointBndFaces() const
 {
-    if (!pointBndFacesPtr_)
+    if (pointBndFacesPtr_.empty())
     {
         makePointFaces();
     }
 
-    return *pointBndFacesPtr_;
+    return pointBndFacesPtr_();
 }
 
 const labelListList& newLeastSquaresVolPointInterpolation
 ::pointCyclicFaces() const
 {
-    if (!pointCyclicFacesPtr_)
+    if (pointCyclicFacesPtr_.empty())
     {
         makePointFaces();
     }
 
-    return *pointCyclicFacesPtr_;
+    return pointCyclicFacesPtr_();
+}
+
+const labelListList& newLeastSquaresVolPointInterpolation
+::pointCyclicBndFaces() const
+{
+    if (pointCyclicBndFacesPtr_.empty())
+    {
+        makePointFaces();
+    }
+
+    return pointCyclicBndFacesPtr_();
+}
+
+const labelListList& newLeastSquaresVolPointInterpolation
+::pointCyclicGgiFaces() const
+{
+    if (pointCyclicGgiFacesPtr_.empty())
+    {
+        makePointFaces();
+    }
+
+    return pointCyclicGgiFacesPtr_();
+}
+
+const labelListList& newLeastSquaresVolPointInterpolation
+::pointCyclicGgiBndFaces() const
+{
+    if (pointCyclicGgiBndFacesPtr_.empty())
+    {
+        makePointFaces();
+    }
+
+    return pointCyclicGgiBndFacesPtr_();
 }
 
 const labelList& newLeastSquaresVolPointInterpolation
 ::axisEdges() const
 {
-    if (!axisEdgesPtr_)
+    if (axisEdgesPtr_.empty())
     {
         makeAxisEdges();
     }
 
-    return *axisEdgesPtr_;
+    return axisEdgesPtr_();
 }
 
 const Map<labelList>&
 newLeastSquaresVolPointInterpolation::pointAxisEdges() const
 {
-    if (!pointAxisEdgesPtr_)
+    if (pointAxisEdgesPtr_.empty())
     {
         makePointAxisEdges();
     }
 
-    return *pointAxisEdgesPtr_;
+    return pointAxisEdgesPtr_();
 }
 
 // const Map<Field<vector> >&
@@ -2326,141 +3814,140 @@ newLeastSquaresVolPointInterpolation::pointAxisEdges() const
 const Map<Field<vector> >&
 newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceCentres() const
 {
-    if (!globalPointNgbProcBndFaceCentresPtr_)
+    if (globalPointNgbProcBndFaceCentresPtr_.empty())
     {
         makeGlobalPointNgbProcBndFaceCentres();
     }
 
-    return *globalPointNgbProcBndFaceCentresPtr_;
+    return globalPointNgbProcBndFaceCentresPtr_();
 }
 
 const Map<Field<vector> >&
 newLeastSquaresVolPointInterpolation::globalPointNgbProcCellCentres() const
 {
-    if (!globalPointNgbProcCellCentresPtr_)
+    if (globalPointNgbProcCellCentresPtr_.empty())
     {
         makeGlobalPointNgbProcCellCentres();
     }
 
-    return *globalPointNgbProcCellCentresPtr_;
+    return globalPointNgbProcCellCentresPtr_();
 }
 
 const labelListList& newLeastSquaresVolPointInterpolation::pointProcFaces() const
 {
-    if (!pointProcFacesPtr_)
+    if (pointProcFacesPtr_.empty())
     {
         makePointFaces();
     }
 
-    return *pointProcFacesPtr_;
+    return pointProcFacesPtr_();
 }
 
 const labelListList& newLeastSquaresVolPointInterpolation::procBndFaces() const
 {
-    if (!procBndFacesPtr_)
+    if (procBndFacesPtr_.empty())
     {
         makeProcBndFaces();
     }
 
-    return *procBndFacesPtr_;
+    return procBndFacesPtr_();
 }
 
 const FieldField<Field, vector>&
 newLeastSquaresVolPointInterpolation::procBndFaceCentres() const
 {
-    if (!procBndFaceCentresPtr_)
+    if (procBndFaceCentresPtr_.empty())
     {
         makeProcBndFaceCentres();
     }
 
-    return *procBndFaceCentresPtr_;
+    return procBndFaceCentresPtr_();
 }
 
 const List<List<labelPair> >& newLeastSquaresVolPointInterpolation::
 pointProcBndFaces() const
 {
-    if (!pointProcBndFacesPtr_)
+    if (pointProcBndFacesPtr_.empty())
     {
         makeProcBndFaces();
     }
 
-    return *pointProcBndFacesPtr_;
+    return pointProcBndFacesPtr_();
 }
 
 const labelListList& newLeastSquaresVolPointInterpolation::procCells() const
 {
-    if (!procCellsPtr_)
+    if (procCellsPtr_.empty())
     {
         makeProcCells();
     }
 
-    return *procCellsPtr_;
+    return procCellsPtr_();
 }
 
 const Map<List<labelPair> >& newLeastSquaresVolPointInterpolation::
 pointProcCells() const
 {
-    if (!pointProcCellsPtr_)
+    if (pointProcCellsPtr_.empty())
     {
         makeProcCells();
     }
 
-    return *pointProcCellsPtr_;
+    return pointProcCellsPtr_();
 }
 
 const FieldField<Field, vector>&
 newLeastSquaresVolPointInterpolation::procCellCentres() const
 {
-    if (!procCellCentresPtr_)
+    if (procCellCentresPtr_.empty())
     {
         makeProcCellCentres();
     }
 
-    return *procCellCentresPtr_;
+    return procCellCentresPtr_();
 }
 
 const FieldField<Field, scalar>&
 newLeastSquaresVolPointInterpolation::weights() const
 {
-    if (!weightsPtr_)
+    if (weightsPtr_.empty())
     {
         makeWeights();
     }
 
-    return *weightsPtr_;
+    return weightsPtr_();
 }
 
 const vectorField& newLeastSquaresVolPointInterpolation::origins() const
 {
-    if (!originsPtr_)
+    if (originsPtr_.empty())
     {
         makeOrigins();
     }
 
-    return *originsPtr_;
+    return originsPtr_();
+}
+
+const scalarField& newLeastSquaresVolPointInterpolation::refL() const
+{
+    if (refLPtr_.empty())
+    {
+        makeOrigins();
+    }
+        
+    return refLPtr_();
 }
 
 const List<Tuple2<vector, tensor> >& newLeastSquaresVolPointInterpolation::
 mirrorPlaneTransformation() const
 {
-    if (!mirrorPlaneTransformationPtr_)
+    if (mirrorPlaneTransformationPtr_.empty())
     {
         makeMirrorPlaneTransformation();
     }
 
-    return *mirrorPlaneTransformationPtr_;
+    return mirrorPlaneTransformationPtr_();
 }
-
-// const Map<Tuple2<vector, tensor> >& newLeastSquaresVolPointInterpolation::
-// mirrorPlaneTransformation() const
-// {
-//     if (!mirrorPlaneTransformationPtr_)
-//     {
-//         makeMirrorPlaneTransformation();
-//     }
-
-//     return *mirrorPlaneTransformationPtr_;
-// }
 
 const PtrList<scalarRectangularMatrix>&
 newLeastSquaresVolPointInterpolation::invLsMatrices() const

@@ -1,0 +1,14 @@
+#!/bin/bash
+cd ${0%/*} || exit 1    # run from this directory
+
+echo "Updating Make/files link"
+if [ "$WM_PROJECT" = "foam" ]
+then
+    echo "Using Make/files.foamextend"
+    (cd Make && ln -sf files.foamextend files)
+else
+    echo "Using Make/files.openfoam"
+    (cd Make && ln -sf files.openfoam files)
+fi
+
+wmake

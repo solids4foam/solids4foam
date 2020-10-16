@@ -44,14 +44,18 @@ SourceFiles
 #include "dictionary.H"
 #include "standAlonePatch.H"
 #include "polyMesh.H"
-#include "PrimitivePatchInterpolationTemplate.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "PrimitivePatchInterpolation.H"
+#else
+    #include "PrimitivePatchInterpolationTemplate.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------* \
                       Class globalPolyPatch Declaration
 \*---------------------------------------------------------------------------*/
 

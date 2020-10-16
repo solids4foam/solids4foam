@@ -28,6 +28,7 @@ License
 #include "transformGeometricField.H"
 #include "logVolFields.H"
 #include "fvc.H"
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -49,45 +50,6 @@ namespace Foam
 
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
-
-
-void Foam::neoHookeanElasticMisesPlasticRubin::makeRelF()
-{
-    if (relFPtr_)
-    {
-        FatalErrorIn
-        (
-            "void Foam::neoHookeanElasticMisesPlasticRubin::makeRelF()"
-        )   << "pointer already set" << abort(FatalError);
-    }
-
-    relFPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "lawRelF",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElasticMisesPlasticRubin::relF()
-{
-    if (!relFPtr_)
-    {
-        makeRelF();
-    }
-
-    return *relFPtr_;
-}
-
 
 void Foam::neoHookeanElasticMisesPlasticRubin::makeJ()
 {
@@ -125,45 +87,6 @@ Foam::volScalarField& Foam::neoHookeanElasticMisesPlasticRubin::J()
     }
 
     return *JPtr_;
-}
-
-
-void Foam::neoHookeanElasticMisesPlasticRubin::makeF()
-{
-    if (FPtr_)
-    {
-        FatalErrorIn("void Foam::neoHookeanElasticMisesPlasticRubin::makeF()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    FPtr_ =
-        new volTensorField
-        (
-            IOobject
-            (
-                "lawF",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            dimensionedTensor("I", dimless, I)
-        );
-
-    // Store the old-time
-    FPtr_->oldTime();
-}
-
-
-Foam::volTensorField& Foam::neoHookeanElasticMisesPlasticRubin::F()
-{
-    if (!FPtr_)
-    {
-        makeF();
-    }
-
-    return *FPtr_;
 }
 
 
@@ -210,11 +133,19 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlasticRubin::Ibar
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    volScalarField& Ibar = tIbar.ref();
+
+    // Take reference to internal fields for efficiency
+    scalarField& IbarI = Ibar.primitiveFieldRef();
+    const symmTensorField devBEbarI = devBEbar.primitiveField();
+#else
     volScalarField& Ibar = tIbar();
 
     // Take reference to internal fields for efficiency
     scalarField& IbarI = Ibar.internalField();
     const symmTensorField devBEbarI = devBEbar.internalField();
+#endif
 
     // Calculate internal field
     forAll(IbarI, cellI)
@@ -256,7 +187,11 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlasticRubin::Ibar
         )
         {
             // Take reference to patch fields for efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+            scalarField& IbarP = Ibar.boundaryFieldRef()[patchI];
+#else
             scalarField& IbarP = Ibar.boundaryField()[patchI];
+#endif
             const symmTensorField& devBEbarP =
                 devBEbar.boundaryField()[patchI];
 
@@ -332,9 +267,7 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
         dimensionedScalar(dict.lookup("initialYieldStress"))
     ),
     K_(dict.lookup("hardeningModulus")),
-    relFPtr_(NULL),
     JPtr_(NULL),
-    FPtr_(NULL),
     P_
     (
         IOobject
@@ -463,9 +396,7 @@ Foam::neoHookeanElasticMisesPlasticRubin::neoHookeanElasticMisesPlasticRubin
 
 Foam::neoHookeanElasticMisesPlasticRubin::~neoHookeanElasticMisesPlasticRubin()
 {
-    deleteDemandDrivenData(relFPtr_);
     deleteDemandDrivenData(JPtr_);
-    deleteDemandDrivenData(FPtr_);
 }
 
 
@@ -522,51 +453,12 @@ void Foam::neoHookeanElasticMisesPlasticRubin::correct
     volSymmTensorField& sigma
 )
 {
-    // Check if the mathematical model is in total or updated Lagrangian form
-    if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    // Update the deformation gradient field
+    // Note: if true is returned, it means that linearised elasticity was
+    // enforced by the solver via the enforceLinear switch
+    if (updateF(sigma, mu_, K_))
     {
-        if (!incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for non-incremental updated Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        // Update the relative deformation gradient
-        relF() = I + gradDD.T();
-
-        // Update the total deformation gradient
-        F() = relF() & F().oldTime();
-    }
-    else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-    {
-        if (incremental())
-        {
-            FatalErrorIn(type() + "::correct(volSymmTensorField& sigma)")
-                << "Not implemented for incremental total Lagrangian"
-                << abort(FatalError);
-        }
-
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        // Update the total deformation gradient
-        F() = I + gradD.T();
-
-        // Update the relative deformation gradient
-        relF() = F() & inv(F().oldTime());
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            type() + "::correct(volSymmTensorField& sigma)"
-        )   << "Unknown nonLinGeom type: " << nonLinGeom() << abort(FatalError);
+        return;
     }
 
     // Update the Jacobian of the total deformation gradient
@@ -660,6 +552,16 @@ Foam::scalar Foam::neoHookeanElasticMisesPlasticRubin::residual()
     // Note: we remove mag(I) when we normalise the residual so that the
     // residual is like a strain residual
     return
+#ifdef OPENFOAMESIORFOUNDATION
+        gMax
+        (
+            mag
+            (
+                lambda_.primitiveField()
+              - lambda_.prevIter().primitiveField()
+            )
+        )/0.1;
+#else
         gMax
         (
             mag
@@ -668,6 +570,7 @@ Foam::scalar Foam::neoHookeanElasticMisesPlasticRubin::residual()
               - lambda_.prevIter().internalField()
             )
         )/0.1;
+#endif
 }
 
 
@@ -678,8 +581,13 @@ void Foam::neoHookeanElasticMisesPlasticRubin::updateTotalFields()
     // Count cells actively yielding
     int numCellsYielding = 0;
 
+#ifdef OPENFOAMESIORFOUNDATION
+    scalarField& activeYieldI = activeYield_.primitiveFieldRef();
+    const scalarField& lambdaI = lambda_.primitiveField();
+#else
     scalarField& activeYieldI = activeYield_.internalField();
     const scalarField& lambdaI = lambda_.internalField();
+#endif
 
     forAll(activeYieldI, cellI)
     {
@@ -700,7 +608,11 @@ void Foam::neoHookeanElasticMisesPlasticRubin::updateTotalFields()
     {
         if (!activeYield_.boundaryField()[patchI].coupled())
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            scalarField& activeYieldP = activeYield_.boundaryFieldRef()[patchI];
+#else
             scalarField& activeYieldP = activeYield_.boundaryField()[patchI];
+#endif
             const scalarField& lambdaP = lambda_.boundaryField()[patchI];
 
             forAll(activeYieldP, faceI)

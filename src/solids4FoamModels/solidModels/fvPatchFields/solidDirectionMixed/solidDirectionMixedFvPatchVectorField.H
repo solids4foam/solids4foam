@@ -40,7 +40,6 @@ SourceFiles
 #ifndef solidDirectionMixedFvPatchVectorField_H
 #define solidDirectionMixedFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "directionMixedFvPatchFields.H"
 #include "Switch.H"
 

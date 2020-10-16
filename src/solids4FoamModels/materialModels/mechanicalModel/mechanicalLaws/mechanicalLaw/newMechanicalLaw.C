@@ -45,7 +45,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewLinGeomMechLaw
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 {
-    word mechTypeName = dict.lookup("type");
+    const word mechTypeName(dict.lookup("type"));
 
     Info<< "Selecting mechanical law " << mechTypeName << endl;
 
@@ -82,7 +82,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 {
-    word mechTypeName = dict.lookup("type");
+    const word mechTypeName(dict.lookup("type"));
 
     Info<< "Selecting mechanical law " << mechTypeName << endl;
 

@@ -9,21 +9,30 @@ solids4foam is toolbox for OpenFOAM with capabilities for solid mechanics and
 fluid solid interactions.
 
 
+### Where do I start? ###
+
+Start with the [solids4foam documentation](documentation/solids4foamDocumentation), located in the documentation directory.
+
+
 ### How do I get set up? ###
 
 To get setup, you must first install foam-extend-4.0 or foam-extend-4.1,
 details of which can be found on the OpenFOAM Wiki at:
 https://openfoamwiki.net/index.php/Installation
 
-Once foam-extend-4.0 or foam-extend-4.0 has been installed, download solids4foam
+Once foam-extend-4.0 or foam-extend-4.1 has been installed, download solids4foam
 and then run the enclosed `Allwmake` script to compile solids4foam.
+
+solids4foam also compiles with OpenFOAM-7 and OpenFOAM-v1812 but some features
+are yet to be ported (porting of all major features is actively underway, Feb-20)
+Note that all tutorials have not yet been configured for OpenFOAM-7 and
+OpenFOAM-v1812.
 
 Notes:
 
   1. the `master` branch compiles with foam-extend-4.0 and foam-extend-4.1.
-  2. the `foam-extend-3.2` branch compiles with foam-extend-3.2 but is not
-up-to-date.
-  4. the `of30parFSIwip` branch compiles with OpenFOAM-3.0.1 but is not
+  2. the `master` branch also compiles with OpenFOAM-7 and OpenFOAM-v1812.
+  3. the `foam-extend-3.2` branch compiles with foam-extend-3.2 but is not
 up-to-date.
 
 
@@ -36,7 +45,7 @@ email: philip.cardiff@ucd.ie
 ### Who do I talk to? ###
 
 solids4foam is developed by Philip Cardiff and Zeljko Tukovic, with
-contributions for many others.
+contributions for many others, in particular Danial Khazaei.
 
 Emails: philip.cardiff@ucd.ie and zeljko.tukovic@fsb.hr
 

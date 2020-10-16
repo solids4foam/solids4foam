@@ -124,21 +124,37 @@ void Foam::fluidModel::updateRobinFsiInterface
         )
         {
             const word ddtScheme =
+#ifdef OPENFOAMESIORFOUNDATION
+                word(mesh().ddtScheme("ddt(" + U.name() +')'));
+#else
                 mesh().schemesDict().ddtScheme("ddt(" + U.name() +')');
+#endif
 
             if (ddtScheme == fv::EulerDdtScheme<vector>::typeName)
             {
+#ifdef OPENFOAMESIORFOUNDATION
+                phi.boundaryFieldRef()[patchI] =
+                    phi.oldTime().boundaryField()[patchI];
+                rAUf.boundaryFieldRef()[patchI] = runTime().deltaT().value();
+#else
                 phi.boundaryField()[patchI] =
                     phi.oldTime().boundaryField()[patchI];
                 rAUf.boundaryField()[patchI] = runTime().deltaT().value();
+#endif
             }
             else if (ddtScheme == fv::backwardDdtScheme<vector>::typeName)
             {
                 if (runTime().timeIndex() == 1)
                 {
+#ifdef OPENFOAMESIORFOUNDATION
+                    phi.boundaryFieldRef()[patchI] =
+                        phi.oldTime().boundaryField()[patchI];
+                    rAUf.boundaryFieldRef()[patchI] = runTime().deltaT().value();
+#else
                     phi.boundaryField()[patchI] =
                         phi.oldTime().boundaryField()[patchI];
                     rAUf.boundaryField()[patchI] = runTime().deltaT().value();
+#endif
 
                     phi.oldTime().oldTime();
                 }
@@ -151,6 +167,15 @@ void Foam::fluidModel::updateRobinFsiInterface
                     scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
                     scalar Co = Cn + Coo;
 
+#ifdef OPENFOAMESIORFOUNDATION
+                    phi.boundaryFieldRef()[patchI] =
+                        (Co/Cn)*phi.oldTime().boundaryField()[patchI]
+                      - (Coo/Cn)
+                       *phi.oldTime().oldTime().boundaryField()[patchI];
+
+                    rAUf.boundaryFieldRef()[patchI] =
+                        runTime().deltaT().value()/Cn;
+#else
                     phi.boundaryField()[patchI] =
                         (Co/Cn)*phi.oldTime().boundaryField()[patchI]
                       - (Coo/Cn)
@@ -158,6 +183,7 @@ void Foam::fluidModel::updateRobinFsiInterface
 
                     rAUf.boundaryField()[patchI] =
                         runTime().deltaT().value()/Cn;
+#endif
                 }
             }
         }
@@ -174,7 +200,15 @@ void Foam::fluidModel::CourantNo
 {
     if (mesh().nInternalFaces())
     {
-        const surfaceScalarField magPhi = mag(phi());
+        surfaceScalarField magPhi = mag(phi());
+
+        if (phi().dimensions() == dimVelocity*dimArea*dimDensity)
+        {
+            const volScalarField& rho =
+                mesh().lookupObject<volScalarField>("rho");
+
+            magPhi /= fvc::interpolate(rho);
+        }
 
         const surfaceScalarField SfUfbyDelta =
             mesh().surfaceInterpolation::deltaCoeffs()*magPhi;
@@ -194,6 +228,14 @@ void Foam::fluidModel::CourantNo
         << endl;
 }
 
+
+void Foam::fluidModel::CourantNo() const
+{
+    scalar CoNum = 0.0;
+    scalar meanCoNum = 0.0;
+    scalar velMag = 0.0;
+    CourantNo(CoNum, meanCoNum, velMag);
+}
 
 #if FOAMEXTEND > 40
 void Foam::fluidModel::oversetCourantNo
@@ -224,7 +266,17 @@ void Foam::fluidModel::oversetCourantNo
         << " velocity magnitude: " << velMag
         << endl;
 }
+
+
+void Foam::fluidModel::oversetCourantNo() const
+{
+    scalar CoNum = 0.0;
+    scalar meanCoNum = 0.0;
+    scalar velMag = 0.0;
+    oversetCourantNo(CoNum, meanCoNum, velMag);
+}
 #endif
+
 
 void Foam::fluidModel::continuityErrs()
 {
@@ -244,7 +296,7 @@ void Foam::fluidModel::continuityErrs()
         << endl;
 }
 
-#if FOAMEXTEND > 40 
+#if FOAMEXTEND > 40
 void Foam::fluidModel::oversetContinuityErrs()
 {
     const volScalarField contErr = osMesh().gamma()*fvc::div(phi());
@@ -302,7 +354,11 @@ void Foam::fluidModel::boundPU
     }
 }
 
+#ifdef OPENFOAMESI
+Foam::meshObjects::gravity Foam::fluidModel::readG() const
+#else
 Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
+#endif
 {
     // Note: READ_IF_PRESENT is incorreclty implemented within the
     // uniformDimensionedField constructor so we will use a work-around here
@@ -311,16 +367,34 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
     // from disk
     IOobject wavePropertiesHeader
     (
-        "waveProperties", mesh().time().constant(), mesh(), IOobject::MUST_READ
+        "waveProperties",
+        runTime().caseConstant(),
+        mesh(),
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE,
+        false // do not register
     );
 
     // Check if g exists on disk
     IOobject gHeader
     (
-        "g", mesh().time().constant(), mesh(), IOobject::MUST_READ
+        "g",
+        runTime().caseConstant(),
+        mesh(),
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE,
+        false // do not register
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if
+    (
+        wavePropertiesHeader.typeHeaderOk<IOdictionary>(true)
+     && !gHeader.typeHeaderOk<uniformDimensionedVectorField>(true)
+    )
+#else
     if (wavePropertiesHeader.headerOk() && !gHeader.headerOk())
+#endif
     {
         FatalErrorIn(type() + "::readG() const")
             << "g field not found in the constant directory: the g field "
@@ -331,37 +405,83 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
     // The if-else-if structure is broken to keep the compiler happy with the
     // lack of a return statement above
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if
+    (
+        wavePropertiesHeader.typeHeaderOk<IOdictionary>(true)
+     || gHeader.typeHeaderOk<uniformDimensionedVectorField>(true)
+    )
+#else
     if (wavePropertiesHeader.headerOk() || gHeader.headerOk())
+#endif
     {
         Info<< "Reading g from constant directory" << endl;
-        return uniformDimensionedVectorField
+#ifdef OPENFOAMESI
+    #if OPENFOAMESI > 1812
+        return meshObjects::gravity(runTime());
+    #else
+        return meshObjects::gravity
         (
+            runTime(),
             IOobject
             (
                 "g",
-                mesh().time().constant(),
+                runTime().caseConstant(),
                 mesh(),
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE
             )
         );
-    }
-    else
-    {
-        Info<< "g field not found in constant directory: initialising to zero"
-            << endl;
+    #endif
+#else
         return uniformDimensionedVectorField
         (
             IOobject
             (
                 "g",
-                mesh().time().constant(),
+                runTime().caseConstant(),
+                mesh(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+#endif
+    }
+    else
+    {
+        Info<< "g field not found in constant directory: initialising to zero"
+            << endl;
+#ifdef OPENFOAMESI
+    #if OPENFOAMESI > 1812
+        return meshObjects::gravity(runTime());
+    #else
+        return meshObjects::gravity
+        (
+            runTime(),
+            IOobject
+            (
+                "g",
+                runTime().caseConstant(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            )
+        );
+    #endif
+#else
+        return uniformDimensionedVectorField
+        (
+            IOobject
+            (
+                "g",
+                runTime().caseConstant(),
                 mesh(),
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
             dimensionedVector("zero", dimAcceleration, vector::zero)
         );
+#endif
     }
 }
 
@@ -556,7 +676,11 @@ Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce
 
 void Foam::fluidModel::UisRequired()
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    if (!Uheader_.typeHeaderOk<volVectorField>(true))
+#else
     if (!Uheader_.headerOk())
+#endif
     {
         FatalErrorIn(type() + "::UisRequired()")
             << "This fluidModel requires the 'U' field to be specified!"
@@ -567,7 +691,11 @@ void Foam::fluidModel::UisRequired()
 
 void Foam::fluidModel::pisRequired()
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    if (!pheader_.typeHeaderOk<volScalarField>(true))
+#else
     if (!pheader_.headerOk())
+#endif
     {
         FatalErrorIn(type() + "::pisRequired()")
             << "This fluidModel requires the 'p' field to be specified!"

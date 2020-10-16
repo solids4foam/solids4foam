@@ -1,6 +1,8 @@
 # git-ls-files --others --exclude-from=.git/info/exclude
 # Lines that start with '#' are comments.
 
+notes.txt
+
 # ignore eigen and ltensor libraries
 ThirdParty/eigen3
 

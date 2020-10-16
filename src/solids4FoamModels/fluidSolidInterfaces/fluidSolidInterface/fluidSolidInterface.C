@@ -29,15 +29,19 @@ License
 #include "polyPatchID.H"
 #include "primitivePatchInterpolation.H"
 #include "twoDPointCorrector.H"
-#include "tetPointFields.H"
-#include "fixedValueTetPolyPatchFields.H"
-#include "tetPolyPatchInterpolation.H"
-#include "tetFemMatrices.H"
+#ifndef OPENFOAMESIORFOUNDATION
+    #include "tetPointFields.H"
+    #include "fixedValueTetPolyPatchFields.H"
+    #include "tetPolyPatchInterpolation.H"
+    #include "tetFemMatrices.H"
+    #include "newSubsetMotionSolverFvMesh.H"
+    #include "newSubsetMotionSolverFvMesh.H"
+#endif
 #include "fixedValuePointPatchFields.H"
 #include "ZoneIDs.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
-#include "newSubsetMotionSolverFvMesh.H"
+#include "RBFMeshMotionSolver.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -86,6 +90,7 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
     {
         dictionary emptyDict;
         fsiProperties_.add("GGICoeffs", emptyDict);
+        fsiProperties_.add("AMICoeffs", emptyDict);
         fsiProperties_.add("RBFCoeffs", emptyDict);
         fsiProperties_.add("directMapCoeffs", emptyDict);
     }
@@ -153,7 +158,20 @@ calcAccumulatedFluidInterfacesDisplacements() const
             IOobject::MUST_READ
         );
 
-        if (accumulatedFluidInterfaceDisplacementHeader.headerOk())
+        if
+        (
+#ifdef OPENFOAMESIORFOUNDATION
+            accumulatedFluidInterfaceDisplacementHeader.typeHeaderOk
+            <
+            vectorIOField
+            >
+            (
+                true
+            )
+#else
+            accumulatedFluidInterfaceDisplacementHeader.headerOk()
+#endif
+        )
         {
             Pout<< "Reading accumulated fluid interface "
                 << "displacement for global patch "
@@ -549,7 +567,11 @@ Foam::vector Foam::fluidSolidInterface::totalForceOnInterface
     vectorField S(localFaces.size(), vector::zero);
     forAll(S, faceI)
     {
+#ifdef OPENFOAMFOUNDATION
+        S[faceI] = localFaces[faceI].area(localPoints);
+#else
         S[faceI] = localFaces[faceI].normal(localPoints);
+#endif
     }
 
     // No need for global sum as the zone is already global
@@ -749,7 +771,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     if (maxDelta < interfaceDeformationLimit())
     {
         // Move only interface points
+#ifdef OPENFOAMESIORFOUNDATION
+        pointField newPoints = fluidMesh().points();
+#else
         pointField newPoints = fluidMesh().allPoints();
+#endif
 
         forAll(fluid().globalPatches(), interfaceI)
         {
@@ -780,18 +806,40 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         // Check mesh motion solver type
 
+        // PC: it is not good that this is hard-coded
+        // A better way is to create an fsi point patch boundary condition that
+        // knows how to lookup the motion from the fsi class or similar
+        // For now, we will leave it
+
         // If the motionU field is in the object registry then we assume that
         // the fe motion solver is being used
+#ifdef OPENFOAMESIORFOUNDATION
+        const bool feMotionSolver = false;
+#else
         const bool feMotionSolver =
             fluidMesh().foundObject<tetPointVectorField>("motionU");
+#endif
 
         // If the pointMotionU field is in the object registry then we assume
         // that the fv motion solver is being used
         const bool fvMotionSolver =
             fluidMesh().foundObject<pointVectorField>("pointMotionU");
 
+#ifndef OPENFOAMFOUNDATION
+        // Check for RBF motion solver
+        const bool rbfMotionSolver =
+            isA<RBFMeshMotionSolver>
+            (
+                fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
+            );
+#endif
+
+        // Set motion on FSI interface
         if (feMotionSolver)
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            notImplemented("Not implemented for this version of OpenFOAM/FOAM");
+#else
             tetPointVectorField& motionU =
                 const_cast<tetPointVectorField&>
                 (
@@ -822,6 +870,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                        /fluid().runTime().deltaT().value()
                     );
             }
+#endif
         }
         else if (fvMotionSolver)
         {
@@ -840,7 +889,14 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 fixedValuePointPatchVectorField& motionUFluidPatch =
                     refCast<fixedValuePointPatchVectorField>
                     (
+#ifdef OPENFOAMESIORFOUNDATION
+                        motionU.boundaryFieldRef()
+                        [
+                            fluidPatchIndices()[interfaceI]
+                        ]
+#else
                         motionU.boundaryField()[fluidPatchIndices()[interfaceI]]
+#endif
                     );
 
                 motionUFluidPatch ==
@@ -850,6 +906,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                     )/fluid().runTime().deltaT().value();
             }
         }
+#ifndef OPENFOAMESIORFOUNDATION
         else if (isA<newSubsetMotionSolverFvMesh>(fluidMesh()))
         {
             newSubsetMotionSolverFvMesh& dynMesh =
@@ -896,6 +953,49 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 }
             }
         }
+#endif
+#ifndef OPENFOAMFOUNDATION
+        else if (rbfMotionSolver)
+        {
+            // Prepare list of patch motions
+            Field<vectorField> motion(fluidMesh().boundaryMesh().size());
+
+            // Initialise all fields to zero
+            forAll(fluidMesh().boundaryMesh(), patchI)
+            {
+                motion[patchI] = vectorField
+                (
+                    fluidMesh().boundaryMesh()[patchI].size(), vector::zero
+                );
+            }
+
+            // Loop through all FSI interfaces
+            forAll(fluid().globalPatches(), interfaceI)
+            {
+                // Interpolate the FSI interface point motion to the faces
+                const vectorField interfacePatchMotion =
+                    fluidPatchesPointsDispls[interfaceI]
+                  - fluidPatchesPointsDisplsPrev[interfaceI];
+
+                // Create interpolator
+                primitivePatchInterpolation interp
+                (
+                    fluidMesh().boundaryMesh()[fluidPatchIndices()[interfaceI]]
+                );
+
+                // Set motion of FSI interface
+                motion[fluidPatchIndices()[interfaceI]] =
+                    interp.pointToFaceInterpolate(interfacePatchMotion);
+            }
+
+            // Set motion field in RBF motion solver
+            // Note: take displacement as opposed to velocity
+            const_cast<RBFMeshMotionSolver&>
+            (
+                fluidMesh().lookupObject<RBFMeshMotionSolver>("dynamicMeshDict")
+            ).setMotion(motion);
+        }
+#endif
         else
         {
             FatalErrorIn("fluidSolidInterface::moveFluidMesh()")
@@ -1130,10 +1230,11 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
 void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 {
-    WarningIn
-    (
-        "void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()"
-    )   << "WIP: to be implemented" << endl;
+    // Disabled
+//     WarningIn
+//     (
+//         "void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()"
+//     )   << "WIP: to be implemented" << endl;
 
     // forAll(fluid().globalPatches(), interfaceI)
     // {
@@ -1180,11 +1281,12 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 
 void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
 {
-    WarningIn
-    (
-        "void Foam::fluidSolidInterface::"
-        "updateElasticWallPressureAcceleration()"
-    )   << "WIP: to be implemented" << endl;
+    // Disabled
+//     WarningIn
+//     (
+//         "void Foam::fluidSolidInterface::"
+//         "updateElasticWallPressureAcceleration()"
+//     )   << "WIP: to be implemented" << endl;
 
     // forAll(fluid().globalPatches(), interfaceI)
     // {

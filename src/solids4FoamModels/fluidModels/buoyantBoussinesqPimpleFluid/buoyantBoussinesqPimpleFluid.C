@@ -25,13 +25,15 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "buoyantBoussinesqPimpleFluid.H"
-#include "volFields.H"
-#include "fvm.H"
-#include "fvc.H"
-#include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "findRefCell.H"
-#include "adjustPhi.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "constrainHbyA.H"
+    #include "constrainPressure.H"
+#else
+    #include "fvc.H"
+    #include "fvm.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,11 +60,25 @@ tmp<fvVectorMatrix> buoyantBoussinesqPimpleFluid::solveUEqn()
     (
         fvm::ddt(U())
       + fvm::div(phi(), U())
+#ifndef OPENFOAMESIORFOUNDATION
       + turbulence_->divDevReff()
+#else
+      + turbulence_->divDevReff(U())
+     ==
+        fvOptions_(U())
+#endif
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    fvVectorMatrix& UEqn = tUEqn.ref();
+#else
     fvVectorMatrix& UEqn = tUEqn();
+#endif
 
     UEqn.relax();
+
+#ifdef OPENFOAMESIORFOUNDATION
+    fvOptions_.constrain(UEqn);
+#endif
 
     if (pimple().momentumPredictor())
     {
@@ -73,11 +89,15 @@ tmp<fvVectorMatrix> buoyantBoussinesqPimpleFluid::solveUEqn()
             fvc::reconstruct
             (
                 (
-                    fvc::interpolate(rhok_)*(g_ & mesh().Sf())
-                  - fvc::snGrad(p())*mesh().magSf()
-                )
+                  - ghf_*fvc::snGrad(rhok_)
+                  - fvc::snGrad(p_rgh_)
+                )*mesh().magSf()
             )
         );
+
+#ifdef OPENFOAMESIORFOUNDATION
+        fvOptions_.correct(U());
+#endif
     }
 
     return tUEqn;
@@ -86,19 +106,39 @@ tmp<fvVectorMatrix> buoyantBoussinesqPimpleFluid::solveUEqn()
 
 void buoyantBoussinesqPimpleFluid::solveTEqn()
 {
-    kappaEff_ =
-        turbulence_->nu()/Pr_ + turbulence_->nut()/Prt_;
+    alphaEff_ = turbulence_->nu()/Pr_ + turbulence_->nut()/Prt_;
+    alphaEff_.correctBoundaryConditions();
 
     fvScalarMatrix TEqn
     (
         fvm::ddt(T_)
       + fvm::div(phi(), T_)
-      - fvm::laplacian(kappaEff_, T_)
+      - fvm::laplacian(alphaEff_, T_)
+#ifdef OPENFOAMFOUNDATION
+     ==
+        radiation_->ST(rhoCpRef_, T_)
+      + fvOptions_(T_)
+#elif OPENFOAMESI
+     ==
+        fvOptions_(T_)
+#endif
     );
 
     TEqn.relax();
 
+#ifdef OPENFOAMESIORFOUNDATION
+    fvOptions_.constrain(TEqn);
+#endif
+
     TEqn.solve();
+
+#ifdef OPENFOAMFOUNDATION
+    radiation_->correct();
+#endif
+
+#ifdef OPENFOAMESIORFOUNDATION
+    fvOptions_.correct(T_);
+#endif
 
     rhok_ = 1.0 - beta_*(T_ - TRef_);
 }
@@ -106,49 +146,95 @@ void buoyantBoussinesqPimpleFluid::solveTEqn()
 
 void buoyantBoussinesqPimpleFluid::solvePEqn
 (
-    tmp<fvVectorMatrix>& UEqn
+    const fvVectorMatrix& UEqn
 )
 {
-    volScalarField rUA("rUA", 1.0/UEqn().A());
-    surfaceScalarField rUAf("(1|A(U))", fvc::interpolate(rUA));
+    volScalarField rAU("rAU", 1.0/UEqn.A());
+    surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
 
-    U() = rUA*UEqn().H();
-    UEqn.clear();
+#ifdef OPENFOAMESIORFOUNDATION
+    volVectorField HbyA(constrainHbyA(rAU*UEqn.H(), U(), p_rgh_));
+#else
+    volVectorField HbyA("HbyA", U());
+    HbyA = rAU*UEqn.H();
+#endif
 
-    phi() = fvc::interpolate(U()) & mesh().Sf();
-    adjustPhi(phi(), U(), p());
+    surfaceScalarField phig(-rAUf*ghf_*fvc::snGrad(rhok_)*mesh().magSf());
 
-    surfaceScalarField buoyancyPhi =
-        rUAf*fvc::interpolate(rhok_)*(g_ & mesh().Sf());
-    phi() += buoyancyPhi;
+    surfaceScalarField phiHbyA
+    (
+        "phiHbyA",
+#ifdef OPENFOAMESIORFOUNDATION
+        fvc::flux(HbyA)
+      + rAUf*fvc::ddtCorr(U(), phi())
+#else
+        (fvc::interpolate(HbyA) & mesh().Sf())
+      + fvc::ddtPhiCorr(rAU, U(), phi())
+#endif
+      + phig
+    );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    // Update the pressure BCs to ensure flux consistency
+    constrainPressure(p_rgh_, U(), phiHbyA, rAUf);
+#endif
 
     while (pimple().correctNonOrthogonal())
     {
-        fvScalarMatrix pEqn
+        fvScalarMatrix p_rghEqn
         (
-            fvm::laplacian(rUAf, p()) == fvc::div(phi())
+            fvm::laplacian(rAUf, p_rgh_) == fvc::div(phiHbyA)
         );
 
-        pEqn.setReference(pRefCell_, pRefValue_);
+        p_rghEqn.setReference(pRefCell_, getRefCellValue(p_rgh_, pRefCell_));
 
-        pEqn.solve();
+        p_rghEqn.solve
+        (
+#ifndef OPENFOAMESIORFOUNDATION
+            mesh().solutionDict().solver
+            (
+                p_rgh_.select(pimple().finalInnerIter())
+            )
+#endif
+        );
+
+        gradp() = fvc::grad(p());
 
         if (pimple().finalNonOrthogonalIter())
         {
             // Calculate the conservative fluxes
-            phi() -= pEqn.flux();
+            phi() = phiHbyA - p_rghEqn.flux();
 
             // Explicitly relax pressure for momentum corrector
-            p().relax();
+            p_rgh_.relax();
 
             // Correct the momentum source with the pressure gradient flux
             // calculated from the relaxed pressure
-            U() += rUA*fvc::reconstruct((buoyancyPhi - pEqn.flux())/rUAf);
+            U() = HbyA + rAU*fvc::reconstruct((phig - p_rghEqn.flux())/rAUf);
             U().correctBoundaryConditions();
+#ifdef OPENFOAMESIORFOUNDATION
+            fvOptions_.correct(U());
+#endif
         }
     }
 
     fluidModel::continuityErrs();
+
+    p() = p_rgh_ + rhok_*gh_;
+
+    if (p_rgh_.needReference())
+    {
+        p() += dimensionedScalar
+        (
+            "p",
+            p().dimensions(),
+            pRefValue_ - getRefCellValue(p(), pRefCell_)
+        );
+        p_rgh_ = p() - rhok_*gh_;
+    }
+
+    // Make the fluxes relative to the mesh motion
+    fvc::makeRelative(phi(), U());
 }
 
 
@@ -161,6 +247,18 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
 )
 :
     fluidModel(typeName, runTime, region),
+    p_rgh_
+    (
+        IOobject
+        (
+            "p_rgh",
+            runTime.timeName(),
+            mesh(),
+            IOobject::MUST_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh()
+    ),
     T_
     (
         IOobject
@@ -174,6 +272,7 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
         mesh()
     ),
     laminarTransport_(U(), phi()),
+    rho_(laminarTransport_.lookup("rho")),
     beta_(laminarTransport_.lookup("beta")),
     TRef_(laminarTransport_.lookup("TRef")),
     Pr_(laminarTransport_.lookup("Pr")),
@@ -185,11 +284,11 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
             U(), phi(), laminarTransport_
         )
     ),
-    kappaEff_
+    alphaEff_
     (
         IOobject
         (
-            "kappaEff",
+            "alphaEff",
             runTime.timeName(),
             mesh(),
             IOobject::NO_READ,
@@ -197,19 +296,21 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
         ),
         turbulence_->nu()/Pr_ + turbulence_->nut()/Prt_
     ),
-    rho_(laminarTransport_.lookup("rho")),
-    g_
+    hRef_
     (
         IOobject
         (
-            "g",
+            "hRef",
             runTime.constant(),
             mesh(),
-            IOobject::MUST_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
-        )
+        ),
+        dimensionedScalar("zero", dimLength, 0)
     ),
-    betaghf_("betagh", beta_*(g_ & mesh().Cf())),
+    ghRef_(-mag(g())*hRef_),
+    gh_("gh", (g() & mesh().C()) - ghRef_),
+    ghf_("ghf", (g() & mesh().Cf()) - ghRef_),
     rhok_
     (
         IOobject
@@ -220,26 +321,107 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
         ),
         1.0 - beta_*(T_ - TRef_)
     ),
+#ifdef OPENFOAMFOUNDATION
+    radiation_(radiationModel::New(T_)),
+    rhoCpRef_
+    (
+        "rhoCpRef",
+        dimDensity*dimEnergy/dimMass/dimTemperature,
+        1.0
+    ),
+#endif
+#ifdef OPENFOAMESIORFOUNDATION
+    fvOptions_(fv::options::New(mesh())),
+#endif
     pRefCell_(0),
     pRefValue_(0)
 {
     UisRequired();
-    pisRequired();
 
+    // Reset p dimensions
+    Info<< "Resetting the dimensions of p and its gradient" << endl;
+    p().dimensions().reset(dimPressure/dimDensity);
+    gradp().dimensions().reset(dimPressure/dimDensity/dimLength);
+    p() = p_rgh_ + rhok_*gh_;
+
+#ifdef OPENFOAMESIORFOUNDATION
+    turbulence_->validate();
+
+    setRefCell(p(), p_rgh_, pimple().dict(), pRefCell_, pRefValue_);
+    mesh().setFluxRequired(p_rgh_.name());
+
+    #ifdef OPENFOAMFOUNDATION
+    if (!isType<radiationModels::noRadiation>(radiation_()))
+    {
+        IOdictionary transportProperties
+        (
+            IOobject
+            (
+                "transportProperties",
+                runTime.constant(),
+                runTime,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false // Do not register
+            )
+        );
+
+        dimensionedScalar rhoRef
+        (
+            "rhoRef",
+            dimDensity,
+            transportProperties
+        );
+
+        dimensionedScalar CpRef
+        (
+            "CpRef",
+            dimSpecificHeatCapacity,
+            transportProperties
+        );
+
+        rhoCpRef_ = rhoRef*CpRef;
+    }
+    #endif
+    // Check if any finite volume option is present
+    if (!fvOptions_.optionList::size())
+    {
+        Info << "No finite volume options present\n" << endl;
+    }
+#else
     setRefCell(p(), pimple().dict(), pRefCell_, pRefValue_);
-    mesh().schemesDict().setFluxRequired(p().name());
+    mesh().schemesDict().setFluxRequired(p_rgh_.name());
+#endif
+
+    if (p_rgh_.needReference())
+    {
+        p() += dimensionedScalar
+        (
+            "p",
+            p().dimensions(),
+            pRefValue_ - getRefCellValue(p(), pRefCell_)
+        );
+        p_rgh_ = p() - rhok_*gh_;
+    }
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-tmp<vectorField> buoyantBoussinesqPimpleFluid::patchViscousForce(const label patchID) const
+tmp<vectorField> buoyantBoussinesqPimpleFluid::patchViscousForce
+(
+    const label patchID
+) const
 {
     tmp<vectorField> tvF
     (
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    tvF.ref() =
+#else
     tvF() =
+#endif
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
@@ -260,7 +442,12 @@ tmp<scalarField> buoyantBoussinesqPimpleFluid::patchPressureForce
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-    tpF() = rho_.value()*p().boundaryField()[patchID];
+#ifdef OPENFOAMESIORFOUNDATION
+    tpF.ref() =
+#else
+    tpF() =
+#endif
+        rho_.value()*p().boundaryField()[patchID];
 
     return tpF;
 }
@@ -270,7 +457,7 @@ bool buoyantBoussinesqPimpleFluid::evolve()
 {
     Info<< "Evolving fluid model: " << this->type() << endl;
 
-    fvMesh& mesh = fluidModel::mesh();
+    dynamicFvMesh& mesh = this->mesh();
 
     bool meshChanged = false;
     if (fluidModel::fsiMeshUpdate())
@@ -280,7 +467,7 @@ bool buoyantBoussinesqPimpleFluid::evolve()
     }
     else
     {
-        meshChanged = refCast<dynamicFvMesh>(mesh).update();
+        meshChanged = mesh.update();
         reduce(meshChanged, orOp<bool>());
     }
 
@@ -290,36 +477,47 @@ bool buoyantBoussinesqPimpleFluid::evolve()
 #       include "volContinuity.H"
     }
 
+    // Update gh fields as the mesh may have moved
+    gh_ = (g() & mesh.C()) - ghRef_;
+    ghf_ = (g() & mesh.Cf()) - ghRef_;
+
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), U());
 
     // Calculate CourantNo
-    {
-        scalar CoNum = 0.0;
-        scalar meanCoNum = 0.0;
-        scalar velMag = 0.0;
-        CourantNo(CoNum, meanCoNum, velMag);
-    }
+    CourantNo();
 
     // Pressure-velocity corrector
     while (pimple().loop())
     {
         // Momentum equation
-        tmp<fvVectorMatrix> UEqn = solveUEqn();
+        tmp<fvVectorMatrix> tUEqn = solveUEqn();
 
         // Temperature equation
         solveTEqn();
 
-        // Pressure equation
-        solvePEqn(UEqn);
+        // --- Pressure corrector loop
+        while (pimple().correct())
+        {
+#ifdef OPENFOAMESIORFOUNDATION
+            solvePEqn(tUEqn.ref());
+#else
+            solvePEqn(tUEqn());
+#endif
+        }
 
-        // Make the fluxes relative to the mesh motion
-        fvc::makeRelative(phi(), U());
+        tUEqn.clear();
 
         gradU() = fvc::grad(U());
 
+#ifdef OPENFOAMESIORFOUNDATION
+        laminarTransport_.correct();
+#endif
         turbulence_->correct();
     }
+
+    Info<< "Fluid temperature min/max(T) = " << min(T_).value()
+	<< ", " << max(T_).value() << " [K]" << endl;
 
     // Make the fluxes absolut to the mesh motion
     fvc::makeAbsolute(phi(), U());

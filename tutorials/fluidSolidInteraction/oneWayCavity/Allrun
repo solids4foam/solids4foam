@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
@@ -7,11 +7,20 @@
 # First run the fluid case to completion
 #
 
-# Create fluid mesh
-runApplication -l log.blockMesh.fluid blockMesh
+if [[ $WM_PROJECT == "foam" ]]
+then
+    # Create fluid mesh
+    runApplication -l log.blockMesh.fluid blockMesh
 
-# Run fluid solver
-runApplication icoFoam
+    # Run fluid solver
+    runApplication icoFoam
+else
+    # Create fluid mesh
+    runApplication -s fluid blockMesh
+
+    # Run fluid solver
+    icoFoam -noFunctionObjects &> log.icoFoam
+fi
 
 
 #
@@ -19,7 +28,12 @@ runApplication icoFoam
 #
 
 # Prepare the solid mesh
-runApplication -l log.blockMesh.solid blockMesh -region solid
+if [[ $WM_PROJECT == "foam" ]]
+then
+    runApplication -l log.blockMesh.solid blockMesh -region solid
+else
+    runApplication -s solid blockMesh -region solid
+fi
 
 # Create links as the solid solver expects the fluid to be a sub-region
 echo "Creating links to the fluid results"
@@ -28,6 +42,11 @@ echo "Creating links to the fluid results"
 find . -type d -name "[0-9]*" | while read i; do \ln -v -s ../$i $i/fluid ; done
 
 # Run the solid solver
-runApplication solids4Foam
+if [[ $WM_PROJECT == "foam" ]]
+then
+    runApplication solids4Foam
+else
+    solids4Foam -noFunctionObjects &> log.solids4Foam
+fi
 
 # ----------------------------------------------------------------- end-of-file

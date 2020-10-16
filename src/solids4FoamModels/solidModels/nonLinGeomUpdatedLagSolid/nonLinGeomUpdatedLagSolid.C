@@ -152,8 +152,13 @@ bool nonLinGeomUpdatedLagSolid::evolve()
     Info<< "Evolving solid solver" << endl;
 
     int iCorr = 0;
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solverPerfDD;
+    SolverPerformance<vector>::debug = 0;
+#else
     lduSolverPerformance solverPerfDD;
     blockLduMatrix::debug = 0;
+#endif
 
     Info<< "Solving the updated Lagrangian form of the momentum equation for DD"
         << endl;
@@ -173,7 +178,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
           - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           + fvc::div(relJ_*relFinv_ & sigma(), "div(sigma)")
           + rho_*g()
-          + mechanical().RhieChowCorrection(DD(), gradDD())
+          + stabilisation().stabilisation(DD(), gradDD(), impK_)
         );
 
         // Under-relax the linear system
@@ -219,8 +224,21 @@ bool nonLinGeomUpdatedLagSolid::evolve()
        !converged
         (
             iCorr,
+#ifdef OPENFOAMESIORFOUNDATION
+            mag(solverPerfDD.initialResidual()),
+            max
+            (
+                solverPerfDD.nIterations()[0],
+                max
+                (
+                    solverPerfDD.nIterations()[1],
+                    solverPerfDD.nIterations()[2]
+                )
+            ),
+#else
             solverPerfDD.initialResidual(),
             solverPerfDD.nIterations(),
+#endif
             DD()
         )
      && ++iCorr < nCorr()
@@ -241,7 +259,9 @@ bool nonLinGeomUpdatedLagSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
+#ifndef OPENFOAMESIORFOUNDATION
     blockLduMatrix::debug = 1;
+#endif
     
     return true;
 }
@@ -337,7 +357,11 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
     rho_ = rho_.oldTime()/relJ_;
 
     // Move the mesh to the deformed configuration
+#ifdef OPENFOAMESIORFOUNDATION
+    const vectorField oldPoints = mesh().points();
+#else
     const vectorField oldPoints = mesh().allPoints();
+#endif
     moveMesh(oldPoints, DD(), pointDD());
 
     solidModel::updateTotalFields();

@@ -47,6 +47,7 @@ SourceFiles
 #define mechanicalEnergies_H
 
 #include "volFields.H"
+#include "OFstream.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

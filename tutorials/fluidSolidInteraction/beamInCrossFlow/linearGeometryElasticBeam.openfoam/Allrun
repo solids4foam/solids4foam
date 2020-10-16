@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Create meshes
+#runApplication -l log.blockMesh.solid blockMesh -region solid
+#runApplication -l log.blockMesh.fluid blockMesh -region fluid
+runApplication -s solid blockMesh -region solid
+runApplication -s fluid blockMesh -region fluid
+
+if [[ "$1" == "parallel" ]]; then
+    # Run parallel
+    runApplication -l log.decomposePar.fluid decomposePar -region fluid
+    runApplication -l log.decomposePar.solid decomposePar -region solid
+    runParallel solids4Foam 4
+    runApplication -l log.reconstructPar.fluid reconstructPar -region fluid
+    runApplication -l log.reconstructPar.solid reconstructPar -region solid
+else
+    # Run serial
+    runApplication solids4Foam
+fi
+
+# ----------------------------------------------------------------- end-of-file
+

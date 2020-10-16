@@ -1,0 +1,42 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:  3.0                                   |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      binary;
+    class       dictionary;
+    location    "constant";
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+planeStress     no;
+
+mechanical
+(
+    steel
+    {
+        type            neoHookeanElasticMisesPlastic;
+        rho             rho [ 1 -3 0 0 0 0 0 ] 7800;
+        E               E [ 1 -1 -2 0 0 0 0 ] 1.86e+11;
+        nu              nu [ 0 0 0 0 0 0 0 ] 0.3;
+        fileName        "$FOAM_CASE/constant/plasticStrainVsYieldStress";
+        outOfBounds     clamp;
+
+        // Solve a Poisson equation to calculate the hydrostatic sigma/pressure
+        // field
+        smoothPressure  yes;
+
+        // Scale the amount of smoothing applied to the pressure field
+        // Defaults to 100
+        pressureSmoothingScaleFactor 1000;
+    }
+);
+
+
+// ************************************************************************* //

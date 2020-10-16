@@ -28,13 +28,15 @@ Description
     St. Venant Kirchhoff Hyperelastic law, where the 2nd Piola Kirchhoff stress
     is given as:
 
-        S = 2*mu*E + lambda*tr(E)*I
+        S = 2*mu*G + lambda*tr(G)*I
 
     where
-    E        Green strain
+    G        Green strain
     lambda   first Lame parameter
     mu       second Lame parameter (shear modulus)
 
+    Either E (Young's modulus) and nu (Poisson's ratio) can be provided or mu
+    (shear modulus) and K (bulk modulus)
 
 SourceFiles
     StVenantKirchhoffElastic.C
@@ -48,6 +50,7 @@ Author
 #define StVenantKirchhoffElastic_H
 
 #include "mechanicalLaw.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -67,37 +70,17 @@ class StVenantKirchhoffElastic
         // Initial density
         const dimensionedScalar rho_;
 
-        // Young's modulus
-        const dimensionedScalar E_;
-
-        // Poisson's ratio
-        const dimensionedScalar nu_;
-
         // First Lame parameter
-        const dimensionedScalar lambda_;
+        dimensionedScalar lambda_;
 
         // Second Lame parameter (shear modulus)
-        const dimensionedScalar mu_;
+        dimensionedScalar mu_;
 
-        // Total deformation gradient volField
-        volTensorField* FPtr_;
+        // Bulk modulus
+        dimensionedScalar K_;
 
-        // Total deformation gradient surfaceField
-        surfaceTensorField* FfPtr_;
 
     // Private Member Functions
-
-        //- Make the F field
-        void makeF();
-
-        //- Return a reference to the F field
-        volTensorField& F();
-
-        //- Make the Ff field
-        void makeFf();
-
-        //- Return a reference to the Ff field
-        surfaceTensorField& Ff();
 
         //- Disallow default bitwise copy construct
         StVenantKirchhoffElastic(const StVenantKirchhoffElastic&);
