@@ -56,7 +56,7 @@ namespace Foam
 bool Foam::pointHistory::writeData()
 {
     const fvMesh& mesh =
-        time_.lookupObject<fvMesh>(polyMesh::defaultRegion);
+        time_.lookupObject<fvMesh>(regionName_);
 
     vector deflection = vector::zero;
     vector velocity = vector::zero;
