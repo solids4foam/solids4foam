@@ -183,7 +183,11 @@ void fixedDisplacementZeroShearFvPatchVectorField::updateCoeffs()
         disp = dispSeries_(this->db().time().timeOutputValue());
     }
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if (internalField().name() == "DD")
+#else
     if (dimensionedInternalField().name() == "DD")
+#endif
     {
         // Incremental approach, so we wil set the increment of displacement
         // Lookup the old displacement field and subtract it from the total
