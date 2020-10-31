@@ -28,7 +28,7 @@ runApplication -l log.blockMesh.solid blockMesh -region solid
 # fluent3DMeshToFoam does not have a region option so we need to workaround
 # it
 mkdir constant/fluid/polyMesh
-runApplication fluent3DMeshToFoam fluid.msh
+runApplication fluentMeshToFoam -writeZones -writeSets beamInCrossFlow.msh
 \mv constant/polyMesh/* constant/fluid/polyMesh/
 cp ./constant/fluid/boundary ./constant/fluid/polyMesh
 
