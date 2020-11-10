@@ -174,6 +174,11 @@ bool linGeomTotalDispSolid::evolve()
             // Update gradient of displacement increment
             gradDD() = gradD() - gradD().oldTime();
 
+			// Update the momentum equation inverse diagonal field
+			// This may be used by the mechanical law when calculating the
+			// hydrostatic pressure
+			const volScalarField DEqnA("DEqnA", DEqn.A());
+
             // Calculate the stress using run-time selectable mechanical law
             mechanical().correct(sigma());
 
