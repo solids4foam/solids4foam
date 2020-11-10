@@ -93,11 +93,62 @@ void sonicLiquidFluid::solveRhoEqn()
 }
 
 
-#ifndef OPENFOAMESIORFOUNDATION
-void sonicLiquidFluid::CorrectPhi()
+void sonicLiquidFluid::CorrectFlux()
 {
-	// Based this implementation in the version found in OFv1812 and 
-	// the one from the pimpleFluid model 
+#ifdef OPENFOAMESIORFOUNDATION
+	// Store divrhoU from the previous mesh so that it can be mapped
+	// and used in correctPhi to ensure the corrected phi has the
+	// same divergence
+	autoPtr<volScalarField> divrhoU;
+
+	divrhoU.set
+	(
+		new volScalarField
+		(
+			"divrhoU",
+			fvc::div(phi())
+		)
+	);
+
+	// Store momentum to set rhoUf for introduced faces.
+	autoPtr<volVectorField> rhoU;
+
+	// Calculate absolute flux
+	// from the mapped surface velocity
+	phi() = mesh().Sf() & rhoUf_();
+
+	// Define volScalarField to hold phi
+	// to pass to compressible CorrectPhi function
+	const volScalarField psi
+	(
+		 IOobject
+		 (
+			"psi",
+			runTime().timeName(),
+			mesh(),
+			IOobject::NO_READ,
+			IOobject::NO_WRITE
+		 ),
+		 mesh(),
+		 psi_
+	);
+
+	CorrectPhi
+	(
+		U(),
+		phi(),
+		p(),
+		rho_,
+		psi,
+		dimensionedScalar("rAUf", dimTime, 1),
+		divrhoU(),
+		pimple()
+#ifndef OPENFOAMESI
+		,
+		true
+#endif
+	);
+#else
 	Info<< "Correcting flux for moving mesh" << endl;
 
 	// Store div(rhoU) before update
@@ -118,8 +169,7 @@ void sonicLiquidFluid::CorrectPhi()
 	// Initialise flux with interpolated velocity
 	phi() = fvc::interpolate(rho_*U()) & mesh().Sf();
 
-	// Not sure if needed...
-//    adjustPhi(phi(), U(), pcorr);
+	adjustPhi(phi(), U(), pcorr);
 
 	mesh().schemesDict().setFluxRequired(pcorr.name());
 
@@ -146,8 +196,8 @@ void sonicLiquidFluid::CorrectPhi()
             phi() -= pcorrEqn.flux();
         }
     }
-}
 #endif
+}
 
 void sonicLiquidFluid::compressibleCourantNo()
 {
@@ -436,68 +486,7 @@ bool sonicLiquidFluid::evolve()
 
 	if (correctPhi && meshChanged)
     {
-#ifdef OPENFOAMESIORFOUNDATION
-		// Store divrhoU from the previous mesh so that it can be mapped
-		// and used in correctPhi to ensure the corrected phi has the
-		// same divergence
-		autoPtr<volScalarField> divrhoU;
-		if (correctPhi)
-		{
-			divrhoU.set
-			(
-				new volScalarField
-				(
-					"divrhoU",
-					fvc::div(phi())
-				)
-			);
-		}
-
-		// Store momentum to set rhoUf for introduced faces.
-		autoPtr<volVectorField> rhoU;
-		//        if (rhoUf_.valid())
-		//        {
-		//            rhoU.set(new volVectorField("rhoU", rho_*U()));
-		//        }
-
-		// Calculate absolute flux
-		// from the mapped surface velocity
-		phi() = mesh.Sf() & rhoUf_();
-
-		// Define volScalarField to hold phi
-		// to pass to compressible CorrectPhi function
-		const volScalarField psi
-		(
-			 IOobject
-			 (
-			  	"psi",
-				runTime().timeName(),
-				mesh,
-				IOobject::NO_READ,
-				IOobject::AUTO_WRITE
-			 ),
-			 mesh,
-			 psi_
-		);
-
-		CorrectPhi
-		(
-			U(),
-			phi(),
-			p(),
-			rho_,
-			psi,
-			dimensionedScalar("rAUf", dimTime, 1),
-			divrhoU(),
-			pimple()
-#ifndef OPENFOAMESI
-			,
-			true
-#endif
-		);
-#else
-		   CorrectPhi();
-#endif
+		CorrectFlux();
     }
 
     // Make the fluxes relative to the mesh motion

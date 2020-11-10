@@ -118,10 +118,8 @@ class sonicLiquidFluid
         //- Solve density equation
         void solveRhoEqn();
 
-#ifndef OPENFOAMESIORFOUNDATION
         //- Phi correction for mesh motion
-        void CorrectPhi();
-#endif
+        void CorrectFlux();
 
         //- Print compressible Courant number
 		void compressibleCourantNo();
