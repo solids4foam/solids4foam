@@ -64,7 +64,11 @@ fixedDisplacementZeroShearFvPatchVectorField
 )
 :
     solidDirectionMixedFvPatchVectorField(ptf, p, iF, mapper),
+#ifdef OPENFOAMFOUNDATION
+    totalDisp_(mapper(ptf.totalDisp_)),
+#else
     totalDisp_(ptf.totalDisp_, mapper),
+#endif
     dispSeries_(ptf.dispSeries_),
     forceZeroShearGrad_(ptf.forceZeroShearGrad_)
 {}
@@ -149,7 +153,11 @@ void fixedDisplacementZeroShearFvPatchVectorField::autoMap
 {
     solidDirectionMixedFvPatchVectorField::autoMap(m);
 
+#ifdef OPENFOAMFOUNDATION
+    m(totalDisp_, totalDisp_);;
+#else
     totalDisp_.autoMap(m);
+#endif
 }
 
 
