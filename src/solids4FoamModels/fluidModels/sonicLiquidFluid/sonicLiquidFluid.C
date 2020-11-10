@@ -307,7 +307,6 @@ sonicLiquidFluid::sonicLiquidFluid
         )
     ),
 	mu_(transportProperties_.lookup("mu")),
-	K_(transportProperties_.lookup("K")),
     thermodynamicProperties_
     (
         IOobject
@@ -321,7 +320,8 @@ sonicLiquidFluid::sonicLiquidFluid
     ),
 	rho0_(thermodynamicProperties_.lookup("rho0")),
 	p0_(thermodynamicProperties_.lookup("p0")),
-    psi_(thermodynamicProperties_.lookup("psi")),
+	K_(thermodynamicProperties_.lookup("K")),
+	psi_(rho0_/K_),
 	rhoO_
 	(
 	 	IOobject
@@ -357,8 +357,8 @@ sonicLiquidFluid::sonicLiquidFluid
             "rAU",
             runTime.timeName(),
             mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
         ),
         mesh(),
         runTime.deltaT()/rho0_,
