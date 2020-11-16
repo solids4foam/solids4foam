@@ -827,11 +827,14 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
 #ifndef OPENFOAMFOUNDATION
         // Check for RBF motion solver
-        const bool rbfMotionSolver =
-            isA<RBFMeshMotionSolver>
+        bool rbfMotionSolver = false;
+        if (fluidMesh().foundObject<motionSolver>("dynamicMeshDict"))
+        {
+            rbfMotionSolver = isA<RBFMeshMotionSolver>
             (
                 fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
             );
+        }
 #endif
 
         // Set motion on FSI interface
