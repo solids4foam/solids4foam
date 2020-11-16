@@ -25,7 +25,7 @@ solids4Foam::convertCaseFormat .
 runApplication -l log.blockMesh.solid blockMesh -region solid
 
 # Create fluid mesh
-# fluent3DMeshToFoam does not have a region option so we need to workaround
+# fluentMeshToFoam does not have a region option so we need to workaround
 # it
 mkdir constant/fluid/polyMesh
 runApplication fluentMeshToFoam -writeZones -writeSets beamInCrossFlow.msh
