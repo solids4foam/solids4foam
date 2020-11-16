@@ -884,6 +884,11 @@ Foam::solidModel::solidModel
     gradDD_.oldTime();
     sigma_.oldTime();
 
+    // There is an issue where old-old fields are not being written so we will
+    // reset the write flag here
+    D_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
+    DD_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
+
     // Print out the relaxation factor
     Info<< "    under-relaxation method: " << relaxationMethod_ << endl;
     if (relaxationMethod_ == "QuasiNewton")
