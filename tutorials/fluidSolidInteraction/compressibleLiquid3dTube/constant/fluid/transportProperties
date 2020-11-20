@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  v1812                                 |
-|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -10,13 +10,17 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    "constant";
-    object      thermodynamicProperties;
+    object      flowProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-rho0            rho0 [ 1 -3 0 0 0 0 0 ] 1000;
-p0              p0 [ 1 -1 -2 0 0 0 0 ] 100000;
-K               K  [ 1 -1 -2 0 0 0 0 ] 2.2e9;
+rho             rho [1 -3 0 0 0 0 0] 1000;
+//nu              nu [0 2 -1 0 0 0 0] 3e-6;
+mu              mu [ 1 -1 -1 0 0 0 0 ] 3e-3;
+
+// For piso/transientSimple
+//transportModel  Newtonian;
+
+
 
 // ************************************************************************* //

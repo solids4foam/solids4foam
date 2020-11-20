@@ -1,9 +1,9 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  v1812                                 |
-|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
-|    \\/     M anipulation  |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -11,12 +11,13 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "constant";
-    object      thermodynamicProperties;
+    object      physicsProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-rho0            rho0 [ 1 -3 0 0 0 0 0 ] 1000;
-p0              p0 [ 1 -1 -2 0 0 0 0 ] 100000;
-K               K  [ 1 -1 -2 0 0 0 0 ] 2.2e9;
+// type    fluid;
+// type    solid;
+type    fluidSolidInteraction;
+
 
 // ************************************************************************* //

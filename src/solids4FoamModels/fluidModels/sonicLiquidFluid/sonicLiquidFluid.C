@@ -93,11 +93,62 @@ void sonicLiquidFluid::solveRhoEqn()
 }
 
 
-#ifndef OPENFOAMESIORFOUNDATION
-void sonicLiquidFluid::CorrectPhi()
+void sonicLiquidFluid::CorrectFlux()
 {
-	// Based this implementation in the version found in OFv1812 and 
-	// the one from the pimpleFluid model 
+#ifdef OPENFOAMESIORFOUNDATION
+	// Store divrhoU from the previous mesh so that it can be mapped
+	// and used in correctPhi to ensure the corrected phi has the
+	// same divergence
+	autoPtr<volScalarField> divrhoU;
+
+	divrhoU.set
+	(
+		new volScalarField
+		(
+			"divrhoU",
+			fvc::div(phi())
+		)
+	);
+
+	// Store momentum to set rhoUf for introduced faces.
+	autoPtr<volVectorField> rhoU;
+
+	// Calculate absolute flux
+	// from the mapped surface velocity
+	phi() = mesh().Sf() & rhoUf_();
+
+	// Define volScalarField to hold phi
+	// to pass to compressible CorrectPhi function
+	const volScalarField psi
+	(
+		 IOobject
+		 (
+			"psi",
+			runTime().timeName(),
+			mesh(),
+			IOobject::NO_READ,
+			IOobject::NO_WRITE
+		 ),
+		 mesh(),
+		 psi_
+	);
+
+	CorrectPhi
+	(
+		U(),
+		phi(),
+		p(),
+		rho_,
+		psi,
+		dimensionedScalar("rAUf", dimTime, 1),
+		divrhoU(),
+		pimple()
+#ifndef OPENFOAMESI
+		,
+		true
+#endif
+	);
+#else
 	Info<< "Correcting flux for moving mesh" << endl;
 
 	// Store div(rhoU) before update
@@ -118,8 +169,7 @@ void sonicLiquidFluid::CorrectPhi()
 	// Initialise flux with interpolated velocity
 	phi() = fvc::interpolate(rho_*U()) & mesh().Sf();
 
-	// Not sure if needed...
-//    adjustPhi(phi(), U(), pcorr);
+	adjustPhi(phi(), U(), pcorr);
 
 	mesh().schemesDict().setFluxRequired(pcorr.name());
 
@@ -146,8 +196,8 @@ void sonicLiquidFluid::CorrectPhi()
             phi() -= pcorrEqn.flux();
         }
     }
-}
 #endif
+}
 
 void sonicLiquidFluid::compressibleCourantNo()
 {
@@ -186,6 +236,7 @@ void sonicLiquidFluid::solvePEqn
 
 	U() = rAU_*UEqn.H();
 
+	// Compute advective transport coeff. to pressure
 	surfaceScalarField phid
 	(
 		"phid",
@@ -196,20 +247,28 @@ void sonicLiquidFluid::solvePEqn
 		  + rhorAUf*fvc::ddtCorr(rho_, U(), phi())/fvc::interpolate(rho_)
 #else
 			(fvc::interpolate(U()) & mesh().Sf())
-		  + fvc::ddtPhiCorr(rAU_, rho_, U(), phi())
+		  - fvc::meshPhi(rho_, U())
 #endif
 		)
 	);
 
+#ifdef OPENFOAMESIORFOUNDATION
+	// Make flux relative to mesh motion
+	fvc::makeRelative(phid, psi_, U());
+#endif
+
+	// Recompute flux for pressure equation
 	phi() = fvc::interpolate(rhoO_)*phid/psi_;
 
+	// Pressure equation 
+	// essential to account for ddt(rho0) term for mesh motion)
 	fvScalarMatrix pEqn
 	(
 		fvm::ddt(psi_, p())
 	  + fvc::div(phi())
 	  + fvm::div(phid, p())
 	  - fvm::laplacian(rhorAUf, p())
-	  + fvc::ddt(rhoO_) // Essential to account for this term with mesh motion
+	  + fvc::ddt(rhoO_) 
 	);
 
 	pEqn.solve();
@@ -248,7 +307,6 @@ sonicLiquidFluid::sonicLiquidFluid
         )
     ),
 	mu_(transportProperties_.lookup("mu")),
-	K_(transportProperties_.lookup("K")),
     thermodynamicProperties_
     (
         IOobject
@@ -262,7 +320,8 @@ sonicLiquidFluid::sonicLiquidFluid
     ),
 	rho0_(thermodynamicProperties_.lookup("rho0")),
 	p0_(thermodynamicProperties_.lookup("p0")),
-    psi_(thermodynamicProperties_.lookup("psi")),
+	K_(thermodynamicProperties_.lookup("K")),
+	psi_(rho0_/K_),
 	rhoO_
 	(
 	 	IOobject
@@ -298,8 +357,8 @@ sonicLiquidFluid::sonicLiquidFluid
             "rAU",
             runTime.timeName(),
             mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
         ),
         mesh(),
         runTime.deltaT()/rho0_,
@@ -427,68 +486,7 @@ bool sonicLiquidFluid::evolve()
 
 	if (correctPhi && meshChanged)
     {
-#ifdef OPENFOAMESIORFOUNDATION
-		// Store divrhoU from the previous mesh so that it can be mapped
-		// and used in correctPhi to ensure the corrected phi has the
-		// same divergence
-		autoPtr<volScalarField> divrhoU;
-		if (correctPhi)
-		{
-			divrhoU.set
-			(
-				new volScalarField
-				(
-					"divrhoU",
-					fvc::div(phi())
-				)
-			);
-		}
-
-		// Store momentum to set rhoUf for introduced faces.
-		autoPtr<volVectorField> rhoU;
-		//        if (rhoUf_.valid())
-		//        {
-		//            rhoU.set(new volVectorField("rhoU", rho_*U()));
-		//        }
-
-		// Calculate absolute flux
-		// from the mapped surface velocity
-		phi() = mesh.Sf() & rhoUf_();
-
-		// Define volScalarField to hold phi
-		// to pass to compressible CorrectPhi function
-		const volScalarField psi
-		(
-			 IOobject
-			 (
-			  	"psi",
-				runTime().timeName(),
-				mesh,
-				IOobject::NO_READ,
-				IOobject::AUTO_WRITE
-			 ),
-			 mesh,
-			 psi_
-		);
-
-		CorrectPhi
-		(
-			U(),
-			phi(),
-			p(),
-			rho_,
-			psi,
-			dimensionedScalar("rAUf", dimTime, 1),
-			divrhoU(),
-			pimple()
-#ifndef OPENFOAMESI
-			,
-			true
-#endif
-		);
-#else
-		   CorrectPhi();
-#endif
+		CorrectFlux();
     }
 
     // Make the fluxes relative to the mesh motion
@@ -511,60 +509,39 @@ bool sonicLiquidFluid::evolve()
 
         // --- Momentum equation
         // Time-derivative matrix
-        fvVectorMatrix ddtUEqn(fvm::ddt(rho_, U()));
-
-        // Convection-diffusion matrix
-        fvVectorMatrix HUEqn
+        fvVectorMatrix UEqn
 		(
-		    fvm::div(phi(), U())
+		 	fvm::ddt(rho_, U())
+		  + fvm::div(phi(), U())
 		  - fvm::laplacian(mu_, U())
 #ifdef OPENFOAMESIORFOUNDATION
 		 ==
 			fvOptions_(rho_, U())
 #endif
-		);
 
-#ifdef OPENFOAMESIORFOUNDATION
-		tmp<fvVectorMatrix> tUEqn(ddtUEqn + HUEqn);
-		fvVectorMatrix& UEqn = tUEqn.ref();
+		);
 
 		UEqn.relax();
 
+#ifdef OPENFOAMESIORFOUNDATION
+		tmp<fvVectorMatrix> tUEqn(UEqn);
+
 		fvOptions_.constrain(UEqn);
+#endif
 
 		if (pimple().momentumPredictor())
 		{
 			solve(UEqn == -fvc::grad(p()));
 		}
-
-        fvOptions_.correct(U());
-#else
-        fvVectorMatrix UEqn(ddtUEqn + HUEqn);
-
-		// Get under-relaxation factor
-		scalar UUrf =
-			mesh.solutionDict().equationRelaxationFactor
-			(
-				U().select(pimple().finalIter())
-			);
-
-		if (pimple().momentumPredictor())
-		{
-			solve
-			(
-				ddtUEqn
-			  + relax(HUEqn, UUrf)
-			 ==
-			  - fvc::grad(p()),
-				mesh.solutionDict().solver((U().select(pimple().finalIter())))
-			);
-		}
 		else
         {
             // Explicit update
-            U() = (ddtUEqn.H() + HUEqn.H() - fvc::grad(p()))/(HUEqn.A() + ddtUEqn.A());
+            U() = (UEqn.H() - fvc::grad(p()))/UEqn.A();
             U().correctBoundaryConditions();
         }
+
+#ifdef OPENFOAMESIORFOUNDATION
+        fvOptions_.correct(U());
 #endif
 
         // --- Pressure corrector loop
@@ -582,7 +559,6 @@ bool sonicLiquidFluid::evolve()
 #endif
 
         gradU() = fvc::grad(U());
-
     }
 
 	// Update rho based on equation of state

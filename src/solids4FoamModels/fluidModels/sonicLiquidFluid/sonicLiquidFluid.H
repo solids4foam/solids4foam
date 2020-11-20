@@ -75,9 +75,6 @@ class sonicLiquidFluid
         //- Dynamic viscosity
         dimensionedScalar mu_;
 
-        //- Fluid bulk modulus field
-        dimensionedScalar K_;
-
 		//- Thermodynamic properties
 		IOdictionary thermodynamicProperties_;
 
@@ -86,6 +83,9 @@ class sonicLiquidFluid
 
 		//- Ref. pressure
 		const dimensionedScalar p0_;
+
+        //- Fluid bulk modulus field
+        const dimensionedScalar K_;
 
         //- const Ref. of psi field
         const dimensionedScalar psi_;
@@ -118,10 +118,8 @@ class sonicLiquidFluid
         //- Solve density equation
         void solveRhoEqn();
 
-#ifndef OPENFOAMESIORFOUNDATION
         //- Phi correction for mesh motion
-        void CorrectPhi();
-#endif
+        void CorrectFlux();
 
         //- Print compressible Courant number
 		void compressibleCourantNo();
