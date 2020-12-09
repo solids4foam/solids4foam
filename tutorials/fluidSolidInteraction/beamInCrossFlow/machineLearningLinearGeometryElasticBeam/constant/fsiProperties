@@ -20,6 +20,9 @@ fluidSolidInterface    Aitken;
 
 "fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
 {
+    // Optional: write interface dtaa data to disk
+    writeInterfaceData yes;
+
     // Solid interface patch list
     solidPatch interface;
 
