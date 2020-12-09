@@ -320,8 +320,14 @@ sonicLiquidFluid::sonicLiquidFluid
     ),
 	rho0_(thermodynamicProperties_.lookup("rho0")),
 	p0_(thermodynamicProperties_.lookup("p0")),
-	K_(thermodynamicProperties_.lookup("K")),
-	psi_(rho0_/K_),
+    // pis (compressibility) can be read directly or calculated from the bulk
+    // modulus
+	psi_
+    (
+        bool(thermodynamicProperties_.found("psi"))
+      ? dimensionedScalar(thermodynamicProperties_.lookup("psi"))
+      : rho0_/dimensionedScalar(thermodynamicProperties_.lookup("K"))
+    ),
 	rhoO_
 	(
 	 	IOobject
@@ -407,6 +413,19 @@ sonicLiquidFluid::sonicLiquidFluid
 #else
     mesh().schemesDict().setFluxRequired(p().name());
 #endif
+
+    // Check that either psi or K are specified, not both
+    if
+    (
+        thermodynamicProperties_.found("psi")
+     && thermodynamicProperties_.found("K")
+    )
+    {
+        FatalErrorIn(type() + "::" + type() + "()")
+            << "Either psi OR K should be specified in "
+            << thermodynamicProperties_.name() << ", not both!"
+            << abort(FatalError);
+    }
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

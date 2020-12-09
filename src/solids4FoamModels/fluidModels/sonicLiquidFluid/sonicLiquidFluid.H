@@ -84,9 +84,6 @@ class sonicLiquidFluid
 		//- Ref. pressure
 		const dimensionedScalar p0_;
 
-        //- Fluid bulk modulus field
-        const dimensionedScalar K_;
-
         //- const Ref. of psi field
         const dimensionedScalar psi_;
 
