@@ -9,8 +9,8 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       pointVectorField;
-    object      pointDD;
+    class       volVectorField;
+    object      D;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -22,33 +22,39 @@ boundaryField
 {
     symmetry-x
     {
-        type 	symmetryPlane;
-        value 	uniform (0 0 0);
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
     }
     symmetry-y
     {
-        type 	symmetryPlane;
-        value 	uniform (0 0 0);
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
     }
     outlet
     {
-        type 	fixedValue;
-        value 	uniform (0 0 0);
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
     }
     inlet
     {
-        type 	fixedValue;
-        value 	uniform (0 0 0);
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
     }
     inner-wall
     {
-        type    calculated;
-        value   uniform (0 0 0);
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
     }
     outer-wall
     {
-        type    calculated;
-        value   uniform (0 0 0);
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
     }
 }
 

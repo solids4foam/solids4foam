@@ -14,46 +14,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//fluidSolidInterface    fixedRelaxation;
-//fluidSolidInterface    Aitken;
-fluidSolidInterface    IQNILS;
-
-fixedRelaxationCoeffs
-{
-    solidPatch         inner-wall;
-    fluidPatch         wall;
-    
-    relaxationFactor 0.3;
-
-    interfaceDeformationLimit 0;
-
-    outerCorrTolerance 1e-6;
-    nOuterCorr 30;
-
-    interpolatorUpdateFrequency 0;
-
-    coupled yes;
-}
+fluidSolidInterface    Aitken;
 
 AitkenCoeffs
-{
-    solidPatch         inner-wall;
-    fluidPatch         wall;
-
-	// Initial relaxation factor
-    relaxationFactor 0.4;
-
-    interfaceDeformationLimit 0;
-
-    outerCorrTolerance 1e-6;
-    nOuterCorr 80;
-
-    interpolatorUpdateFrequency 0;
-
-    coupled yes;
-}
-
-IQNILSCoeffs
 {
     // Solid interface patch list
     solidPatch         inner-wall;
@@ -71,7 +34,7 @@ IQNILSCoeffs
     relaxationFactor   0.05;
 
     // Tolerance for the FSI loop within each time-step
-    outerCorrTolerance 1e-6;
+    outerCorrTolerance 1e-3;
 
     // Maximum number of outer FSI loop correctors within each time-step
     nOuterCorr         30;
@@ -87,7 +50,7 @@ IQNILSCoeffs
     // Optional (only for IQNILS): re-use modes from previous time-steps.
     // The number of modes to be re-used is specified
     // Defaults to 0 modes
-    couplingReuse       2;
+    //couplingReuse       2;
 
     // Optional: if any point on the fluid interface moves greater than the
     // interfaceDeformationLimit then the entire fluid mesh is updated; if not
@@ -96,14 +59,14 @@ IQNILSCoeffs
     // point displacement normalised with respect to the local cell size (delta
     // coeffs are used)
     // Defaults to 0.0 i.e. the fluid mesh is always updated
-    interfaceDeformationLimit 0;
+    //interfaceDeformationLimit 0;
 
     // Frequency of time-step at which the fluid-solid interface interpolation
     // weights are updated
     // 0 means there will be no interpolator update during simulation, whereas
     // 10 means the interpolator will be updated every 10 time-steps
     // Defaults to 0
-    interpolatorUpdateFrequency 0;
+    //interpolatorUpdateFrequency 0;
 }
 
 // ************************************************************************* //
