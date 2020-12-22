@@ -1522,17 +1522,15 @@ void Foam::solidModel::moveMesh
     Info<< "Moving the mesh to the deformed configuration" << nl << endl;
 
     //- Move mesh by interpolating displacement field to vertices
-    // To be checked: sync boundary and global points across procs to make sure
-    // numiercal error does not build up and when end up with the error
-    // "face area does not match neighbour..."
-    // We could sync points as a pointVectorField just as we sync pointDD
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(DD, pointDD);
 
-    // Ensure continuous displacement across processor boundary
-    // Something strange is happening here
-    pointDD.correctBoundaryConditions();
+    // Fix, AW/PC, 22-Dec-20,
+    // correctBoundaryConditions should not be called as it causes (global?)
+    // points to become out of sync. This results in the error "face area does
+    // not match neighbour..."
+    //pointDD.correctBoundaryConditions();
 
 #ifdef OPENFOAMESIORFOUNDATION
     vectorField& pointDDI = pointDD.primitiveFieldRef();
