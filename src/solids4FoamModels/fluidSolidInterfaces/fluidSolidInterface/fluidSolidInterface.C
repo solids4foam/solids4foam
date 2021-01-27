@@ -869,9 +869,9 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 motionUFluidPatch ==
                     tppi.pointToPointInterpolate
                     (
-                        accumulatedFluidInterfacesDisplacements()[interfaceI]
-                       /fluid().runTime().deltaT().value()
-                    );
+                        fluidPatchesPointsDispls[interfaceI]
+                      - fluidPatchesPointsDisplsPrev[interfaceI]
+                    )/fluid().runTime().deltaT().value();
             }
 #endif
         }
