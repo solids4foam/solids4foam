@@ -17,7 +17,7 @@ FoamFile
 dynamicFvMesh dynamicMotionSolverFvMesh;
 
 solver velocityLaplacian; // finite volume solver
-//solver lapace; // finite element solver
+//solver laplace; // finite element solver
 //solver RBFMeshMotionSolver; // radial basis function solver
 
 diffusivity quadratic inverseDistance (interface);

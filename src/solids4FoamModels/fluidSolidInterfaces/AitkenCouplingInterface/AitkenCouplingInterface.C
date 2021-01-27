@@ -61,9 +61,18 @@ AitkenCouplingInterface::AitkenCouplingInterface
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
     ),
-    predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
+    predictSolid_(fsiProperties().lookupOrDefault<Switch>("predictSolid", true)),
+    additionalMeshCorrection_
+    (
+        fsiProperties().lookupOrDefault<Switch>
+        (
+            "additionalMeshCorrection", false
+        )
+    ),
     aitkenRelaxationFactors_(nGlobalPatches(), relaxationFactor_)
-{}
+{
+    Info<< "additionalMeshCorrection: " << additionalMeshCorrection_ << endl;
+}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -120,6 +129,17 @@ bool AitkenCouplingInterface::evolve()
     while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
+
+    // Optional: correct fluid mesh to avoid build-up of interface position
+    // errors
+    if (additionalMeshCorrection_)
+    {
+        // Transfer the displacement from the solid to the fluid
+        updateDisplacement();
+
+        // Move the fluid mesh
+        moveFluidMesh();
+    }
 
     return 0;
 }
