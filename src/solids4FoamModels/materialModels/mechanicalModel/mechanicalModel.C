@@ -578,7 +578,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::bulkModulus() const
                     IOobject::AUTO_WRITE
                 ),
                 mesh(),
-                dimensionedScalar("zero", dimDensity, 0),
+                dimensionedScalar("zero", dimPressure, 0),
                 calculatedFvPatchScalarField::typeName
             )
         );
