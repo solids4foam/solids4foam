@@ -103,6 +103,9 @@ class fluidSolidInterface
         //- Maximal number of outer correctors
         const label nOuterCorr_;
 
+        //- Optional additional mesh correction step after FSI loop
+        const Switch additionalMeshCorrection_;
+
         //- Fsi coupling on/off
         Switch coupled_;
 
@@ -456,6 +459,12 @@ public:
             //- Return const access to the interface-to-interface list
             const PtrList<interfaceToInterfaceMapping>&
                 interfaceToInterfaceList() const;
+
+            //- Return const access to the additional mesh correction switch
+            const Switch& additionalMeshCorrection() const
+            {
+                return additionalMeshCorrection_;
+            }
 
 
         // Edit
