@@ -3,6 +3,13 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Case only runs with some versions of OpenFOAM/FOAM
+if [[ $WM_PROJECT = "foam" ]]
+then
+    echo; echo "FOAM EXTEND loaded: skipping case"; echo
+    exit 0
+fi
+
 # Create meshes
 #runApplication -l log.blockMesh.solid blockMesh -region solid
 #runApplication -l log.blockMesh.fluid blockMesh -region fluid
