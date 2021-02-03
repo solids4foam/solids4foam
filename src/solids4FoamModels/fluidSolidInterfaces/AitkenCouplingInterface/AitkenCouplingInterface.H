@@ -66,9 +66,6 @@ class AitkenCouplingInterface
         //- Predict solid
         const Switch predictSolid_;
 
-        //- Optional additional mesh correction step after FSI loop
-        const Switch additionalMeshCorrection_;
-
         //- List of Aitken under-relaxation factors
         List<scalar> aitkenRelaxationFactors_;
 

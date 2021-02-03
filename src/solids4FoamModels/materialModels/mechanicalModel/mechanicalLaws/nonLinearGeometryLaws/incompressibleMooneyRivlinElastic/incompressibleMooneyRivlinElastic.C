@@ -66,6 +66,9 @@ Foam::incompressibleMooneyRivlinElastic::incompressibleMooneyRivlinElastic
             type() + " mechanical law is not implemented for planeStress"
         );
     }
+
+    // Force sigmaHyd to be read if present
+    sigmaHyd();
 }
 
 

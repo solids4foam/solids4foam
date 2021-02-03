@@ -24,29 +24,33 @@ boundaryField
     {
         type            empty;
     }
-   	top 
+    top
     {
         type            empty;
     }
     inner-wall
     {
         type            extrapolatedPressureValue;
-		relaxFactor		0.5;
-		value			uniform 0;
+        relaxFactor		0.1;
+        value			uniform 0;
     }
     outer-wall
     {
         type            extrapolatedPressureValue;
-		relaxFactor		0.5;
-		value			uniform 0;
+        relaxFactor		0.1;
+        value			uniform 0;
     }
     symmetry-x
     {
-        type             	symmetryPlane;	
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value			uniform 0;
     }
     symmetry-y
     {
-        type             	symmetryPlane;	
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value			uniform 0;
     }
 }
 

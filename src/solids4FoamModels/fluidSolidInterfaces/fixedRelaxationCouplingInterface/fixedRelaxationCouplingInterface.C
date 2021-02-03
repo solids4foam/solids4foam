@@ -120,6 +120,17 @@ bool fixedRelaxationCouplingInterface::evolve()
 
     solid().updateTotalFields();
 
+    // Optional: correct fluid mesh to avoid build-up of interface position
+    // errors
+    if (additionalMeshCorrection())
+    {
+        // Transfer the displacement from the solid to the fluid
+        updateDisplacement();
+
+        // Move the fluid mesh
+        moveFluidMesh();
+    }
+
     return 0;
 }
 

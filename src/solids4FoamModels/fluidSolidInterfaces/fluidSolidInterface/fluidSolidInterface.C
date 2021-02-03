@@ -274,6 +274,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrDefault<int>("nOuterCorr", 30)
     ),
+    additionalMeshCorrection_
+    (
+        fsiProperties_.lookupOrDefault<Switch>
+        (
+            "additionalMeshCorrection", false
+        )
+    ),
     coupled_
     (
         fsiProperties_.lookupOrDefault<Switch>("coupled", true)
@@ -310,6 +317,8 @@ Foam::fluidSolidInterface::fluidSolidInterface
     ),
     accumulatedFluidInterfacesDisplacementsList_()
 {
+    Info<< "additionalMeshCorrection: " << additionalMeshCorrection_ << endl;
+
     // Check if couplingStartTime is specified
     if (couplingStartTime_ > SMALL)
     {
