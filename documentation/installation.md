@@ -65,9 +65,12 @@ $> docker pull philippic/solids4foam-ubuntu18.04
 ```
 $> docker run -itd -v="${HOME}":/home/app/foam/app-4.0/sharedRun --name solids4foam.ubuntu18.04  philippic/solids4foam-ubuntu18.04 /bin/bash
 ```
-- Create a solids4foam container (Windows powershell terminal):
+- Create a solids4foam container (Windows powershell terminal, where you first need to add your Windows home folder within the docker GUI under Resources -> file sharing -> press the + symbol -> add your home folder):
 ```
 $> docker run -itd -v="${HOME}":/home/app/foam/app-4.0/sharedRun \--name solids4foam.ubuntu18.04 \ philippic/solids4foam-ubuntu18.04 /bin/bash
+or (where yourHomeFolderName is replaced with your home folder name)
+$> docker run -itd -v=c:/users/yourHomeFolderName:/home/app/foam/app-4.0/sharedRun \--name solids4foam.ubuntu18.04 \ philippic/solids4foam-ubuntu18.04 /bin/bash
+
 ```
 
 - You can now attach to the newly created container:
@@ -123,7 +126,7 @@ $> docker pull philippic/solids4foam-ubuntu18.04
 
 - Create a solids4foam container (macOS and linux terminal):
 ```
-$> docker run -itd -v="~":/home/app/foam/app-4.0/sharedRun --name solids4foam.ubuntu18.04  philippic/solids4foam-ubuntu18.04 /bin/bash
+$> docker run -itd -v="${HOME}":/home/app/foam/app-4.0/sharedRun --name solids4foam.ubuntu18.04  philippic/solids4foam-ubuntu18.04 /bin/bash
 ```
 - Create a solids4foam container (Windows powershell terminal):
 ```
