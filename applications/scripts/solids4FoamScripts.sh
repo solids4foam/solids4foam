@@ -43,51 +43,64 @@ function solids4Foam::convertCaseFormat()
     # Exit if foam extend is loaded
     if [[ $WM_PROJECT = "foam" ]]
     then
-        echo "FOAM EXTEND loaded: no changes made"; echo
-        return 0
+        if [ 1 -eq "$(echo "${WM_PROJECT_VERSION} > 4.0" | bc)" ]
+        then
+            echo "foam-extend-${WM_PROJECT_VERSION} loaded"
+            if [[ -n $(find "${CASE_DIR}" -name "nut") ]]
+            then
+                echo "Changing nutWallFunction in nut to nutkWallFunction"; echo
+                find "${CASE_DIR}" -name "nut" \
+                    | xargs sed -i 's\nutWallFunction\nutkWallFunction\g'
+            fi
+
+            return 0
+        else
+            echo "foam-extend-4.0 loaded: no changes made"; echo
+            return 0
+        fi
     fi
 
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
 
-    echo "Changing symmetryPlane to symmetry in D*"; echo
     if [[ -n $(find "${CASE_DIR}" -name "D*") ]]
     then
+        echo "Changing symmetryPlane to symmetry in D*"; echo
         find "${CASE_DIR}" -name "D*" | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
-    echo "Changing symmetryPlane to symmetry in pointD*"; echo
     if [[ -n $(find "${CASE_DIR}" -name "pointD*") ]]
     then
+        echo "Changing symmetryPlane to symmetry in pointD*"; echo
         find "${CASE_DIR}" -name "pointD*" | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
-    echo "Changing symmetryPlane to symmetry in U"; echo
     if [[ -n $(find "${CASE_DIR}" -name "U") ]]
     then
+        echo "Changing symmetryPlane to symmetry in U"; echo
         find "${CASE_DIR}" -name "U" | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
-    echo "Changing symmetryPlane to symmetry in p"; echo
     if [[ -n $(find "${CASE_DIR}" -name "p") ]]
     then
+        echo "Changing symmetryPlane to symmetry in p"; echo
         find "${CASE_DIR}" -name "p" | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
-    echo "Changing symmetryPlane to symmetry in pointMotionU"; echo
     if [[ -n $(find "${CASE_DIR}" -name "pointMotionU") ]]
     then
+        echo "Changing symmetryPlane to symmetry in pointMotionU"; echo
         find "${CASE_DIR}" -name "pointMotionU" | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
-    echo "Changing symmetryPlane to symmetry in blockMeshDict"; echo
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict) ]]
     then
+        echo "Changing symmetryPlane to symmetry in blockMeshDict"; echo
         find "${CASE_DIR}" -name blockMeshDict | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
-    echo "Changing symmetryPlane to symmetry in boundary"; echo
     if [[ -n $(find "${CASE_DIR}" -name boundary) ]]
     then
+        echo "Changing symmetryPlane to symmetry in boundary"; echo
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
@@ -118,8 +131,8 @@ function solids4Foam::convertCaseFormat()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # convertCaseFormatFoamExtend
-#     Converts a case from foam extend format to FOAM EXTEND format, regardless
-#     of what OpenFOAM version is loaded
+#     Converts a case to the FOAM EXTEND format, regardless of what OpenFOAM
+#     version is loaded
 # Arguments:
 #     1: CASE_DIR
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -141,47 +154,55 @@ function solids4Foam::convertCaseFormatFoamExtend()
 
     # Un-do changes made in convertCaseFormat, if any
 
+    # nut boundary condition
+    if [[ -n $(find "${CASE_DIR}" -name "nut") ]]
+    then
+        echo "Changing nutkWallFunction in nut to nutWallFunction"; echo
+        find "${CASE_DIR}" -name nut \
+            | xargs sed -i 's\nutkWallFunction\nutWallFunction\g'
+    fi
+
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
 
-    echo "Changing symmetry to symmetryPlane in D*"; echo
     if [[ -n $(find "${CASE_DIR}" -name "D*") ]]
     then
+        echo "Changing symmetry to symmetryPlane in D*"; echo
         find "${CASE_DIR}" -name "D*" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
  
-    echo "Changing symmetry to symmetryPlane in pointD*"; echo
     if [[ -n $(find "${CASE_DIR}" -name "pointD*") ]]
     then
+        echo "Changing symmetry to symmetryPlane in pointD*"; echo
         find "${CASE_DIR}" -name "pointD*" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
-    echo "Changing symmetry to symmetryPlane in U"; echo
     if [[ -n $(find "${CASE_DIR}" -name "U") ]]
     then
+        echo "Changing symmetry to symmetryPlane in U"; echo
         find "${CASE_DIR}" -name "U" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
-    echo "Changing symmetry to symmetryPlane in p"; echo
     if [[ -n $(find "${CASE_DIR}" -name "p") ]]
     then
+        echo "Changing symmetry to symmetryPlane in p"; echo
         find "${CASE_DIR}" -name "p" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
-    echo "Changing symmetry to symmetryPlane in pointMotionU"; echo
     if [[ -n $(find "${CASE_DIR}" -name "pointMotionU") ]]
     then
+        echo "Changing symmetry to symmetryPlane in pointMotionU"; echo
         find "${CASE_DIR}" -name "pointMotionU" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
-    echo "Changing symmetry to symmetryPlane in blockMeshDict"; echo
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict) ]]
     then
+        echo "Changing symmetry to symmetryPlane in blockMeshDict"; echo
         find "${CASE_DIR}" -name blockMeshDict | xargs sed -i 's\symmetry \symmetryPlane \g'
     fi
 
-    echo "Changing symmetry to symmetryPlane in boundary"; echo
     if [[ -n $(find "${CASE_DIR}" -name boundary) ]]
     then
+    echo "Changing symmetry to symmetryPlane in boundary"; echo
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
