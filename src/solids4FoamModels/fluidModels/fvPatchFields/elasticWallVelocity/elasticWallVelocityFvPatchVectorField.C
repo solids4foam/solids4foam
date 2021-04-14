@@ -45,9 +45,9 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 :
     fixedValueFvPatchVectorField(p, iF),
 #ifdef OPENFOAMESIORFOUNDATION
-    myTimeIndex_(internalField().mesh().time().timeIndex()),
+    timeIndex_(internalField().mesh().time().timeIndex()),
 #else
-    myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
+    timeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
 #endif
     Fc_(p.patch().size(),vector::zero),
     oldFc_(p.patch().size(),vector::zero),
@@ -64,7 +64,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(ptf, p, iF, mapper),
-    myTimeIndex_(ptf.myTimeIndex_),
+    timeIndex_(ptf.timeIndex_),
     Fc_(p.patch().size(),vector::zero),
     oldFc_(p.patch().size(),vector::zero),
     oldOldFc_(p.patch().size(),vector::zero)
@@ -79,8 +79,8 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF),
-    myTimeIndex_(-1),
-//     myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
+    timeIndex_(-1),
+    //timeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
     Fc_(p.patch().size(),vector::zero),
     oldFc_(p.patch().size(),vector::zero),
     oldOldFc_(p.patch().size(),vector::zero)
@@ -111,7 +111,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(pivpvf),
-    myTimeIndex_(pivpvf.myTimeIndex_),
+    timeIndex_(pivpvf.timeIndex_),
     Fc_(pivpvf.Fc_),
     oldFc_(pivpvf.oldFc_),
     oldOldFc_(pivpvf.oldOldFc_)
@@ -125,7 +125,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(pivpvf, iF),
-    myTimeIndex_(pivpvf.myTimeIndex_),
+    timeIndex_(pivpvf.timeIndex_),
     Fc_(pivpvf.oldFc_),
     oldFc_(pivpvf.oldFc_),
     oldOldFc_(pivpvf.oldOldFc_)
@@ -136,8 +136,6 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 
 void elasticWallVelocityFvPatchVectorField::updateCoeffs()
 {
-//     Info << "elasticWallVelocityFvPatchVectorField::updateCoeffs" << endl;
-
     if (updated())
     {
         return;
@@ -176,19 +174,20 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
 #endif
     );
 
+    // Compute velocity vector
     if (ddtScheme == fv::backwardDdtScheme<vector>::typeName)
     {
-//         Info << "void elasticWallVelocityFvPatchVectorField::updateCoeffs() - "
-//             << "backward"
-//             << endl;
+        //Info<< "void elasticWallVelocityFvPatchVectorField::updateCoeffs() - "
+        //    << "backward"
+        //    << endl;
 
-        if(myTimeIndex_ < mesh.time().timeIndex())
+        if(timeIndex_ < mesh.time().timeIndex())
         {
             oldOldFc_ = oldFc_;
             oldFc_ = Fc_;
-//             Fc_ = pp.faceCentres();
+            //Fc_ = pp.faceCentres();
 
-            myTimeIndex_ = mesh.time().timeIndex();
+            timeIndex_ = mesh.time().timeIndex();
         }
 
         forAll(Fc_, i)
@@ -210,20 +209,20 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
         //Set coefficients based on deltaT and deltaT0
         scalar coefft   = 1 + deltaT/(deltaT + deltaT0);
         scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
-//         scalar coefft0  = coefft + coefft00;
+        //scalar coefft0  = coefft + coefft00;
 
         Up = coefft*(Fc_ - oldFc_)/deltaT
-          - coefft00*(oldFc_ - oldOldFc_)/deltaT;
+             - coefft00*(oldFc_ - oldOldFc_)/deltaT;
     }
     else // Euler
     {
-        if (myTimeIndex_ < mesh.time().timeIndex())
+        if (timeIndex_ < mesh.time().timeIndex())
         {
             oldOldFc_ = oldFc_;
             oldFc_ = Fc_;
 
-//             Fc_ = pp.faceCentres();
-            myTimeIndex_ = mesh.time().timeIndex();
+            //Fc_ = pp.faceCentres();
+            timeIndex_ = mesh.time().timeIndex();
         }
 
         forAll(Fc_, i)
@@ -234,6 +233,8 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
         Up = (Fc_ - oldFc_)/mesh.time().deltaT().value();
     }
 
+    // Compute normal velocity component (from mesh flux)
+    // Is this calculation being useful or is it an old version?
     scalarField phip =
         p.patchField<surfaceScalarField, scalar>(fvc::meshPhi(U));
 
@@ -241,9 +242,9 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     const scalarField& magSf = p.magSf();
     scalarField Un = phip/(magSf + VSMALL);
 
-//     Info << max(mag(Un)) << endl;
-//     Up += n*(Un - (n & Up));
-//     Info << max(mag(Up)) << endl;
+    //Info << max(mag(Un)) << endl;
+    //Up += n*(Un - (n & Up));
+    //Info << max(mag(Up)) << endl;
 
     if (mesh.foundObject<surfaceScalarField>("phi"))
     {
@@ -261,6 +262,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     {
         const volScalarField& pressure =
             mesh.lookupObject<volScalarField>("p");
+
         scalarField nGradP =
             pressure.boundaryField()[this->patch().index()].snGrad();
 
@@ -282,12 +284,12 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
         );
 
         vectorField UOld = U.oldTime().boundaryField()[this->patch().index()];
+
         Un = (n & UOld) - nGradP*mesh.time().deltaT().value();
-//         Un = (n & UOld) - nGradP*mesh.time().deltaT().value()/rho.value();
+        //Un = (n & UOld) - nGradP*mesh.time().deltaT().value()/rho.value();
     }
 
-    // Info << "mwvuc " << max(mag(Up)) << ", " << average(mag(Up)) << endl;
-
+    // Compute tangential + normal components (from flux)
     Up += n*(Un - (n & Up));
 
     vectorField::operator=(Up);
@@ -315,13 +317,13 @@ snGrad() const
 
     vectorField n = this->patch().nf();
     vectorField delta = this->patch().delta();
-    vectorField k = delta - n*(n&delta);
+    vectorField k = delta - n*(n & delta);
 
-    vectorField dUP = (k&gradU.patchInternalField());
+    vectorField dUP = (k & gradU.patchInternalField());
 
     if (secondOrder_)
     {
-        vectorField nGradUP = (n&gradU.patchInternalField());
+        vectorField nGradUP = (n & gradU.patchInternalField());
 
         tmp<Field<vector> > tnGradU
         (
@@ -352,18 +354,18 @@ snGrad() const
 
         return tnGradU;
 
-//         return
-//             2
-//            *(
-//                 *this
-//               - (patchInternalField() + dUP)
-//             )*this->patch().deltaCoeffs()
-//           - nGradUP;
+        //return
+        //    2
+        //   *(
+        //        *this
+        //      - (patchInternalField() + dUP)
+        //    )*this->patch().deltaCoeffs()
+        //  - nGradUP;
     }
 
 
     // First order
-//     vectorField dUP = (k&gradU.patchInternalField());
+    //vectorField dUP = (k&gradU.patchInternalField());
 
     tmp<Field<vector> > tnGradU
     (
@@ -390,11 +392,11 @@ snGrad() const
 
     return tnGradU;
 
-//     return
-//     (
-//         *this
-//       - (patchInternalField() + (k&gradU.patchInternalField()))
-//     )*this->patch().deltaCoeffs();
+    //return
+    //(
+    //    *this
+    //  - (patchInternalField() + (k&gradU.patchInternalField()))
+    //)*this->patch().deltaCoeffs();
 }
 
 
@@ -417,13 +419,13 @@ gradientBoundaryCoeffs() const
 
     vectorField n = this->patch().nf();
     vectorField delta = this->patch().delta();
-    vectorField k = delta - n*(n&delta);
+    vectorField k = delta - n*(n & delta);
 
-    vectorField dUP = (k&gradU.patchInternalField());
+    vectorField dUP = (k & gradU.patchInternalField());
 
     if (secondOrder_)
     {
-        vectorField nGradUP = (n&gradU.patchInternalField());
+        vectorField nGradUP = (n & gradU.patchInternalField());
 
         vectorField nGradU =
             2
@@ -433,7 +435,7 @@ gradientBoundaryCoeffs() const
             )*this->patch().deltaCoeffs()
           - nGradUP;
 
-        vectorField nGradUn = n*(n&nGradU);
+        vectorField nGradUn = n*(n & nGradU);
 
         return
             this->patch().deltaCoeffs()
@@ -444,18 +446,18 @@ gradientBoundaryCoeffs() const
           - nGradUP
           - nGradUn;
 
-//         return
-//             this->patch().deltaCoeffs()
-//            *(
-//                 2*(*this - dUP)
-//               - patchInternalField()
-//             )
-//           - nGradUP;
+        //return
+        //    this->patch().deltaCoeffs()
+        //   *(
+        //        2*(*this - dUP)
+        //      - patchInternalField()
+        //    )
+        //  - nGradUP;
     }
 
 
     // First order
-//     vectorField dUP = (k&gradU.patchInternalField());
+    //vectorField dUP = (k&gradU.patchInternalField());
 
     vectorField nGradU =
         (
@@ -472,8 +474,8 @@ gradientBoundaryCoeffs() const
         )
       - nGradUn;
 
-//     return this->patch().deltaCoeffs()
-//        *(*this - (k&gradU.patchInternalField()));
+    //return this->patch().deltaCoeffs()
+    //   *(*this - (k&gradU.patchInternalField()));
 }
 
 
