@@ -163,6 +163,9 @@ void fixedRelaxationCouplingInterface::updateDisplacement()
     // Update movingWallPressure boundary conditions, if found
     fluidSolidInterface::updateMovingWallPressureAcceleration();
 
+    // Update elasticWallPressure boundary conditions, if found
+    fluidSolidInterface::updateElasticWallPressureAcceleration();
+
     // Make sure that displacement on all processors is equal to one
     // calculated on master processor
     fluidSolidInterface::syncFluidZonePointsDispl(fluidZonesPointsDispls());
