@@ -146,30 +146,27 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
             "fsiProperties"
         );
 
+    label patchID = this->patch().index();
+
     // Solid properties
     // PC: hmnn what if the solidModel does not use mu and lambda...
     // It seems that ap is the speed of sound so we just need the stiffness, we
     // can lookup impK
     // Also, what happends if mu/lambda are varying...
-    const volScalarField rho = fsi.solid().mechanical().rho()();
 
-    if (rho.size() == 0)
-    {
-        return;
-    }
+    // Get solid density
+    const scalarField rhoSolid =
+        fsi.solid().mechanical().rho()().boundaryField()[patchID];
 
-    // Could a patchField be used for heterogeneous properties?
-    const scalar rhoSolid = rho[0];
+    // Get solid stiffness (impK for generality)
+    scalarField impK =
+        fsi.solid().mechanical().impK()().boundaryField()[patchID];
 
-    const scalar impK =
-        fsi.solid().mechanical().impK()()[0];
+    // p-wave propagation speed, ap
+    const scalarField ap = sqrt(impK/rhoSolid);
 
-    // Compute p-wave propagation speed, ap
-    const scalar ap = sqrt(impK/rhoSolid);
-
-    // Compute solid "thickness"
-    // Derive another version for a shell? Then a "Thickness" field can be used
-    const scalar hs = ap*mesh.time().deltaT().value();
+    // Solid "virtual thickness"
+    scalarField hs = ap*mesh.time().deltaT().value();
 
     // Fluid properties
     IOdictionary transportProperties
@@ -189,8 +186,10 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         transportProperties.lookup("rho")
     );
 
-    Info<< "rhoSolid = " << rhoSolid << ", hs = " << hs
-        << ", rhoFluid = " << rhoFluid.value() << endl;
+    Info<< "rhoSolid = " << max(rhoSolid)
+        << ", hs = " << max(hs)
+        << ", rhoFluid = " << rhoFluid.value()
+        << endl;
 
     // Update velocity and acceleration
 

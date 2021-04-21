@@ -56,7 +56,7 @@ class elasticWallPressureFvPatchScalarField
     public robinFvPatchField<scalar>
 {
     // Private data
-
+    //
         //- Pressure applied at the solid side of the interface
         //  in the previous fsi iteration
         scalarField prevPressure_;
