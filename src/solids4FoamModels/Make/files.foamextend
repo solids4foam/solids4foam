@@ -37,6 +37,7 @@ fluidModels/stokesFluid/stokesFluid.C
 fluidModels/transientSimpleFluid/transientSimpleFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
 fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
+fluidModels/unsIcoFluid/unsIcoFluid.C
 
 fluidModels/finiteVolume/RBFMeshMotionSolver/RBFInterpolation.C
 fluidModels/finiteVolume/RBFMeshMotionSolver/RBFCoarsening.C
