@@ -57,7 +57,7 @@ A number of the tutorial cases are described in the following publications:
 P. Cardiff, A Karac, P. De Jaeger, H. Jasak, J. Nagy, A. Ivanković, Ž. Tuković:
 An open-source finite volume toolbox for solid mechanics and fluid-solid
 interaction simulations. arXiv:1808.10736v2, 2018, available at
-https://arxiv.org/abs/1808.10736.
+https://arxiv.org/abs/1808.10736
 
 Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković: OpenFOAM finite volume
 solver for fluid-solid interaction.  Transactions of Famena, 42 (3), pp. 1-31,
