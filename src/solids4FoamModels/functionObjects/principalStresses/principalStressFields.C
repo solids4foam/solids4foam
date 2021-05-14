@@ -223,12 +223,21 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma)
 
     // References to internalFields for efficiency
     const symmTensorField& sigmaI = sigma.internalField();
+#ifdef OPENFOAMESIORFOUNDATION
+    scalarField& sigmaMaxI = sigmaMax.primitiveFieldRef();
+    scalarField& sigmaMidI = sigmaMid.primitiveFieldRef();
+    scalarField& sigmaMinI = sigmaMin.primitiveFieldRef();
+    vectorField& sigmaMaxDirI = sigmaMaxDir.primitiveFieldRef();
+    vectorField& sigmaMidDirI = sigmaMidDir.primitiveFieldRef();
+    vectorField& sigmaMinDirI = sigmaMinDir.primitiveFieldRef();
+#else
     scalarField& sigmaMaxI = sigmaMax.internalField();
     scalarField& sigmaMidI = sigmaMid.internalField();
     scalarField& sigmaMinI = sigmaMin.internalField();
     vectorField& sigmaMaxDirI = sigmaMaxDir.internalField();
     vectorField& sigmaMidDirI = sigmaMidDir.internalField();
     vectorField& sigmaMinDirI = sigmaMinDir.internalField();
+#endif
 
     forAll (sigmaI, cellI)
     {
@@ -253,12 +262,21 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma)
         )
         {
             const symmTensorField& pSigma = sigma.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+            scalarField& pSigmaMax = sigmaMax.boundaryFieldRef()[patchI];
+            scalarField& pSigmaMid = sigmaMid.boundaryFieldRef()[patchI];
+            scalarField& pSigmaMin = sigmaMin.boundaryFieldRef()[patchI];
+            vectorField& pSigmaMaxDir = sigmaMaxDir.boundaryFieldRef()[patchI];
+            vectorField& pSigmaMidDir = sigmaMidDir.boundaryFieldRef()[patchI];
+            vectorField& pSigmaMinDir = sigmaMinDir.boundaryFieldRef()[patchI];
+#else
             scalarField& pSigmaMax = sigmaMax.boundaryField()[patchI];
             scalarField& pSigmaMid = sigmaMid.boundaryField()[patchI];
             scalarField& pSigmaMin = sigmaMin.boundaryField()[patchI];
             vectorField& pSigmaMaxDir = sigmaMaxDir.boundaryField()[patchI];
             vectorField& pSigmaMidDir = sigmaMidDir.boundaryField()[patchI];
             vectorField& pSigmaMinDir = sigmaMinDir.boundaryField()[patchI];
+#endif
 
             forAll(pSigmaMax, faceI)
             {
