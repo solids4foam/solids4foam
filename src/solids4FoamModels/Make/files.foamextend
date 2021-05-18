@@ -178,6 +178,7 @@ functionObjects/solidPointTemperature/solidPointTemperature.C
 functionObjects/solidPotentialEnergy/solidPotentialEnergy.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
 functionObjects/principalStresses/principalStresses.C
+functionObjects/principalStresses/principalStressFields.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
 functionObjects/solidTractions/solidTractions.C
 functionObjects/centrifugalBodyForce/centrifugalBodyForce.C

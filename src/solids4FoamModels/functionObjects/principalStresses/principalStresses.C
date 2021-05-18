@@ -28,6 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "principalStressFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -46,235 +47,24 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-
-void Foam::principalStresses::calculateEigenValues
-(
-    const symmTensor& sigma,
-    vector& sigmaMax,
-    vector& sigmaMid,
-    vector& sigmaMin
-)
-{
-    const vector eValues = eigenValues(sigma);
-    const tensor eVectors = eigenVectors(sigma);
-
-    label iMax = -1;
-    label iMid = -1;
-    label iMin = -1;
-    label MaxMidMin = -1;
-    // const label a = mag(eValues[0]);
-    // const label b = mag(eValues[1]);
-    // const label c = mag(eValues[2]);
-    const scalar a = eValues[0];
-    const scalar b = eValues[1];
-    const scalar c = eValues[2];
-
-    if (a < b)
-    {
-        if (a < c)
-        {
-            if (b < c)
-            {
-                iMin = 0;
-                iMid = 1;
-                iMax = 2;
-            }
-            else
-            {
-                iMin = 0;
-                iMid = 2;
-                iMax = 1;
-            }
-        }
-        else
-        {
-            iMin = 2;
-            iMid = 0;
-            iMax = 1;
-        }
-    }
-    else
-    {
-        if (b < c)
-        {
-            if (a < c)
-            {
-                iMin = 1;
-                iMid = 0;
-                iMax = 2;
-            }
-            else
-            {
-                iMin = 1;
-                iMid = 2;
-                iMax = 0;
-            }
-        }
-        else
-        {
-            iMin = 2;
-            iMid = 1;
-            iMax = 0;
-        }
-    }
-
-    MaxMidMin = iMax*100 + iMid*10 + iMin;
-
-    if (MaxMidMin != -1)
-    {
-        switch (MaxMidMin)
-        {
-            case 12:
-                sigmaMax = eVectors.x()*eValues.x();
-                sigmaMid = eVectors.y()*eValues.y();
-                sigmaMin = eVectors.z()*eValues.z();
-                break;
-            case 21:
-                sigmaMax = eVectors.x()*eValues.x();
-                sigmaMin = eVectors.y()*eValues.y();
-                sigmaMid = eVectors.z()*eValues.z();
-                break;
-            case 102:
-                sigmaMid = eVectors.x()*eValues.x();
-                sigmaMax = eVectors.y()*eValues.y();
-                sigmaMin = eVectors.z()*eValues.z();
-                break;
-            case 120:
-                sigmaMid = eVectors.x()*eValues.x();
-                sigmaMin = eVectors.y()*eValues.y();
-                sigmaMax = eVectors.z()*eValues.z();
-                break;
-            case 201:
-                sigmaMin = eVectors.x()*eValues.x();
-                sigmaMax = eVectors.y()*eValues.y();
-                sigmaMid = eVectors.z()*eValues.z();
-                break;
-            case 210:
-                sigmaMin = eVectors.x()*eValues.x();
-                sigmaMid = eVectors.y()*eValues.y();
-                sigmaMax = eVectors.z()*eValues.z();
-                break;
-        }
-    }
-}
-
 bool Foam::principalStresses::writeData()
 {
     if (runTime_.outputTime())
     {
         // Lookup stress tensor
-        const volSymmTensorField& sigma =
-            mesh_.lookupObject<volSymmTensorField>("sigma");
-
-        // Calculate principal stress vectors
-
-        volVectorField sigmaMax
-        (
-            IOobject
-            (
-                "sigmaMax",
-                runTime_.timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh_,
-            dimensionedVector("sigmaMaxVal", dimPressure, vector::zero)
-        );
-
-        volVectorField sigmaMid
-        (
-            IOobject
-            (
-                "sigmaMid",
-                runTime_.timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh_,
-            dimensionedVector("sigmaMaxVal", dimPressure, vector::zero)
-        );
-
-        volVectorField sigmaMin
-        (
-            IOobject
-            (
-                "sigmaMin",
-                runTime_.timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh_,
-            dimensionedVector("sigmaMaxVal", dimPressure, vector::zero)
-        );
-
-        // References to internalFields for efficiency
-#ifdef OPENFOAMESIORFOUNDATION
-        const symmTensorField& sigmaI = sigma.primitiveField();
-        vectorField& sigmaMaxI = sigmaMax.primitiveFieldRef();
-        vectorField& sigmaMidI = sigmaMid.primitiveFieldRef();
-        vectorField& sigmaMinI = sigmaMin.primitiveFieldRef();
-#else
-        const symmTensorField& sigmaI = sigma.internalField();
-        vectorField& sigmaMaxI = sigmaMax.internalField();
-        vectorField& sigmaMidI = sigmaMid.internalField();
-        vectorField& sigmaMinI = sigmaMin.internalField();
-#endif
-
-        forAll (sigmaI, cellI)
+        const volSymmTensorField* sigmaPtr = NULL;
+        if (mesh_.foundObject<volSymmTensorField>("sigma"))
         {
-            calculateEigenValues
-            (
-                sigmaI[cellI],
-                sigmaMaxI[cellI],
-                sigmaMidI[cellI],
-                sigmaMinI[cellI]
-            );
+            sigmaPtr = &(mesh_.lookupObject<volSymmTensorField>("sigma"));
         }
-
-        forAll(sigmaMax.boundaryField(), patchI)
+        else if (mesh_.foundObject<volSymmTensorField>("sigmaCauchy"))
         {
-            if
-            (
-                !sigmaMax.boundaryField()[patchI].coupled()
-             && mesh_.boundaryMesh()[patchI].type() != "empty"
-            )
-            {
-                const symmTensorField& pSigma = sigma.boundaryField()[patchI];
-#ifdef OPENFOAMESIORFOUNDATION
-                vectorField& pSigmaMax = sigmaMax.boundaryFieldRef()[patchI];
-                vectorField& pSigmaMid = sigmaMid.boundaryFieldRef()[patchI];
-                vectorField& pSigmaMin = sigmaMin.boundaryFieldRef()[patchI];
-#else
-                vectorField& pSigmaMax = sigmaMax.boundaryField()[patchI];
-                vectorField& pSigmaMid = sigmaMid.boundaryField()[patchI];
-                vectorField& pSigmaMin = sigmaMin.boundaryField()[patchI];
-#endif
-
-                forAll(pSigmaMax, faceI)
-                {
-                    calculateEigenValues
-                    (
-                        pSigma[faceI],
-                        pSigmaMax[faceI],
-                        pSigmaMid[faceI],
-                        pSigmaMin[faceI]
-                    );
-                }
-            }
+            sigmaPtr = &(mesh_.lookupObject<volSymmTensorField>("sigmaCauchy"));
         }
+        const volSymmTensorField& sigma = *sigmaPtr;;
 
-        sigmaMax.correctBoundaryConditions();
-        sigmaMid.correctBoundaryConditions();
-        sigmaMin.correctBoundaryConditions();
-
-        sigmaMax.write();
-        sigmaMid.write();
-        sigmaMin.write();
-
-        Info<< "Principal stresses: max = " << gMax(mag(sigmaMax)()) << endl;
+        // Calculate and write principal stress fields
+        writePrincipalStressFields(sigma);
     }
 
     return true;
@@ -336,7 +126,6 @@ bool Foam::principalStresses::read(const dictionary& dict)
 {
     return true;
 }
-
 
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::principalStresses::write()
