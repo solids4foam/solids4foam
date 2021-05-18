@@ -14,7 +14,7 @@ source ${testScriptsDir}/solids4FoamFunctions.sh
 chmod -R o+w .
 
 # Create container
-CONTAINER="autobuild-solids4foam--openfoam-v1812"
+CONTAINER="autobuild-solids4foam-openfoam-v7"
 solids4foam::createContainer "openfoam-7" \
     "openfoam/openfoam7-graphical-apps" \
     "${CONTAINER}" \
