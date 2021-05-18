@@ -100,7 +100,7 @@ bool linGeomSolid::evolve()
               - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
               + fvc::div(sigma(), "div(sigma)")
               + rho()*g()
-              + mechanical().RhieChowCorrection(DD(), gradDD())
+              + stabilisation().stabilisation(DD(), gradDD(), impK_)
             );
 
             // Under-relaxation the linear system
