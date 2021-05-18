@@ -372,6 +372,9 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
 #else
     writeEntry("value", os);
 #endif
+
+    // Write gradient to allow consistent restart
+    gradient().writeEntry("gradient", os);
 }
 
 

@@ -25,7 +25,12 @@ Class
     elasticWallPressureFvPatchScalarField
 
 Description
-    elasticWallPressureFvPatchScalarField
+    Robin boundary condition for pressure of a flow in a fluid-solid
+    interaction problem which accounts for the solid inertia.
+
+    Reference:
+    Tuković et al. Added Mass Partitioned Fluid–Structure Interaction Solver
+    Based on a Robin Boundary Condition for Pressure. OpenFOAM. 2019;1–22.
 
 SourceFiles
     elasticWallPressureFvPatchScalarField.C
@@ -51,10 +56,7 @@ class elasticWallPressureFvPatchScalarField
     public robinFvPatchField<scalar>
 {
     // Private data
-
-        //- Local time index
-        label timeIndex_;
-
+    //
         //- Pressure applied at the solid side of the interface
         //  in the previous fsi iteration
         scalarField prevPressure_;
@@ -62,18 +64,6 @@ class elasticWallPressureFvPatchScalarField
         //- Acceleration of the solid side of the interface
         //  in the previous fsi iteration
         vectorField prevAcceleration_;
-
-        //- Old face centres of patch.
-        //  Needed for (second order) time integration
-        vectorField Fc_;
-        vectorField oldFc_;
-        vectorField oldOldFc_;
-
-        //- Face centre velocity.
-        //  Needed for (second order) time integration
-        vectorField U_;
-        vectorField oldU_;
-        vectorField oldOldU_;
 
 public:
 
@@ -143,7 +133,6 @@ public:
         }
 
 
-
     // Member functions
 
         // Access functions
@@ -153,7 +142,6 @@ public:
             {
                 return prevPressure_;
             }
-
 
             //- Get previous pressure patch field
             scalarField& prevPressure()
@@ -166,7 +154,6 @@ public:
             {
                 return prevAcceleration_;
             }
-
 
             //- Get previous pressure patch field
             vectorField& prevAcceleration()
@@ -191,15 +178,6 @@ public:
 
         // Evaluation functions
 
-//             //- Return gradient at boundary
-//             virtual tmp<Field<scalar> > snGrad() const
-//             {
-//                 return tmp<Field<scalar> >
-//                 (
-//                     new scalarField(this->patch().size(), 0)
-//                 );
-//             }
-
             //- Update the coefficients associated with the patch field
             virtual void updateCoeffs();
 
@@ -209,34 +187,6 @@ public:
                 GeometricField<scalar, fvsPatchField, surfaceMesh>& flux,
                 const fvMatrix<scalar>& matrix
             ) const;
-
-//             //- Evaluate the patch field
-//             virtual void evaluate
-//             (
-//                 const Pstream::commsTypes commsType=Pstream::blocking
-//             );
-
-//             //- Return the matrix diagonal coefficients corresponding to the
-//             //  evaluation of the value of this patchField with given weights
-//             virtual tmp<Field<scalar> > valueInternalCoeffs
-//             (
-//                 const tmp<scalarField>&
-//             ) const;
-
-//             //- Return the matrix source coefficients corresponding to the
-//             //  evaluation of the value of this patchField with given weights
-//             virtual tmp<Field<scalar> > valueBoundaryCoeffs
-//             (
-//                 const tmp<scalarField>&
-//             ) const;
-
-//             //- Return the matrix diagonal coefficients corresponding to the
-//             //  evaluation of the gradient of this patchField
-//             virtual tmp<Field<scalar> > gradientInternalCoeffs() const;
-
-//             //- Return the matrix source coefficients corresponding to the
-//             //  evaluation of the gradient of this patchField
-//             virtual tmp<Field<scalar> > gradientBoundaryCoeffs() const;
 
 
         //- Write

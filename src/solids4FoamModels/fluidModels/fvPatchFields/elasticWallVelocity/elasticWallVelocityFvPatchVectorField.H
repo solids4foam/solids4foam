@@ -25,7 +25,12 @@ Class
     Foam::elasticWallVelocityFvPatchVectorField
 
 Description
-    Foam::elasticWallVelocityFvPatchVectorField
+    Moving-wall velocity boundary condition that computes the tangential and
+    normal velocity components from the normal volumetric flux.
+
+    It must be used together with "elasticWallPressure" for correct
+    reinforcement of velocity at the fluid-solid interface when Robin boundary
+    conditions are used.
 
 SourceFiles
     elasticWallVelocityFvPatchVectorField.C
@@ -53,7 +58,7 @@ class elasticWallVelocityFvPatchVectorField
 {
 
     //To keep track when to copy patch face centres
-    label myTimeIndex_;
+    label timeIndex_;
 
     //Old face centres of patch. Needed for (second order) time integration
     vectorField Fc_;
@@ -127,7 +132,6 @@ public:
                 new elasticWallVelocityFvPatchVectorField(*this, iF)
             );
         }
-
 
 
     // Member functions
