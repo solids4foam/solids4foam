@@ -369,12 +369,11 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
 
 #ifdef OPENFOAMFOUNDATION
     writeEntry(os, "value", *this);
+    writeEntry(os, "gradient", gradient());
 #else
     writeEntry("value", os);
-#endif
-
-    // Write gradient to allow consistent restart
     gradient().writeEntry("gradient", os);
+#endif
 }
 
 
