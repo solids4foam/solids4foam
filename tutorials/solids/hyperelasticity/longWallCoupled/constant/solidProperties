@@ -1,0 +1,120 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+//solidModel     nonLinearGeometryUpdatedLagrangian;
+//solidModel     unsNonLinearGeometryUpdatedLagrangian;
+//solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+//solidModel     coupledLinearGeometryPressureDisplacement;
+solidModel     coupledNonLinearGeometryPressureDisplacement;
+
+coupledLinearGeometryPressureDisplacementCoeffs
+{
+    nCorrectors     		10000;
+    solutionTolerance 		1e-09;
+    alternativeTolerance 	1e-9;
+    materialTolerance 		1e-05;
+    infoFrequency   		100;
+}
+
+coupledNonLinearGeometryPressureDisplacementCoeffs
+{
+    nCorrectors     		    10000;
+    solutionTolerance 		    1e-06;
+    alternativeTolerance 	    1e-07;
+    materialTolerance 		    1e-05;
+    infoFrequency   		    1;
+
+    stabilisation
+    {
+        type        RhieChow;
+        scaleFactor 0.0;
+    }
+
+    // Solid-model-specific options
+	pressureRhieChowScaleFactor 0.0;
+    predictor   false;
+}
+
+nonLinearGeometryUpdatedLagrangianCoeffs
+{
+    // Maximum number of momentum correctors
+    nCorrectors             1000;
+
+    // Solution tolerance for displacement
+    solutionTolerance       1e-09;
+
+    // Alternative solution tolerance for displacement
+    alternativeTolerance    1e-10;
+
+    // Material law solution tolerance
+    materialTolerance       1e-05;
+
+    // Write frequency for the residuals
+    infoFrequency           100;
+
+    // Stabilise the hydrostatic pressure calculation with smoothing
+    //stabilisePressure     no;
+}
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    // Maximum number of momentum correctors
+    nCorrectors             10000;
+
+    // Solution tolerance for displacement
+    solutionTolerance       1e-09;
+
+    // Alternative solution tolerance for displacement
+    alternativeTolerance    1e-10;
+
+    // Material law solution tolerance
+    materialTolerance       1e-05;
+
+    // Write frequency for the residuals
+    infoFrequency           100;
+
+    stabilisation
+    {
+        type        RhieChow;
+        scaleFactor 0.1;
+    }
+}
+
+unsNonLinearGeometryUpdatedLagrangianCoeffs
+{
+    // Maximum number of momentum correctors
+    nCorrectors             1000;
+
+    // Solution tolerance for displacement
+    solutionTolerance       1e-06;
+
+    // Alternative solution tolerance for displacement
+    alternativeTolerance    1e-07;
+
+    // Material law solution tolerance
+    materialTolerance       1e-05;
+
+    // Write frequency for the residuals
+    infoFrequency           100;
+
+    // Stabilise hydrostatic pressure field
+    stabilisePressure       yes;
+}
+
+// ************************************************************************* //

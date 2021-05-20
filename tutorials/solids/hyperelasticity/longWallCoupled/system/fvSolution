@@ -1,0 +1,102 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    Dp
+    {
+        solver 	        BiCGStab;
+        preconditioner  Cholesky;
+
+        tolerance       1e-9;
+        relTol          0.1;
+
+        minIter         1;
+        maxIter         500;
+    }
+
+    "D|DD"
+    {
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-09;
+        relTol          0.1;
+    }
+
+	sigmaHyd
+	{
+		solver          PCG;
+		preconditioner  FDIC;
+		tolerance       1e-09;
+		relTol          0.1;
+	}
+}
+
+//PIMPLE
+//{
+//    nOuterCorrectors 1000;
+//    nCorrectors     5;
+//    nNonOrthogonalCorrectors 0;
+
+//    pRefCell 0;
+//    pRefValue 0;-3.3333333e6;
+
+//    //Controls outer correctors (if not achieved, run for nOuterCorrectors)
+//    //so, similar to the solutionTolerance of solids4foam
+//    //and similar to the one used in solidMechanics dict below
+//    residualControl
+//    {
+//        U
+//        {
+//            tolerance   1e-8;
+//            relTol      0;
+//        }
+
+//        Up
+//        {
+//            tolerance   1e-8;
+//            relTol      0;
+//        }
+//    }
+//}
+
+//solidMechanics
+//{
+//    //nCorrectors           5000;
+//    //transformStress         no;
+
+//    convergence 1e-9;
+//}
+
+relaxationFactors
+{
+    // Under-relaxating the DD equation by 0.99-0.9999 can improve convergence in
+    // some cases, in particular when there are solidContact boundaries
+    equations
+    {
+        //"D|DD"   0.999;
+    }
+
+    // Under-relaxating the DD field by 0.1-0.9 can improve convergence in some
+    // cases
+    fields
+    {
+        "D|DD"   0.9;
+    }
+}
+
+// ************************************************************************* //

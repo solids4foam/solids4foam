@@ -428,14 +428,14 @@ coupledNonLinGeomPressureDisplacementSolid
         const unallocLabelList& own = mesh().owner();
         const unallocLabelList& nei = mesh().neighbour();
 
-        const scalarField& impKI = impK_.internalField();
+        const scalarField& impKfI = impKf_.internalField();
 
         scalarField& AUI = AU_.internalField();
 
         forAll(deltaCoeffsI, faceI)
         {
-            AUI[own[faceI]] += impKI[faceI]*deltaCoeffsI[faceI]*magSI[faceI];
-            AUI[nei[faceI]] += impKI[faceI]*deltaCoeffsI[faceI]*magSI[faceI];
+            AUI[own[faceI]] += impKfI[faceI]*deltaCoeffsI[faceI]*magSI[faceI];
+            AUI[nei[faceI]] += impKfI[faceI]*deltaCoeffsI[faceI]*magSI[faceI];
         }
 
         forAll(deltaCoeffs.boundaryField(), patchI)
@@ -448,12 +448,12 @@ coupledNonLinGeomPressureDisplacementSolid
             const labelList& faceCells =
                 mesh().boundary()[patchI].faceCells();
 
-            const scalarField& impKI = impK_.boundaryField()[patchI];
+            const scalarField& impKfI = impKf_.boundaryField()[patchI];
 
             forAll(deltaCoeffsI, faceI)
             {
                 AUI[faceCells[faceI]] +=
-                    0.5*impKI[faceI]*deltaCoeffsI[faceI]*magSI[faceI];
+                    0.5*impKfI[faceI]*deltaCoeffsI[faceI]*magSI[faceI];
             }
         }
 
