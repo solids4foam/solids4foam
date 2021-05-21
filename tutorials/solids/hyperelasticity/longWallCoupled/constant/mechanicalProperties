@@ -28,7 +28,7 @@ mechanical
 		c11             c11 [1 -1 -2 0 0 0 0] 0.0;
 
 		// To solve pressure Poisson equation
-        solvePressureEqn		true;
+        solvePressureEqn		no;
 
 		// Pressure smoothing coefficient
         pressureSmoothingScaleFactor	1.0;
