@@ -85,4 +85,7 @@ EXE_LIBS = \
     -ldynamicFvMesh \
     -ldynamicMesh \
     -lmeshTools \
-    -ltopoChangerFvMesh
+    -ltopoChangerFvMesh \
+    -lgfortran \
+    $(FOAM_USER_LIBBIN)/abaqusUmatLinearElastic.o \
+    -labaqusUmatLinearElastic

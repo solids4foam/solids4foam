@@ -1,0 +1,20 @@
+#!/bin/bash
+cd ${0%/*} || exit 1    # run from this directory
+
+# Compile C++ wrapper class
+wmake libso
+
+# Check gfortran is installed before compiling fortran sub-routines
+if ! hash gfortran 2>/dev/null
+then
+    echo
+    echo "'gfortran' command not found! Please install gfortran!"
+    echo "On Ubuntu, you can do this by running the following command:"
+    echo "    sudo apt-get install gfortran"
+    echo
+    exit 1
+fi
+
+# Compile fortran routines
+echo "Compiling abaqusUmatLinearElastic.f and placing object in $FOAM_USER_LIBBIN"
+(cd abaqusUmatLinearElastic && gfortran -c abaqusUmatLinearElastic.f -O3 -o $FOAM_USER_LIBBIN/abaqusUmatLinearElastic.o)
