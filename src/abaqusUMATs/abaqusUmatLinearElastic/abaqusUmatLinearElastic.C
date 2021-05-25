@@ -340,7 +340,11 @@ void Foam::abaqusUmatLinearElastic::correct(volSymmTensorField& sigma)
 
     // Internal field
     const symmTensorField& epsilonI = epsilon_.internalField();
+#ifdef OPENFOAMESIORFOUNDATION
+    symmTensorField& sigmaI = sigma.primitiveFieldRef();
+#else
     symmTensorField& sigmaI = sigma.internalField();
+#endif
     forAll(epsilonI, cellI)
     {
         double STRESS[NTENS];
@@ -446,7 +450,11 @@ void Foam::abaqusUmatLinearElastic::correct(volSymmTensorField& sigma)
     forAll(epsilon_.boundaryField(), patchI)
     {
         const symmTensorField& epsilonP = epsilon_.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+        symmTensorField& sigmaP = sigma.boundaryFieldRef()[patchI];
+#else
         symmTensorField& sigmaP = sigma.boundaryField()[patchI];
+#endif
         forAll(epsilonP, faceI)
         {
             double STRESS[NTENS];
