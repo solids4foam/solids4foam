@@ -16,7 +16,7 @@ chmod -R o+w .
 # Create container
 CONTAINER="autobuild-solids4foam-foam-extend-4.1"
 solids4foam::createContainer "foam-extend-4.1" \
-    "philippic/foam-extend-4.1-ubuntu18.04:latest" \
+    "philippic/foam-extend-4.1-ubuntu18.04.gfortran:latest" \
     "${CONTAINER}" \
     "/home/dockeruser"
 

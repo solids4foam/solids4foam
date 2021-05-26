@@ -16,7 +16,7 @@ chmod -R o+w .
 # Create container
 CONTAINER="autobuild-solids4foam-openfoam-v1912"
 solids4foam::createContainer "openfoam-v1912" \
-    "philippic/openfoam-v1912-centos73:latest" \
+    "philippic/openfoam-v1912-centos73.gfortran:latest" \
     "${CONTAINER}" \
     "/home/dockeruser"
 

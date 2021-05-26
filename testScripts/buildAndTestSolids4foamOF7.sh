@@ -16,7 +16,7 @@ chmod -R o+w .
 # Create container
 CONTAINER="autobuild-solids4foam-openfoam-v7"
 solids4foam::createContainer "openfoam-7" \
-    "openfoam/openfoam7-graphical-apps" \
+    "philippic/openfoam7-graphical-apps.gfortran" \
     "${CONTAINER}" \
     "/home/openfoam"
 
