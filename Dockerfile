@@ -1,10 +1,10 @@
 ################################################################################
 # Dockerfile to build solids4foam with foam-extend-4.0 and Ubuntu-18.04-LTS
-# philip.cardiff@gmail.com, July 2019
+# philip.cardiff@gmail.com, May 2021
 ################################################################################
 
 # Set the base image to foam-extend-4.0 and Ubuntu-18.04-LTS
-FROM philippic/foam-extend-4.0-ubuntu18.04
+FROM philippic/foam-extend-4.0-ubuntu18.04.gfortran
 
 # File Author / Maintainer
 MAINTAINER Philip Cardiff <philip.cardiff@gmail.com>
