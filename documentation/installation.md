@@ -1,4 +1,4 @@
-# **Installation**
+# Installation
 
 The solids4foam toolbox can be installed using one of at least two methods:
 - ### **natively**:  with a foam-extend-4.0 installation
@@ -7,21 +7,26 @@ The solids4foam toolbox can be installed using one of at least two methods:
 
 Both methods for installing the solids4foam toolbox are explained here.
 
+Automated scripts are provided to test the build as described further in [Test Scripts](../testScripts/testScripts.md).
+
 --------
 
 ## Installing solids4foam **natively**
 
-- The latest version of solids4foam currently compiles with the foam-extend-4.0 and foam-extend-4.1 forks of OpenFOAM (in the future, it will work will all major versions). To install foam-extend-4.0 on your system, following instructions on the OpenFOAM wiki:
+- The latest version of solids4foam currently compiles with foam-extend-4.0, foam-extend-4.1, OpenFOAM-v1812, OpenFOAM-v1912, and OpenFOAM-7.
+
+- **Note**: currently all the tutorials only run with the foam-extend-4.0 and foam-extend-4.1 forks. For the other versions, some minor (or not so minor) changes to the tutorials are required: this is currently being addressed!
+
+- One of these forks of OpenFOAM needs to be installed before installing solids4foam, e.g. to install foam-extend-4.0 on your system, following instructions on the OpenFOAM wiki:
 https://openfoamwiki.net/index.php/Installation/Linux/foam-extend-4.0
 
-- To get access to the main development git repository, please email me(philip.cardiff@ucd.ie) with “solids4foam access” in the subject. solids4foam can be downloaded using git (it can be placed anywhere convenient):
+- ~~To get access to the main development git repository, please email me(philip.cardiff@ucd.ie) with “solids4foam access” in the subject~~. The solids4foam bitbucket repository is now public, and solids4foam can be downloaded using git; it can be placed anywhere convenient:
 ```
 $> cd $FOAM_RUN/..
-$> git clone https://YOUR_USER_NAME@bitbucket.org/philip_cardiff/solids4foam-release.git solids4foam
+$> git clone https://bitbucket.org/philip_cardiff/solids4foam-release.git
 ```
-- where ```YOUR_USER_NAME``` is your bitbucket username.
 
-- Navigate into the downloaded solids4foam (or solids4foam-release) directory and run the included Allwmake script:
+- To build, navigate into the downloaded solids4foam-release directory and run the included Allwmake script:
 ```
 $> cd solids4foam-release
 $> ./Allwmake
@@ -43,8 +48,7 @@ solids4Foam is now setup and ready to use!
 
   ## Installing solids4foam using **Docker**
 
-Docker is like a light-weight virtual machine that can allow a Ubuntu linux installation of solids4foam to run on macOS, Windows or linux.
-For macOS and Windows, Docker can be installed via **Docker Desktop** or **Docker Toolbox**: Docker Desktop is the preferred approach, while Docker Toolbox is for older Mac and Windows systems that do not meet the requirements of the Docker Desktop.
+Docker is like a light-weight virtual machine that can allow a Ubuntu (or other) linux installation of solids4foam to run on macOS, Windows or linux. For macOS and Windows, Docker can be installed via **Docker Desktop** or **Docker Toolbox**: Docker Desktop is the preferred approach, while Docker Toolbox is for older Mac and Windows systems that do not meet the requirements of the Docker Desktop.
 
 ### **Docker Desktop (Preferred Approach)**
 
@@ -97,7 +101,7 @@ $> docker stop solids4foam
 $> sudo apt-get install emacs
 ```
 
-- Note2: the shared directory points to the home directory in your host (actual) computer and in the docker container it is located at:
+- Another Note: the shared directory points to the home directory in your host (actual) computer and in the docker container it is located at:
 ```
 /home/app/foam/app-4.0/sharedDir
 ```
