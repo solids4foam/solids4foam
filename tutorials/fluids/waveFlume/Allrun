@@ -3,10 +3,18 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+if [[ $WM_PROJECT != "foam" ]]
+then
+    echo; echo "This case currently only runs in foam-extend"; echo
+    exit 0
+fi
+
 if [ ! -f "$FOAM_USER_LIBBIN/libwaves2Foam.so" ]
 then
+    echo
     echo "libwaves2Foam.so is required for this tutorial, but it is not found"
-    echo "in $FOAM_USER_LIBBIN/libwaves2Foam.so"
+    echo "in $FOAM_USER_LIBBIN/"
+    echo
     exit 0
 fi
 

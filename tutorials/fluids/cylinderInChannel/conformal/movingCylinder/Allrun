@@ -9,6 +9,6 @@ then
     exit 0
 fi
 
-runApplication fluentMeshToFoam CylinderInChannel.msh
+runApplication fluentMeshToFoam cylinderInChannel.msh
 runApplication changeDictionary
 runApplication solids4Foam
