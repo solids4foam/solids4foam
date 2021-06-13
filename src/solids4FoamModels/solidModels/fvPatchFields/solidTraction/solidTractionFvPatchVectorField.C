@@ -203,6 +203,7 @@ void solidTractionFvPatchVectorField::autoMap
 )
 {
     fixedGradientFvPatchVectorField::autoMap(m);
+
 #ifdef OPENFOAMFOUNDATION
     m(traction_, traction_);
     m(pressure_, pressure_);

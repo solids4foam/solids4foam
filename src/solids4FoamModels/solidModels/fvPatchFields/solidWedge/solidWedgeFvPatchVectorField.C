@@ -69,8 +69,13 @@ solidWedgeFvPatchVectorField::solidWedgeFvPatchVectorField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-            << " of field " << this->dimensionedInternalField().name()
-            << " in file " << this->dimensionedInternalField().objectPath()
+#ifdef OPENFOAMESIORFOUNDATION
+            << " of field " << internalField().name()
+            << " in file " << internalField().objectPath()
+#else
+            << " of field " << dimensionedInternalField().name()
+            << " in file " << dimensionedInternalField().objectPath()
+#endif
             << exit(FatalIOError);
     }
 }
@@ -99,8 +104,13 @@ solidWedgeFvPatchVectorField::solidWedgeFvPatchVectorField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-            << " of field " << this->dimensionedInternalField().name()
-            << " in file " << this->dimensionedInternalField().objectPath()
+#ifdef OPENFOAMESIORFOUNDATION
+            << " of field " << internalField().name()
+            << " in file " << internalField().objectPath()
+#else
+            << " of field " << dimensionedInternalField().name()
+            << " in file " << dimensionedInternalField().objectPath()
+#endif
             << exit(FatalIOError);
     }
 
@@ -170,7 +180,11 @@ tmp<Field<vector> > solidWedgeFvPatchVectorField::snGrad() const
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>
         (
-            "grad(" + this->dimensionedInternalField().name() + ")"
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
+            "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
     Field<vector> projU =
@@ -219,7 +233,11 @@ void solidWedgeFvPatchVectorField::evaluate(const Pstream::commsTypes)
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>
         (
-            "grad(" + this->dimensionedInternalField().name() + ")"
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
+            "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
     Field<vector> pif = this->patchInternalField();
@@ -235,7 +253,12 @@ void solidWedgeFvPatchVectorField::evaluate(const Pstream::commsTypes)
 void solidWedgeFvPatchVectorField::write(Ostream& os) const
 {
     wedgeFvPatchVectorField::write(os);
+
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "value", *this);
+#else
     writeEntry("value", os);
+#endif
 }
 
 

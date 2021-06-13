@@ -109,7 +109,9 @@ $(solidFvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
 $(solidFvPatchFields)/fixedTemperatureGradient/fixedTemperatureGradientFvPatchScalarField.C
 $(solidFvPatchFields)/linearSpatialDisplacement/linearSpatialDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/linearDisplacement/linearDisplacementFvPatchVectorField.C
+*/
 $(solidFvPatchFields)/normalDisplacement/normalDisplacementFvPatchVectorField.C
+/*
 $(solidFvPatchFields)/oscillateDisplacement/oscillateDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/rigidCylinderContact/rigidCylinderContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
@@ -124,9 +126,9 @@ $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
 /*
 $(solidFvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C
 $(solidFvPatchFields)/solidVelocity/solidVelocityFvPatchVectorField.C
+*/
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
-*/
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
 /*
 $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C

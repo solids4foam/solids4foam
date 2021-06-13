@@ -92,10 +92,10 @@ function solids4Foam::convertCaseFormat()
         find "${CASE_DIR}" -name "pointMotionU" | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
-    if [[ -n $(find "${CASE_DIR}" -name blockMeshDict) ]]
+    if [[ -n $(find "${CASE_DIR}" -name blockMeshDict*) ]]
     then
         echo "Changing symmetryPlane to symmetry in blockMeshDict"; echo
-        find "${CASE_DIR}" -name blockMeshDict | xargs sed -i 's\symmetryPlane\symmetry\g'
+        find "${CASE_DIR}" -name blockMeshDict* | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
     if [[ -n $(find "${CASE_DIR}" -name boundary) ]]
@@ -121,8 +121,18 @@ function solids4Foam::convertCaseFormat()
         echo "    Moving constant/fluid/polyMesh/blockMeshDict to system/fluid"
         \mv "${CASE_DIR}"/constant/fluid/polyMesh/blockMeshDict "${CASE_DIR}"/system/fluid
     fi
-    echo
 
+    # Replace the functions file
+    if [[ -f "${CASE_DIR}"/system/functions ]]
+    then
+        echo "    Replacing system/functions with system/functions.openfoam"
+        \cp "${CASE_DIR}"/system/functions \
+            "${CASE_DIR}"/system/functions.foamextend
+        \cp -f "${CASE_DIR}"/system/functions.openfoam \
+            "${CASE_DIR}"/system/functions
+    fi
+
+    echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
@@ -226,8 +236,15 @@ function solids4Foam::convertCaseFormatFoamExtend()
         mkdir "${CASE_DIR}"/constant/fluid/polyMesh
         \mv "${CASE_DIR}"/system/fluid/blockMeshDict "${CASE_DIR}"/constant/fluid/polyMesh
     fi
-    echo
 
+    if [[ -f "${CASE_DIR}"/system/functions.foamextend ]]
+    then
+        echo "    Replacing system/functions with system/functions.openfoam"
+        \mv -f "${CASE_DIR}"/system/functions.foamextend \
+            "${CASE_DIR}"/system/functions
+    fi
+
+    echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormatFoamExtend end                        |"
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"

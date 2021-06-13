@@ -39,7 +39,6 @@ Author
 #ifndef solidWedgeFvPatchVectorField_H
 #define solidWedgeFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "wedgeFvPatchFields.H"
 #include "wedgeFvPatch.H"
 
@@ -135,7 +134,11 @@ public:
             //- Evaluate the patch field
             virtual void evaluate
             (
-                const Pstream::commsTypes commsType=Pstream::blocking
+#ifdef OPENFOAMESIORFOUNDATION
+            const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
+#else
+            const Pstream::commsTypes commsType = Pstream::blocking
+#endif
             );
 
             //- Return face-gradient transform diagonal

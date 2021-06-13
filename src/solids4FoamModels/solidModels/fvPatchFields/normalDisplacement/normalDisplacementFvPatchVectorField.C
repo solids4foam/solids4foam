@@ -58,7 +58,11 @@ normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(ptf, p, iF, mapper),
+#ifdef OPENFOAMFOUNDATION
+    normalDisp_(mapper(ptf.normalDisp_)),
+#else
     normalDisp_(ptf.normalDisp_, mapper),
+#endif
     dispSeries_(ptf.dispSeries_)
 {}
 
@@ -131,7 +135,11 @@ void normalDisplacementFvPatchVectorField::autoMap
 {
     fixedValueFvPatchVectorField::autoMap(m);
 
+#ifdef OPENFOAMFOUNDATION
+    m(normalDisp_, normalDisp_);
+#else
     normalDisp_.autoMap(m);
+#endif
 }
 
 
@@ -261,7 +269,11 @@ void normalDisplacementFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
+#ifdef OPENFOAMFOUNDATION
+        writeEntry(os, "normalDisp", normalDisp_);
+#else
         normalDisp_.writeEntry("normalDisp", os);
+#endif
     }
 
     fixedValueFvPatchVectorField::write(os);
