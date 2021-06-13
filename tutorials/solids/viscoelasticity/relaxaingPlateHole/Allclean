@@ -3,8 +3,11 @@
 # Source tutorial clean functions
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
 cleanCase
-\rm -f constant/polyMesh/boundary case.foam
+\rm -rf constant/polyMesh/boundary case.foam history
 \rm -rf system/*Subset
 
 # Convert case version to FOAM EXTEND

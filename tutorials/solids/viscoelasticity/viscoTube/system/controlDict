@@ -45,23 +45,6 @@ timePrecision   6;
 
 runTimeModifiable no;
 
-functions
-(
-    pointStressSymmy
-    {
-        type    solidPointStress;
-        point   (0.0075 0 0);
-    }
-    pointStressSymmx
-    {
-        type    solidPointStress;
-        point   (0 0.0075 0);
-    }
-    pointDisp
-    {
-        type    solidPointDisplacement;
-        point   (0.0075 0 0);
-    }
-);
+#include "./system/functions"
 
 // ************************************************************************* //
