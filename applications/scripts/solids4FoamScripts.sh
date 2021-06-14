@@ -86,6 +86,12 @@ function solids4Foam::convertCaseFormat()
         find "${CASE_DIR}" -name "p" | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
+    if [[ -n $(find "${CASE_DIR}" -name "T") ]]
+    then
+        echo "Changing symmetryPlane to symmetry in T"; echo
+        find "${CASE_DIR}" -name "T" | xargs sed -i 's\symmetryPlane\symmetry\g'
+    fi
+
     if [[ -n $(find "${CASE_DIR}" -name "pointMotionU") ]]
     then
         echo "Changing symmetryPlane to symmetry in pointMotionU"; echo
@@ -198,6 +204,12 @@ function solids4Foam::convertCaseFormatFoamExtend()
         find "${CASE_DIR}" -name "p" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
+    if [[ -n $(find "${CASE_DIR}" -name "T") ]]
+    then
+        echo "Changing symmetry to symmetryPlane in T"; echo
+        find "${CASE_DIR}" -name "T" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
+    fi
+
     if [[ -n $(find "${CASE_DIR}" -name "pointMotionU") ]]
     then
         echo "Changing symmetry to symmetryPlane in pointMotionU"; echo
@@ -281,4 +293,19 @@ function solids4Foam::err()
 
     # Stop with error
     exit 1
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# caseOnlyRunsWithFoamExtend
+#     Give error if OpenFOAM version is not foam-extend
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::caseOnlyRunsWithFoamExtend()
+{
+    if [[ $WM_PROJECT != "foam" ]]
+    then
+        echo; echo "This case currently only runs in foam-extend"; echo
+        exit 0
+    fi
 }

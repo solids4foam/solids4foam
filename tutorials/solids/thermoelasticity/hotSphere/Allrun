@@ -9,7 +9,6 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-
 # Create the mesh
 runApplication fluentMeshToFoam hotSphere.msh
 

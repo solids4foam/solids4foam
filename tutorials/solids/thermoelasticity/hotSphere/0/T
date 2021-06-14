@@ -44,7 +44,7 @@ boundaryField
         type            fixedTemperature;
         temperatureSeries
         {
-            fileName    "$FOAM_CASE/constant/timeVsTemperature";
+            "fileName|file" "$FOAM_CASE/constant/timeVsTemperature";
             outOfBounds clamp;
         }
         value           uniform 300;
