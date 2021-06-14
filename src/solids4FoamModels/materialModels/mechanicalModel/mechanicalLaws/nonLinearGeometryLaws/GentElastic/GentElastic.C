@@ -25,6 +25,7 @@ License
 
 #include "GentElastic.H"
 #include "addToRunTimeSelectionTable.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

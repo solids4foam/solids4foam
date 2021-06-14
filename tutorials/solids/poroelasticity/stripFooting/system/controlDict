@@ -47,28 +47,6 @@ graphFormat     raw;
 
 runTimeModifiable yes;
 
-
-functions
-(
-    probes
-    {
-        type           probes;
-        functionObjectLibs ("libsampling.so");
-        enabled        true;
-        outputControl  outputTime;
-        outputInterval 1;
-        probeLocations
-        (    
-            (0.01 0.05 9.98)       
-        );
-        fields
-        (
-            sigma
-            DEpsilonP
-            D
-        );
-    }
-);
-
+#include "functions"
 
 // ************************************************************************* //

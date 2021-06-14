@@ -83,6 +83,7 @@ $(linGeomLaws)/linearElasticCt/linearElasticCt.C
 $(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
 
 nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
+$(nonLinGeomLaws)/GentElastic/GentElastic.C
 $(nonLinGeomLaws)/incompressibleMooneyRivlinElastic/incompressibleMooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
@@ -103,9 +104,7 @@ $(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVector
 */
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
-/*
 $(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
-*/
 $(solidFvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
 /*
 $(solidFvPatchFields)/fixedTemperatureGradient/fixedTemperatureGradientFvPatchScalarField.C
@@ -260,5 +259,6 @@ numerics/globalPolyPatch/globalPolyPatch.C
 numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
 numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
 */
+numerics/rotation/RodriguesRotation.C
 
 LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
