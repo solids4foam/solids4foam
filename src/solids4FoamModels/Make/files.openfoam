@@ -114,7 +114,9 @@ $(solidFvPatchFields)/linearDisplacement/linearDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/normalDisplacement/normalDisplacementFvPatchVectorField.C
 /*
 $(solidFvPatchFields)/oscillateDisplacement/oscillateDisplacementFvPatchVectorField.C
+*/
 $(solidFvPatchFields)/rigidCylinderContact/rigidCylinderContactFvPatchVectorField.C
+/*
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorFieldCalcContact.C
 $(solidFvPatchFields)/solidRigidContact/solidRigidContactFvPatchVectorField.C
