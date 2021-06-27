@@ -49,6 +49,7 @@ linux*Gcc*/
 linux*Icc*/
 darwin*Gcc*/
 darwin*Intel*/
+darwin*Arm*/
 linuxming*/
 SiCortex*Gcc*/
 solaris*Gcc*/

@@ -70,9 +70,8 @@ mechanicalEnergies::mechanicalEnergies
     curTimeIndex_(-1)
 {
     // TODO: read/write energies to allow restart?
-    //wip();
 
-    if (Pstream::master)
+    if (Pstream::master())
     {
         Pout<< "Writing energies.dat" << endl;
 
