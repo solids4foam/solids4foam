@@ -9,9 +9,8 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-
 # Create mesh
-m4 constant/polyMesh/blockMeshDict.thickCylinder.m4 > constant/polyMesh/blockMeshDict
+m4 system/blockMeshDict.thickCylinder.m4 > constant/polyMesh/blockMeshDict
 runApplication blockMesh
 
 # Run solver

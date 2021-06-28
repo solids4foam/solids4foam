@@ -9,14 +9,13 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
+solids4Foam::caseOnlyRunsWithFoamExtend
 
-# Create mesh
+# Create the mesh
 runApplication blockMesh
 
-# Run solver in serial
+# Run the solver
 runApplication solids4Foam
 
-# Run solver in parallel
-#runApplication decomposePar
-#runParallel solidFoam 8
-#runApplication reconstructPar
+# ----------------------------------------------------------------- end-of-file
+

@@ -19,26 +19,23 @@ FoamFile
 // Axisymmetric cylinder mesh with compression die
 
 // Setup m4 stuff
-
-
+changecom(//)changequote([,])
+define(calc, [esyscmd(perl -e 'printf ($1)')])
 
 // define geometry in mm
-
- // half cylinder height
- // cylinder radius
- // angle of wedge in degrees
- // die thickness
- // die width
+define(PI, 3.14159265359)
+define(l, 1) // length of cylinder section
+define(ri, 10) // cylinder inner radius
+define(ro, 20) // cylinder outer radius
+define(theta, 1) // angle of wedge in degrees
 
 // calculated quantities
-
-
-
+define(thetaRad2, calc(0.5*theta*PI/180))
+define(sint, calc(sin(thetaRad2)))
+define(cost, calc(cos(thetaRad2)))
 
 // define mesh density
- // number of cells in axial direction
- // number of cells in radial direction
-
+define(mr, 10) // number of cells in radial direction
 
 // start of blockMeshDict
 
@@ -47,25 +44,20 @@ convertToMeters 0.001;
 vertices
 (
     //- dimension in mm
-    (0 0 0)
-    (15 0 0)
-    (15 9.99961923064171 -0.0872653549837451)
-    (0 9.99961923064171 -0.0872653549837451)
-    (15 9.99961923064171 0.0872653549837451)
-    (0 9.99961923064171 0.0872653549837451)
+    (0 calc(ri*cost) calc(-ri*sint))
+    (l calc(ri*cost) calc(-ri*sint))
+    (l calc(ro*cost) calc(-ro*sint))
+    (0 calc(ro*cost) calc(-ro*sint))
 
-    (15 0 0)
-    (16 0 0)
-    (16 19.9992384612834 -0.17453070996749)
-    (15 19.9992384612834 -0.17453070996749)
-    (16 19.9992384612834 0.17453070996749)
-    (15 19.9992384612834 0.17453070996749)
+    (0 calc(ri*cost) calc(ri*sint))
+    (l calc(ri*cost) calc(ri*sint))
+    (l calc(ro*cost) calc(ro*sint))
+    (0 calc(ro*cost) calc(ro*sint))
 );
 
 blocks
 (
-    hex (0 1 2 3 0 1 4 5) billet (12 12 1) simpleGrading (1 1 1)
-    hex (6 7 8 9 6 7 10 11) die (1 24 1) simpleGrading (1 1 1)
+    hex (0 1 2 3 4 5 6 7) billet (1 mr 1) simpleGrading (1 1 1)
 );
 
 edges
@@ -74,44 +66,30 @@ edges
 
 patches
 (
-    symmetryPlane symmPlane
+    symmetry symmPlane
     (
-        (0 5 3 0)
+        (0 4 7 3)
+        (1 2 6 5)
     )
 
-    patch dieContact
+    patch inner
     (
-        (6 11 9 6)
-        (8 9 11 10)
+        (0 1 5 4)
     )
 
-    patch billetContact
+    patch outer
     (
-        (1 4 2 1)
-        (2 3 5 4)
-    )
-
-    patch loading
-    (
-        (7 10 8 7)
+        (2 3 7 6)
     )
 
     wedge back
     (
         (3 2 1 0)
-        (9 8 7 6)
     )
 
     wedge front
     (
-        (0 1 4 5)
-        (6 7 10 11)
-    )
-
-    empty axis
-    (
-        (0 1 1 0)
-        (6 7 7 6)
+        (4 5 6 7)
     )
 );
 
