@@ -9,12 +9,8 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-
-# Create the mesh
+# Create mesh
 runApplication blockMesh
 
-# Run the solver
+# Run solver
 runApplication solids4Foam
-
-# ----------------------------------------------------------------- end-of-file
-
