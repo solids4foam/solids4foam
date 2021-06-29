@@ -52,7 +52,7 @@ linearGeometryTotalDisplacementCoeffs
             approximateCoordinate    (0.75 0.25 0);
             timeVaryingDisplacement
             {
-                fileName "$FOAM_CASE/constant/timeVsCellDisp3";
+                "file|fileName" "$FOAM_CASE/constant/timeVsCellDisp3";
                 outOfBounds clamp;
             }
         }

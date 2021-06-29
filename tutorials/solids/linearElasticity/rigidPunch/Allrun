@@ -9,9 +9,16 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-
+solids4Foam::caseOnlyRunsWithFoamExtend
 
 # Create cylinder mesh
+if ! command -v cartesianMesh &> /dev/null
+then
+    echo
+    echo "cartesianMesh command not found, which is required for this case"
+    echo
+    exit 0
+fi
 runApplication cartesianMesh
 
 # Scale the geometry to metres
@@ -22,7 +29,7 @@ transformPoints -scale "(0.001 0.001 0.001)" >& log.transformPoints
 runApplication autoPatch 45 -overwrite
 runApplication createPatch -overwrite
 
-# Run the solver
+# Run solver
 runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
