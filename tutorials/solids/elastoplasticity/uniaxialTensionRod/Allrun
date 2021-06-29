@@ -10,6 +10,7 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Create mesh
+mkdir -p constant/polyMesh
 m4 system/blockMeshDict.uniaxialRod.m4 > constant/polyMesh/blockMeshDict
 runApplication blockMesh
 
