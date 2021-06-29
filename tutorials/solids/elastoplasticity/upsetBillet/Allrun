@@ -12,6 +12,7 @@ solids4Foam::convertCaseFormat .
 solids4Foam::caseOnlyRunsWithFoamExtend
 
 # Create mesh
+mkdir -p constant/polyMesh
 m4 system/blockMeshDict.cylinder.m4 > constant/polyMesh/blockMeshDict
 runApplication blockMesh
 

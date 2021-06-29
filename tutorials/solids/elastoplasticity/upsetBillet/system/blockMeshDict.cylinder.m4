@@ -74,7 +74,7 @@ edges
 
 patches
 (
-    symmetry symmPlane
+    symmetryPlane symmPlane
     (
         (0 5 3 0)
     )
