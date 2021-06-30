@@ -387,7 +387,6 @@ void displacementOrTractionFvPatchVectorField::write(Ostream& os) const
         writeEntry(os, "constantTraction", constantTraction_);
 #else
         constantTraction_.writeEntry("constantTraction", os);
-, os);
 #endif
     }
 

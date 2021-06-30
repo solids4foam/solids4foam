@@ -100,8 +100,8 @@ $(thermalLaws)/constantThermal/constantThermal.C
 solidFvPatchFields = solidModels/fvPatchFields
 /*
 $(solidFvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
-$(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVectorField.C
 */
+$(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
 $(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
