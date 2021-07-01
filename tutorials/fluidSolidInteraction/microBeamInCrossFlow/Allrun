@@ -9,6 +9,14 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
+if ! command -v cartesianMesh &> /dev/null
+then
+    echo
+    echo "cartesianMesh command not found, which is required for this case"
+    echo
+    exit 0
+fi
+
 if [[ "${WM_PROJECT}" == "foam" ]]
 then
     # Create solid mesh

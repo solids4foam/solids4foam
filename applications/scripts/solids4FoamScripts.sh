@@ -233,19 +233,19 @@ function solids4Foam::convertCaseFormatFoamExtend()
     if [[ -f "${CASE_DIR}"/system/blockMeshDict ]]
     then
         echo "    Moving system/blockMeshDict to constant/polyMesh"
-        mkdir "${CASE_DIR}"/constant/polyMesh
+        mkdir -p "${CASE_DIR}"/constant/polyMesh
         \mv "${CASE_DIR}"/system/blockMeshDict "${CASE_DIR}"/constant/polyMesh
     fi
     if [[ -f "${CASE_DIR}"/system/solid/blockMeshDict ]]
     then
         echo "    Moving system/solid/blockMeshDict to constant/solid/polyMesh"
-        mkdir "${CASE_DIR}"/constant/solid/polyMesh
+        mkdir -p "${CASE_DIR}"/constant/solid/polyMesh
         \mv "${CASE_DIR}"/system/solid/blockMeshDict "${CASE_DIR}"/constant/solid/polyMesh
     fi
     if [[ -f "${CASE_DIR}"/system/fluid/blockMeshDict ]]
     then
         echo "    Moving system/fluid/blockMeshDict to constant/fluid/polyMesh"
-        mkdir "${CASE_DIR}"/constant/fluid/polyMesh
+        mkdir -p "${CASE_DIR}"/constant/fluid/polyMesh
         \mv "${CASE_DIR}"/system/fluid/blockMeshDict "${CASE_DIR}"/constant/fluid/polyMesh
     fi
 

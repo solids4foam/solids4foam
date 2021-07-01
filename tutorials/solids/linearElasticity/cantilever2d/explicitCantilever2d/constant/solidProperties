@@ -22,7 +22,7 @@ explicitLinearGeometryTotalDisplacementCoeffs
 {
     // Linear bulk viscosity coefficient to kill high frequency oscillations
     // Defaults to 0.06
-    linearBulkViscosityCoeff 0.06; //0.06;
+    linearBulkViscosityCoeff 0.06;
 
     // JST stabilisation
     JSTScaleFactor 0.0; //0.01;
