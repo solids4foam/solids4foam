@@ -33,12 +33,12 @@ else
         # Run parallel
         runApplication -s fluid decomposePar -region fluid
         runApplication -s solid decomposePar -region solid
-        mpirun -np 4 solids4Foam -parallel -noFunctionObjects &> log.solids4Foam
+        mpirun -np 4 solids4Foam -noFunctionObjects -parallel &> log.solids4Foam
         runApplication -s fluid reconstructPar -region fluid
         runApplication -s solid reconstructPar -region solid
     else
         # Run serial
-        solids4Foam -noFunctionObjects runApplication solids4Foam -noFunctionObjects> log.solids4Foam
+        runApplication solids4Foam -noFunctionObjects
     fi
 fi
 

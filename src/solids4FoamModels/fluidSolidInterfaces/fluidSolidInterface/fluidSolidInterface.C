@@ -86,7 +86,7 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
 
     interfaceToInterfaceList_.setSize(nGlobalPatches_);
 
-    // To maintain backwards compatibility, we will add a default dicts
+    // To maintain backwards compatibility, we will add a default dict
     {
         dictionary emptyDict;
         fsiProperties_.add("GGICoeffs", emptyDict);
@@ -101,9 +101,15 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
     {
         // Lookup the type
         const word type = fsiProperties_.lookupOrDefault<word>
+#ifdef OPENFOAMESIORFOUNDATION
+        (
+            "interfaceTransferMethod", "AMI"
+        );
+#else
         (
             "interfaceTransferMethod", "GGI"
         );
+#endif
 
         interfaceToInterfaceList_.set
         (

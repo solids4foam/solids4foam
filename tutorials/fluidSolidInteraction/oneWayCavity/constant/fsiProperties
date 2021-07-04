@@ -23,6 +23,9 @@ oneWayCouplingCoeffs
 
     // Fluid patch list
     fluidPatch fixedWalls;
+
+    // Interface transfer method
+    interfaceTransferMethod directMap;
 }
 
 // ************************************************************************* //
