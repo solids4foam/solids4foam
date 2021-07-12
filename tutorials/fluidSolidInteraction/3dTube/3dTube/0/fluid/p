@@ -41,8 +41,8 @@ boundaryField
     }
     wall
     {
-        // type       zeroGradient;
-        type       extrapolatedPressure;
+        type       zeroGradient;
+        // type       extrapolatedPressure;
         value      uniform 0;
     }
 

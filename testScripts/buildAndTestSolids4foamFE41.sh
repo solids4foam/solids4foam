@@ -33,7 +33,7 @@ fi
 
 # Test
 if solids4foam::test "${CONTAINER}" "foam-extend-4.1" \
-       "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
+       "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc" "Alltest"
 then
     TEST_STATUS=true
 else

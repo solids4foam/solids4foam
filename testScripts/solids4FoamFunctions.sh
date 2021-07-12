@@ -145,7 +145,7 @@ function solids4foam::test()
     echo
 
     # Check number of input parameters is correct
-    if [[ $# -ne 3 ]]
+    if [[ $# -ne 4 ]]
     then
         echo; echo "solids4foam::test incorrect number of parameters"; echo
         exit 1
@@ -155,18 +155,20 @@ function solids4foam::test()
     CONTAINER="${1}"
     VERSION="${2}"
     BASH_ADDRESS="${3}"
+    ALLTEST_SCRIPT="${4}"
 
     echo "Container: ${CONTAINER}"
     echo "Version: ${VERSION}"
     echo "Bash address: ${BASH_ADDRESS}"
+    echo "Alltest script: ${ALLTEST_SCRIPT}"
     echo
 
     # Run Alltest and check if all tutorials passed
-    echo "Running Alltest"
+    echo "Running ${ALLTEST_SCRIPT}"
     docker exec "${CONTAINER}" bash -c \
         "source ${BASH_ADDRESS} &> /dev/null \
         && cd solids4foam-release/tutorials \
-        && ./Alltest &> ../Alltest.${VERSION}.log \
+        && ./${ALLTEST_SCRIPT} &> ../Alltest.${VERSION}.log \
         && cd .. && chmod -R 777 . &> chmod.${VERSION}.log"
 
     # The generated testLoopReport will contain the word "FATAL" for any

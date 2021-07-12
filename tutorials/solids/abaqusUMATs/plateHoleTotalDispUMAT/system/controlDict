@@ -14,15 +14,6 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// libs
-// (
-//     "-L $FOAM_USER_LIBBIN}"
-//     //"libgfortran.so"
-//     "libgfortran.dylib"
-//     "exampleAbaqusUMAT.o"
-//     "libexampleAbaqusUMAT.dylib"
-// );
-
 application     solids4Foam;
 
 startFrom       startTime;

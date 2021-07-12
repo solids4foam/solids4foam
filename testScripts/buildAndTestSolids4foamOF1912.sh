@@ -31,7 +31,7 @@ fi
 
 # Test
 # if solids4foam::test "${CONTAINER}" "openfoam-v1912" \
-#        "/opt/OpenFOAM/OpenFOAM-v1912/etc/bashrc"
+#        "/opt/OpenFOAM/OpenFOAM-v1912/etc/bashrc" "Alltest.openfoam"
 # then
 #     TEST_STATUS=true
 # else
