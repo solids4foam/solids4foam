@@ -13,32 +13,35 @@ if [[ "${WM_PROJECT}" == "foam" ]]
 then
     # fluent3DMeshToFoam does not have a region option so we need to workaround
     # it
-    mkdir constant/solid/polyMesh
+    mkdir -p constant/solid/polyMesh
     runApplication -l log.fluent3DMeshToFoam.solid fluent3DMeshToFoam solid.msh
     \mv constant/polyMesh/* constant/solid/polyMesh/
     runApplication -l log.changeDictionary.solid changeDictionary -region solid
 
-    mkdir constant/fluid/polyMesh
+    mkdir -p constant/fluid/polyMesh
     runApplication fluent3DMeshToFoam fluid.msh
     \mv constant/polyMesh/* constant/fluid/polyMesh/
     runApplication changeDictionary -region fluid
-
-    runApplication solids4Foam
 else
     # fluent3DMeshToFoam does not have a region option so we need to workaround
     # it
-    mkdir constant/solid/polyMesh
+    mkdir -p constant/solid/polyMesh
     runApplication -s solid fluent3DMeshToFoam solid.msh
+    echo "Running foamDictionary on solid"
+    foamDictionary constant/solid/polyMesh/boundary -entry entry0.symmetry.type \
+		   -set symmetry &> log.foamDictionary
     \mv constant/polyMesh/* constant/solid/polyMesh/
-    runApplication -s solid changeDictionary -region solid
 
-    mkdir constant/fluid/polyMesh
+    mkdir -p constant/fluid/polyMesh
     runApplication -s fluid fluent3DMeshToFoam fluid.msh
+    echo "Running foamDictionary on fluid"
+    foamDictionary constant/fluid/polyMesh/boundary -entry entry0.symmetry.type \
+		   -set symmetry &> log.foamDictionary
     \mv constant/polyMesh/* constant/fluid/polyMesh/
-    runApplication -s fluid changeDictionary -region fluid
-
-    solids4Foam -noFunctionObjects &> log.solids4Foam
 fi
+
+# Run solver
+runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 

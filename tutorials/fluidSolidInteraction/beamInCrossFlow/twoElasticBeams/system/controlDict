@@ -49,23 +49,6 @@ adjustTimeStep  no;
 
 maxCo           0.2;
 
-functions
-(
-    forces
-    {
-        type                forces;
-        region              fluid;
-        functionObjectLibs  ( "libforces.so" );
-        outputControl       timeStep;
-        outputInterval      1;
-        patches             (interface1 interface2);
-        pName               p;
-        UName               U;
-        rhoName             rhoInf;
-        log                 true;
-        rhoInf              1000;
-        CofR                (0.5 0.1 0);
-    }
-);
+#include "functions"
 
 // ************************************************************************* //

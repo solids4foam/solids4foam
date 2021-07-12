@@ -9,32 +9,35 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
+solids4Foam::caseOnlyRunsWithFoamExtend
+
 if [[ "${WM_PROJECT}" == "foam" ]]
 then
+    # Create meshes
     runApplication -l log.blockMesh.solid blockMesh -region solid
     runApplication -l log.blockMesh.fluid blockMesh -region fluid
+
+    # Set water volume fraction field (alpha) in the fluid
+    # Note: setField does not have a '-region' option so we will use a work-around
+    # runApplication setFields -region fluid
+    \mv constant/fluid/polyMesh constant/
+    \mv system/fluid/setFieldsDict system/
+    \cp 0/fluid/alpha1.org 0/alpha1
+    runApplication setFields
+    \mv constant/polyMesh constant/fluid/
+    \mv system/setFieldsDict system/fluid/
+    \mv 0/alpha1 0/fluid/alpha1
 else
+    # Create meshes
     runApplication -s solid blockMesh -region solid
     runApplication -s fluid blockMesh -region fluid
+
+    # Set water volume fraction field (alpha) in the fluid
+    runApplication setFields -region fluid
 fi
 
-# Set water volume fraction field (alpha) in the fluid
-# Note: setField does not have a '-region' option so we will use a work-around
-# runApplication setFields -region fluid
-\mv constant/fluid/polyMesh constant/
-\mv system/fluid/setFieldsDict system/
-\cp 0/fluid/alpha1.org 0/alpha1
-runApplication setFields
-\mv constant/polyMesh constant/fluid/
-\mv system/setFieldsDict system/fluid/
-\mv 0/alpha1 0/fluid/alpha1
-
-if [[ "${WM_PROJECT}" == "foam" ]]
-then
-    runApplication solids4Foam
-else
-    solids4Foam -noFunctionObjects runApplication solids4Foam -noFunctionObjects> log.solids4Foam
-fi
+# Run solver
+runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 
