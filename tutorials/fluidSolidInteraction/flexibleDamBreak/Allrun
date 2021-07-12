@@ -23,7 +23,7 @@ then
     \mv constant/fluid/polyMesh constant/
     \mv system/fluid/setFieldsDict system/
     \cp 0/fluid/alpha1.org 0/alpha1
-    runApplication setFields -region fluid
+    runApplication setFields
     \mv constant/polyMesh constant/fluid/
     \mv system/setFieldsDict system/fluid/
     \mv 0/alpha1 0/fluid/alpha1
