@@ -79,6 +79,10 @@ class solidTractionFvPatchVectorField
         //- Second order accuracy correction
         const Switch secondOrder_;
 
+        //- Switch so that the effective traction is enforced rather than the
+        //  total traction. This only applies to porous flow based solids
+        const Switch setEffectiveTraction_;
+
         //- Limiter coefficient for snGrad correction
         const scalar limitCoeff_;
 

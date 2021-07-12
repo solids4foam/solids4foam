@@ -29,6 +29,7 @@ boundaryField
     left
     {
         type            solidTraction;
+        //setEffectiveTraction yes;
         traction        uniform (0 0 0);
         pressure        uniform 0;
         value           uniform (0 0 0);
