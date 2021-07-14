@@ -55,7 +55,7 @@ function solids4foam::createContainer()
     # Create temporary container
     echo; echo "Creating temporary docker container"; echo
     CWD=$(pwd)
-    docker create --entrypoint /bin/bash --mount \
+    docker create --network=host --entrypoint /bin/bash --mount \
         src="${CWD}",target="${HOME_DIR}"/solids4foam-release,type=bind \
         --name "${CONTAINER}" -it "${IMAGE}"
 
