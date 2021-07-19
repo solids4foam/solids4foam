@@ -64,7 +64,7 @@ void Foam::mechanicalLaw::makeF()
         (
             IOobject
             (
-                "F+" + type(),
+                "F_",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -91,7 +91,7 @@ void Foam::mechanicalLaw::makeFf()
         (
             IOobject
             (
-                "Ff_" + type(),
+                "Ff_",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -117,7 +117,7 @@ void Foam::mechanicalLaw::makeRelF()
         (
             IOobject
             (
-                "relF_" + type(),
+                "relF_",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -144,7 +144,7 @@ void Foam::mechanicalLaw::makeRelFf()
         (
             IOobject
             (
-                "relFf_" + type(),
+                "relFf_",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -197,6 +197,33 @@ void Foam::mechanicalLaw::makeSigmaHyd()
             ),
             mesh(),
             dimensionedVector("zero", dimPressure/dimLength, vector::zero)
+        )
+    );
+}
+
+
+void Foam::mechanicalLaw::makeSigmaEff()
+{
+    if (sigmaEffPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeSigmaEff()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    sigmaEffPtr_.set
+    (
+        new volSymmTensorField
+        (
+            IOobject
+            (
+                "sigmaEff_",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
         )
     );
 }
@@ -303,6 +330,17 @@ Foam::volVectorField& Foam::mechanicalLaw::gradSigmaHyd()
     }
 
     return gradSigmaHydPtr_();
+}
+
+
+Foam::volSymmTensorField& Foam::mechanicalLaw::sigmaEff()
+{
+    if (sigmaEffPtr_.empty())
+    {
+        makeSigmaEff();
+    }
+
+    return sigmaEffPtr_();
 }
 
 
@@ -654,7 +692,8 @@ Foam::mechanicalLaw::mechanicalLaw
         dict.lookupOrDefault<scalar>("pressureSmoothingScaleFactor", 100.0)
     ),
     sigmaHydPtr_(),
-    gradSigmaHydPtr_()
+    gradSigmaHydPtr_(),
+    sigmaEffPtr_()
 {
     // Set the base mesh region name
     // For an FSI case, the region will be called solid, else it will be called

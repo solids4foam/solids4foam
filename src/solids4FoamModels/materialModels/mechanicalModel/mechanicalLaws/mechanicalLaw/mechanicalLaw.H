@@ -98,6 +98,13 @@ class mechanicalLaw
         // Gradient of the hydrostatic stress field
         autoPtr<volVectorField> gradSigmaHydPtr_;
 
+        //- Effective stress (sigmaEff = sigma + p*I)
+        //  Where:
+        //      sigmaEff is the effective stress
+        //      sigma is the total stress
+        //      p is the pore pressure
+        autoPtr<volSymmTensorField> sigmaEffPtr_;
+
 
     // Private Member Functions
 
@@ -115,6 +122,9 @@ class mechanicalLaw
 
         //- Make the sigmaHyd field
         void makeSigmaHyd();
+
+        //- Make the sigmaEff field
+        void makeSigmaEff();
 
         //- Disallow copy construct
         mechanicalLaw(const mechanicalLaw&);
@@ -172,6 +182,9 @@ protected:
 
         //- Return a reference to the gradSigmaHyd field
         volVectorField& gradSigmaHyd();
+
+        //- Return a reference to the sigmaEff field
+        volSymmTensorField& sigmaEff();
 
         //- Update the deformation gradient
         //  The lienarised shear and bulk modulii are used to enforce linear
