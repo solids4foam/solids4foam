@@ -104,15 +104,24 @@ function solids4foam::build()
 
     echo "Compiling solids4foam with ${VERSION} via docker"; echo
     buildPassed=false
-    if ! docker exec "${CONTAINER}" bash -c \
+    BUILD_LOG_FILE="Allwmake.${VERSION}.log"
+    if docker exec "${CONTAINER}" bash -c \
        "source ${BASH_ADDRESS} &> /dev/null \
        && cd solids4foam-release \
-       && ./Allwmake &> Allwmake.${VERSION}.log"
+       && ./Allwmake &> ${BUILD_LOG_FILE}"
     then
-        echo; echo "solids4foam ${VERSION}: Allwmake failed *************"; echo
+        # Also check the log file for the string "Error " if the build fails
+        if [[ $(grep -c "Error " "${BUILD_LOG_FILE}") -gt 0 ]]
+        then
+            echo; echo "solids4foam ${VERSION}: Allwmake failed *************"; echo
+            buildPassed=false
+        else
+            echo; echo "solids4foam ${VERSION}: Allwmake passed"; echo
+            buildPassed=true
+        fi
     else
-        echo; echo "solids4foam ${VERSION}: Allwmake passed"; echo
-        buildPassed=true
+        echo; echo "solids4foam ${VERSION}: Alltest failed **************"; echo
+        buildPassed=false
     fi
 
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
