@@ -119,14 +119,14 @@ Foam::poroLinearElastic::~poroLinearElastic()
 void Foam::poroLinearElastic::correct(volSymmTensorField& sigma)
 {
     // Calculate effective stress
-    linearElastic::correct(sigma);
+    linearElastic::correct(sigmaEff());
 
     // Lookup the pressure field from the solver
     const volScalarField& p = mesh().lookupObject<volScalarField>("p");
 
     // Calculate the total stress as the sum of the effective stress and the
     // pore-pressure
-    sigma -= (p + p0_)*symmTensor(I);
+    sigma = sigmaEff() - (p + p0_)*symmTensor(I);
 }
 
 
