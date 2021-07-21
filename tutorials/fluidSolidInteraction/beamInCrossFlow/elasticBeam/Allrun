@@ -38,7 +38,7 @@ else
         runApplication -s solid reconstructPar -region solid
     else
         # Run serial
-        solids4Foam -noFunctionObjects runApplication solids4Foam -noFunctionObjects> log.solids4Foam
+        runApplication solids4Foam
     fi
 fi
 

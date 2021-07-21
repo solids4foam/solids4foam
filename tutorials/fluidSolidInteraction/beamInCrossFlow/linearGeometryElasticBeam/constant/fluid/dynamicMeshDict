@@ -23,16 +23,16 @@ solver velocityLaplacian; // finite volume solver
 diffusivity quadratic inverseDistance (interface);
 
 // Settings for the RBF solver
-staticPatches    (top bottom left);
-movingPatches    (interface);
-fixedPatches     (inlet outlet);
-interpolation
-{
-    function     TPS;
-}
-coarsening
-{
-    enabled      no;
-}
+// staticPatches    (top bottom left);
+// movingPatches    (interface);
+// fixedPatches     (inlet outlet);
+// interpolation
+// {
+//     function     TPS;
+// }
+// coarsening
+// {
+//     enabled      no;
+// }
 
 // ************************************************************************* //
