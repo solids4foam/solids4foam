@@ -106,6 +106,14 @@ bool linGeomSolid::evolve()
             // Under-relaxation the linear system
             DDEqn.relax();
 
+            // Enforce any cell displacements
+            solidModel::setCellDisps(DDEqn);
+
+            // Hack to avoid expensive copy of residuals
+#ifdef OPENFOAMESI
+            const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
+#endif
+
             // Solve the linear system
             solverPerfDD = DDEqn.solve();
 

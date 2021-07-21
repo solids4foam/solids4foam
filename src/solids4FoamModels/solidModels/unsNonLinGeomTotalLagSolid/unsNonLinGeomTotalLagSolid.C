@@ -292,6 +292,14 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         // Under-relax the linear system
         DEqn.relax();
 
+        // Enforce any cell displacements
+        solidModel::setCellDisps(DEqn);
+
+        // Hack to avoid expensive copy of residuals
+#ifdef OPENFOAMESI
+        const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
+#endif
+
         // Solve the system
         solverPerfD = DEqn.solve();
 
