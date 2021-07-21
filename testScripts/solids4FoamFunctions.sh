@@ -52,6 +52,10 @@ function solids4foam::createContainer()
     echo "Container home directory: ${HOME_DIR}"
     echo
 
+    # Pull latest image
+    echo; echo "Pulling latest docker image: ${IMAGE}"; echo
+    docker pull "${IMAGE}"
+
     # Create temporary container
     echo; echo "Creating temporary docker container"; echo
     CWD=$(pwd)
