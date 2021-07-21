@@ -23,17 +23,17 @@ boundaryField
 {
     floor
     {
-        type            nutkWallFunction;
+        type            nutWallFunction;
         value           uniform 0;
     }
     ceiling
     {
-        type            nutkWallFunction;
+        type            nutWallFunction;
         value           uniform 0;
     }
     fixedWalls
     {
-        type            nutkWallFunction;
+        type            nutWallFunction;
         value           uniform 0;
     }
 }
