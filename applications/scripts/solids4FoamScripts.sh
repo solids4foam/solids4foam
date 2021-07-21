@@ -60,6 +60,14 @@ function solids4Foam::convertCaseFormat()
         fi
     fi
 
+    # nutWallFunction becomes nutkWallFunction
+    if [[ -n $(find "${CASE_DIR}" -name "nut") ]]
+    then
+        echo "Changing nutWallFunction in nut to nutkWallFunction"; echo
+        find "${CASE_DIR}" -name "nut" \
+            | xargs sed -i 's\nutWallFunction\nutkWallFunction\g'
+    fi
+
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
 
     if [[ -n $(find "${CASE_DIR}" -name "D*") ]]
@@ -110,32 +118,38 @@ function solids4Foam::convertCaseFormat()
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
-    # 2. If found, move the blockMeshDict to the system directory 
-    echo "2. Checking if the blockMeshDict exists"
+    # 2. If found, move the blockMeshDict to the system directory
     if [[ -f "${CASE_DIR}"/constant/polyMesh/blockMeshDict ]]
     then
-        echo "    Moving constant/polyMesh/blockMeshDict to system"
+        echo "Moving constant/polyMesh/blockMeshDict to system"
         \mv "${CASE_DIR}"/constant/polyMesh/blockMeshDict "${CASE_DIR}"/system/
     fi
     if [[ -f "${CASE_DIR}"/constant/solid/polyMesh/blockMeshDict ]]
     then
-        echo "    Moving constant/solid/polyMesh/blockMeshDict to system/solid"
+        echo "Moving constant/solid/polyMesh/blockMeshDict to system/solid"
         \mv "${CASE_DIR}"/constant/solid/polyMesh/blockMeshDict "${CASE_DIR}"/system/solid
     fi
     if [[ -f "${CASE_DIR}"/constant/fluid/polyMesh/blockMeshDict ]]
     then
-        echo "    Moving constant/fluid/polyMesh/blockMeshDict to system/fluid"
+        echo "Moving constant/fluid/polyMesh/blockMeshDict to system/fluid"
         \mv "${CASE_DIR}"/constant/fluid/polyMesh/blockMeshDict "${CASE_DIR}"/system/fluid
     fi
 
     # Replace the functions file
     if [[ -f "${CASE_DIR}"/system/functions ]]
     then
-        echo "    Replacing system/functions with system/functions.openfoam"
+        echo "Replacing system/functions with system/functions.openfoam"
         \cp "${CASE_DIR}"/system/functions \
             "${CASE_DIR}"/system/functions.foamextend
         \cp -f "${CASE_DIR}"/system/functions.openfoam \
             "${CASE_DIR}"/system/functions
+    fi
+
+    # Rename turbulence model
+    if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
+    then
+        echo "Changing RASModel to RAS in turbulenceProperties"
+        find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RASModel;/RAS;/g"
     fi
 
     echo
@@ -185,7 +199,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
         echo "Changing symmetry to symmetryPlane in D*"; echo
         find "${CASE_DIR}" -name "D*" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
- 
+
     if [[ -n $(find "${CASE_DIR}" -name "pointD*") ]]
     then
         echo "Changing symmetry to symmetryPlane in pointD*"; echo
@@ -228,32 +242,37 @@ function solids4Foam::convertCaseFormatFoamExtend()
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
-    # 2. If found, move the blockMeshDict to the system directory 
-    echo "2. Checking if the blockMeshDict exists"
+    # 2. If found, move the blockMeshDict to the system directory
     if [[ -f "${CASE_DIR}"/system/blockMeshDict ]]
     then
-        echo "    Moving system/blockMeshDict to constant/polyMesh"
+        echo "Moving system/blockMeshDict to constant/polyMesh"
         mkdir -p "${CASE_DIR}"/constant/polyMesh
         \mv "${CASE_DIR}"/system/blockMeshDict "${CASE_DIR}"/constant/polyMesh
     fi
     if [[ -f "${CASE_DIR}"/system/solid/blockMeshDict ]]
     then
-        echo "    Moving system/solid/blockMeshDict to constant/solid/polyMesh"
+        echo "Moving system/solid/blockMeshDict to constant/solid/polyMesh"
         mkdir -p "${CASE_DIR}"/constant/solid/polyMesh
         \mv "${CASE_DIR}"/system/solid/blockMeshDict "${CASE_DIR}"/constant/solid/polyMesh
     fi
     if [[ -f "${CASE_DIR}"/system/fluid/blockMeshDict ]]
     then
-        echo "    Moving system/fluid/blockMeshDict to constant/fluid/polyMesh"
+        echo "Moving system/fluid/blockMeshDict to constant/fluid/polyMesh"
         mkdir -p "${CASE_DIR}"/constant/fluid/polyMesh
         \mv "${CASE_DIR}"/system/fluid/blockMeshDict "${CASE_DIR}"/constant/fluid/polyMesh
     fi
 
     if [[ -f "${CASE_DIR}"/system/functions.foamextend ]]
     then
-        echo "    Replacing system/functions with system/functions.openfoam"
+        echo "Replacing system/functions with system/functions.openfoam"
         \mv -f "${CASE_DIR}"/system/functions.foamextend \
             "${CASE_DIR}"/system/functions
+    fi
+
+    if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
+    then
+        echo "Changing RAS to RASModel in turbulenceProperties"
+        find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RAS;/RASModel;/g"
     fi
 
     echo

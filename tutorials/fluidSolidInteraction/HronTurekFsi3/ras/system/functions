@@ -13,9 +13,9 @@ functions
        outputControl       timeStep;
        outputInterval      1;
        patches             (plate);
-       pName               p;
-       UName               U;
-       rhoName             rhoInf;
+       "pName|p"           p;
+       "UName|U"           U;
+       "rhoName|rho"       rhoInf;
        log                 true;
        rhoInf              100;
        CofR                (0.5 0.1 0);
