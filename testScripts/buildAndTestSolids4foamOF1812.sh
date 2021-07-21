@@ -30,13 +30,13 @@ else
 fi
 
 # Test
-# if solids4foam::test "${CONTAINER}" "openfoam-v1812" \
-#        "/opt/OpenFOAM/OpenFOAM-v1812/etc/bashrc" "Alltest.openfoam"
-# then
-#     TEST_STATUS=true
-# else
-#     TEST_STATUS=false
-# fi
+if solids4foam::test "${CONTAINER}" "openfoam-v1812" \
+       "/opt/OpenFOAM/OpenFOAM-v1812/etc/bashrc" "Alltest.openfoam"
+then
+    TEST_STATUS=true
+else
+    TEST_STATUS=false
+fi
 
 # Remove container
 solids4foam::removeContainer "${CONTAINER}"
