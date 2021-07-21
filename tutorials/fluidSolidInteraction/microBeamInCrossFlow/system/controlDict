@@ -47,15 +47,8 @@ runTimeModifiable no;
 
 adjustTimeStep  no;
 
-maxCo           20.0; //2.0;
+maxCo           20.0;
 
-functions
-(
-    pointDisp
-    {
-        type    solidPointDisplacement;
-        point   (105e-6 50e-6 0);
-    }
-);
+#include "functions"
 
 // ************************************************************************* //
