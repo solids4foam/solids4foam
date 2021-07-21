@@ -65,6 +65,8 @@ primitivePatchInterpolation& fixedDisplacementFvPatchVectorField::interp()
 }
 
 
+// * * * * * * * * *  Protected Member Functions  * * * * * * * * * * * * * * //
+
 void fixedDisplacementFvPatchVectorField::setPointDisplacement
 (
     const vectorField& faceDisp

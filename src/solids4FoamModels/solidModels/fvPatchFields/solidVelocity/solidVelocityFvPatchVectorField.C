@@ -38,78 +38,6 @@ License
 namespace Foam
 {
 
-// * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * * //
-
-void solidVelocityFvPatchVectorField::makeInterp() const
-{
-    if (interpPtr_.valid())
-    {
-        FatalErrorIn
-        (
-            "void solidVelocityFvPatchVectorField::makeInterp() const"
-        ) << "pointer already set" << abort(FatalError);
-    }
-
-    interpPtr_.set(new primitivePatchInterpolation(patch().patch()));
-}
-
-
-primitivePatchInterpolation& solidVelocityFvPatchVectorField::interp()
-{
-    if (interpPtr_.empty())
-    {
-        makeInterp();
-    }
-
-    return interpPtr_();
-}
-
-
-void solidVelocityFvPatchVectorField::setPointDisplacement
-(
-    const vectorField& faceDisp
-)
-{
-    const fvMesh& mesh = patch().boundaryMesh().mesh();
-
-    if
-    (
-        mesh.foundObject<pointVectorField>
-        (
-            "point" + dimensionedInternalField().name()
-        )
-    )
-    {
-        const pointVectorField& pointD =
-            mesh.lookupObject<pointVectorField>
-            (
-                "point" + dimensionedInternalField().name()
-            );
-
-        // Check if the boundary is fixedValue
-        if
-        (
-            pointD.boundaryField()[patch().index()].type()
-         == fixedValuePointPatchVectorField::typeName
-        )
-        {
-            // Use const_cast to set boundary condition
-            fixedValuePointPatchVectorField& patchPointD =
-                refCast<fixedValuePointPatchVectorField>
-                (
-                    const_cast<pointVectorField&>
-                    (
-                        pointD
-                    ).boundaryField()[patch().index()]
-                );
-
-            // Interpolate face values to the points
-            patchPointD == interp().faceToPointInterpolate(faceDisp);
-        }
-    }
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
@@ -118,10 +46,9 @@ solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    fixedValueFvPatchVectorField(p, iF),
+    fixedDisplacementFvPatchVectorField(p, iF),
     velocity_(p.size(), vector::zero),
-    velocitySeries_(),
-    interpPtr_(NULL)
+    velocitySeries_()
 {}
 
 
@@ -133,10 +60,9 @@ solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
     const fvPatchFieldMapper& mapper
 )
 :
-    fixedValueFvPatchVectorField(ptf, p, iF, mapper),
+    fixedDisplacementFvPatchVectorField(ptf, p, iF, mapper),
     velocity_(ptf.velocity_),
-    velocitySeries_(ptf.velocitySeries_),
-    interpPtr_(NULL)
+    velocitySeries_(ptf.velocitySeries_)
 {}
 
 
@@ -147,10 +73,9 @@ solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
     const dictionary& dict
 )
 :
-    fixedValueFvPatchVectorField(p, iF),
+    fixedDisplacementFvPatchVectorField(p, iF),
     velocity_(p.size(), vector::zero),
-    velocitySeries_(),
-    interpPtr_(NULL)
+    velocitySeries_()
 {
     Info<< "Creating " << type() << " boundary condition" << endl;
 
@@ -193,10 +118,9 @@ solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
     const solidVelocityFvPatchVectorField& pivpvf
 )
 :
-    fixedValueFvPatchVectorField(pivpvf),
+    fixedDisplacementFvPatchVectorField(pivpvf),
     velocity_(pivpvf.velocity_),
-    velocitySeries_(pivpvf.velocitySeries_),
-    interpPtr_(NULL)
+    velocitySeries_(pivpvf.velocitySeries_)
 {}
 
 
@@ -206,10 +130,9 @@ solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    fixedValueFvPatchVectorField(pivpvf, iF),
+    fixedDisplacementFvPatchVectorField(pivpvf, iF),
     velocity_(pivpvf.velocity_),
-    velocitySeries_(pivpvf.velocitySeries_),
-    interpPtr_(NULL)
+    velocitySeries_(pivpvf.velocitySeries_)
 {}
 
 
@@ -221,9 +144,13 @@ void solidVelocityFvPatchVectorField::autoMap
     const fvPatchFieldMapper& m
 )
 {
-    fixedValueFvPatchVectorField::autoMap(m);
+    fixedDisplacementFvPatchVectorField::autoMap(m);
 
+#ifdef OPENFOAMFOUNDATION
+    m(velocity_, velocity_);
+#else
     velocity_.autoMap(m);
+#endif
 }
 
 
@@ -234,7 +161,7 @@ void solidVelocityFvPatchVectorField::rmap
     const labelList& addr
 )
 {
-    fixedValueFvPatchVectorField::rmap(ptf, addr);
+    fixedDisplacementFvPatchVectorField::rmap(ptf, addr);
 
     const solidVelocityFvPatchVectorField& dmptf =
        refCast<const solidVelocityFvPatchVectorField>(ptf);
@@ -258,7 +185,11 @@ void solidVelocityFvPatchVectorField::updateCoeffs()
 
     vectorField disp = vectorField(patch().size(), vector::zero);
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if (internalField().name() == "DD")
+#else
     if (dimensionedInternalField().name() == "DD")
+#endif
     {
         // Incremental approach, so we wil set the increment of displacement for
         // this time-step
@@ -283,56 +214,7 @@ void solidVelocityFvPatchVectorField::updateCoeffs()
 
     // If the corresponding point displacement field has a fixedValue type
     // boundary condition, then we wil update it
-    setPointDisplacement(disp);
-}
-
-
-Foam::tmp<Foam::Field<vector> > solidVelocityFvPatchVectorField::snGrad() const
-{
-    // fixedValue snGrad with no correction
-    // return (*this - patchInternalField())*this->patch().deltaCoeffs();
-
-    const fvPatchField<tensor>& gradField =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
-            "grad(" + dimensionedInternalField().name() + ")"
-        );
-
-    // Unit normals
-    const vectorField n = patch().nf();
-
-    // Delta vectors
-    const vectorField delta = patch().delta();
-
-    // Correction vectors
-    const vectorField k = delta - n*(n&delta);
-
-    return
-    (
-        *this - (patchInternalField() + (k & gradField.patchInternalField()))
-    )*patch().deltaCoeffs();
-}
-
-tmp<Field<vector> >
-solidVelocityFvPatchVectorField::gradientBoundaryCoeffs() const
-{
-    const fvPatchField<tensor>& gradField =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
-            "grad(" + dimensionedInternalField().name() + ")"
-        );
-
-    vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
-
-    //- correction vector
-    vectorField k = delta - n*(n&delta);
-
-    return
-    (
-        this->patch().deltaCoeffs()
-       *(*this - (k & gradField.patchInternalField()))
-    );
+    fixedDisplacementFvPatchVectorField::setPointDisplacement(disp);
 }
 
 void solidVelocityFvPatchVectorField::write(Ostream& os) const
@@ -346,10 +228,14 @@ void solidVelocityFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
+#ifdef OPENFOAMFOUNDATION
+        writeEntry(os, "velocity", velocity_);
+#else
         velocity_.writeEntry("velocity", os);
+#endif
     }
 
-    fixedValueFvPatchVectorField::write(os);
+    fixedDisplacementFvPatchVectorField::write(os);
 }
 
 

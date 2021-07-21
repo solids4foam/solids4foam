@@ -90,14 +90,18 @@ bool Foam::solidPotentialEnergy::writeData()
     const vector gDir = g.value()/magG;
 
     // Lookup the displacement field
-    const volVectorField& U = mesh.lookupObject<volVectorField>("U");
+    const volVectorField& U = mesh.lookupObject<volVectorField>("D");
 
     // Calculate the height from the reference (zero potential energy) plane for
     // all cells
     // Potential energy is positive for any cells that are in the negative
     // gravity direction from the refPoint
     const scalarField h =
+#ifdef OPENFOAMESIORFOUNDATION
+        (-gDir & (mesh.C().primitiveField() + U.primitiveField() - refPoint_));
+#else
         (-gDir & (mesh.C().internalField() + U.internalField() - refPoint_));
+#endif
 
     // Calculate the potential energy per unit volume field
     const scalarField potentialEnergyPerVol = rho.internalField()*magG*h;

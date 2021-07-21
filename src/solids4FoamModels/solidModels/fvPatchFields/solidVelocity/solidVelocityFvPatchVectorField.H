@@ -44,11 +44,8 @@ Author
 #ifndef solidVelocityFvPatchVectorField_H
 #define solidVelocityFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
-#include "fixedValueFvPatchFields.H"
-#include "interpolationTable.H"
-#include "primitivePatchInterpolation.H"
+#include "fixedDisplacementFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -61,7 +58,7 @@ namespace Foam
 
 class solidVelocityFvPatchVectorField
 :
-    public fixedValueFvPatchVectorField
+    public fixedDisplacementFvPatchVectorField
 {
     // Private Data
 
@@ -70,20 +67,6 @@ class solidVelocityFvPatchVectorField
 
         //- Velocity time series
         interpolationTable<vector> velocitySeries_;
-
-        //- Patch interpolator to interpolate face values to the points
-        mutable autoPtr<primitivePatchInterpolation> interpPtr_;
-
-    // Private Functions
-
-        //- Make the patch interpolator
-        void makeInterp() const;
-
-        //- Return the patch interpolator
-        primitivePatchInterpolation& interp();
-
-        //- Set the point displacement field boundary condition
-        void setPointDisplacement(const vectorField& faceDisp);
 
 public:
 
@@ -160,15 +143,6 @@ public:
 
             //- Update the coefficients associated with the patch field
             virtual void updateCoeffs();
-
-            //- Return patch-normal gradient
-            //- with non-orthogonal correction regardless of whether snGrad
-            //- is corrected or not
-            virtual tmp<Field<vector> > snGrad() const;
-
-            //- Return the matrix source coefficients corresponding to the
-            //  evaluation of the gradient of this patchField
-            virtual tmp<Field<vector> > gradientBoundaryCoeffs() const;
 
         // Mapping functions
 

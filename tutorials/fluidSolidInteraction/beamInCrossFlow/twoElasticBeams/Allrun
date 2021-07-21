@@ -27,17 +27,17 @@ else
     # it
     mkdir -p constant/solid/polyMesh
     runApplication -s solid fluent3DMeshToFoam solid.msh
+    \mv constant/polyMesh/* constant/solid/polyMesh/
     echo "Running foamDictionary on solid"
     foamDictionary constant/solid/polyMesh/boundary -entry entry0.symmetry.type \
-		   -set symmetry &> log.foamDictionary
-    \mv constant/polyMesh/* constant/solid/polyMesh/
+		   -set symmetry &> log.foamDictionary.solid
 
     mkdir -p constant/fluid/polyMesh
     runApplication -s fluid fluent3DMeshToFoam fluid.msh
+    \mv constant/polyMesh/* constant/fluid/polyMesh/
     echo "Running foamDictionary on fluid"
     foamDictionary constant/fluid/polyMesh/boundary -entry entry0.symmetry.type \
-		   -set symmetry &> log.foamDictionary
-    \mv constant/polyMesh/* constant/fluid/polyMesh/
+		   -set symmetry &> log.foamDictionary.fluid
 fi
 
 # Run solver
