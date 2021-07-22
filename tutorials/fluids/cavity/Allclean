@@ -3,7 +3,7 @@
 # Source tutorial clean functions
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
-cp constant/polyMesh/blockMeshDict system/
+mv constant/polyMesh/blockMeshDict system/
 cleanCase
-mkdir constant/polyMesh ; mv -f system/blockMeshDict constant/polyMesh/
+mkdir -p constant/polyMesh ; mv -f system/blockMeshDict constant/polyMesh/
 rm -f constant/polyMesh/boundary case.foam
