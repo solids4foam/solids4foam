@@ -29,7 +29,7 @@ endTime         1.6e-03;
 
 deltaT          1e-07;
 
-maxCo           0.7;
+maxCo           0.1;
 
 writeControl    runTime;
 
