@@ -123,6 +123,11 @@ const surfaceScalarField& mechanicalEnergies::viscousPressure
         rho*fvc::ddt(epsilonVol(gradD))
     )*waveSpeed/mesh_.deltaCoeffs();
 
+#ifdef OPENFOAMESI
+    viscousPressurePtr_().setOriented(false);
+    viscousPressurePtr_().oldTime().setOriented(false);
+#endif
+
     return viscousPressurePtr_();
 }
 
