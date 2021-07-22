@@ -25,7 +25,9 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#if defined(OPENFOAMFOUNDATION) || OPENFOAMESI < 1912
+#ifdef OPENFOAMESIORFOUNDATION
+
+#if (defined(OPENFOAMFOUNDATION) || OPENFOAMESI < 1912)
 
 #include "skewCorrectedSnGrad.H"
 #include "fvMesh.H"
@@ -58,6 +60,10 @@ Foam::fv::skewCorrectedSnGrad<Foam::vector>::correction
     return fullGradCorrection(vvf);
 }
 
-#endif // end of #if
+#endif // end of #if (defined(OPENFOAMFOUNDATION) || OPENFOAMESI < 1912)
+
+#endif // end of #ifdef OPENFOAMESIORFOUNDATION
+
+
 
 // ************************************************************************* //
