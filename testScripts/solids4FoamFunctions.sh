@@ -179,8 +179,8 @@ function solids4foam::test()
     # Print the number of tutorials and the number only supported by foam extend
     NUM_TUTS=$(find . -name Allrun -type f | wc -l)
     NUM_TUTS_FE_ONLY=$(find . -name Allrun -type f | xargs grep "solids4Foam::caseOnlyRunsWithFoamExtend" | wc -l)
-    echo "Number of tutorials: ${NUM_TUT}"
-    echo "Number of tutorials limit to foam extend: ${NUM_TUTS_FE_ONLY}"
+    echo "Number of tutorials: ${NUM_TUTS}"
+    echo "Number of tutorials limited to foam extend: ${NUM_TUTS_FE_ONLY}"
     echo
 
     # Run Alltest and check if all tutorials passed
