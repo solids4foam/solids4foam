@@ -176,6 +176,13 @@ function solids4foam::test()
     echo "Alltest script: ${ALLTEST_SCRIPT}"
     echo
 
+    # Print the number of tutorials and the number only supported by foam extend
+    NUM_TUTS=$(find . -name Allrun -type f | wc -l)
+    NUM_TUTS_FE_ONLY=$(find . -name Allrun -type f | xargs grep "solids4Foam::caseOnlyRunsWithFoamExtend" | wc -l)
+    echo "Number of tutorials: ${NUM_TUT}"
+    echo "Number of tutorials limit to foam extend: ${NUM_TUTS_FE_ONLY}"
+    echo
+
     # Run Alltest and check if all tutorials passed
     echo "Running ${ALLTEST_SCRIPT}"
     docker exec "${CONTAINER}" bash -c \
