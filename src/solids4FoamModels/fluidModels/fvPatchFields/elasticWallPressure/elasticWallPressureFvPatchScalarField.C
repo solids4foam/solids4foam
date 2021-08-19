@@ -146,7 +146,30 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
             "fsiProperties"
         );
 
-    label patchID = this->patch().index();
+    // Bug-fix, Mike Tree, see:
+    // https://bitbucket.org/philip_cardiff/solids4foam-release/issues/27/elasticwallpressurefvpatchscalarfieldc
+    // label patchID = this->patch().index(); // this is the fluid patch ID!
+
+    // Find the solid patch ID corresponding to the current fluid patch
+    label patchID = -1;
+    forAll(fsi.fluidPatchIndices(), interfaceI)
+    {
+        if (fsi.fluidPatchIndices()[interfaceI] == patch().index())
+        {
+            // Take the corresponding solid patch ID
+            patchID = fsi.solidPatchIndices()[interfaceI];
+            break;
+        }
+    }
+
+    if (patchID == -1)
+    {
+        FatalErrorIn
+        (
+            "void elasticWallPressureFvPatchScalarField::updateCoeffs()"
+        )   << "Are you sure this patch is an FSI interface?"
+            << abort(FatalError);
+    }
 
     // Solid properties
     // PC: hmnn what if the solidModel does not use mu and lambda...
