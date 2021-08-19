@@ -668,6 +668,8 @@ bool coupledNonLinGeomPressureDisplacementSolid::evolve()
 
     mechanical().correct(sigma());
 
+    blockLduMatrix::debug = 1;
+
     return true;
 }
 

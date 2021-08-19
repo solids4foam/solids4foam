@@ -255,7 +255,9 @@ bool nonLinGeomTotalLagSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
 
