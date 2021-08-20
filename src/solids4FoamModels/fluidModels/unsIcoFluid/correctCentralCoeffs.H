@@ -39,14 +39,22 @@ if (true)
                 label curCell =
                     mesh.boundary()[patchI].faceCells()[faceI];
 
+#ifdef OPENFOAMESIORFOUNDATION
+                AUcorr.primitiveFieldRef()[curCell] +=
+#else
                 AUcorr.internalField()[curCell] +=
+#endif
                     intCoeffs[faceI]/mesh.V().field()[curCell];
 
                 //AUcorr.internalField()[curCell] +=
                 //    nu_.value()*magSf[faceI]*intCoeffs[faceI]
                 //   /mesh.V().field()[curCell];
 
+#ifdef OPENFOAMESIORFOUNDATION
+                AUcorr.primitiveFieldRef()[curCell] +=
+#else
                 AUcorr.internalField()[curCell] +=
+#endif
                     nu_.value()*deltaCoeffs[faceI]*magSf[faceI]
                    /mesh.V().field()[curCell]/2.0;
             }

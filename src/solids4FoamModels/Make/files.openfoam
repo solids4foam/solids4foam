@@ -35,6 +35,7 @@ fluidModels/pimpleFluid/pimpleFluid.C
 fluidModels/pUCoupledFluid/pUCoupledFluid.C
 fluidModels/stokesFluid/stokesFluid.C
 fluidModels/transientSimpleFluid/transientSimpleFluid.C
+fluidModels/unsIcoFluid/unsIcoFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
 fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
 

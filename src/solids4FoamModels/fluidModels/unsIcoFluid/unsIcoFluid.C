@@ -87,7 +87,11 @@ void unsIcoFluid::updateRobinFsiInterfaceFlux()
         )
         {
             Info<< "Mesh changed: updating flux on Robin interface.";
+#ifdef OPENFOAMESIORFOUNDATION
+            phi().boundaryFieldRef()[patchI] = 0;
+#else
             phi().boundaryField()[patchI] = 0;
+#endif
         }
     }
 }
@@ -120,10 +124,17 @@ void unsIcoFluid::updateRobinFsiInterface()
             )
         )
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            word ddtScheme
+            (
+                mesh().ddtScheme("ddt(" + U().name() +')')
+            );
+#else
             word ddtScheme
             (
                 mesh().schemesDict().ddtScheme("ddt(" + U().name() +')')
             );
+#endif
 
             if
             (
@@ -131,12 +142,20 @@ void unsIcoFluid::updateRobinFsiInterface()
              == fv::EulerDdtScheme<vector>::typeName
             )
             {
+#ifdef OPENFOAMESIORFOUNDATION
+                phi().boundaryFieldRef()[patchI] =
+                    phi().oldTime().boundaryField()[patchI];
+
+                rAUf_.boundaryFieldRef()[patchI] =
+                    runTime().deltaT().value();
+#else
                 phi().boundaryField()[patchI] =
                     phi().oldTime().boundaryField()[patchI];
 
                 rAUf_.boundaryField()[patchI] =
                     runTime().deltaT().value();
-            }
+#endif
+        }
             else if
             (
                 ddtScheme
@@ -145,11 +164,19 @@ void unsIcoFluid::updateRobinFsiInterface()
             {
                 if(runTime().timeIndex() == 1)
                 {
+#ifdef OPENFOAMESIORFOUNDATION
+                    phi().boundaryFieldRef()[patchI] =
+                        phi().oldTime().boundaryField()[patchI];
+
+                    rAUf_.boundaryFieldRef()[patchI] =
+                        runTime().deltaT().value();
+#else
                     phi().boundaryField()[patchI] =
                         phi().oldTime().boundaryField()[patchI];
 
                     rAUf_.boundaryField()[patchI] =
                         runTime().deltaT().value();
+#endif
 
                     phi().oldTime().oldTime();
                 }
@@ -162,7 +189,11 @@ void unsIcoFluid::updateRobinFsiInterface()
                     scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
                     scalar Co = Cn + Coo;
 
+#ifdef OPENFOAMESIORFOUNDATION
+                    phi().boundaryFieldRef()[patchI] =
+#else
                     phi().boundaryField()[patchI] =
+#endif
                         (Co/Cn)*phi().oldTime().boundaryField()
                         [
                             patchI
@@ -172,7 +203,11 @@ void unsIcoFluid::updateRobinFsiInterface()
                             patchI
                         ];
 
+#ifdef OPENFOAMESIORFOUNDATION
+                    rAUf_.boundaryFieldRef()[patchI] = deltaT/Cn;
+#else
                     rAUf_.boundaryField()[patchI] = deltaT/Cn;
+#endif
                 }
             }
         }
@@ -207,10 +242,17 @@ void unsIcoFluid::correctRobinFsiInterfaceFlux()
             )
         )
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            word ddtScheme
+            (
+                mesh().ddtScheme("ddt(" + U().name() +')')
+            );
+#else
             word ddtScheme
             (
                 mesh().schemesDict().ddtScheme("ddt(" + U().name() +')')
             );
+#endif
 
             if
             (
@@ -218,7 +260,11 @@ void unsIcoFluid::correctRobinFsiInterfaceFlux()
              == fv::EulerDdtScheme<vector>::typeName
             )
             {
+#ifdef OPENFOAMESIORFOUNDATION
+                phi().boundaryFieldRef()[patchI] =
+#else
                 phi().boundaryField()[patchI] =
+#endif
                     phi().oldTime().boundaryField()[patchI]
                   - p().boundaryField()
                     [
@@ -237,11 +283,19 @@ void unsIcoFluid::correctRobinFsiInterfaceFlux()
             {
                 if(runTime().timeIndex() == 1)
                 {
+#ifdef OPENFOAMESIORFOUNDATION
+                    phi().boundaryFieldRef()[patchI] =
+                        phi().oldTime().boundaryField()[patchI];
+
+                    rAUf_.boundaryFieldRef()[patchI] =
+                        runTime().deltaT().value();
+#else
                     phi().boundaryField()[patchI] =
                         phi().oldTime().boundaryField()[patchI];
 
                     rAUf_.boundaryField()[patchI] =
                         runTime().deltaT().value();
+#endif
 
                     phi().oldTime().oldTime();
                 }
@@ -254,7 +308,11 @@ void unsIcoFluid::correctRobinFsiInterfaceFlux()
                     scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
                     scalar Co = Cn + Coo;
 
+#ifdef OPENFOAMESIORFOUNDATION
+                    phi().boundaryFieldRef()[patchI] =
+#else
                     phi().boundaryField()[patchI] =
+#endif
                         (Co/Cn)*phi().oldTime().boundaryField()
                         [
                             patchI
@@ -264,7 +322,11 @@ void unsIcoFluid::correctRobinFsiInterfaceFlux()
                             patchI
                         ];
 
+#ifdef OPENFOAMESIORFOUNDATION
+                    rAUf_.boundaryFieldRef()[patchI] = deltaT/Cn;
+#else
                     rAUf_.boundaryField()[patchI] = deltaT/Cn;
+#endif
                 }
             }
         }
@@ -327,10 +389,17 @@ unsIcoFluid::unsIcoFluid
     phi().oldTime();
     Uf_.oldTime();
 
-	word ddtScheme
+#ifdef OPENFOAMESIORFOUNDATION
+    word ddtScheme
+    (
+        mesh().ddtScheme("ddt(" + U().name() +')')
+    );
+#else
+    word ddtScheme
     (
         mesh().schemesDict().ddtScheme("ddt(" + U().name() +')')
     );
+#endif
 
     if
     (
