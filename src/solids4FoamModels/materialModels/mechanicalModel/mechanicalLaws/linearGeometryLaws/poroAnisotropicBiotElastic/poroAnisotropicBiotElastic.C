@@ -26,7 +26,7 @@ License
 #include "poroAnisotropicBiotElastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
-#include "mechanicalModel.H"
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -309,7 +309,11 @@ void Foam::poroAnisotropicBiotElastic::correct(volSymmTensorField& sigma)
     // sigma = C:epsilon
 
     // Take references for convenience and efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+    symmTensorField& sigmaI = sigmaEff().primitiveFieldRef();
+#else
     symmTensorField& sigmaI = sigmaEff().internalField();
+#endif
     const symmTensorField& epsilonI = epsilon_.internalField();
 
     // Internal field
@@ -343,7 +347,11 @@ void Foam::poroAnisotropicBiotElastic::correct(volSymmTensorField& sigma)
     forAll(sigmaEff().boundaryField(), patchI)
     {
         // Take references for convenience and efficiency
+#ifdef OPENFOAMESIORFOUNDATION
+        symmTensorField& sigmaP = sigmaEff().boundaryFieldRef()[patchI];
+#else
         symmTensorField& sigmaP = sigmaEff().boundaryField()[patchI];
+#endif
         const symmTensorField& epsilonP = epsilon_.boundaryField()[patchI];
 
         forAll(sigmaP, faceI)

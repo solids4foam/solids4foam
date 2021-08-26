@@ -77,6 +77,7 @@ $(linGeomLaws)/linearElastic/linearElastic.C
 $(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
 $(linGeomLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
 /*$(linGeomLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C*/
+$(linGeomLaws)/poroAnisotropicBiotElastic/poroAnisotropicBiotElastic.C
 $(linGeomLaws)/poroLinearElastic/poroLinearElastic.C
 $(linGeomLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
 $(linGeomLaws)/thermoLinearElastic/thermoLinearElastic.C

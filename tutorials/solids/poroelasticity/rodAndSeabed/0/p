@@ -22,28 +22,25 @@ internalField   uniform 79290;
 boundaryField
 {
     structure
-      {
-	//type            timeVaryingMappedFixedValue;
-       // setAverage off;
-       type       zeroGradient;	
-      }
+    {
+        type            zeroGradient;
+    }
 
     bottom
-      {
-	type            zeroGradient;
-      }
+    {
+        type            zeroGradient;
+    }
 
     sides
-      {
-	type            zeroGradient;
-      }
+    {
+        type            zeroGradient;
+    }
 
     seabed
-      {
-	type            timeVaryingMappedFixedValue;
-        setAverage off;
-      }
-
+    {
+        type            timeVaryingMappedFixedValue;
+        setAverage      off;
+    }
 }
 
 // ************************************************************************* //
