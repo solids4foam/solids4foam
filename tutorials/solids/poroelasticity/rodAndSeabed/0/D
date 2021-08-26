@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    structure
+    {
+        //type            timeVaryingMappedFixedValue;
+        // setAverage off;
+        //type            timeVaryingMappedTotalTraction;
+        // Not equivalent but we will use it in the interim
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform 1e4;
+        value           uniform (0 0 0);
+    }
+
+    bottom
+    {
+        type            slip;
+    }
+
+    sides
+    {
+        type            slip;
+    }
+
+    seabed
+    {
+        // type            fixedTraction;
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform  0;
+        value           uniform (0 0 0);
+    }
+
+}
+
+// ************************************************************************* //
