@@ -20,7 +20,7 @@ solidModel     poroLinearGeometry;
 poroLinearGeometryCoeffs
 {
     // Maximum number of momentum correctors
-    nCorrectors     100;
+    nCorrectors     1000;
 
     // Solution tolerance for displacement
     solutionTolerance 1e-06;
@@ -32,7 +32,7 @@ poroLinearGeometryCoeffs
     materialTolerance 1e-05;
 
     // Write frequency for the residuals
-    infoFrequency   1;
+    infoFrequency   10;
 
     // Poroelastic properties: defined here for now
     hydraulicConductivity  hydraulicConductivity [0 1 -1 0 0 0 0] 1e-3;

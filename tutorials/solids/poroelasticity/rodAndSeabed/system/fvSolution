@@ -46,8 +46,8 @@ relaxationFactors
 {
     fields
     {
-        D     0.5;
-        p     0.5;
+        // D     0.5;
+        // p     0.5;
     }
 }
 

@@ -152,6 +152,16 @@ function solids4Foam::convertCaseFormat()
         find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RASModel;/RAS;/g"
     fi
 
+    # Check for boundaryData
+    if [[ -d "${CASE_DIR}"/constant/boundaryData && -d "${CASE_DIR}"/constant/boundaryData.openfoam ]]
+    then
+        echo "Moving constant/boundaryData to constant/boundaryData.foam-extend"
+        \mv "${CASE_DIR}"/constant/boundaryData "${CASE_DIR}"/constant/boundaryData.foam-extend
+
+        echo "Moving constant/boundaryData.openfoam to constant/boundaryData"
+        \mv "${CASE_DIR}"/constant/boundaryData.openfoam "${CASE_DIR}"/constant/boundaryData
+    fi
+
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -273,6 +283,15 @@ function solids4Foam::convertCaseFormatFoamExtend()
     then
         echo "Changing RAS to RASModel in turbulenceProperties"
         find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RAS;/RASModel;/g"
+    fi
+
+    if [[ -d "${CASE_DIR}"/constant/boundaryData && -d "${CASE_DIR}"/constant/boundaryData.foam-extend ]]
+    then
+        echo "Moving constant/boundaryData to constant/boundaryData.openfoam"
+        \mv "${CASE_DIR}"/constant/boundaryData "${CASE_DIR}"/constant/boundaryData.openfoam
+
+        echo "Moving constant/boundaryData.foam-extend to constant/boundaryData"
+        \mv "${CASE_DIR}"/constant/boundaryData.foam-extend "${CASE_DIR}"/constant/boundaryData
     fi
 
     echo
