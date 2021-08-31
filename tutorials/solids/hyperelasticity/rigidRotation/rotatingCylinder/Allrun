@@ -1,10 +1,24 @@
 #!/bin/bash
+
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
 # Create mesh
 runApplication fluentMeshToFoam cylinderRotation.msh
-runApplication changeDictionary
+
+if [[ $WM_PROJECT = "foam" ]]
+then
+    runApplication changeDictionary
+else
+    echo "Running foamDictionary"
+    foamDictionary constant/polyMesh/boundary -entry entry0.frontAndBackPlanes.type -set empty &> log.foamDictionary
+fi
 
 # Run solver
 runApplication solids4Foam

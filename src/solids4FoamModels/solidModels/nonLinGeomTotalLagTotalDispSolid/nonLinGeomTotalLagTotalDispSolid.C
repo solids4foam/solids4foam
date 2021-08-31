@@ -205,6 +205,11 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
         // Enforce any cell displacements
         solidModel::setCellDisps(DEqn);
 
+        // Hack to avoid expensive copy of residuals
+#ifdef OPENFOAMESI
+        const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
+#endif
+
         // Solve the linear system
         solverPerfD = DEqn.solve();
 
@@ -270,7 +275,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
     

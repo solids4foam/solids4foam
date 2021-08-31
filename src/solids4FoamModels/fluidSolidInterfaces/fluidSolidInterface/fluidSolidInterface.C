@@ -86,7 +86,7 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
 
     interfaceToInterfaceList_.setSize(nGlobalPatches_);
 
-    // To maintain backwards compatibility, we will add a default dicts
+    // To maintain backwards compatibility, we will add a default dict
     {
         dictionary emptyDict;
         fsiProperties_.add("GGICoeffs", emptyDict);
@@ -101,9 +101,15 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
     {
         // Lookup the type
         const word type = fsiProperties_.lookupOrDefault<word>
+#ifdef OPENFOAMESIORFOUNDATION
+        (
+            "interfaceTransferMethod", "AMI"
+        );
+#else
         (
             "interfaceTransferMethod", "GGI"
         );
+#endif
 
         interfaceToInterfaceList_.set
         (
@@ -274,6 +280,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrDefault<int>("nOuterCorr", 30)
     ),
+    additionalMeshCorrection_
+    (
+        fsiProperties_.lookupOrDefault<Switch>
+        (
+            "additionalMeshCorrection", false
+        )
+    ),
     coupled_
     (
         fsiProperties_.lookupOrDefault<Switch>("coupled", true)
@@ -310,6 +323,8 @@ Foam::fluidSolidInterface::fluidSolidInterface
     ),
     accumulatedFluidInterfacesDisplacementsList_()
 {
+    Info<< "additionalMeshCorrection: " << additionalMeshCorrection_ << endl;
+
     // Check if couplingStartTime is specified
     if (couplingStartTime_ > SMALL)
     {
@@ -827,11 +842,14 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
 #ifndef OPENFOAMFOUNDATION
         // Check for RBF motion solver
-        const bool rbfMotionSolver =
-            isA<RBFMeshMotionSolver>
+        bool rbfMotionSolver = false;
+        if (fluidMesh().foundObject<motionSolver>("dynamicMeshDict"))
+        {
+            rbfMotionSolver = isA<RBFMeshMotionSolver>
             (
                 fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
             );
+        }
 #endif
 
         // Set motion on FSI interface
@@ -866,9 +884,9 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 motionUFluidPatch ==
                     tppi.pointToPointInterpolate
                     (
-                        accumulatedFluidInterfacesDisplacements()[interfaceI]
-                       /fluid().runTime().deltaT().value()
-                    );
+                        fluidPatchesPointsDispls[interfaceI]
+                      - fluidPatchesPointsDisplsPrev[interfaceI]
+                    )/fluid().runTime().deltaT().value();
             }
 #endif
         }
@@ -1230,102 +1248,120 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
 void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 {
-    // Disabled
-//     WarningIn
-//     (
-//         "void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()"
-//     )   << "WIP: to be implemented" << endl;
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        if
+        (
+            isA<movingWallPressureFvPatchScalarField>
+            (
+                fluid().p().boundaryField()[fluidPatchIndices()[interfaceI]]
+            )
+        )
+        {
+            Info<< "Setting acceleration at fluid side of the interface"
+                << endl;
 
-    // forAll(fluid().globalPatches(), interfaceI)
-    // {
-    //     if
-    //     (
-    //         isA<movingWallPressureFvPatchScalarField>
-    //         (
-    //             fluid().p().boundaryField()[fluidPatchIndices()[interfaceI]]
-    //         )
-    //     )
-    //     {
-    //         Info<< "Setting acceleration at fluid side of the interface"
-    //             << endl;
+            // Take references to zones
+            const standAlonePatch& fluidZone =
+               fluid().globalPatches()[interfaceI].globalPatch();
+            const standAlonePatch& solidZone =
+               solid().globalPatches()[interfaceI].globalPatch();
 
-    //         const vectorField solidZoneAcceleration =
-    //             solid().faceZoneAcceleration(interfaceI);
+            const vectorField solidZoneAcceleration =
+               solid().faceZoneAcceleration(interfaceI);
 
-    //         const vectorField fluidZoneAcceleration =
-    //             ggiInterpolators()
-    //             [
-    //                 interfaceI
-    //             ].slaveToMaster(solidZoneAcceleration);
+            // Initialise the fluid zone acceleration field that is to be
+            // interpolated from the solid zone
+            vectorField fluidZoneAcceleration(fluidZone.size(), vector::zero);
 
-    //         const vectorField fluidPatchAcceleration =
-    //             fluid().globalPatches()
-    //             [
-    //                 interfaceI
-    //             ].globalFaceToPatch(fluidZoneAcceleration);
+            // Transfer the field from the fluid interface to the solid
+            // interface
+            interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
+            (
+                solidZone,                // from zone
+                fluidZone,                // to zone
+                solidZoneAcceleration,    // from field
+                fluidZoneAcceleration     // to field
+            );
 
-    //         const_cast<movingWallPressureFvPatchScalarField&>
-    //         (
-    //             refCast<const movingWallPressureFvPatchScalarField>
-    //             (
-    //                 fluid().p().boundaryField()
-    //                 [
-    //                     fluid().globalPatches()[interfaceI].patch().index()
-    //                 ]
-    //             )
-    //         ).prevAcceleration() = fluidPatchAcceleration;
-    //     }
-    // }
+            const vectorField fluidPatchAcceleration =
+                fluid().globalPatches()
+                [
+                   interfaceI
+                ].globalFaceToPatch(fluidZoneAcceleration);
+
+            const_cast<movingWallPressureFvPatchScalarField&>
+            (
+                refCast<const movingWallPressureFvPatchScalarField>
+                (
+                    fluid().p().boundaryField()
+                    [
+                        fluid().globalPatches()[interfaceI].patch().index()
+                    ]
+                )
+            ).prevAcceleration() = fluidPatchAcceleration;
+        }
+    }
 }
 
 
 void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
 {
-    // Disabled
-//     WarningIn
-//     (
-//         "void Foam::fluidSolidInterface::"
-//         "updateElasticWallPressureAcceleration()"
-//     )   << "WIP: to be implemented" << endl;
+    forAll(fluid().globalPatches(), interfaceI)
+    {
+        // Set interface acceleration
+        if
+        (
+            isA<elasticWallPressureFvPatchScalarField>
+            (
+                fluid().p().boundaryField()[fluidPatchIndices()[interfaceI]]
+            )
+        )
+        {
+            Info<< "Setting acceleration at fluid side of the interface"
+                << endl;
 
-    // forAll(fluid().globalPatches(), interfaceI)
-    // {
-    //     // Set interface acceleration
-    //     if
-    //     (
-    //         isA<elasticWallPressureFvPatchScalarField>
-    //         (
-    //             fluid().p().boundaryField()[fluidPatchIndices()[interfaceI]]
-    //         )
-    //     )
-    //     {
-    //         const vectorField solidZoneAcceleration =
-    //             solid().faceZoneAcceleration(interfaceI);
+            // Take references to zones
+            const standAlonePatch& fluidZone =
+               fluid().globalPatches()[interfaceI].globalPatch();
+            const standAlonePatch& solidZone =
+               solid().globalPatches()[interfaceI].globalPatch();
 
-    //         const vectorField fluidZoneAcceleration =
-    //             ggiInterpolators()
-    //             [
-    //                 interfaceI
-    //             ].slaveToMaster(solidZoneAcceleration);
+            const vectorField solidZoneAcceleration =
+               solid().faceZoneAcceleration(interfaceI);
 
-    //         const vectorField fluidPatchAcceleration =
-    //             fluid().globalPatches()
-    //             [
-    //                 interfaceI
-    //             ].globalFaceToPatch(fluidZoneAcceleration);
+            // Initialise the fluid zone acceleration field that is to be
+            // interpolated from the solid zone
+            vectorField fluidZoneAcceleration(fluidZone.size(), vector::zero);
 
-    //         const_cast<elasticWallPressureFvPatchScalarField&>
-    //         (
-    //             refCast<const elasticWallPressureFvPatchScalarField>
-    //             (
-    //                 fluid().p().boundaryField()
-    //                 [
-    //                     fluid().globalPatches()[interfaceI].patch().index()
-    //                 ]
-    //             )
-    //         ).prevAcceleration() = fluidPatchAcceleration;
-    //     }
-    // }
+            // Transfer the field from the fluid interface to the solid
+            // interface
+            interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
+            (
+                solidZone,                // from zone
+                fluidZone,                // to zone
+                solidZoneAcceleration,    // from field
+                fluidZoneAcceleration     // to field
+            );
+
+            const vectorField fluidPatchAcceleration =
+                fluid().globalPatches()
+                [
+                    interfaceI
+                ].globalFaceToPatch(fluidZoneAcceleration);
+
+            const_cast<elasticWallPressureFvPatchScalarField&>
+            (
+                refCast<const elasticWallPressureFvPatchScalarField>
+                (
+                    fluid().p().boundaryField()
+                    [
+                        fluid().globalPatches()[interfaceI].patch().index()
+                    ]
+                )
+            ).prevAcceleration() = fluidPatchAcceleration;
+        }
+    }
 }
 
 

@@ -15,6 +15,13 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 //simulationType   laminar;
+//simulationType     RASModel;
 simulationType     RASModel;
+
+// Used by OpenFOAM
+RAS
+{
+    #include "./constant/fluid/RASProperties"
+}
 
 // ************************************************************************* //

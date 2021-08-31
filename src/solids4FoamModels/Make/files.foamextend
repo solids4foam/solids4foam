@@ -5,6 +5,7 @@ solidModels/solidModel/lookupSolidModel.C
 solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
 solidModels/coupledLinGeomPressureDisplacementSolid/coupledLinGeomPressureDisplacementSolid.C
+solidModels/coupledNonLinGeomPressureDisplacementSolid/coupledNonLinGeomPressureDisplacementSolid.C
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/coupledUnsLinGeomSolid/coupledUnsLinGeomSolid.C
 solidModels/explicitLinGeomTotalDispSolid/explicitLinGeomTotalDispSolid.C
@@ -36,6 +37,8 @@ fluidModels/pUCoupledFluid/pUCoupledFluid.C
 fluidModels/stokesFluid/stokesFluid.C
 fluidModels/transientSimpleFluid/transientSimpleFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
+fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
+fluidModels/unsIcoFluid/unsIcoFluid.C
 
 fluidModels/finiteVolume/RBFMeshMotionSolver/RBFInterpolation.C
 fluidModels/finiteVolume/RBFMeshMotionSolver/RBFCoarsening.C
@@ -73,6 +76,7 @@ $(linGeomLaws)/linearElastic/linearElastic.C
 $(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
 $(linGeomLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
 $(linGeomLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C
+$(linGeomLaws)/poroAnisotropicBiotElastic/poroAnisotropicBiotElastic.C
 $(linGeomLaws)/poroLinearElastic/poroLinearElastic.C
 $(linGeomLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
 $(linGeomLaws)/thermoLinearElastic/thermoLinearElastic.C
@@ -81,6 +85,7 @@ $(linGeomLaws)/linearElasticCt/linearElasticCt.C
 $(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
 
 nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
+$(nonLinGeomLaws)/GentElastic/GentElastic.C
 $(nonLinGeomLaws)/incompressibleMooneyRivlinElastic/incompressibleMooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
@@ -173,8 +178,10 @@ functionObjects/solidPointDisplacement/solidPointDisplacement.C
 functionObjects/solidPointStress/solidPointStress.C
 functionObjects/solidPointTemperature/solidPointTemperature.C
 functionObjects/solidPotentialEnergy/solidPotentialEnergy.C
+functionObjects/solidTorque/solidTorque.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
 functionObjects/principalStresses/principalStresses.C
+functionObjects/principalStresses/principalStressFields.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
 functionObjects/solidTractions/solidTractions.C
 functionObjects/centrifugalBodyForce/centrifugalBodyForce.C

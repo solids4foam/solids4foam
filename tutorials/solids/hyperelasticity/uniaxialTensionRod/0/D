@@ -24,9 +24,10 @@ boundaryField
     loading
     {
         type            fixedDisplacement;
+        //type            fixedDisplacementZeroShear;
         displacementSeries
         {
-            fileName        "$FOAM_CASE/constant/timeVsDisp";
+            "fileName|file"        "$FOAM_CASE/constant/timeVsDisp";
             outOfBounds     clamp;
         }
         value           uniform (0 0 0);

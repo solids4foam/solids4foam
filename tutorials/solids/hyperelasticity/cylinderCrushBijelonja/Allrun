@@ -1,9 +1,21 @@
 #!/bin/bash
+
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# Create mesh
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+solids4Foam::caseOnlyRunsWithFoamExtend
+
+# Create the mesh
 runApplication blockMesh
 
-# Run solver
+# Run the solver
 runApplication solids4Foam
+
+# ----------------------------------------------------------------- end-of-file
+

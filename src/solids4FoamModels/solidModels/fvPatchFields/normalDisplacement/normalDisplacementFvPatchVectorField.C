@@ -58,7 +58,11 @@ normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(ptf, p, iF, mapper),
+#ifdef OPENFOAMFOUNDATION
+    normalDisp_(mapper(ptf.normalDisp_)),
+#else
     normalDisp_(ptf.normalDisp_, mapper),
+#endif
     dispSeries_(ptf.dispSeries_)
 {}
 
@@ -131,7 +135,11 @@ void normalDisplacementFvPatchVectorField::autoMap
 {
     fixedValueFvPatchVectorField::autoMap(m);
 
+#ifdef OPENFOAMFOUNDATION
+    m(normalDisp_, normalDisp_);
+#else
     normalDisp_.autoMap(m);
+#endif
 }
 
 
@@ -167,30 +175,22 @@ void normalDisplacementFvPatchVectorField::updateCoeffs()
 
     vectorField disp = nDisp*patch().nf();
 
-    bool incremental = bool(dimensionedInternalField().name() == "DU");
-
-    if (incremental)
+#ifdef OPENFOAMESIORFOUNDATION
+    if (internalField().name() == "DD")
+#else
+    if (dimensionedInternalField().name() == "DD")
+#endif
     {
-        if (patch().boundaryMesh().mesh().foundObject<volVectorField>("U_0"))
-        {
-            const fvPatchField<vector>& Uold =
-              patch().lookupPatchField<volVectorField, vector>("U_0");
+        // Incremental approach, so we wil set the increment of displacement
+        // Lookup the old displacement field and subtract it from the total
+        // displacement
+        const volVectorField& Dold =
+            db().lookupObject<volVectorField>("D").oldTime();
 
-            disp -= Uold;
-        }
-        else if (patch().boundaryMesh().mesh().foundObject<volVectorField>("U"))
-        {
-            const fvPatchField<vector>& Uold =
-              patch().lookupPatchField<volVectorField, vector>("U");
-
-            disp -= Uold;
-        }
+        disp -= Dold.boundaryField()[patch().index()];
     }
 
-    fvPatchField<vector>::operator==
-    (
-        disp
-    );
+    fvPatchField<vector>::operator==(disp);
 
     fixedValueFvPatchVectorField::updateCoeffs();
 }
@@ -205,7 +205,11 @@ normalDisplacementFvPatchVectorField::snGrad() const
     const fvPatchField<tensor>& gradField =
         patch().lookupPatchField<volTensorField, tensor>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
             "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
     // Unit normal vectors
@@ -230,7 +234,11 @@ normalDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
     const fvPatchField<tensor>& gradField =
         patch().lookupPatchField<volTensorField, tensor>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
             "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
     // Unit normal vectors
@@ -261,7 +269,11 @@ void normalDisplacementFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
+#ifdef OPENFOAMFOUNDATION
+        writeEntry(os, "normalDisp", normalDisp_);
+#else
         normalDisp_.writeEntry("normalDisp", os);
+#endif
     }
 
     fixedValueFvPatchVectorField::write(os);

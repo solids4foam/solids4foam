@@ -133,7 +133,11 @@ tmp<Foam::Field<scalar> > fixedTemperatureFvPatchScalarField::snGrad() const
     const fvPatchField<vector>& gradField =
         patch().lookupPatchField<volVectorField, vector>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
             "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
     // Unit normals
@@ -159,7 +163,11 @@ gradientBoundaryCoeffs() const
     const fvPatchField<vector>& gradField =
         patch().lookupPatchField<volVectorField, vector>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
             "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
     // Unit normals

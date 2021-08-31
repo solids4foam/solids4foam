@@ -16,22 +16,23 @@ FoamFile
 
 dynamicFvMesh dynamicMotionSolverFvMesh;
 
-solver velocityLaplacian;
-//solver RBFMeshMotionSolver;
+solver velocityLaplacian; // finite volume solver
+//solver laplace; // finite element solver
+//solver RBFMeshMotionSolver; // radial basis function solver
 
 diffusivity quadratic inverseDistance (interface);
 
 // Settings for the RBF solver
-staticPatches    (top bottom left);
-movingPatches    (interface);
-fixedPatches     (inlet outlet);
-interpolation
-{
-    function     TPS;
-}
-coarsening
-{
-    enabled      no;
-}
+// staticPatches    (top bottom left);
+// movingPatches    (interface);
+// fixedPatches     (inlet outlet);
+// interpolation
+// {
+//     function     TPS;
+// }
+// coarsening
+// {
+//     enabled      no;
+// }
 
 // ************************************************************************* //

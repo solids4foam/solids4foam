@@ -66,8 +66,13 @@ displacementOrTractionFvPatchVectorField
 )
 :
     solidDirectionMixedFvPatchVectorField(ptf, p, iF, mapper),
+#ifdef OPENFOAMFOUNDATION
+    constantDisplacement_(mapper(ptf.constantDisplacement_)),
+    constantTraction_(mapper(ptf.constantTraction_)),
+#else
     constantDisplacement_(ptf.constantDisplacement_, mapper),
     constantTraction_(ptf.constantTraction_, mapper),
+#endif
     displacementSeries_(ptf.displacementSeries_),
     tractionSeries_(ptf.tractionSeries_),
     specifyNormalDirection_(ptf.specifyNormalDirection_)
@@ -251,9 +256,28 @@ void displacementOrTractionFvPatchVectorField::autoMap
 {
     solidDirectionMixedFvPatchVectorField::autoMap(m);
 
+#ifdef OPENFOAMFOUNDATION
+    m(constantDisplacement_, constantDisplacement_);
+    m(constantTraction_, constantTraction_);
+
+    // mapper is not defined for an int so we will cast to
+    // a scalar and back again
+    //m(specifyNormalDirection_, specifyNormalDirection_);
+    scalarField t(specifyNormalDirection_.size(), 0.0);
+    forAll(t, i)
+    {
+        t[i] = specifyNormalDirection_[i];
+    }
+    m(t, t);
+    forAll(t, i)
+    {
+        specifyNormalDirection_[i] = t[i];
+    }
+#else
     constantDisplacement_.autoMap(m);
     constantTraction_.autoMap(m);
     specifyNormalDirection_.autoMap(m);
+#endif
 }
 
 
@@ -343,7 +367,11 @@ void displacementOrTractionFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
+#ifdef OPENFOAMFOUNDATION
+        writeEntry(os, "constantDisplacement", constantDisplacement_);
+#else
         constantDisplacement_.writeEntry("constantDisplacement", os);
+#endif
     }
 
     if (tractionSeries_.size())
@@ -355,7 +383,11 @@ void displacementOrTractionFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
+#ifdef OPENFOAMFOUNDATION
+        writeEntry(os, "constantTraction", constantTraction_);
+#else
         constantTraction_.writeEntry("constantTraction", os);
+#endif
     }
 
     os.writeKeyword("specifyNormalDirection")

@@ -71,14 +71,14 @@ void Foam::poroLinearElasticMohrCoulombPlastic::correct
 )
 {
     // Call Mohr-Coulomb law to calculate the effective stress
-    linearElasticMohrCoulombPlastic::correct(sigma);
+    linearElasticMohrCoulombPlastic::correct(sigmaEff());
 
     // Lookup the pore-pressure from the solver
     const volScalarField& p = mesh().lookupObject<volScalarField>("p");
 
     // The total stress is equal to the sum of the effective stress and
     // pore-pressure components
-    sigma -= p*symmTensor(I);
+    sigma = sigmaEff() - p*symmTensor(I);
 }
 
 

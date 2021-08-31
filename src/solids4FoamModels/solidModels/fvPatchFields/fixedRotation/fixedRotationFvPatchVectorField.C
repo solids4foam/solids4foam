@@ -84,7 +84,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     const dictionary& dict
 )
 :
-    fixedValueFvPatchVectorField(p, iF),
+    fixedValueFvPatchVectorField(p, iF, dict),
     rotationAngle_(0.0),
     rotationAxis_(dict.lookup("rotationAxis")),
     rotationOrigin_(vector::zero),
@@ -97,6 +97,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     // Check if angle is time-varying
     if (dict.found("rotationAngleSeries"))
     {
+        Info<< "    angle is time-varying" << endl;
         angleSeries_ =
             interpolationTable<scalar>(dict.subDict("rotationAngleSeries"));
     }
@@ -108,6 +109,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     // Check if there is a time-varying translation
     if (dict.found("displacementSeries"))
     {
+        Info<< "    translation is time-varying" << endl;
         dispSeries_ =
             interpolationTable<vector>(dict.subDict("displacementSeries"));
     }
@@ -115,37 +117,39 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     // Check if origin is time-varying
     if (dict.found("rotationOriginSeries"))
     {
+        Info<< "    origin is time-varying" << endl;
         originSeries_ =
             interpolationTable<vector>(dict.subDict("rotationOriginSeries"));
     }
     else
     {
-        rotationOrigin_ = dict.lookup("rotationOrigin");
+        rotationOrigin_ = vector(dict.lookup("rotationOrigin"));
     }
 
     if (dict.found("value"))
     {
-        Field<vector>::operator==
+        fvPatchField<vector>::operator==
         (
             vectorField("value", dict, p.size())
         );
     }
     else
     {
-        Field<vector>::operator==
+        fvPatchField<vector>::operator==
         (
             vectorField(p.size(), vector::zero)
         );
     }
 
-    const word& fieldName = dimensionedInternalField().name();
-
     if
     (
-        fieldName != "D" && fieldName != "DD"
-     && fieldName != "D_0" && fieldName != "DD_0"
-     && fieldName != "D_0_0" && fieldName != "DD_0_0"
-     && fieldName != "D_0_0_0" && fieldName != "DD_0_0_0"
+#ifdef OPENFOAMESIORFOUNDATION
+        internalField().name() != "D"
+     && internalField().name() != "DD"
+#else
+        dimensionedInternalField().name() != "D"
+     && dimensionedInternalField().name() != "DD"
+#endif
     )
     {
         FatalErrorIn
@@ -153,7 +157,6 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
             "fixedRotationFvPatchVectorField::"
             "fixedRotationFvPatchVectorField(...)"
         )   << "The displacement field should be D or DD"
-            << ": current name is " << fieldName
             << abort(FatalError);
     }
 }
@@ -205,20 +208,27 @@ snGrad() const
     const fvPatchField<tensor>& gradField =
         patch().lookupPatchField<volTensorField, tensor>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
             "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
-    vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
+    // Face unit normals
+    const vectorField n = patch().nf();
 
-    // Correction vectors
-    vectorField k = delta - n*(n & delta);
+    // Delta vectors
+    const vectorField delta = patch().delta();
+
+    // Non-orthogonal correction vectors
+    const vectorField k = ((I - sqr(n)) & delta);
 
     return
     (
         *this
       - (patchInternalField() + (k & gradField.patchInternalField()))
-    )*this->patch().deltaCoeffs();
+    )*patch().deltaCoeffs();
 }
 
 
@@ -255,7 +265,11 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
 
     const fvMesh& mesh = patch().boundaryMesh().mesh();
 
+#ifdef OPENFOAMESIORFOUNDATION
+    if (internalField().name() == "DD")
+#else
     if (dimensionedInternalField().name() == "DD")
+#endif
     {
         const volVectorField& D = mesh.lookupObject<volVectorField>("D");
 
@@ -274,32 +288,44 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
     (
         mesh.foundObject<pointVectorField>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "point" + internalField().name()
+#else
             "point" + dimensionedInternalField().name()
+#endif
         )
     )
     {
-        pointVectorField& pointDDField =
+        pointVectorField& pointDField =
             const_cast<pointVectorField&>
             (
                 mesh.lookupObject<pointVectorField>
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    "point" + internalField().name()
+#else
                     "point" + dimensionedInternalField().name()
+#endif
                 )
             );
 
         if
         (
-            pointDDField.boundaryField()[patch().index()].type()
+            pointDField.boundaryField()[patch().index()].type()
          == fixedValuePointPatchVectorField::typeName
         )
         {
-            fixedValuePointPatchVectorField& pointDD =
+            fixedValuePointPatchVectorField& pointD =
                 refCast<fixedValuePointPatchVectorField>
                 (
-                    pointDDField.boundaryField()[patch().index()]
+#ifdef OPENFOAMESIORFOUNDATION
+                    pointDField.boundaryFieldRef()[patch().index()]
+#else
+                    pointDField.boundaryField()[patch().index()]
+#endif
                 );
 
-            vectorField newPatchPoints =
+            const vectorField newPatchPoints =
                 (rotMat & (origPatchPoints_ - rotationOrigin_))
               + rotationOrigin_;
 
@@ -314,19 +340,23 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
             const labelList& meshPoints =
                 mesh.boundaryMesh()[patch().index()].meshPoints();
 
+#ifdef OPENFOAMESIORFOUNDATION
+            if (internalField().name() == "DD")
+#else
             if (dimensionedInternalField().name() == "DD")
+#endif
             {
                 // Lookup the accumulated total displacement
-                const pointVectorField& pointDField =
+                const pointVectorField& pointDFieldOld =
                     mesh.lookupObject<pointVectorField>("pointD").oldTime();
 
                 forAll(meshPoints, pointI)
                 {
-                    pointDisp[pointI] -= pointDField[meshPoints[pointI]];
+                    pointDisp[pointI] -= pointDFieldOld[meshPoints[pointI]];
                 }
             }
 
-            pointDD == pointDisp;
+            pointD == pointDisp;
         }
     }
 
@@ -340,20 +370,26 @@ gradientBoundaryCoeffs() const
     const fvPatchField<tensor>& gradField =
         patch().lookupPatchField<volTensorField, tensor>
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
             "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
-    vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
+    // Face unit normals
+    const vectorField n = patch().nf();
 
-    //- correction vector
-    vectorField k = delta - n*(n & delta);
+    // Delta vectors
+    const vectorField delta = patch().delta();
 
-    return
-        this->patch().deltaCoeffs()
-       *(
-           *this - (k & gradField.patchInternalField())
-       );
+    // Non-orthogonal correction vectors
+    const vectorField k = ((I - sqr(n)) & delta);
+
+    return patch().deltaCoeffs()*
+    (
+       *this - (k & gradField.patchInternalField())
+    );
 }
 
 

@@ -100,11 +100,19 @@ bool linGeomSolid::evolve()
               - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
               + fvc::div(sigma(), "div(sigma)")
               + rho()*g()
-              + mechanical().RhieChowCorrection(DD(), gradDD())
+              + stabilisation().stabilisation(DD(), gradDD(), impK_)
             );
 
             // Under-relaxation the linear system
             DDEqn.relax();
+
+            // Enforce any cell displacements
+            solidModel::setCellDisps(DDEqn);
+
+            // Hack to avoid expensive copy of residuals
+#ifdef OPENFOAMESI
+            const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
+#endif
 
             // Solve the linear system
             solverPerfDD = DDEqn.solve();
@@ -160,7 +168,9 @@ bool linGeomSolid::evolve()
     }
     while (mesh().update());
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
 

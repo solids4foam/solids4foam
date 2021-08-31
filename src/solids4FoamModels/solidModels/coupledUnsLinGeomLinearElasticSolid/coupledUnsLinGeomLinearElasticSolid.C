@@ -360,6 +360,8 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
 
     // Velocity
     U() = fvc::ddt(D());
+
+    BlockLduMatrix<vector>::debug = 1;
 #else
     notImplemented("Not implemented for this version of OpenFOAM/FOAM");
 #endif

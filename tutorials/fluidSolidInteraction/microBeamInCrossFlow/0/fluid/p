@@ -44,11 +44,11 @@ boundaryField
         //type         zeroGradientCorrected;
         value        uniform 0;
     }
-    front
+    frontPlane
     {
         type         empty;
     }
-    back
+    backPlane
     {
         type         empty;
     }

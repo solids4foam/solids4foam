@@ -16,7 +16,7 @@ FoamFile
 
 numberOfSubdomains 8;
 
-method          metis;
+method          scotch;
 
 
 simpleCoeffs

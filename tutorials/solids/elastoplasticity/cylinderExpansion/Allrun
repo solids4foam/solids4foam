@@ -3,8 +3,15 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
 # Create mesh
-m4 constant/polyMesh/blockMeshDict.thickCylinder.m4 > constant/polyMesh/blockMeshDict
+mkdir -p constant/polyMesh
+m4 system/blockMeshDict.thickCylinder.m4 > constant/polyMesh/blockMeshDict
 runApplication blockMesh
 
 # Run solver

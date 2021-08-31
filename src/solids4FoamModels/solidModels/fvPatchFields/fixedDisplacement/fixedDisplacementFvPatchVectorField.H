@@ -79,6 +79,8 @@ class fixedDisplacementFvPatchVectorField
         //- Return the patch interpolator
         primitivePatchInterpolation& interp();
 
+protected:
+
         //- Set the point displacement field boundary condition
         void setPointDisplacement(const vectorField& faceDisp);
 

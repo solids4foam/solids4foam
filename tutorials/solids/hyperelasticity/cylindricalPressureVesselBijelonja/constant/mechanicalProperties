@@ -29,10 +29,10 @@ mechanical
 		c11             c11 [1 -1 -2 0 0 0 0] 0;
 
 		// To solve pressure Poisson equation
-		solvePressureEqn		yes;
+		solvePressureEqn yes;
 
-		// Pressure smoothing coefficient
-		pressureSmoothingCoeff	1.0;
+		// Pressure smoothing scale factor
+		pressureSmoothingScaleFactor 100;
     }
 );
 

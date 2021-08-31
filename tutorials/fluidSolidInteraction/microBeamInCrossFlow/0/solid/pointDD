@@ -30,11 +30,11 @@ boundaryField
        type            fixedValue;
        value           uniform (0 0 0);
     }
-    back
+    backPlane
     {
        type            empty;
     }
-    front
+    frontPlane
     {
        type            empty;
     }

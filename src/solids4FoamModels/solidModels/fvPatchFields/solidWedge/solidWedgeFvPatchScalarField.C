@@ -69,8 +69,13 @@ solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-            << " of field " << this->dimensionedInternalField().name()
-            << " in file " << this->dimensionedInternalField().objectPath()
+#ifdef OPENFOAMESIORFOUNDATION
+            << " of field " << internalField().name()
+            << " in file " << internalField().objectPath()
+#else
+            << " of field " << dimensionedInternalField().name()
+            << " in file " << dimensionedInternalField().objectPath()
+#endif
             << exit(FatalIOError);
     }
 }
@@ -99,8 +104,13 @@ solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-            << " of field " << this->dimensionedInternalField().name()
-            << " in file " << this->dimensionedInternalField().objectPath()
+#ifdef OPENFOAMESIORFOUNDATION
+            << " of field " << internalField().name()
+            << " in file " << internalField().objectPath()
+#else
+            << " of field " << dimensionedInternalField().name()
+            << " in file " << dimensionedInternalField().objectPath()
+#endif
             << exit(FatalIOError);
     }
 
@@ -171,7 +181,11 @@ tmp<Field<scalar> > solidWedgeFvPatchScalarField::snGrad() const
     const fvPatchField<vector>& gradU =
         patch().lookupPatchField<volVectorField, vector>
         (
-            "grad(" + this->dimensionedInternalField().name() + ")"
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
+            "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
     Field<scalar> projU =
@@ -220,7 +234,11 @@ void solidWedgeFvPatchScalarField::evaluate(const Pstream::commsTypes)
     const fvPatchField<vector>& gradU =
         patch().lookupPatchField<volVectorField, vector>
         (
-            "grad(" + this->dimensionedInternalField().name() + ")"
+#ifdef OPENFOAMESIORFOUNDATION
+            "grad(" + internalField().name() + ")"
+#else
+            "grad(" + dimensionedInternalField().name() + ")"
+#endif
         );
 
     Field<scalar> pif = this->patchInternalField();

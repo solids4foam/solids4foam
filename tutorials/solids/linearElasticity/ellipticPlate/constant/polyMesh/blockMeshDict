@@ -74,12 +74,12 @@ patches
         (2 3 7 6)
     )
 
-    symmetryPlane symmx
+    patch symmx
     (
         (3 0 4 7)
     )
 
-    symmetryPlane symmy
+    patch symmy
     (
         (1 2 6 5)
     )

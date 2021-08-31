@@ -10,11 +10,22 @@ then
     exit 0
 fi
 
-# Create solid mesh
-runApplication -l log.blockMesh.solid blockMesh -region solid
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
 
-# Create fluid mesh
-runApplication -l log.blockMesh.fluid blockMesh -region fluid
+solids4Foam::caseOnlyRunsWithFoamExtend
+
+# Create meshes
+if [[ "${WM_PROJECT}" == "foam" ]]
+then
+    # Create meshes
+    runApplication -l log.blockMesh.solid blockMesh -region solid
+    runApplication -l log.blockMesh.fluid blockMesh -region fluid
+else
+    # Create meshes
+    runApplication -s solid blockMesh -region solid
+    runApplication -s fluid blockMesh -region fluid
+fi
 
 # Set fluid wave parameters
 # As the waves2Foam utilities do not have the "-region" option, we will

@@ -15,7 +15,11 @@ else
     VERSION_SPECIFIC_INC = \
         -DOPENFOAMESIORFOUNDATION -I$(LIB_SRC)/dynamicFvMesh/lnInclude/
     ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
-        VERSION_SPECIFIC_INC += -DOPENFOAMESI
+        ifeq (v1812,$(findstring v1812,$(WM_PROJECT_VERSION)))
+            VERSION_SPECIFIC_INC += -DOPENFOAMESI=1812
+        else
+            VERSION_SPECIFIC_INC += -DOPENFOAMESI=1912
+        endif
     else
         VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
     endif

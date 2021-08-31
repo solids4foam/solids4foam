@@ -3,10 +3,17 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+solids4Foam::caseOnlyRunsWithFoamExtend
+
 if [ ! -f "$FOAM_USER_LIBBIN/libwaves2Foam.so" ]
 then
+    echo
     echo "libwaves2Foam.so is required for this tutorial, but it is not found"
-    echo "in $FOAM_USER_LIBBIN/libwaves2Foam.so"
+    echo "in $FOAM_USER_LIBBIN/"
+    echo
     exit 0
 fi
 

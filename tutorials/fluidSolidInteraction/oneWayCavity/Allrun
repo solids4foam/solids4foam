@@ -3,23 +3,39 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
 #
 # First run the fluid case to completion
 #
 
-# Create fluid mesh
-runApplication -l log.blockMesh.fluid blockMesh
+if [[ $WM_PROJECT == "foam" ]]
+then
+    # Create fluid mesh
+    runApplication -l log.blockMesh.fluid blockMesh
+else
+    # Create fluid mesh
+    runApplication -s fluid blockMesh
+fi
 
 # Run fluid solver
 runApplication icoFoam
-
 
 #
 # Then run the solid case to completion, using the fluid interface forces
 #
 
 # Prepare the solid mesh
-runApplication -l log.blockMesh.solid blockMesh -region solid
+if [[ $WM_PROJECT == "foam" ]]
+then
+    runApplication -l log.blockMesh.solid blockMesh -region solid
+else
+    runApplication -s solid blockMesh -region solid
+fi
 
 # Create links as the solid solver expects the fluid to be a sub-region
 echo "Creating links to the fluid results"

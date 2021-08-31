@@ -45,7 +45,7 @@ boundaryField
         traction        uniform ( 0 0 0 );
         pressureSeries
         {
-            fileName    "$FOAM_CASE/constant/timeVsPressure";
+            "fileName|file"    "$FOAM_CASE/constant/timeVsPressure";
             outOfBounds clamp;
         }
         value           uniform (0 0 0);

@@ -28,7 +28,8 @@ Class
 Description
     FunctionObject that outputs the principal stress fields.
 
-    Calculate and write principal stress fields.
+    Calculate and write principal stress fields. It assumed that the stress
+    tensor is called "sigma" or "sigmaCauchy".
 
     Three vector fields are created: sigmaMax, sigmaMid, sigmaMin.
     sigmaMax is the most positive/tensile principal stress multiplied by the
@@ -44,6 +45,10 @@ Description
         // Type of functionObject
         type principalStresses;
 
+        // Where to load it from (if not already in solver)
+        // Note: this is not required if the solver already loads this library.
+        functionObjectLibs ("libsolidModelsBekaert.so");
+
         // Optional: specifiy mesh region for multi-region solvers, defaults to
         // region0
         region    region0;
@@ -51,7 +56,7 @@ Description
     @endverbatim
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
+    Philip Cardiff UCD
 
 SourceFiles
     principalStresses.C
@@ -144,12 +149,6 @@ public:
         virtual bool execute();
 #endif
 
-        //- Called when time was set at the end of the Time::operator++
-        virtual bool timeSet()
-        {
-            return true;
-        }
-  
         //- Read and set the function object if its data has changed
         virtual bool read(const dictionary& dict);
 

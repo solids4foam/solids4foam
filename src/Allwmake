@@ -3,3 +3,4 @@ cd ${0%/*} || exit 1    # run from this directory
 
 (cd blockCoupledSolids4FoamTools && ./Allwmake)
 (cd solids4FoamModels && ./Allwmake)
+(cd abaqusUMATs && ./Allwmake)

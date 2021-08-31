@@ -54,16 +54,7 @@ namespace Foam
 bool Foam::solidPointDisplacement::writeData()
 {
     // Lookup the solid mesh
-    const fvMesh* meshPtr = NULL;
-    if (time_.foundObject<fvMesh>("solid"))
-    {
-        meshPtr = &(time_.lookupObject<fvMesh>("solid"));
-    }
-    else
-    {
-        meshPtr = &(time_.lookupObject<fvMesh>("region0"));
-    }
-    const fvMesh& mesh = *meshPtr;
+    const fvMesh& mesh = time_.lookupObject<fvMesh>(region_);
 
     if (mesh.foundObject<volVectorField>("D"))
     {
@@ -139,10 +130,25 @@ Foam::solidPointDisplacement::solidPointDisplacement
     functionObject(name),
     name_(name),
     time_(t),
+    region_(dict.lookupOrDefault<word>("region", "UNDEFINED")),
     pointID_(-1),
     historyFilePtr_()
 {
     Info<< "Creating " << this->name() << " function object" << endl;
+
+    // Set region if it is undefined
+    if (region_ == "UNDEFINED")
+    {
+        if (time_.foundObject<fvMesh>("solid"))
+        {
+            region_ = "solid";
+        }
+        else
+        {
+            region_ = fvMesh::defaultRegion;
+        }
+    }
+    Info<< "    region = " << region_ << endl;
 
     // Lookup the point
     const vector point(dict.lookup("point"));
@@ -197,8 +203,7 @@ Foam::solidPointDisplacement::solidPointDisplacement
 
         if (pointID_ > -1)
         {
-            Pout<< this->name()
-                << ": distance from specified point is " << minDist
+            Pout<< "    distance from specified point is " << minDist
                 << endl;
         }
 

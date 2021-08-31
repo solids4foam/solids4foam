@@ -49,6 +49,7 @@ solidTractionFvPatchVectorField
     tractionSeries_(),
     pressureSeries_(),
     secondOrder_(false),
+    setEffectiveTraction_(false),
     limitCoeff_(1.0),
     relaxFac_(1.0)
 {
@@ -71,6 +72,10 @@ solidTractionFvPatchVectorField
     tractionSeries_(),
     pressureSeries_(),
     secondOrder_(dict.lookupOrDefault<Switch>("secondOrder", false)),
+    setEffectiveTraction_
+    (
+        dict.lookupOrDefault<Switch>("setEffectiveTraction", false)
+    ),
     limitCoeff_(dict.lookupOrDefault<scalar>("limitCoeff", 1.0)),
     relaxFac_(dict.lookupOrDefault<scalar>("relaxationFactor", 1.0))
 {
@@ -123,6 +128,11 @@ solidTractionFvPatchVectorField
         Info<< "    second order correction" << endl;
     }
 
+    if (setEffectiveTraction_)
+    {
+        Info<< "    set effective traction" << endl;
+    }
+
     if (limitCoeff_)
     {
         Info<< "    limiter coefficient: " << limitCoeff_ << endl;
@@ -155,6 +165,7 @@ solidTractionFvPatchVectorField
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
     secondOrder_(stpvf.secondOrder_),
+    setEffectiveTraction_(stpvf.setEffectiveTraction_),
     limitCoeff_(stpvf.limitCoeff_),
     relaxFac_(stpvf.relaxFac_)
 {}
@@ -172,6 +183,7 @@ solidTractionFvPatchVectorField
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
     secondOrder_(stpvf.secondOrder_),
+    setEffectiveTraction_(stpvf.setEffectiveTraction_),
     limitCoeff_(stpvf.limitCoeff_),
     relaxFac_(stpvf.relaxFac_)
 {}
@@ -190,6 +202,7 @@ solidTractionFvPatchVectorField
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
     secondOrder_(stpvf.secondOrder_),
+    setEffectiveTraction_(stpvf.setEffectiveTraction_),
     limitCoeff_(stpvf.limitCoeff_),
     relaxFac_(stpvf.relaxFac_)
 {}
@@ -203,6 +216,7 @@ void solidTractionFvPatchVectorField::autoMap
 )
 {
     fixedGradientFvPatchVectorField::autoMap(m);
+
 #ifdef OPENFOAMFOUNDATION
     m(traction_, traction_);
     m(pressure_, pressure_);
@@ -248,6 +262,17 @@ void solidTractionFvPatchVectorField::updateCoeffs()
         pressure_ = pressureSeries_(this->db().time().timeOutputValue());
     }
 
+    scalarField press = pressure_;
+    if (setEffectiveTraction_)
+    {
+        const fvPatchField<scalar>& p =
+            patch().lookupPatchField<volScalarField, scalar>("p");
+
+        // Remove the dynamic pressure component: this will force the effective
+        // traction to be enforced rather than the total traction
+        press -= p;
+    }
+
     // Lookup the solidModel object
     const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
 
@@ -256,7 +281,7 @@ void solidTractionFvPatchVectorField::updateCoeffs()
     gradient() =
         relaxFac_*solMod.tractionBoundarySnGrad
         (
-            traction_, pressure_, patch()
+            traction_, press, patch()
         )
       + (1.0 - relaxFac_)*gradient();
 
@@ -362,6 +387,8 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
     }
     os.writeKeyword("secondOrder")
         << secondOrder_ << token::END_STATEMENT << nl;
+    os.writeKeyword("setEffectiveTraction")
+        << setEffectiveTraction_ << token::END_STATEMENT << nl;
     os.writeKeyword("limitCoeff")
         << limitCoeff_ << token::END_STATEMENT << nl;
     os.writeKeyword("relaxationFactor")
@@ -369,8 +396,10 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
 
 #ifdef OPENFOAMFOUNDATION
     writeEntry(os, "value", *this);
+    writeEntry(os, "gradient", gradient());
 #else
     writeEntry("value", os);
+    gradient().writeEntry("gradient", os);
 #endif
 }
 

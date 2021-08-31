@@ -58,7 +58,6 @@ Author
 #ifndef displacementOrTractionFvPatchVectorField_H
 #define displacementOrTractionFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "solidDirectionMixedFvPatchVectorField.H"
 #include "Switch.H"

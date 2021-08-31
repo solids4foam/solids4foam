@@ -70,9 +70,8 @@ mechanicalEnergies::mechanicalEnergies
     curTimeIndex_(-1)
 {
     // TODO: read/write energies to allow restart?
-    //wip();
 
-    if (Pstream::master)
+    if (Pstream::master())
     {
         Pout<< "Writing energies.dat" << endl;
 
@@ -123,6 +122,11 @@ const surfaceScalarField& mechanicalEnergies::viscousPressure
     (
         rho*fvc::ddt(epsilonVol(gradD))
     )*waveSpeed/mesh_.deltaCoeffs();
+
+#ifdef OPENFOAMESI
+    viscousPressurePtr_().setOriented(false);
+    viscousPressurePtr_().oldTime().setOriented(false);
+#endif
 
     return viscousPressurePtr_();
 }

@@ -40,7 +40,7 @@ boundaryField
         type            fixedDisplacement;
         displacementSeries
         {
-            fileName    "$FOAM_CASE/constant/timeVsDisp";
+            "fileName|file"    "$FOAM_CASE/constant/timeVsDisp";
             outOfBounds clamp;
         }
         pressure        uniform 0;

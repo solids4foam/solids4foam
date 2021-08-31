@@ -31,7 +31,7 @@ boundaryField
         type            solidVelocity;
         velocitySeries
         {
-            fileName    "$FOAM_CASE/constant/timeVsVelocity";
+            "fileName|file" "$FOAM_CASE/constant/timeVsVelocity";
             outOfBounds clamp;
         }
         value           uniform (0 0 0);

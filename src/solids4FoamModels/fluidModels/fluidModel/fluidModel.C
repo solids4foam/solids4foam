@@ -32,7 +32,7 @@ License
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "EulerDdtScheme.H"
-#include "CrankNicolsonDdtScheme.H"
+//#include "CrankNicolsonDdtScheme.H"
 #include "backwardDdtScheme.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -417,6 +417,9 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
     {
         Info<< "Reading g from constant directory" << endl;
 #ifdef OPENFOAMESI
+    #if OPENFOAMESI > 1812
+        return meshObjects::gravity(runTime());
+    #else
         return meshObjects::gravity
         (
             runTime()
@@ -432,6 +435,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
             )
 #endif
         );
+    #endif
 #else
         return uniformDimensionedVectorField
         (
@@ -451,6 +455,9 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
         Info<< "g field not found in constant directory: initialising to zero"
             << endl;
 #ifdef OPENFOAMESI
+    #if OPENFOAMESI > 1812
+        return meshObjects::gravity(runTime());
+    #else
         return meshObjects::gravity
         (
             runTime()
@@ -466,6 +473,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
             )
 #endif
         );
+    #endif
 #else
         return uniformDimensionedVectorField
         (

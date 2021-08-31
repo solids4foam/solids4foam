@@ -30,7 +30,7 @@ numberOfSubdomains  4;
 // method          scotch;
 // method          hierarchical;
 method          simple;
-// method          metis;
+// method          scotch;
 // method          manual;
 
 simpleCoeffs

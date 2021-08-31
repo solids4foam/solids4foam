@@ -84,12 +84,16 @@ then
 else
     if [[ $WM_PROJECT_VERSION == v* ]]
     then
-        # ESI OpenFOAM e.g. OpenFOAM-v1812
-        checkAndReport \
-            "dataTemplates.C" \
-            "$FOAM_SRC/OpenFOAM/meshes/data" \
-            "$FOAM_SRC/OpenFOAM"
-        if [ $? -ne 0 ]; then result=1; fi
+        # ESI OpenFOAM e.g. OpenFOAM-v1812, v1912, etc
+
+        # This change is no longer needed as it is fixed by adding the following
+        # line each solid model
+        # const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
+        # checkAndReport \
+        #     "dataTemplates.C" \
+        #     "$FOAM_SRC/OpenFOAM/meshes/data" \
+        #     "$FOAM_SRC/OpenFOAM"
+        # if [ $? -ne 0 ]; then result=1; fi
 
         checkAndReport \
             "AMIInterpolation.C" \

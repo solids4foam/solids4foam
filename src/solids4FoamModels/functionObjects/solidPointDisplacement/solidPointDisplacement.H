@@ -69,6 +69,13 @@ class solidPointDisplacement
         //- Reference to main object registry
         const Time& time_;
 
+        //- Optional: region name
+        //  This can be "solid" for FSI cases or it can be the name of the
+        //  material for multi-material cases
+        //  If it is not specified, the "solid" region will still be looked for
+        //  to preserve backwards compatibility
+        word region_;
+
         //- Point ID
         label pointID_;
 

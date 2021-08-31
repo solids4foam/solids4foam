@@ -3,31 +3,70 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# Create solid mesh
-\cp system/solid/meshDict system/
-runApplication -l log.cartesian2DMesh.solid cartesian2DMesh
-mkdir constant/solid/polyMesh
-\mv constant/polyMesh/* constant/solid/polyMesh/
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
 
-# Create fluid mesh
-\cp system/fluid/meshDict system/
-runApplication -l log.cartesian2DMesh.fluid cartesian2DMesh 
-mkdir constant/fluid/polyMesh
-\mv constant/polyMesh/* constant/fluid/polyMesh/
+# Check case version is correct
+solids4Foam::convertCaseFormat .
 
-# Correct patch types
-runApplication -l log.createPatch.fluid createPatch -overwrite -region fluid
-runApplication -l log.createPatch.solid createPatch -overwrite -region solid
+if ! command -v cartesianMesh &> /dev/null
+then
+    echo
+    echo "cartesianMesh command not found, which is required for this case"
+    echo
+    exit 0
+fi
+
+if [[ "${WM_PROJECT}" == "foam" ]]
+then
+    # Create solid mesh
+    \cp system/solid/meshDict system/
+    runApplication -l log.cartesian2DMesh.solid cartesian2DMesh
+    mkdir -p constant/solid/polyMesh
+    \mv constant/polyMesh/* constant/solid/polyMesh/
+
+    # Create fluid mesh
+    \cp system/fluid/meshDict system/
+    runApplication -l log.cartesian2DMesh.fluid cartesian2DMesh 
+    mkdir -p constant/fluid/polyMesh
+    \mv constant/polyMesh/* constant/fluid/polyMesh/
+
+    # Correct patch types
+    runApplication -l log.createPatch.fluid createPatch -overwrite -region fluid
+    runApplication -l log.createPatch.solid createPatch -overwrite -region solid
+else
+    # Create solid mesh
+    \cp system/solid/meshDict system/
+    runApplication -s solid cartesian2DMesh
+    mkdir -p constant/solid/polyMesh
+    \mv constant/polyMesh/* constant/solid/polyMesh/
+
+    # Create fluid mesh
+    \cp system/fluid/meshDict system/
+    runApplication -s fluid cartesian2DMesh 
+    mkdir -p constant/fluid/polyMesh
+    \mv constant/polyMesh/* constant/fluid/polyMesh/
+
+    # Correct patch types
+    foamDictionary constant/fluid/polyMesh/boundary \
+                   -entry entry0.frontPlane.type \
+                   -set empty &> log.foamDictionary.fluid.front
+    foamDictionary constant/fluid/polyMesh/boundary \
+                   -entry entry0.backPlane.type \
+                   -set empty &> log.foamDictionary.fluid.back
+    foamDictionary constant/solid/polyMesh/boundary \
+                   -entry entry0.frontPlane.type \
+                   -set empty &> log.foamDictionary.solid.front
+    foamDictionary constant/solid/polyMesh/boundary \
+                   -entry entry0.backPlane.type \
+                   -set empty &> log.foamDictionary.solid.back
+fi
 
 # Scale from microns to metres
 echo "Running transformPoints on the fluid"
 transformPoints -scale "(1e-6 1e-6 1e-6)" -region fluid > log.transformPoints.fluid
 echo "Running transformPoints on the solid"
 transformPoints -scale "(1e-6 1e-6 1e-6)" -region solid > log.transformPoints.solid
-
-# Create face zones for FSI interfaces
-runApplication -l log.setsToZones.fluid setsToZones -region fluid -noFlipMap
-runApplication -l log.setsToZones.solid setsToZones -region solid -noFlipMap
 
 # Run the solver
 runApplication solids4Foam

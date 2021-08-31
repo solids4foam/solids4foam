@@ -29,6 +29,8 @@ boundaryField
     left
     {
         type            zeroGradient;
+        // type            fixedValue;
+        // value           uniform 1;
     }
 
     front

@@ -15,17 +15,21 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel     explicitLinearGeometryTotalDisplacement;
-solidModel     explicitUnsLinearGeometryTotalDisplacement;
+// linearGeometry: assumes small strains and rotations
+solidModel     explicitLinearGeometryTotalDisplacement;
 
-"explicitLinearGeometryTotalDisplacementCoeffs|explicitUnsLinearGeometryTotalDisplacementCoeffs"
+explicitLinearGeometryTotalDisplacementCoeffs
 {
     // Linear bulk viscosity coefficient to kill high frequency oscillations
     // Defaults to 0.06
     linearBulkViscosityCoeff 0.06;
 
-    // JST stabilisation
-    JSTScaleFactor 0.01;
+    // Scale factor for JST smoothing term to quell checkerboarding
+    // Note: the solver can explode if this is too small or too large :)
+    JSTScaleFactor   0.1;
+
+    // Numerical viscosity for 1st temporal derivative term
+    numericalViscosity    eta [ 0 0 -1 0 0 0 0 ] 0;
 }
 
 

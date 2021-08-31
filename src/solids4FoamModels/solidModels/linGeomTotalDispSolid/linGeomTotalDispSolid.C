@@ -84,6 +84,9 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 {
     DisRequired();
 
+    // For consistent restarts, we will calculate the gradient field
+    mechanical().grad(D(), gradD());
+
     if (predictor_)
     {
         // Check ddt scheme for D is not steadyState
@@ -155,6 +158,11 @@ bool linGeomTotalDispSolid::evolve()
             // Enforce any cell displacements
             solidModel::setCellDisps(DEqn);
 
+            // Hack to avoid expensive copy of residuals
+#ifdef OPENFOAMESI
+            const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
+#endif
+
             // Solve the linear system
             solverPerfD = DEqn.solve();
 
@@ -169,6 +177,11 @@ bool linGeomTotalDispSolid::evolve()
 
             // Update gradient of displacement increment
             gradDD() = gradD() - gradD().oldTime();
+
+            // Update the momentum equation inverse diagonal field
+            // This may be used by the mechanical law when calculating the
+            // hydrostatic pressure
+            const volScalarField DEqnA("DEqnA", DEqn.A());
 
             // Calculate the stress using run-time selectable mechanical law
             mechanical().correct(sigma());
@@ -220,7 +233,9 @@ bool linGeomTotalDispSolid::evolve()
     }
     while (mesh().update());
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
 

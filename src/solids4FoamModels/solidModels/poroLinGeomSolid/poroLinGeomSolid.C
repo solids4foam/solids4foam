@@ -256,6 +256,7 @@ bool poroLinGeomSolid::evolve()
 #ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector> solverPerfD;
     SolverPerformance<scalar> solverPerfp;
+    SolverPerformance<scalar>::debug = 0;
     SolverPerformance<vector>::debug = 0;
 #else
     lduSolverPerformance solverPerfD;
@@ -314,6 +315,14 @@ bool poroLinGeomSolid::evolve()
         // Under-relaxation the linear system
         DEqn.relax();
 
+        // Enforce any cell displacements
+        solidModel::setCellDisps(DEqn);
+
+        // Hack to avoid expensive copy of residuals
+#ifdef OPENFOAMESI
+        const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
+#endif
+
         // Solve the linear system
         solverPerfD = DEqn.solve();
 
@@ -355,7 +364,10 @@ bool poroLinGeomSolid::evolve()
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<scalar>::debug = 1;
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
 

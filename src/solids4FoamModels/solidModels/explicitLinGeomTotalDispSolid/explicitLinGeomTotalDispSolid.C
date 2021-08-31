@@ -218,7 +218,7 @@ bool explicitLinGeomTotalDispSolid::evolve()
 
         // Update the stress field based on the latest D field
         updateStress();
-
+            
         // Compute acceleration
         // Note the inclusion of a linear bulk viscosity pressure term to
         // dissipate high frequency energies, and a Rhie-Chow term to avoid
@@ -254,7 +254,12 @@ bool explicitLinGeomTotalDispSolid::evolve()
                     "laplacian(DU,U)"
                 )().internalField()
             )/rho().internalField()
+#ifdef OPENFOAMESIORFOUNDATION
+          + g();
+#else
           + g().value();
+#endif
+
         a_.correctBoundaryConditions();
 
         // Check energies

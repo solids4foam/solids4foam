@@ -29,6 +29,7 @@ boundaryField
     left
     {
         type            solidTraction;
+        //setEffectiveTraction yes;
         traction        uniform (0 0 0);
         pressure        uniform 0;
         value           uniform (0 0 0);
@@ -45,7 +46,7 @@ boundaryField
         traction        uniform (0 0 0);
         tractionSeries
         {
-            fileName    "$FOAM_CASE/constant/timeVsTrac";
+            "fileName|file"    "$FOAM_CASE/constant/timeVsTrac";
             outOfBounds clamp;
         }
         pressure        uniform 0;

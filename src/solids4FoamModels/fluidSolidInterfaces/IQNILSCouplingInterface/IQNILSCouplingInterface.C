@@ -132,6 +132,25 @@ bool IQNILSCouplingInterface::evolve()
 
     solid().updateTotalFields();
 
+    // Optional: correct fluid mesh to avoid build-up of interface position
+    // errors
+    if (additionalMeshCorrection())
+    {
+        // Transfer the displacement from the solid to the fluid, where we will
+        // use no relaxation; in that way, we can force the solid and fluid
+        // interfaces to stay aligned
+        forAll(fluid().globalPatches(), interfaceI)
+        {
+            fluidZonesPointsDisplsPrev()[interfaceI] =
+                fluidZonesPointsDispls()[interfaceI];
+
+            fluidZonesPointsDispls()[interfaceI] += residuals()[interfaceI];
+        }
+
+        // Move the fluid mesh
+        moveFluidMesh();
+    }
+
     return 0;
 }
 
@@ -379,6 +398,9 @@ void IQNILSCouplingInterface::updateDisplacement()
 
     // Update movingWallPressure boundary conditions, if found
     fluidSolidInterface::updateMovingWallPressureAcceleration();
+
+    // Update elasticWallPressure boundary conditions, if found
+    fluidSolidInterface::updateElasticWallPressureAcceleration();
 
     // Make sure that displacement on all processors is equal to one
     // calculated on master processor

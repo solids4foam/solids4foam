@@ -4,7 +4,7 @@ solidModels/solidModel/solidModel.C
 solidModels/solidModel/lookupSolidModel.C
 solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
-solidModels/coupledLinGeomPressureDisplacementSolid/coupledLinGeomPressureDisplacementSolid.C
+/*solidModels/coupledLinGeomPressureDisplacementSolid/coupledLinGeomPressureDisplacementSolid.C*/
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/coupledUnsLinGeomSolid/coupledUnsLinGeomSolid.C
 solidModels/explicitLinGeomTotalDispSolid/explicitLinGeomTotalDispSolid.C
@@ -35,7 +35,9 @@ fluidModels/pimpleFluid/pimpleFluid.C
 fluidModels/pUCoupledFluid/pUCoupledFluid.C
 fluidModels/stokesFluid/stokesFluid.C
 fluidModels/transientSimpleFluid/transientSimpleFluid.C
+fluidModels/unsIcoFluid/unsIcoFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
+fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
 
 fluidModels/finiteVolume/RBFMeshMotionSolver/RBFInterpolation.C
 fluidModels/finiteVolume/RBFMeshMotionSolver/RBFCoarsening.C
@@ -75,6 +77,7 @@ $(linGeomLaws)/linearElastic/linearElastic.C
 $(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
 $(linGeomLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
 /*$(linGeomLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C*/
+$(linGeomLaws)/poroAnisotropicBiotElastic/poroAnisotropicBiotElastic.C
 $(linGeomLaws)/poroLinearElastic/poroLinearElastic.C
 $(linGeomLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
 $(linGeomLaws)/thermoLinearElastic/thermoLinearElastic.C
@@ -83,6 +86,7 @@ $(linGeomLaws)/linearElasticCt/linearElasticCt.C
 $(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
 
 nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
+$(nonLinGeomLaws)/GentElastic/GentElastic.C
 $(nonLinGeomLaws)/incompressibleMooneyRivlinElastic/incompressibleMooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
@@ -99,37 +103,43 @@ $(thermalLaws)/constantThermal/constantThermal.C
 solidFvPatchFields = solidModels/fvPatchFields
 /*
 $(solidFvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
-$(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVectorField.C
 */
+$(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
-/*
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
 $(solidFvPatchFields)/fixedRotation/fixedRotationFvPatchVectorField.C
 $(solidFvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
+/*
 $(solidFvPatchFields)/fixedTemperatureGradient/fixedTemperatureGradientFvPatchScalarField.C
+*/
 $(solidFvPatchFields)/linearSpatialDisplacement/linearSpatialDisplacementFvPatchVectorField.C
+/*
 $(solidFvPatchFields)/linearDisplacement/linearDisplacementFvPatchVectorField.C
+*/
 $(solidFvPatchFields)/normalDisplacement/normalDisplacementFvPatchVectorField.C
+/*
 $(solidFvPatchFields)/oscillateDisplacement/oscillateDisplacementFvPatchVectorField.C
+*/
 $(solidFvPatchFields)/rigidCylinderContact/rigidCylinderContactFvPatchVectorField.C
+/*
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidContact/solidContactFvPatchVectorFieldCalcContact.C
 $(solidFvPatchFields)/solidRigidContact/solidRigidContactFvPatchVectorField.C
 $(solidFvPatchFields)/solidRigidContact/solidRigidContactFvPatchVectorFieldCalcContact.C
 $(solidFvPatchFields)/solidRigidContact/triSurfaceMotion/triSurfaceMotion.C
-$(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 */
+$(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
 $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
 /*
 $(solidFvPatchFields)/solidTractionFree/solidTractionFreeFvPatchVectorField.C
+*/
 $(solidFvPatchFields)/solidVelocity/solidVelocityFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
-*/
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
-/*
 $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
+/*
 $(solidFvPatchFields)/convectiveFlux/convectiveFluxFvPatchScalarField.C
 
 pointPatchFields = solidModels/pointPatchFields
@@ -175,13 +185,16 @@ functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/setInletVelocity/setInletVelocity.C
 functionObjects/solidForces/solidForces.C
 functionObjects/solidForcesDisplacements/solidForcesDisplacements.C
+functionObjects/solidKineticEnergy/solidKineticEnergy.C
 functionObjects/solidStresses/solidStresses.C
 functionObjects/solidDisplacements/solidDisplacements.C
 functionObjects/solidPointDisplacement/solidPointDisplacement.C
 functionObjects/solidPointStress/solidPointStress.C
 functionObjects/solidPointTemperature/solidPointTemperature.C
+functionObjects/solidPotentialEnergy/solidPotentialEnergy.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
 functionObjects/principalStresses/principalStresses.C
+functionObjects/principalStresses/principalStressFields.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
 functionObjects/solidTractions/solidTractions.C
 functionObjects/centrifugalBodyForce/centrifugalBodyForce.C
@@ -255,5 +268,6 @@ numerics/globalPolyPatch/globalPolyPatch.C
 numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
 numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
 */
+numerics/rotation/RodriguesRotation.C
 
 LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels

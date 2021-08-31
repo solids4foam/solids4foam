@@ -54,7 +54,11 @@ Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
 :
     fixedValueFvPatchScalarField(ptf, p, iF, mapper),
     DTName_(ptf.DTName_),
+#ifdef OPENFOAMFOUNDATION
+    alpha_(mapper(ptf.alpha_)),
+#else
     alpha_(ptf.alpha_, mapper),
+#endif
     Tinf_(ptf.Tinf_)
 {}
 
@@ -216,13 +220,15 @@ Foam::thermalConvectionFvPatchScalarField::gradientBoundaryCoeffs() const
 
 void Foam::thermalConvectionFvPatchScalarField::write(Ostream& os) const
 {
-    //fvPatchScalarField::write(os);
-    //writeEntry("value", os);
-
     os.writeKeyword("thermalConductivityName")
         << DTName_ << token::END_STATEMENT << nl;
-    alpha_.writeEntry("alpha", os);
-    os.writeKeyword("Tinf") << Tinf_.value() << token::END_STATEMENT << nl;
+     os.writeKeyword("Tinf") << Tinf_.value() << token::END_STATEMENT << nl;
+
+#ifdef OPENFOAMFOUNDATION
+     writeEntry(os, "alpha", alpha_);
+#else
+     alpha_.writeEntry("alpha", os);
+#endif
 
     fixedValueFvPatchScalarField::write(os);
 }
