@@ -1,0 +1,43 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    sides
+    {
+        type            calculated;
+        value           uniform ( 0 0 0 );
+    }
+
+    originalPatch
+    {
+        type            calculated;
+        value           uniform ( 0 0 0 );
+    }
+
+    otherSide
+    {
+        type            calculated;
+        value           uniform ( 0 0 0 );
+    }
+}
+
+// ************************************************************************* //
