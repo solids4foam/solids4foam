@@ -63,6 +63,9 @@ class AitkenCouplingInterface
         //- Fixed under-relaxation factor
         const scalar relaxationFactor_;
 
+        //- Maximum fixed under-relaxation factor
+        const scalar relaxationFactorMax_;
+
         //- Predict solid
         const Switch predictSolid_;
 
