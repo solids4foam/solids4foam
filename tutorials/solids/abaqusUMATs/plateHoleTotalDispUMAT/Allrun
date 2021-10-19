@@ -3,6 +3,15 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+if [[ -z "${S4F_USE_GFORTRAN+x}" ]]
+then
+    echo; echo "The S4F_USE_GFORTRAN variable is not set: skipping"
+    echo "To use abaqusUMATs, install gfortran and set the S4F_USE_GFORTRAN "
+    echo "variable to 1"; echo
+
+    exit 0;
+fi
+
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
