@@ -43,6 +43,13 @@ else
     endif
 endif
 
+ifdef S4F_USE_GFORTRAN
+    GFORTRAN_LIBS = \
+        -lgfortran \
+        $(FOAM_USER_LIBBIN)/abaqusUmatLinearElastic.o \
+        -labaqusUmatLinearElastic
+endif
+
 EXE_INC = \
     -I../../../src/solids4FoamModels/lnInclude \
     -I../../../src/blockCoupledSolids4FoamTools/lnInclude \
@@ -87,6 +94,4 @@ EXE_LIBS = \
     -ldynamicMesh \
     -lmeshTools \
     -ltopoChangerFvMesh \
-    -lgfortran \
-    $(FOAM_USER_LIBBIN)/abaqusUmatLinearElastic.o \
-    -labaqusUmatLinearElastic
+    $(GFORTRAN_LIBS)

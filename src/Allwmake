@@ -3,4 +3,12 @@ cd ${0%/*} || exit 1    # run from this directory
 
 (cd blockCoupledSolids4FoamTools && ./Allwmake)
 (cd solids4FoamModels && ./Allwmake)
-(cd abaqusUMATs && ./Allwmake)
+
+if [[ ! -z "${S4F_USE_GFORTRAN+x}" ]]
+then
+    (cd abaqusUMATs && ./Allwmake)
+else
+    echo; echo "The S4F_USE_GFORTRAN variable is not set: skipping abaqusUMATs"
+    echo "To use abaqusUMATs, install gfortran and set the S4F_USE_GFORTRAN "
+    echo "variable to 1"; echo
+fi

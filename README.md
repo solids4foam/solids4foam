@@ -31,9 +31,8 @@ OpenFOAM-v1812.
 Notes:
 
   1. the `master` branch compiles with foam-extend-4.0 and foam-extend-4.1.
-  2. the `master` branch also compiles with OpenFOAM-7 and OpenFOAM-v1812.
-  3. the `foam-extend-3.2` branch compiles with foam-extend-3.2 but is not
-up-to-date.
+  2. the `master` branch compiles with OpenFOAM-7.
+  3. the `master` branch compiles with OpenFOAM-v1812 and OpenFOAM-v1912.
 
 
 ### Contribution guidelines ###
