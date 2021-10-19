@@ -16,23 +16,16 @@ Start with the [solids4foam documentation](documentation/solids4foamDocumentatio
 
 ### How do I get set up? ###
 
-To get setup, you must first install foam-extend-4.0 or foam-extend-4.1,
-details of which can be found on the OpenFOAM Wiki at:
-https://openfoamwiki.net/index.php/Installation
+To get setup, you must first install OpenFOAM, using one of the following versions:
+- foam-extend-4.0
+- foam-extend-4.1
+- OpenFOAM-7
+- OpenFOAM-v1812
+- OpenFOAM-v1912
 
-Once foam-extend-4.0 or foam-extend-4.1 has been installed, download solids4foam
-and then run the enclosed `Allwmake` script to compile solids4foam.
+Once a version of OpenFOAM has been installed, download solids4foam and then run the enclosed `Allwmake` script to compile solids4foam.
 
-solids4foam also compiles with OpenFOAM-7 and OpenFOAM-v1812 but some features
-are yet to be ported (porting of all major features is actively underway, Feb-20)
-Note that all tutorials have not yet been configured for OpenFOAM-7 and
-OpenFOAM-v1812.
-
-Notes:
-
-  1. the `master` branch compiles with foam-extend-4.0 and foam-extend-4.1.
-  2. the `master` branch compiles with OpenFOAM-7.
-  3. the `master` branch compiles with OpenFOAM-v1812 and OpenFOAM-v1912.
+solids4foam is primarily developed on foam-extend-4.0 so some of the features are yet to be ported to the other versions.
 
 
 ### Contribution guidelines ###
