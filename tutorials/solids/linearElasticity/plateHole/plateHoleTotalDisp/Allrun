@@ -13,7 +13,16 @@ solids4Foam::convertCaseFormat .
 runApplication blockMesh
 
 # Run solver
-runApplication solids4Foam
+if [[ "${1}" -gt 1 ]]
+then
+    # Number of cores passed as an argument
+    runApplication decomposePar
+    runParallel solids4Foam "${1}"
+    runApplication reconstructPar
+else
+    # Case runs in serial if no argument is passed or if the argument is 1
+    runApplication solids4Foam
+fi
 
 # ----------------------------------------------------------------- end-of-file
 
