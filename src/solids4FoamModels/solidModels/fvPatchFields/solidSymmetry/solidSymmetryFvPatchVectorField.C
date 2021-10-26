@@ -91,16 +91,25 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
     const dictionary& dict
 )
 :
-    symmetryFvPatchField<vector>(p, iF, dict),
+    symmetryFvPatchField<vector>(p, iF),
     secondOrder_(false)
 {
-    Info << "Symmetry boundary condition with non-orthogonal correction"
+    Info<< "Symmetry boundary condition with skew correction"
         << endl;
 
     if (dict.found("secondOrder"))
     {
         secondOrder_ = Switch(dict.lookup("secondOrder"));
         Info<< "Second order correction: " << secondOrder_ << endl;
+    }
+
+    if (dict.found("value"))
+    {
+        fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
+    }
+    else
+    {
+        fvPatchVectorField::operator=(patchInternalField());
     }
 
     if (!isType<symmetryFvPatch>(p))
