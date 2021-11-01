@@ -1,0 +1,18 @@
+#!/bin/sh
+
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+set -e
+
+# paraview file
+touch case.foam
+
+# mesh
+runApplication blockMesh
+
+# serial
+#runApplication solids4Foam
+
+# parallel
+runApplication decomposePar -force
+runParallel solids4Foam 2 || :
