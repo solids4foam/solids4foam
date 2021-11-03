@@ -1,9 +1,8 @@
-### solids4foam ###
-solids4foam - a finite volume toolbox for solid mechanics and fluid solid
-interaction simulations
+# solids4foam
 
+[![Bitbucket build](https://img.shields.io/bitbucket/pipelines/philip_cardiff/solids4foam-release/master)](https://bitbucket.org/philip_cardiff/solids4foam-release/addon/pipelines/home#!/results/branch/master/page/1)
 
-### What is this repository for? ###
+[![Bitbucket issues](https://img.shields.io/bitbucket/issues/philip_cardiff/solids4foam-release)](https://bitbucket.org/philip_cardiff/solids4foam-release/issues/)
 
 solids4foam is toolbox for OpenFOAM with capabilities for solid mechanics and
 fluid solid interactions.
