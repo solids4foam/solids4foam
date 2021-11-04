@@ -20,13 +20,13 @@ solidModel     unsNonLinearGeometryUpdatedLagrangian;
 "unsNonLinearGeometryUpdatedLagrangianCoeffs"
 {
     // Maximum number of momentum correctors
-    nCorrectors             1000;
+    nCorrectors             2000;
 
     // Solution tolerance for displacement
-    solutionTolerance       1e-06;
+    solutionTolerance       1e-03;
 
     // Alternative solution tolerance for displacement
-    alternativeTolerance    1e-07;
+    alternativeTolerance    1e-03;
 
     // Material law solution tolerance
     materialTolerance       1e-05;
@@ -36,11 +36,7 @@ solidModel     unsNonLinearGeometryUpdatedLagrangian;
 
     stabilisation
     {
-        // Momentum stabilisation seems to contribute to sigmaHyd oscillations
         type none;
-        // type RhieChow;
-        // type JamesonSchmidtTurkel;
-        // scaleFactor 0.1;
     }
 }
 
