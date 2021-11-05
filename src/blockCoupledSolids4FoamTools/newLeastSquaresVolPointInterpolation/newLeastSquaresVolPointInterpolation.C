@@ -93,12 +93,12 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
     // Allocate storage for addressing
     pointCyclicBndFacesPtr_.set(new labelListList(points.size()));
     labelListList& pointCyclicBndFaces = pointCyclicBndFacesPtr_();
-    
+
 #ifdef FOAMEXTEND
     // Allocate storage for addressing
     pointCyclicGgiFacesPtr_.set(new labelListList(points.size()));
     labelListList& pointCyclicGgiFaces = pointCyclicGgiFacesPtr_();
-    
+
     // Allocate storage for addressing
     pointCyclicGgiBndFacesPtr_.set(new labelListList(points.size()));
     labelListList& pointCyclicGgiBndFaces = pointCyclicGgiBndFacesPtr_();
@@ -1174,14 +1174,14 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                     }
 
                     // FIX: Ph 5-5-2021
-                    //  Temporary fix for the cell-skipping:
-                    //  if a cell is connected to the current (processor patch)
-                    //  point and is part of the current patch but connected to
-                    //  the patch by a face that doesn't contain the current
-                    //  point the above condition will skip the cell even
-                    //  though it should be included (because the cell can't be
-                    //  accessed through a processor-patch face since the face
-                    //  won't be available because it doesn't contain the point)
+                    // Temporary fix for the cell-skipping:
+                    // if a cell is connected to the current (processor patch)
+                    // point and is part of the current patch but connected to
+                    // the patch by a face that doesn't contain the current
+                    // point the above condition will skip the cell even
+                    // though it should be included (because the cell can't be
+                    // accessed through a processor-patch face since the face
+                    // won't be available because it doesn't contain the point)
                     if
                     (
                         curCells.size()
@@ -2108,10 +2108,10 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
     originsPtr_.set(new vectorField(mesh().points().size(), vector::zero));
     vectorField& origins = originsPtr_();
-    
+
     refLPtr_.set(new scalarField(mesh().points().size(), 0));
     scalarField& refL = refLPtr_();
-    
+
     const FieldField<Field, scalar>& w = weights();
 
     const vectorField& p = mesh().points();
@@ -4061,7 +4061,7 @@ const scalarField& newLeastSquaresVolPointInterpolation::refL() const
     {
         makeOrigins();
     }
-        
+
     return refLPtr_();
 }
 
