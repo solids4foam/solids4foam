@@ -207,7 +207,11 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
 
                 // XXX: is this expensive?
                 boundBox bb(vectorField(points, pointPoints[pointI]), false);
+#ifdef OPENFOAMESIORFOUNDATION
+                const scalar tol = mesh().globalData().matchTol_*mag(bb.max() - bb.min());
+#else
                 const scalar tol = polyPatch::matchTol_()*mag(bb.max() - bb.min());
+#endif
 
                 for
                 (
