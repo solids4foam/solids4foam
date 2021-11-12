@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Set the endTime to 2
+echo "Changing the endTime to 2"
+sed -i "s/endTime         4;/endTime         2;/g" system/controlDict
+
+# Set the writeFormat to binary to avoid precision errors
+echo "Changing the writeFormat to binary"
+sed -i "s/writeFormat     ascii;/writeFormat     binary;/g" system/controlDict
+
+# Create the meshes and run the solver
+echo "Running the Allrun script"
+./Allrun &> log.Allrun
+
+# Set the startFrom to latestTime
+echo "Changing startFrom to latestTime"
+sed -i "s/startFrom       startTime;/startFrom       latestTime;/g" system/controlDict
+
+# Set the endTime to 4
+echo "Changing the endTime to 4"
+sed -i "s/endTime         2;/endTime         4;/g" system/controlDict
+
+# Restart the solver
+echo "Restarting solids4Foam"
+solids4Foam &> log.solids4Foam.restart
+
+# ----------------------------------------------------------------- end-of-file
+
