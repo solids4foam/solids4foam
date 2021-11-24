@@ -76,6 +76,9 @@ class solidTractionFvPatchVectorField
         //- Pressure time series
         interpolationTable<scalar> pressureSeries_;
 
+        //- Pressure field given as a field
+        autoPtr<volScalarField> pressureFieldPtr_;
+
         //- Second order accuracy correction
         const Switch secondOrder_;
 

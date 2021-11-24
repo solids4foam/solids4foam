@@ -48,6 +48,7 @@ solidTractionFvPatchVectorField
     pressure_(p.size(), 0.0),
     tractionSeries_(),
     pressureSeries_(),
+    pressureFieldPtr_(),
     secondOrder_(false),
     setEffectiveTraction_(false),
     limitCoeff_(1.0),
@@ -71,6 +72,7 @@ solidTractionFvPatchVectorField
     pressure_(p.size(), 0.0),
     tractionSeries_(),
     pressureSeries_(),
+    pressureFieldPtr_(),
     secondOrder_(dict.lookupOrDefault<Switch>("secondOrder", false)),
     setEffectiveTraction_
     (
@@ -112,11 +114,40 @@ solidTractionFvPatchVectorField
     }
 
     // Check if pressure is time-varying
-    if (dict.found("pressureSeries"))
+    if (dict.found("pressureSeries") && dict.found("pressureField"))
+    {
+        FatalErrorIn
+        (
+            "solidTractionFvPatchVectorField::solidTractionFvPatchVectorField"
+        )   << "pressureSeries and pressureField cannot both be specified!"
+            << abort(FatalError);
+    }
+    else if (dict.found("pressureSeries"))
     {
         Info<< "    pressure is time-varying" << endl;
         pressureSeries_ =
             interpolationTable<scalar>(dict.subDict("pressureSeries"));
+    }
+    else if (dict.found("pressureField"))
+    {
+        Info<< "    pressure is specified as a field" << endl;
+        pressureFieldPtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    word(dict.lookup("pressureField")),
+                    patch().boundaryMesh().mesh().time().timeName(),
+                    patch().boundaryMesh().mesh(),
+                    IOobject::MUST_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                patch().boundaryMesh().mesh()
+            )
+        );
+
+        Info<< "field = " << pressureFieldPtr_().boundaryField()[patch().index()] << endl;
     }
     else
     {
@@ -164,6 +195,7 @@ solidTractionFvPatchVectorField
 #endif
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
+    pressureFieldPtr_(), //stpvf.pressureFieldPtr_),
     secondOrder_(stpvf.secondOrder_),
     setEffectiveTraction_(stpvf.setEffectiveTraction_),
     limitCoeff_(stpvf.limitCoeff_),
@@ -182,6 +214,7 @@ solidTractionFvPatchVectorField
     pressure_(stpvf.pressure_),
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
+    pressureFieldPtr_(), //stpvf.pressureFieldPtr_),
     secondOrder_(stpvf.secondOrder_),
     setEffectiveTraction_(stpvf.setEffectiveTraction_),
     limitCoeff_(stpvf.limitCoeff_),
@@ -201,6 +234,7 @@ solidTractionFvPatchVectorField
     pressure_(stpvf.pressure_),
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
+    pressureFieldPtr_(), //stpvf.pressureFieldPtr_),
     secondOrder_(stpvf.secondOrder_),
     setEffectiveTraction_(stpvf.setEffectiveTraction_),
     limitCoeff_(stpvf.limitCoeff_),
@@ -257,7 +291,13 @@ void solidTractionFvPatchVectorField::updateCoeffs()
         traction_ = tractionSeries_(this->db().time().timeOutputValue());
     }
 
-    if (pressureSeries_.size())
+    if (pressureFieldPtr_.valid())
+    {
+        // const_cast<volScalarField&>(pressureFieldPtr_()).boundaryField()[patch().index()].updateCoeffs();
+        const_cast<volScalarField&>(pressureFieldPtr_()).correctBoundaryConditions();
+        pressure_ = pressureFieldPtr_().boundaryField()[patch().index()];
+    }
+    else if (pressureSeries_.size())
     {
         pressure_ = pressureSeries_(this->db().time().timeOutputValue());
     }
@@ -370,7 +410,10 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
 #endif
     }
 
-    if (pressureSeries_.size())
+    if (pressureFieldPtr_.valid())
+    {
+    }
+    else if (pressureSeries_.size())
     {
         os.writeKeyword("pressureSeries") << nl;
         os << token::BEGIN_BLOCK << nl;
@@ -385,6 +428,7 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
         pressure_.writeEntry("pressure", os);
 #endif
     }
+
     os.writeKeyword("secondOrder")
         << secondOrder_ << token::END_STATEMENT << nl;
     os.writeKeyword("setEffectiveTraction")
