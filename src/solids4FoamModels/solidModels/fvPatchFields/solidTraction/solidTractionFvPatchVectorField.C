@@ -48,11 +48,12 @@ solidTractionFvPatchVectorField
     pressure_(p.size(), 0.0),
     tractionSeries_(),
     pressureSeries_(),
+    tractionFieldPtr_(),
     pressureFieldPtr_(),
     secondOrder_(false),
     setEffectiveTraction_(false),
-    limitCoeff_(1.0),
-    relaxFac_(1.0)
+    relaxFac_(1.0),
+    curTimeIndex_(-1)
 {
     fvPatchVectorField::operator=(patchInternalField());
     gradient() = vector::zero;
@@ -72,14 +73,15 @@ solidTractionFvPatchVectorField
     pressure_(p.size(), 0.0),
     tractionSeries_(),
     pressureSeries_(),
+    tractionFieldPtr_(),
     pressureFieldPtr_(),
     secondOrder_(dict.lookupOrDefault<Switch>("secondOrder", false)),
     setEffectiveTraction_
     (
         dict.lookupOrDefault<Switch>("setEffectiveTraction", false)
     ),
-    limitCoeff_(dict.lookupOrDefault<scalar>("limitCoeff", 1.0)),
-    relaxFac_(dict.lookupOrDefault<scalar>("relaxationFactor", 1.0))
+    relaxFac_(dict.lookupOrDefault<scalar>("relaxationFactor", 1.0)),
+    curTimeIndex_(-1)
 {
     Info<< "Creating " << type() << " boundary condition" << endl;
 
@@ -101,25 +103,64 @@ solidTractionFvPatchVectorField
         fvPatchVectorField::operator=(patchInternalField());
     }
 
-    // Check if traction is time-varying
-    if (dict.found("tractionSeries"))
+    // Check how traction is defined
+    if
+    (
+        (dict.found("traction") && dict.found("tractionSeries"))
+     || (dict.found("traction") && dict.found("tractionField"))
+     || (dict.found("tractionSeries") && dict.found("tractionField"))
+    )
+    {
+        FatalErrorIn
+        (
+            "solidTractionFvPatchVectorField::solidTractionFvPatchVectorField"
+        )   << "Only one of traction, tractionSeries or tractionField can be "
+            << "specified!"
+            << abort(FatalError);
+    }
+    else if (dict.found("tractionSeries"))
     {
         Info<< "    traction is time-varying" << endl;
         tractionSeries_ =
             interpolationTable<vector>(dict.subDict("tractionSeries"));
+    }
+    else if (dict.found("tractionField"))
+    {
+        Info<< "    traction is specified as a field" << endl;
+        tractionFieldPtr_.set
+        (
+            new volVectorField
+            (
+                IOobject
+                (
+                    word(dict.lookup("tractionField")),
+                    patch().boundaryMesh().mesh().time().timeName(),
+                    patch().boundaryMesh().mesh(),
+                    IOobject::MUST_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                patch().boundaryMesh().mesh()
+            )
+        );
     }
     else
     {
         traction_ = vectorField("traction", dict, p.size());
     }
 
-    // Check if pressure is time-varying
-    if (dict.found("pressureSeries") && dict.found("pressureField"))
+    // Check how pressure is defined
+    if
+    (
+        (dict.found("pressure") && dict.found("pressureSeries"))
+     || (dict.found("pressure") && dict.found("pressureField"))
+     || (dict.found("pressureSeries") && dict.found("pressureField"))
+    )
     {
         FatalErrorIn
         (
             "solidTractionFvPatchVectorField::solidTractionFvPatchVectorField"
-        )   << "pressureSeries and pressureField cannot both be specified!"
+        )   << "Only one of pressure, pressureSeries or pressureField can be "
+            << "specified!"
             << abort(FatalError);
     }
     else if (dict.found("pressureSeries"))
@@ -146,8 +187,6 @@ solidTractionFvPatchVectorField
                 patch().boundaryMesh().mesh()
             )
         );
-
-        Info<< "field = " << pressureFieldPtr_().boundaryField()[patch().index()] << endl;
     }
     else
     {
@@ -162,11 +201,6 @@ solidTractionFvPatchVectorField
     if (setEffectiveTraction_)
     {
         Info<< "    set effective traction" << endl;
-    }
-
-    if (limitCoeff_)
-    {
-        Info<< "    limiter coefficient: " << limitCoeff_ << endl;
     }
 
     if (relaxFac_ < 1.0)
@@ -195,11 +229,12 @@ solidTractionFvPatchVectorField
 #endif
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
-    pressureFieldPtr_(), //stpvf.pressureFieldPtr_),
+    tractionFieldPtr_(),
+    pressureFieldPtr_(),
     secondOrder_(stpvf.secondOrder_),
     setEffectiveTraction_(stpvf.setEffectiveTraction_),
-    limitCoeff_(stpvf.limitCoeff_),
-    relaxFac_(stpvf.relaxFac_)
+    relaxFac_(stpvf.relaxFac_),
+    curTimeIndex_(stpvf.curTimeIndex_)
 {}
 
 
@@ -214,11 +249,12 @@ solidTractionFvPatchVectorField
     pressure_(stpvf.pressure_),
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
-    pressureFieldPtr_(), //stpvf.pressureFieldPtr_),
+    tractionFieldPtr_(),
+    pressureFieldPtr_(),
     secondOrder_(stpvf.secondOrder_),
     setEffectiveTraction_(stpvf.setEffectiveTraction_),
-    limitCoeff_(stpvf.limitCoeff_),
-    relaxFac_(stpvf.relaxFac_)
+    relaxFac_(stpvf.relaxFac_),
+    curTimeIndex_(stpvf.curTimeIndex_)
 {}
 
 
@@ -234,11 +270,12 @@ solidTractionFvPatchVectorField
     pressure_(stpvf.pressure_),
     tractionSeries_(stpvf.tractionSeries_),
     pressureSeries_(stpvf.pressureSeries_),
-    pressureFieldPtr_(), //stpvf.pressureFieldPtr_),
+    tractionFieldPtr_(),
+    pressureFieldPtr_(),
     secondOrder_(stpvf.secondOrder_),
     setEffectiveTraction_(stpvf.setEffectiveTraction_),
-    limitCoeff_(stpvf.limitCoeff_),
-    relaxFac_(stpvf.relaxFac_)
+    relaxFac_(stpvf.relaxFac_),
+    curTimeIndex_(stpvf.curTimeIndex_)
 {}
 
 
@@ -286,15 +323,42 @@ void solidTractionFvPatchVectorField::updateCoeffs()
         return;
     }
 
-    if (tractionSeries_.size())
+    if (curTimeIndex_ != db().time().timeIndex())
+    {
+        curTimeIndex_ = db().time().timeIndex();
+
+        // Called once per time-step
+
+        if (pressureFieldPtr_.valid())
+        {
+            // Force the pressure field boundary conditions to update
+            const_cast<volScalarField&>
+            (
+                pressureFieldPtr_()
+            ).correctBoundaryConditions();
+        }
+
+        if (tractionFieldPtr_.valid())
+        {
+            // Force the traction field boundary conditions to update
+            const_cast<volVectorField&>
+            (
+                tractionFieldPtr_()
+            ).correctBoundaryConditions();
+        }
+    }
+
+    if (tractionFieldPtr_.valid())
+    {
+        traction_ = tractionFieldPtr_().boundaryField()[patch().index()];
+    }
+    else if (tractionSeries_.size())
     {
         traction_ = tractionSeries_(this->db().time().timeOutputValue());
     }
 
     if (pressureFieldPtr_.valid())
     {
-        // const_cast<volScalarField&>(pressureFieldPtr_()).boundaryField()[patch().index()].updateCoeffs();
-        const_cast<volScalarField&>(pressureFieldPtr_()).correctBoundaryConditions();
         pressure_ = pressureFieldPtr_().boundaryField()[patch().index()];
     }
     else if (pressureSeries_.size())
@@ -394,7 +458,12 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
     //fixedGradientFvPatchVectorField::write(os);
     fvPatchVectorField::write(os);
 
-    if (tractionSeries_.size())
+    if (tractionFieldPtr_.valid())
+    {
+        os.writeKeyword("tractionField")
+            << tractionFieldPtr_().name() << token::END_STATEMENT << nl;
+    }
+    else if (tractionSeries_.size())
     {
         os.writeKeyword("tractionSeries") << nl;
         os << token::BEGIN_BLOCK << nl;
@@ -412,6 +481,8 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
 
     if (pressureFieldPtr_.valid())
     {
+        os.writeKeyword("pressureField")
+            << pressureFieldPtr_().name() << token::END_STATEMENT << nl;
     }
     else if (pressureSeries_.size())
     {
@@ -433,8 +504,6 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
         << secondOrder_ << token::END_STATEMENT << nl;
     os.writeKeyword("setEffectiveTraction")
         << setEffectiveTraction_ << token::END_STATEMENT << nl;
-    os.writeKeyword("limitCoeff")
-        << limitCoeff_ << token::END_STATEMENT << nl;
     os.writeKeyword("relaxationFactor")
         << relaxFac_ << token::END_STATEMENT << nl;
 

@@ -10,11 +10,11 @@ FoamFile
     version     2.0;
     format      ascii;
     class       volVectorField;
-    object      D;
+    object      tractionOnUp;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
+dimensions      [0 1 -1 -2 0 0 0];
 
 internalField   uniform (0 0 0);
 
@@ -23,37 +23,23 @@ boundaryField
     left
     {
         type            symmetryPlane;
-        skewCorrected   yes;
     }
     right
     {
-        // This is an example of how you can set a pressure field based on a
-        // point cloud
-        type            solidTraction;
-        traction        uniform (0 0 0);
-        pressureField   "pressureOnRight";
-        value           uniform (0 0 0);
+        type            zeroGradient;
     }
     down
     {
         type            symmetryPlane;
-        skewCorrected   yes;
     }
     up
     {
-        // This is an example of how you can set a traction field based on a
-        // point cloud
-        type            solidTraction;
-        tractionField   "tractionOnUp";
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type            timeVaryingMappedFixedValue;
+        setAverage      off;
     }
     hole
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type            zeroGradient;
     }
     frontAndBack
     {
