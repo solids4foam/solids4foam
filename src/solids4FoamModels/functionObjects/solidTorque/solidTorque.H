@@ -81,7 +81,7 @@ class solidTorque
         const word stressName_;
 
         //- Point on the axis
-        vector pointOnAxis_;
+        const vector pointOnAxis_;
 
         //- Axis direction
         vector axis_;
