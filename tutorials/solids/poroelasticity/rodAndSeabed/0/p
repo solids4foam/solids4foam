@@ -21,11 +21,6 @@ internalField   uniform 79290;
 
 boundaryField
 {
-    structure
-    {
-        type            zeroGradient;
-    }
-
     bottom
     {
         type            zeroGradient;
