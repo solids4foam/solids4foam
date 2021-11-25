@@ -122,7 +122,7 @@ function solids4Foam::convertCaseFormat()
     # missed any in the checks above
     # Check: the checks above may not be needed, as this command should pick up
     # all the files in the time directories
-    for FILE in [0-9]/*;
+    for FILE in $(\ls [0-9]/*) ;
     do
         if [[ -f "${FILE}" ]]
         then
@@ -272,7 +272,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
     # missed any in the checks above
     # Check: the checks above may not be needed, as this command should pick up
     # all the files in the time directories
-    for FILE in [0-9]/*;
+    for FILE in $(\ls [0-9]/*) ;
     do
         if [[ -f "${FILE}" ]]
         then
