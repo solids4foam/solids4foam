@@ -8,6 +8,7 @@ source solids4FoamScripts.sh
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
+(cd hotCylinderTemperatureField && solids4Foam::convertCaseFormat .)
 
 # Create the mesh
 runApplication blockMesh
