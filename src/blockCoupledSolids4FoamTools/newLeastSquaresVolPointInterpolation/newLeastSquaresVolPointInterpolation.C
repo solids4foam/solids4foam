@@ -3537,8 +3537,8 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
         // PC, for now, disable as it negatively affects the coupled solver
         // if (mag(D[pointI]) > SMALL)
         {
-            tensor invLsM = hinv(lsM);
-            //tensor invLsM = inv(lsM);
+            //tensor invLsM = hinv(lsM);
+            tensor invLsM = inv(lsM);
 
             for (label i=0; i<3; i++)
             {
