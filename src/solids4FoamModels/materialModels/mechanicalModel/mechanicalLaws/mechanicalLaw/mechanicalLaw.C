@@ -675,6 +675,11 @@ void Foam::mechanicalLaw::updateSigmaHyd
 
         // Relax the pressure field
         sigmaHyd().relax();
+
+        if (allocatedMemory)
+        {
+            delete ADPtr;
+        }
     }
     else
     {
