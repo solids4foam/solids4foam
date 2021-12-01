@@ -615,6 +615,11 @@ void Foam::mechanicalLaw::updateSigmaHyd
             }
             else
             {
+#ifdef OPENFOAMESIORFOUNDATION
+                FatalErrorIn("void Foam::mechanicalLaw::updateSigmaHyd(...)")
+                    << "Multi-materials are not yet ported for this version of "
+                    << "OpenFOAM" << abort(FatalError);
+#else
                 ADPtr =
                     new volScalarField
                     (
@@ -627,6 +632,7 @@ void Foam::mechanicalLaw::updateSigmaHyd
                         )
                     );
                 allocatedMemory = true;
+#endif
             }
         }
         else if (baseMesh().foundObject<volScalarField>("DDEqnA"))
