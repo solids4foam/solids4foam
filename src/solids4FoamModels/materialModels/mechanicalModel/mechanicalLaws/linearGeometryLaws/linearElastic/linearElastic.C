@@ -570,7 +570,7 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
     //sigma = 2.0*mu_*epsilon_ + lambda_*tr(epsilon_)*I + sigma0_;
 
     // Hooke's law : partitioned deviatoric and dilation form
-    const volScalarField trEpsilon = tr(epsilon_);
+    const volScalarField trEpsilon(tr(epsilon_));
     calculateHydrostaticStress(sigmaHyd_, trEpsilon);
     sigma = 2.0*mu_*dev(epsilon_) + sigmaHyd_*I + sigma0_;
 }
@@ -621,7 +621,7 @@ void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
     //sigma = 2.0*mu_*epsilonf_ + lambda_*tr(epsilonf_)*I + sigma0f();
 
     // Hooke's law : partitioned deviatoric and dilation form
-    const surfaceScalarField trEpsilon = tr(epsilonf_);
+    const surfaceScalarField trEpsilon(tr(epsilonf_));
     calculateHydrostaticStress(sigmaHydf_, trEpsilon);
     sigma = 2.0*mu_*dev(epsilonf_) + sigmaHydf_*I + sigma0f();
 }

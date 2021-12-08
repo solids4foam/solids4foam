@@ -404,10 +404,10 @@ tmp<vectorField> unsNonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
     const scalarField& relJ = relJf_.boundaryField()[patchID];
 
     // Patch unit normals (updated configuration)
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Patch unit normals (deformed configuration)
-    const vectorField nCurrent = relJ*relFinv.T() & n;
+    const vectorField nCurrent(relJ*relFinv.T() & n);
 
     // Return patch snGrad
     return tmp<vectorField>

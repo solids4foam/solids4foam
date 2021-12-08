@@ -548,7 +548,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::impK() const
 Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalModel::impKf() const
 {
     // Linear interpolation actually seems to give the best convergence
-    const volScalarField impK = this->impK();
+    const volScalarField impK(this->impK());
     const word interpName = "interpolate(" + impK.name() + ')';
     return fvc::interpolate(impK, interpName);
 }

@@ -412,7 +412,7 @@ void Foam::viscousHookeanElastic::correct(volSymmTensorField& sigma)
             mesh().lookupObject<volTensorField>("grad(DD)");
 
         // Calculate deviatoric component of the strain increment
-        const volSymmTensorField De = dev(symm(gradDD));
+        const volSymmTensorField De(dev(symm(gradDD)));
 
         // Calculate deviatoric component of the initial stress, based on
         // Hooke's law
@@ -428,7 +428,7 @@ void Foam::viscousHookeanElastic::correct(volSymmTensorField& sigma)
             mesh().lookupObject<volTensorField>("grad(D)");
 
         // Calculate deviatoric component of total strain
-        const volSymmTensorField e = dev(symm(gradD));
+        const volSymmTensorField e(dev(symm(gradD)));
 
         // Calculate deviatoric component of the initial stress, based on
         // Hooke's law
@@ -459,8 +459,10 @@ void Foam::viscousHookeanElastic::correct(volSymmTensorField& sigma)
             const volScalarField& T = mesh().lookupObject<volScalarField>("T");
 
             // Calculate the WLF shift function
-            const volScalarField aT =
-                pow(10, -C1_*(T - Tref_)/(C2_ + (T - Tref_)));
+            const volScalarField aT
+            (
+                pow(10, -C1_*(T - Tref_)/(C2_ + (T - Tref_)))
+            );
 
             //Info<< "min(aT): " << min(aT).value() << nl
             //    << "max(aT): " << max(aT).value() << nl << endl;
@@ -501,7 +503,7 @@ void Foam::viscousHookeanElastic::correct(surfaceSymmTensorField& sigma)
             mesh().lookupObject<surfaceTensorField>("grad(DD)f");
 
         // Calculate deviatoric component of the strain increment
-        const surfaceSymmTensorField De = dev(symm(gradDD));
+        const surfaceSymmTensorField De(dev(symm(gradDD)));
 
         // Calculate deviatoric component of the initial stress, based on
         // Hooke's law
@@ -517,7 +519,7 @@ void Foam::viscousHookeanElastic::correct(surfaceSymmTensorField& sigma)
             mesh().lookupObject<surfaceTensorField>("grad(D)f");
 
         // Calculate deviatoric component of total strain
-        const surfaceSymmTensorField e = dev(symm(gradD));
+        const surfaceSymmTensorField e(dev(symm(gradD)));
 
         // Calculate deviatoric component of the initial stress, based on
         // Hooke's law
@@ -549,8 +551,10 @@ void Foam::viscousHookeanElastic::correct(surfaceSymmTensorField& sigma)
                 mesh().lookupObject<surfaceScalarField>("T");
 
             // Calculate the WLF shift function
-            const surfaceScalarField aT =
-                pow(10, -C1_*(T - Tref_)/(C2_ + (T - Tref_)));
+            const surfaceScalarField aT
+            (
+                pow(10, -C1_*(T - Tref_)/(C2_ + (T - Tref_)))
+            );
 
             // Eqn 10.3.12 in Simo and Hughes 1998, where we shift the
             // relaxation time based on the temperature field using the

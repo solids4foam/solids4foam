@@ -460,7 +460,7 @@ tmp<scalarField> unsIcoFluid::patchPressureForce(const label patchID) const
 void unsIcoFluid::evolveConsistent()
 {
     Info<< "Evolving fluid model with consistent strategy: "
-		<< this->type() << endl;
+                << this->type() << endl;
 
     dynamicFvMesh& mesh = this->mesh();
 
@@ -515,19 +515,19 @@ void unsIcoFluid::evolveConsistent()
 
     // --- PISO loop
     //
-	volScalarField AU("AU", HUEqn.A() + ddtUEqn.A());
+        volScalarField AU("AU", HUEqn.A() + ddtUEqn.A());
 
 #   include "correctCentralCoeffs.H"
 
 #if FOAMEXTEND > 40
     // Prepare clean 1/a_p without time derivative contribution
-    volScalarField rAU = 1.0/HUEqn.A();
+    const volScalarField rAU = 1.0/HUEqn.A();
 
     rAUf_ = fvc::interpolate(rAU);
 #else
-	volScalarField rAU = 1.0/AU;
+    const volScalarField rAU(1.0/AU);
 
-	rAUf_ = 1.0/fvc::interpolate(AUcorr, "interpolate(U)");
+    rAUf_ = 1.0/fvc::interpolate(AUcorr, "interpolate(U)");
 #endif
 
     while (piso().correct())
@@ -539,7 +539,7 @@ void unsIcoFluid::evolveConsistent()
         // Consistently calculate flux
         piso().calcTransientConsistentFlux(phi(), U(), rAU, ddtUEqn);
 #else
-#		include "calcPhiConsistent.H"
+#               include "calcPhiConsistent.H"
 
         // Calculate U from convection-diffusion matrix
         U() = rAU*(HUEqn.H() + ddtUEqn.H());
@@ -576,11 +576,11 @@ void unsIcoFluid::evolveConsistent()
                 mesh.solutionDict().solver(p().select(piso().finalInnerIter()))
             );
 #endif
-			if (Pstream::parRun())
-			{
-				// Needed for extrapolated BC
-				p().correctBoundaryConditions();
-			}
+                        if (Pstream::parRun())
+                        {
+                                // Needed for extrapolated BC
+                                p().correctBoundaryConditions();
+                        }
 
             gradp() = fvc::grad(p());
 
@@ -607,26 +607,26 @@ void unsIcoFluid::evolveConsistent()
 #endif
 
         gradU() = fvc::grad(U());
-		ddtU_ = fvc::ddt(U());
+                ddtU_ = fvc::ddt(U());
     }
 
     // Make the fluxes absolut to the mesh motion
     fvc::makeAbsolute(phi(), U());
 
-	// Update velocity on faces
+        // Update velocity on faces
     Uf_ = fvc::interpolate(U(), "interpolate(U)");
 
-	// Get tangential velocity
+        // Get tangential velocity
     Uf_ -= (mesh.Sf() & Uf_)*mesh.Sf()/magSqr(mesh.Sf());
 
-	// Update with normal from flux
+        // Update with normal from flux
     Uf_ += phi()*mesh.Sf()/magSqr(mesh.Sf());
 }
 
 void unsIcoFluid::evolveInconsistent()
 {
     Info<< "Evolving fluid model with inconsistent strategy: "
-		<< this->type() << endl;
+                << this->type() << endl;
 
     dynamicFvMesh& mesh = this->mesh();
 
@@ -684,9 +684,9 @@ void unsIcoFluid::evolveInconsistent()
 
 #if FOAMEXTEND > 40
     // Prepare clean 1/a_p without time derivative contribution
-    volScalarField rAU = 1.0/HUEqn.A();
+    volScalarField rAU(1.0/HUEqn.A());
 #else
-    volScalarField rAU = 1.0/(HUEqn.A() + ddtUEqn.A());
+    volScalarField rAU(1.0/(HUEqn.A() + ddtUEqn.A()));
 #endif
 
     rAUf_ = fvc::interpolate(rAU);
@@ -737,11 +737,11 @@ void unsIcoFluid::evolveInconsistent()
                 mesh.solutionDict().solver(p().select(piso().finalInnerIter()))
             );
 #endif
-			if (Pstream::parRun())
-			{
-				// Needed for extrapolated BC
-				p().correctBoundaryConditions();
-			}
+                        if (Pstream::parRun())
+                        {
+                                // Needed for extrapolated BC
+                                p().correctBoundaryConditions();
+                        }
 
             gradp() = fvc::grad(p());
 

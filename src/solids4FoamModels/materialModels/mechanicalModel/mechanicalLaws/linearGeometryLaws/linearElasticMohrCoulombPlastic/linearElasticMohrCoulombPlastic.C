@@ -689,14 +689,16 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
             mesh().lookupObject<volTensorField>("grad(D)");
 
         // Calculate gradient of displacement increment
-        const volTensorField gradDD = gradD - gradD.oldTime();
+        const volTensorField gradDD(gradD - gradD.oldTime());
 
         DEpsilon = symm(gradDD);
     }
 
     // Calculate trial elastic stress assuming Hooke's elastic law
-    const volSymmTensorField DSigmaTrial =
-        2.0*mu_*DEpsilon + lambda_*I*tr(DEpsilon);
+    const volSymmTensorField DSigmaTrial
+    (
+        2.0*mu_*DEpsilon + lambda_*I*tr(DEpsilon)
+    );
 
     // Set sigma to sigma effective trial
     sigma = sigmaEff_.oldTime() + DSigmaTrial;
@@ -795,14 +797,16 @@ void Foam::linearElasticMohrCoulombPlastic::correct
             mesh().lookupObject<surfaceTensorField>("grad(D)f");
 
         // Calculate gradient of displacement increment
-        const surfaceTensorField gradDD = gradD - gradD.oldTime();
+        const surfaceTensorField gradDD(gradD - gradD.oldTime());
 
         DEpsilon = symm(gradDD);
     }
 
     // Calculate trial elastic stress assuming Hooke's elastic law
-    const surfaceSymmTensorField DSigmaTrial =
-        2.0*mu_*DEpsilon + lambda_*I*tr(DEpsilon);
+    const surfaceSymmTensorField DSigmaTrial
+    (
+        2.0*mu_*DEpsilon + lambda_*I*tr(DEpsilon)
+    );
 
     // Set sigma to sigma effective trial
     sigma = sigmaEfff_.oldTime() + DSigmaTrial;
@@ -969,7 +973,7 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
             mesh().lookupObject<volTensorField>("grad(D)");
 
         // Calculate gradient of displacement increment
-        const volTensorField gradDD = gradD - gradD.oldTime();
+        const volTensorField gradDD(gradD - gradD.oldTime());
 
         DEpsilon = symm(gradDD);
     }
@@ -1035,7 +1039,7 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
     //   - dev(sigma - sigmaEff_.oldTime())/(2.0*mu_);
 
     // Calculate the increment of equivalent plastic strain
-    const volScalarField DEpsilonPEq = sqrt((2.0/3.0)*magSqr(dev(DEpsilonP_)));
+    const volScalarField DEpsilonPEq(sqrt((2.0/3.0)*magSqr(dev(DEpsilonP_))));
 
     // Update the total plastic strain
     epsilonP_ = epsilonP_.oldTime() + DEpsilonP_;

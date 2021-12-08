@@ -694,7 +694,7 @@ tmp<vectorField> coupledNonLinGeomPressureDisplacementSolid::tractionBoundarySnG
     const scalarField& pP = pf_.boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Patch total deformation gradient inverse
     const tensorField& Finv = Finvf_.boundaryField()[patchID];

@@ -28,11 +28,13 @@ if (true)
             //    U().boundaryField()[patchI]
             //   .gradientInternalCoeffs();
 
-            vectorField intCoeffsV =
+            vectorField intCoeffsV
+            (
                 nu_.value()*magSf
-               *U().boundaryField()[patchI].gradientInternalCoeffs();
+               *U().boundaryField()[patchI].gradientInternalCoeffs()
+            );
 
-            scalarField intCoeffs = cmptAv(intCoeffsV);
+            scalarField intCoeffs(cmptAv(intCoeffsV));
 
             forAll(intCoeffs, faceI)
             {
