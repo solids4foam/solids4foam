@@ -998,9 +998,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             forAll(fluid().globalPatches(), interfaceI)
             {
                 // Interpolate the FSI interface point motion to the faces
-                const vectorField interfacePatchMotion =
+                const vectorField interfacePatchMotion
+                (
                     fluidPatchesPointsDispls[interfaceI]
-                  - fluidPatchesPointsDisplsPrev[interfaceI];
+                  - fluidPatchesPointsDisplsPrev[interfaceI]
+                );
 
                 // Create interpolator
                 primitivePatchInterpolation interp
