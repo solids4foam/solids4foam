@@ -538,7 +538,7 @@ tmp
             point centrePoint = point::zero;
             Type cf = pTraits<Type>::zero;
 
-            for (register label pI=0; pI<nPoints; pI++)
+            for (label pI = 0; pI < nPoints; pI++)
             {
                 centrePoint += points[curFace[pI]];
                 cf += pfI[curFace[pI]];
@@ -547,7 +547,7 @@ tmp
             centrePoint /= nPoints;
             cf /= nPoints;
 
-            for (register label pI=0; pI<nPoints; pI++)
+            for (label pI = 0; pI < nPoints; pI++)
             {
                 // Calculate triangle centre field value
                 Type ttcf =
@@ -630,7 +630,7 @@ tmp
                 point centrePoint = point::zero;
                 Type cf = pTraits<Type>::zero;
 
-                for (register label pI=0; pI<nPoints; pI++)
+                for (label pI = 0; pI < nPoints; pI++)
                 {
                     centrePoint += points[curFace[pI]];
                     cf += pfI[curFace[pI]];
@@ -639,7 +639,7 @@ tmp
                 centrePoint /= nPoints;
                 cf /= nPoints;
 
-                for (register label pI=0; pI<nPoints; pI++)
+                for (label pI = 0; pI < nPoints; pI++)
                 {
                     // Calculate triangle centre field value
                     Type ttcf =
