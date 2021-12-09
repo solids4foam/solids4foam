@@ -92,7 +92,6 @@ $(nonLinGeomLaws)/GentElastic/GentElastic.C
 $(nonLinGeomLaws)/incompressibleMooneyRivlinElastic/incompressibleMooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
-$(nonLinGeomLaws)/neoHookeanElasticMisesPlasticRubin/neoHookeanElasticMisesPlasticRubin.C
 $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 $(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C
 $(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C

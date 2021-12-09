@@ -165,13 +165,13 @@ void Foam::StVenantKirchhoffElastic::correct(volSymmTensorField& sigma)
     }
 
     // Calculate the right Cauchy–Green deformation tensor
-    const volSymmTensorField c = symm(F().T() & F());
+    const volSymmTensorField c(symm(F().T() & F()));
 
     // Calculate the Green strain tensor
-    const volSymmTensorField E = 0.5*(c - I);
+    const volSymmTensorField E(0.5*(c - I));
 
     // Calculate the 2nd Piola Kirchhoff stress
-    const volSymmTensorField S = 2.0*mu_*E + lambda_*tr(E)*I;
+    const volSymmTensorField S(2.0*mu_*E + lambda_*tr(E)*I);
 
     // Calculate the Jacobian of the deformation gradient
     const volScalarField J(det(F()));
@@ -193,13 +193,13 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
     }
 
     // Calculate the right Cauchy–Green deformation tensor
-    const surfaceSymmTensorField c = symm(Ff().T() & Ff());
+    const surfaceSymmTensorField c(symm(Ff().T() & Ff()));
 
     // Calculate the Green strain tensor
-    const surfaceSymmTensorField E = 0.5*(c - I);
+    const surfaceSymmTensorField E(0.5*(c - I));
 
     // Calculate the 2nd Piola Kirchhoff stress
-    const surfaceSymmTensorField S = 2.0*mu_*E + lambda_*tr(E)*I;
+    const surfaceSymmTensorField S(2.0*mu_*E + lambda_*tr(E)*I);
 
     // Calculate the Jacobian of the deformation gradient
     const surfaceScalarField J(det(Ff()));
