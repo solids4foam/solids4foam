@@ -38,7 +38,6 @@ Author
 #define FieldSumOp_H
 
 #include "Field.H"
-#include "tmp.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -51,12 +50,12 @@ namespace Foam
         public:
 
         // Op function
-        tmp< Field<Type> > operator()
+        Field<Type> operator()
         (
             const Field<Type>& x, const Field<Type>& y
         ) const
         {
-            return tmp< Field<Type> >(new Field<Type>(x + y));
+            return Field<Type>(x + y);
         }
     };
 
