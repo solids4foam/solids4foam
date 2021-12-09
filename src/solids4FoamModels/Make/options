@@ -1,7 +1,7 @@
 ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
     DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-deprecated-declarations
 else
-    DISABLE_WARNING_FLAGS = -Wno-deprecated-copy
+    DISABLE_WARNING_FLAGS = -Wno-deprecated-copy -Wno-old-style-cast
 endif
 
 ifeq ($(WM_PROJECT), foam)

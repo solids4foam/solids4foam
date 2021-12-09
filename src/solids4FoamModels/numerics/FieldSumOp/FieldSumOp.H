@@ -46,7 +46,7 @@ namespace Foam
 {
 
     template<class Type>
-    class FieldSumOp
+    struct FieldSumOp
     {
         public:
 
@@ -56,19 +56,7 @@ namespace Foam
             const Field<Type>& x, const Field<Type>& y
         ) const
         {
-            tmp<Field<Type> > tresult(new Field<Type>(x));
-#ifdef OPENFOAMESIORFOUNDATION
-            Field<Type>& result = tresult.ref();
-#else
-            Field<Type>& result = tresult();
-#endif
-
-            forAll(result, i)
-            {
-                result[i] += y[i];
-            }
-
-            return tresult;
+            return tmp< Field<Type> >(new Field<Type>(x + y));
         }
     };
 
