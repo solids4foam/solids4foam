@@ -556,7 +556,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     }
 
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J = det(F());
+    const volScalarField J(det(F()));
 
     // Calculate the volume preserving right Cauchy Green tensor
     const volTensorField C = F().T() & F();
@@ -724,7 +724,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     }
 
     // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J = det(Ff());
+    const surfaceScalarField J(det(Ff()));
 
     // Calculate the volume preserving right Cauchy Green tensor
     const surfaceTensorField C = Ff().T() & Ff();

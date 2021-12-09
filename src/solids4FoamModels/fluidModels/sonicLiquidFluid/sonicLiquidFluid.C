@@ -236,7 +236,7 @@ void sonicLiquidFluid::solvePEqn(const fvVectorMatrix& UEqn)
 
     // Compute advective transport coeff. to pressure
 #ifdef OPENFOAMESIORFOUNDATION
-    const surfaceScalarField phid
+    surfaceScalarField phid
     (
         "phid",
         psi_
@@ -246,7 +246,7 @@ void sonicLiquidFluid::solvePEqn(const fvVectorMatrix& UEqn)
         )
     );
 #else
-    const surfaceScalarField phid
+    surfaceScalarField phid
     (
         "phid",
         psi_
