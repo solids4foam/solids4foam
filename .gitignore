@@ -50,6 +50,7 @@ linux*Icc*/
 darwin*Gcc*/
 darwin*Intel*/
 darwin*Arm*/
+darwin*Clang*/
 linuxming*/
 SiCortex*Gcc*/
 solaris*Gcc*/

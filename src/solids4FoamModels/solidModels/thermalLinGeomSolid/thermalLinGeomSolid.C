@@ -417,7 +417,7 @@ tmp<vectorField> thermalLinGeomSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>

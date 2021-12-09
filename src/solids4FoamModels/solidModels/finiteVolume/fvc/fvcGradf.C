@@ -67,7 +67,7 @@ tmp
 
     const fvMesh& mesh = vf.mesh();
 
-    surfaceVectorField n = mesh.Sf()/mesh.magSf();
+    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
     tmp<GeometricField<GradType, fvsPatchField, surfaceMesh> > tGrad
     (
@@ -187,7 +187,7 @@ tmp
         const vectorField& points = mesh.points();
         const faceList& faces = mesh.faces();
 
-        surfaceVectorField n = mesh.Sf()/mesh.magSf();
+        const surfaceVectorField n(mesh.Sf()/mesh.magSf());
         const vectorField& nI = n.internalField();
 
         const Field<Type>& pfI = pf.internalField();
@@ -307,7 +307,7 @@ tmp
             (
                 "grad(" + vf.name() + ")"
             );
-        surfaceVectorField n = mesh.Sf()/mesh.magSf();
+        const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
 #ifdef OPENFOAMESIORFOUNDATION
         tGrad.ref() = ((I - n*n) & linearInterpolate(gradVf));
@@ -713,8 +713,10 @@ tmp
         && !isA<wedgeFvPatch>(mesh.boundary()[patchI])
         )
         {
-            Field<Type> ppf =
-                pf.boundaryField()[patchI].patchInternalField();
+            Field<Type> ppf
+            (
+                pf.boundaryField()[patchI].patchInternalField()
+            );
 
 #ifdef OPENFOAMESIORFOUNDATION
             tGrad.ref().boundaryFieldRef()[patchI] ==
@@ -773,7 +775,7 @@ tmp
     {
         if (!vf.boundaryField()[patchi].coupled())
         {
-            vectorField n = vf.mesh().boundary()[patchi].nf();
+            const vectorField n(vf.mesh().boundary()[patchi].nf());
 
 #ifdef OPENFOAMESIORFOUNDATION
             tGrad.ref().boundaryFieldRef()[patchi] +=

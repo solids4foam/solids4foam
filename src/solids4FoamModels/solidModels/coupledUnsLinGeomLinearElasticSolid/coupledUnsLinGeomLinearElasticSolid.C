@@ -390,7 +390,7 @@ tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField pN = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>
@@ -398,8 +398,8 @@ tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::tractionBoundarySnGrad
         new vectorField
         (
             (
-                (traction - pN*pressure)
-              - (pN & (pSigma - (2.0*mu + lambda)*pGradD))
+                (traction - n*pressure)
+              - (n & (pSigma - (2.0*mu + lambda)*pGradD))
             )/(2.0*mu + lambda)
         )
     );

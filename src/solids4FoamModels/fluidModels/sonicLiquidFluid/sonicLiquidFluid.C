@@ -30,7 +30,7 @@ License
 #include "fvc.H"
 #include "fvm.H"
 #ifdef OPENFOAMESIORFOUNDATION
-	#include "CorrectPhi.H"
+        #include "CorrectPhi.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -52,18 +52,18 @@ addToRunTimeSelectionTable(fluidModel, sonicLiquidFluid, dictionary);
 
 void sonicLiquidFluid::compressibleContinuityErrs()
 {
-	scalar sumLocalContErr =
+        scalar sumLocalContErr =
         (sum(mag(rho_ - rho0_ - psi_*(p() - p0_)))/sum(rho_)).value();
 
-    scalar globalContErr = 
-		(
-			sum(rho_ - rho0_ - psi_*(p() - p0_))/sum(rho_)
-		).value();
+    scalar globalContErr =
+                (
+                        sum(rho_ - rho0_ - psi_*(p() - p0_))/sum(rho_)
+                ).value();
 
     cumulativeContErr_ += globalContErr;
 
-    Info<< "time step continuity errors : sum local = " 
-		<< sumLocalContErr
+    Info<< "time step continuity errors : sum local = "
+                << sumLocalContErr
         << ", global = " << globalContErr
         << ", cumulative = " << cumulativeContErr_ << endl;
 }
@@ -76,17 +76,17 @@ void sonicLiquidFluid::solveRhoEqn()
         fvm::ddt(rho_)
       + fvc::div(phi())
 #ifdef OPENFOAMESIORFOUNDATION
-	  ==
-		fvOptions_(rho_)
+          ==
+                fvOptions_(rho_)
 #endif
     );
 
 #ifdef OPENFOAMESIORFOUNDATION
-	fvOptions_.constrain(rhoEqn);
+        fvOptions_.constrain(rhoEqn);
 
     rhoEqn.solve();
 
-	fvOptions_.correct(rho_);
+        fvOptions_.correct(rho_);
 #else
     rhoEqn.solve();
 #endif
@@ -96,98 +96,98 @@ void sonicLiquidFluid::solveRhoEqn()
 void sonicLiquidFluid::CorrectFlux()
 {
 #ifdef OPENFOAMESIORFOUNDATION
-	// Store divrhoU from the previous mesh so that it can be mapped
-	// and used in correctPhi to ensure the corrected phi has the
-	// same divergence
-	autoPtr<volScalarField> divrhoU;
+        // Store divrhoU from the previous mesh so that it can be mapped
+        // and used in correctPhi to ensure the corrected phi has the
+        // same divergence
+        autoPtr<volScalarField> divrhoU;
 
-	divrhoU.set
-	(
-		new volScalarField
-		(
-			"divrhoU",
-			fvc::div(phi())
-		)
-	);
+        divrhoU.set
+        (
+                new volScalarField
+                (
+                        "divrhoU",
+                        fvc::div(phi())
+                )
+        );
 
-	// Store momentum to set rhoUf for introduced faces.
-	autoPtr<volVectorField> rhoU;
+        // Store momentum to set rhoUf for introduced faces.
+        autoPtr<volVectorField> rhoU;
 
-	// Calculate absolute flux
-	// from the mapped surface velocity
-	phi() = mesh().Sf() & rhoUf_();
+        // Calculate absolute flux
+        // from the mapped surface velocity
+        phi() = mesh().Sf() & rhoUf_();
 
-	// Define volScalarField to hold phi
-	// to pass to compressible CorrectPhi function
-	const volScalarField psi
-	(
-		 IOobject
-		 (
-			"psi",
-			runTime().timeName(),
-			mesh(),
-			IOobject::NO_READ,
-			IOobject::NO_WRITE
-		 ),
-		 mesh(),
-		 psi_
-	);
+        // Define volScalarField to hold phi
+        // to pass to compressible CorrectPhi function
+        const volScalarField psi
+        (
+                 IOobject
+                 (
+                        "psi",
+                        runTime().timeName(),
+                        mesh(),
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                 ),
+                 mesh(),
+                 psi_
+        );
 
-	CorrectPhi
-	(
-		U(),
-		phi(),
-		p(),
-		rho_,
-		psi,
-		dimensionedScalar("rAUf", dimTime, 1),
-		divrhoU(),
-		pimple()
+        CorrectPhi
+        (
+                U(),
+                phi(),
+                p(),
+                rho_,
+                psi,
+                dimensionedScalar("rAUf", dimTime, 1),
+                divrhoU(),
+                pimple()
 #ifndef OPENFOAMESI
-		,
-		true
+                ,
+                true
 #endif
-	);
+        );
 #else
-	Info<< "Correcting flux for moving mesh" << endl;
+        Info<< "Correcting flux for moving mesh" << endl;
 
-	// Store div(rhoU) before update
-	autoPtr<volScalarField> divrhoU;
+        // Store div(rhoU) before update
+        autoPtr<volScalarField> divrhoU;
 
-	divrhoU.set
-	(
-		new volScalarField
-		(
-			"divrhoU",
-			fvc::div(phi())
-		)
-	);
+        divrhoU.set
+        (
+                new volScalarField
+                (
+                        "divrhoU",
+                        fvc::div(phi())
+                )
+        );
 
-	volScalarField pcorr("pcorr", p());
-	pcorr *= 0;
+        volScalarField pcorr("pcorr", p());
+        pcorr *= 0;
 
-	// Initialise flux with interpolated velocity
-	phi() = fvc::interpolate(rho_*U()) & mesh().Sf();
+        // Initialise flux with interpolated velocity
+        phi() = fvc::interpolate(rho_*U()) & mesh().Sf();
 
-	adjustPhi(phi(), U(), pcorr);
+        adjustPhi(phi(), U(), pcorr);
 
-	mesh().schemesDict().setFluxRequired(pcorr.name());
+        mesh().schemesDict().setFluxRequired(pcorr.name());
 
-	surfaceScalarField rhorAUf
-	(
-		"rhorAUf",
-		fvc::interpolate(rho_*rAU_)
-	);
+        surfaceScalarField rhorAUf
+        (
+                "rhorAUf",
+                fvc::interpolate(rho_*rAU_)
+        );
 
     while (pimple().correctNonOrthogonal())
     {
         fvScalarMatrix pcorrEqn
         (
-			fvm::ddt(psi_, pcorr)
-		  + fvc::div(phi())
+                        fvm::ddt(psi_, pcorr)
+                  + fvc::div(phi())
           - fvm::laplacian(rhorAUf, pcorr)
-		 == divrhoU()
-		);
+                 == divrhoU()
+                );
 
         pcorrEqn.solve();
 
@@ -201,30 +201,28 @@ void sonicLiquidFluid::CorrectFlux()
 
 void sonicLiquidFluid::compressibleCourantNo()
 {
-	scalar CoNum = 0.0;                                                                               
-	scalar meanCoNum = 0.0;                                                     
-																				
-	surfaceScalarField SfUfbyDelta =
-		mesh().surfaceInterpolation::deltaCoeffs()
-	  * mag(phi())
-	  / fvc::interpolate(rho_);
+    scalar CoNum = 0.0;
+    scalar meanCoNum = 0.0;
 
-	CoNum = max(SfUfbyDelta/mesh().magSf())
-		.value()*runTime().deltaT().value();
+    surfaceScalarField SfUfbyDelta
+        (
+            mesh().surfaceInterpolation::deltaCoeffs()*mag(phi())
+            /fvc::interpolate(rho_)
+        );
 
-	meanCoNum = (sum(SfUfbyDelta)/sum(mesh().magSf()))
-		.value()*runTime().deltaT().value();
+    CoNum = max(SfUfbyDelta/mesh().magSf())
+        .value()*runTime().deltaT().value();
 
-	Info<< "Region: " << mesh().name()
-		<< " Courant Number mean: " << meanCoNum
-		<< " max: " << CoNum << endl;
+    meanCoNum = (sum(SfUfbyDelta)/sum(mesh().magSf()))
+        .value()*runTime().deltaT().value();
+
+    Info<< "Region: " << mesh().name()
+        << " Courant Number mean: " << meanCoNum
+        << " max: " << CoNum << endl;
 }
 
 
-void sonicLiquidFluid::solvePEqn
-(
-	const fvVectorMatrix& UEqn
-)
+void sonicLiquidFluid::solvePEqn(const fvVectorMatrix& UEqn)
 {
     rAU_ = 1.0/UEqn.A();
 
@@ -312,7 +310,7 @@ sonicLiquidFluid::sonicLiquidFluid
             IOobject::NO_WRITE
         )
     ),
-	mu_(transportProperties_.lookup("mu")),
+    mu_(transportProperties_.lookup("mu")),
     thermodynamicProperties_
     (
         IOobject
@@ -324,30 +322,30 @@ sonicLiquidFluid::sonicLiquidFluid
             IOobject::NO_WRITE
         )
     ),
-	rho0_(thermodynamicProperties_.lookup("rho0")),
-	p0_(thermodynamicProperties_.lookup("p0")),
+    rho0_(thermodynamicProperties_.lookup("rho0")),
+    p0_(thermodynamicProperties_.lookup("p0")),
     // pis (compressibility) can be read directly or calculated from the bulk
     // modulus
-	psi_
+    psi_
     (
         bool(thermodynamicProperties_.found("psi"))
       ? dimensionedScalar(thermodynamicProperties_.lookup("psi"))
       : rho0_/dimensionedScalar(thermodynamicProperties_.lookup("K"))
     ),
-	rhoO_
-	(
-	 	IOobject
-		(
-		 	"rhoO",
-			runTime.timeName(),
-			mesh(),
-			IOobject::NO_READ,
+    rhoO_
+    (
+        IOobject
+        (
+            "rhoO",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
             IOobject::NO_WRITE
-		),
-		mesh(),
-		rho0_ - psi_*p0_
-	),
-	rho_
+        ),
+        mesh(),
+        rho0_ - psi_*p0_
+    ),
+    rho_
     (
         IOobject
         (
@@ -360,7 +358,7 @@ sonicLiquidFluid::sonicLiquidFluid
         rhoO_ + psi_*p()
     ),
 #ifdef OPENFOAMESIORFOUNDATION
-	fvOptions_(fv::options::New(mesh())),
+    fvOptions_(fv::options::New(mesh())),
 #endif
     rAU_
     (
@@ -388,34 +386,34 @@ sonicLiquidFluid::sonicLiquidFluid
     phi() = linearInterpolate(rho_*U()) & mesh().Sf();
 
 #ifdef OPENFOAMESIORFOUNDATION
-	mesh().setFluxRequired(p().name());
+        mesh().setFluxRequired(p().name());
 
-	if (mesh().dynamic())
-	{
-		Info<< "Constructing face momentum rhoUf" << endl;
+        if (mesh().dynamic())
+        {
+                Info<< "Constructing face momentum rhoUf" << endl;
 
-		rhoUf_.set
-		(
-			new surfaceVectorField
-			(
-				IOobject
-				(
-					"rhoUf",
-					runTime.timeName(),
-					mesh(),
-					IOobject::READ_IF_PRESENT,
-					IOobject::AUTO_WRITE
-				),
-				fvc::interpolate(rho_*U())
-			)
-		);
-	}
+                rhoUf_.set
+                (
+                        new surfaceVectorField
+                        (
+                                IOobject
+                                (
+                                        "rhoUf",
+                                        runTime.timeName(),
+                                        mesh(),
+                                        IOobject::READ_IF_PRESENT,
+                                        IOobject::AUTO_WRITE
+                                ),
+                                fvc::interpolate(rho_*U())
+                        )
+                );
+        }
 
-	// Check if any finite volume option is present
-	if (!fvOptions_.optionList::size())
-	{
-		Info << "No finite volume options present\n" << endl;
-	}
+        // Check if any finite volume option is present
+        if (!fvOptions_.optionList::size())
+        {
+                Info << "No finite volume options present\n" << endl;
+        }
 #else
     mesh().schemesDict().setFluxRequired(p().name());
 #endif
@@ -447,12 +445,12 @@ tmp<vectorField> sonicLiquidFluid::patchViscousForce
     );
 
 #ifdef OPENFOAMESIORFOUNDATION
-	tvF.ref() =
+        tvF.ref() =
 #else
-	tvF() =
+        tvF() =
 #endif
         mu_.value()*U().boundaryField()[patchID].snGrad();
-        
+
     return tvF;
 }
 
@@ -467,13 +465,13 @@ tmp<scalarField> sonicLiquidFluid::patchPressureForce
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-	// Pressure here is already in Pa
+        // Pressure here is already in Pa
 #ifdef OPENFOAMESIORFOUNDATION
-	tpF.ref() =
+        tpF.ref() =
 #else
-	tpF() =
+        tpF() =
 #endif
-   	p().boundaryField()[patchID];
+        p().boundaryField()[patchID];
 
     return tpF;
 }
@@ -485,9 +483,9 @@ bool sonicLiquidFluid::evolve()
 
     dynamicFvMesh& mesh = this->mesh();
 
-	bool meshChanged = false;
+        bool meshChanged = false;
 
-	if (fluidModel::fsiMeshUpdate())
+        if (fluidModel::fsiMeshUpdate())
     {
         // The FSI interface is in charge of calling mesh.update()
         meshChanged = fluidModel::fsiMeshUpdateChanged();
@@ -507,58 +505,58 @@ bool sonicLiquidFluid::evolve()
     bool correctPhi
     (
         pimple().dict().lookupOrDefault("correctPhi", false)
-	);
+        );
 
-	if (correctPhi && meshChanged)
+        if (correctPhi && meshChanged)
     {
-		CorrectFlux();
+                CorrectFlux();
     }
 
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), rho_, U());
 
     // Calculate CourantNo
-	compressibleCourantNo();
+        compressibleCourantNo();
 
     // Pressure-velocity corrector
     while (pimple().loop())
     {
 #ifdef OPENFOAMFOUNDATION
-		if (!pimple().simpleRho())
-		{
-			solveRhoEqn();
-		}
+                if (!pimple().simpleRho())
+                {
+                        solveRhoEqn();
+                }
 #else
-		solveRhoEqn();
+                solveRhoEqn();
 #endif
 
         // --- Momentum equation
         // Time-derivative matrix
         fvVectorMatrix UEqn
-		(
-		 	fvm::ddt(rho_, U())
-		  + fvm::div(phi(), U())
-		  - fvm::laplacian(mu_, U())
+                (
+                        fvm::ddt(rho_, U())
+                  + fvm::div(phi(), U())
+                  - fvm::laplacian(mu_, U())
 #ifdef OPENFOAMESIORFOUNDATION
-		 ==
-			fvOptions_(rho_, U())
+                 ==
+                        fvOptions_(rho_, U())
 #endif
 
-		);
+                );
 
-		UEqn.relax();
+                UEqn.relax();
 
 #ifdef OPENFOAMESIORFOUNDATION
-		tmp<fvVectorMatrix> tUEqn(UEqn);
+                tmp<fvVectorMatrix> tUEqn(UEqn);
 
-		fvOptions_.constrain(UEqn);
+                fvOptions_.constrain(UEqn);
 #endif
 
-		if (pimple().momentumPredictor())
-		{
-			solve(UEqn == -fvc::grad(p()));
-		}
-		else
+                if (pimple().momentumPredictor())
+                {
+                        solve(UEqn == -fvc::grad(p()));
+                }
+                else
         {
             // Explicit update
             U() = (UEqn.H() - fvc::grad(p()))/UEqn.A();
@@ -573,42 +571,42 @@ bool sonicLiquidFluid::evolve()
         while (pimple().correct())
         {
 #ifdef OPENFOAMESIORFOUNDATION
-			solvePEqn(tUEqn.ref());
+                        solvePEqn(tUEqn.ref());
 #else
-			solvePEqn(UEqn);
+                        solvePEqn(UEqn);
 #endif
         }
 
 #ifdef OPENFOAMESIORFOUNDATION
-		tUEqn.clear();
+                tUEqn.clear();
 #endif
 
         gradU() = fvc::grad(U());
     }
 
-	// Update rho based on equation of state
-	rho_ = rhoO_ + psi_*p();
+        // Update rho based on equation of state
+        rho_ = rhoO_ + psi_*p();
 
     // Make the fluxes absolute to the mesh motion
     fvc::makeAbsolute(phi(), rho_, U());
 
-	// Print variables for inspection
-	// Density variation
-	scalar deltaRho = max(rho_).value() - min(rho_).value();
-	scalar refDeltaRho = 0.01*rho0_.value();
+        // Print variables for inspection
+        // Density variation
+        scalar deltaRho = max(rho_).value() - min(rho_).value();
+        scalar refDeltaRho = 0.01*rho0_.value();
 
-	// Info variable values
-	Info<< nl << "Density: min " << min(rho_).value() 
-		<< " max " << max(rho_).value() << endl;
+        // Info variable values
+        Info<< nl << "Density: min " << min(rho_).value()
+                << " max " << max(rho_).value() << endl;
 
-	Info<< "Density variation: " << deltaRho 
-		<< " ref: " << refDeltaRho << endl; 
+        Info<< "Density variation: " << deltaRho
+                << " ref: " << refDeltaRho << endl;
 
-	Info<< "Pressure: min " << min(p()).value()
-		<< " max " << max(p()).value() << endl;
+        Info<< "Pressure: min " << min(p()).value()
+                << " max " << max(p()).value() << endl;
 
-	Info<< "Velocity: min " << min(mag(U())).value()
-		<< " max " << max(mag(U())).value() << nl << nl;
+        Info<< "Velocity: min " << min(mag(U())).value()
+                << " max " << max(mag(U())).value() << nl << nl;
 
     return 0;
 }

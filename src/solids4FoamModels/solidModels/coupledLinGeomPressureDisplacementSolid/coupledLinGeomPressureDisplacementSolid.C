@@ -158,7 +158,7 @@ bool coupledLinGeomPressureDisplacementSolid::evolve()
             );
 
             // Store reciprocal of diagonal
-            const surfaceScalarField rAUf = fvc::interpolate(1.0/DEqn.A());
+            const surfaceScalarField rAUf(fvc::interpolate(1.0/DEqn.A()));
 
             // Under-relaxation the linear system
             DEqn.relax();
@@ -299,7 +299,7 @@ tmp<vectorField> coupledLinGeomPressureDisplacementSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>

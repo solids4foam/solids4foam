@@ -174,9 +174,9 @@ bool icoFluid::evolve()
 
 #if FOAMEXTEND > 40
     // Prepare clean 1/a_p without time derivative contribution
-    volScalarField rAU = 1.0/HUEqn.A();
+    volScalarField rAU(1.0/HUEqn.A());
 #else
-    volScalarField rAU = 1.0/(HUEqn.A() + ddtUEqn.A());
+    volScalarField rAU(1.0/(HUEqn.A() + ddtUEqn.A()));
     surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
 #endif
 
