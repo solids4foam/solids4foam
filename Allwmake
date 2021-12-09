@@ -32,3 +32,5 @@ fi
 
 # Compile applications
 (cd applications && ./Allwmake)
+
+echo; echo "solids4foam compilation complete; check for errors above"; echo
