@@ -228,61 +228,67 @@ void sonicLiquidFluid::solvePEqn
 {
     rAU_ = 1.0/UEqn.A();
 
-	surfaceScalarField rhorAUf
-	(
-		"rhorAUf",
-		fvc::interpolate(rho_*rAU_)
-	);
+    const surfaceScalarField rhorAUf
+    (
+        "rhorAUf",
+        fvc::interpolate(rho_*rAU_)
+    );
 
-	U() = rAU_*UEqn.H();
+    U() = rAU_*UEqn.H();
 
-	// Compute advective transport coeff. to pressure
-	surfaceScalarField phid
-	(
-		"phid",
-		psi_
-	   *(
+    // Compute advective transport coeff. to pressure
 #ifdef OPENFOAMESIORFOUNDATION
-			fvc::flux(U())
-		  + rhorAUf*fvc::ddtCorr(rho_, U(), phi())/fvc::interpolate(rho_)
+    const surfaceScalarField phid
+    (
+        "phid",
+        psi_
+       *(
+            fvc::flux(U())
+          + rhorAUf*fvc::ddtCorr(rho_, U(), phi())/fvc::interpolate(rho_)
+        )
+    );
 #else
-			(fvc::interpolate(U()) & mesh().Sf())
-		  - fvc::meshPhi(rho_, U())
+    const surfaceScalarField phid
+    (
+        "phid",
+        psi_
+       *(
+            (fvc::interpolate(U()) & mesh().Sf()) - fvc::meshPhi(rho_, U())
+        )
+    );
 #endif
-		)
-	);
 
 #ifdef OPENFOAMESIORFOUNDATION
-	// Make flux relative to mesh motion
-	fvc::makeRelative(phid, psi_, U());
+    // Make flux relative to mesh motion
+    fvc::makeRelative(phid, psi_, U());
 #endif
 
-	// Recompute flux for pressure equation
-	phi() = fvc::interpolate(rhoO_)*phid/psi_;
+    // Recompute flux for pressure equation
+    phi() = fvc::interpolate(rhoO_)*phid/psi_;
 
-	// Pressure equation 
-	// essential to account for ddt(rho0) term for mesh motion)
-	fvScalarMatrix pEqn
-	(
-		fvm::ddt(psi_, p())
-	  + fvc::div(phi())
-	  + fvm::div(phid, p())
-	  - fvm::laplacian(rhorAUf, p())
-	  + fvc::ddt(rhoO_) 
-	);
+    // Pressure equation
+    // essential to account for ddt(rho0) term for mesh motion)
+    fvScalarMatrix pEqn
+    (
+        fvm::ddt(psi_, p())
+      + fvc::div(phi())
+      + fvm::div(phid, p())
+      - fvm::laplacian(rhorAUf, p())
+      + fvc::ddt(rhoO_)
+    );
 
-	pEqn.solve();
+    pEqn.solve();
 
-	phi() += pEqn.flux();
+    phi() += pEqn.flux();
 
-	solveRhoEqn();
+    solveRhoEqn();
 
-	// State equation errors
-	compressibleContinuityErrs();
-	
-	// Correct velocity
-	U() -= rAU_*fvc::grad(p());
-	U().correctBoundaryConditions();
+    // State equation errors
+    compressibleContinuityErrs();
+
+    // Correct velocity
+    U() -= rAU_*fvc::grad(p());
+    U().correctBoundaryConditions();
 }
 
 
