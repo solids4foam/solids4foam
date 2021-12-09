@@ -153,7 +153,7 @@ void interFluid::solveAlphaEqnSubCycle(const pimpleControl& pimple)
     if (nAlphaSubCycles > 1)
     {
         const dimensionedScalar totalDeltaT = runTime().deltaT();
-        surfaceScalarField rhoPhiSum = 0.0*rhoPhi_;
+        surfaceScalarField rhoPhiSum(0.0*rhoPhi_);
 
         for
         (
@@ -187,18 +187,19 @@ void interFluid::solveAlphaEqn(const label nAlphaCorr)
     const word alphaScheme("div(phi,alpha)");
     const word alpharScheme("div(phirb,alpha)");
 
-    surfaceScalarField phic = mag(phi()/mesh().magSf());
+    surfaceScalarField phic(mag(phi()/mesh().magSf()));
 #ifdef OPENFOAMESIORFOUNDATION
     phic = min(mixture_.cAlpha()*phic, max(phic));
-    surfaceScalarField phir = phic*mixture_.nHatf();
+    surfaceScalarField phir(phic*mixture_.nHatf());
 #else
     phic = min(interface_.cAlpha()*phic, max(phic));
-    surfaceScalarField phir = phic*interface_.nHatf();
+    surfaceScalarField phir(phic*interface_.nHatf());
 #endif
 
     for (int aCorr=0; aCorr<nAlphaCorr; aCorr++)
     {
-        surfaceScalarField phiAlpha =
+        surfaceScalarField phiAlpha
+        (
             fvc::flux
             (
                 phi(),
@@ -210,7 +211,8 @@ void interFluid::solveAlphaEqn(const label nAlphaCorr)
                 -fvc::flux(-phir, scalar(1) - alpha1_, alpharScheme),
                 alpha1_,
                 alpharScheme
-            );
+            )
+        );
 
         MULES::explicitSolve(alpha1_, phi(), phiAlpha, 1, 0);
 
@@ -289,12 +291,15 @@ void interFluid::solvePEqn
     const scalar pdRefValue
 )
 {
-    volScalarField rUA = 1.0/UEqn.A();
-    surfaceScalarField rUAf = fvc::interpolate(rUA);
+    const volScalarField rUA(1.0/UEqn.A());
+    const surfaceScalarField rUAf(fvc::interpolate(rUA));
 
     U() = rUA*UEqn.H();
 
-    surfaceScalarField phiU("phiU", (fvc::interpolate(U()) & mesh().Sf()));
+    const surfaceScalarField phiU
+    (
+        "phiU", (fvc::interpolate(U()) & mesh().Sf())
+    );
 
     if (pd_.needReference())
     {
@@ -566,7 +571,7 @@ bool interFluid::evolve()
 
         solveAlphaEqnSubCycle(pimple);
 
-        fvVectorMatrix UEqn = solveUEqn(pimple);
+        fvVectorMatrix UEqn(solveUEqn(pimple));
 
         // --- PISO loop
         while (pimple.correct())
