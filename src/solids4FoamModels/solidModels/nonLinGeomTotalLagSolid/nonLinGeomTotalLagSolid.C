@@ -288,7 +288,7 @@ tmp<vectorField> nonLinGeomTotalLagSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals (initial configuration)
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     if (enforceLinear())
     {
@@ -311,7 +311,7 @@ tmp<vectorField> nonLinGeomTotalLagSolid::tractionBoundarySnGrad
         const tensorField& Finv = Finv_.boundaryField()[patchID];
 
         // Patch unit normals (deformed configuration)
-        vectorField nCurrent = Finv.T() & n;
+        vectorField nCurrent(Finv.T() & n);
         nCurrent /= mag(nCurrent);
 
         // Return patch snGrad

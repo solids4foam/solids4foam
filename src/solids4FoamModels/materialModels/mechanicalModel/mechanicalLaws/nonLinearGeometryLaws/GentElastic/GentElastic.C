@@ -153,13 +153,13 @@ void Foam::GentElastic::correct(volSymmTensorField& sigma)
     const dimensionedScalar N = N_/omega;
 
     // Jacobian of the deformation gradient
-    volScalarField J = det(F());
+    const volScalarField J(det(F()));
 
     // Right tensor product
-    const volSymmTensorField B = symm(F() & F().T());
+    const volSymmTensorField B(symm(F() & F().T()));
 
     // Left tensor product
-    const volSymmTensorField C = symm(F().T() & F());
+    const volSymmTensorField C(symm(F().T() & F()));
 
     // Calculate the sigma Terzaghi (Gent)
     sigma = kb*temperature_*(N/J)*((ilim_/(ilim_ - tr(B) + 3))*C - I);
@@ -200,13 +200,13 @@ void Foam::GentElastic::correct(surfaceSymmTensorField& sigma)
     const dimensionedScalar N = N_/omega;
 
     // Jacobian of the deformation gradient
-    const surfaceScalarField Jf = det(Ff());
+    const surfaceScalarField Jf(det(Ff()));
 
     // Right tensor product
-    const surfaceSymmTensorField Bf = symm(Ff() & Ff().T());
+    const surfaceSymmTensorField Bf(symm(Ff() & Ff().T()));
 
     // Left tensor product
-    const surfaceSymmTensorField Cf = symm(Ff().T() & Ff());
+    const surfaceSymmTensorField Cf(symm(Ff().T() & Ff()));
 
     // Calculate the sigma Terzaghi (Gent)
     sigma = kb*temperature_*(N/Jf)*((ilim_/(ilim_ - tr(Bf) + 3))*Cf - I);

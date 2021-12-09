@@ -61,9 +61,6 @@ class freeSurfaceVelocityFvPatchVectorField
         //- Name of density field
         word rhoName_;
 
-        //- Current time index
-        label curTimeIndex_;
-
 public:
 
     //- Runtime type information

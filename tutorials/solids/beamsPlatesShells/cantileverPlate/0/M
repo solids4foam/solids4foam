@@ -1,0 +1,94 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       areaScalarField;
+    location    "0";
+    object      M;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [1 1 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    right
+    {
+        // Simply supported
+        //type            fixedValue;
+        //value           uniform 0;
+
+        // Clamped
+        //type            clampedMoment;
+        //value           uniform 0;
+
+        // Shear force
+        // This is the force in Newtons
+        type              fixedGradient;
+        gradient          uniform 1e5;
+
+        // Free
+        //type              zeroGradient;
+    }
+
+    top
+    {
+        // Simply supported
+        //type            fixedValue;
+        //value           uniform 0;
+
+        // Clamped
+        //type            clampedMoment;
+        //value           uniform 0;
+
+        // Free?
+        type              zeroGradient;
+    }
+
+    bottom
+    {
+        // Simply supported
+        //type            fixedValue;
+        //value           uniform 0;
+
+        // Clamped
+        //type            clampedMoment;
+        //value           uniform 0;
+
+        // Free?
+        type              zeroGradient;
+    }
+
+    left
+    {
+        // Simply supported or free
+        //type            fixedValue;
+        //value           uniform 0;
+
+        // Clamped
+        type            clampedMoment;
+        relaxationFactor 0.01;
+        value           uniform 0;
+    }
+
+    back
+    {
+         type            empty;
+    }
+
+    front
+    {
+         type            empty;
+    }
+}
+
+// ************************************************************************* //

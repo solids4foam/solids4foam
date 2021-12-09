@@ -145,8 +145,8 @@ void Foam::thermalConvectionFvPatchScalarField::evaluate
         this->updateCoeffs();
     }
 
-    scalarField delta = 1.0/this->patch().deltaCoeffs() + SMALL;
-    scalarField TP = this->patchInternalField();
+    const scalarField delta(1.0/patch().deltaCoeffs() + SMALL);
+    const scalarField TP(patchInternalField());
 
     // Lookup thermal diffusivity i.e. conductivity
     const fvPatchField<scalar>& DT =
@@ -164,8 +164,8 @@ void Foam::thermalConvectionFvPatchScalarField::evaluate
 Foam::tmp<Foam::Field<Foam::scalar> >
 Foam::thermalConvectionFvPatchScalarField::snGrad() const
 {
-    scalarField delta = 1.0/this->patch().deltaCoeffs() + SMALL;
-    scalarField TP = this->patchInternalField();
+    const scalarField delta(1.0/patch().deltaCoeffs() + SMALL);
+    const scalarField TP(patchInternalField());
 
     const fvPatchField<scalar>& DT =
         patch().lookupPatchField<volScalarField, scalar>(DTName_);
@@ -189,15 +189,10 @@ Foam::thermalConvectionFvPatchScalarField::snGrad() const
 Foam::tmp<Foam::Field<Foam::scalar> >
 Foam::thermalConvectionFvPatchScalarField::gradientInternalCoeffs() const
 {
-    scalarField delta = 1.0/this->patch().deltaCoeffs() + SMALL;
+    const scalarField delta(1.0/patch().deltaCoeffs() + SMALL);
 
     const fvPatchField<scalar>& DT =
         patch().lookupPatchField<volScalarField, scalar>(DTName_);
-
-//     return tmp<Field<scalar> >
-//     (
-//         -pTraits<scalar>::one*DT*alpha_/(DT + alpha_*delta + SMALL)
-//     );
 
     return tmp<Field<scalar> >
     (
@@ -209,7 +204,7 @@ Foam::thermalConvectionFvPatchScalarField::gradientInternalCoeffs() const
 Foam::tmp<Foam::Field<Foam::scalar> >
 Foam::thermalConvectionFvPatchScalarField::gradientBoundaryCoeffs() const
 {
-    scalarField delta = 1.0/this->patch().deltaCoeffs() + SMALL;
+    const scalarField delta(1.0/patch().deltaCoeffs() + SMALL);
 
     const fvPatchField<scalar>& DT =
         patch().lookupPatchField<volScalarField, scalar>(DTName_);

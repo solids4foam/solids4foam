@@ -105,6 +105,12 @@ class mechanicalLaw
         //      p is the pore pressure
         autoPtr<volSymmTensorField> sigmaEffPtr_;
 
+        //- Current time index
+        label curTimeIndex_;
+
+        //- Enforce linearity warning flag
+        bool warnAboutEnforceLinear_;
+
 
     // Private Member Functions
 

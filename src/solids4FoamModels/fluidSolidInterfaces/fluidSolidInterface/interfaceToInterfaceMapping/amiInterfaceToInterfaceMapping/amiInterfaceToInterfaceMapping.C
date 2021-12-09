@@ -100,22 +100,27 @@ void amiInterfaceToInterfaceMapping::checkZoneAToZoneBError() const
     const vectorField& patchAFaceCentres = patchA().faceCentres();
 
     // Construct global zone field
-    const vectorField zoneAFaceCentres =
-        globalPatchA().patchFaceToGlobal(patchAFaceCentres);
+    const vectorField zoneAFaceCentres
+    (
+        globalPatchA().patchFaceToGlobal(patchAFaceCentres)
+    );
 
     // Interpolate global zone field from A to B
-    const vectorField zoneBFaceCentres =
-        interpolator().interpolateToTarget(zoneAFaceCentres);
+    const vectorField zoneBFaceCentres
+    (
+        interpolator().interpolateToTarget(zoneAFaceCentres)
+    );
 
     // Extract local patch field
-    const vectorField patchBFaceCentres =
-        globalPatchB().globalFaceToPatch(zoneBFaceCentres);
+    const vectorField patchBFaceCentres
+    (
+        globalPatchB().globalFaceToPatch(zoneBFaceCentres)
+    );
 
     // Print maximum error
     Info<< "interface-to-interface face error: "
         << gMax(mag(patchBFaceCentres - patchB().faceCentres()))
         << endl;
-
 }
 
 

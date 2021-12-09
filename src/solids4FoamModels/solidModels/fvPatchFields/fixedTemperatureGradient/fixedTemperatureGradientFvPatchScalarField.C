@@ -147,8 +147,8 @@ void fixedTemperatureGradientFvPatchScalarField::evaluate
             "grad(" + fieldName_ + ")"
         );
 
-    vectorField n = patch().nf();
-    vectorField delta = patch().delta();
+    vectorField n(patch().nf());
+    vectorField delta(patch().delta());
 
     // Correction vectors
     vectorField k = delta - n*(n&delta);

@@ -28,6 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -65,33 +66,93 @@ bool Foam::solidTorque::writeData()
         // Check if the stress tensor field is found
         if (mesh.foundObject<volSymmTensorField>(stressName_))
         {
+            // Cauchy stress tensor
             const symmTensorField& sigma =
                 mesh.lookupObject<volSymmTensorField>
                 (
                     stressName_
                 ).boundaryField()[historyPatchID_];
 
-            // Calculate moment arms
-            const vectorField patchC =
-                mesh.C().boundaryField()[historyPatchID_];
+            // Patch area vectors
+            const vectorField& patchSf =
+                mesh.Sf().boundaryField()[historyPatchID_];
 
-            vectorField r = patchC - pointOnAxis_;
-            r -= axis_*(axis_ & r);
+            // Lookup solid model
+            const solidModel& solMod = lookupSolidModel(mesh);
 
-            // Calculate torque
-            const vectorField force =
-                mesh.Sf().boundaryField()[historyPatchID_] & sigma;
+            scalar torque = 0.0;
 
-            const vector torque = gSum(r ^ force);
+            // Check if it is a linear or nonlinear geometry case
+            if
+            (
+                solMod.nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY
+             || solMod.nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN
+            )
+            {
+                // Calculate moment arms
+                const vectorField patchC =
+                    mesh.C().boundaryField()[historyPatchID_];
+                vectorField r = patchC - pointOnAxis_;
+                r -= axis_*(axis_ & r);
 
+                // Calculate force
+                const vectorField force = patchSf & sigma;
+
+                // Calculate torque
+                torque = gSum(axis_ & (r ^ force));
+            }
+            else if (solMod.nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
+            {
+                // Lookup the total displacement field
+                const vectorField& D =
+                    mesh.lookupObject<volVectorField>
+                    (
+                        "D"
+                    ).boundaryField()[historyPatchID_];
+
+                // Calculate deformed patch face centres
+                const vectorField patchDeformC =
+                    mesh.C().boundaryField()[historyPatchID_] + D;
+
+                // Calculate moment arms
+                vectorField r = patchDeformC - pointOnAxis_;
+                r -= axis_*(axis_ & r);
+
+                // Lookup the inverse of the deformation gradient
+                const tensorField& Finv =
+                    mesh.lookupObject<volTensorField>
+                    (
+                        "Finv"
+                    ).boundaryField()[historyPatchID_];
+
+                // Lookup the Jacobian
+                const scalarField& J =
+                    mesh.lookupObject<volScalarField>
+                    (
+                        "J"
+                    ).boundaryField()[historyPatchID_];
+
+                // Calculate area vectors in the deformed configuration
+                const vectorField patchDeformSf = (J*Finv.T() & patchSf);
+
+                // Calculate force
+                const vectorField force = patchDeformSf & sigma;
+
+                // Calculate torque
+                torque = gSum(axis_ & (r ^ force));
+            }
+            else
+            {
+                FatalErrorIn("bool Foam::solidForces::writeData()")
+                    << "Unknown solidModel nonLinGeom type = "
+                    << solMod.nonLinGeom() << abort(FatalError);
+            }
+
+            // Write to file
             if (Pstream::master())
             {
                 historyFilePtr_()
-                    << time_.time().value()
-                    << " " << torque.x() << " " << torque.y()
-                    << " " << torque.z();
-
-                historyFilePtr_() << endl;
+                    << time_.time().value() << " " << torque << endl;
             }
         }
         else
@@ -126,7 +187,7 @@ Foam::solidTorque::solidTorque
     ),
     pointOnAxis_(dict.lookup("pointOnAxis")),        
     axis_(dict.lookup("axisDirection")),
-    historyFilePtr_(NULL)
+    historyFilePtr_()
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 

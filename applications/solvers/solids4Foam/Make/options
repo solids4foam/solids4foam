@@ -1,7 +1,8 @@
 ifeq ($(WM_PROJECT), foam)
     VERSION_SPECIFIC_LIBS = \
         -lincompressibleTurbulenceModel -lincompressibleRASModels \
-        -lincompressibleLESModels -llduSolvers -linterfaceProperties
+        -lincompressibleLESModels -llduSolvers -linterfaceProperties \
+        -lfiniteArea
     VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
     ifeq ($(VER), 1)
         VERSION_SPECIFIC_LIBS += -loversetMesh -loversetDynamicFvMesh
@@ -40,6 +41,13 @@ else
     else
         VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
     endif
+endif
+
+ifdef S4F_USE_GFORTRAN
+    GFORTRAN_LIBS = \
+        -lgfortran \
+        $(FOAM_USER_LIBBIN)/abaqusUmatLinearElastic.o \
+        -labaqusUmatLinearElastic
 endif
 
 EXE_INC = \
@@ -86,6 +94,4 @@ EXE_LIBS = \
     -ldynamicMesh \
     -lmeshTools \
     -ltopoChangerFvMesh \
-    -lgfortran \
-    $(FOAM_USER_LIBBIN)/abaqusUmatLinearElastic.o \
-    -labaqusUmatLinearElastic
+    $(GFORTRAN_LIBS)

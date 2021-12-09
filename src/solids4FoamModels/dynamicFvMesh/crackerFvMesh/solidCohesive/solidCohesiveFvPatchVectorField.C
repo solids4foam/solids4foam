@@ -464,10 +464,10 @@ void solidCohesiveFvPatchVectorField::evaluate(const Pstream::commsTypes)
         );
 
     // Patch unit normals
-    const vectorField n = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Correction vectors
     const vectorField k = delta - n*(n&delta);

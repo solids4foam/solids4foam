@@ -178,7 +178,7 @@ bool linGeomPressureDisplacementSolid::evolve()
             gradDD() = gradD() - gradD().oldTime();
 
             // Store reciprocal of diagonal
-            const surfaceScalarField rAUf = fvc::interpolate(1.0/DEqn.A());
+            const surfaceScalarField rAUf(fvc::interpolate(1.0/DEqn.A()));
 
             // Calculate hydrostatic pressure
             if (solvePressureEquationImplicitly_)
@@ -339,7 +339,7 @@ tmp<vectorField> linGeomPressureDisplacementSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>

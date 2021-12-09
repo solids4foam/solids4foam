@@ -201,7 +201,7 @@ tmp<vectorField> linGeomSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField pN = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>
@@ -209,8 +209,8 @@ tmp<vectorField> linGeomSolid::tractionBoundarySnGrad
         new vectorField
         (
             (
-                (traction - pN*pressure)
-              - (pN & (pSigma - pImpK*pGradDD))
+                (traction - n*pressure)
+              - (n & (pSigma - pImpK*pGradDD))
             )*pRImpK
         )
     );

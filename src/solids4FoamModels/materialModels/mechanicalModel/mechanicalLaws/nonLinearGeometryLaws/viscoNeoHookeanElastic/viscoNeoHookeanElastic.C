@@ -556,18 +556,18 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     }
 
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J = det(F());
+    const volScalarField J(det(F()));
 
     // Calculate the volume preserving right Cauchy Green tensor
-    const volTensorField C = F().T() & F();
+    const volTensorField C(F().T() & F());
     // PC: this should be symmetric, we could do this:
     // const volTensorField C = symm(F().T() & F());
 
     // Define Fbar := J^(-1/3)*F
-    const volTensorField Fbar = pow(J, -1.0/3.0)*F();
+    const volTensorField Fbar(pow(J, -1.0/3.0)*F());
 
     // Define Cbar := J^(-2/3)*C
-    const volTensorField Cbar = pow(J, -2.0/3.0)*C;
+    const volTensorField Cbar(pow(J, -2.0/3.0)*C);
 
     // Take references to the internal fields for efficiency
 #ifdef OPENFOAMESIORFOUNDATION
@@ -661,7 +661,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     sigma = dev(transformFbar_);
 
     // Calculate initial stress
-    const volTensorField invFbar = inv(Fbar);
+    const volTensorField invFbar(inv(Fbar));
 
     s_ = transform(invFbar, sigma);
 
@@ -696,10 +696,12 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     }
 
     // Calculate hydrostatic pressure, defined in (G. A. HOLZAPFEL,1996)
-    const volScalarField pressure_ =
-        K_*(1.0/(beta_.value()*J))*(1 - pow(J, -beta_.value()));
+    const volScalarField pressure
+    (
+        K_*(1.0/(beta_.value()*J))*(1 - pow(J, -beta_.value()))
+    );
 
-    sigma += J*pressure_*I + gRelax*sigma;
+    sigma += J*pressure*I + gRelax*sigma;
 
     forAll(H_, MaxwellModelI)
     {
@@ -724,18 +726,18 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     }
 
     // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J = det(Ff());
+    const surfaceScalarField J(det(Ff()));
 
     // Calculate the volume preserving right Cauchy Green tensor
-    const surfaceTensorField C = Ff().T() & Ff();
+    const surfaceTensorField C(Ff().T() & Ff());
     // PC: this should be symmetric, we could do this:
     // const surfaceTensorField C = symm(F().T() & F());
 
     // Define Fbar := J^(-1/3)*F
-    const surfaceTensorField Fbar = pow(J, -1.0/3.0)*Ff();
+    const surfaceTensorField Fbar(pow(J, -1.0/3.0)*Ff());
 
     // Define Cbar := J^(-2/3)*C
-    const surfaceTensorField Cbar = pow(J, -2.0/3.0)*C;
+    const surfaceTensorField Cbar(pow(J, -2.0/3.0)*C);
 
     // Take references to the internal fields for efficiency
 #ifdef OPENFOAMESIORFOUNDATION
@@ -829,7 +831,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     sigma = dev(transformFbarf_);
 
     // Calculate initial stress
-    const surfaceTensorField invFbar = inv(Fbar);
+    const surfaceTensorField invFbar(inv(Fbar));
 
     sf_ = transform(invFbar, sigma);
 
@@ -864,10 +866,12 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     }
 
     // Calculate hydrostatic pressure, defined in (G. A. HOLZAPFEL,1996)
-    const surfaceScalarField pressure_ =
-        K_*(1.0/(beta_.value()*J))*(1 - pow(J, -beta_.value()));
+    const surfaceScalarField pressure
+    (
+        K_*(1.0/(beta_.value()*J))*(1 - pow(J, -beta_.value()))
+    );
 
-    sigma += J*pressure_*I + gRelax*sigma;
+    sigma += J*pressure*I + gRelax*sigma;
 
     forAll(Hf_, MaxwellModelI)
     {

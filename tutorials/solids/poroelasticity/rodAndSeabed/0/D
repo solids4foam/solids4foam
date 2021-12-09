@@ -21,18 +21,6 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-    structure
-    {
-        //type            timeVaryingMappedFixedValue;
-        // setAverage off;
-        //type            timeVaryingMappedTotalTraction;
-        // Not equivalent but we will use it in the interim
-        type            solidTraction;
-        traction        uniform (0 0 0);
-        pressure        uniform 1e4;
-        value           uniform (0 0 0);
-    }
-
     bottom
     {
         type            slip;
@@ -45,13 +33,11 @@ boundaryField
 
     seabed
     {
-        // type            fixedTraction;
         type            solidTraction;
         traction        uniform (0 0 0);
         pressure        uniform  0;
         value           uniform (0 0 0);
     }
-
 }
 
 // ************************************************************************* //

@@ -200,7 +200,7 @@ void Foam::fluidModel::CourantNo
 {
     if (mesh().nInternalFaces())
     {
-        surfaceScalarField magPhi = mag(phi());
+        surfaceScalarField magPhi(mag(phi()));
 
         if (phi().dimensions() == dimVelocity*dimArea*dimDensity)
         {
@@ -210,8 +210,10 @@ void Foam::fluidModel::CourantNo
             magPhi /= fvc::interpolate(rho);
         }
 
-        const surfaceScalarField SfUfbyDelta =
-            mesh().surfaceInterpolation::deltaCoeffs()*magPhi;
+        const surfaceScalarField SfUfbyDelta
+        (
+            mesh().surfaceInterpolation::deltaCoeffs()*magPhi
+        );
 
         const scalar deltaT = runTime().deltaT().value();
 
@@ -280,7 +282,7 @@ void Foam::fluidModel::oversetCourantNo() const
 
 void Foam::fluidModel::continuityErrs()
 {
-    const volScalarField contErr = fvc::div(phi());
+    const volScalarField contErr(fvc::div(phi()));
 
     const scalar sumLocalContErr = runTime().deltaT().value()*
         mag(contErr)().weightedAverage(mesh().V()).value();
@@ -337,15 +339,17 @@ void Foam::fluidModel::boundPU
     }
 
     // Bound the velocity
-    volScalarField magU = mag(U);
-    dimensionedScalar U1 = max(magU);
+    volScalarField magU(mag(U));
+    dimensionedScalar U1(max(magU));
 
     if (U1 > UMax_)
     {
         Info<< "U: " << U1.value() << ".  Bounding." << endl;
 
-        volScalarField Ulimiter = pos(magU - UMax_)*UMax_/(magU + smallU_)
-            + neg(magU - UMax_);
+        volScalarField Ulimiter
+        (
+            pos(magU - UMax_)*UMax_/(magU + smallU_) + neg(magU - UMax_)
+        );
         Ulimiter.max(scalar(0));
         Ulimiter.min(scalar(1));
 
@@ -661,8 +665,10 @@ Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce
     const label interfaceI
 ) const
 {
-    const vectorField patchVF =
-        patchViscousForce(globalPatches()[interfaceI].patch().index());
+    const vectorField patchVF
+    (
+        patchViscousForce(globalPatches()[interfaceI].patch().index())
+    );
 
     return globalPatches()[interfaceI].patchFaceToGlobal(patchVF);
 }
@@ -673,8 +679,10 @@ Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce
     const label interfaceI
 ) const
 {
-    const scalarField patchPF =
-        patchPressureForce(globalPatches()[interfaceI].patch().index());
+    const scalarField patchPF
+    (
+        patchPressureForce(globalPatches()[interfaceI].patch().index())
+    );
 
     return globalPatches()[interfaceI].patchFaceToGlobal(patchPF);
 }

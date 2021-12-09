@@ -139,7 +139,7 @@ void Foam::poroLinearElastic::correct(surfaceSymmTensorField& sigma)
     const volScalarField& p = mesh().lookupObject<volScalarField>("p");
 
     // Interpolate pressure to the faces
-    const surfaceScalarField pf = fvc::interpolate(p);
+    const surfaceScalarField pf(fvc::interpolate(p));
 
     // Calculate the total stress as the sum of the effective stress and the
     // pore-pressure

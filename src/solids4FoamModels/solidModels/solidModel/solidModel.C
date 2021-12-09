@@ -364,8 +364,10 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
         }
         else
         {
-            const volVectorField aitkenResidualDelta =
-                aitkenResidual_.prevIter() - aitkenResidual_;
+            const volVectorField aitkenResidualDelta
+            (
+                aitkenResidual_.prevIter() - aitkenResidual_
+            );
 
             // Update the relaxation factor field
             aitkenAlpha_ =
@@ -1055,8 +1057,10 @@ void Foam::solidModel::makeGlobalPatches
             );
 
             // Calculate deformation point positions
-            const pointField newPoints =
-                mesh().points() + pointDorPointDD().internalField();
+            const pointField newPoints
+            (
+                mesh().points() + pointDorPointDD().internalField()
+            );
 
             // Move the mesh to deformed position
             // const_cast is justified as it is not our intention to permanently
@@ -1186,7 +1190,7 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
     const label interfaceI
 ) const
 {
-    const volVectorField a = fvc::d2dt2(D());
+    const volVectorField a(fvc::d2dt2(D()));
 
     return globalPatches()[interfaceI].patchFaceToGlobal
     (
@@ -1369,8 +1373,10 @@ void Foam::solidModel::setTraction
     const vectorField& faceZoneTraction
 )
 {
-    const vectorField patchTraction =
-        globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction);
+    const vectorField patchTraction
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction)
+    );
 
 #ifdef OPENFOAMESIORFOUNDATION
     setTraction(solutionD().boundaryFieldRef()[patchID], patchTraction);
@@ -1387,8 +1393,10 @@ void Foam::solidModel::setPressure
     const scalarField& faceZonePressure
 )
 {
-    const scalarField patchPressure =
-        globalPatches()[interfaceI].globalFaceToPatch(faceZonePressure);
+    const scalarField patchPressure
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZonePressure)
+    );
 
 #ifdef OPENFOAMESIORFOUNDATION
     setPressure(solutionD().boundaryFieldRef()[patchID], patchPressure);

@@ -186,10 +186,10 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
           + ")"
         );
 
-        dimensionedScalar halfRdeltaT2 = 0.5*rDeltaT2;
+        const dimensionedScalar halfRdeltaT2 = 0.5*rDeltaT2;
 
-        volScalarField rhoRho0 = rho + rho.oldTime();
-        volScalarField rho0Rho00 = rho.oldTime() +rho.oldTime().oldTime();
+        const volScalarField rhoRho0(rho + rho.oldTime());
+        const volScalarField rho0Rho00(rho.oldTime() +rho.oldTime().oldTime());
 
         return tmp<GeometricField<Type, fvPatchField, volMesh> >
         (
@@ -207,10 +207,10 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
     }
     else
     {
-        dimensionedScalar halfRdeltaT2 = 0.5*rDeltaT2;
+        const dimensionedScalar halfRdeltaT2 = 0.5*rDeltaT2;
 
-        volScalarField rhoRho0 = rho + rho.oldTime();
-        volScalarField rho0Rho00 = rho.oldTime() + rho.oldTime().oldTime();
+        const volScalarField rhoRho0(rho + rho.oldTime());
+        const volScalarField rho0Rho00(rho.oldTime() + rho.oldTime().oldTime());
 
         return tmp<GeometricField<Type, fvPatchField, volMesh> >
         (
@@ -383,10 +383,12 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
     {
         scalar halfRdeltaT2 = 0.5*rDeltaT2;
 
-        scalarField rhoRho0 =
-            (rho.primitiveField() + rho.oldTime().primitiveField());
+        const scalarField rhoRho0
+        (
+            (rho.primitiveField() + rho.oldTime().primitiveField())
+        );
 
-        scalarField rho0Rho00 =
+        const scalarField rho0Rho00
         (
             rho.oldTime().primitiveField()
           + rho.oldTime().oldTime().primitiveField()

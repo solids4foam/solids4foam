@@ -115,26 +115,26 @@ elasticSlipWallVelocityFvPatchVectorField
     //
     if (dict.found("refValue"))
     {
-        this->refValue() = vectorField("refValue", dict, p.size());
+        refValue() = vectorField("refValue", dict, p.size());
     }
     else
     {
-        this->refValue() = vector::zero;
+        refValue() = vector::zero;
     }
 
     if (dict.found("refGradient"))
     {
-        this->refGrad() = vectorField("refGradient", dict, p.size());
+        refGrad() = vectorField("refGradient", dict, p.size());
     }
     else
     {
-        this->refGrad() = vector::zero;
+        refGrad() = vector::zero;
     }
 
     // Patch normal
-    vectorField n = patch().nf();
+    vectorField n(patch().nf());
 
-    this->valueFraction() = sqr(n);
+    valueFraction() = sqr(n);
 
     if (dict.found("value"))
     {
@@ -142,13 +142,17 @@ elasticSlipWallVelocityFvPatchVectorField
     }
     else
     {
-        Field<vector> normalValue = transform(valueFraction(), refValue());
+        const Field<vector> normalValue(transform(valueFraction(), refValue()));
 
-        Field<vector> gradValue =
-            this->patchInternalField() + refGrad()/this->patch().deltaCoeffs();
+        const Field<vector> gradValue
+        (
+            patchInternalField() + refGrad()/patch().deltaCoeffs()
+        );
 
-        Field<vector> transformGradValue =
-            transform(I - valueFraction(), gradValue);
+        const Field<vector> transformGradValue
+        (
+            transform(I - valueFraction(), gradValue)
+        );
 
         Field<vector>::operator=(normalValue + transformGradValue);
     }
@@ -220,7 +224,7 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
 #endif
         );
 
-    word ddtScheme
+    const word ddtScheme
     (
 #ifdef OPENFOAMESIORFOUNDATION
         mesh.ddtScheme("ddt(" + U.name() +')')
@@ -231,11 +235,10 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
 
     if (ddtScheme == fv::backwardDdtScheme<vector>::typeName)
     {
-        if(myTimeIndex_ < mesh.time().timeIndex())
+        if (myTimeIndex_ < mesh.time().timeIndex())
         {
             oldoldFc_ = oldFc_;
             oldFc_ = Fc_;
-//             Fc_ = pp.faceCentres();
 
             forAll(Fc_, i)
             {
@@ -245,8 +248,9 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
             myTimeIndex_ = mesh.time().timeIndex();
         }
 
-        scalar deltaT = mesh.time().deltaT().value();
+        const scalar deltaT = mesh.time().deltaT().value();
         scalar deltaT0 = mesh.time().deltaT0().value();
+
         if
         (
             U.oldTime().timeIndex() == U.oldTime().oldTime().timeIndex()
@@ -257,18 +261,11 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
         }
 
         //Set coefficients based on deltaT and deltaT0
-        scalar coefft   = 1 + deltaT/(deltaT + deltaT0);
-        scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
-//         scalar coefft0  = coefft + coefft00;
-
-//         Up = (coefft*Fc_ - coefft0*oldFc_ + coefft00*oldoldFc_)
-//            /mesh.time().deltaT().value();
-
+        const scalar coefft   = 1 + deltaT/(deltaT + deltaT0);
+        const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
 
         Up = coefft*(Fc_ - oldFc_)/deltaT
-          - coefft00*(oldFc_ - oldoldFc_)/deltaT;
-
-//         Info << max(mag(Up)) << endl;
+           - coefft00*(oldFc_ - oldoldFc_)/deltaT;
     }
     else // Euler
     {
@@ -281,48 +278,46 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
                 Fc_[i] = pp[i].centre(points);
             }
 
-//             Fc_ = pp.faceCentres();
             myTimeIndex_ = mesh.time().timeIndex();
         }
 
         Up = (Fc_ - oldFc_)/mesh.time().deltaT().value();
     }
 
-    scalarField phip =
-        p.patchField<surfaceScalarField, scalar>(fvc::meshPhi(U));
+    const scalarField phip
+    (
+        p.patchField<surfaceScalarField, scalar>(fvc::meshPhi(U))
+    );
 
-    vectorField n = p.nf();
+    const vectorField n(p.nf());
     const scalarField& magSf = p.magSf();
-    scalarField Un = phip/(magSf + VSMALL);
+    scalarField Un(phip/(magSf + VSMALL));
 
     Up += n*(Un - (n & Up));
 
-
-//     vectorField::operator=(Up);
     movingWallVelocity_ = Up;
 
-    this->valueFraction() = sqr(n);
-
-
-//     this->refValue() = movingWallVelocity_;
-//     Info << max(Un) << endl;
+    valueFraction() = sqr(n);
 
     if (mesh.foundObject<surfaceScalarField>("phi"))
     {
         const surfaceScalarField& phi =
             mesh.lookupObject<surfaceScalarField>("phi");
 
-        scalarField phip = phi.boundaryField()[this->patch().index()];
+        const scalarField phip(phi.boundaryField()[patch().index()]);
+
         Un = phip/(magSf + VSMALL);
     }
     else
     {
         const volScalarField& pressure =
             mesh.lookupObject<volScalarField>("p");
-        scalarField nGradP =
-            pressure.boundaryField()[this->patch().index()].snGrad();
+        const scalarField nGradP
+        (
+            pressure.boundaryField()[patch().index()].snGrad()
+        );
 
-        IOdictionary transportProperties
+        const IOdictionary transportProperties
         (
             IOobject
             (
@@ -334,18 +329,20 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
             )
         );
 
-        dimensionedScalar rho
+        const dimensionedScalar rho
         (
             transportProperties.lookup("rho")
         );
 
-        vectorField UOld = U.oldTime().boundaryField()[this->patch().index()];
+        const vectorField UOld
+        (
+            U.oldTime().boundaryField()[patch().index()]
+        );
+
         Un = (n & UOld) - nGradP*mesh.time().deltaT().value()/rho.value();
     }
 
-    this->refValue() = n*Un;
-
-//     Info << max(mag(nGradP)) << endl;
+    refValue() = n*Un;
 
     solidDirectionMixedFvPatchVectorField::updateCoeffs();
 }

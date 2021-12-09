@@ -22,31 +22,29 @@ boundaryField
 {
     left
     {
-        type            solidSymmetry;
-        patchType       symmetryPlane;
-        value           uniform (0 0 0);
+        type            symmetryPlane;
+        skewCorrected   yes;
     }
     right
     {
+        // This is an example of how you can set a pressure field based on a
+        // point cloud
         type            solidTraction;
-        tractionSeries
-        {
-            "fileName|file"    "$FOAM_CASE/constant/timeVsTraction";
-            outOfBounds clamp;
-        }
-        pressure        uniform 0;
+        traction        uniform (0 0 0);
+        pressureField   "pressureOnRight";
         value           uniform (0 0 0);
     }
     down
     {
-        type            solidSymmetry;
-        patchType       symmetryPlane;
-        value           uniform (0 0 0);
+        type            symmetryPlane;
+        skewCorrected   yes;
     }
     up
     {
+        // This is an example of how you can set a traction field based on a
+        // point cloud
         type            solidTraction;
-        traction        uniform ( 0 0 0 );
+        tractionField   "tractionOnUp";
         pressure        uniform 0;
         value           uniform (0 0 0);
     }

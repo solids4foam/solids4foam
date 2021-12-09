@@ -90,7 +90,6 @@ $(nonLinGeomLaws)/GentElastic/GentElastic.C
 $(nonLinGeomLaws)/incompressibleMooneyRivlinElastic/incompressibleMooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
-$(nonLinGeomLaws)/neoHookeanElasticMisesPlasticRubin/neoHookeanElasticMisesPlasticRubin.C
 $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 /*$(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C*/
 $(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
@@ -197,7 +196,6 @@ functionObjects/principalStresses/principalStresses.C
 functionObjects/principalStresses/principalStressFields.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
 functionObjects/solidTractions/solidTractions.C
-functionObjects/centrifugalBodyForce/centrifugalBodyForce.C
 functionObjects/patchAvgTractionHistory/patchAvgTractionHistory.C
 functionObjects/pointHistory/pointHistory.C
 /*

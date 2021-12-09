@@ -303,10 +303,10 @@ tmp<vectorField> nonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
     const tensorField& relFinv = relFinv_.boundaryField()[patchID];
 
     // Patch unit normals (updated configuration)
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Patch unit normals (deformed configuration)
-    vectorField nCurrent = relFinv.T() & n;
+    vectorField nCurrent(relFinv.T() & n);
     nCurrent /= mag(nCurrent);
 
     // Testing: let us instead calculate the deformed normals by interpolating

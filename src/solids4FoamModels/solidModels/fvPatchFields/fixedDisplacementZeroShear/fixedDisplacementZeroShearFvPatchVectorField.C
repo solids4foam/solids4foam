@@ -35,9 +35,6 @@ License
 namespace Foam
 {
 
-// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 fixedDisplacementZeroShearFvPatchVectorField::
@@ -117,13 +114,20 @@ fixedDisplacementZeroShearFvPatchVectorField
 
     this->valueFraction() = sqr(patch().nf());
 
-    Field<vector> normalValue = transform(valueFraction(), refValue());
+    Field<vector> normalValue
+    (
+        transform(valueFraction(), refValue())
+    );
 
-    Field<vector> gradValue =
-        this->patchInternalField() + refGrad()/this->patch().deltaCoeffs();
+    Field<vector> gradValue
+    (
+        this->patchInternalField() + refGrad()/this->patch().deltaCoeffs()
+    );
 
-    Field<vector> transformGradValue =
-        transform(I - valueFraction(), gradValue);
+    Field<vector> transformGradValue
+    (
+        transform(I - valueFraction(), gradValue)
+    );
 
     Field<vector>::operator=(normalValue + transformGradValue);
 }

@@ -94,7 +94,7 @@ void Foam::poroLinearElasticMohrCoulombPlastic::correct
     const volScalarField& p = mesh().lookupObject<volScalarField>("p");
 
     // Interpolate pressure to the faces
-    const surfaceScalarField pf = fvc::interpolate(p);
+    const surfaceScalarField pf(fvc::interpolate(p));
 
     // The total stress is equal to the sum of the effective stress and
     // pore-pressure components

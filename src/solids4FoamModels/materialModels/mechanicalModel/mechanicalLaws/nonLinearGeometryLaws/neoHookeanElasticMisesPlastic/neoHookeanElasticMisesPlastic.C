@@ -979,17 +979,19 @@ Foam::neoHookeanElasticMisesPlastic::impK() const
     // This is similar to the tangent matrix in FE procedures
 
     // Calculate deviatoric trial stress
-    const volSymmTensorField sTrial = mu_*dev(bEbarTrial_);
+    const volSymmTensorField sTrial(mu_*dev(bEbarTrial_));
 
-    const volScalarField Ibar = tr(bEbarTrial_)/3.0;
-    const volScalarField muBar = Ibar*mu_;
+    const volScalarField Ibar(tr(bEbarTrial_)/3.0);
+    const volScalarField muBar(Ibar*mu_);
 
     // Magnitude of the deviatoric trial stress
-    const volScalarField magSTrial =
-        max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL));
+    const volScalarField magSTrial
+    (
+        max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL))
+    );
 
     // Calculate scaling factor
-    const volScalarField scaleFactor = 1.0 - (2.0*muBar*DLambda_/magSTrial);
+    const volScalarField scaleFactor(1.0 - (2.0*muBar*DLambda_/magSTrial));
 
     return tmp<volScalarField>
     (
@@ -1026,20 +1028,20 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     J() = det(F());
 
     // Calculate the relative Jacobian
-    const volScalarField relJ = J()/J().oldTime();
+    const volScalarField relJ(J()/J().oldTime());
 
     // Calculate the relative deformation gradient with the volumetric term
     // removed
-    const volTensorField relFbar = pow(relJ, -1.0/3.0)*relF();
+    const volTensorField relFbar(pow(relJ, -1.0/3.0)*relF());
 
     // Update bE trial
     bEbarTrial_ = transform(relFbar, bEbar_.oldTime());
 
     // Calculate trial deviatoric stress
-    const volSymmTensorField sTrial = mu_*dev(bEbarTrial_);
+    const volSymmTensorField sTrial(mu_*dev(bEbarTrial_));
 
-    const volScalarField Ibar = tr(bEbarTrial_)/3.0;
-    const volScalarField muBar = Ibar*mu_;
+    const volScalarField Ibar(tr(bEbarTrial_)/3.0);
+    const volScalarField muBar(Ibar*mu_);
 
     // Check for plastic loading
     // and calculate increment of plastic equivalent strain
@@ -1058,7 +1060,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 
     // Trial yield function
     // sigmaY is the Cauchy yield stress so we scale it by J
-    const volScalarField fTrial = mag(sTrial) - sqrtTwoOverThree_*J()*sigmaY_;
+    const volScalarField fTrial(mag(sTrial) - sqrtTwoOverThree_*J()*sigmaY_);
 
     // Magnitude of hardening slope
     const scalar magHp = mag(Hp_);
@@ -1222,12 +1224,12 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     DEpsilonP_.relax();
 
     // Calculate deviatoric stress
-    const volSymmTensorField s = sTrial - 2*mu_*DEpsilonP_;
+    const volSymmTensorField s(sTrial - 2*mu_*DEpsilonP_);
 
     // Update bEbar
     if (updateBEbarConsistent_)
     {
-        const volSymmTensorField devBEbar = (s/mu_);
+        const volSymmTensorField devBEbar(s/mu_);
         bEbar_ = devBEbar + this->Ibar(devBEbar)*I;
     }
     else
@@ -1261,20 +1263,20 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     Jf() = det(Ff());
 
     // Calculate the relative Jacobian
-    const surfaceScalarField relJ = Jf()/Jf().oldTime();
+    const surfaceScalarField relJ(Jf()/Jf().oldTime());
 
     // Calculate the relative deformation gradient with the volumetric term
     // removed
-    surfaceTensorField relFbar = pow(relJ, -1.0/3.0)*relFf();
+    const surfaceTensorField relFbar(pow(relJ, -1.0/3.0)*relFf());
 
     // Update bE trial
     bEbarTrialf_ = transform(relFbar, bEbarf_.oldTime());
 
     // Calculate trial deviatoric stress
-    surfaceSymmTensorField sTrial = mu_*dev(bEbarTrialf_);
+    const surfaceSymmTensorField sTrial(mu_*dev(bEbarTrialf_));
 
-    const surfaceScalarField Ibar = tr(bEbarTrialf_)/3.0;
-    const surfaceScalarField muBar = Ibar*mu_;
+    const surfaceScalarField Ibar(tr(bEbarTrialf_)/3.0);
+    const surfaceScalarField muBar(Ibar*mu_);
 
     // Check for plastic loading
     // and calculate increment of plastic equivalent strain
@@ -1293,8 +1295,10 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 
     // Trial yield function
     // sigmaY is the Cauchy yield stress so we scale it by J
-    const surfaceScalarField fTrial =
-        mag(sTrial) - sqrtTwoOverThree_*Jf()*sigmaYf_;
+    const surfaceScalarField fTrial
+    (
+        mag(sTrial) - sqrtTwoOverThree_*Jf()*sigmaYf_
+    );
 
     // Magnitude of hardening slope
     const scalar magHp = mag(Hp_);
@@ -1468,12 +1472,12 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     DEpsilonPf_.relax();
 
     // Calculate deviatoric stress
-    const surfaceSymmTensorField s = sTrial - 2*mu_*DEpsilonPf_;
+    const surfaceSymmTensorField s(sTrial - 2*mu_*DEpsilonPf_);
 
     // Update bEbar
     if (updateBEbarConsistent_)
     {
-        const surfaceSymmTensorField devBEbar = (s/mu_);
+        const surfaceSymmTensorField devBEbar(s/mu_);
         bEbarf_ = devBEbar + this->Ibar(devBEbar)*I;
     }
     else
@@ -1647,10 +1651,10 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
     // }
 
     // Calculate the total true (Hencky) strain
-    const volSymmTensorField epsilon = 0.5*log(symm(F().T() & F()));
+    const volSymmTensorField epsilon(0.5*log(symm(F().T() & F())));
 
     // Calculate equivalent strain, for normalisation of the error
-    const volScalarField epsilonEq = sqrt((2.0/3.0)*magSqr(dev(epsilon)));
+    const volScalarField epsilonEq(sqrt((2.0/3.0)*magSqr(dev(epsilon))));
 
     // Take reference to internal fields
 #ifdef OPENFOAMESIORFOUNDATION
@@ -1666,9 +1670,11 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
 #endif
 
     // Calculate error field
-    const symmTensorField DEpsilonPErrorI =
+    const symmTensorField DEpsilonPErrorI
+    (
         Foam::sqrt(3.0/8.0)*DEpsilonPI*mag(plasticNI - plasticNIold)
-       /(epsilonEqI + SMALL);
+       /(epsilonEqI + SMALL)
+    );
 
     // Max error
     const scalar maxMagDEpsilonPErr = gMax(mag(DEpsilonPErrorI));

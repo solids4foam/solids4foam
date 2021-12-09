@@ -351,6 +351,12 @@ bool Foam::mechanicalLaw::updateF
     const dimensionedScalar& K
 )
 {
+    if (curTimeIndex_ != mesh().time().timeIndex())
+    {
+        curTimeIndex_ = mesh().time().timeIndex();
+        warnAboutEnforceLinear_ = true;
+    }
+
     // Check if the mathematical model is in total or updated Lagrangian form
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
@@ -373,11 +379,16 @@ bool Foam::mechanicalLaw::updateF
 
         if (enforceLinear())
         {
-            WarningIn
-            (
-                "void Foam::MooneyRivlinThreeParametersElastic::"
-                "correct(volSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
+            if (warnAboutEnforceLinear_)
+            {
+                warnAboutEnforceLinear_ = false;
+
+                WarningIn
+                (
+                    "void " + type() + "::"
+                    "correct(volSymmTensorField& sigma)"
+                )   << "Material linearity enforced for stability!" << endl;
+            }
 
             // Calculate stress using Hooke's law
             sigma =
@@ -404,10 +415,15 @@ bool Foam::mechanicalLaw::updateF
 
             if (enforceLinear())
             {
-                WarningIn
-                (
-                    "void " + type() + "::correct(volSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
+                if (warnAboutEnforceLinear_)
+                {
+                    warnAboutEnforceLinear_ = false;
+
+                    WarningIn
+                    (
+                        "void " + type() + "::correct(volSymmTensorField& sigma)"
+                    )   << "Material linearity enforced for stability!" << endl;
+                }
 
                 // Calculate stress using Hooke's law
                 sigma =
@@ -431,10 +447,15 @@ bool Foam::mechanicalLaw::updateF
 
             if (enforceLinear())
             {
-                WarningIn
-                (
-                    "void " + type() + "::correct(volSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
+                if (warnAboutEnforceLinear_)
+                {
+                    warnAboutEnforceLinear_ = false;
+
+                    WarningIn
+                    (
+                        "void " + type() + "::correct(volSymmTensorField& sigma)"
+                    )   << "Material linearity enforced for stability!" << endl;
+                }
 
                 // Calculate stress using Hooke's law
                 sigma = 2.0*mu*dev(symm(gradD)) + K*tr(gradD)*I;
@@ -585,13 +606,41 @@ void Foam::mechanicalLaw::updateSigmaHyd
 
         // Lookup the momentum equation inverse diagonal field
         const volScalarField* ADPtr = NULL;
-        if (mesh().foundObject<volScalarField>("DEqnA"))
+        bool allocatedMemory = false;
+        if (baseMesh().foundObject<volScalarField>("DEqnA"))
         {
-            ADPtr = &mesh().lookupObject<volScalarField>("DEqnA");
+            if (mesh() == baseMesh())
+            {
+                ADPtr = &mesh().lookupObject<volScalarField>("DEqnA");
+            }
+            else
+            {
+#ifdef OPENFOAMESIORFOUNDATION
+                FatalErrorIn("void Foam::mechanicalLaw::updateSigmaHyd(...)")
+                    << "Multi-materials are not yet ported for this version of "
+                    << "OpenFOAM" << abort(FatalError);
+#else
+                ADPtr =
+                    new volScalarField
+                    (
+                        baseMesh().lookupObject<mechanicalModel>
+                        (
+                            "mechanicalProperties"
+                        ).solSubMeshes().lookupBaseMeshVolField<scalar>
+                        (
+                            "DEqnA", mesh()
+                        )
+                    );
+                allocatedMemory = true;
+#endif
+            }
         }
-        else if (mesh().foundObject<volScalarField>("DDEqnA"))
+        else if (baseMesh().foundObject<volScalarField>("DDEqnA"))
         {
-            ADPtr = &mesh().lookupObject<volScalarField>("DDEqnA");
+            notImplemented
+            (
+                "DDEqnA in solidModels should instead be called DEqnA"
+            );
         }
         else
         {
@@ -632,6 +681,11 @@ void Foam::mechanicalLaw::updateSigmaHyd
 
         // Relax the pressure field
         sigmaHyd().relax();
+
+        if (allocatedMemory)
+        {
+            delete ADPtr;
+        }
     }
     else
     {
@@ -693,7 +747,9 @@ Foam::mechanicalLaw::mechanicalLaw
     ),
     sigmaHydPtr_(),
     gradSigmaHydPtr_(),
-    sigmaEffPtr_()
+    sigmaEffPtr_(),
+    curTimeIndex_(-1),
+    warnAboutEnforceLinear_(true)
 {
     // Set the base mesh region name
     // For an FSI case, the region will be called solid, else it will be called

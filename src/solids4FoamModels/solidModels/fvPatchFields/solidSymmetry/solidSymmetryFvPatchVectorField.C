@@ -155,13 +155,13 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
 tmp<Field<vector> > solidSymmetryFvPatchVectorField::snGrad() const
 {
     // Unit normals
-    const vectorField nHat = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Non-orthogonal correction vectors
-    const vectorField k = ((I - sqr(nHat)) & delta);
+    const vectorField k((I - sqr(n)) & delta);
 
     // Lookup the gradient of displacement field
     const fvPatchField<tensor>& gradD =
@@ -175,26 +175,28 @@ tmp<Field<vector> > solidSymmetryFvPatchVectorField::snGrad() const
         );
 
     // Calculate the corrected patch internal field
-    const vectorField DP =
+    const vectorField DP
+    (
         patchInternalField()
-      + (k & gradD.patchInternalField());
+      + (k & gradD.patchInternalField())
+    );
 
     if (secondOrder_)
     {
         // Normal component of patch internal gradient
-        const vectorField nGradDP = (nHat & gradD.patchInternalField());
+        const vectorField nGradDP(n & gradD.patchInternalField());
 
         return
           2*(
-                transform(I - 2.0*sqr(nHat), DP) - DP
+                transform(I - 2.0*sqr(n), DP) - DP
             )*(patch().deltaCoeffs()/2.0)
-          - transform(sqr(nHat), nGradDP);
+          - transform(sqr(n), nGradDP);
     }
     else
     {
         return
         (
-            transform(I - 2.0*sqr(nHat), DP)
+            transform(I - 2.0*sqr(n), DP)
           - DP
         )*(patch().deltaCoeffs()/2.0);
     }
@@ -211,13 +213,13 @@ evaluate(const Pstream::commsTypes)
     }
 
     // Unit normals
-    const vectorField nHat = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Non-orthogonal correction vectors
-    const vectorField k = ((I - sqr(nHat)) & delta);
+    const vectorField k((I - sqr(n)) & delta);
 
     // Lookup the gradient of displacement field
     const fvPatchField<tensor>& gradD =
@@ -231,19 +233,21 @@ evaluate(const Pstream::commsTypes)
         );
 
     // Calculate the corrected patch internal field
-    const vectorField DP =
+    const vectorField DP
+    (
         patchInternalField()
-      + (k & gradD.patchInternalField());
+      + (k & gradD.patchInternalField())
+    );
 
     if (secondOrder_)
     {
-        vectorField nGradDP = (nHat&gradD.patchInternalField());
+        const vectorField nGradDP(n&gradD.patchInternalField());
 
         Field<vector>::operator=
         (
             transform
             (
-                I - sqr(nHat),
+                I - sqr(n),
                 DP + 0.5*nGradDP/patch().deltaCoeffs()
             )
         );
@@ -254,7 +258,7 @@ evaluate(const Pstream::commsTypes)
         (
             (
                 DP
-              + transform(I - 2.0*sqr(nHat), DP)
+              + transform(I - 2.0*sqr(n), DP)
             )/2.0
         );
     }

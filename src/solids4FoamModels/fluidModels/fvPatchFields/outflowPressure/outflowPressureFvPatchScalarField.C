@@ -141,7 +141,7 @@ void outflowPressureFvPatchScalarField::updateCoeffs()
     const fvPatchField<vector>& pU =
         patch().lookupPatchField<volVectorField, vector>("U");
 
-    vectorField n = this->patch().nf();
+    vectorField n(patch().nf());
 
     pp = nu.value()*(n & pU.snGrad());
 

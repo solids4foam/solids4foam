@@ -469,7 +469,7 @@ void Foam::StVenantKirchhoffOrthotropicElastic::correct
     const volSymmTensorField S = elasticC() && E;
 
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J = det(F());
+    const volScalarField J(det(F()));
 
     // Convert the 2nd Piola Kirchhoff stress to the Cauchy stress
     // sigma = (1.0/J)*symm(F() & S & F().T());
@@ -500,7 +500,7 @@ void Foam::StVenantKirchhoffOrthotropicElastic::correct
     const surfaceSymmTensorField S = elasticCf() && E;
 
     // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J = det(Ff());
+    const surfaceScalarField J(det(Ff()));
 
     // Convert the 2nd Piola Kirchhoff stress to the Cauchy stress
     // sigma = (1.0/J)*symm(Ff() & S & Ff().T());

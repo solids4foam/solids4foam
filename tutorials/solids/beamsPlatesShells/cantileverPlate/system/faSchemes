@@ -1,0 +1,60 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      faSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+ddtSchemes
+{
+    ddt(w)      steadyState;
+    ddt(w_0)    steadyState;
+}
+
+d2dt2Schemes
+{
+}
+
+interpolationSchemes
+{
+}
+
+divSchemes
+{
+}
+
+gradSchemes
+{
+    //grad(w)    leastSquares;
+    //grad(theta) leastSquares;
+    grad(w)    Gauss linear;
+    grad(theta) Gauss linear;
+}
+
+lnGradSchemes
+{
+}
+
+laplacianSchemes
+{
+    laplacian(gamma,M) Gauss linear corrected;
+    laplacian(((E*pow(plateThickness,3))|(12*(1-pow(nu,2)))),w) Gauss linear corrected;
+}
+
+fluxRequired
+{
+}
+
+
+// ************************************************************************* //

@@ -366,7 +366,7 @@ void Foam::thermoLinearElastic::correct(surfaceSymmTensorField& sigma)
         const volScalarField& T = mesh().lookupObject<volScalarField>("T");
 
         // Interpolate the volField temperature to the faces
-        const surfaceScalarField Tf = fvc::interpolate(T);
+        const surfaceScalarField Tf(fvc::interpolate(T));
 
         // Add thermal stress component
         sigma -= 3.0*K()*alpha_*(Tf - T0_)*symmTensor(I);
@@ -374,7 +374,7 @@ void Foam::thermoLinearElastic::correct(surfaceSymmTensorField& sigma)
     else if (readTField())
     {
         // Interpolate the volField temperature to the faces
-        const surfaceScalarField Tf = fvc::interpolate(TPtr_());
+        const surfaceScalarField Tf(fvc::interpolate(TPtr_()));
 
         // Add thermal stress component
         sigma -= 3.0*K()*alpha_*(Tf - T0_)*symmTensor(I);

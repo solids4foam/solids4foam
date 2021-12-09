@@ -108,7 +108,7 @@ bool Foam::solidForcesDisplacements::writeData()
             ).boundaryField()[historyPatchID_];
 
         // Calculate area vectors in the deformed configuration
-        const vectorField patchDeformSf = (J*Finv.T() & patchSf);
+        const vectorField patchDeformSf(J*Finv.T() & patchSf);
 
         // It is assumed that sigma is the true (Cauchy) stress
         force = gSum(patchDeformSf & sigma);

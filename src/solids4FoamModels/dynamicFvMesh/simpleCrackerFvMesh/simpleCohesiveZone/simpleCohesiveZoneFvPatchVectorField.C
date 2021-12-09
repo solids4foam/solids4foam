@@ -206,7 +206,7 @@ simpleCohesiveZoneFvPatchVectorField
         else
         {
             // Symmetry plane
-            vectorField n = this->patch().nf();
+            vectorField n(patch().nf());
             this->valueFraction() = sqr(n);
         }
     }
@@ -337,7 +337,7 @@ label simpleCohesiveZoneFvPatchVectorField::updateCrack()
         patch().lookupPatchField<volSymmTensorField, symmTensor>("sigma");
 
     // Patch normal
-    const vectorField n = this->patch().nf();
+    const vectorField n(patch().nf());
 
     // Current normal traction
     const scalarField curNormalTraction = (n & (n & curSigma));
@@ -546,7 +546,7 @@ void simpleCohesiveZoneFvPatchVectorField::updateCoeffs()
     }
 
     // Patch normal
-    const vectorField n = this->patch().nf();
+    const vectorField n(patch().nf());
 
     // Current normal traction
     const scalarField curNormalTraction = (n & (n & curSigma));

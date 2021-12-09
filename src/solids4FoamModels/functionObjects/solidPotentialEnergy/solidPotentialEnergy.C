@@ -96,15 +96,17 @@ bool Foam::solidPotentialEnergy::writeData()
     // all cells
     // Potential energy is positive for any cells that are in the negative
     // gravity direction from the refPoint
-    const scalarField h =
+    const scalarField h
+    (
 #ifdef OPENFOAMESIORFOUNDATION
-        (-gDir & (mesh.C().primitiveField() + U.primitiveField() - refPoint_));
+        (-gDir & (mesh.C().primitiveField() + U.primitiveField() - refPoint_))
 #else
-        (-gDir & (mesh.C().internalField() + U.internalField() - refPoint_));
+        (-gDir & (mesh.C().internalField() + U.internalField() - refPoint_))
 #endif
+    );
 
     // Calculate the potential energy per unit volume field
-    const scalarField potentialEnergyPerVol = rho.internalField()*magG*h;
+    const scalarField potentialEnergyPerVol(rho.internalField()*magG*h);
 
     // Calculate the total potential energy
     const scalar potentialEnergy = gSum(potentialEnergyPerVol*mesh.V().field());
