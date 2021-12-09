@@ -125,7 +125,7 @@ void Foam::freeEdgeDisplacementFaPatchScalarField::updateCoeffs()
 
     // Calculate correction vectors
     // const vectorField n = patch().edgeNormals();
-    // const vectorField delta = patch().delta();
+    // const vectorField delta(patch().delta());
     // const vectorField k = (I - sqr(n)) & delta;
 
     // Calculate the patch internal field and correction for non-orthogonality

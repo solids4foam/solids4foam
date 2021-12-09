@@ -104,7 +104,7 @@ void Foam::freeSurfacePressureFvPatchScalarField::updateCoeffs()
                 "U"
             );
 
-        vectorField n = this->patch().nf();
+        vectorField n(patch().nf());
 
         scalarField nGradUn = (n & U.snGrad());
 
@@ -156,7 +156,7 @@ Foam::freeSurfacePressureFvPatchScalarField::snGrad() const
             "grad(" + pName + ")"
         );
 
-    vectorField n = this->patch().nf();
+    vectorField n(patch().nf());
     vectorField delta = this->patch().delta();
     vectorField k = delta - n*(n&delta);
 
@@ -198,7 +198,7 @@ Foam::freeSurfacePressureFvPatchScalarField::gradientBoundaryCoeffs() const
             "grad(" + pName + ")"
         );
 
-    vectorField n = this->patch().nf();
+    vectorField n(patch().nf());
     vectorField delta = this->patch().delta();
     vectorField k = delta - n*(n&delta);
 

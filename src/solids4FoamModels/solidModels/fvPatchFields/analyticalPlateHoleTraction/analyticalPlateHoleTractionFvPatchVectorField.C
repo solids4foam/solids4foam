@@ -184,7 +184,7 @@ void analyticalPlateHoleTractionFvPatchVectorField::updateCoeffs()
     }
 
     // Patch unit normals
-    vectorField n = patch().nf();
+    vectorField n(patch().nf());
 
     // Patch face centres
     const vectorField& Cf = patch().Cf();

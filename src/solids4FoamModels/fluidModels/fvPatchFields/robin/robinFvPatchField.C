@@ -159,7 +159,7 @@ void robinFvPatchField<Type>::evaluate(const Pstream::commsTypes)
         this->updateCoeffs();
     }
 
-    scalarField dn = 1.0/this->patch().deltaCoeffs();
+    const scalarField dn(1.0/this->patch().deltaCoeffs());
 
     Field<Type>::operator=
     (

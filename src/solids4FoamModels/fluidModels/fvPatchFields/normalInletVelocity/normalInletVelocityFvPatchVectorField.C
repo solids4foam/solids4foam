@@ -243,7 +243,7 @@ snGrad() const
             "grad(" + UName + ")"
         );
 
-    vectorField n = this->patch().nf();
+    vectorField n(patch().nf());
     vectorField delta = this->patch().delta();
     vectorField k = delta - n*(n&delta);
 
@@ -339,7 +339,7 @@ gradientBoundaryCoeffs() const
             "grad(" + UName + ")"
         );
 
-    vectorField n = this->patch().nf();
+    vectorField n(patch().nf());
     vectorField delta = this->patch().delta();
     vectorField k = delta - n*(n&delta);
 

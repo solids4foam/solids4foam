@@ -121,7 +121,7 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::updateCoeffs()
 //     );
 //     dimensionedScalar nu(transportProperties.lookup("nu"));
 
-        vectorField n = this->patch().nf();
+        vectorField n(patch().nf());
 
 //     const volScalarField& p =
 //         db().lookupObject<volScalarField>("p");
@@ -174,8 +174,8 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::evaluate
 //             << "using second order correction"
 //             << endl;
 
-        vectorField n = patch().nf();
-        vectorField delta = patch().delta();
+        vectorField n(patch().nf());
+        vectorField delta(patch().delta());
         vectorField k = delta - n*(n&delta);
 
 #ifdef OPENFOAMESIORFOUNDATION
@@ -225,7 +225,7 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::evaluate
     const fvsPatchField<scalar>& phip =
         patch().patchField<surfaceScalarField, scalar>(phi);
 
-    vectorField n = patch().nf();
+    vectorField n(patch().nf());
     const Field<scalar>& magS = patch().magSf();
 
     if (phi.dimensions() == dimVelocity*dimArea)

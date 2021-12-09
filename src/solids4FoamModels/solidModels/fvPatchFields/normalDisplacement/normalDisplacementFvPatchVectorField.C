@@ -173,7 +173,7 @@ void normalDisplacementFvPatchVectorField::updateCoeffs()
         nDisp = dispSeries_(this->db().time().timeOutputValue());
     }
 
-    vectorField disp = nDisp*patch().nf();
+    vectorField disp(nDisp*patch().nf());
 
 #ifdef OPENFOAMESIORFOUNDATION
     if (internalField().name() == "DD")
@@ -213,13 +213,13 @@ normalDisplacementFvPatchVectorField::snGrad() const
         );
 
     // Unit normal vectors
-    const vectorField n = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Correction vectors
-    const vectorField k = (I - sqr(n)) & delta;
+    const vectorField k((I - sqr(n)) & delta);
 
     return
     (
@@ -242,13 +242,13 @@ normalDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
         );
 
     // Unit normal vectors
-    const vectorField n = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Correction vectors
-    const vectorField k = (I - sqr(n)) & delta;
+    const vectorField k((I - sqr(n)) & delta);
 
     return
     (

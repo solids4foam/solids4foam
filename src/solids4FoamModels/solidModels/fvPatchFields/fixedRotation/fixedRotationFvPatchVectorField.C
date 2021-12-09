@@ -216,13 +216,13 @@ snGrad() const
         );
 
     // Face unit normals
-    const vectorField n = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Non-orthogonal correction vectors
-    const vectorField k = ((I - sqr(n)) & delta);
+    const vectorField k((I - sqr(n)) & delta);
 
     return
     (
@@ -252,10 +252,12 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
     // Rotation tensor
     const tensor rotMat = RodriguesRotation(rotationAxis_, rotationAngle_);
 
-    vectorField newFaceCentres =
-        (rotMat & (origFaceCentres_ - rotationOrigin_)) + rotationOrigin_;
+    vectorField newFaceCentres
+    (
+        (rotMat & (origFaceCentres_ - rotationOrigin_)) + rotationOrigin_
+    );
 
-    vectorField disp = newFaceCentres - origFaceCentres_;
+    vectorField disp(newFaceCentres - origFaceCentres_);
 
     // Superimposed translation
     if (dispSeries_.size())
@@ -325,11 +327,13 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
 #endif
                 );
 
-            const vectorField newPatchPoints =
+            const vectorField newPatchPoints
+            (
                 (rotMat & (origPatchPoints_ - rotationOrigin_))
-              + rotationOrigin_;
+              + rotationOrigin_
+            );
 
-            vectorField pointDisp = newPatchPoints - origPatchPoints_;
+            vectorField pointDisp(newPatchPoints - origPatchPoints_);
 
             // Superimposed translation
             if (dispSeries_.size())
@@ -378,13 +382,13 @@ gradientBoundaryCoeffs() const
         );
 
     // Face unit normals
-    const vectorField n = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Non-orthogonal correction vectors
-    const vectorField k = ((I - sqr(n)) & delta);
+    const vectorField k((I - sqr(n)) & delta);
 
     return patch().deltaCoeffs()*
     (

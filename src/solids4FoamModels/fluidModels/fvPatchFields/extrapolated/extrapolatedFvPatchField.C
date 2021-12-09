@@ -178,7 +178,7 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
 
     skewCorrectionVectors scv(mesh);
 
-    vectorField n = this->patch().nf();
+    const vectorField n(patch().nf());
 
     iPoints_.clear();
     iPoints_.setSize(this->patch().size());
@@ -360,7 +360,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
             fieldName
         );
 
-    vectorField n = this->patch().nf();
+    vectorField n(patch().nf());
     const vectorField& C = this->patch().Cf();
 
     Field<Type> patchPhi(this->patch().size(), pTraits<Type>::zero);

@@ -186,13 +186,13 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         fsi.solid().mechanical().impK()().boundaryField()[patchID];
 
     // p-wave propagation speed, ap
-    const scalarField ap = sqrt(impK/rhoSolid);
+    const scalarField ap(sqrt(impK/rhoSolid));
 
     // Solid "virtual thickness"
-    scalarField hs = ap*mesh.time().deltaT().value();
+    const scalarField hs(ap*mesh.time().deltaT().value());
 
     // Fluid properties
-    IOdictionary transportProperties
+    const IOdictionary transportProperties
     (
         IOobject
         (
@@ -217,8 +217,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     // Update velocity and acceleration
 
     const fvPatch& p = patch();
-
-    vectorField n = p.nf();
+    const vectorField n(p.nf());
 
 #ifdef OPENFOAMESIORFOUNDATION
     const word fieldName = internalField().name();
@@ -231,7 +230,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
 
     // The previous acceleration is updated at the end of each
     // time step in the fluidSolidInterface
-    scalarField prevDdtUn = (n & prevAcceleration_);
+    const scalarField prevDdtUn(n & prevAcceleration_);
 
     if (pressure.dimensions() == dimPressure/dimDensity)
     {
@@ -260,7 +259,7 @@ void elasticWallPressureFvPatchScalarField::patchFlux
     const fvMatrix<scalar>& matrix
 ) const
 {
-    const label patchI = this->patch().index();
+    const label patchI = patch().index();
 
 #ifdef OPENFOAMESIORFOUNDATION
     const fvMesh& mesh = internalField().mesh();

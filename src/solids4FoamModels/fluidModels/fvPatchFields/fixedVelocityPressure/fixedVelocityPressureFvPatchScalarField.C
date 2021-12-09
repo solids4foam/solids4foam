@@ -128,7 +128,7 @@ fixedVelocityPressureFvPatchScalarField
 //             patch().lookupPatchField<surfaceScalarField, scalar>("phi");
 
 //         scalarField magS = this->patch().magSf();
-//         vectorField n = this->patch().nf();
+//         vectorField n(patch().nf());
 //         scalarField dn = 1.0/this->patch().deltaCoeffs();
 
 //         scalarField nGradP = (n & HU) - phi/rAU/magS;
@@ -181,7 +181,7 @@ void fixedVelocityPressureFvPatchScalarField::updateCoeffs()
 
     scalarField dn = 1.0/this->patch().deltaCoeffs();
 
-    vectorField n = this->patch().nf();
+    vectorField n(patch().nf());
 
 //     scalarField Un = (n & U);
 //     scalarField UnP = (n & U.patchInternalField());

@@ -123,7 +123,7 @@ void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
 
 //     vectorField delta = this->patch().delta();
 
-    vectorField n = this->patch().nf();
+    vectorField n(patch().nf());
     vectorField delta = this->patch().delta();
     vectorField k = delta - n*(n&delta);
 
@@ -202,7 +202,7 @@ void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
 //     const fvPatchField<vector>& ddtU =
 //         patch().lookupPatchField<volVectorField, vector>("ddt(U)");
 
-//     vectorField n = this->patch().nf();
+//     vectorField n(patch().nf());
 
 //     if (p.dimensions() == dimPressure)
 //     {
