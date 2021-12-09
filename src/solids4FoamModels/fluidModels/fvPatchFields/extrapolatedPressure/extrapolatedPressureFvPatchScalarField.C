@@ -114,7 +114,7 @@ void extrapolatedPressureFvPatchScalarField::evaluate
     const fvPatchField<vector>& gradP =
         patch().lookupPatchField<volVectorField, vector>("grad(p)");
 
-    vectorField delta = this->patch().delta();
+    const vectorField delta(this->patch().delta());
 
     Field<scalar>::operator=
     (

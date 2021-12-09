@@ -40,8 +40,7 @@ freeSurfaceVelocityFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(p, iF),
     phiName_("phi"),
-    rhoName_("rho"),
-    curTimeIndex_(-1)
+    rhoName_("rho")
 {}
 
 
@@ -55,8 +54,7 @@ freeSurfaceVelocityFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(p, iF),
     phiName_(dict.lookupOrDefault<word>("phi", "phi")),
-    rhoName_(dict.lookupOrDefault<word>("rho", "rho")),
-    curTimeIndex_(-1)
+    rhoName_(dict.lookupOrDefault<word>("rho", "rho"))
 {
     fvPatchVectorField::operator=(patchInternalField());
 }
@@ -73,8 +71,7 @@ freeSurfaceVelocityFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(ptf, p, iF, mapper),
     phiName_(ptf.phiName_),
-    rhoName_(ptf.rhoName_),
-    curTimeIndex_(-1)
+    rhoName_(ptf.rhoName_)
 {}
 
 
@@ -87,8 +84,7 @@ freeSurfaceVelocityFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(fcvpvf, iF),
     phiName_(fcvpvf.phiName_),
-    rhoName_(fcvpvf.rhoName_),
-    curTimeIndex_(-1)
+    rhoName_(fcvpvf.rhoName_)
 {}
 
 
@@ -101,34 +97,8 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::updateCoeffs()
         return;
     }
 
-//     if (curTimeIndex_ != this->db().time().timeIndex())
     {
-//         curTimeIndex_ = this->db().time().timeIndex();
-
-//     const fvMesh& mesh =
-//         this->patch().boundaryMesh().mesh();
-
-//     IOdictionary transportProperties
-//     (
-//         IOobject
-//         (
-//             "transportProperties",
-//             mesh.time().constant(),
-//             mesh,
-//             IOobject::MUST_READ,
-//             IOobject::NO_WRITE
-//         )
-//     );
-//     dimensionedScalar nu(transportProperties.lookup("nu"));
-
-        vectorField n(patch().nf());
-
-//     const volScalarField& p =
-//         db().lookupObject<volScalarField>("p");
-//     const fvPatchField<scalar>& pfs =
-//         patch().patchField<volScalarField, scalar>(p);
-
-//     gradient() = (pfs/(2*nu.value()))*n;
+        const vectorField n(patch().nf());
 
 #ifdef OPENFOAMESIORFOUNDATION
         word UName = this->internalField().name();
@@ -141,11 +111,10 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::updateCoeffs()
                 "grad(" + UName + ")"
             );
 
-//         tensorField gradUP = gradU;
-        tensorField gradUP = gradU.patchInternalField();
+        const tensorField gradUP(gradU.patchInternalField());
 
-        vectorField sGradUn = (((I-sqr(n)) & gradUP) & n);
-        vectorField nGradUn = -tr(((I-sqr(n)) & gradUP) & (I-sqr(n)))*n;
+        const vectorField sGradUn(((I-sqr(n)) & gradUP) & n);
+        const vectorField nGradUn(-tr(((I-sqr(n)) & gradUP) & (I-sqr(n)))*n);
 
         gradient() = nGradUn - sGradUn;
     }
@@ -174,9 +143,9 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::evaluate
 //             << "using second order correction"
 //             << endl;
 
-        vectorField n(patch().nf());
-        vectorField delta(patch().delta());
-        vectorField k = delta - n*(n&delta);
+        const vectorField n(patch().nf());
+        const vectorField delta(patch().delta());
+        const vectorField k((I - sqr(n)) & delta);
 
 #ifdef OPENFOAMESIORFOUNDATION
         word UName = this->internalField().name();
@@ -190,11 +159,11 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::evaluate
                 "grad(" + UName + ")"
             );
 
-        vectorField dUP = (k&gradU.patchInternalField());
+        const vectorField dUP(k & gradU.patchInternalField());
 
         if (true)
         {
-            vectorField nGradUP = (n&gradU.patchInternalField());
+            const vectorField nGradUP(n & gradU.patchInternalField());
 
             Field<vector>::operator=
             (
@@ -225,7 +194,7 @@ void Foam::freeSurfaceVelocityFvPatchVectorField::evaluate
     const fvsPatchField<scalar>& phip =
         patch().patchField<surfaceScalarField, scalar>(phi);
 
-    vectorField n(patch().nf());
+    const vectorField n(patch().nf());
     const Field<scalar>& magS = patch().magSf();
 
     if (phi.dimensions() == dimVelocity*dimArea)

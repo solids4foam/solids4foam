@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <memory>
 #include <vector>
+#include "FieldSumOp.H"
 
 using namespace Foam;
 
@@ -751,7 +752,7 @@ void RBFMeshMotionSolver::solve()
 
         assert(index == nbGlobalFixedFaceCenters[Pstream::myProcNo()]);
 
-        reduce(positionsField, sumOp<vectorField>());
+        reduce(positionsField, FieldSumOp<vector>());
 
         // Copy the FOAM vector field to an Eigen matrix
         for (int i = 0; i < positions.rows(); i++)
@@ -840,7 +841,7 @@ void RBFMeshMotionSolver::solve()
         assert(index == nbGlobalMovingFaceCenters[Pstream::myProcNo()]);
     }
 
-    reduce(valuesField, sumOp<vectorField>());
+    reduce(valuesField, FieldSumOp<vector>());
 
     // Copy the FOAM vector field to an Eigen matrix
     for (int i = 0; i < values.rows(); i++)

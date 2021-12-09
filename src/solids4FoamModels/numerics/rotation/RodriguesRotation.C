@@ -234,20 +234,20 @@ Foam::tensorField Foam::RodriguesRotation
         k3*k1,       k3*k2,       k3*k3 - 1.0);
 
     // Project both vectors onto the plane defined by the rotation axis
-    vectorField nvi = -(projectionT & vi);
-    vectorField nvf = -(projectionT & vf);
+    vectorField nvi(-(projectionT & vi));
+    vectorField nvf(-(projectionT & vf));
     nvi = nvi/mag(nvi);
     nvf = nvf/mag(nvf);
 
-    const vectorField crossNviNvf = nvi ^ nvf;
-    const scalarField cosTheta = nvi & nvf;
-    const scalarField sinTheta = mag(crossNviNvf) * sign(crossNviNvf & k);
+    const vectorField crossNviNvf(nvi ^ nvf);
+    const scalarField cosTheta(nvi & nvf);
+    const scalarField sinTheta(mag(crossNviNvf) * sign(crossNviNvf & k));
 
     const tensorField I_F(vi.size(), I);
     const tensorField rotationT_F(vi.size(), rotationT);
     const tensorField projectionT_F(vi.size(), projectionT);
 
-    return I_F + sinTheta*rotationT_F + (1 - cosTheta)*projectionT_F;
+    return tensorField(I_F + sinTheta*rotationT_F + (1 - cosTheta)*projectionT_F);
 }
 
 

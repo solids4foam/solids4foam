@@ -42,6 +42,7 @@ License
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "movingWallPressureFvPatchScalarField.H"
 #include "RBFMeshMotionSolver.H"
+#include "FieldSumOp.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -737,28 +738,34 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             ].pointNormals();
 
         // Patch deltaCoeffs
-        const scalarField fluidZoneDeltaCoeffs =
+        const scalarField fluidZoneDeltaCoeffs
+        (
             fluid().globalPatches()[interfaceI].patchFaceToGlobal
             (
                 fluidMesh().boundary()
                 [
                     fluid().globalPatches()[interfaceI].patch().index()
                 ].deltaCoeffs()
-            );
+            )
+        );
 
         // Zone deltaCoeffs at points
-        const scalarField fluidZonePointDeltaCoeffs =
+        const scalarField fluidZonePointDeltaCoeffs
+        (
             fluid().globalPatches()
             [
                 interfaceI
-            ].interpolator().faceToPointInterpolate(fluidZoneDeltaCoeffs);
+            ].interpolator().faceToPointInterpolate(fluidZoneDeltaCoeffs)
+        );
 
         // Patch deltaCoeffs at points
-        const scalarField fluidPatchPointDeltaCoeffs =
+        const scalarField fluidPatchPointDeltaCoeffs
+        (
             fluid().globalPatches()[interfaceI].globalPointToPatch
             (
                 fluidZonePointDeltaCoeffs
-            );
+            )
+        );
 
         const scalar delta =
             gMax
@@ -1081,9 +1088,11 @@ void Foam::fluidSolidInterface::updateForce()
             solid().globalPatches()[interfaceI].globalPatch();
 
         // Calculate total traction of fluid zone
-        vectorField fluidZoneTotalTraction =
+        vectorField fluidZoneTotalTraction
+        (
             fluid().faceZoneViscousForce(interfaceI)
-          - fluid().faceZonePressureForce(interfaceI)*fluidZone.faceNormals();
+          - fluid().faceZonePressureForce(interfaceI)*fluidZone.faceNormals()
+        );
 
         // Initialise the solid zone traction field that is to be interpolated
         // from the fluid zone
@@ -1165,10 +1174,14 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
             solid().globalPatches()[interfaceI].globalPatch();
 
         // Calculate the point displacements of the solid interface
-        const vectorField solidZonePointsDisplsAtSolid =
-            solid().faceZonePointDisplacementIncrement(interfaceI);
-        const vectorField solidZonePointsTotDisplsAtSolid =
-            solid().faceZonePointDisplacementOld(interfaceI);
+        const vectorField solidZonePointsDisplsAtSolid
+        (
+            solid().faceZonePointDisplacementIncrement(interfaceI)
+        );
+        const vectorField solidZonePointsTotDisplsAtSolid
+        (
+            solid().faceZonePointDisplacementOld(interfaceI)
+        );
 
         // Initialise point displacement field at fluid interface
         vectorField solidZonePointsTotDispl
@@ -1200,7 +1213,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
           - fluidZonesPointsDispls()[interfaceI];
 
         // We will use two definitions of residual
-        scalar residualNorm1 = ::sqrt(gSum(magSqr(residuals()[interfaceI])));
+        scalar residualNorm1 = Foam::sqrt(gSum(magSqr(residuals()[interfaceI])));
         scalar residualNorm2 = residualNorm1;
 
         if (residualNorm1 > maxResidualsNorm_[interfaceI])
@@ -1219,8 +1232,10 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         interfacesPointsDispls_[interfaceI] =
             solidZonesPointsDispls()[interfaceI];
 
-        const vectorField intTotDispl =
-            interfacesPointsDispls_[interfaceI] + solidZonePointsTotDispl;
+        const vectorField intTotDispl
+        (
+            interfacesPointsDispls_[interfaceI] + solidZonePointsTotDispl
+        );
 
         const scalar intTotDisplNorm = Foam::sqrt(gSum(magSqr(intTotDispl)));
 
@@ -1267,8 +1282,10 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
             const standAlonePatch& solidZone =
                solid().globalPatches()[interfaceI].globalPatch();
 
-            const vectorField solidZoneAcceleration =
-               solid().faceZoneAcceleration(interfaceI);
+            const vectorField solidZoneAcceleration
+            (
+               solid().faceZoneAcceleration(interfaceI)
+            );
 
             // Initialise the fluid zone acceleration field that is to be
             // interpolated from the solid zone
@@ -1284,11 +1301,13 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
                 fluidZoneAcceleration     // to field
             );
 
-            const vectorField fluidPatchAcceleration =
+            const vectorField fluidPatchAcceleration
+            (
                 fluid().globalPatches()
                 [
                    interfaceI
-                ].globalFaceToPatch(fluidZoneAcceleration);
+                ].globalFaceToPatch(fluidZoneAcceleration)
+            );
 
             const_cast<movingWallPressureFvPatchScalarField&>
             (
@@ -1327,8 +1346,10 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
             const standAlonePatch& solidZone =
                solid().globalPatches()[interfaceI].globalPatch();
 
-            const vectorField solidZoneAcceleration =
-               solid().faceZoneAcceleration(interfaceI);
+            const vectorField solidZoneAcceleration
+            (
+               solid().faceZoneAcceleration(interfaceI)
+            );
 
             // Initialise the fluid zone acceleration field that is to be
             // interpolated from the solid zone
@@ -1344,11 +1365,13 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 fluidZoneAcceleration     // to field
             );
 
-            const vectorField fluidPatchAcceleration =
+            const vectorField fluidPatchAcceleration
+            (
                 fluid().globalPatches()
                 [
                     interfaceI
-                ].globalFaceToPatch(fluidZoneAcceleration);
+                ].globalFaceToPatch(fluidZoneAcceleration)
+            );
 
             const_cast<elasticWallPressureFvPatchScalarField&>
             (
@@ -1382,7 +1405,7 @@ void Foam::fluidSolidInterface::syncFluidZonePointsDispl
             }
 
             // pass to all procs
-            reduce(fluidZonesPointsDispls[interfaceI], sumOp<vectorField>());
+            reduce(fluidZonesPointsDispls[interfaceI], FieldSumOp<vector>());
 
             const labelList& map =
                 fluid().globalPatches()

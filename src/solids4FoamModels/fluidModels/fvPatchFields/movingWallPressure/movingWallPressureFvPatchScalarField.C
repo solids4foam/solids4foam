@@ -121,19 +121,17 @@ void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
     const fvPatchField<vector>& ddtU =
         patch().lookupPatchField<volVectorField, vector>("ddt(U)");
 
-//     vectorField delta = this->patch().delta();
+    const vectorField n(patch().nf());
+    const vectorField delta(patch().delta());
+    const vectorField k((I - sqr(n)) & delta);
 
-    vectorField n(patch().nf());
-    vectorField delta = this->patch().delta();
-    vectorField k = delta - n*(n&delta);
+    const scalarField dPP(k & gradP.patchInternalField());
 
-    scalarField dPP = (k&gradP.patchInternalField());
-
-    scalarField nGradPb(this->patch().size(), 0);
+    scalarField nGradPb(patch().size(), 0);
 
     if (p.dimensions() == dimPressure)
     {
-        IOdictionary transportProperties
+        const IOdictionary transportProperties
         (
             IOobject
             (
@@ -145,37 +143,30 @@ void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
             )
         );
 
-        dimensionedScalar rho
+        const dimensionedScalar rho
         (
             transportProperties.lookup("rho")
         );
 
         nGradPb = -rho.value()*(n&ddtU);
-//         nGradPb = -rho.value()*(n&prevAcceleration_);
     }
     else
     {
         nGradPb = -(n&ddtU);
-//         nGradPb = -(n&prevAcceleration_);
     }
 
-
-//     scalarField gradPb = -(n&ddtU);
-//     scalarField gradPp = (n&gradP.patchInternalField());
-
-    Info << "ddtUn, max: " << max(n&ddtU)
+    Info<< "ddtUn, max: " << max(n&ddtU)
         << ", avg: " << average(n&ddtU)
         << ", min: " << min(n&ddtU) << endl;
 
     Field<scalar>::operator=
     (
-//         this->patchInternalField()
         this->patchInternalField() + dPP
       + nGradPb/this->patch().deltaCoeffs()
-//         + 0.5*(gradient() + gradPp)/this->patch().deltaCoeffs()
+    //+ 0.5*(gradient() + gradPp)/this->patch().deltaCoeffs()
     );
 
-    Info << "p, max: " << max(*this)
+    Info<< "p, max: " << max(*this)
         << ", avg: " << average(*this)
         << ", min: " << min(*this) << endl;
 

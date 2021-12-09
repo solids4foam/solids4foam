@@ -69,7 +69,7 @@ bool Foam::solidForces::writeData()
             mesh.Sf().boundaryField()[historyPatchID_];
 
         // Patch unit area vectors
-        const vectorField patchNf = mesh.boundary()[historyPatchID_].nf();
+        const vectorField patchNf(mesh.boundary()[historyPatchID_].nf());
 
         // Calculate the force as the intergal of the traction over the area
         vector force = vector::zero;
@@ -113,10 +113,10 @@ bool Foam::solidForces::writeData()
                 ).boundaryField()[historyPatchID_];
 
             // Calculate area vectors in the deformed configuration
-            const vectorField patchDeformSf = (J*Finv.T() & patchSf);
+            const vectorField patchDeformSf(J*Finv.T() & patchSf);
 
             // Calculate unit area vectors in the deformed configuration
-            const vectorField patchDeformNf = patchDeformSf/mag(patchDeformSf);
+            const vectorField patchDeformNf(patchDeformSf/mag(patchDeformSf));
 
             // It is assumed that sigma is the true (Cauchy) stress
             force = gSum(patchDeformSf & sigma);

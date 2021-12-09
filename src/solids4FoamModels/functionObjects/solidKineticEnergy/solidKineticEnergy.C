@@ -75,7 +75,7 @@ bool Foam::solidKineticEnergy::writeData()
     const volScalarField& rho = lookupSolidModel(mesh).rho();
 
     // Calculate the kinetic energy per unit volume field
-    const volScalarField kinEnergyPerVol = 0.5*rho*(U & U);
+    const volScalarField kinEnergyPerVol(0.5*rho*(U & U));
 
     // Calculate the total kinetic energy
     const scalar kinEnergy =

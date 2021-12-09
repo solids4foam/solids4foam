@@ -25,6 +25,7 @@ License
 
 #include "globalPolyPatch.H"
 #include "polyPatchID.H"
+#include "FieldSumOp.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -263,7 +264,7 @@ void Foam::globalPolyPatch::calcGlobalMasterToCurrentProcPointAddr() const
     }
 
     // Pass points to all procs
-    reduce(fzGlobalPoints, sumOp<vectorField>());
+    reduce(fzGlobalPoints, FieldSumOp<vector>());
 
     // Now every proc has the master's list of FZ points
     // every proc must now find the mapping from their local FZ points to

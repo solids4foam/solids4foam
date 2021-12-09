@@ -165,7 +165,7 @@ void fixedVelocityPressureFvPatchScalarField::updateCoeffs()
 
     const fvMesh& mesh = this->patch().boundaryMesh().mesh();
 
-    IOdictionary transportProperties
+    const IOdictionary transportProperties
     (
         IOobject
         (
@@ -177,19 +177,15 @@ void fixedVelocityPressureFvPatchScalarField::updateCoeffs()
         )
     );
 
-    dimensionedScalar nu(transportProperties.lookup("nu"));
+    const dimensionedScalar nu(transportProperties.lookup("nu"));
 
-    scalarField dn = 1.0/this->patch().deltaCoeffs();
+    const scalarField dn(1.0/this->patch().deltaCoeffs());
 
-    vectorField n(patch().nf());
-
-//     scalarField Un = (n & U);
-//     scalarField UnP = (n & U.patchInternalField());
-//     scalarField nGradUnP = (n & (gradU.patchInternalField() & n));
+    const vectorField n(patch().nf());
 
     gradient() = (n & laplacianU.patchInternalField());
 
-    Info << patch().name() << ", nGradP, max: " << max(gradient())
+    Info<< patch().name() << ", nGradP, max: " << max(gradient())
         << ", avg: " << average(gradient())
         << ", min: " << min(gradient()) << endl;
 

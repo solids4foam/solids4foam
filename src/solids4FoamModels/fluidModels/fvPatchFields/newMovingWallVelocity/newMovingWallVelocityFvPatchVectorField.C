@@ -244,9 +244,9 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
     scalarField phip =
         p.patchField<surfaceScalarField, scalar>(fvc::meshPhi(U));
 
-    vectorField n = p.nf();
+    const vectorField n(p.nf());
     const scalarField& magSf = p.magSf();
-    scalarField Un = phip/(magSf + VSMALL);
+    const scalarField Un(phip/(magSf + VSMALL));
 
     Up += n*(Un - (n & Up));
 
@@ -275,15 +275,15 @@ snGrad() const
             "grad(" + UName + ")"
         );
 
-    vectorField n(patch().nf());
-    vectorField delta = this->patch().delta();
-    vectorField k = delta - n*(n&delta);
+    const vectorField n(patch().nf());
+    const vectorField delta(patch().delta());
+    const vectorField k((I - sqr(n)) & delta);
 
-    vectorField dUP = (k&gradU.patchInternalField());
+    const vectorField dUP(k & gradU.patchInternalField());
 
     if (secondOrder_)
     {
-        vectorField nGradUP = (n&gradU.patchInternalField());
+        const vectorField nGradUP(n & gradU.patchInternalField());
 
         tmp<Field<vector> > tnGradU
         (
@@ -377,25 +377,27 @@ gradientBoundaryCoeffs() const
             "grad(" + UName + ")"
         );
 
-    vectorField n(patch().nf());
-    vectorField delta = this->patch().delta();
-    vectorField k = delta - n*(n&delta);
+    const vectorField n(patch().nf());
+    const vectorField delta(patch().delta());
+    const vectorField k((I - sqr(n)) & delta);
 
-    vectorField dUP = (k&gradU.patchInternalField());
+    const vectorField dUP(k & gradU.patchInternalField());
 
     if (secondOrder_)
     {
-        vectorField nGradUP = (n&gradU.patchInternalField());
+        const vectorField nGradUP(n & gradU.patchInternalField());
 
-        vectorField nGradU =
+        const vectorField nGradU
+        (
             2
            *(
                 *this
               - (patchInternalField() + dUP)
             )*this->patch().deltaCoeffs()
-          - nGradUP;
+          - nGradUP
+        );
 
-        vectorField nGradUn = n*(n&nGradU);
+        const vectorField nGradUn(sqr(n) & nGradU);
 
         return
             this->patch().deltaCoeffs()
@@ -419,13 +421,15 @@ gradientBoundaryCoeffs() const
     // First order
 //     vectorField dUP = (k&gradU.patchInternalField());
 
-    vectorField nGradU =
+    const vectorField nGradU
+    (
         (
             *this
           - (patchInternalField() + dUP)
-        )*this->patch().deltaCoeffs();
+        )*this->patch().deltaCoeffs()
+    );
 
-    vectorField nGradUn = n*(n&nGradU);
+    const vectorField nGradUn(sqr(n) & nGradU);
 
     return
         this->patch().deltaCoeffs()

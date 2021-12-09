@@ -104,14 +104,13 @@ void Foam::freeSurfacePressureFvPatchScalarField::updateCoeffs()
                 "U"
             );
 
-        vectorField n(patch().nf());
-
-        scalarField nGradUn = (n & U.snGrad());
+        const vectorField n(patch().nf());
+        const scalarField nGradUn(n & U.snGrad());
 
         const fvMesh& mesh =
             this->patch().boundaryMesh().mesh();
 
-        IOdictionary transportProperties
+        const IOdictionary transportProperties
         (
             IOobject
             (
@@ -122,7 +121,7 @@ void Foam::freeSurfacePressureFvPatchScalarField::updateCoeffs()
                 IOobject::NO_WRITE
             )
         );
-        dimensionedScalar nu(transportProperties.lookup("nu"));
+        const dimensionedScalar nu(transportProperties.lookup("nu"));
 
 //         scalarField newFsPressure = -2*nu.value()*nGradUn;
 //         scalarField oldFsPressure = *this;
@@ -156,15 +155,15 @@ Foam::freeSurfacePressureFvPatchScalarField::snGrad() const
             "grad(" + pName + ")"
         );
 
-    vectorField n(patch().nf());
-    vectorField delta = this->patch().delta();
-    vectorField k = delta - n*(n&delta);
+    const vectorField n(patch().nf());
+    const vectorField delta(patch().delta());
+    const vectorField k((I - sqr(n)) & delta);
 
     bool secondOrder_ = true;
     if (secondOrder_)
     {
-        scalarField dpP = (k&gradp.patchInternalField());
-        scalarField nGradpP = (n&gradp.patchInternalField());
+        const scalarField dpP(k & gradp.patchInternalField());
+        const scalarField nGradpP(n & gradp.patchInternalField());
 
         return
             2
@@ -187,9 +186,9 @@ Foam::tmp<Foam::Field<Foam::scalar> >
 Foam::freeSurfacePressureFvPatchScalarField::gradientBoundaryCoeffs() const
 {
 #ifdef OPENFOAMESIORFOUNDATION
-    word pName = this->internalField().name();
+    const word pName = this->internalField().name();
 #else
-    word pName = this->dimensionedInternalField().name();
+    const word pName = this->dimensionedInternalField().name();
 #endif
 
     const fvPatchField<vector>& gradp =
@@ -198,15 +197,15 @@ Foam::freeSurfacePressureFvPatchScalarField::gradientBoundaryCoeffs() const
             "grad(" + pName + ")"
         );
 
-    vectorField n(patch().nf());
-    vectorField delta = this->patch().delta();
-    vectorField k = delta - n*(n&delta);
+    const vectorField n(patch().nf());
+    const vectorField delta(patch().delta());
+    const vectorField k((I - sqr(n)) & delta);
 
     bool secondOrder_ = true;
     if (secondOrder_)
     {
-        scalarField dpP = (k&gradp.patchInternalField());
-        scalarField nGradpP = (n&gradp.patchInternalField());
+        const scalarField dpP(k & gradp.patchInternalField());
+        const scalarField nGradpP(n & gradp.patchInternalField());
 
         return
             this->patch().deltaCoeffs()
