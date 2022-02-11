@@ -21,16 +21,6 @@ solidModel     linearGeometryTotalDisplacement;
 
 "linearGeometryTotalDisplacementCoeffs|linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
 {
-    // Rhie-Chow 3rd order stabilisation term
-    // Less than or equal to 1.0 seems to be a reasonable value
-    // Defaults to 1.0
-    RhieChowScale        0.0;
-
-    // Jameson-Schmidt-Turkel 4th order stabilisation term
-    // Less than or equal to 0.01 seems to be a reasonable value
-    // Defaults to 0.0
-    JameSchimTurkScale   0.01;
-
     // Maximum number of momentum correctors
     nCorrectors          10000;
 
