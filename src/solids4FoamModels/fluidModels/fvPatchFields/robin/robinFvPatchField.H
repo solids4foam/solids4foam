@@ -100,14 +100,14 @@ public:
             const robinFvPatchField<Type>&
         );
 
-        //- Construct and return a clone
-        virtual tmp<fvPatchField<Type> > clone() const
-        {
-            return tmp<fvPatchField<Type> >
-            (
-                new robinFvPatchField<Type>(*this)
-            );
-        }
+        // //- Construct and return a clone
+        // virtual tmp<fvPatchField<Type> > clone() const
+        // {
+        //     return tmp<fvPatchField<Type> >
+        //     (
+        //         new robinFvPatchField<Type>(*this)
+        //     );
+        // }
 
         //- Construct as copy setting internal field reference
         robinFvPatchField

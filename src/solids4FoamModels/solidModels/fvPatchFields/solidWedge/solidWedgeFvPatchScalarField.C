@@ -130,13 +130,13 @@ solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
 }
 
 
-solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
-(
-    const solidWedgeFvPatchScalarField& ptf
-)
-:
-    wedgeFvPatchField<scalar>(ptf)
-{}
+// solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
+// (
+//     const solidWedgeFvPatchScalarField& ptf
+// )
+// :
+//     wedgeFvPatchField<scalar>(ptf)
+// {}
 
 
 solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField

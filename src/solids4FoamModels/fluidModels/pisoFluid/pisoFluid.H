@@ -43,9 +43,11 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESI
     #include "turbulentTransportModel.H"
     #include "fvOptions.H"
+#elif OPENFOAMFOUNDATION
+    #include "kinematicMomentumTransportModel.H"
 #else
     #include "turbulenceModel.H"
 #endif
@@ -72,12 +74,16 @@ class pisoFluid
         singlePhaseTransportModel laminarTransport_;
 
         //- Turbulence model
+#ifdef OPENFOAMFOUNDATION
+        autoPtr<incompressible::momentumTransportModel> turbulence_;
+#else
         autoPtr<incompressible::turbulenceModel> turbulence_;
+#endif
 
         //- Density
         dimensionedScalar rho_;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESI
         //- Create finite volume options
         fv::options& fvOptions_;
 #endif

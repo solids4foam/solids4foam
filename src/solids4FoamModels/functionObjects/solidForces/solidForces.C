@@ -30,6 +30,7 @@ License
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "lookupSolidModel.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

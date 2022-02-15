@@ -96,13 +96,13 @@ public:
         );
 
         //- Construct and return a clone
-        virtual tmp<fvPatchField<vector> > clone() const
-        {
-            return tmp<fvPatchField<vector> >
-            (
-                new solidDirectionMixedFvPatchVectorField(*this)
-            );
-        }
+        // virtual tmp<fvPatchField<vector> > clone() const
+        // {
+        //     return tmp<fvPatchField<vector> >
+        //     (
+        //         new solidDirectionMixedFvPatchVectorField(*this)
+        //     );
+        // }
 
         //- Construct as copy setting internal field reference
         solidDirectionMixedFvPatchVectorField

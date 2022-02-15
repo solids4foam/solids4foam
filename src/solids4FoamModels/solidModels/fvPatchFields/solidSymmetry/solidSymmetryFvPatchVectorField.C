@@ -130,14 +130,14 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
 }
 
 
-solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
-(
-    const solidSymmetryFvPatchVectorField& ptf
-)
-:
-    symmetryFvPatchField<vector>(ptf),
-    secondOrder_(ptf.secondOrder_)
-{}
+// solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
+// (
+//     const solidSymmetryFvPatchVectorField& ptf
+// )
+// :
+//     symmetryFvPatchField<vector>(ptf),
+//     secondOrder_(ptf.secondOrder_)
+// {}
 
 
 solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField

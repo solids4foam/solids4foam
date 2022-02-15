@@ -125,13 +125,13 @@ public:
         );
 
         //- Construct and return a clone
-        virtual tmp<fvPatchVectorField> clone() const
-        {
-            return tmp<fvPatchVectorField>
-            (
-                new pulsedParabolicVelocityFvPatchVectorField(*this)
-            );
-        }
+        // virtual tmp<fvPatchVectorField> clone() const
+        // {
+        //     return tmp<fvPatchVectorField>
+        //     (
+        //         new pulsedParabolicVelocityFvPatchVectorField(*this)
+        //     );
+        // }
 
         //- Construct as copy setting internal field reference
         pulsedParabolicVelocityFvPatchVectorField

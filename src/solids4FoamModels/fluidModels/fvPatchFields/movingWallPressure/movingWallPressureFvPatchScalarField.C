@@ -74,14 +74,14 @@ movingWallPressureFvPatchScalarField
 {}
 
 
-movingWallPressureFvPatchScalarField::
-movingWallPressureFvPatchScalarField
-(
-    const movingWallPressureFvPatchScalarField& ptf
-)
-:
-    fixedGradientFvPatchScalarField(ptf)
-{}
+// movingWallPressureFvPatchScalarField::
+// movingWallPressureFvPatchScalarField
+// (
+//     const movingWallPressureFvPatchScalarField& ptf
+// )
+// :
+//     fixedGradientFvPatchScalarField(ptf)
+// {}
 
 
 movingWallPressureFvPatchScalarField::

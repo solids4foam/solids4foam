@@ -159,19 +159,19 @@ elasticSlipWallVelocityFvPatchVectorField
 }
 
 
-elasticSlipWallVelocityFvPatchVectorField::
-elasticSlipWallVelocityFvPatchVectorField
-(
-    const elasticSlipWallVelocityFvPatchVectorField& pivpvf
-)
-:
-    solidDirectionMixedFvPatchVectorField(pivpvf),
-    myTimeIndex_(pivpvf.myTimeIndex_),
-    Fc_(pivpvf.Fc_),
-    oldFc_(pivpvf.oldFc_),
-    oldoldFc_(pivpvf.oldoldFc_),
-    movingWallVelocity_(pivpvf.movingWallVelocity_)
-{}
+// elasticSlipWallVelocityFvPatchVectorField::
+// elasticSlipWallVelocityFvPatchVectorField
+// (
+//     const elasticSlipWallVelocityFvPatchVectorField& pivpvf
+// )
+// :
+//     solidDirectionMixedFvPatchVectorField(pivpvf),
+//     myTimeIndex_(pivpvf.myTimeIndex_),
+//     Fc_(pivpvf.Fc_),
+//     oldFc_(pivpvf.oldFc_),
+//     oldoldFc_(pivpvf.oldoldFc_),
+//     movingWallVelocity_(pivpvf.movingWallVelocity_)
+// {}
 
 
 elasticSlipWallVelocityFvPatchVectorField::

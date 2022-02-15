@@ -88,13 +88,13 @@ outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 }
 
 
-outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
-(
-    const outflowPressureFvPatchScalarField& pivpvf
-)
-:
-    fixedValueFvPatchScalarField(pivpvf)
-{}
+// outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
+// (
+//     const outflowPressureFvPatchScalarField& pivpvf
+// )
+// :
+//     fixedValueFvPatchScalarField(pivpvf)
+// {}
 
 
 outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField

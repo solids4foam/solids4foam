@@ -85,14 +85,14 @@ fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
 }
 
 
-fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
-(
-    const fixedTemperatureFvPatchScalarField& pivpvf
-)
-:
-    fixedValueFvPatchScalarField(pivpvf),
-    temperatureSeries_(pivpvf.temperatureSeries_)
-{}
+// fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
+// (
+//     const fixedTemperatureFvPatchScalarField& pivpvf
+// )
+// :
+//     fixedValueFvPatchScalarField(pivpvf),
+//     temperatureSeries_(pivpvf.temperatureSeries_)
+// {}
 
 
 fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField

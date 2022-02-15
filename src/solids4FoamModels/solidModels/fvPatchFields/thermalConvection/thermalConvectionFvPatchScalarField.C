@@ -81,16 +81,16 @@ Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
 }
 
 
-Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
-(
-    const thermalConvectionFvPatchScalarField& wbppsf
-)
-:
-    fixedValueFvPatchScalarField(wbppsf),
-    DTName_(wbppsf.DTName_),
-    alpha_(wbppsf.alpha_),
-    Tinf_(wbppsf.Tinf_)
-{}
+// Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
+// (
+//     const thermalConvectionFvPatchScalarField& wbppsf
+// )
+// :
+//     fixedValueFvPatchScalarField(wbppsf),
+//     DTName_(wbppsf.DTName_),
+//     alpha_(wbppsf.alpha_),
+//     Tinf_(wbppsf.Tinf_)
+// {}
 
 
 Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField

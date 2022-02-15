@@ -88,13 +88,13 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 }
 
 
-normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
-(
-    const normalInletVelocityFvPatchVectorField& pivpvf
-)
-:
-    fixedValueFvPatchVectorField(pivpvf)
-{}
+// normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
+// (
+//     const normalInletVelocityFvPatchVectorField& pivpvf
+// )
+// :
+//     fixedValueFvPatchVectorField(pivpvf)
+// {}
 
 
 normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField

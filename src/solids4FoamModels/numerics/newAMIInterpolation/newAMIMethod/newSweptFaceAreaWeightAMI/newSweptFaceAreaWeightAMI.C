@@ -402,7 +402,7 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::interArea
 
     // Triangulate the faces
     const faceAreaIntersect::triangulationMode triMode = this->triMode_;
-    faceList srcFaceTris, tgtFaceTris;
+    triFaceList srcFaceTris, tgtFaceTris;
     faceAreaIntersect::triangulate(srcFace, srcPoints, triMode, srcFaceTris);
     faceAreaIntersect::triangulate(tgtFace, tgtPoints, triMode, tgtFaceTris);
 
@@ -410,7 +410,7 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::interArea
     scalar areaMag = Zero;
 
     // Loop the target triangles
-    forAllConstIter(faceList, tgtFaceTris, tgtIter)
+    forAllConstIter(triFaceList, tgtFaceTris, tgtIter)
     {
         const FixedList<point, 3>
             tgtTri =
@@ -421,7 +421,7 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::interArea
             };
 
         // Loop the source triangles
-        forAllConstIter(faceList, srcFaceTris, srcIter)
+        forAllConstIter(triFaceList, srcFaceTris, srcIter)
         {
             FixedList<point, 4>
                 srcTri =

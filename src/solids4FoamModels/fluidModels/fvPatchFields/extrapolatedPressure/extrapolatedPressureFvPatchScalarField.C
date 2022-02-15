@@ -74,14 +74,14 @@ extrapolatedPressureFvPatchScalarField
 {}
 
 
-extrapolatedPressureFvPatchScalarField::
-extrapolatedPressureFvPatchScalarField
-(
-    const extrapolatedPressureFvPatchScalarField& ptf
-)
-:
-    zeroGradientFvPatchScalarField(ptf)
-{}
+// extrapolatedPressureFvPatchScalarField::
+// extrapolatedPressureFvPatchScalarField
+// (
+//     const extrapolatedPressureFvPatchScalarField& ptf
+// )
+// :
+//     zeroGradientFvPatchScalarField(ptf)
+// {}
 
 
 extrapolatedPressureFvPatchScalarField::

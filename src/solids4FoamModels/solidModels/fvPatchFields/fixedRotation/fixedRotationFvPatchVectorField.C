@@ -162,21 +162,21 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 }
 
 
-fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
-(
-    const fixedRotationFvPatchVectorField& pivpvf
-)
-:
-    fixedValueFvPatchVectorField(pivpvf),
-    rotationAngle_(pivpvf.rotationAngle_),
-    rotationAxis_(pivpvf.rotationAxis_),
-    rotationOrigin_(pivpvf.rotationOrigin_),
-    origFaceCentres_(pivpvf.origFaceCentres_),
-    origPatchPoints_(pivpvf.origPatchPoints_),
-    angleSeries_(pivpvf.angleSeries_),
-    dispSeries_(pivpvf.dispSeries_),
-    originSeries_(pivpvf.originSeries_)
-{}
+// fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
+// (
+//     const fixedRotationFvPatchVectorField& pivpvf
+// )
+// :
+//     fixedValueFvPatchVectorField(pivpvf),
+//     rotationAngle_(pivpvf.rotationAngle_),
+//     rotationAxis_(pivpvf.rotationAxis_),
+//     rotationOrigin_(pivpvf.rotationOrigin_),
+//     origFaceCentres_(pivpvf.origFaceCentres_),
+//     origPatchPoints_(pivpvf.origPatchPoints_),
+//     angleSeries_(pivpvf.angleSeries_),
+//     dispSeries_(pivpvf.dispSeries_),
+//     originSeries_(pivpvf.originSeries_)
+// {}
 
 
 fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField

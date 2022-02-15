@@ -130,13 +130,13 @@ solidWedgeFvPatchVectorField::solidWedgeFvPatchVectorField
 }
 
 
-solidWedgeFvPatchVectorField::solidWedgeFvPatchVectorField
-(
-    const solidWedgeFvPatchVectorField& ptf
-)
-:
-    wedgeFvPatchField<vector>(ptf)
-{}
+// solidWedgeFvPatchVectorField::solidWedgeFvPatchVectorField
+// (
+//     const solidWedgeFvPatchVectorField& ptf
+// )
+// :
+//     wedgeFvPatchField<vector>(ptf)
+// {}
 
 
 solidWedgeFvPatchVectorField::solidWedgeFvPatchVectorField

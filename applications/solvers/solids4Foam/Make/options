@@ -8,11 +8,20 @@ ifeq ($(WM_PROJECT), foam)
         VERSION_SPECIFIC_LIBS += -loversetMesh -loversetDynamicFvMesh
     endif
 else
-    VERSION_SPECIFIC_LIBS = \
-        -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
-        -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
-        -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
-        -lfluidThermophysicalModels -lturbulenceModels -lcompressibleTurbulenceModels
+    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        VERSION_SPECIFIC_LIBS = \
+            -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
+            -limmiscibleIncompressibleTwoPhaseMixture -lfvMotionSolvers \
+            -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
+            -lfluidThermophysicalModels -lcompressibleTurbulenceModels
+    else
+        VERSION_SPECIFIC_LIBS = \
+            -ltwoPhaseMixture \
+            -limmiscibleIncompressibleTwoPhaseMixture \
+            -lfvMotionSolvers -lradiationModels -lspecie \
+            -lfluidThermophysicalModels -lmomentumTransportModels \
+            -lincompressibleMomentumTransportModels -ltransportModels
+    endif            
 endif
                                                 
 ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
@@ -53,7 +62,7 @@ endif
 EXE_INC = \
     -I../../../src/solids4FoamModels/lnInclude \
     -I../../../src/blockCoupledSolids4FoamTools/lnInclude \
-    -std=c++11 \
+    -std=c++14 \
     $(DISABLE_WARNING_FLAGS) \
     $(VERSION_SPECIFIC_INC) \
     -I../../ThirdParty/eigen3 \
@@ -89,7 +98,6 @@ EXE_LIBS = \
     -lblockCoupledSolids4FoamTools \
     -lsolids4FoamModels \
     -lfiniteVolume \
-    -lincompressibleTransportModels \
     -ldynamicFvMesh \
     -ldynamicMesh \
     -lmeshTools \

@@ -123,16 +123,16 @@ public:
         );
 
         //- Construct and return a clone
-        virtual autoPtr<pointPatchField<vector> > clone() const
-        {
-            return autoPtr<pointPatchField<vector> >
-            (
-                new timeVaryingVelocityPointPatchVectorField
-                (
-                    *this
-                )
-            );
-        }
+        // virtual autoPtr<pointPatchField<vector> > clone() const
+        // {
+        //     return autoPtr<pointPatchField<vector> >
+        //     (
+        //         new timeVaryingVelocityPointPatchVectorField
+        //         (
+        //             *this
+        //         )
+        //     );
+        // }
 
         //- Construct as copy setting internal field reference
         timeVaryingVelocityPointPatchVectorField

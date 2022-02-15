@@ -83,15 +83,15 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 }
 
 
-elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
-(
-    const elasticWallPressureFvPatchScalarField& pivpvf
-)
-:
-    robinFvPatchScalarField(pivpvf),
-    prevPressure_(pivpvf.prevPressure_),
-    prevAcceleration_(pivpvf.prevAcceleration_)
-{}
+// elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
+// (
+//     const elasticWallPressureFvPatchScalarField& pivpvf
+// )
+// :
+//     robinFvPatchScalarField(pivpvf),
+//     prevPressure_(pivpvf.prevPressure_),
+//     prevAcceleration_(pivpvf.prevAcceleration_)
+// {}
 
 
 elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField

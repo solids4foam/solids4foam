@@ -102,15 +102,15 @@ normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 }
 
 
-normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
-(
-    const normalDisplacementFvPatchVectorField& pivpvf
-)
-:
-    fixedValueFvPatchVectorField(pivpvf),
-    normalDisp_(pivpvf.normalDisp_),
-    dispSeries_(pivpvf.dispSeries_)
-{}
+// normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
+// (
+//     const normalDisplacementFvPatchVectorField& pivpvf
+// )
+// :
+//     fixedValueFvPatchVectorField(pivpvf),
+//     normalDisp_(pivpvf.normalDisp_),
+//     dispSeries_(pivpvf.dispSeries_)
+// {}
 
 
 normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField

@@ -95,16 +95,16 @@ extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
 }
 
 
-template<class Type>
-extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
-(
-    const extrapolatedFvPatchField<Type>& ptf
-)
-:
-    fixedGradientFvPatchField<Type>(ptf),
-    iPoints_(ptf.size()),
-    zeroGradient_(ptf.zeroGradient_)
-{}
+// template<class Type>
+// extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
+// (
+//     const extrapolatedFvPatchField<Type>& ptf
+// )
+// :
+//     fixedGradientFvPatchField<Type>(ptf),
+//     iPoints_(ptf.size()),
+//     zeroGradient_(ptf.zeroGradient_)
+// {}
 
 
 template<class Type>

@@ -95,13 +95,13 @@ public:
         );
 
         //- Construct and return a clone
-        virtual tmp<fvPatchVectorField> clone() const
-        {
-            return tmp<fvPatchVectorField>
-            (
-                new freeSurfaceVelocityFvPatchVectorField(*this)
-            );
-        }
+        // virtual tmp<fvPatchVectorField> clone() const
+        // {
+        //     return tmp<fvPatchVectorField>
+        //     (
+        //         new freeSurfaceVelocityFvPatchVectorField(*this)
+        //     );
+        // }
 
         //- Construct as copy setting internal field reference
         freeSurfaceVelocityFvPatchVectorField

@@ -238,24 +238,24 @@ solidTractionFvPatchVectorField
 {}
 
 
-solidTractionFvPatchVectorField::
-solidTractionFvPatchVectorField
-(
-    const solidTractionFvPatchVectorField& stpvf
-)
-:
-    fixedGradientFvPatchVectorField(stpvf),
-    traction_(stpvf.traction_),
-    pressure_(stpvf.pressure_),
-    tractionSeries_(stpvf.tractionSeries_),
-    pressureSeries_(stpvf.pressureSeries_),
-    tractionFieldPtr_(),
-    pressureFieldPtr_(),
-    secondOrder_(stpvf.secondOrder_),
-    setEffectiveTraction_(stpvf.setEffectiveTraction_),
-    relaxFac_(stpvf.relaxFac_),
-    curTimeIndex_(stpvf.curTimeIndex_)
-{}
+// solidTractionFvPatchVectorField::
+// solidTractionFvPatchVectorField
+// (
+//     const solidTractionFvPatchVectorField& stpvf
+// )
+// :
+//     fixedGradientFvPatchVectorField(stpvf),
+//     traction_(stpvf.traction_),
+//     pressure_(stpvf.pressure_),
+//     tractionSeries_(stpvf.tractionSeries_),
+//     pressureSeries_(stpvf.pressureSeries_),
+//     tractionFieldPtr_(),
+//     pressureFieldPtr_(),
+//     secondOrder_(stpvf.secondOrder_),
+//     setEffectiveTraction_(stpvf.setEffectiveTraction_),
+//     relaxFac_(stpvf.relaxFac_),
+//     curTimeIndex_(stpvf.curTimeIndex_)
+// {}
 
 
 solidTractionFvPatchVectorField::

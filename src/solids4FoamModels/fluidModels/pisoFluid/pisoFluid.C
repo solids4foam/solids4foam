@@ -62,7 +62,11 @@ pisoFluid::pisoFluid
     laminarTransport_(U(), phi()),
     turbulence_
     (
+#ifdef OPENFOAMFOUNDATION
+        incompressible::momentumTransportModel::New
+#else
         incompressible::turbulenceModel::New
+#endif
         (
             U(), phi(), laminarTransport_
         )
@@ -71,7 +75,7 @@ pisoFluid::pisoFluid
     (
         laminarTransport_.lookup("rho")
     ),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESI
     fvOptions_(fv::options::New(mesh())),
 #endif
     pRefCell_(0),
@@ -100,16 +104,28 @@ tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
-    tvF.ref() =
-#else
+#ifdef FOAMEXTEND
     tvF() =
-#endif
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
           & (-turbulence_->devReff()().boundaryField()[patchID])
         );
+#elif OPENFOAMESI
+    tvF.ref() =
+        rho_.value()
+       *(
+            mesh().boundary()[patchID].nf()
+          & (-turbulence_->devReff()().boundaryField()[patchID])
+        );
+#else
+    tvF.ref() =
+        rho_.value()
+       *(
+            mesh().boundary()[patchID].nf()
+          & (-turbulence_->devSigma()().boundaryField()[patchID])
+        );
+#endif
 
     return tvF;
 }
@@ -170,12 +186,14 @@ bool pisoFluid::evolve()
     fvVectorMatrix HUEqn
     (
         fvm::div(phi(), U())
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
       + turbulence_->divDevReff()
-#else
+#elif OPENFOAMESI
       + turbulence_->divDevReff(U())
      ==
         fvOptions_(U())
+#else
+      + turbulence_->divDevSigma(U())
 #endif
     );
 
@@ -183,9 +201,9 @@ bool pisoFluid::evolve()
     fvVectorMatrix UEqn(ddtUEqn + HUEqn);
 #endif
 
-#ifdef OPENFOAMESIORFOUNDATION
     UEqn.relax();
 
+#ifdef OPENFOAMESI
     fvOptions_.constrain(UEqn);
 #endif
 
@@ -197,7 +215,7 @@ bool pisoFluid::evolve()
         solve(ddtUEqn + HUEqn == -fvc::grad(p()));
 #endif
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESI
         fvOptions_.correct(U());
 #endif
     }
@@ -307,14 +325,18 @@ bool pisoFluid::evolve()
         // Make the fluxes relative to the mesh motion
         fvc::makeRelative(phi(), U());
 
-#ifdef OPENFOAMESIORFOUNDATION
+    #ifdef OPENFOAMESIORFOUNDATION
         U() = HbyA - rAU*fvc::grad(p());
         U().correctBoundaryConditions();
-        fvOptions_.correct(U());
-#else
+    #else
         U() -= rAU*gradp();
         U().correctBoundaryConditions();
-#endif
+    #endif
+
+    #ifdef OPENFOAMESI
+        fvOptions_.correct(U());
+    #endif
+
 #endif
         gradU() = fvc::grad(U());
     }

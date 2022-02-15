@@ -120,13 +120,13 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 }
 
 
-solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
-(
-    const solidSymmetryFvPatchScalarField& ptf
-)
-:
-    symmetryFvPatchField<scalar>(ptf)
-{}
+// solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
+// (
+//     const solidSymmetryFvPatchScalarField& ptf
+// )
+// :
+//     symmetryFvPatchField<scalar>(ptf)
+// {}
 
 
 solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField

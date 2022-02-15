@@ -108,17 +108,17 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 }
 
 
-newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
-(
-    const newMovingWallVelocityFvPatchVectorField& pivpvf
-)
-:
-    fixedValueFvPatchVectorField(pivpvf),
-    myTimeIndex_(pivpvf.myTimeIndex_),
-    Fc_(pivpvf.Fc_),
-    oldFc_(pivpvf.oldFc_),
-    oldoldFc_(pivpvf.oldoldFc_)
-{}
+// newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
+// (
+//     const newMovingWallVelocityFvPatchVectorField& pivpvf
+// )
+// :
+//     fixedValueFvPatchVectorField(pivpvf),
+//     myTimeIndex_(pivpvf.myTimeIndex_),
+//     Fc_(pivpvf.Fc_),
+//     oldFc_(pivpvf.oldFc_),
+//     oldoldFc_(pivpvf.oldoldFc_)
+// {}
 
 
 newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField

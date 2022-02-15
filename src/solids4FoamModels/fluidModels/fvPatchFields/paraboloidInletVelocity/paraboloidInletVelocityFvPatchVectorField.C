@@ -93,19 +93,19 @@ paraboloidInletVelocityFvPatchVectorField
 {}
 
 
-paraboloidInletVelocityFvPatchVectorField::
-paraboloidInletVelocityFvPatchVectorField
-(
-    const paraboloidInletVelocityFvPatchVectorField& pivpvf
-)
-:
-    fixedValueFvPatchVectorField(pivpvf),
-    Umax_(pivpvf.Umax_),
-    yMax_(pivpvf.yMax_),
-    zMax_(pivpvf.zMax_),
-    timeVaryingEndTime_(pivpvf.timeVaryingEndTime_),
-    timeAtMaxVelocity_(pivpvf.timeAtMaxVelocity_)
-{}
+// paraboloidInletVelocityFvPatchVectorField::
+// paraboloidInletVelocityFvPatchVectorField
+// (
+//     const paraboloidInletVelocityFvPatchVectorField& pivpvf
+// )
+// :
+//     fixedValueFvPatchVectorField(pivpvf),
+//     Umax_(pivpvf.Umax_),
+//     yMax_(pivpvf.yMax_),
+//     zMax_(pivpvf.zMax_),
+//     timeVaryingEndTime_(pivpvf.timeVaryingEndTime_),
+//     timeAtMaxVelocity_(pivpvf.timeAtMaxVelocity_)
+// {}
 
 
 paraboloidInletVelocityFvPatchVectorField::

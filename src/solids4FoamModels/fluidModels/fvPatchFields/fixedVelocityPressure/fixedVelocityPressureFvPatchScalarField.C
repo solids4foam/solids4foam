@@ -74,14 +74,14 @@ fixedVelocityPressureFvPatchScalarField
 {}
 
 
-fixedVelocityPressureFvPatchScalarField::
-fixedVelocityPressureFvPatchScalarField
-(
-    const fixedVelocityPressureFvPatchScalarField& ptf
-)
-:
-    fixedGradientFvPatchScalarField(ptf)
-{}
+// fixedVelocityPressureFvPatchScalarField::
+// fixedVelocityPressureFvPatchScalarField
+// (
+//     const fixedVelocityPressureFvPatchScalarField& ptf
+// )
+// :
+//     fixedGradientFvPatchScalarField(ptf)
+// {}
 
 
 fixedVelocityPressureFvPatchScalarField::

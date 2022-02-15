@@ -111,13 +111,13 @@ public:
         );
 
         //- Construct and return a clone
-        virtual tmp<fvPatchVectorField> clone() const
-        {
-            return tmp<fvPatchVectorField>
-            (
-                new transitionalParabolicVelocityFvPatchVectorField(*this)
-            );
-        }
+        // virtual tmp<fvPatchVectorField> clone() const
+        // {
+        //     return tmp<fvPatchVectorField>
+        //     (
+        //         new transitionalParabolicVelocityFvPatchVectorField(*this)
+        //     );
+        // }
 
         //- Construct as copy setting internal field reference
         transitionalParabolicVelocityFvPatchVectorField
