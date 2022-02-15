@@ -167,11 +167,6 @@ paraboloidInletVelocityFvPatchVectorField::snGrad() const
 {
     bool secondOrder_ = false;
 
-    tmp<Field<vector> > tnGradU
-    (
-        new vectorField(this->patch().size(), vector::zero)
-    );
-
 #ifdef OPENFOAMESIORFOUNDATION
     const word& UName = internalField().name();
 #else
@@ -180,6 +175,11 @@ paraboloidInletVelocityFvPatchVectorField::snGrad() const
 
     if (db().foundObject<volTensorField>("grad(" + UName + ")"))
     {
+        tmp<Field<vector> > tnGradU
+        (
+            new vectorField(this->patch().size(), vector::zero)
+        );
+
         const fvPatchField<tensor>& gradU =
             patch().lookupPatchField<volTensorField, tensor>
             (
@@ -226,7 +226,7 @@ paraboloidInletVelocityFvPatchVectorField::snGrad() const
         return tnGradU;
     }
 
-    return
+     return
      (
          *this - patchInternalField()
      )*patch().deltaCoeffs();
