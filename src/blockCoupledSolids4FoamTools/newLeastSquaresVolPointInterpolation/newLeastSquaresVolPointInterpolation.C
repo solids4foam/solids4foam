@@ -24,6 +24,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifndef OPENFOAMFOUNDATION
+
 #include "newLeastSquaresVolPointInterpolation.H"
 #include "fvMesh.H"
 #include "volFields.H"
@@ -4100,3 +4102,5 @@ newLeastSquaresVolPointInterpolation::invLsMatrices() const
 } // End namespace Foam
 
 // ************************************************************************* //
+
+#endif
