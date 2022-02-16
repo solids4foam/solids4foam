@@ -25,13 +25,13 @@ stopAt          endTime;
 
 endTime         0.01;
 
-deltaT          0.001;
+deltaT          1e-9; // not used but must be less than endTime
 
 maxCo           0.1;
 
 writeControl    adjustableRunTime;
 
-writeInterval   0.001;
+writeInterval   0.0001;
 
 cycleWrite      0;
 
