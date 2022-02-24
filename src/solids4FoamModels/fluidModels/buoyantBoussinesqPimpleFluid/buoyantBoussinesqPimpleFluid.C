@@ -60,12 +60,16 @@ tmp<fvVectorMatrix> buoyantBoussinesqPimpleFluid::solveUEqn()
     (
         fvm::ddt(U())
       + fvm::div(phi(), U())
-#ifndef OPENFOAMESIORFOUNDATION
-      + turbulence_->divDevReff()
-#else
-      + turbulence_->divDevReff(U())
+#ifdef OPENFOAMFOUNDATION
+      + turbulence_->divDevSigma(U())
      ==
-        fvOptions_(U())
+        models().source(U())
+#elif OPENFOAMESI
+      + turbulence_->divDevReff(U()))
+     ==
+        options()(U())
+#else
+      + turbulence_->divDevReff()
 #endif
     );
 #ifdef OPENFOAMESIORFOUNDATION
@@ -76,8 +80,10 @@ tmp<fvVectorMatrix> buoyantBoussinesqPimpleFluid::solveUEqn()
 
     UEqn.relax();
 
-#ifdef OPENFOAMESIORFOUNDATION
-    fvOptions_.constrain(UEqn);
+#ifdef OPENFOAMFOUNDATION
+    constraints().constrain(UEqn);
+#elif OPENFOAMESI
+    options().constrain(UEqn);
 #endif
 
     if (pimple().momentumPredictor())
@@ -95,8 +101,10 @@ tmp<fvVectorMatrix> buoyantBoussinesqPimpleFluid::solveUEqn()
             )
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
-        fvOptions_.correct(U());
+#ifdef OPENFOAMFOUNDATION
+    constraints().constrain(U());
+#elif OPENFOAMESI
+    options().correct(U());
 #endif
     }
 
@@ -117,29 +125,30 @@ void buoyantBoussinesqPimpleFluid::solveTEqn()
 #ifdef OPENFOAMFOUNDATION
      ==
         radiation_->ST(rhoCpRef_, T_)
-      + fvOptions_(T_)
+      + models().source(T_)
 #elif OPENFOAMESI
      ==
-        fvOptions_(T_)
+        options()(T_)
 #endif
     );
 
     TEqn.relax();
 
-#ifdef OPENFOAMESIORFOUNDATION
-    fvOptions_.constrain(TEqn);
+#ifdef OPENFOAMFOUNDATION
+    constraints().constrain(TEqn);
+#elif OPENFOAMESI
+    options().constrain(TEqn);
 #endif
+
 
     TEqn.solve();
 
 #ifdef OPENFOAMFOUNDATION
     radiation_->correct();
+    constraints().constrain(T_);
+#elif OPENFOAMESI
+    options().correct(T_);
 #endif
-
-#ifdef OPENFOAMESIORFOUNDATION
-    fvOptions_.correct(T_);
-#endif
-
     rhok_ = 1.0 - beta_*(T_ - TRef_);
 }
 
@@ -212,8 +221,10 @@ void buoyantBoussinesqPimpleFluid::solvePEqn
             // calculated from the relaxed pressure
             U() = HbyA + rAU*fvc::reconstruct((phig - p_rghEqn.flux())/rAUf);
             U().correctBoundaryConditions();
-#ifdef OPENFOAMESIORFOUNDATION
-            fvOptions_.correct(U());
+#ifdef OPENFOAMFOUNDATION
+            constraints().constrain(U());
+#elif OPENFOAMESI
+            options().correct(U());
 #endif
         }
     }
@@ -277,6 +288,15 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
     TRef_(laminarTransport_.lookup("TRef")),
     Pr_(laminarTransport_.lookup("Pr")),
     Prt_(laminarTransport_.lookup("Prt")),
+#ifdef OPENFOAMFOUNDATION
+    turbulence_
+    (
+        incompressible::momentumTransportModel::New
+        (
+            U(), phi(), laminarTransport_
+        )
+    ),
+#else
     turbulence_
     (
         incompressible::turbulenceModel::New
@@ -284,6 +304,7 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
             U(), phi(), laminarTransport_
         )
     ),
+#endif
     alphaEff_
     (
         IOobject
@@ -329,9 +350,6 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
         dimDensity*dimEnergy/dimMass/dimTemperature,
         1.0
     ),
-#endif
-#ifdef OPENFOAMESIORFOUNDATION
-    fvOptions_(fv::options::New(mesh())),
 #endif
     pRefCell_(0),
     pRefValue_(0)
@@ -383,11 +401,6 @@ buoyantBoussinesqPimpleFluid::buoyantBoussinesqPimpleFluid
         rhoCpRef_ = rhoRef*CpRef;
     }
     #endif
-    // Check if any finite volume option is present
-    if (!fvOptions_.optionList::size())
-    {
-        Info << "No finite volume options present\n" << endl;
-    }
 #else
     setRefCell(p(), pimple().dict(), pRefCell_, pRefValue_);
     mesh().schemesDict().setFluxRequired(p_rgh_.name());
@@ -425,7 +438,11 @@ tmp<vectorField> buoyantBoussinesqPimpleFluid::patchViscousForce
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
+#ifdef OPENFOAMFOUNDATION
+          & (-turbulence_->devSigma()().boundaryField()[patchID])
+#else
           & (-turbulence_->devReff()().boundaryField()[patchID])
+#endif
         );
 
     return tvF;

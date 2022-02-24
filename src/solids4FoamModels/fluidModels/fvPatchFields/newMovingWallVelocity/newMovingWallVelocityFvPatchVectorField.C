@@ -107,7 +107,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     oldoldFc_ = Fc_;
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 (
     const newMovingWallVelocityFvPatchVectorField& pivpvf
@@ -119,7 +119,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     oldFc_(pivpvf.oldFc_),
     oldoldFc_(pivpvf.oldoldFc_)
 {}
-
+#endif
 
 newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 (

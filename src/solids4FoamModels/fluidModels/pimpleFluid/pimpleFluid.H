@@ -43,9 +43,11 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
+    #include "kinematicMomentumTransportModel.H"
+    #include "pressureReference.H"
+#elif OPENFOAMESI
     #include "turbulentTransportModel.H"
-    #include "fvOptions.H"
 #else
     #include "turbulenceModel.H"
 #endif
@@ -71,8 +73,13 @@ class pimpleFluid
         //- Transport model
         singlePhaseTransportModel laminarTransport_;
 
+#ifdef OPENFOAMFOUNDATION
+        //- Momentum transport model
+        autoPtr<incompressible::momentumTransportModel> turbulence_;
+#else
         //- Turbulence model
         autoPtr<incompressible::turbulenceModel> turbulence_;
+#endif
 
         //- Fluid density [kg/m3]
         dimensionedScalar rho_;
@@ -81,8 +88,6 @@ class pimpleFluid
         //- Creates and initialises the velocity field Uf if required
         autoPtr<surfaceVectorField> Uf_;
 
-        //- Create finite volume options
-        fv::options& fvOptions_;
 #else
 #if FOAMEXTEND > 40
         //- rAU field
@@ -93,6 +98,10 @@ class pimpleFluid
 #endif
 #endif
 
+#ifdef OPENFOAMFOUNDATION
+        //- Reference pressure cell
+        pressureReference pressureControl_;
+#endif
         //- Reference pressure cell
         label pRefCell_;
 

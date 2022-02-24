@@ -62,7 +62,11 @@ pisoFluid::pisoFluid
     laminarTransport_(U(), phi()),
     turbulence_
     (
+#ifdef OPENFOAMFOUNDATION
+        incompressible::momentumTransportModel::New
+#else
         incompressible::turbulenceModel::New
+#endif
         (
             U(), phi(), laminarTransport_
         )
@@ -71,15 +75,12 @@ pisoFluid::pisoFluid
     (
         laminarTransport_.lookup("rho")
     ),
-#ifdef OPENFOAMESIORFOUNDATION
-    fvOptions_(fv::options::New(mesh())),
-#endif
     pRefCell_(0),
     pRefValue_(0)
 {
     UisRequired();
     pisRequired();
-    
+
     setRefCell(p(), piso().dict(), pRefCell_, pRefValue_);
 
 #ifdef OPENFOAMESIORFOUNDATION
@@ -108,7 +109,11 @@ tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
+#ifdef OPENFOAMFOUNDATION
+          & (-turbulence_->devTau()().boundaryField()[patchID])
+#else
           & (-turbulence_->devReff()().boundaryField()[patchID])
+#endif
         );
 
     return tvF;
@@ -156,7 +161,7 @@ bool pisoFluid::evolve()
         const Time& runTime = fluidModel::runTime();
 #       include "volContinuity.H"
     }
-    
+
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), U());
 
@@ -172,10 +177,14 @@ bool pisoFluid::evolve()
         fvm::div(phi(), U())
 #ifndef OPENFOAMESIORFOUNDATION
       + turbulence_->divDevReff()
+#elif OPENFOAMFOUNDATION
+      + turbulence_->divDevSigma(U())
+    ==
+        models().source(U())
 #else
       + turbulence_->divDevReff(U())
      ==
-        fvOptions_(U())
+        options()(U())
 #endif
     );
 
@@ -183,10 +192,12 @@ bool pisoFluid::evolve()
     fvVectorMatrix UEqn(ddtUEqn + HUEqn);
 #endif
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
     UEqn.relax();
-
-    fvOptions_.constrain(UEqn);
+    constraints().constrain(UEqn);
+#elif OPENFOAMESI
+    UEqn.relax();
+    options().constrain(UEqn);
 #endif
 
     if (piso().momentumPredictor())
@@ -197,8 +208,10 @@ bool pisoFluid::evolve()
         solve(ddtUEqn + HUEqn == -fvc::grad(p()));
 #endif
 
-#ifdef OPENFOAMESIORFOUNDATION
-        fvOptions_.correct(U());
+#ifdef OPENFOAMFOUNDATION
+        constraints().constrain(U());
+#elif OPENFOAMEFI
+        options().correct(U());
 #endif
     }
 
@@ -310,7 +323,13 @@ bool pisoFluid::evolve()
 #ifdef OPENFOAMESIORFOUNDATION
         U() = HbyA - rAU*fvc::grad(p());
         U().correctBoundaryConditions();
-        fvOptions_.correct(U());
+
+#ifdef OPENFOAMFOUNDATION
+        constraints().constrain(U());
+#elif OPENFOAMESI
+        options().correct(U());
+#endif
+
 #else
         U() -= rAU*gradp();
         U().correctBoundaryConditions();

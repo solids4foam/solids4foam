@@ -1,14 +1,39 @@
 #!/bin/bash
 cd ${0%/*} || exit 1    # run from this directory
 
+if [ "$WM_PROJECT" = "OpenFOAM" ]
+then
+    # Parse arguments for library compilation
+    . $WM_PROJECT_DIR/wmake/scripts/AllwmakeParseArguments
+fi
+
+if [ "$WM_PROJECT_VERSION" = "9" ]
+then
+    if [ ! -d "interpolationTable" ]
+    then
+        cp -r ../../filesToReplaceInOF/interpolationTable ./
+    fi
+else
+    if [ -d "interpolationTable" ]
+    then
+        rm -r interpolationTable
+    fi
+fi
+
 echo "Updating Make/files link"
 if [ "$WM_PROJECT" = "foam" ]
 then
     echo "Using Make/files.foamextend"
-    (cd Make && ln -sf files.foamextend files)
+    if [ $(readlink Make/files) != "files.foamextend" ]
+    then
+        (cd Make && ln -sf files.foamextend files)
+    fi
 else
     echo "Using Make/files.openfoam"
-    (cd Make && ln -sf files.openfoam files)
+    if [ $(readlink Make/files) != "files.openfoam" ]
+    then
+        (cd Make && ln -sf files.openfoam files)
+    fi
 fi
 
 wmake libso

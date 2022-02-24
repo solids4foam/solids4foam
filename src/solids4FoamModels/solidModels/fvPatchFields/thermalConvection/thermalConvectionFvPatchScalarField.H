@@ -104,6 +104,9 @@ public:
         thermalConvectionFvPatchScalarField
         (
             const thermalConvectionFvPatchScalarField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -114,6 +117,7 @@ public:
                 new thermalConvectionFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         thermalConvectionFvPatchScalarField

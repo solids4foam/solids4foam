@@ -93,16 +93,20 @@ public:
         solidWedgeFvPatchScalarField
         (
             const solidWedgeFvPatchScalarField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
-        virtual tmp<fvPatchField<scalar> > clone() const
+        virtual tmp<fvPatchScalarField> clone() const
         {
-            return tmp<fvPatchField<scalar> >
+            return tmp<fvPatchScalarField>
             (
                 new solidWedgeFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         solidWedgeFvPatchScalarField

@@ -31,6 +31,9 @@ License
 #ifdef OPENFOAMESIORFOUNDATION
     #include "surfaceFields.H"
 #endif
+#ifdef OPENFOAMFOUNDATION
+    #include "OSspecific.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

@@ -133,6 +133,9 @@ public:
         solidTractionFvPatchVectorField
         (
             const solidTractionFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -143,6 +146,7 @@ public:
                 new solidTractionFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         solidTractionFvPatchVectorField

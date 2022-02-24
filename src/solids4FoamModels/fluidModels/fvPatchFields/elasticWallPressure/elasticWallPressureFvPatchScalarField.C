@@ -82,7 +82,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     this->coeff1() = 1.0;
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 (
     const elasticWallPressureFvPatchScalarField& pivpvf
@@ -92,7 +92,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     prevPressure_(pivpvf.prevPressure_),
     prevAcceleration_(pivpvf.prevAcceleration_)
 {}
-
+#endif
 
 elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 (

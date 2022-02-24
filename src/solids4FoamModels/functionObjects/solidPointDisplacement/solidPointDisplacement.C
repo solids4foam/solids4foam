@@ -33,6 +33,9 @@ License
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
+#ifdef OPENFOAMFOUNDATION
+    #include "OSspecific.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -62,7 +65,11 @@ bool Foam::solidPointDisplacement::writeData()
         const volVectorField& D = mesh.lookupObject<volVectorField>("D");
 
         // Create a point mesh
+#ifdef OPENFOAMFOUNDATION
+        const pointMesh& pMesh = pointMesh::New(mesh);
+#else
         pointMesh pMesh(mesh);
+#endif
 
         // Create a point field
         pointVectorField pointD
@@ -79,7 +86,9 @@ bool Foam::solidPointDisplacement::writeData()
             dimensionedVector("zero", D.dimensions(), vector::zero)
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
+        volPointInterpolation::New(mesh).interpolate(D, pointD);
+#elif OPENFOAMESI
         mesh.lookupObject<volPointInterpolation>
         (
             "volPointInterpolation"

@@ -578,8 +578,28 @@ Foam::fluidModel::fluidModel
         mesh(),
         dimensionedScalar("zero", dimPressure, 0.0)
     ),
-    gradU_(fvc::grad(U_)),
-    gradp_(fvc::grad(p_)),
+    gradU_
+    (
+        IOobject
+        (
+            "grad(U)",
+            runTime.timeName(),
+            mesh()
+        ),
+        mesh(),
+        dimensionedTensor("zero", dimVelocity/dimLength, Zero)
+    ),
+    gradp_
+    (
+        IOobject
+        (
+            "grad(p)",
+            runTime.timeName(),
+            mesh()
+        ),
+        mesh(),
+        dimensionedVector("zero", p_.dimensions()/dimLength, Zero)
+    ),
     phi_
     (
         IOobject
@@ -609,10 +629,18 @@ Foam::fluidModel::fluidModel
     UMax_("UMax", U_.dimensions(), 0),
     smallU_("smallU", dimVelocity, 1e-10),
     cumulativeContErr_(0.0),
+#ifdef OPENFOAMFOUNDATION
+    fvModels_(fvModels::New(mesh())),
+    fvConstraints_(fvConstraints::New(mesh())),
+#elif OPENFOAMESI
+    fvOptions_(fv::options::New(mesh())),
+#endif
     fsiMeshUpdate_(false),
     fsiMeshUpdateChanged_(false),
     globalPatchesPtrList_()
 {
+    gradU_ = fvc::grad(U_);
+    gradp_ = fvc::grad(p_);
     if (mesh().solutionDict().found("fieldBounds"))
     {
         dictionary fieldBounds = mesh().solutionDict().subDict("fieldBounds");
@@ -621,6 +649,25 @@ Foam::fluidModel::fluidModel
         fieldBounds.lookup(U().name())
             >> UMax_.value();
     }
+#ifdef OPENFOAMFOUNDATION
+    // Check if any finite volume models is present
+    if (!fvModels_.PtrListDictionary<fvModel>::size())
+    {
+        Info << "No fvModels present" << endl;
+    }
+
+    // Check if any finite volume constrains is present
+    if (!fvConstraints_.PtrListDictionary<fvConstraint>::size())
+    {
+        Info << "No fvConstraints present" << endl;
+    }
+#elif OPENFOAMESI
+    // Check if any finite volume option is present
+    if (!fvOptions_.optionList::size())
+    {
+        Info << "No finite volume options present\n" << endl;
+    }
+#endif
 }
 
 

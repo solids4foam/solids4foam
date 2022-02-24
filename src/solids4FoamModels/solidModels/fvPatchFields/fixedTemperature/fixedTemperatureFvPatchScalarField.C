@@ -84,7 +84,7 @@ fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
 (
     const fixedTemperatureFvPatchScalarField& pivpvf
@@ -93,7 +93,7 @@ fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
     fixedValueFvPatchScalarField(pivpvf),
     temperatureSeries_(pivpvf.temperatureSeries_)
 {}
-
+#endif
 
 fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
 (

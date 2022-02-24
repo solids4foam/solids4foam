@@ -33,6 +33,9 @@ License
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
+#ifdef OPENFOAMFOUNDATION
+    #include "OSspecific.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -72,7 +75,11 @@ bool Foam::solidPointStress::writeData()
             mesh.lookupObject<volSymmTensorField>("sigma");
 
         // Create a point mesh
+#ifdef OPENFOAMFOUNDATION
+        const pointMesh& pMesh = pointMesh::New(mesh);
+#else
         pointMesh pMesh(mesh);
+#endif
 
         // Create a point stress field
         pointSymmTensorField pointSigma
@@ -89,7 +96,9 @@ bool Foam::solidPointStress::writeData()
             dimensionedSymmTensor("zero", sigma.dimensions(), symmTensor::zero)
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
+        volPointInterpolation::New(mesh).interpolate(sigma, pointSigma);
+#elif OPENFOAMESI
         mesh.lookupObject<volPointInterpolation>
         (
             "volPointInterpolation"

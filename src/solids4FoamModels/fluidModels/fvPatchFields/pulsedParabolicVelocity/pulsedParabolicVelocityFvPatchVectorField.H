@@ -113,7 +113,7 @@ public:
             const dictionary&
         );
 
-        //- Construct by mapping given 
+        //- Construct by mapping given
         //  pulsedParabolicVelocityFvPatchVectorField
         //  onto a new patch
         pulsedParabolicVelocityFvPatchVectorField
@@ -124,6 +124,13 @@ public:
             const fvPatchFieldMapper&
         );
 
+#ifdef OPENFOAMFOUNDATION
+        //- Construct as copy
+        pulsedParabolicVelocityFvPatchVectorField
+        (
+            const pulsedParabolicVelocityFvPatchVectorField&
+        ) = delete;
+#else
         //- Construct and return a clone
         virtual tmp<fvPatchVectorField> clone() const
         {
@@ -132,6 +139,7 @@ public:
                 new pulsedParabolicVelocityFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         pulsedParabolicVelocityFvPatchVectorField

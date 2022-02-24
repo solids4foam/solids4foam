@@ -91,6 +91,13 @@ public:
             const fvPatchFieldMapper&
         );
 
+#ifdef OPENFOAMFOUNDATION
+        //- Construct as copy
+        freeSurfacePressureFvPatchScalarField
+        (
+            const freeSurfacePressureFvPatchScalarField&
+        ) = delete;
+#else
         //- Construct and return a clone
         virtual tmp<fvPatchScalarField> clone() const
         {
@@ -99,6 +106,7 @@ public:
                 new freeSurfacePressureFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         freeSurfacePressureFvPatchScalarField

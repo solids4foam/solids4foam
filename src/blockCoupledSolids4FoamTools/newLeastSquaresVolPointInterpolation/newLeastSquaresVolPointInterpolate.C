@@ -247,27 +247,45 @@ void newLeastSquaresVolPointInterpolation::interpolate
 
             label sizeby2 = faceCells.size()/2;
 
+#ifdef OPENFOAMFOUNDATION
+            if (!isA<processorPolyPatch>(cycPatch) || pTraits<Type>::rank == 0)
+#else
             if (!(cycPatch.parallel() || pTraits<Type>::rank == 0))
+#endif
             {
                 if (localFaceID < sizeby2)
                 {
                     source[pointID] =
+#ifdef OPENFOAMFOUNDATION
+                        cycPatch.transform().transformPosition
+                        (
+                            vfI[faceCells[localFaceID + sizeby2]]
+                        );
+#else
                         transform
                         (
                             cycPatch.forwardT()[0],
                             vfI[faceCells[localFaceID + sizeby2]]
                         );
+#endif
                     avg += sqr(W[pointID])*source[pointID];
                     pointID++;
                 }
                 else
                 {
                     source[pointID] =
+#ifdef OPENFOAMFOUNDATION
+                        cycPatch.transform().invTransformPosition
+                        (
+                            vfI[faceCells[localFaceID + sizeby2]]
+                        );
+#else
                         transform
                         (
                             cycPatch.reverseT()[0],
                             vfI[faceCells[localFaceID - sizeby2]]
                         );
+#endif
                     avg += sqr(W[pointID])*source[pointID];
                     pointID++;
                 }
@@ -310,27 +328,45 @@ void newLeastSquaresVolPointInterpolation::interpolate
 
             label sizeby2 = cycPolyPatch.size()/2;
 
-            if (!cycPolyPatch.parallel())
+#ifdef OPENFOAMFOUNDATION
+            if (!isA<processorPolyPatch>(cycPolyPatch))
+#else
+            if (!(cycPolyPatch.parallel())
+#endif
             {
                 if (cycLocalFaceID < sizeby2)
                 {
                     source[pointID] =
+#ifdef OPENFOAMFOUNDATION
+                        cycPolyPatch.transform().transformPosition
+                        (
+                            vf.boundaryField()[patchID][localFaceID]
+                        );
+#else
                         transform
                         (
                             cycPolyPatch.forwardT()[0],
                             vf.boundaryField()[patchID][localFaceID]
                         );
+#endif
                     avg += sqr(W[pointID])*source[pointID];
                     pointID++;
                 }
                 else
                 {
                     source[pointID] =
+#ifdef OPENFOAMFOUNDATION
+                        cycPolyPatch.transform().invTransformPosition
+                        (
+                            vf.boundaryField()[patchID][localFaceID]
+                        );
+#else
                         transform
                         (
                             cycPolyPatch.reverseT()[0],
                             vf.boundaryField()[patchID][localFaceID]
                         );
+#endif
                     avg += sqr(W[pointID])*source[pointID];
                     pointID++;
                 }

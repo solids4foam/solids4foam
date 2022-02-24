@@ -48,14 +48,16 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "fluidThermo.H"
-#include "turbulentFluidThermoModel.H"
 #ifdef OPENFOAMFOUNDATION
+    #include "dynamicMomentumTransportModel.H"
+    #include "fluidThermophysicalTransportModel.H"
     #include "radiationModel.H"
+    #include "pressureReference.H"
+#else
+    #include "turbulentFluidThermoModel.H"
+    #include "pressureControl.H"
 #endif
-#include "pimpleControl.H"
 #include "uniformDimensionedFields.H"
-#include "pressureControl.H"
-#include "fvOptions.H"
 #include "fvcSmooth.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -112,20 +114,25 @@ class buoyantPimpleFluid
         //- gravity*height: face-interpolated
         surfaceScalarField ghf_;
 
-        //- Finite volume options: source terms, constrains and corrections
-        fv::options& fvOptions_;
+#ifdef OPENFOAMFOUNDATION
+        //- Momentum Transport model
+        autoPtr<compressible::momentumTransportModel> turbulence_;
 
+        //- Thermophysical Transport model
+        autoPtr<fluidThermophysicalTransportModel> thermophysicalTransport_;
+
+        //- Create radiation model
+        autoPtr<radiationModel> radiation_;
+
+        //- Reference pressure cell
+        pressureReference pressureControl_;
+#else
         //- Turbulent Transport model
         autoPtr<compressible::turbulenceModel> turbulence_;
 
-#ifdef OPENFOAMFOUNDATION
-        //- Create radiation model
-        autoPtr<radiationModel> radiation_;
-#endif
-
         //- Reference pressure cell
         pressureControl pressureControl_;
-
+#endif
         //- Cumulative continuity error
         scalar cumulativeContErr_;
 

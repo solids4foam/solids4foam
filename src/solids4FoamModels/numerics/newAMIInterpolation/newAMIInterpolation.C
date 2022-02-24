@@ -150,7 +150,12 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::patchMagSf
 
     const pointField& patchPoints = patch.localPoints();
 
+#ifdef OPENFOAMFOUNDATION
+    triFaceList patchFaceTris;
+#else
     faceList patchFaceTris;
+#endif
+
 
     forAll(result, patchFacei)
     {

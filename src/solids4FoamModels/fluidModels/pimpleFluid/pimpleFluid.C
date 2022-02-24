@@ -116,7 +116,12 @@ void pimpleFluid::solvePEqn
 
     U() = HbyA - rAtU*fvc::grad(p());
     U().correctBoundaryConditions();
-    fvOptions_.correct(U());
+
+#ifdef OPENFOAMFOUNDATION
+    constraints().constrain(U());
+#elif OPENFOAMESI
+    options().correct(U());
+#endif
 
     gradU() = fvc::grad(U());
 
@@ -279,15 +284,17 @@ pimpleFluid::pimpleFluid
     laminarTransport_(U(), phi()),
     turbulence_
     (
+#ifdef OPENFOAMFOUNDATION
+        incompressible::momentumTransportModel::New
+#else
         incompressible::turbulenceModel::New
+#endif
         (
             U(), phi(), laminarTransport_
         )
     ),
     rho_(laminarTransport_.lookup("rho")),
-#ifdef OPENFOAMESIORFOUNDATION
-    fvOptions_(fv::options::New(mesh())),
-#else
+#ifdef FOAMEXTEND
 #if FOAMEXTEND > 40
     rAU_
     (
@@ -320,10 +327,21 @@ pimpleFluid::pimpleFluid
     ),
 #endif
 #endif
+#ifdef OPENFOAMFOUNDATION
+    pressureControl_
+    (
+        p(),
+        pimple().dict()
+    ),
+    pRefCell_(pressureControl_.refCell()),
+    pRefValue_(pressureControl_.refValue())
+{
+#else
     pRefCell_(0),
     pRefValue_(0)
 {
     setRefCell(p(), pimple().dict(), pRefCell_, pRefValue_);
+#endif
 
 #ifdef OPENFOAMESIORFOUNDATION
     mesh().setFluxRequired(p().name());
@@ -372,7 +390,11 @@ tmp<vectorField> pimpleFluid::patchViscousForce(const label patchID) const
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
+#ifdef OPENFOAMFOUNDATION
+          & (-turbulence_->devSigma()().boundaryField()[patchID])
+#else
           & (-turbulence_->devReff()().boundaryField()[patchID])
+#endif
         );
 
     return tvF;
@@ -428,7 +450,23 @@ bool pimpleFluid::evolve()
 
     if (correctPhi && meshChanged)
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
+        // Calculate absolute flux
+        // from the mapped surface velocity
+        phi() = mesh.Sf() & Uf_();
+
+        correctUphiBCs(U(), phi(), true);
+        CorrectPhi
+        (
+            phi(),
+            U(),
+            p(),
+            dimensionedScalar("rAUf", dimTime, 1),
+            geometricZeroField(),
+            pressureControl_,
+            pimple()
+        );
+#elif OPENFOAMESI
         // Calculate absolute flux
         // from the mapped surface velocity
         phi() = mesh.Sf() & Uf_();
@@ -441,17 +479,13 @@ bool pimpleFluid::evolve()
             dimensionedScalar("rAUf", dimTime, 1),
             geometricZeroField(),
             pimple()
-            #ifdef OPENFOAMFOUNDATION
-            ,
-            true
-            #endif
         );
 #else
         CorrectPhi();
 #endif
         fluidModel::continuityErrs();
     }
-    
+
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), U());
 
@@ -468,12 +502,16 @@ bool pimpleFluid::evolve()
         fvVectorMatrix HUEqn
         (
             fvm::div(phi(), U())
-#ifndef OPENFOAMESIORFOUNDATION
-          + turbulence_->divDevReff()
-#else
+#ifdef OPENFOAMFOUNDATION
+          + turbulence_->divDevSigma(U())
+         ==
+            models().source(U())
+#elif OPENFOAMESI
           + turbulence_->divDevReff(U())
          ==
-            fvOptions_(U())
+            options()(U());
+#else
+          + turbulence_->divDevReff()
 #endif
         );
 
@@ -483,13 +521,21 @@ bool pimpleFluid::evolve()
 
         UEqn.relax();
 
-        fvOptions_.constrain(UEqn);
+#ifdef OPENFOAMFOUNDATION
+            constraints().constrain(UEqn);
+#elif OPENFOAMESI
+            options().constrain(UEqn);
+#endif
 
         if (pimple().momentumPredictor())
         {
             solve(UEqn == -fvc::grad(p()));
 
-            fvOptions_.correct(U());
+#ifdef OPENFOAMFOUNDATION
+            constraints().constrain(U());
+#elif OPENFOAMESI
+            options().correct(U());
+#endif
         }
 #else
 #if FOAMEXTEND < 41

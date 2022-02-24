@@ -1,5 +1,6 @@
 ifeq ($(WM_PROJECT), foam)
     VERSION_SPECIFIC_LIBS = \
+        -lincompressibleTransportModels \
         -lincompressibleTurbulenceModel -lincompressibleRASModels \
         -lincompressibleLESModels -llduSolvers -linterfaceProperties \
         -lfiniteArea
@@ -8,13 +9,22 @@ ifeq ($(WM_PROJECT), foam)
         VERSION_SPECIFIC_LIBS += -loversetMesh -loversetDynamicFvMesh
     endif
 else
-    VERSION_SPECIFIC_LIBS = \
-        -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
-        -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
-        -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
-        -lfluidThermophysicalModels -lturbulenceModels -lcompressibleTurbulenceModels
+    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 8)
+    ifeq ($(VER), 1)
+        VERSION_SPECIFIC_LIBS = \
+            -lmomentumTransportModels -lincompressibleMomentumTransportModels -lcompressibleMomentumTransportModels -ltwoPhaseMixture \
+            -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
+            -lradiationModels -lfvModels -lfvConstraints  -lspecie \
+            -lfluidThermophysicalModels
+    else
+        VERSION_SPECIFIC_LIBS = \
+            -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
+            -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
+            -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
+            -lfluidThermophysicalModels -lturbulenceModels -lcompressibleTurbulenceModels -lincompressibleTransportModels
+    endif
 endif
-                                                
+
 ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
     DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-deprecated-declarations
 else
@@ -89,7 +99,6 @@ EXE_LIBS = \
     -lblockCoupledSolids4FoamTools \
     -lsolids4FoamModels \
     -lfiniteVolume \
-    -lincompressibleTransportModels \
     -ldynamicFvMesh \
     -ldynamicMesh \
     -lmeshTools \

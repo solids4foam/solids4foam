@@ -81,7 +81,7 @@ linearDisplacementFvPatchVectorField::linearDisplacementFvPatchVectorField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 linearDisplacementFvPatchVectorField::linearDisplacementFvPatchVectorField
 (
     const linearDisplacementFvPatchVectorField& pivpvf
@@ -91,7 +91,7 @@ linearDisplacementFvPatchVectorField::linearDisplacementFvPatchVectorField
     rate_(pivpvf.rate_),
     initialC_(pivpvf.initialC_)
 {}
-
+#endif
 
 linearDisplacementFvPatchVectorField::linearDisplacementFvPatchVectorField
 (

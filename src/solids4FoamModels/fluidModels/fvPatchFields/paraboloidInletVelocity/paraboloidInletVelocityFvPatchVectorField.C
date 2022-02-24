@@ -92,7 +92,7 @@ paraboloidInletVelocityFvPatchVectorField
     )
 {}
 
-
+#ifndef OPENFOAMFOUNDATION
 paraboloidInletVelocityFvPatchVectorField::
 paraboloidInletVelocityFvPatchVectorField
 (
@@ -106,7 +106,7 @@ paraboloidInletVelocityFvPatchVectorField
     timeVaryingEndTime_(pivpvf.timeVaryingEndTime_),
     timeAtMaxVelocity_(pivpvf.timeAtMaxVelocity_)
 {}
-
+#endif
 
 paraboloidInletVelocityFvPatchVectorField::
 paraboloidInletVelocityFvPatchVectorField

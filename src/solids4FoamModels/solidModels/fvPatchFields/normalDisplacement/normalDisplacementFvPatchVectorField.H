@@ -103,6 +103,9 @@ public:
         normalDisplacementFvPatchVectorField
         (
             const normalDisplacementFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -113,6 +116,7 @@ public:
                 new normalDisplacementFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         normalDisplacementFvPatchVectorField

@@ -119,7 +119,7 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 (
     const solidSymmetryFvPatchScalarField& ptf
@@ -127,7 +127,7 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 :
     symmetryFvPatchField<scalar>(ptf)
 {}
-
+#endif
 
 solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 (

@@ -33,6 +33,9 @@ License
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
+#ifdef OPENFOAMFOUNDATION
+    #include "OSspecific.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -71,7 +74,11 @@ bool Foam::solidPointTemperature::writeData()
         const volScalarField& T = mesh.lookupObject<volScalarField>("T");
 
         // Create a point mesh
+#ifdef OPENFOAMFOUNDATION
+        const pointMesh& pMesh = pointMesh::New(mesh);
+#else
         pointMesh pMesh(mesh);
+#endif
 
         // Create a point temperature field
         pointScalarField pointT
@@ -88,7 +95,9 @@ bool Foam::solidPointTemperature::writeData()
             dimensionedScalar("zero", T.dimensions(), 0.0)
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
+        volPointInterpolation::New(mesh).interpolate(T, pointT);
+#elif OPENFOAMESI
         mesh.lookupObject<volPointInterpolation>
         (
             "volPointInterpolation"
