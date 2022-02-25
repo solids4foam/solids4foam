@@ -30,9 +30,7 @@ License
 #include "pointFields.H"
 #include "surfaceFields.H"
 #include "lookupSolidModel.H"
-#ifdef OPENFOAMFOUNDATION
-    #include "OSspecific.H"
-#endif
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

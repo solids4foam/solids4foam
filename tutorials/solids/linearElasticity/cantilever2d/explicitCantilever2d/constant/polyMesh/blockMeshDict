@@ -10,41 +10,69 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    "system";
-    object      controlDict;
+    location    "constant/polyMesh";
+    object      blockMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     solids4Foam;
+convertToMeters 1;
 
-startFrom       startTime;
+vertices
+(
+    (0 0 0)
+    (0.5 0 0)
+    (0.5 0.1 0)
+    (0 0.1 0)
+    (0 0 1)
+    (0.5 0 1)
+    (0.5 0.1 1)
+    (0 0.1 1)
+);
 
-startTime       0;
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (50 10 1) simpleGrading (1 1 1)
+);
 
-stopAt          endTime;
+edges
+(
+);
 
-endTime         0.01;
+patches
+(
+    patch top
+    (
+        (2 3 7 6)
+    )
 
-deltaT          1e-9; // not used but must be less than endTime
+    patch left
+    (
+        (3 0 4 7)
+    )
 
-maxCo           0.1;
+    patch right
+    (
+        (1 2 6 5)
+    )
 
-writeControl    adjustableRunTime;
+    patch bottom
+    (
+        (0 1 5 4)
+    )
 
-writeInterval   0.0001;
+    empty front
+    (
+        (7 6 5 4)
+    )
 
-cycleWrite      0;
+    empty back
+    (
+        (0 1 2 3)
+    )
+);
 
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression uncompressed;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable no;
+mergePatchPairs
+(
+);
 
 // ************************************************************************* //

@@ -174,6 +174,7 @@ elasticSlipWallVelocityFvPatchVectorField
 {}
 #endif
 
+
 elasticSlipWallVelocityFvPatchVectorField::
 elasticSlipWallVelocityFvPatchVectorField
 (

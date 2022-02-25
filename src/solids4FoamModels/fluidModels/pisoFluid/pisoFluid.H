@@ -72,12 +72,10 @@ class pisoFluid
         //- Transport model
         singlePhaseTransportModel laminarTransport_;
 
-
 #ifdef OPENFOAMFOUNDATION
         //- Momentum transport model
         autoPtr<incompressible::momentumTransportModel> turbulence_;
 #else
-        //- Turbulence model
         autoPtr<incompressible::turbulenceModel> turbulence_;
 #endif
 

@@ -101,11 +101,8 @@ tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
-    tvF.ref() =
-#else
+#ifdef FOAMEXTEND
     tvF() =
-#endif
         rho_.value()
        *(
             mesh().boundary()[patchID].nf()
@@ -115,6 +112,21 @@ tmp<vectorField> pisoFluid::patchViscousForce(const label patchID) const
           & (-turbulence_->devReff()().boundaryField()[patchID])
 #endif
         );
+#elif OPENFOAMESI
+    tvF.ref() =
+        rho_.value()
+       *(
+            mesh().boundary()[patchID].nf()
+          & (-turbulence_->devReff()().boundaryField()[patchID])
+        );
+#else
+    tvF.ref() =
+        rho_.value()
+       *(
+            mesh().boundary()[patchID].nf()
+          & (-turbulence_->devSigma()().boundaryField()[patchID])
+        );
+#endif
 
     return tvF;
 }
@@ -175,13 +187,13 @@ bool pisoFluid::evolve()
     fvVectorMatrix HUEqn
     (
         fvm::div(phi(), U())
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
       + turbulence_->divDevReff()
 #elif OPENFOAMFOUNDATION
       + turbulence_->divDevSigma(U())
     ==
         models().source(U())
-#else
+#elif OPENFOAMESI
       + turbulence_->divDevReff(U())
      ==
         options()(U())

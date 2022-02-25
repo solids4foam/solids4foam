@@ -87,6 +87,7 @@ outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 //     oldoldFc_ = Fc_;
 }
 
+
 #ifndef OPENFOAMFOUNDATION
 outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 (
@@ -96,6 +97,7 @@ outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
     fixedValueFvPatchScalarField(pivpvf)
 {}
 #endif
+
 
 outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 (

@@ -115,7 +115,6 @@ public:
             const fixedDisplacementZeroShearFvPatchVectorField&
         ) = delete;
 #else
-
         //- Construct and return a clone
         virtual tmp<fvPatchVectorField> clone() const
         {

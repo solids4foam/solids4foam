@@ -9,19 +9,18 @@ ifeq ($(WM_PROJECT), foam)
         VERSION_SPECIFIC_LIBS += -loversetMesh -loversetDynamicFvMesh
     endif
 else
-    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 8)
-    ifeq ($(VER), 1)
+    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        VERSION_SPECIFIC_LIBS = \
+            -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
+            -limmiscibleIncompressibleTwoPhaseMixture -lfvMotionSolvers \
+            -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
+            -lfluidThermophysicalModels -lcompressibleTurbulenceModels
+    else
         VERSION_SPECIFIC_LIBS = \
             -lmomentumTransportModels -lincompressibleMomentumTransportModels -lcompressibleMomentumTransportModels -ltwoPhaseMixture \
             -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
             -lradiationModels -lfvModels -lfvConstraints  -lspecie \
             -lfluidThermophysicalModels
-    else
-        VERSION_SPECIFIC_LIBS = \
-            -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
-            -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
-            -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
-            -lfluidThermophysicalModels -lturbulenceModels -lcompressibleTurbulenceModels -lincompressibleTransportModels
     endif
 endif
 
@@ -63,7 +62,7 @@ endif
 EXE_INC = \
     -I../../../src/solids4FoamModels/lnInclude \
     -I../../../src/blockCoupledSolids4FoamTools/lnInclude \
-    -std=c++11 \
+    -std=c++14 \
     $(DISABLE_WARNING_FLAGS) \
     $(VERSION_SPECIFIC_INC) \
     -I../../ThirdParty/eigen3 \

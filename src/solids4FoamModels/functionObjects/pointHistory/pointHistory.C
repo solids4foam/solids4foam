@@ -35,9 +35,7 @@ Author
 #include "OStringStream.H"
 #include "IStringStream.H"
 #include "IOmanip.H"
-#ifdef OPENFOAMFOUNDATION
-    #include "OSspecific.H"
-#endif
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

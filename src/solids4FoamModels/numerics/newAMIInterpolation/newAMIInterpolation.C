@@ -155,8 +155,6 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::patchMagSf
 #else
     faceList patchFaceTris;
 #endif
-
-
     forAll(result, patchFacei)
     {
         faceAreaIntersect::triangulate
@@ -170,12 +168,7 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::patchMagSf
         forAll(patchFaceTris, i)
         {
             result[patchFacei] +=
-                triPointRef
-                (
-                    patchPoints[patchFaceTris[i][0]],
-                    patchPoints[patchFaceTris[i][1]],
-                    patchPoints[patchFaceTris[i][2]]
-                ).mag();
+                patchFaceTris[i].tri(patchPoints).mag();
         }
     }
 

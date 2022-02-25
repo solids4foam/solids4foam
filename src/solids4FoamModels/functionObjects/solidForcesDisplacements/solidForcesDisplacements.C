@@ -28,12 +28,8 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "surfaceFields.H"
-#endif
-#ifdef OPENFOAMFOUNDATION
-    #include "OSspecific.H"
-#endif
+#include "surfaceFields.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

@@ -107,6 +107,7 @@ extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
 {}
 #endif
 
+
 template<class Type>
 extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
 (

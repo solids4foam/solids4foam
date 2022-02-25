@@ -92,6 +92,7 @@ paraboloidInletVelocityFvPatchVectorField
     )
 {}
 
+
 #ifndef OPENFOAMFOUNDATION
 paraboloidInletVelocityFvPatchVectorField::
 paraboloidInletVelocityFvPatchVectorField
@@ -107,6 +108,7 @@ paraboloidInletVelocityFvPatchVectorField
     timeAtMaxVelocity_(pivpvf.timeAtMaxVelocity_)
 {}
 #endif
+
 
 paraboloidInletVelocityFvPatchVectorField::
 paraboloidInletVelocityFvPatchVectorField
@@ -162,11 +164,9 @@ void paraboloidInletVelocityFvPatchVectorField::updateCoeffs()
 }
 
 
-Foam::tmp<Foam::Field<vector> > paraboloidInletVelocityFvPatchVectorField::
-snGrad() const
+Foam::tmp<Foam::Field<vector> >
+paraboloidInletVelocityFvPatchVectorField::snGrad() const
 {
-//     Info << "snGrad - in" << endl;
-
     bool secondOrder_ = false;
 
 #ifdef OPENFOAMESIORFOUNDATION
@@ -175,62 +175,64 @@ snGrad() const
     const word& UName = dimensionedInternalField().name();
 #endif
 
-    const fvPatchField<tensor>& gradU =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
-            "grad(" + UName + ")"
-        );
-
-    const vectorField n(patch().nf());
-    const vectorField delta(patch().delta());
-    const vectorField k((I - sqr(n)) & delta);
-
-    if (secondOrder_)
+    if (db().foundObject<volTensorField>("grad(" + UName + ")"))
     {
-        const vectorField dUP(k & gradU.patchInternalField());
-        const vectorField nGradUP(n & gradU.patchInternalField());
-
         tmp<Field<vector> > tnGradU
         (
             new vectorField(this->patch().size(), vector::zero)
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+        const fvPatchField<tensor>& gradU =
+            patch().lookupPatchField<volTensorField, tensor>
+            (
+                "grad(" + UName + ")"
+            );
+
+        const vectorField n(patch().nf());
+        const vectorField delta(patch().delta());
+        const vectorField k((I - sqr(n)) & delta);
+
+        if (secondOrder_)
+        {
+            const vectorField dUP(k & gradU.patchInternalField());
+            const vectorField nGradUP(n & gradU.patchInternalField());
+
+            #ifdef OPENFOAMESIORFOUNDATION
+            tnGradU.ref() =
+            #else
+            tnGradU() =
+            #endif
+                2
+               *(
+                    *this
+                  - (patchInternalField() + dUP)
+                )*this->patch().deltaCoeffs()
+              - nGradUP;
+
+            return tnGradU;
+        }
+
+        // First order
+        const vectorField dUP(k & gradU.patchInternalField());
+
+        #ifdef OPENFOAMESIORFOUNDATION
         tnGradU.ref() =
-#else
+        #else
         tnGradU() =
-#endif
-            2
-           *(
-                *this
-              - (patchInternalField() + dUP)
-            )*this->patch().deltaCoeffs()
-          - nGradUP;
-
-        return tnGradU;
-    }
-
-    // First order
-    const vectorField dUP(k & gradU.patchInternalField());
-
-    tmp<Field<vector> > tnGradU
-    (
-        new vectorField(this->patch().size(), vector::zero)
-    );
-
-#ifdef OPENFOAMESIORFOUNDATION
-    tnGradU.ref() =
-#else
-     tnGradU() =
-#endif
+        #endif
         (
             *this
           - (patchInternalField() + dUP)
         )*patch().deltaCoeffs();
 
-    return tnGradU;
-}
+        return tnGradU;
+    }
 
+     return
+     (
+         *this - patchInternalField()
+     )*patch().deltaCoeffs();
+}
 
 tmp<Field<vector> > paraboloidInletVelocityFvPatchVectorField::
 gradientBoundaryCoeffs() const

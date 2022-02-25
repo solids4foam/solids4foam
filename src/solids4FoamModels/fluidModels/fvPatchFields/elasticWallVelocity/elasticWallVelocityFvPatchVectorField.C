@@ -104,6 +104,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
     oldOldFc_ = Fc_;
 }
 
+
 #ifndef OPENFOAMFOUNDATION
 elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 (
@@ -117,6 +118,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
     oldOldFc_(pivpvf.oldOldFc_)
 {}
 #endif
+
 
 elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 (

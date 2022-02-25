@@ -73,6 +73,7 @@ extrapolatedPressureFvPatchScalarField
     zeroGradientFvPatchScalarField(ptf, p, iF, mapper)
 {}
 
+
 #ifndef OPENFOAMFOUNDATION
 extrapolatedPressureFvPatchScalarField::
 extrapolatedPressureFvPatchScalarField
@@ -83,6 +84,7 @@ extrapolatedPressureFvPatchScalarField
     zeroGradientFvPatchScalarField(ptf)
 {}
 #endif
+
 
 extrapolatedPressureFvPatchScalarField::
 extrapolatedPressureFvPatchScalarField

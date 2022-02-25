@@ -28,6 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "OSspecific.H"
 #ifdef OPENFOAMESIORFOUNDATION
     #include "volPointInterpolation.H"
 #else
@@ -59,46 +60,11 @@ bool Foam::solidPointDisplacement::writeData()
     // Lookup the solid mesh
     const fvMesh& mesh = time_.lookupObject<fvMesh>(region_);
 
-    if (mesh.foundObject<volVectorField>("D"))
+    if (mesh.foundObject<pointVectorField>("pointD"))
     {
-        // Read the displacement field
-        const volVectorField& D = mesh.lookupObject<volVectorField>("D");
-
-        // Create a point mesh
-#ifdef OPENFOAMFOUNDATION
-        const pointMesh& pMesh = pointMesh::New(mesh);
-#else
-        pointMesh pMesh(mesh);
-#endif
-
-        // Create a point field
-        pointVectorField pointD
-        (
-            IOobject
-            (
-                "volToPoint(D)",
-                mesh.time().timeName(),
-                mesh,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            pMesh,
-            dimensionedVector("zero", D.dimensions(), vector::zero)
-        );
-
-#ifdef OPENFOAMFOUNDATION
-        volPointInterpolation::New(mesh).interpolate(D, pointD);
-#elif OPENFOAMESI
-        mesh.lookupObject<volPointInterpolation>
-        (
-            "volPointInterpolation"
-        ).interpolate(D, pointD);
-#else
-        mesh.lookupObject<newLeastSquaresVolPointInterpolation>
-        (
-            "newLeastSquaresVolPointInterpolation"
-        ).interpolate(D, pointD);
-#endif
+        // Lookup the point displacement field
+        const pointVectorField& pointD =
+            mesh.lookupObject<pointVectorField>("pointD");
 
         vector pointDValue = vector::zero;
         if (pointID_ > -1)
@@ -121,7 +87,7 @@ bool Foam::solidPointDisplacement::writeData()
     else
     {
         InfoIn(this->name() + " function object constructor")
-            << "volVectorField D not found" << endl;
+            << "pointVectorField pointD not found" << endl;
     }
 
     return true;

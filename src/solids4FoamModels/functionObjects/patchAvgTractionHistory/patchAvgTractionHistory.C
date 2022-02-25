@@ -32,12 +32,8 @@ Author
 #include "pointFields.H"
 #include "boundBox.H"
 #include "polyPatchID.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "surfaceFields.H"
-#endif
-#ifdef OPENFOAMFOUNDATION
-    #include "OSspecific.H"
-#endif
+#include "surfaceFields.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

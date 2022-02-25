@@ -28,6 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "OSspecific.H"
 #ifdef OPENFOAMESIORFOUNDATION
     #include "volPointInterpolation.H"
 #else
