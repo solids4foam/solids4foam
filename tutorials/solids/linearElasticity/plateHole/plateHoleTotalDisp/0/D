@@ -23,7 +23,7 @@ boundaryField
     left
     {
         type            solidSymmetry;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
     right
@@ -40,7 +40,7 @@ boundaryField
     down
     {
         type            solidSymmetry;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
     up

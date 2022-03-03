@@ -63,9 +63,11 @@ SourceFiles
 
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
+    #include "kinematicMomentumTransportModel.H"
+    #include "thermophysicalTransportModel.H"
+#elif OPENFOAMESI
     #include "turbulentTransportModel.H"
-    #include "fvOptions.H"
 #else
     #include "turbulenceModel.H"
 #endif
@@ -117,9 +119,13 @@ class buoyantBoussinesqPimpleFluid
         // Turbulent Prandtl number
         dimensionedScalar Prt_;
 
+#ifdef OPENFOAMFOUNDATION
+        //- Momentum Transport model
+        autoPtr<incompressible::momentumTransportModel> turbulence_;
+#else
         //- Turbulent Transport model
         autoPtr<incompressible::turbulenceModel> turbulence_;
-
+#endif
         //- Effective fluid thermal diffusivity
         volScalarField alphaEff_;
 
@@ -143,11 +149,6 @@ class buoyantBoussinesqPimpleFluid
         autoPtr<radiationModel> radiation_;
 
         dimensionedScalar rhoCpRef_;
-#endif
-
-#ifdef OPENFOAMESIORFOUNDATION
-        //- Create finite volume options
-        fv::options& fvOptions_;
 #endif
 
         //- Reference pressure cell

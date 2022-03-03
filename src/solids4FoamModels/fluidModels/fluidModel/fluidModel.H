@@ -60,6 +60,12 @@ SourceFiles
 #if FOAMEXTEND > 40
     #include "oversetMesh.H"
 #endif
+#ifdef OPENFOAMFOUNDATION
+    #include "fvModels.H"
+    #include "fvConstraints.H"
+#elif OPENFOAMESI
+    #include "fvOptions.H"
+#endif
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -144,6 +150,17 @@ class fluidModel
 
         //- Cumulative continuity error
         scalar cumulativeContErr_;
+
+#ifdef OPENFOAMFOUNDATION
+        //- fvModels
+        fvModels& fvModels_;
+
+        //- fvConstraints
+        fvConstraints& fvConstraints_;
+#elif OPENFOAMESI
+        //- fvOptions
+        fv::options& fvOptions_;
+#endif
 
         //- Flag to let the fluid model know that the fsi interface is in charge
         //  of calling fluid mesh.update()
@@ -383,6 +400,44 @@ public:
             {
                 return phi_;
             }
+
+#ifdef OPENFOAMFOUNDATION
+            //- Return fvModels
+            const fvModels& models() const
+            {
+                return fvModels_;
+            }
+
+            //- Access fvModels
+            fvModels& models()
+            {
+                return fvModels_;
+            }
+
+            //- Return  fvConstraints
+            const fvConstraints& constraints() const
+            {
+                return fvConstraints_;
+            }
+
+            //- Access fvConstraints
+            fvConstraints& constraints()
+            {
+                return fvConstraints_;
+            }
+#elif OPENFOAMESI
+            //- Return fvOptions
+            const fv::options& options() const
+            {
+                return fvOptions_;
+            }
+
+            //- Access fvOptions
+            fv::options& options()
+            {
+                return fvOptions_;
+            }
+#endif
 
             //- Non-const access to the fsiMeshUpdate flag
             virtual bool& fsiMeshUpdate()

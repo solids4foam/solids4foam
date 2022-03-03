@@ -74,14 +74,16 @@ fixedVelocityPressureFvPatchScalarField
 {}
 
 
-// fixedVelocityPressureFvPatchScalarField::
-// fixedVelocityPressureFvPatchScalarField
-// (
-//     const fixedVelocityPressureFvPatchScalarField& ptf
-// )
-// :
-//     fixedGradientFvPatchScalarField(ptf)
-// {}
+#ifndef OPENFOAMFOUNDATION
+fixedVelocityPressureFvPatchScalarField::
+fixedVelocityPressureFvPatchScalarField
+(
+    const fixedVelocityPressureFvPatchScalarField& ptf
+)
+:
+    fixedGradientFvPatchScalarField(ptf)
+{}
+#endif
 
 
 fixedVelocityPressureFvPatchScalarField::

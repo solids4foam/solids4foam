@@ -1137,7 +1137,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
                     DLambdaI[cellI] /= 1.0 + Hp_/(3*muBarI[cellI]);
 
                     // Update increment of yield stress
-                    DSigmaYI[cellI] = DLambdaI[cellI]*Hp_;
+                    DSigmaYI[cellI] = sqrtTwoOverThree_*DLambdaI[cellI]*Hp_;
                 }
             }
         }
@@ -1211,7 +1211,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
                         DLambdaP[faceI] /= 1.0 + Hp_/(3.0*muBarP[faceI]);
 
                         // Update increment of yield stress
-                        DSigmaYP[faceI] = DLambdaP[faceI]*Hp_;
+                        DSigmaYP[faceI] = sqrtTwoOverThree_*DLambdaP[faceI]*Hp_;
                     }
                 }
             }
@@ -1375,7 +1375,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
                     DLambdaI[faceI] /= 1.0 + Hp_/(3*muBarI[faceI]);
 
                     // Update increment of yield stress
-                    DSigmaYI[faceI] = DLambdaI[faceI]*Hp_;
+                    DSigmaYI[faceI] = sqrtTwoOverThree_*DLambdaI[faceI]*Hp_;
                 }
             }
         }
@@ -1452,7 +1452,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
                             DLambdaP[faceI] /= 1.0 + Hp_/(3.0*muBarP[faceI]);
 
                             // Update increment of yield stress
-                            DSigmaYP[faceI] = DLambdaP[faceI]*Hp_;
+                            DSigmaYP[faceI] = sqrtTwoOverThree_*DLambdaP[faceI]*Hp_;
                         }
                     }
                 }

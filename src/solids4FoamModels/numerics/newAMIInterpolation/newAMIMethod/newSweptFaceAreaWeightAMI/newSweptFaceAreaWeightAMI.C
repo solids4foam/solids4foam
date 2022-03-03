@@ -402,7 +402,11 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::interArea
 
     // Triangulate the faces
     const faceAreaIntersect::triangulationMode triMode = this->triMode_;
+#ifdef OPENFOAMFOUNDATION
     triFaceList srcFaceTris, tgtFaceTris;
+#else
+    faceList srcFaceTris, tgtFaceTris;
+#endif
     faceAreaIntersect::triangulate(srcFace, srcPoints, triMode, srcFaceTris);
     faceAreaIntersect::triangulate(tgtFace, tgtPoints, triMode, tgtFaceTris);
 
@@ -410,7 +414,11 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::interArea
     scalar areaMag = Zero;
 
     // Loop the target triangles
+#ifdef OPENFOAMFOUNDATION
     forAllConstIter(triFaceList, tgtFaceTris, tgtIter)
+#else
+    forAllConstIter(faceList, tgtFaceTris, tgtIter)
+#endif
     {
         const FixedList<point, 3>
             tgtTri =
@@ -421,7 +429,11 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::interArea
             };
 
         // Loop the source triangles
+#ifdef OPENFOAMFOUNDATION
         forAllConstIter(triFaceList, srcFaceTris, srcIter)
+#else
+        forAllConstIter(faceList, srcFaceTris, srcIter)
+#endif
         {
             FixedList<point, 4>
                 srcTri =

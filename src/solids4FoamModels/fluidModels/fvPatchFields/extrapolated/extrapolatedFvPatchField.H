@@ -96,7 +96,10 @@ public:
         //- Construct as copy
         extrapolatedFvPatchField
         (
-            const extrapolatedFvPatchField<Type>&
+            const extrapolatedFvPatchField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -104,9 +107,10 @@ public:
         {
             return tmp<fvPatchField<Type> >
             (
-                new extrapolatedFvPatchField<Type>(*this)
+                new extrapolatedFvPatchField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         extrapolatedFvPatchField

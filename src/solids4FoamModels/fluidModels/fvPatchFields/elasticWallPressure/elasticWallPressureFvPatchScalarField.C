@@ -83,15 +83,17 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 }
 
 
-// elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
-// (
-//     const elasticWallPressureFvPatchScalarField& pivpvf
-// )
-// :
-//     robinFvPatchScalarField(pivpvf),
-//     prevPressure_(pivpvf.prevPressure_),
-//     prevAcceleration_(pivpvf.prevAcceleration_)
-// {}
+#ifndef OPENFOAMFOUNDATION
+elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
+(
+    const elasticWallPressureFvPatchScalarField& pivpvf
+)
+:
+    robinFvPatchScalarField(pivpvf),
+    prevPressure_(pivpvf.prevPressure_),
+    prevAcceleration_(pivpvf.prevAcceleration_)
+{}
+#endif
 
 
 elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField

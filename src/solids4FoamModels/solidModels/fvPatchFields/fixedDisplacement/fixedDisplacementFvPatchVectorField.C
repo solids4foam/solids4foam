@@ -186,18 +186,18 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     }
 }
 
-
-// fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
-// (
-//     const fixedDisplacementFvPatchVectorField& pivpvf
-// )
-// :
-//     fixedValueFvPatchVectorField(pivpvf),
-//     totalDisp_(pivpvf.totalDisp_),
-//     dispSeries_(pivpvf.dispSeries_),
-//     interpPtr_()
-// {}
-
+#ifndef OPENFOAMFOUNDATION
+fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
+(
+    const fixedDisplacementFvPatchVectorField& pivpvf
+)
+:
+    fixedValueFvPatchVectorField(pivpvf),
+    totalDisp_(pivpvf.totalDisp_),
+    dispSeries_(pivpvf.dispSeries_),
+    interpPtr_()
+{}
+#endif
 
 fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 (

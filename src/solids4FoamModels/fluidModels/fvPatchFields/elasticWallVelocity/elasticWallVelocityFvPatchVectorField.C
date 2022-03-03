@@ -105,17 +105,19 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 }
 
 
-// elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
-// (
-//     const elasticWallVelocityFvPatchVectorField& pivpvf
-// )
-// :
-//     fixedValueFvPatchVectorField(pivpvf),
-//     timeIndex_(pivpvf.timeIndex_),
-//     Fc_(pivpvf.Fc_),
-//     oldFc_(pivpvf.oldFc_),
-//     oldOldFc_(pivpvf.oldOldFc_)
-// {}
+#ifndef OPENFOAMFOUNDATION
+elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
+(
+    const elasticWallVelocityFvPatchVectorField& pivpvf
+)
+:
+    fixedValueFvPatchVectorField(pivpvf),
+    timeIndex_(pivpvf.timeIndex_),
+    Fc_(pivpvf.Fc_),
+    oldFc_(pivpvf.oldFc_),
+    oldOldFc_(pivpvf.oldOldFc_)
+{}
+#endif
 
 
 elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField

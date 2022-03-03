@@ -54,6 +54,7 @@ $(interfaceToInterface)/directMapInterfaceToInterfaceMapping/directMapInterfaceT
 $(interfaceToInterface)/rbfInterfaceToInterfaceMapping/rbfInterfaceToInterfaceMapping.C
 
 materialModels/mechanicalModel/mechanicalModel.C
+
 mechanicalLaws = materialModels/mechanicalModel/mechanicalLaws
 $(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
 $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C

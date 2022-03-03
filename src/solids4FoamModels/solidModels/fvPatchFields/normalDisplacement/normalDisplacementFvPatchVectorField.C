@@ -96,22 +96,22 @@ normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 
         fvPatchField<vector>::operator==
         (
-	    patch().nf()*normalDisp_ 
+	    patch().nf()*normalDisp_
         );
     }
 }
 
-
-// normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
-// (
-//     const normalDisplacementFvPatchVectorField& pivpvf
-// )
-// :
-//     fixedValueFvPatchVectorField(pivpvf),
-//     normalDisp_(pivpvf.normalDisp_),
-//     dispSeries_(pivpvf.dispSeries_)
-// {}
-
+#ifndef OPENFOAMFOUNDATION
+normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
+(
+    const normalDisplacementFvPatchVectorField& pivpvf
+)
+:
+    fixedValueFvPatchVectorField(pivpvf),
+    normalDisp_(pivpvf.normalDisp_),
+    dispSeries_(pivpvf.dispSeries_)
+{}
+#endif
 
 normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 (

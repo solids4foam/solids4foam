@@ -74,15 +74,28 @@ void buoyantPimpleFluid::solveRhoEqn()
     (
         fvm::ddt(rho_)
       + fvc::div(phi())
-      ==
-        fvOptions_(rho_)
+#ifdef OPENFOAMFOUNDATION
+     ==
+        models().source(rho_)
+#elif OPENFOAMESI
+     ==
+        options()(rho_)
+#endif
     );
 
-    fvOptions_.constrain(rhoEqn);
+#ifdef OPENFOAMFOUNDATION
+        constraints().constrain(rhoEqn);
+#elif OPENFOAMESI
+        options().constrain(rhoEqn);
+#endif
 
     rhoEqn.solve();
 
-    fvOptions_.correct(rho_);
+#ifdef OPENFOAMFOUNDATION
+        constraints().constrain(rho_);
+#elif OPENFOAMESI
+        options().correct(rho_);
+#endif
 }
 
 
@@ -94,15 +107,24 @@ tmp<fvVectorMatrix> buoyantPimpleFluid::solveUEqn()
     (
         fvm::ddt(rho_, U())
       + fvm::div(phi(), U())
+#ifdef OPENFOAMFOUNDATION
+      + turbulence_->divDevTau(U())
+     ==
+        models().source(rho_, U())
+#else
       + turbulence_->divDevRhoReff(U())
      ==
         fvOptions_(rho_, U())
+#endif
     );
     fvVectorMatrix& UEqn = tUEqn.ref();
 
     UEqn.relax();
-
-    fvOptions_.constrain(UEqn);
+#ifdef OPENFOAMFOUNDATION
+    constraints().constrain(UEqn);
+#elif OPENFOAMESI
+    options().constrain(UEqn);
+#endif
 
     if (pimple().momentumPredictor())
     {
@@ -118,8 +140,11 @@ tmp<fvVectorMatrix> buoyantPimpleFluid::solveUEqn()
                 )*mesh().magSf()
             )
         );
-
-        fvOptions_.correct(U());
+#ifdef OPENFOAMFOUNDATION
+        constraints().constrain(U());
+#elif OPENFOAMESI
+        options().correct(U());
+#endif
         K_ = 0.5*magSqr(U());
     }
 
@@ -145,22 +170,36 @@ void buoyantPimpleFluid::solveEEqn()
             )
           : -dpdt_
         )
+#ifdef OPENFOAMFOUNDATION
+      + thermophysicalTransport_->divq(he)
+#else
       - fvm::laplacian(turbulence_->alphaEff(), he)
+#endif
      ==
         rho_*(U() & g())
 #ifdef OPENFOAMFOUNDATION
       + radiation_->Sh(thermo_, he)
+      + models().source(rho_, he)
+#elif
+      + options()(rho_, he)
 #endif
-      + fvOptions_(rho_, he)
     );
 
     EEqn.relax();
 
-    fvOptions_.constrain(EEqn);
+#ifdef OPENFOAMFOUNDATION
+    constraints().constrain(EEqn);
+#elif OPENFOAMESI
+    options().constrain(EEqn);
+#endif
 
     EEqn.solve();
 
-    fvOptions_.correct(he);
+#ifdef OPENFOAMFOUNDATION
+    constraints().constrain(he);
+#elif OPENFOAMESI
+    options().correct(he);
+#endif
 
     thermo_.correct();
 #ifdef OPENFOAMFOUNDATION
@@ -213,7 +252,11 @@ void buoyantPimpleFluid::solvePEqn
         fvc::ddt(rho_) + psi_*correction(fvm::ddt(p_rgh_))
       + fvc::div(phiHbyA)
       ==
-        fvOptions_(psi_, p_rgh_, rho_.name())
+#ifdef OPENFOAMFOUNDATION
+        models().source(psi_, p_rgh_, rho_.name())
+#elif OPENFOAMESI
+        options()(psi_, p_rgh_, rho_.name())
+#endif
     );
 
     while (pimple().correctNonOrthogonal())
@@ -246,14 +289,22 @@ void buoyantPimpleFluid::solvePEqn
             // calculated from the relaxed pressure
             U() = HbyA + rAU*fvc::reconstruct((phig + p_rghEqn.flux())/rhorAUf);
             U().correctBoundaryConditions();
-            fvOptions_.correct(U());
+#ifdef OPENFOAMFOUNDATION
+            constraints().constrain(U());
+#elif OPENFOAMESI
+            options().correct(U());
+#endif
             K_ = 0.5*magSqr(U());
         }
     }
 
     p() = p_rgh_ + rho_*gh_;
 
+#ifdef OPENFOAMFOUNDATION
+    bool limitedp = !thermo_.incompressible();
+#else
     bool limitedp = pressureControl_.limit(p());
+#endif
 
     if (limitedp)
     {
@@ -366,7 +417,27 @@ buoyantPimpleFluid::buoyantPimpleFluid
     ghRef_(-mag(g())*hRef_),
     gh_("gh", (g() & mesh().C()) - ghRef_),
     ghf_("ghf", (g() & mesh().Cf()) - ghRef_),
-    fvOptions_(fv::options::New(mesh())),
+#ifdef OPENFOAMFOUNDATION
+    turbulence_
+    (
+        compressible::momentumTransportModel::New
+        (
+            rho_, U(), phi(), thermo_
+        )
+    ),
+    thermophysicalTransport_
+    (
+        fluidThermophysicalTransportModel::New(turbulence_(), thermo_)
+    ),
+    radiation_(radiationModel::New(thermo_.T())),
+    pressureControl_
+    (
+        p(),
+        p_rgh_,
+        pimple().dict(),
+        thermo_.incompressible()
+    ),
+#else
     turbulence_
     (
         compressible::turbulenceModel::New
@@ -374,10 +445,8 @@ buoyantPimpleFluid::buoyantPimpleFluid
             rho_, U(), phi(), thermo_
         )
     ),
-#ifdef OPENFOAMFOUNDATION
-    radiation_(radiationModel::New(thermo_.T())),
-#endif
     pressureControl_(p(), rho_, pimple().dict(), false),
+#endif
     cumulativeContErr_(0)
 {
     UisRequired();
@@ -417,12 +486,6 @@ buoyantPimpleFluid::buoyantPimpleFluid
             )
         );
     }
-
-    // Check if any finite volume option is present
-    if (!fvOptions_.optionList::size())
-    {
-        Info << "No finite volume options present\n" << endl;
-    }
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -440,7 +503,11 @@ tmp<vectorField> buoyantPimpleFluid::patchViscousForce
     tvF.ref() =
         (
             mesh().boundary()[patchID].nf()
+#ifdef OPENFOAMFOUNDATION
+          & (-turbulence_->devTau()().boundaryField()[patchID])
+#else
           & (-turbulence_->devRhoReff()().boundaryField()[patchID])
+#endif
         );
 
     return tvF;
@@ -543,7 +610,9 @@ bool buoyantPimpleFluid::evolve()
 
                     CorrectPhi
                     (
+#ifndef OPENFOAMFOUNDATION
                         U(),
+#endif
                         phi(),
                         p_rgh_,
                         rho_,
@@ -551,7 +620,7 @@ bool buoyantPimpleFluid::evolve()
                         dimensionedScalar("rAUf", dimTime, 1),
                         divrhoU(),
                         pimple()
-#ifndef OPENFOAMESI
+#ifndef OPENFOAMESIORFOUNDATION
                         ,
                         true
 #endif

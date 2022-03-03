@@ -95,14 +95,21 @@ public:
             const fvPatchFieldMapper&
         );
 
+#ifdef OPENFOAMESIORFOUNDATION
+        solidDirectionMixedFvPatchVectorField
+        (
+            const solidDirectionMixedFvPatchVectorField&
+        ) = delete;
+#else
         //- Construct and return a clone
-        // virtual tmp<fvPatchField<vector> > clone() const
-        // {
-        //     return tmp<fvPatchField<vector> >
-        //     (
-        //         new solidDirectionMixedFvPatchVectorField(*this)
-        //     );
-        // }
+        virtual tmp<fvPatchField<vector> > clone() const
+        {
+            return tmp<fvPatchField<vector> >
+            (
+                new solidDirectionMixedFvPatchVectorField(*this)
+            );
+        }
+#endif
 
         //- Construct as copy setting internal field reference
         solidDirectionMixedFvPatchVectorField

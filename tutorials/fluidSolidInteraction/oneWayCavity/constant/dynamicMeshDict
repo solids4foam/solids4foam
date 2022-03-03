@@ -17,6 +17,7 @@ FoamFile
 dynamicFvMesh   dynamicMotionSolverFvMesh;
 
 solver velocityLaplacian;
+motionSolver velocityLaplacian;
 diffusivity quadratic inverseDistance 1(fixedWalls);
 
 // ************************************************************************* //

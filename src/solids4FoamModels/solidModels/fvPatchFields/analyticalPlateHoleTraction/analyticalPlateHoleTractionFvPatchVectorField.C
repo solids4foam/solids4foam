@@ -127,7 +127,7 @@ analyticalPlateHoleTractionFvPatchVectorField
     holeR_(stpvf.holeR_)
 {}
 
-
+#ifndef OPENFOAMFOUNDATION
 analyticalPlateHoleTractionFvPatchVectorField::
 analyticalPlateHoleTractionFvPatchVectorField
 (
@@ -138,7 +138,7 @@ analyticalPlateHoleTractionFvPatchVectorField
     T_(stpvf.T_),
     holeR_(stpvf.holeR_)
 {}
-
+#endif
 
 analyticalPlateHoleTractionFvPatchVectorField::
 analyticalPlateHoleTractionFvPatchVectorField

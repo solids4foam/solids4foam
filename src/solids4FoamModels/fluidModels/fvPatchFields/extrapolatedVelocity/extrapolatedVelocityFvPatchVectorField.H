@@ -93,6 +93,9 @@ public:
         extrapolatedVelocityFvPatchVectorField
         (
             const extrapolatedVelocityFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -103,6 +106,7 @@ public:
                 new extrapolatedVelocityFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         extrapolatedVelocityFvPatchVectorField

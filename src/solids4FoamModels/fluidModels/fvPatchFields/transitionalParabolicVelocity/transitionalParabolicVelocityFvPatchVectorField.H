@@ -110,14 +110,22 @@ public:
             const fvPatchFieldMapper&
         );
 
+#ifdef OPENFOAMFOUNDATION
+        //- Construct as copy
+        transitionalParabolicVelocityFvPatchVectorField
+        (
+            const transitionalParabolicVelocityFvPatchVectorField&
+        ) = delete;
+#else
         //- Construct and return a clone
-        // virtual tmp<fvPatchVectorField> clone() const
-        // {
-        //     return tmp<fvPatchVectorField>
-        //     (
-        //         new transitionalParabolicVelocityFvPatchVectorField(*this)
-        //     );
-        // }
+        virtual tmp<fvPatchVectorField> clone() const
+        {
+            return tmp<fvPatchVectorField>
+            (
+                new transitionalParabolicVelocityFvPatchVectorField(*this)
+            );
+        }
+#endif
 
         //- Construct as copy setting internal field reference
         transitionalParabolicVelocityFvPatchVectorField

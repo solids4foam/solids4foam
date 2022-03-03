@@ -110,6 +110,9 @@ public:
         linearDisplacementFvPatchVectorField
         (
             const linearDisplacementFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -120,6 +123,7 @@ public:
                 new linearDisplacementFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         linearDisplacementFvPatchVectorField

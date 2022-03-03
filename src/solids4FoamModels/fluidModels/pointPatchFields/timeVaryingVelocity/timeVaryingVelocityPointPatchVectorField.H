@@ -60,7 +60,7 @@ namespace Foam
 {
 
 #ifdef OPENFOAMESIORFOUNDATION
-    typedef fixedValuePointPatchField<vector> 
+    typedef fixedValuePointPatchField<vector>
         fixedValuePointPatchVectorField;
 #else
     typedef FixedValuePointPatchField
@@ -122,17 +122,25 @@ public:
 #endif
         );
 
+#ifdef OPENFOAMFOUNDATION
+        //- Construct as copy
+        timeVaryingVelocityPointPatchVectorField
+        (
+            const timeVaryingVelocityPointPatchVectorField&
+        ) = delete;
+#else
         //- Construct and return a clone
-        // virtual autoPtr<pointPatchField<vector> > clone() const
-        // {
-        //     return autoPtr<pointPatchField<vector> >
-        //     (
-        //         new timeVaryingVelocityPointPatchVectorField
-        //         (
-        //             *this
-        //         )
-        //     );
-        // }
+        virtual autoPtr<pointPatchField<vector> > clone() const
+        {
+            return autoPtr<pointPatchField<vector> >
+            (
+                new timeVaryingVelocityPointPatchVectorField
+                (
+                    *this
+                )
+            );
+        }
+#endif
 
         //- Construct as copy setting internal field reference
         timeVaryingVelocityPointPatchVectorField

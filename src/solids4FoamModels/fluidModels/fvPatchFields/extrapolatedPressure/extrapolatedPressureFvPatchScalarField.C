@@ -74,14 +74,16 @@ extrapolatedPressureFvPatchScalarField
 {}
 
 
-// extrapolatedPressureFvPatchScalarField::
-// extrapolatedPressureFvPatchScalarField
-// (
-//     const extrapolatedPressureFvPatchScalarField& ptf
-// )
-// :
-//     zeroGradientFvPatchScalarField(ptf)
-// {}
+#ifndef OPENFOAMFOUNDATION
+extrapolatedPressureFvPatchScalarField::
+extrapolatedPressureFvPatchScalarField
+(
+    const extrapolatedPressureFvPatchScalarField& ptf
+)
+:
+    zeroGradientFvPatchScalarField(ptf)
+{}
+#endif
 
 
 extrapolatedPressureFvPatchScalarField::

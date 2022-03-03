@@ -97,17 +97,21 @@ public:
         //- Construct as copy
         robinFvPatchField
         (
-            const robinFvPatchField<Type>&
+            const robinFvPatchField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
-        // //- Construct and return a clone
-        // virtual tmp<fvPatchField<Type> > clone() const
-        // {
-        //     return tmp<fvPatchField<Type> >
-        //     (
-        //         new robinFvPatchField<Type>(*this)
-        //     );
-        // }
+        //- Construct and return a clone
+        virtual tmp<fvPatchField<Type> > clone() const
+        {
+            return tmp<fvPatchField<Type> >
+            (
+                new robinFvPatchField(*this)
+            );
+        }
+#endif
 
         //- Construct as copy setting internal field reference
         robinFvPatchField

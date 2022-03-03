@@ -99,7 +99,7 @@ solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
     {
         FatalErrorIn(type() + "::solidVelocityFvPatchVectorField(...)")
             << "Either 'velocity' or 'velocitySeries' should be specified!"
-            << abort(FatalError); 
+            << abort(FatalError);
     }
 
     if (dict.found("value"))
@@ -112,7 +112,7 @@ solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
 (
     const solidVelocityFvPatchVectorField& pivpvf
@@ -122,7 +122,7 @@ solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
     velocity_(pivpvf.velocity_),
     velocitySeries_(pivpvf.velocitySeries_)
 {}
-
+#endif
 
 solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
 (

@@ -130,6 +130,24 @@ public:
             const fvPatchFieldMapper&
         );
 
+#ifdef OPENFOAMFOUNDATION
+        //- Construct as copy
+        displacementOrTractionFvPatchVectorField
+        (
+            const displacementOrTractionFvPatchVectorField&
+        ) = delete;
+#else
+
+        //- Construct and return a clone
+        virtual tmp<fvPatchVectorField> clone() const
+        {
+            return tmp<fvPatchVectorField>
+            (
+                new displacementOrTractionFvPatchVectorField(*this)
+            );
+        }
+#endif
+
         //- Construct as copy setting internal field reference
         displacementOrTractionFvPatchVectorField
         (

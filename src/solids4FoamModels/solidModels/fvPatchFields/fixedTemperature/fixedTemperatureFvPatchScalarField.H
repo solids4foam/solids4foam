@@ -102,6 +102,9 @@ public:
         fixedTemperatureFvPatchScalarField
         (
             const fixedTemperatureFvPatchScalarField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -112,6 +115,7 @@ public:
                 new fixedTemperatureFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         fixedTemperatureFvPatchScalarField

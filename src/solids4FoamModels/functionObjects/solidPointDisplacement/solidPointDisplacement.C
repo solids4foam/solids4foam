@@ -34,6 +34,9 @@ License
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
+#ifdef OPENFOAMFOUNDATION
+    #include "OSspecific.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

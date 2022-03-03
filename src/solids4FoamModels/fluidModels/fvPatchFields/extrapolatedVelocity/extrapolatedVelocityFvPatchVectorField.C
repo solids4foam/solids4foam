@@ -73,7 +73,7 @@ extrapolatedVelocityFvPatchVectorField
     zeroGradientFvPatchVectorField(ptf, p, iF, mapper)
 {}
 
-
+#ifndef OPENFOAMFOUNDATION
 extrapolatedVelocityFvPatchVectorField::
 extrapolatedVelocityFvPatchVectorField
 (
@@ -82,7 +82,7 @@ extrapolatedVelocityFvPatchVectorField
 :
     zeroGradientFvPatchVectorField(ptf)
 {}
-
+#endif
 
 extrapolatedVelocityFvPatchVectorField::
 extrapolatedVelocityFvPatchVectorField

@@ -44,10 +44,15 @@ SourceFiles
 #include "fluidModel.H"
 #include "MULES.H"
 #include "subCycle.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#if OPENFOAMESIORFOUNDATION
     #include "immiscibleIncompressibleTwoPhaseMixture.H"
-    #include "turbulentTransportModel.H"
     //#include "gravityMeshObject.H"
+
+    #ifdef OPENFOAMFOUNDATION
+        #include "kinematicMomentumTransportModel.H"
+    #else
+        #include "turbulentTransportModel.H"
+    #endif
 #else
     #include "interfaceProperties.H"
     #include "twoPhaseMixture.H"
@@ -73,7 +78,6 @@ class interFluid
     public fluidModel
 {
     // Private data
-
 #ifndef OPENFOAMFOUNDATION
         //- pd
         volScalarField pd_;
@@ -124,8 +128,13 @@ class interFluid
         //- p reference value
         scalar pRefValue_;
 
+#ifdef OPENFOAMFOUNDATION
+        //- Momentum transport model
+        autoPtr<incompressible::momentumTransportModel> turbulence_;
+#else
         //- Turbulence model
         autoPtr<incompressible::turbulenceModel> turbulence_;
+#endif
 
     // Private Member Functions
 
