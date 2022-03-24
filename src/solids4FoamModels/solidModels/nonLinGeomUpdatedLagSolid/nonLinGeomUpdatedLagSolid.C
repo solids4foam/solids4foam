@@ -141,6 +141,13 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     rImpK_(1.0/impK_)
 {
     DDisRequired();
+
+    // For consistent restarts, we will update the relative kinematic fields
+    DD().correctBoundaryConditions();
+    mechanical().grad(DD(), gradDD());
+    relF_ = I + gradDD().T();
+    relFinv_ = inv(relF_);
+    relJ_ = det(relF_);
 }
 
 
