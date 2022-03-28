@@ -315,7 +315,26 @@ Foam::volScalarField& Foam::solidModel::rho()
 
 void Foam::solidModel::setCellDisps(fvVectorMatrix& DEqn)
 {
-    if (setCellDisps().cellIDs().size() > 0)
+    if (setCellDisps().cellIDs().size() == 0)
+    {
+        return;
+    }
+
+    if (incremental())
+    {
+        // Prepare the list of incremental displacements
+        const vectorField& Dold = D().oldTime().internalField();
+        const vectorField cellDisps = setCellDisps().cellDisps();
+        vectorField cellIncrDisps(cellDisps.size(), vector::zero);
+        const labelList cellIDs = setCellDisps().cellIDs();
+        forAll(cellIncrDisps, cI)
+        {
+            cellIncrDisps[cI] = cellDisps[cI] - Dold[cellIDs[cI]];
+        }
+
+        DEqn.setValues(cellIDs, cellIncrDisps);
+    }
+    else
     {
         DEqn.setValues(setCellDisps().cellIDs(), setCellDisps().cellDisps());
     }
