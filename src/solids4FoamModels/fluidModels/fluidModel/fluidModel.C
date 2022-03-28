@@ -771,7 +771,7 @@ void Foam::fluidModel::setDeltaT(Time& runTime)
     {
         // Calculate the maximum Courant number
         // Careful to use the relative flux in the calculation
-        // We  have to be careufl when we call makeRelative and makeAbsolute
+        // We have to be careful when we call makeRelative and makeAbsolute
         scalar CoNum = 0.0;
         scalar meanCoNum = 0.0;
         scalar velMag = 0.0;
