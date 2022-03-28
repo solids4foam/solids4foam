@@ -135,7 +135,7 @@ void Foam::GentElastic::correct(volSymmTensorField& sigma)
     (
         "Na",
         dimensionSet(0,0,0,0,0,0,0),
-        scalar(6.022141*pow(10,9)*pow(10,9)*pow(10,5))
+        scalar(6.022141*Foam::pow(10,9)*Foam::pow(10,9)*Foam::pow(10,5))
     );
 
     // Volume per solvent molecule
@@ -146,7 +146,7 @@ void Foam::GentElastic::correct(volSymmTensorField& sigma)
     (
         "kb",
         dimensionSet(1,2,-2,-1,0,0,0),
-        scalar(1.38064852/pow(10,9)/pow(10,9)/pow(10,5))
+        scalar(1.38064852/Foam::pow(10,9)/Foam::pow(10,9)/Foam::pow(10,5))
     );
 
     // Crosslinking density
@@ -183,7 +183,7 @@ void Foam::GentElastic::correct(surfaceSymmTensorField& sigma)
     (
         "Na",
         dimensionSet(0,0,0,0,0,0,0),
-        scalar(6.022141*pow(10,9)*pow(10,9)*pow(10,5))
+        scalar(6.022141*Foam::pow(10,9)*Foam::pow(10,9)*Foam::pow(10,5))
     );
 
     // Volume per solvent molecule
@@ -194,7 +194,7 @@ void Foam::GentElastic::correct(surfaceSymmTensorField& sigma)
     (
         "kb",
         dimensionSet(1,2,-2,-1,0,0,0),
-        scalar(1.38064852/pow(10,9)/pow(10,9)/pow(10,5))
+        scalar(1.38064852/Foam::pow(10,9)/Foam::pow(10,9)/Foam::pow(10,5))
     );
 
     const dimensionedScalar N = N_/omega;
