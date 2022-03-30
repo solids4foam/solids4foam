@@ -788,6 +788,42 @@ Foam::mechanicalLaw::mechanicalLaw
 // * * * * * * * * * * * * * * * Member functions * * * * * * * * * * * * * * //
 
 
+Foam::dimensionedScalar Foam::mechanicalLaw::rhoScalar() const
+{
+    return dimensionedScalar(dict_.lookup("rho"));
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::mechanicalLaw::rho() const
+{
+    tmp<volScalarField> tresult
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "rho",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            rhoScalar(),
+            zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
+    tresult().correctBoundaryConditions();
+#endif
+
+    return tresult;
+}
+
+
 Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalLaw::impKf() const
 {
     return fvc::interpolate(impK());

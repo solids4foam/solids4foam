@@ -36,6 +36,7 @@ SourceFiles
 
 Author
     Philip Cardiff, UCD. All rights reserved.
+    Inspired by Denis Maier, BAW, code design suggestions.
 
 \*---------------------------------------------------------------------------*/
 
@@ -124,9 +125,6 @@ public:
 
 
     // Member Functions
-
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term

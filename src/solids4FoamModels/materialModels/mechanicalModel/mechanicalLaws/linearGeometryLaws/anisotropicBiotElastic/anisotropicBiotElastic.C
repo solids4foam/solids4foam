@@ -53,7 +53,6 @@ Foam::anisotropicBiotElastic::anisotropicBiotElastic
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
     model2d_(bool(mesh.solutionD()[vector::Z] > 0)),
-    rho_(dict.lookup("rho")),
     A11_(0.0),
     A22_(0.0),
     A33_(0.0),
@@ -178,36 +177,6 @@ Foam::anisotropicBiotElastic::~anisotropicBiotElastic()
 
 
 // * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::volScalarField> Foam::anisotropicBiotElastic::rho() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-#ifdef OPENFOAMESIORFOUNDATION
-    tresult.ref().correctBoundaryConditions();
-#else
-    tresult().correctBoundaryConditions();
-#endif
-
-    return tresult;
-}
-
 
 Foam::tmp<Foam::volScalarField> Foam::anisotropicBiotElastic::impK() const
 {

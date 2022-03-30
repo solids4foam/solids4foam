@@ -22,23 +22,30 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    thermoLinearElastic
+    thermoMechanicalLaw
 
 Description
-    Duhamel-Neumann form of Hooke's law for linear thermo-elasticity.
+    Generalised thermo-coupled mechanical law, where a thermal volumetric stress
+    term is add to the stress calculated from any other run-time selectable
+    mechanical law.
+
+    Careful: if the run-time selected mechanical law is a non-linear function of
+    the volumetric stress then this de-coupled approach may not make sense. For
+    example, if plasticity depended on the volumetric stress.
 
 SourceFiles
-    thermoLinearElastic.C
+    thermoMechanicalLaw.C
 
 Author
     Philip Cardiff, UCD. All rights reserved.
+    Inspired by Denis Maier, BAW, code design suggestions.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef thermoLinearElastic_H
-#define thermoLinearElastic_H
+#ifndef thermoMechanicalLaw_H
+#define thermoMechanicalLaw_H
 
-#include "linearElastic.H"
+#include "mechanicalLaw.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -46,14 +53,18 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class thermoLinearElastic Declaration
+                         Class thermoMechanicalLaw Declaration
 \*---------------------------------------------------------------------------*/
 
-class thermoLinearElastic
+class thermoMechanicalLaw
 :
-    public linearElastic
+    public mechanicalLaw
 {
-    // Private data
+    // Private Data
+
+        //- Run-time selectable mechanical law to define the stress without a
+        //  a thermal term
+        autoPtr<mechanicalLaw> mechLawPtr_;
 
         //- Coefficient of linear expansion
         const dimensionedScalar alpha_;
@@ -82,7 +93,6 @@ class thermoLinearElastic
         //- Store the current time index so we know the start of a new time-step
         label curTimeIndex_;
 
-
     // Private Member Functions
 
         //- Make the TrunTime object
@@ -101,16 +111,22 @@ class thermoLinearElastic
         //  Return true if the T field has ever been read from disk
         bool readTField();
 
+        //- Return a reference to the initial pore-temperature surface field
+        const surfaceScalarField& p0f() const;
+
+        //- Lookup and return a reference to the temperature field
+        const volScalarField& lookupTemperatureField();
+
         //- Disallow default bitwise copy construct
-        thermoLinearElastic(const thermoLinearElastic&);
+        thermoMechanicalLaw(const thermoMechanicalLaw&);
 
         //- Disallow default bitwise assignment
-        void operator=(const thermoLinearElastic&);
+        void operator=(const thermoMechanicalLaw&);
 
 public:
 
     //- Runtime type information
-    TypeName("thermoLinearElastic");
+    TypeName("thermoMechanicalLaw");
 
     // Static data members
 
@@ -118,7 +134,7 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        thermoLinearElastic
+        thermoMechanicalLaw
         (
             const word& name,
             const fvMesh& mesh,
@@ -129,10 +145,14 @@ public:
 
     // Destructor
 
-        virtual ~thermoLinearElastic();
+        virtual ~thermoMechanicalLaw();
 
 
     // Member Functions
+
+        //- Return the implicit stiffness
+        //  This is the diffusivity for the Laplacian term
+        virtual tmp<volScalarField> impK() const;
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);

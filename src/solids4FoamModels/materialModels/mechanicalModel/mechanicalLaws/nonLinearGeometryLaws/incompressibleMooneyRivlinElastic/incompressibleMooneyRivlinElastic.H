@@ -99,9 +99,6 @@ class incompressibleMooneyRivlinElastic
 {
     // Private data
 
-        // Initial density
-        const dimensionedScalar rho_;
-
         // First material parameter
         const dimensionedScalar c10_;
 
@@ -151,9 +148,6 @@ public:
 
 
     // Member Functions
-
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term

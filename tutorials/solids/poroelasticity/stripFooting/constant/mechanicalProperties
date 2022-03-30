@@ -21,11 +21,11 @@ mechanical
     soil
     {
         type            poroMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 7854;
         biotCoeff       biotCoeff [0 0 0 0 0 0 0] 1.0;
         effectiveStressMechanicalLaw
         {
             type            linearElasticMohrCoulombPlastic;
-            rho             rho [1 -3 0 0 0 0 0] 7854;
             E               E [ 1 -1 -2 0 0 0 0 ] 20e6;
             nu              nu [0 0 0 0 0 0 0] 0.3;
             frictionAngle   frictionAngle [0 0 0 0 0 0 0] 30;

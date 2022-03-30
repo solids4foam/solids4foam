@@ -21,11 +21,11 @@ mechanical
     steel
     {
         type            poroMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 2650;
         biotCoeff       biotCoeff [0 0 0 0 0 0 0] 1.0;
         effectiveStressMechanicalLaw
         {
             type            anisotropicBiotElastic;
-            rho             rho [1 -3 0 0 0 0 0] 2650;
 
             // Young's modulii (in Pa)
             Ex              1.2e7;

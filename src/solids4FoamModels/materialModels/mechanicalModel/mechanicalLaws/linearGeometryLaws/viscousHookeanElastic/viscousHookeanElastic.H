@@ -87,9 +87,6 @@ class viscousHookeanElastic
 {
     // Private data
 
-        //- Density
-        dimensionedScalar rho_;
-
         //- Relaxed (long term) modulus of elasticity
         dimensionedScalar EInf_;
 
@@ -180,9 +177,6 @@ public:
 
 
     // Member Functions
-
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term

@@ -166,12 +166,6 @@ Foam::poroMechanicalLaw::~poroMechanicalLaw()
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::poroMechanicalLaw::rho() const
-{
-    return effectiveStressMechLawPtr_->rho();
-}
-
-
 Foam::tmp<Foam::volScalarField> Foam::poroMechanicalLaw::impK() const
 {
     return effectiveStressMechLawPtr_->impK();

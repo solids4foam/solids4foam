@@ -83,7 +83,7 @@ $(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
 $(linGeomLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
 $(linGeomLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C
 $(linGeomLaws)/poroMechanicalLaw/poroMechanicalLaw.C
-$(linGeomLaws)/thermoLinearElastic/thermoLinearElastic.C
+$(linGeomLaws)/thermoMechanicalLaw/thermoMechanicalLaw.C
 $(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
 
 nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws

@@ -23,26 +23,26 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "thermoLinearElastic.H"
+#include "thermoMechanicalLaw.H"
 #include "addToRunTimeSelectionTable.H"
-#include "mechanicalModel.H"
 #include "fvc.H"
+#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(thermoLinearElastic, 0);
+    defineTypeNameAndDebug(thermoMechanicalLaw, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, thermoLinearElastic, linGeomMechLaw
+        mechanicalLaw, thermoMechanicalLaw, linGeomMechLaw
     );
 }
 
 
-// * * * * * * * * * * * * *  Private Data Members * * * * * * * * * * * * * //
+// * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
 
-void Foam::thermoLinearElastic::makeTrunTime()
+void Foam::thermoMechanicalLaw::makeTrunTime()
 {
     if (TrunTimePtr_.valid())
     {
@@ -75,7 +75,7 @@ void Foam::thermoLinearElastic::makeTrunTime()
     TrunTimePtr_().setTime(mesh().time());
 }
 
-Foam::Time& Foam::thermoLinearElastic::TrunTime()
+Foam::Time& Foam::thermoMechanicalLaw::TrunTime()
 {
     if (TrunTimePtr_.empty())
     {
@@ -86,7 +86,7 @@ Foam::Time& Foam::thermoLinearElastic::TrunTime()
 }
 
 
-void Foam::thermoLinearElastic::makeTmesh()
+void Foam::thermoMechanicalLaw::makeTmesh()
 {
     if (TmeshPtr_.valid())
     {
@@ -138,7 +138,7 @@ void Foam::thermoLinearElastic::makeTmesh()
 }
 
 
-Foam::fvMesh& Foam::thermoLinearElastic::Tmesh()
+Foam::fvMesh& Foam::thermoMechanicalLaw::Tmesh()
 {
     if (TmeshPtr_.empty())
     {
@@ -149,7 +149,7 @@ Foam::fvMesh& Foam::thermoLinearElastic::Tmesh()
 }
 
 
-bool Foam::thermoLinearElastic::readTField()
+bool Foam::thermoMechanicalLaw::readTField()
 {
     if (debug)
     {
@@ -294,10 +294,37 @@ bool Foam::thermoLinearElastic::readTField()
 }
 
 
+const Foam::volScalarField&
+Foam::thermoMechanicalLaw::lookupTemperatureField()
+{
+    if (mesh().foundObject<volScalarField>("T") && !TFieldWasReadFromDisk_)
+    {
+        // Lookup the temperature field from the solver
+        return  mesh().lookupObject<volScalarField>("T");
+    }
+    else if (readTField())
+    {
+        // Read T from disk
+        return TPtr_();
+    }
+    else
+    {
+        FatalErrorIn("Foam::poroMechanicalLaw::lookupTemperatureField()")
+            << "No T field found in memory or on disk. Make sure you have "
+            << "either specified a solidModel that solves for temperature "
+            << "or give the T field in at least the starting time "
+            << "directory" << abort(FatalError);
+    }
+
+    // Keep compiler happy
+    return mesh().lookupObject<volScalarField>("null");
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
-Foam::thermoLinearElastic::thermoLinearElastic
+Foam::thermoMechanicalLaw::thermoMechanicalLaw
 (
     const word& name,
     const fvMesh& mesh,
@@ -305,7 +332,17 @@ Foam::thermoLinearElastic::thermoLinearElastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    linearElastic(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechLawPtr_
+    (
+        mechanicalLaw::NewLinGeomMechLaw
+        (
+            word(dict.subDict("mechanicalLaw").lookup("type")),
+            mesh,
+            dict.subDict("mechanicalLaw"),
+            nonLinGeom
+        )
+    ),
     alpha_(dict.lookup("alpha")),
     T0_(dict.lookup("T0")),
     TPtr_(),
@@ -319,74 +356,45 @@ Foam::thermoLinearElastic::thermoLinearElastic
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
-Foam::thermoLinearElastic::~thermoLinearElastic()
+Foam::thermoMechanicalLaw::~thermoMechanicalLaw()
 {}
 
 
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-void Foam::thermoLinearElastic::correct(volSymmTensorField& sigma)
+Foam::tmp<Foam::volScalarField> Foam::thermoMechanicalLaw::impK() const
 {
-    // Calculate linear elastic stress
-    linearElastic::correct(sigma);
-
-    if (mesh().foundObject<volScalarField>("T") && !TFieldWasReadFromDisk_)
-    {
-        // Lookup the temperature field from the solver
-        const volScalarField& T = mesh().lookupObject<volScalarField>("T");
-
-        // Add thermal stress component
-        sigma -= 3.0*K()*alpha_*(T - T0_)*symmTensor(I);
-    }
-    else if (readTField())
-    {
-        // Add thermal stress component
-        sigma -= 3.0*K()*alpha_*(TPtr_() - T0_)*symmTensor(I);
-    }
-    else
-    {
-        FatalErrorIn(type() + "::correct(...)")
-            << "No T field found in memory or on disk. Make sure you have "
-            << "either specified a solidModel that solves for temperature "
-            << "or give the T field in at least the starting time "
-            << "directory" << abort(FatalError);
-    }
+    return mechLawPtr_->impK();
 }
 
 
-void Foam::thermoLinearElastic::correct(surfaceSymmTensorField& sigma)
+void Foam::thermoMechanicalLaw::correct(volSymmTensorField& sigma)
 {
-    // Calculate linear elastic stress
-    linearElastic::correct(sigma);
+    // Calculate stress without thermal stress term
+    mechLawPtr_->correct(sigma);
 
-    if (mesh().foundObject<volScalarField>("T") && !TFieldWasReadFromDisk_)
-    {
-        // Lookup the temperature field from the solver
-        const volScalarField& T = mesh().lookupObject<volScalarField>("T");
+    // Lookup the temperature field
+    const volScalarField& T = lookupTemperatureField();
 
-        // Interpolate the volField temperature to the faces
-        const surfaceScalarField Tf(fvc::interpolate(T));
+    // Add thermal stress term
+    sigma -= 3.0*mechLawPtr_->bulkModulus()*alpha_*(T - T0_)*symmTensor(I);
+}
 
-        // Add thermal stress component
-        sigma -= 3.0*K()*alpha_*(Tf - T0_)*symmTensor(I);
-    }
-    else if (readTField())
-    {
-        // Interpolate the volField temperature to the faces
-        const surfaceScalarField Tf(fvc::interpolate(TPtr_()));
 
-        // Add thermal stress component
-        sigma -= 3.0*K()*alpha_*(Tf - T0_)*symmTensor(I);
-    }
-    else
-    {
-        FatalErrorIn(type() + "::correct(...)")
-            << "No T field found in memory or on disk. Make sure you have "
-            << "either specified a solidModel that solves for temperature "
-            << "or give the T field in at least the starting time "
-            << "directory" << abort(FatalError);
-    }
+void Foam::thermoMechanicalLaw::correct(surfaceSymmTensorField& sigma)
+{
+    // Calculate stress without thermal stress term
+    mechLawPtr_->correct(sigma);
+
+    // Lookup the temperature field
+    const volScalarField& T = lookupTemperatureField();
+
+    // Interpolate T to the faces
+    const surfaceScalarField Tf(fvc::interpolate(T));
+
+    // Interpolate bulk modulus to the faces
+    const surfaceScalarField Kf(fvc::interpolate(mechLawPtr_->bulkModulus()));
+
+    // Add thermal stress term
+    sigma -= 3.0*Kf*alpha_*(Tf - T0_)*symmTensor(I);
 }
 
 

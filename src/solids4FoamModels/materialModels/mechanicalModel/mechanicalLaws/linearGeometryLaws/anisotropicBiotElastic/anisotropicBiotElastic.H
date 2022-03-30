@@ -74,9 +74,6 @@ class anisotropicBiotElastic
         //- Flag to indicate a 2-D model
         const bool model2d_;
 
-        //- Density
-        const dimensionedScalar rho_;
-
         //- Elastic stiffness parameters
         scalar A11_;
         scalar A22_;
@@ -126,9 +123,6 @@ public:
 
 
     // Member Functions
-
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term

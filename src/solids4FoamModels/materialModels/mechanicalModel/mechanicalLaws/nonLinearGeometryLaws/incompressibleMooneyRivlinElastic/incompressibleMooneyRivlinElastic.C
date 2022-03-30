@@ -52,7 +52,6 @@ Foam::incompressibleMooneyRivlinElastic::incompressibleMooneyRivlinElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     c10_(dict.lookup("c10")),
     c01_(dict.lookup("c01")),
     c11_(dict.lookup("c11")),
@@ -80,28 +79,6 @@ Foam::incompressibleMooneyRivlinElastic::~incompressibleMooneyRivlinElastic()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::volScalarField> Foam::incompressibleMooneyRivlinElastic::rho() const
-{
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rhoLaw",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            calculatedFvPatchScalarField::typeName
-        )
-    );
-}
-
 
 Foam::tmp<Foam::volScalarField> Foam::incompressibleMooneyRivlinElastic::impK() const
 {

@@ -78,9 +78,6 @@ class neoHookeanElastic
 {
     // Private data
 
-        // Initial density
-        const dimensionedScalar rho_;
-
         // Shear modulus
         dimensionedScalar mu_;
 
@@ -121,9 +118,6 @@ public:
 
 
     // Member Functions
-
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term

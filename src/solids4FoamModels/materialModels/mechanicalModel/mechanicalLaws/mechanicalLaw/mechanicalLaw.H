@@ -325,8 +325,11 @@ public:
             return name_;
         }
 
-        //- Return density
-        virtual tmp<volScalarField> rho() const = 0;
+        //- Return scalar density, if defined
+        virtual dimensionedScalar rhoScalar() const;
+
+        //- Return density field
+        virtual tmp<volScalarField> rho() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
