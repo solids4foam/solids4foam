@@ -22,12 +22,14 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    poroLinearElasticMohrCoulombPlastic
+    anisotropicBiotElastic
 
 Description
-    Poro-elasto-plastic mechanical law where the total stress is the sum
-    of the solid skeleton stress (effective stress), governed by Hooke's
-    law and Mohr-Coulomb plasticity, and the poro-pressure.
+    Anisotropic elastic mechanical law ported from Tian Tang's minigeotechfoam
+    at https://bitbucket.org/tiantang/minigeotechfoam.
+
+    Note: to include pore pressure, you can use this law with the general
+    poroMechanicalLaw wrapper mechanical law.
 
     More reading at:
 
@@ -41,18 +43,18 @@ Description
     Volume 2, Pages 1301-1306.
 
 SourceFiles
-    poroLinearElasticMohrCoulombPlastic.C
+    anisotropicBiotElastic.C
 
 Author
-    Tian Tang, DTU. All rights reserved.
-    Philip Cardiff, UCD. All rights reserved.
+    Original author: Tian Tang, DTU. All rights reserved.
+    Ported to solids4foam by: Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef poroLinearElasticMohrCoulombPlastic_H
-#define poroLinearElasticMohrCoulombPlastic_H
+#ifndef anisotropicBiotElastic_H
+#define anisotropicBiotElastic_H
 
-#include "linearElasticMohrCoulombPlastic.H"
+#include "mechanicalLaw.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -60,28 +62,48 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class poroLinearElasticMohrCoulombPlastic Declaration
+                         Class anisotropicBiotElastic Declaration
 \*---------------------------------------------------------------------------*/
 
-class poroLinearElasticMohrCoulombPlastic
+class anisotropicBiotElastic
 :
-    public linearElasticMohrCoulombPlastic
+    public mechanicalLaw
 {
+    // Private Data
+
+        //- Flag to indicate a 2-D model
+        const bool model2d_;
+
+        //- Density
+        const dimensionedScalar rho_;
+
+        //- Elastic stiffness parameters
+        scalar A11_;
+        scalar A22_;
+        scalar A33_;
+        scalar A44_;
+        scalar A55_;
+        scalar A66_;
+        scalar A12_;
+        scalar A21_;
+        scalar A31_;
+        scalar A23_;
+
+        //- Total strain
+        volSymmTensorField epsilon_;
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        poroLinearElasticMohrCoulombPlastic
-        (
-            const poroLinearElasticMohrCoulombPlastic&
-        );
+        anisotropicBiotElastic(const anisotropicBiotElastic&);
 
         //- Disallow default bitwise assignment
-        void operator=(const poroLinearElasticMohrCoulombPlastic&);
+        void operator=(const anisotropicBiotElastic&);
 
 public:
 
     //- Runtime type information
-    TypeName("poroLinearElasticMohrCoulombPlastic");
+    TypeName("anisotropicBiotElastic");
 
     // Static data members
 
@@ -89,7 +111,7 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        poroLinearElasticMohrCoulombPlastic
+        anisotropicBiotElastic
         (
             const word& name,
             const fvMesh& mesh,
@@ -100,10 +122,17 @@ public:
 
     // Destructor
 
-        virtual ~poroLinearElasticMohrCoulombPlastic();
+        virtual ~anisotropicBiotElastic();
 
 
     // Member Functions
+
+        //- Return density
+        virtual tmp<volScalarField> rho() const;
+
+        //- Return the implicit stiffness
+        //  This is the diffusivity for the Laplacian term
+        virtual tmp<volScalarField> impK() const;
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);

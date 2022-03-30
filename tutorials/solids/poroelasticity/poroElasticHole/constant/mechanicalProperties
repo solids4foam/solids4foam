@@ -20,11 +20,6 @@ mechanical
 (
     steel
     {
-        // type            poroLinearElastic;
-        // rho             rho [1 -3 0 0 0 0 0] 7854;
-        // E               E [1 -1 -2 0 0 0 0] 2e+11;
-        // nu              nu [0 0 0 0 0 0 0] 0.3;
-
         type            poroMechanicalLaw;
         biotCoeff       biotCoeff [0 0 0 0 0 0 0] 1.0;
         effectiveStressMechanicalLaw

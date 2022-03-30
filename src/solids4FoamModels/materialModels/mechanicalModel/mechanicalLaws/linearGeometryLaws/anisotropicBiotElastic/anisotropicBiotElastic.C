@@ -23,7 +23,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "poroAnisotropicBiotElastic.H"
+#include "anisotropicBiotElastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
 #include "zeroGradientFvPatchFields.H"
@@ -32,48 +32,18 @@ License
 
 namespace Foam
 {
-    defineTypeNameAndDebug(poroAnisotropicBiotElastic, 0);
+    defineTypeNameAndDebug(anisotropicBiotElastic, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, poroAnisotropicBiotElastic, linGeomMechLaw
+        mechanicalLaw, anisotropicBiotElastic, linGeomMechLaw
     );
-}
-
-
-// * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
-
-void Foam::poroAnisotropicBiotElastic::makeP0f() const
-{
-    if (p0fPtr_)
-    {
-        FatalErrorIn("void Foam::poroAnisotropicBiotElastic::makeP0f() const")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    p0fPtr_ =
-        new surfaceScalarField
-        (
-            "p0f",
-            fvc::interpolate(p0_)
-        );
-}
-
-
-const Foam::surfaceScalarField& Foam::poroAnisotropicBiotElastic::p0f() const
-{
-    if (!p0fPtr_)
-    {
-        makeP0f();
-    }
-
-    return *p0fPtr_;
 }
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
-Foam::poroAnisotropicBiotElastic::poroAnisotropicBiotElastic
+Foam::anisotropicBiotElastic::anisotropicBiotElastic
 (
     const word& name,
     const fvMesh& mesh,
@@ -106,31 +76,8 @@ Foam::poroAnisotropicBiotElastic::poroAnisotropicBiotElastic
         ),
         mesh,
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
-    p0_
-    (
-        IOobject
-        (
-            "p0",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dict.lookupOrDefault<dimensionedScalar>
-        (
-            "p0",
-            dimensionedScalar("zero", dimPressure, 0.0)
-        )
-    ),
-    p0fPtr_(NULL)
+    )
 {
-    if (gMax(mag(p0_)()) > SMALL)
-    {
-        Info<< "Reading p0 initial/residual pore-pressure field" << endl;
-    }
-
     // Set elastic stiffness parameters
     if (model2d_)
     {
@@ -226,15 +173,13 @@ Foam::poroAnisotropicBiotElastic::poroAnisotropicBiotElastic
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
-Foam::poroAnisotropicBiotElastic::~poroAnisotropicBiotElastic()
-{
-    deleteDemandDrivenData(p0fPtr_);
-}
+Foam::anisotropicBiotElastic::~anisotropicBiotElastic()
+{}
 
 
 // * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volScalarField> Foam::poroAnisotropicBiotElastic::rho() const
+Foam::tmp<Foam::volScalarField> Foam::anisotropicBiotElastic::rho() const
 {
     tmp<volScalarField> tresult
     (
@@ -264,7 +209,7 @@ Foam::tmp<Foam::volScalarField> Foam::poroAnisotropicBiotElastic::rho() const
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::poroAnisotropicBiotElastic::impK() const
+Foam::tmp<Foam::volScalarField> Foam::anisotropicBiotElastic::impK() const
 {
     return tmp<volScalarField>
     (
@@ -285,7 +230,7 @@ Foam::tmp<Foam::volScalarField> Foam::poroAnisotropicBiotElastic::impK() const
     );
 }
 
-void Foam::poroAnisotropicBiotElastic::correct(volSymmTensorField& sigma)
+void Foam::anisotropicBiotElastic::correct(volSymmTensorField& sigma)
 {
     // Calculate total strain
     if (incremental())
@@ -310,9 +255,9 @@ void Foam::poroAnisotropicBiotElastic::correct(volSymmTensorField& sigma)
 
     // Take references for convenience and efficiency
 #ifdef OPENFOAMESIORFOUNDATION
-    symmTensorField& sigmaI = sigmaEff().primitiveFieldRef();
+    symmTensorField& sigmaI = sigma.primitiveFieldRef();
 #else
-    symmTensorField& sigmaI = sigmaEff().internalField();
+    symmTensorField& sigmaI = sigma.internalField();
 #endif
     const symmTensorField& epsilonI = epsilon_.internalField();
 
@@ -344,13 +289,13 @@ void Foam::poroAnisotropicBiotElastic::correct(volSymmTensorField& sigma)
     }
 
     // BOundary patches
-    forAll(sigmaEff().boundaryField(), patchI)
+    forAll(sigma.boundaryField(), patchI)
     {
         // Take references for convenience and efficiency
 #ifdef OPENFOAMESIORFOUNDATION
-        symmTensorField& sigmaP = sigmaEff().boundaryFieldRef()[patchI];
+        symmTensorField& sigmaP = sigma.boundaryFieldRef()[patchI];
 #else
-        symmTensorField& sigmaP = sigmaEff().boundaryField()[patchI];
+        symmTensorField& sigmaP = sigma.boundaryField()[patchI];
 #endif
         const symmTensorField& epsilonP = epsilon_.boundaryField()[patchI];
 
@@ -383,21 +328,14 @@ void Foam::poroAnisotropicBiotElastic::correct(volSymmTensorField& sigma)
             }
         }
     }
-
-    // Lookup the pressure field from the solver
-    const volScalarField& p = mesh().lookupObject<volScalarField>("p");
-
-    // Calculate the total stress as the sum of the effective stress and the
-    // pore-pressure
-    sigma = sigmaEff() - (p + p0_)*symmTensor(I);
 }
 
 
-void Foam::poroAnisotropicBiotElastic::correct(surfaceSymmTensorField& sigma)
+void Foam::anisotropicBiotElastic::correct(surfaceSymmTensorField& sigma)
 {
     notImplemented
     (
-        "void Foam::poroAnisotropicBiotElastic::correct(surfaceSymmTensorField&)"
+        "void Foam::anisotropicBiotElastic::correct(surfaceSymmTensorField&)"
     );
 }
 

@@ -67,6 +67,13 @@ class poroMechanicalLaw
         //  total stress. Defaults to 1.0.
         const dimensionedScalar b_;
 
+        //- Name of pressure field (defaults to "p")
+        const word pName_;
+
+        //- Name of object registry (region) that contains the pressure field
+        //  Defaults to checking "solid" then "region0"
+        const word pRegion_;
+
         //- Initial (residual) poro-pressure field
         //  Defaults to zero if not specified
         const volScalarField p0_;
@@ -81,6 +88,9 @@ class poroMechanicalLaw
 
         //- Return a reference to the initial pore-pressure surface field
         const surfaceScalarField& p0f() const;
+
+        //- Lookup and return a reference to the pressure field
+        const volScalarField& lookupPressureField() const;
 
         //- Disallow default bitwise copy construct
         poroMechanicalLaw(const poroMechanicalLaw&);

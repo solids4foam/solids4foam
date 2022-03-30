@@ -70,6 +70,37 @@ const Foam::surfaceScalarField& Foam::poroMechanicalLaw::p0f() const
 }
 
 
+const Foam::volScalarField& Foam::poroMechanicalLaw::lookupPressureField() const
+{
+    if (mesh().db().subRegistry(pRegion_).foundObject<volScalarField>(pName_))
+    {
+        return mesh().db().subRegistry
+        (
+            pRegion_
+        ).lookupObject<volScalarField>(pName_);
+    }
+    else if
+    (
+        mesh().db().subRegistry("solid").foundObject<volScalarField>(pName_)
+    )
+    {
+        return mesh().db().subRegistry
+        (
+            "solid"
+        ).lookupObject<volScalarField>(pName_);
+    }
+    else
+    {
+        FatalErrorIn("Foam::poroMechanicalLaw::lookupPressureField()")
+            << "Cannot find " << pName_ << " field in " << pRegion_
+            << " or in 'solid'" << abort(FatalError);
+    }
+
+    // Keep compiler happy
+    return mesh().lookupObject<volScalarField>("null");
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -99,6 +130,8 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
             "biotCoeff", dimensionedScalar("0", dimless, 1.0)
         )
     ),
+    pName_(dict.lookupOrDefault<word>("pressureFieldName", "p")),
+    pRegion_(dict.lookupOrDefault<word>("pressureFieldRegion", "region0")),
     p0_
     (
         IOobject
@@ -153,8 +186,8 @@ void Foam::poroMechanicalLaw::correct(volSymmTensorField& sigma)
     // stress
     effectiveStressMechLawPtr_->correct(sigmaEff());
 
-    // Lookup the pressure field from the solver
-    const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+    // Lookup the pressure field
+    const volScalarField& p = lookupPressureField();
 
     // Calculate the total stress as the sum of the effective stress and the
     // pore-pressure
@@ -167,8 +200,8 @@ void Foam::poroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
     // Calculate effective stress
     effectiveStressMechLawPtr_->correct(sigma);
 
-    // Lookup the pressure field from the solver
-    const volScalarField& p = mesh().lookupObject<volScalarField>("p");
+    // Lookup the pressure field
+    const volScalarField& p = lookupPressureField();
 
     // Interpolate pressure to the faces
     const surfaceScalarField pf(fvc::interpolate(p));
