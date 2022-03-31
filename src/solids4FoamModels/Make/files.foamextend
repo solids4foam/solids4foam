@@ -61,6 +61,8 @@ fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
 fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
 
+/*fluidSolidInterfaces/fvPatchFields/fsiInterfaceSolid/fsiInterfaceSolidFvPatchVectorField.C*/
+
 interfaceToInterface = fluidSolidInterfaces/fluidSolidInterface/interfaceToInterfaceMapping
 $(interfaceToInterface)/interfaceToInterfaceMapping/interfaceToInterfaceMapping.C
 $(interfaceToInterface)/amiInterfaceToInterfaceMapping/amiInterfaceToInterfaceMapping.C
@@ -246,6 +248,6 @@ numerics/fvMotionSolvers/totalVelocityLaplacian/totalVelocityLaplacianFvMotionSo
 numerics/globalPolyPatch/globalPolyPatch.C
 numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
 numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
-/*numerics/pointGaussLeastSquaresGrad/pointGaussLeastSquaresGrads.C*/
+numerics/pointGaussLeastSquaresGrad/pointGaussLeastSquaresGrads.C
 
 LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
