@@ -2051,7 +2051,6 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
         vectorField allMirrorPoints(0);
         if (mag(mirrorPlaneTransformation()[pointI].first())>SMALL)
-//         if (mirrorPlaneTransformation().found(pointI))
         {
             const vector& n = mirrorPlaneTransformation()[pointI].first();
 
@@ -2713,7 +2712,6 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
         vectorField allMirrorPoints(0);
         if (mag(mirrorPlaneTransformation()[pointI].first())>SMALL)
-//         if (mirrorPlaneTransformation().found(pointI))
         {
             const vector& n = mirrorPlaneTransformation()[pointI].first();
 
@@ -3375,7 +3373,6 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
         vectorField allMirrorPoints(0);
         if (mag(mirrorPlaneTransformation()[pointI].first()) > SMALL)
-//         if (mirrorPlaneTransformation().found(pointI))
         {
             const vector& n = mirrorPlaneTransformation()[pointI].first();
 
@@ -3390,7 +3387,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
         if (allPoints.size() + allMirrorPoints.size() < nCoeffs)
         {
-            Pout << pointI << ", "
+            Pout<< pointI << ", "
                 << interpCells.size() << ", "
                 << interpBndFaces.size() << ", "
                 << interpCyclicFaces.size() << ", "
@@ -3606,11 +3603,6 @@ makeMirrorPlaneTransformation() const
     List<Tuple2<vector, tensor> >& mirrorPlaneTransformation =
         mirrorPlaneTransformationPtr_();
 
-//     mirrorPlaneTransformationPtr_ = new Map<Tuple2<vector, tensor> >();
-//     Map<Tuple2<vector, tensor> >& mirrorPlaneTransformation =
-//         *mirrorPlaneTransformationPtr_;
-
-
     forAll(mesh().boundaryMesh(), patchI)
     {
         if
@@ -3635,16 +3627,7 @@ makeMirrorPlaneTransformation() const
                         pointNormals[pointI],
                         I
                     );
-
-//                 mirrorPlaneTransformation.insert
-//                 (
-//                     meshPoints[pointI],
-//                     Tuple2<vector, tensor>
-//                     (
-//                         pointNormals[pointI],
-//                         I
-//                     )
-//                 );
+                }
             }
         }
         else if
@@ -3673,15 +3656,6 @@ makeMirrorPlaneTransformation() const
                             wedge.cellT()
                         );
                 }
-//                 mirrorPlaneTransformation.insert
-//                 (
-//                     meshPoints[pointI],
-//                     Tuple2<vector, tensor>
-//                     (
-//                         pointNormals[pointI],
-//                         wedge.cellT()
-//                     )
-//                 );
             }
         }
     }
