@@ -3627,7 +3627,6 @@ makeMirrorPlaneTransformation() const
                         pointNormals[pointI],
                         I
                     );
-                }
             }
         }
         else if
