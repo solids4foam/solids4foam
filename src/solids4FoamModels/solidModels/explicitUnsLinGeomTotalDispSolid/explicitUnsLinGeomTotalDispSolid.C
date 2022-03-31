@@ -179,6 +179,16 @@ explicitUnsLinGeomTotalDispSolid::explicitUnsLinGeomTotalDispSolid
         fvc::div(sigma(), "div(sigma)")().internalField()
        /(rho().internalField());
     a_.correctBoundaryConditions();
+
+    // Set the printInfo
+    physicsModel::printInfo() = bool
+    (
+        runTime.timeIndex() % infoFrequency() == 0
+     || mag(runTime.value() - runTime.endTime().value()) < SMALL
+    );
+
+    Info<< "Frequency at which info is printed: every " << infoFrequency()
+        << " time-steps" << endl;
 }
 
 
@@ -215,8 +225,18 @@ void explicitUnsLinGeomTotalDispSolid::setDeltaT(Time& runTime)
 
     const scalar newDeltaT = maxCo*requiredDeltaT;
 
-    Info<< "maxCo = " << maxCo << nl
-        << "deltaT = " << newDeltaT << nl << endl;
+    // Update print info
+    physicsModel::printInfo() = bool
+    (
+        runTime.timeIndex() % infoFrequency() == 0
+     || mag(runTime.value() - runTime.endTime().value()) < SMALL
+    );
+
+    if (physicsModel::printInfo())
+    {
+        Info<< nl << "Setting deltaT = " << newDeltaT
+            << ", maxCo = " << maxCo << endl;
+    }
 
     runTime.setDeltaT(newDeltaT);
 }
@@ -224,12 +244,13 @@ void explicitUnsLinGeomTotalDispSolid::setDeltaT(Time& runTime)
 
 bool explicitUnsLinGeomTotalDispSolid::evolve()
 {
-    Info<< "Evolving solid solver" << endl;
-
     // Mesh update loop
     do
     {
-        Info<< "Solving the momentum equation for D" << endl;
+        if (printInfo())
+        {
+            Info<< "Solving the solid momentum equation for D" << endl;
+        }
 
         // Central difference scheme
 
@@ -284,7 +305,7 @@ bool explicitUnsLinGeomTotalDispSolid::evolve()
         energies_.checkEnergies
         (
             rho(), U(), D(), DD(), sigma(), gradD(), gradDD(), waveSpeed_, g(),
-            0.0, impKf_
+            0.0, impKf_, printInfo()
         );
     }
     while (mesh().update());

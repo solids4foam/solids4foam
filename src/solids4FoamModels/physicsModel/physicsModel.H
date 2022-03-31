@@ -72,6 +72,11 @@ class physicsModel
         //- Solid mesh pointer
         autoPtr<dynamicFvMesh> solidMeshPtr_;
 
+        //- Flag to indicate whether info statements should be printed to
+        //  std out or not. Defaults to true but can be modified by the
+        //  printInfo() access function
+        bool printInfo_;
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -166,6 +171,12 @@ public:
             const dictionary& physicsProperties() const
             {
                 return dict_;
+            }
+
+            //- Return reference to the printInfo flag
+            bool& printInfo()
+            {
+                return printInfo_;
             }
 
         // Edit

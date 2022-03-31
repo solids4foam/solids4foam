@@ -40,7 +40,7 @@ edges
 
 patches
 (
-    empty top
+    symmetryPlane top
     (
         (2 3 7 6)
     )
@@ -55,7 +55,7 @@ patches
         (1 2 6 5)
     )
 
-    empty bottom
+    symmetryPlane bottom
     (
         (0 1 5 4)
     )

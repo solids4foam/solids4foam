@@ -30,6 +30,9 @@ explicitLinearGeometryTotalDisplacementCoeffs
 
     // Numerical viscosity for 1st temporal derivative term
     numericalViscosity    eta [ 0 0 -1 0 0 0 0 ] 0;
+
+    // Frequency at which time-step energy information is printed to the std out
+    infoFrequency 1000;
 }
 
 

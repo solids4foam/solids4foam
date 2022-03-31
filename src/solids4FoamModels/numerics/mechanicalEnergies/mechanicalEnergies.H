@@ -166,7 +166,8 @@ public:
             const surfaceScalarField& waveSpeed,
             const dimensionedVector& g,
             const scalar, // laplacianSmoothCoeff,
-            const surfaceScalarField& impKf
+            const surfaceScalarField& impKf,
+            const bool printInfo = true
         );
 };
 
