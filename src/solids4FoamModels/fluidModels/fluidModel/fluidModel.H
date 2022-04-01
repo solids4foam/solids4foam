@@ -113,19 +113,19 @@ class fluidModel
         IOobject pheader_;
 
         //- Velocity field
-        volVectorField U_;
+        autoPtr<volVectorField> UPtr_;
 
         //- Pressure field
-        volScalarField p_;
+        autoPtr<volScalarField> pPtr_;
 
         //- Velocity gradient
-        volTensorField gradU_;
+        autoPtr<volTensorField> gradUPtr_;
 
         //- Pressure gradient
-        volVectorField gradp_;
+        autoPtr<volVectorField> gradpPtr_;
 
         //- Flux field
-        surfaceScalarField phi_;
+        autoPtr<surfaceScalarField> phiPtr_;
 
         //- Adjustable time-step switch
         const Switch adjustTimeStep_;
@@ -280,7 +280,8 @@ public:
         (
             const word& type,
             Time& runTime,
-            const word& region = dynamicFvMesh::defaultRegion
+            const word& region = dynamicFvMesh::defaultRegion,
+            const bool constructNull = false
         );
 
 
@@ -344,61 +345,61 @@ public:
             //- Return const velocity field
             virtual const volVectorField& U() const
             {
-                return U_;
+                return UPtr_();
             }
 
             //- Return velocity field
             virtual volVectorField& U()
             {
-                return U_;
+                return UPtr_();
             }
 
             //- Return const pressure field
             virtual const volScalarField& p() const
             {
-                return p_;
+                return pPtr_();
             }
 
             //- Return pressure field
             virtual volScalarField& p()
             {
-                return p_;
+                return pPtr_();
             }
 
             //- Return const velocity gradient field
             virtual const volTensorField& gradU() const
             {
-                return gradU_;
+                return gradUPtr_();
             }
 
             //- Return velocity gradient field
             virtual volTensorField& gradU()
             {
-                return gradU_;
+                return gradUPtr_();
             }
 
             //- Return const pressure gradient field
             virtual const volVectorField& gradp() const
             {
-                return gradp_;
+                return gradpPtr_();
             }
 
             //- Return pressure gradient field
             virtual volVectorField& gradp()
             {
-                return gradp_;
+                return gradpPtr_();
             }
 
             //- Return const reference to flux field
             virtual const surfaceScalarField& phi() const
             {
-                return phi_;
+                return phiPtr_();
             }
 
             //- Return reference to flux field
             virtual surfaceScalarField& phi()
             {
-                return phi_;
+                return phiPtr_();
             }
 
 #ifdef OPENFOAMFOUNDATION

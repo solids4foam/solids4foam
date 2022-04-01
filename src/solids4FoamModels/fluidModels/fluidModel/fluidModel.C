@@ -502,7 +502,8 @@ Foam::fluidModel::fluidModel
 (
     const word& type,
     Time& runTime,
-    const word& region
+    const word& region,
+    const bool constructNull
 )
 :
     physicsModel(type, runTime),
@@ -552,65 +553,90 @@ Foam::fluidModel::fluidModel
     g_(readG()),
     Uheader_("U", runTime.timeName(), mesh(), IOobject::MUST_READ),
     pheader_("p", runTime.timeName(), mesh(), IOobject::MUST_READ),
-    U_
+    UPtr_
     (
-        IOobject
+        constructNull
+      ? nullptr
+      : new volVectorField
         (
-            "U",
-            runTime.timeName(),
+            IOobject
+            (
+                "U",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
             mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedVector("zero", dimVelocity, vector::zero)
+            dimensionedVector("zero", dimVelocity, vector::zero)
+        )
     ),
-    p_
+    pPtr_
     (
-        IOobject
+        constructNull
+      ? nullptr
+      : new volScalarField
         (
-            "p",
-            runTime.timeName(),
+            IOobject
+            (
+                "p",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
             mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedScalar("zero", dimPressure, 0.0)
+            dimensionedScalar("zero", dimPressure, 0.0)
+        )
     ),
-    gradU_
+    gradUPtr_
     (
-        IOobject
+        constructNull
+      ? nullptr
+      : new volTensorField
         (
-            "grad(U)",
-            runTime.timeName(),
-            mesh()
-        ),
-        mesh(),
-        dimensionedTensor("zero", dimVelocity/dimLength, Zero)
-    ),
-    gradp_
-    (
-        IOobject
-        (
-            "grad(p)",
-            runTime.timeName(),
-            mesh()
-        ),
-        mesh(),
-        dimensionedVector("zero", p_.dimensions()/dimLength, Zero)
-    ),
-    phi_
-    (
-        IOobject
-        (
-            "phi",
-            runTime.timeName(),
+            IOobject
+            (
+                "grad(U)",
+                runTime.timeName(),
+                mesh()
+            ),
             mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        fvc::interpolate(U_) & mesh().Sf()
+            dimensionedTensor("zero", dimVelocity/dimLength, Zero)
+        )
+    ),
+    gradpPtr_
+    (
+        constructNull
+      ? nullptr
+      : new volVectorField
+        (
+            IOobject
+            (
+                "grad(p)",
+                runTime.timeName(),
+                mesh()
+            ),
+            mesh(),
+            dimensionedVector("zero", p().dimensions()/dimLength, Zero)
+        )
+    ),
+    phiPtr_
+    (
+        constructNull
+      ? nullptr
+      : new surfaceScalarField
+        (
+            IOobject
+            (
+                "phi",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            fvc::interpolate(U()) & mesh().Sf()
+        )
     ),
     adjustTimeStep_
     (
@@ -624,9 +650,9 @@ Foam::fluidModel::fluidModel
     (
         runTime.controlDict().lookupOrDefault<scalar>("maxDeltaT", GREAT)
     ),
-    pMin_("pMin", p_.dimensions(), 0),
-    pMax_("pMax", p_.dimensions(), 0),
-    UMax_("UMax", U_.dimensions(), 0),
+    pMin_("pMin", dimPressure, 0),
+    pMax_("pMax", dimPressure, 0),
+    UMax_("UMax", dimVelocity, 0),
     smallU_("smallU", dimVelocity, 1e-10),
     cumulativeContErr_(0.0),
 #ifdef OPENFOAMFOUNDATION
@@ -639,16 +665,23 @@ Foam::fluidModel::fluidModel
     fsiMeshUpdateChanged_(false),
     globalPatchesPtrList_()
 {
-    gradU_ = fvc::grad(U_);
-    gradp_ = fvc::grad(p_);
-    if (mesh().solutionDict().found("fieldBounds"))
+    if (!constructNull)
     {
-        dictionary fieldBounds = mesh().solutionDict().subDict("fieldBounds");
-        fieldBounds.lookup(p().name())
-            >> pMin_.value() >> pMax_.value();
-        fieldBounds.lookup(U().name())
-            >> UMax_.value();
+        gradUPtr_() = fvc::grad(UPtr_());
+        gradpPtr_() = fvc::grad(pPtr_());
+
+        pMin_.dimensions().reset(p().dimensions());
+        pMax_.dimensions().reset(p().dimensions());
+        if (mesh().solutionDict().found("fieldBounds"))
+        {
+            dictionary fieldBounds = mesh().solutionDict().subDict("fieldBounds");
+            fieldBounds.lookup(p().name())
+                >> pMin_.value() >> pMax_.value();
+            fieldBounds.lookup(U().name())
+                >> UMax_.value();
+        }
     }
+
 #ifdef OPENFOAMFOUNDATION
     // Check if any finite volume models is present
     if (!fvModels_.PtrListDictionary<fvModel>::size())
