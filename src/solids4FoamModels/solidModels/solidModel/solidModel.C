@@ -842,7 +842,7 @@ Foam::solidModel::solidModel
             "aitkenAlpha",
             runTime.constant(),
             meshPtr_(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         meshPtr_(),
@@ -855,7 +855,7 @@ Foam::solidModel::solidModel
             "aitkenResidual",
             runTime.constant(),
             meshPtr_(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         meshPtr_(),
@@ -875,7 +875,7 @@ Foam::solidModel::solidModel
             "DRef",
             runTime.constant(),
             meshPtr_(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         meshPtr_(),
@@ -888,13 +888,18 @@ Foam::solidModel::solidModel
             "unrelaxedDRef",
             runTime.constant(),
             meshPtr_(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         meshPtr_(),
         dimensionedVector("zero", dimLength, vector::zero)
     ),
-    globalPatchesPtrList_()
+    globalPatchesPtrList_(),
+    setCellDispsPtr_(),
+    restart_
+    (
+        solidModelDict().lookupOrDefault<Switch>("restart", false)
+    )
 {
     // Force old time fields to be stored
     D_.oldTime().oldTime();
@@ -905,10 +910,35 @@ Foam::solidModel::solidModel
     gradDD_.oldTime();
     sigma_.oldTime();
 
-    // There is an issue where old-old fields are not being written so we will
-    // reset the write flag here
-    D_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
-    DD_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
+    if (restart_)
+    {
+        // Enable writing of fields which are needed for restart
+        D_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        D_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        DD_.writeOpt() = IOobject::AUTO_WRITE;
+        DD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        DD_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        pointD_.writeOpt() = IOobject::AUTO_WRITE;
+        pointD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        pointDD_.writeOpt() = IOobject::AUTO_WRITE;
+        gradD_.writeOpt() = IOobject::AUTO_WRITE;
+        gradD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        gradDD_.writeOpt() = IOobject::AUTO_WRITE;
+    }
+    else
+    {
+        D_.oldTime().writeOpt() = IOobject::NO_WRITE;
+        D_.oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
+        DD_.writeOpt() = IOobject::NO_WRITE;
+        DD_.oldTime().writeOpt() = IOobject::NO_WRITE;
+        DD_.oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
+        pointD_.writeOpt() = IOobject::AUTO_WRITE;
+        pointD_.oldTime().writeOpt() = IOobject::NO_WRITE;
+        pointDD_.writeOpt() = IOobject::NO_WRITE;
+        gradD_.writeOpt() = IOobject::NO_WRITE;
+        gradD_.oldTime().writeOpt() = IOobject::NO_WRITE;
+        gradDD_.writeOpt() = IOobject::NO_WRITE;
+    }
 
     // Print out the relaxation factor
     Info<< "    under-relaxation method: " << relaxationMethod_ << endl;

@@ -86,7 +86,7 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid
             "Finv",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         inv(F_)
@@ -98,7 +98,7 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid
             "J",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(F_)
@@ -108,6 +108,22 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid
     rImpK_(1.0/impK_)
 {
     DDisRequired();
+
+    // For consistent restarts, we will update the relative kinematic fields
+    if (restart())
+    {
+        DD().correctBoundaryConditions();
+        mechanical().grad(DD(), gradDD());
+        gradD() = gradD().oldTime() + gradDD();
+        F_ = I + gradD().T();
+        Finv_ = inv(F_);
+        J_ = det(F_);
+
+        gradD().storeOldTime();
+
+        // Let the mechanical law know
+        mechanical().setRestart();
+    }
 }
 
 

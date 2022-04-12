@@ -204,6 +204,10 @@ class solidModel
         //- Optional: set displacement at internal cells
         mutable autoPtr<setCellDisplacements> setCellDispsPtr_;
 
+        //- Optional: restart flag
+        //  Write out all fields required for a consistent restart
+        const Switch restart_;
+
 
     // Private Member Functions
 
@@ -559,6 +563,12 @@ public:
             Switch& enforceLinear()
             {
                 return enforceLinear_;
+            }
+
+            //- Return restart switch
+            const Switch& restart() const
+            {
+                return restart_;
             }
 
             //- Does this model take an incremental approach?

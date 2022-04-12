@@ -480,4 +480,10 @@ void Foam::StVenantKirchhoffOrthotropicElastic::correct
 }
 
 
+void Foam::StVenantKirchhoffOrthotropicElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
+}
+
 // ************************************************************************* //

@@ -158,6 +158,10 @@ public:
 
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Set restart: some mechanical laws may change the writeOpt of fields
+        //  accordingly
+        virtual void setRestart();
 };
 
 

@@ -261,6 +261,10 @@ public:
 
             //- Move subMeshes
             void moveSubMeshes();
+
+            //- Set restart: some mechanical laws may change the writeOpt of
+            //  fields accordingly
+            void setRestart();
 };
 
 

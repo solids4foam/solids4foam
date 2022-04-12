@@ -88,6 +88,10 @@ Foam::neoHookeanElastic::neoHookeanElastic
             << "Either E and nu or mu and K should be specified"
             << abort(FatalError);
     }
+
+    // Store old F
+    F().storeOldTime();
+    Ff().storeOldTime();
 }
 
 
@@ -167,5 +171,11 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
 }
 
+
+void Foam::neoHookeanElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
+}
 
 // ************************************************************************* //

@@ -85,7 +85,7 @@ Foam::tmp<Foam::volScalarField> Foam::GentElastic::impK() const
                 "impK",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -189,5 +189,11 @@ void Foam::GentElastic::correct(surfaceSymmTensorField& sigma)
     sigma = kb*temperature_*(N/Jf)*((ilim_/(ilim_ - tr(Bf) + 3))*Cf - I);
 }
 
+
+void Foam::GentElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
+}
 
 // ************************************************************************* //

@@ -187,4 +187,10 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
 }
 
 
+void Foam::StVenantKirchhoffElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
+}
+
 // ************************************************************************* //

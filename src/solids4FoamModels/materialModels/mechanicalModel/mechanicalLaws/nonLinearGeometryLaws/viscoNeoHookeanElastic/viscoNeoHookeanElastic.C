@@ -82,7 +82,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "s",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -95,7 +95,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "sf",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -108,7 +108,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "transformNeeded",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -121,7 +121,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "transformFbar",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -134,7 +134,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "transformNeededf",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -147,7 +147,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "transformFbarf",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -310,7 +310,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "transformH" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -328,7 +328,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "transformHf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -355,7 +355,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "h" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -373,7 +373,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "hf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -402,7 +402,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "H" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -420,7 +420,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "Hf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -456,7 +456,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::impK() const
                     "impK",
                     mesh().time().timeName(),
                     mesh(),
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh(),
@@ -478,7 +478,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::impK() const
                     "impK",
                     mesh().time().timeName(),
                     mesh(),
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh(),
@@ -504,7 +504,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::K() const
                 "K",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -851,6 +851,13 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     {
         sigma += gamma_[MaxwellModelI]*dev(transformHf_[MaxwellModelI]);
     }
+}
+
+
+void Foam::viscoNeoHookeanElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
 }
 
 

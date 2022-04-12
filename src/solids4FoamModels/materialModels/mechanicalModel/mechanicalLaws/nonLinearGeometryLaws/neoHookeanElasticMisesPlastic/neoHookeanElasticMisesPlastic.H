@@ -296,6 +296,10 @@ public:
 
         //- Return the desired new time-step
         virtual scalar newDeltaT();
+
+        //- Set restart: some mechanical laws may change the writeOpt of fields
+        //  accordingly
+        virtual void setRestart();
 };
 
 

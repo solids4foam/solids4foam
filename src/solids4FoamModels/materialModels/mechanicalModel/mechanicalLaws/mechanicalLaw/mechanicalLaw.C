@@ -67,7 +67,7 @@ void Foam::mechanicalLaw::makeF()
                 "F_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -94,7 +94,7 @@ void Foam::mechanicalLaw::makeFf()
                 "Ff_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -120,7 +120,7 @@ void Foam::mechanicalLaw::makeRelF()
                 "relF_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -147,7 +147,7 @@ void Foam::mechanicalLaw::makeRelFf()
                 "relFf_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -219,7 +219,7 @@ void Foam::mechanicalLaw::makeSigmaEff()
                 "sigmaEff_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::AUTO_WRITE
             ),
             mesh(),
@@ -805,7 +805,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalLaw::rho() const
                 "rho",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
