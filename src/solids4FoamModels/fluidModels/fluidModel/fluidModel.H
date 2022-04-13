@@ -35,7 +35,6 @@ Author
 
 SourceFiles
     fluidModel.C
-    newFluidModel.C
 
 \*---------------------------------------------------------------------------*/
 

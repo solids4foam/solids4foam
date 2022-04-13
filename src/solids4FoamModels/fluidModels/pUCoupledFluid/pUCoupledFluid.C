@@ -44,7 +44,6 @@ namespace fluidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(pUCoupledFluid, 0);
-addToRunTimeSelectionTable(physicsModel, pUCoupledFluid, fluid);
 addToRunTimeSelectionTable(fluidModel, pUCoupledFluid, dictionary);
 
 

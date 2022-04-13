@@ -44,7 +44,6 @@ namespace fluidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(stokesFluid, 0);
-addToRunTimeSelectionTable(physicsModel, stokesFluid, fluid);
 addToRunTimeSelectionTable(fluidModel, stokesFluid, dictionary);
 
 

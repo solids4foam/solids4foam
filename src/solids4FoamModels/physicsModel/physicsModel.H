@@ -94,38 +94,18 @@ public:
 
     // Declare run-time constructor selection table
 
-        declareRunTimeSelectionTable
+        declareRunTimeNewSelectionTable
         (
             autoPtr,
             physicsModel,
-            fluid,
+            physicsModel,
             (
-                Time& runTime
+                Time& runTime,
+                const word& region
             ),
-            (runTime)
+            (runTime, region)
         );
 
-        declareRunTimeSelectionTable
-        (
-            autoPtr,
-            physicsModel,
-            solid,
-            (
-                Time& runTime
-            ),
-            (runTime)
-        );
-
-        declareRunTimeSelectionTable
-        (
-            autoPtr,
-            physicsModel,
-            fluidSolidInteraction,
-            (
-                Time& runTime
-            ),
-            (runTime)
-        );
 
     // Constructors
 
@@ -133,8 +113,9 @@ public:
         physicsModel
         (
             const word& type,
-            Time& runTime
-        );
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+       );
 
 
     // Selectors
@@ -142,7 +123,8 @@ public:
         //- Select constructor
         static autoPtr<physicsModel> New
         (
-            Time& runTime
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
         );
 
 

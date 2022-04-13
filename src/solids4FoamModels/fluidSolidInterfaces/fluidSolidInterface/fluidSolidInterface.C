@@ -50,6 +50,7 @@ namespace Foam
 {
     defineTypeNameAndDebug(fluidSolidInterface, 0);
     defineRunTimeSelectionTable(fluidSolidInterface, dictionary);
+    addToRunTimeSelectionTable(physicsModel, fluidSolidInterface, physicsModel);
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //

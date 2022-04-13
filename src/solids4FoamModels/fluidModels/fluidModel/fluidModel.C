@@ -32,7 +32,6 @@ License
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "EulerDdtScheme.H"
-//#include "CrankNicolsonDdtScheme.H"
 #include "backwardDdtScheme.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -41,6 +40,7 @@ namespace Foam
 {
     defineTypeNameAndDebug(fluidModel, 0);
     defineRunTimeSelectionTable(fluidModel, dictionary);
+    //addToRunTimeSelectionTable(physicsModel, fluidModel, physicsModel);
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
@@ -814,7 +814,9 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
             IOobject
             (
                 "fluidProperties",
-                runTime.caseConstant()/region,
+                 bool(region == dynamicFvMesh::defaultRegion)
+              ? fileName(runTime.caseConstant())
+              : fileName(runTime.caseConstant()/region),
                 runTime,
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE

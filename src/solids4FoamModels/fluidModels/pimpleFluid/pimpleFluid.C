@@ -48,7 +48,6 @@ namespace fluidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(pimpleFluid, 0);
-addToRunTimeSelectionTable(physicsModel, pimpleFluid, fluid);
 addToRunTimeSelectionTable(fluidModel, pimpleFluid, dictionary);
 
 

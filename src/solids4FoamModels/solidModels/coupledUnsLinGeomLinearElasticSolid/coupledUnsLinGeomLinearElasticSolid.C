@@ -53,10 +53,6 @@ namespace solidModels
 defineTypeNameAndDebug(coupledUnsLinGeomLinearElasticSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, coupledUnsLinGeomLinearElasticSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, coupledUnsLinGeomLinearElasticSolid, dictionary
 );
 

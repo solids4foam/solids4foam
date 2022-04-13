@@ -53,7 +53,6 @@ namespace fluidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(unsIcoFluid, 0);
-addToRunTimeSelectionTable(physicsModel, unsIcoFluid, fluid);
 addToRunTimeSelectionTable(fluidModel, unsIcoFluid, dictionary);
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //

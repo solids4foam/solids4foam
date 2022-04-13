@@ -44,6 +44,7 @@ namespace Foam
 {
     defineTypeNameAndDebug(solidModel, 0);
     defineRunTimeSelectionTable(solidModel, dictionary);
+    //addToRunTimeSelectionTable(physicsModel, solidModel, physicsModel);
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
@@ -1287,7 +1288,9 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
             IOobject
             (
                 "solidProperties",
-                runTime.caseConstant()/region,
+                bool(region == dynamicFvMesh::defaultRegion)
+              ? fileName(runTime.caseConstant())
+              : fileName(runTime.caseConstant()/region),
                 runTime,
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE

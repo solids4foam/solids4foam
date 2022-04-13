@@ -50,10 +50,6 @@ namespace solidModels
 defineTypeNameAndDebug(unsNonLinGeomUpdatedLagSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, unsNonLinGeomUpdatedLagSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, unsNonLinGeomUpdatedLagSolid, dictionary
 );
 
