@@ -51,7 +51,9 @@ Foam::physicsModel::physicsModel
         IOobject
         (
             "physicsProperties",
-            runTime.caseConstant()/region,
+            bool(region == dynamicFvMesh::defaultRegion)
+          ? fileName(runTime.caseConstant())
+          : fileName(runTime.caseConstant()/region),
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
@@ -100,6 +102,21 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New
             >> physicsModelTypeName;
     }
 
+    // For backwards compatibility, update names
+    // This means the user can equivalently select "solid" or "solidModel", etc.
+    if (physicsModelTypeName == "solid")
+    {
+        physicsModelTypeName = "solidModel";
+    }
+    else if (physicsModelTypeName == "fluid")
+    {
+        physicsModelTypeName = "fluidModel";
+    }
+    else if (physicsModelTypeName == "fluidSolidInteraction")
+    {
+        physicsModelTypeName = "fluidSolidInterface";
+    }
+
     Info<< "Selecting physicsModel " << physicsModelTypeName << endl;
 
     physicsModelConstructorTable::iterator cstrIter =
@@ -110,9 +127,9 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New
         FatalErrorIn
         (
             "physicsModel::New(Time&)"
-        )   << "Unknown physicsModelModel type " << physicsModelTypeName
+        )   << "Unknown physicsModel type " << physicsModelTypeName
             << endl << endl
-            << "Valid physicsModelModel types are :" << endl
+            << "Valid physicsModel types are :" << endl
             << physicsModelConstructorTablePtr_->toc()
             << exit(FatalError);
     }
