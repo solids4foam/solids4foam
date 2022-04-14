@@ -37,6 +37,7 @@ License
 #endif
 #include "fvcGradf.H"
 #include "wedgePolyPatch.H"
+#include "addToRunTimeSelectionTable.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -44,7 +45,7 @@ namespace Foam
 {
     defineTypeNameAndDebug(solidModel, 0);
     defineRunTimeSelectionTable(solidModel, dictionary);
-    //addToRunTimeSelectionTable(physicsModel, solidModel, physicsModel);
+    addToRunTimeSelectionTable(physicsModel, solidModel, physicsModel);
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //

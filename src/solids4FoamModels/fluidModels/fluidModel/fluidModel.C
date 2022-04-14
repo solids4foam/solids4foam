@@ -33,6 +33,7 @@ License
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "EulerDdtScheme.H"
 #include "backwardDdtScheme.H"
+#include "addToRunTimeSelectionTable.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -40,7 +41,7 @@ namespace Foam
 {
     defineTypeNameAndDebug(fluidModel, 0);
     defineRunTimeSelectionTable(fluidModel, dictionary);
-    //addToRunTimeSelectionTable(physicsModel, fluidModel, physicsModel);
+    addToRunTimeSelectionTable(physicsModel, fluidModel, physicsModel);
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
