@@ -55,14 +55,22 @@ Foam::GentElastic::GentElastic
     mu_(E_/(2.0*(1.0 + nu_))),
     temperature_(dict.lookup("temperature")),
     ilim_(dict.lookup("ilim")),
-    N_(dict.lookup("N")),
-    Vs_(dict.lookup("Vs")),
     K_
     (
         planeStress()
       ? (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_
       : (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_
-    )
+    ),
+    Na_
+    (
+        "Na", dimensionSet(0, 0, 0, 0, 0, 0, 0), 6.022141e23
+    ),
+    kb_
+    (
+        "kb", dimensionSet(1, 2, -2, -1, 0, 0, 0), 1.38064852e-23
+    ),
+    omega_(dimensionedScalar(dict.lookup("Vs"))/Na_),
+    N_(dimensionedScalar(dict.lookup("N"))/omega_)
 {}
 
 
@@ -105,30 +113,6 @@ void Foam::GentElastic::correct(volSymmTensorField& sigma)
         return;
     }
 
-    // Global Constants
-
-    // Avocado number
-    const dimensionedScalar Na
-    (
-        "Na",
-        dimensionSet(0,0,0,0,0,0,0),
-        scalar(6.022141*Foam::pow(10,9)*Foam::pow(10,9)*Foam::pow(10,5))
-    );
-
-    // Volume per solvent molecule
-    const dimensionedScalar omega = Vs_/Na;
-
-    // Boltzmann constant
-    const dimensionedScalar kb
-    (
-        "kb",
-        dimensionSet(1,2,-2,-1,0,0,0),
-        scalar(1.38064852/Foam::pow(10,9)/Foam::pow(10,9)/Foam::pow(10,5))
-    );
-
-    // Crosslinking density
-    const dimensionedScalar N = N_/omega;
-
     // Jacobian of the deformation gradient
     const volScalarField J(det(F()));
 
@@ -139,7 +123,7 @@ void Foam::GentElastic::correct(volSymmTensorField& sigma)
     const volSymmTensorField C(symm(F().T() & F()));
 
     // Calculate the sigma Terzaghi (Gent)
-    sigma = kb*temperature_*(N/J)*((ilim_/(ilim_ - tr(B) + 3))*C - I);
+    sigma = kb_*temperature_*(N_/J)*((ilim_/(ilim_ - tr(B) + 3))*C - I);
 }
 
 
@@ -153,29 +137,6 @@ void Foam::GentElastic::correct(surfaceSymmTensorField& sigma)
         return;
     }
 
-    // Global Constants
-
-    // Avocado number
-    const dimensionedScalar Na
-    (
-        "Na",
-        dimensionSet(0,0,0,0,0,0,0),
-        scalar(6.022141*Foam::pow(10,9)*Foam::pow(10,9)*Foam::pow(10,5))
-    );
-
-    // Volume per solvent molecule
-    const dimensionedScalar omega = Vs_/Na;
-
-    // Boltzmann constant
-    const dimensionedScalar kb
-    (
-        "kb",
-        dimensionSet(1,2,-2,-1,0,0,0),
-        scalar(1.38064852/Foam::pow(10,9)/Foam::pow(10,9)/Foam::pow(10,5))
-    );
-
-    const dimensionedScalar N = N_/omega;
-
     // Jacobian of the deformation gradient
     const surfaceScalarField Jf(det(Ff()));
 
@@ -186,7 +147,7 @@ void Foam::GentElastic::correct(surfaceSymmTensorField& sigma)
     const surfaceSymmTensorField Cf(symm(Ff().T() & Ff()));
 
     // Calculate the sigma Terzaghi (Gent)
-    sigma = kb*temperature_*(N/Jf)*((ilim_/(ilim_ - tr(Bf) + 3))*Cf - I);
+    sigma = kb_*temperature_*(N_/Jf)*((ilim_/(ilim_ - tr(Bf) + 3))*Cf - I);
 }
 
 

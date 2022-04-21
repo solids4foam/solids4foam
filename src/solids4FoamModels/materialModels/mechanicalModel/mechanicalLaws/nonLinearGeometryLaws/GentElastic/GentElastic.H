@@ -66,29 +66,37 @@ class GentElastic
 {
     // Private data
 
-        // Young's modulus
+        //- Young's modulus
         const dimensionedScalar E_;
 
-        // Poisson's ratio
+        //- Poisson's ratio
         const dimensionedScalar nu_;
 
-        // Shear modulus
+        //- Shear modulus
         const dimensionedScalar mu_;
 
-        // Temperature
+        //- Temperature
         const dimensionedScalar temperature_;
 
-        // ilim = 3*( pow(Jlim,2/3) - 1 ) where Jlim is the maximum volume fraction
+        //- ilim = 3*( pow(Jlim,2/3) - 1 ) where Jlim is the maximum volume
+        //  fraction
         const dimensionedScalar ilim_;
 
-        // Number of crosslinks
+        //- Bulk modulus
+        const dimensionedScalar K_;
+
+        //- Avogadro's number
+        const dimensionedScalar Na_;
+
+        //- Boltzmann constant
+        const dimensionedScalar kb_;
+
+        //- Volume per solvent molecule
+        const dimensionedScalar omega_;
+
+        //- Number of crosslinks normalised with respect to Avogadro's number
         const dimensionedScalar N_;
 
-        // Unit volume of solvent
-        const dimensionedScalar Vs_;
-
-        // Bulk modulus
-        const dimensionedScalar K_;
 
     // Private Member Functions
 

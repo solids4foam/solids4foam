@@ -11,7 +11,7 @@ FoamFile
     format      ascii;
     class       volVectorField;
     location    "0";
-    object      D;
+    object      DD;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -50,15 +50,19 @@ boundaryField
 
     back
     {
-        type            solidWedge;
-        patchType       wedge;
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        // type            solidWedge;
+        // patchType       wedge;
         value           uniform (0 0 0);
     }
 
     front
     {
-        type            solidWedge;
-        patchType       wedge;
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        // type            solidWedge;
+        // patchType       wedge;
         value           uniform (0 0 0);
     }
 

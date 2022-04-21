@@ -448,7 +448,7 @@ void readElements
         inputStream.read(tok);
 
         // Read the nodes in the element
-        labelList p(8, -1);
+        labelList p(label(8), label(-1));
         forAll(p, pI)
         {
             // Read node index
