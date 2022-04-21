@@ -243,11 +243,17 @@ bool Foam::mechanicalLaw::planeStress() const
             ).lookup("planeStress")
         );
     }
-    else if (mesh_.parent().foundObject<objectRegistry>("region0"))
+    else if
+    (
+        mesh_.objectRegistry::parent().foundObject<objectRegistry>("region0")
+    )
     {
         return Switch
         (
-            mesh_.parent().subRegistry("region0").lookupObject<IOdictionary>
+            mesh_.objectRegistry::parent().subRegistry
+            (
+                "region0"
+            ).lookupObject<IOdictionary>
             (
                 "mechanicalProperties"
             ).lookup("planeStress")
@@ -257,7 +263,10 @@ bool Foam::mechanicalLaw::planeStress() const
     {
         return Switch
         (
-            mesh_.parent().subRegistry("solid").lookupObject<IOdictionary>
+            mesh_.objectRegistry::parent().subRegistry
+            (
+                "solid"
+            ).lookupObject<IOdictionary>
             (
                 "mechanicalProperties"
             ).lookup("planeStress")
