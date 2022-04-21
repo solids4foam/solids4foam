@@ -10,28 +10,50 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress no;
+d2dt2Schemes
+{
+    default            Euler;
+}
 
-mechanical
-(
-    SOLID1
-    {
-        type        linearElastic;
-        rho         rho [1 -3 0 0 0 0 0] 1000;
-        E           E [1 -1 -2 0 0 0 0] 5e3;
-        nu          nu [0 0 0 0 0 0 0] 0.3;
-    }
-    SOLID2
-    {
-        type        linearElastic;
-        rho         rho [1 -3 0 0 0 0 0] 1500;
-        E           E [1 -1 -2 0 0 0 0] 1e4;
-        nu          nu [0 0 0 0 0 0 0] 0.4;
-    }
-);
+ddtSchemes
+{
+    default            Euler;
+}
+
+gradSchemes
+{
+    default            extendedLeastSquares 0;
+}
+
+divSchemes
+{
+    default            Gauss linear;
+}
+
+laplacianSchemes
+{
+    default            none;
+    laplacian(DD,D)    Gauss linear corrected;
+    laplacian(DDD,DD)  Gauss linear corrected;
+}
+
+snGradSchemes
+{
+    default            none;
+    snGrad(D)          corrected;
+    snGrad(DD)         corrected;
+}
+
+interpolationSchemes
+{
+    default            none;
+    interpolate(impK)  linear;
+    interpolate(grad(D)) linear;
+    interpolate(grad(DD)) linear;
+}
 
 // ************************************************************************* //
