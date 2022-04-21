@@ -235,34 +235,42 @@ bool Foam::mechanicalLaw::planeStress() const
 {
     if (mesh_.foundObject<IOdictionary>("mechanicalProperties"))
     {
-        return
-            Switch
+        return Switch
+        (
+            mesh_.lookupObject<IOdictionary>
             (
-                mesh_.lookupObject<IOdictionary>
-                (
-                    "mechanicalProperties"
-                ).lookup("planeStress")
-            );
+                "mechanicalProperties"
+            ).lookup("planeStress")
+        );
+    }
+    else if
+    (
+        mesh_.objectRegistry::parent().foundObject<objectRegistry>("region0")
+    )
+    {
+        return Switch
+        (
+            mesh_.objectRegistry::parent().subRegistry
+            (
+                "region0"
+            ).lookupObject<IOdictionary>
+            (
+                "mechanicalProperties"
+            ).lookup("planeStress")
+        );
     }
     else
     {
-        // It is not straight-forward to lookup the mechanicalProperties from
-        // here as we only have access to a subMesh fvMesh objectRegistry
-        // We will read it here again; this switch only gets called at the start
-        // of a simulation so it is not a problem
-        IOdictionary mechProp
+        return Switch
         (
-            IOobject
+            mesh_.objectRegistry::parent().subRegistry
             (
-                "mechanicalProperties",
-                "constant",
-                mesh_.time(),
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
+                "solid"
+            ).lookupObject<IOdictionary>
+            (
+                "mechanicalProperties"
+            ).lookup("planeStress")
         );
-
-        return Switch(mechProp.lookup("planeStress"));
     }
 }
 
