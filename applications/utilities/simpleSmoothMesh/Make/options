@@ -23,7 +23,6 @@ EXE_INC = \
     -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
 
 EXE_LIBS = \
-    -L$(PETSC_DIR)/lib -lpetsc \
     -L$(FOAM_USER_LIBBIN) -lsolids4FoamModels \
     -lfiniteVolume \
     -ldynamicMesh \
