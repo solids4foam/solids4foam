@@ -72,19 +72,19 @@ const Foam::surfaceScalarField& Foam::poroMechanicalLaw::p0f() const
 
 const Foam::volScalarField& Foam::poroMechanicalLaw::lookupPressureField() const
 {
-    if (mesh().db().subRegistry(pRegion_).foundObject<volScalarField>(pName_))
+    if (mesh().thisDb().parent().foundObject<objectRegistry>(pRegion_))
     {
-        return mesh().db().subRegistry
+        return mesh().thisDb().parent().subRegistry
         (
             pRegion_
         ).lookupObject<volScalarField>(pName_);
     }
     else if
     (
-        mesh().db().subRegistry("solid").foundObject<volScalarField>(pName_)
+        mesh().thisDb().parent().foundObject<objectRegistry>("solid")
     )
     {
-        return mesh().db().subRegistry
+        return mesh().thisDb().parent().subRegistry
         (
             "solid"
         ).lookupObject<volScalarField>(pName_);
