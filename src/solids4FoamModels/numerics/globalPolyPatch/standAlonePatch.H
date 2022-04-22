@@ -50,6 +50,8 @@ namespace Foam
 {
 #ifdef OPENFOAMFOUNDATION
     typedef PrimitivePatch<List<face>, pointField> standAlonePatch;
+#elif OPENFOAMESI
+    typedef PrimitivePatch<faceList, pointField> standAlonePatch;
 #else
     typedef PrimitivePatch<face, List, pointField> standAlonePatch;
 #endif

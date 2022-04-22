@@ -37,7 +37,7 @@ endif
 
 EXE_INC = \
     -std=c++14 \
-    -Wno-old-style-cast -Wno-deprecated-declarations \
+    -Wno-old-style-cast -Wno-deprecated-declarations -Wno-deprecated-copy \
     $(DISABLE_WARNING_FLAGS) \
     $(VERSION_SPECIFIC_INC) \
     -I../../ThirdParty/eigen3 \
@@ -50,6 +50,7 @@ EXE_INC = \
     -I$(LIB_SRC)/dynamicMesh/dynamicMesh/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/topoChangerFvMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicFvMesh/lnInclude \
     -I$(LIB_SRC)/sampling/lnInclude \
     -I$(LIB_SRC)/surfMesh/lnInclude \
     -I$(LIB_SRC)/postProcessing/foamCalcFunctions/lnInclude \

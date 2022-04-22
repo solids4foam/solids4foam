@@ -108,6 +108,8 @@ namespace fvc
     (
 #ifdef OPENFOAMFOUNDATION
         const PrimitivePatch<FaceList<face>, const pointField&>& patch,
+#elif OPENFOAMESI
+        const PrimitivePatch<faceList, const pointField&> patch,
 #else
         const PrimitivePatch<face, FaceList, const pointField&>& patch,
 #endif

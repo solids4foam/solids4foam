@@ -29,9 +29,6 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "demandDrivenData.H"
-// #include "faMesh.H"
-// #include "processorFaPatch.H"
-// #include "areaFields.H"
 #include "cyclicPolyPatch.H"
 #ifdef FOAMEXTEND
     #include "cyclicGgiPolyPatch.H"
@@ -150,7 +147,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                  == processorPolyPatch::typeName
                 )
                 {
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                     FatalErrorIn("makePointFaces()")
                         << "processor patches not allowed!"
                         << abort(FatalError);
@@ -920,7 +917,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
             {
                 OPstream toNeighbProc
                 (
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -938,7 +935,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
             {
                 IPstream fromNeighbProc
                 (
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -1029,7 +1026,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
                 {
                     OPstream toNeighbProc
                     (
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                         Pstream::commsTypes::blocking,
 #else
                         Pstream::blocking,
@@ -1053,7 +1050,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
                 {
                     IPstream fromNeighbProc
                     (
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                         Pstream::commsTypes::blocking,
 #else
                         Pstream::blocking,
@@ -1303,7 +1300,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
             {
                 OPstream toNeighbProc
                 (
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -1342,7 +1339,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
             {
                 IPstream fromNeighbProc
                 (
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -1434,7 +1431,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
                 {
                     OPstream toNeighbProc
                     (
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                         Pstream::commsTypes::blocking,
 #else
                         Pstream::blocking,
@@ -1458,7 +1455,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
                 {
                     IPstream fromNeighbProc
                     (
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                         Pstream::commsTypes::blocking,
 #else
                         Pstream::blocking,
@@ -3461,7 +3458,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
         // Note: the definition of n() and m() are flipped in foam-extend-4.0
         // and OpenFOAM... wtf
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
         // Applying weights
         for (label i=0; i<M.m(); i++)
         {
@@ -3499,7 +3496,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
         {
             for (label j=0; j<3; j++)
             {
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                 for (label k=0; k<M.m(); k++)
 #else
                 for (label k=0; k<M.n(); k++)
@@ -3539,7 +3536,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
             for (label i=0; i<3; i++)
             {
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
                 for (label j=0; j<M.m(); j++)
 #else
                 for (label j=0; j<M.n(); j++)
@@ -3660,7 +3657,7 @@ makeMirrorPlaneTransformation() const
     }
 }
 
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
 tensor newLeastSquaresVolPointInterpolation::hinv(const tensor& t) const
 {
     static const scalar hinvLarge = 1e10;
@@ -3672,8 +3669,32 @@ tensor newLeastSquaresVolPointInterpolation::hinv(const tensor& t) const
     }
     else
     {
+#if OPENFOAMESI
+        Vector<complex> compEig = eigenValues(t);
+        Tensor<complex> comEigVecs = eigenVectors(t);
+
+        vector eig
+        (
+            compEig[vector::X].Re(),
+            compEig[vector::Y].Re(),
+            compEig[vector::Z].Re()
+        );
+        tensor eigVecs
+        (
+            comEigVecs[tensor::XX].Re(),
+            comEigVecs[tensor::XY].Re(),
+            comEigVecs[tensor::XZ].Re(),
+            comEigVecs[tensor::YX].Re(),
+            comEigVecs[tensor::YY].Re(),
+            comEigVecs[tensor::YZ].Re(),
+            comEigVecs[tensor::ZX].Re(),
+            comEigVecs[tensor::ZY].Re(),
+            comEigVecs[tensor::ZZ].Re()
+        );
+#else
         vector eig = eigenValues(t);
         tensor eigVecs = eigenVectors(t);
+#endif
 
         tensor zeroInv = tensor::zero;
 
@@ -3717,7 +3738,7 @@ newLeastSquaresVolPointInterpolation::newLeastSquaresVolPointInterpolation
     const fvMesh& vm
 )
 :
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
     MeshObject<fvMesh, Foam::UpdateableMeshObject, newLeastSquaresVolPointInterpolation>(vm),
 #else
     MeshObject<fvMesh, newLeastSquaresVolPointInterpolation>(vm),
@@ -3743,12 +3764,12 @@ newLeastSquaresVolPointInterpolation::newLeastSquaresVolPointInterpolation
     mirrorPlaneTransformationPtr_(),
     invLsMatrices_(0),
     refLPtr_()
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
     ,
     processorBoundariesExist_(false)
 #endif
 {
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
     if (Pstream::parRun())
     {
         // Check there are no processor boundaries
@@ -3773,7 +3794,7 @@ newLeastSquaresVolPointInterpolation::~newLeastSquaresVolPointInterpolation()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
 bool newLeastSquaresVolPointInterpolation::movePoints()
 #else
 bool newLeastSquaresVolPointInterpolation::movePoints() const
@@ -3794,7 +3815,7 @@ bool newLeastSquaresVolPointInterpolation::movePoints() const
 }
 
 
-#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
+#ifdef OPENFOAMESIORFOUNDATION
 void newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&)
 #else
 bool newLeastSquaresVolPointInterpolation::updateMesh(const mapPolyMesh&) const
