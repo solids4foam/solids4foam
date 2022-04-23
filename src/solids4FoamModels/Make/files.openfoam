@@ -25,17 +25,9 @@ solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 solidModels/finiteVolume/fvc/fvcCellLimitedGrad.C
 
 fluidModels/fluidModel/fluidModel.C
-fluidModels/buoyantBoussinesqPimpleFluid/buoyantBoussinesqPimpleFluid.C
-fluidModels/buoyantPimpleFluid/buoyantPimpleFluid.C
-fluidModels/icoFluid/icoFluid.C
-fluidModels/interFluid/interFluid.C
+/*fluidModels/interFluid/interFluid.C*/
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
-fluidModels/pisoFluid/pisoFluid.C
 fluidModels/pimpleFluid/pimpleFluid.C
-fluidModels/pUCoupledFluid/pUCoupledFluid.C
-fluidModels/stokesFluid/stokesFluid.C
-fluidModels/transientSimpleFluid/transientSimpleFluid.C
-fluidModels/unsIcoFluid/unsIcoFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
 fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
 

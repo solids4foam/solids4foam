@@ -31,6 +31,9 @@ License
 #include "fvm.H"
 #include "fixedGradientFvPatchFields.H"
 #include "zeroGradientFvPatchFields.H"
+#ifdef OPENFOAMESI
+    #include "realEigenValues.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -557,7 +560,11 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     forAll(transformNeededI, cellI)
     {
         // Calculate principal stretches: lambda^2, which are eigenvalues of C
+#ifdef OPENFOAMESI
+        eigenValues = Foam::realEigenValues(CI[cellI]);
+#else
         eigenValues = Foam::eigenValues(CI[cellI]);
+#endif
 
         // Calculate modified principal stretches
         eigenValuesBar.x() = pow(JI[cellI], -1.0/3)*sqrt(eigenValues.x());
@@ -598,9 +605,13 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
         {
              // Calculate principal stretches: lambda^2, which are eigenvalues
              // of C
-             eigenValues = Foam::eigenValues(CP[faceI]);
+#ifdef OPENFOAMESI
+            eigenValues = Foam::realEigenValues(CP[faceI]);
+#else
+            eigenValues = Foam::eigenValues(CP[faceI]);
+#endif
 
-             // Calculate modified principal stretches
+            // Calculate modified principal stretches
              eigenValuesBar.x() = pow(JP[faceI], -1.0/3)*sqrt(eigenValues.x());
              eigenValuesBar.y() = pow(JP[faceI], -1.0/3)*sqrt(eigenValues.y());
              eigenValuesBar.z() = pow(JP[faceI], -1.0/3)*sqrt(eigenValues.z());
@@ -724,27 +735,31 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     vector eigenValues = vector::zero;
     vector eigenValuesBar = vector::zero;
 
-    forAll(transformNeededI, cellI)
+    forAll(transformNeededI, faceI)
     {
         // Calculate principal stretches: lambda^2, which are eigenvalues of C
-        eigenValues = Foam::eigenValues(CI[cellI]);
+#ifdef OPENFOAMESI
+        eigenValues = Foam::realEigenValues(CI[faceI]);
+#else
+        eigenValues = Foam::eigenValues(CI[faceI]);
+#endif
 
         // Calculate modified principal stretches
-        eigenValuesBar.x() = pow(JI[cellI], -1.0/3)*sqrt(eigenValues.x());
-        eigenValuesBar.y() = pow(JI[cellI], -1.0/3)*sqrt(eigenValues.y());
-        eigenValuesBar.z() = pow(JI[cellI], -1.0/3)*sqrt(eigenValues.z());
+        eigenValuesBar.x() = pow(JI[faceI], -1.0/3)*sqrt(eigenValues.x());
+        eigenValuesBar.y() = pow(JI[faceI], -1.0/3)*sqrt(eigenValues.y());
+        eigenValuesBar.z() = pow(JI[faceI], -1.0/3)*sqrt(eigenValues.z());
 
-        transformNeededI[cellI].xx() =
+        transformNeededI[faceI].xx() =
             mu0_.value()*pow(eigenValuesBar.x(), alpha_[0] - 1)
           + mu1_.value()*pow(eigenValuesBar.x(), alpha_[1] - 1)
           + mu2_.value()*pow(eigenValuesBar.x(), alpha_[2] - 1);
 
-        transformNeededI[cellI].yy() =
+        transformNeededI[faceI].yy() =
             mu0_.value()*pow(eigenValuesBar.y(), alpha_[0] - 1)
           + mu1_.value()*pow(eigenValuesBar.y(), alpha_[1] - 1)
           + mu2_.value()*pow(eigenValuesBar.y(), alpha_[2] - 1);
 
-        transformNeededI[cellI].zz() =
+        transformNeededI[faceI].zz() =
             mu0_.value()*pow(eigenValuesBar.z(), alpha_[0] - 1)
           + mu1_.value()*pow(eigenValuesBar.z(), alpha_[1] - 1)
           + mu2_.value()*pow(eigenValuesBar.z(), alpha_[2] - 1);
@@ -768,7 +783,11 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         {
              // Calculate principal stretches: lambda^2, which are eigenvalues
              // of C
-             eigenValues = Foam::eigenValues(CP[faceI]);
+#ifdef OPENFOAMESI
+            eigenValues = Foam::realEigenValues(CP[faceI]);
+#else
+            eigenValues = Foam::eigenValues(CP[faceI]);
+#endif
 
              // Calculate modified principal stretches
              eigenValuesBar.x() = pow(JP[faceI], -1.0/3)*sqrt(eigenValues.x());

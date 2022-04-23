@@ -369,10 +369,8 @@ tmp
 template<class Type, template<class> class FaceList>
 tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
 (
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
         const PrimitivePatch<FaceList<face>, const pointField&>& patch,
-#elif OPENFOAMESI
-        const PrimitivePatch<faceList, const pointField&>& patch,
 #else
         const PrimitivePatch<face, FaceList, const pointField&>& patch,
 #endif
