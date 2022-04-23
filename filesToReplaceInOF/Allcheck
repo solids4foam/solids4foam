@@ -36,65 +36,13 @@ checkAndReport()
 result=0
 if [ "$WM_PROJECT" = "foam" ]
 then
-    if (( $(echo "$WM_PROJECT_VERSION > 4.0" |bc -l) ))
-    then
-        # foam-extend-4.1 and newer
-        echo "No checks for versions of foam-extend greater than 4.0"
-        exit 0
-    else
-        # foam-extend-4.0 and older
-        checkAndReport \
-            "solution.C" \
-            "$FOAM_SRC/foam/matrices/solution" \
-            "$FOAM_SRC/foam"
-        if [ $? -ne 0 ]; then result=1; fi
-
-        checkAndReport \
-            "WedgePointPatchField.C" \
-            "$FOAM_SRC/foam/fields/PointPatchFieldTemplates/constraint/wedge" \
-            "$FOAM_SRC/foam"
-        if [ $? -ne 0 ]; then result=1; fi
-
-        checkAndReport \
-            "tensor.C" \
-            "$FOAM_SRC/foam/primitives/Tensor/tensor" \
-            "$FOAM_SRC/foam"
-        if [ $? -ne 0 ]; then result=1; fi
-
-        checkAndReport \
-            "findRefCell.C" \
-            "$FOAM_SRC/finiteVolume/cfdTools/general/findRefCell" \
-            "$FOAM_SRC/finiteVolume"
-        if [ $? -ne 0 ]; then result=1; fi
-
-        # disabled: as it may have other unintended consequences; however, this is
-        # needed when using layer addition removal
-        #checkAndReport \
-        #    "fvMesh.C" \
-        #    "$FOAM_SRC/finiteVolume/fvMesh" \
-        #    "$FOAM_SRC/finiteVolume"
-        #if [ $? -ne 0 ]; then result=1; fi
-
-        # disabled: adding debug loop to reduce screen print-out
-        #checkAndReport \
-        #    "fvBlockMatrix.C" \
-        #    "$FOAM_SRC/finiteVolume/fvMatrices/fvBlockMatrix" \
-        #    "$FOAM_SRC/finiteVolume"
-    fi
+    # foam-extend-4.1 and newer
+    echo "No checks for versions of foam-extend greater than 4.0"
+    exit 0
 else
     if [[ $WM_PROJECT_VERSION == v* ]]
     then
         # ESI OpenFOAM e.g. OpenFOAM-v1812, v1912, etc
-
-        # This change is no longer needed as it is fixed by adding the following
-        # line each solid model
-        # const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
-        # checkAndReport \
-        #     "dataTemplates.C" \
-        #     "$FOAM_SRC/OpenFOAM/meshes/data" \
-        #     "$FOAM_SRC/OpenFOAM"
-        # if [ $? -ne 0 ]; then result=1; fi
-
         checkAndReport \
             "AMIInterpolation.C" \
             "$FOAM_SRC/meshTools/AMIInterpolation/AMIInterpolation" \
