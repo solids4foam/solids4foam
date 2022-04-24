@@ -51,7 +51,6 @@ Foam::StVenantKirchhoffElastic::StVenantKirchhoffElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     lambda_("lambda", dimPressure, 0.0),
     mu_("mu", dimPressure, 0.0),
     K_("K", dimPressure, 0.0)
@@ -110,28 +109,6 @@ Foam::StVenantKirchhoffElastic::~StVenantKirchhoffElastic()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::volScalarField> Foam::StVenantKirchhoffElastic::rho() const
-{
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rhoLaw",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            calculatedFvPatchScalarField::typeName
-        )
-    );
-}
-
 
 Foam::tmp<Foam::volScalarField> Foam::StVenantKirchhoffElastic::impK() const
 {
@@ -209,5 +186,11 @@ void Foam::StVenantKirchhoffElastic::correct(surfaceSymmTensorField& sigma)
     sigma = (1.0/J)*transform(Ff(), S);
 }
 
+
+void Foam::StVenantKirchhoffElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
+}
 
 // ************************************************************************* //

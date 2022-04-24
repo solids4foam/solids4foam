@@ -51,10 +51,6 @@ namespace solidModels
 defineTypeNameAndDebug(coupledLinGeomPressureDisplacementSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, coupledLinGeomPressureDisplacementSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, coupledLinGeomPressureDisplacementSolid, dictionary
 );
 

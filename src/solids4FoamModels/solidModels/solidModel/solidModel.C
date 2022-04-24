@@ -37,6 +37,7 @@ License
 #endif
 #include "fvcGradf.H"
 #include "wedgePolyPatch.H"
+#include "addToRunTimeSelectionTable.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -44,6 +45,7 @@ namespace Foam
 {
     defineTypeNameAndDebug(solidModel, 0);
     defineRunTimeSelectionTable(solidModel, dictionary);
+    addToRunTimeSelectionTable(physicsModel, solidModel, physicsModel);
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
@@ -315,7 +317,26 @@ Foam::volScalarField& Foam::solidModel::rho()
 
 void Foam::solidModel::setCellDisps(fvVectorMatrix& DEqn)
 {
-    if (setCellDisps().cellIDs().size() > 0)
+    if (setCellDisps().cellIDs().size() == 0)
+    {
+        return;
+    }
+
+    if (incremental())
+    {
+        // Prepare the list of incremental displacements
+        const vectorField& Dold = D().oldTime().internalField();
+        const vectorField cellDisps = setCellDisps().cellDisps();
+        vectorField cellIncrDisps(cellDisps.size(), vector::zero);
+        const labelList cellIDs = setCellDisps().cellIDs();
+        forAll(cellIncrDisps, cI)
+        {
+            cellIncrDisps[cI] = cellDisps[cI] - Dold[cellIDs[cI]];
+        }
+
+        DEqn.setValues(cellIDs, cellIncrDisps);
+    }
+    else
     {
         DEqn.setValues(setCellDisps().cellIDs(), setCellDisps().cellDisps());
     }
@@ -827,7 +848,7 @@ Foam::solidModel::solidModel
             "aitkenAlpha",
             runTime.constant(),
             meshPtr_(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         meshPtr_(),
@@ -840,7 +861,7 @@ Foam::solidModel::solidModel
             "aitkenResidual",
             runTime.constant(),
             meshPtr_(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         meshPtr_(),
@@ -860,7 +881,7 @@ Foam::solidModel::solidModel
             "DRef",
             runTime.constant(),
             meshPtr_(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         meshPtr_(),
@@ -873,13 +894,18 @@ Foam::solidModel::solidModel
             "unrelaxedDRef",
             runTime.constant(),
             meshPtr_(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         meshPtr_(),
         dimensionedVector("zero", dimLength, vector::zero)
     ),
-    globalPatchesPtrList_()
+    globalPatchesPtrList_(),
+    setCellDispsPtr_(),
+    restart_
+    (
+        solidModelDict().lookupOrDefault<Switch>("restart", false)
+    )
 {
     // Force old time fields to be stored
     D_.oldTime().oldTime();
@@ -890,10 +916,35 @@ Foam::solidModel::solidModel
     gradDD_.oldTime();
     sigma_.oldTime();
 
-    // There is an issue where old-old fields are not being written so we will
-    // reset the write flag here
-    D_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
-    DD_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
+    if (restart_)
+    {
+        // Enable writing of fields which are needed for restart
+        D_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        D_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        DD_.writeOpt() = IOobject::AUTO_WRITE;
+        DD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        DD_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        pointD_.writeOpt() = IOobject::AUTO_WRITE;
+        pointD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        pointDD_.writeOpt() = IOobject::AUTO_WRITE;
+        gradD_.writeOpt() = IOobject::AUTO_WRITE;
+        gradD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        gradDD_.writeOpt() = IOobject::AUTO_WRITE;
+    }
+    else
+    {
+        D_.oldTime().writeOpt() = IOobject::NO_WRITE;
+        D_.oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
+        DD_.writeOpt() = IOobject::NO_WRITE;
+        DD_.oldTime().writeOpt() = IOobject::NO_WRITE;
+        DD_.oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
+        pointD_.writeOpt() = IOobject::AUTO_WRITE;
+        pointD_.oldTime().writeOpt() = IOobject::NO_WRITE;
+        pointDD_.writeOpt() = IOobject::NO_WRITE;
+        gradD_.writeOpt() = IOobject::NO_WRITE;
+        gradD_.oldTime().writeOpt() = IOobject::NO_WRITE;
+        gradDD_.writeOpt() = IOobject::NO_WRITE;
+    }
 
     // Print out the relaxation factor
     Info<< "    under-relaxation method: " << relaxationMethod_ << endl;
@@ -1242,7 +1293,9 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
             IOobject
             (
                 "solidProperties",
-                runTime.caseConstant()/region,
+                bool(region == dynamicFvMesh::defaultRegion)
+              ? fileName(runTime.caseConstant())
+              : fileName(runTime.caseConstant()/region),
                 runTime,
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE

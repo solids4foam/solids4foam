@@ -67,7 +67,7 @@ void Foam::mechanicalLaw::makeF()
                 "F_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -94,7 +94,7 @@ void Foam::mechanicalLaw::makeFf()
                 "Ff_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -120,7 +120,7 @@ void Foam::mechanicalLaw::makeRelF()
                 "relF_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -147,7 +147,7 @@ void Foam::mechanicalLaw::makeRelFf()
                 "relFf_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -219,7 +219,7 @@ void Foam::mechanicalLaw::makeSigmaEff()
                 "sigmaEff_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::AUTO_WRITE
             ),
             mesh(),
@@ -235,34 +235,42 @@ bool Foam::mechanicalLaw::planeStress() const
 {
     if (mesh_.foundObject<IOdictionary>("mechanicalProperties"))
     {
-        return
-            Switch
+        return Switch
+        (
+            mesh_.lookupObject<IOdictionary>
             (
-                mesh_.lookupObject<IOdictionary>
-                (
-                    "mechanicalProperties"
-                ).lookup("planeStress")
-            );
+                "mechanicalProperties"
+            ).lookup("planeStress")
+        );
+    }
+    else if
+    (
+        mesh_.objectRegistry::parent().foundObject<objectRegistry>("region0")
+    )
+    {
+        return Switch
+        (
+            mesh_.objectRegistry::parent().subRegistry
+            (
+                "region0"
+            ).lookupObject<IOdictionary>
+            (
+                "mechanicalProperties"
+            ).lookup("planeStress")
+        );
     }
     else
     {
-        // It is not straight-forward to lookup the mechanicalProperties from
-        // here as we only have access to a subMesh fvMesh objectRegistry
-        // We will read it here again; this switch only gets called at the start
-        // of a simulation so it is not a problem
-        IOdictionary mechProp
+        return Switch
         (
-            IOobject
+            mesh_.objectRegistry::parent().subRegistry
             (
-                "mechanicalProperties",
-                "constant",
-                mesh_.time(),
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
+                "solid"
+            ).lookupObject<IOdictionary>
+            (
+                "mechanicalProperties"
+            ).lookup("planeStress")
         );
-
-        return Switch(mechProp.lookup("planeStress"));
     }
 }
 
@@ -786,6 +794,42 @@ Foam::mechanicalLaw::mechanicalLaw
 
 
 // * * * * * * * * * * * * * * * Member functions * * * * * * * * * * * * * * //
+
+
+Foam::dimensionedScalar Foam::mechanicalLaw::rhoScalar() const
+{
+    return dimensionedScalar(dict_.lookup("rho"));
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::mechanicalLaw::rho() const
+{
+    tmp<volScalarField> tresult
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "rho",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            rhoScalar(),
+            zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
+    tresult().correctBoundaryConditions();
+#endif
+
+    return tresult;
+}
 
 
 Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalLaw::impKf() const

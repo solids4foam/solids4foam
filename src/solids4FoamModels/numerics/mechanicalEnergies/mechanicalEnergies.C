@@ -175,7 +175,8 @@ void mechanicalEnergies::checkEnergies
     const surfaceScalarField& waveSpeed,
     const dimensionedVector& g,
     const scalar, // laplacianSmoothCoeff,
-    const surfaceScalarField& impKf
+    const surfaceScalarField& impKf,
+    const bool printInfo
 )
 {
     if (curTimeIndex_ != mesh_.time().timeIndex())
@@ -297,24 +298,26 @@ void mechanicalEnergies::checkEnergies
             SMALL, max(externalWork_, max(internalEnergy_, kineticEnergy_))
         );
 
-    Info<< "External work = " << externalWork_ << " J" << nl
-        << "Internal energy = " << internalEnergy_ << " J" << nl
-        << "Kinetic energy = " << kineticEnergy_ << " J" << nl
-        //<< "laplacian smoothing energy = "
-        //<< laplacianSmoothingEnergy_ << " J"
-        << nl
-        << "Bulk viscosity energy = " << linearBulkViscosityEnergy_ << " J"
-        << nl
-        << "Energy imbalance (% of max) = " << energyImbalancePercent << " %"
-        << endl;
-
-    if (energyImbalancePercent > 10.0)
+    if (printInfo)
     {
-       WarningIn(type() + "::checkEnergies()")
-           << "The energy imbalance is greater than 10%" << endl;
-       // FatalErrorIn(type() + "::checkEnergies()")
-       //     << "The energy imbalance is greater than 10%"
-       //     << abort(FatalError);
+        Info<< "External work = " << externalWork_ << " J" << nl
+            << "Internal energy = " << internalEnergy_ << " J" << nl
+            << "Kinetic energy = " << kineticEnergy_ << " J" << nl
+            //<< "laplacian smoothing energy = "
+            //<< laplacianSmoothingEnergy_ << " J" << nl
+            << "Bulk viscosity energy = " << linearBulkViscosityEnergy_ << " J"
+            << nl
+            << "Energy imbalance (% of max) = " << energyImbalancePercent << " %"
+            << endl;
+
+        if (energyImbalancePercent > 10.0)
+        {
+           WarningIn(type() + "::checkEnergies()")
+               << "The energy imbalance is greater than 10%" << endl;
+           // FatalErrorIn(type() + "::checkEnergies()")
+           //     << "The energy imbalance is greater than 10%"
+           //     << abort(FatalError);
+        }
     }
 
     // Write energies to file

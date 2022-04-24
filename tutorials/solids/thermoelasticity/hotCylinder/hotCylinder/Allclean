@@ -7,8 +7,7 @@
 source solids4FoamScripts.sh
 
 cleanCase
-\rm -rf constant/polyMesh/sets constant/polyMesh/*Zones*
-\rm -rf VTK case.foam history
+rm -rf constant/polyMesh/boundary VTK case.foam history
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

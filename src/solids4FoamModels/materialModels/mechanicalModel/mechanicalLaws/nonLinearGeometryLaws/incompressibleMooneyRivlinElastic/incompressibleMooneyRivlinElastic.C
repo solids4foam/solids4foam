@@ -52,7 +52,6 @@ Foam::incompressibleMooneyRivlinElastic::incompressibleMooneyRivlinElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     c10_(dict.lookup("c10")),
     c01_(dict.lookup("c01")),
     c11_(dict.lookup("c11")),
@@ -81,28 +80,6 @@ Foam::incompressibleMooneyRivlinElastic::~incompressibleMooneyRivlinElastic()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volScalarField> Foam::incompressibleMooneyRivlinElastic::rho() const
-{
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rhoLaw",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            calculatedFvPatchScalarField::typeName
-        )
-    );
-}
-
-
 Foam::tmp<Foam::volScalarField> Foam::incompressibleMooneyRivlinElastic::impK() const
 {
     return tmp<volScalarField>
@@ -114,7 +91,7 @@ Foam::tmp<Foam::volScalarField> Foam::incompressibleMooneyRivlinElastic::impK() 
                 "impK",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -224,6 +201,13 @@ void Foam::incompressibleMooneyRivlinElastic::correct(surfaceSymmTensorField& si
     // This term is important to assure the underformed configuration
     // to be stress-free
     sigma = sigmaHydf*I + s - 2.0*(c10_ + 2.0*c01_)*I;
+}
+
+
+void Foam::incompressibleMooneyRivlinElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
 }
 
 

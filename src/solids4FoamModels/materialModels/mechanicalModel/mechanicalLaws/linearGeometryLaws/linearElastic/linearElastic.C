@@ -188,7 +188,6 @@ Foam::linearElastic::linearElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     mu_("mu", dimPressure, 0.0),
     K_("K", dimPressure, 0.0),
     E_("E", dimPressure, 0.0),
@@ -385,35 +384,6 @@ Foam::linearElastic::~linearElastic()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volScalarField> Foam::linearElastic::rho() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-#ifdef OPENFOAMESIORFOUNDATION
-    tresult.ref().correctBoundaryConditions();
-#else
-    tresult().correctBoundaryConditions();
-#endif
-
-    return tresult;
-}
-
 
 Foam::tmp<Foam::volScalarField> Foam::linearElastic::bulkModulus() const
 {
@@ -442,12 +412,6 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::bulkModulus() const
 #endif
 
     return tresult;
-}
-
-
-const Foam::dimensionedScalar& Foam::linearElastic::rhoScalar() const
-{
-    return rho_;
 }
 
 

@@ -26,13 +26,14 @@ License
 #ifdef OPENFOAMESIORFOUNDATION
 
 #include "amiZoneInterpolation.H"
-#ifdef OPENFOAMESI
-    #include "AMIMethod.H"
-    #include "directAMI.H"
-    #include "mapNearestAMI.H"
-    #include "faceAreaWeightAMI.H"
-    #include "partialFaceAreaWeightAMI.H"
-#else
+// #ifdef OPENFOAMESI
+//     #include "AMIMethod.H"
+//     #include "directAMI.H"
+//     #include "mapNearestAMI.H"
+//     #include "faceAreaWeightAMI.H"
+//     #include "partialFaceAreaWeightAMI.H"
+// #else
+#ifdef OPENFOAMFOUNDATION
     #include "newAMIMethod.H"
     #include "newDirectAMI.H"
     #include "newMapNearestAMI.H"
@@ -47,13 +48,14 @@ namespace Foam
 {
     defineTypeNameAndDebug(amiZoneInterpolation, 0);
 
-#ifdef OPENFOAMESI
-    makeAMIMethod(amiZoneInterpolation);
-    makeAMIMethodType(amiZoneInterpolation, directAMI);
-    makeAMIMethodType(amiZoneInterpolation, mapNearestAMI);
-    makeAMIMethodType(amiZoneInterpolation, faceAreaWeightAMI);
-    makeAMIMethodType(amiZoneInterpolation, partialFaceAreaWeightAMI);
-#else
+// #ifdef OPENFOAMESI
+//     makeAMIMethod(amiZoneInterpolation);
+//     makeAMIMethodType(amiZoneInterpolation, directAMI);
+//     makeAMIMethodType(amiZoneInterpolation, mapNearestAMI);
+//     makeAMIMethodType(amiZoneInterpolation, faceAreaWeightAMI);
+//     makeAMIMethodType(amiZoneInterpolation, partialFaceAreaWeightAMI);
+// #else
+#ifdef OPENFOAMFOUNDATION
     makeAMIMethod(amiZoneInterpolation);
     makeAMIMethodType(amiZoneInterpolation, newDirectAMI);
     makeAMIMethodType(amiZoneInterpolation, newMapNearestAMI);
@@ -461,17 +463,20 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
     const standAlonePatch& tgtPatch,
     const faceAreaIntersect::triangulationMode& triMode,
     const bool requireMatch,
-    const interpolationMethod& method,
     const scalar lowWeightCorrection,
     const bool reverseTarget,
     const bool useGlobalPolyPatch
 )
 :
 #ifdef OPENFOAMESI
-    AMIInterpolation<standAlonePatch, standAlonePatch>
+    faceAreaWeightAMI
+    (
+        false, // requireMatch
+        false, // reverseTarget
+        -1     // lowWeightCorrection
+    ),
 #else
     newAMIInterpolation<standAlonePatch, standAlonePatch>
-#endif
     (
         srcPatch,
         tgtPatch,
@@ -482,8 +487,13 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
         false,
         useGlobalPolyPatch
     ),
+#endif
     sourcePatch_(srcPatch),
     targetPatch_(tgtPatch),
+#ifdef OPENFOAMESI
+    sourcePrimPatchPtr_(),
+    targetPrimPatchPtr_(),
+#endif
     sourcePatchInterp_(sourcePatch_),
     targetPatchInterp_(targetPatch_),
     sourcePointAddressingPtr_(nullptr),
@@ -492,7 +502,32 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
     targetPointAddressingPtr_(nullptr),
     targetPointWeightsPtr_(nullptr),
     targetPointDistancePtr_(nullptr)
-{}
+{
+#ifdef OPENFOAMESI
+    // Create source primitivePatch
+    SubList<face> srcFcs
+    (
+        sourcePatch_.localFaces(), sourcePatch_.localFaces().size()
+    );
+    sourcePrimPatchPtr_.set
+    (
+        new primitivePatch(srcFcs, sourcePatch_.localPoints())
+    );
+
+    // Create target primitivePatch
+    SubList<face> tgtFcs
+    (
+        targetPatch_.localFaces(), targetPatch_.localFaces().size()
+    );
+    targetPrimPatchPtr_.set
+    (
+        new primitivePatch(tgtFcs, targetPatch_.localPoints())
+    );
+
+    // Calculate AMI weights and addressing
+    calculate(sourcePrimPatchPtr_(), targetPrimPatchPtr_());
+#endif
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor * * * * * * * * * * * * * * * //

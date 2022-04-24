@@ -564,7 +564,6 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
     JPtr_(),
@@ -688,7 +687,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
             mesh.time().timeName(),
             mesh,
             IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
+            IOobject::NO_WRITE
         ),
         mesh,
         dimensionedSymmTensor("I", dimless, I)
@@ -701,7 +700,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
             mesh.time().timeName(),
             mesh,
             IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
+            IOobject::NO_WRITE
         ),
         mesh,
         dimensionedSymmTensor("I", dimless, I)
@@ -714,7 +713,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
             mesh.time().timeName(),
             mesh,
             IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
+            IOobject::NO_WRITE
         ),
         mesh,
         dimensionedSymmTensor("I", dimless, I)
@@ -727,7 +726,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
             mesh.time().timeName(),
             mesh,
             IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
+            IOobject::NO_WRITE
         ),
         mesh,
         dimensionedSymmTensor("I", dimless, I)
@@ -864,11 +863,14 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
         mesh.time().controlDict().lookupOrDefault<scalar>("maxDeltaErr", 0.01)
     )
 {
-    // Force storage of old time for adjustable time-step calculations
-    plasticN_.oldTime();
-    bEbar_.oldTime();
-
     Info<< "    updateBEbarConsistent: " << updateBEbarConsistent_ << endl;
+
+    // Force storage of old time for adjustable time-step calculations
+    plasticN_.storeOldTime();
+
+    // Force the creation of Fs so they are read on restart
+    F();
+    Ff();
 
     // Read elastic parameters
     // The user can specify E and nu or mu and K
@@ -949,28 +951,6 @@ Foam::neoHookeanElasticMisesPlastic::~neoHookeanElasticMisesPlastic()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlastic::rho() const
-{
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            calculatedFvPatchScalarField::typeName
-        )
-    );
-}
-
 
 Foam::tmp<Foam::volScalarField>
 Foam::neoHookeanElasticMisesPlastic::impK() const
@@ -1707,5 +1687,18 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
     return mesh().time().endTime().value();
 }
 
+
+void Foam::neoHookeanElasticMisesPlastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    J().writeOpt() = IOobject::AUTO_WRITE;
+    bEbar_.writeOpt() = IOobject::AUTO_WRITE;
+    epsilonPEq_.writeOpt() = IOobject::AUTO_WRITE;
+
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
+    Jf().writeOpt() = IOobject::AUTO_WRITE;
+    bEbarf_.writeOpt() = IOobject::AUTO_WRITE;
+    epsilonPEqf_.writeOpt() = IOobject::AUTO_WRITE;
+}
 
 // ************************************************************************* //

@@ -41,10 +41,6 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(oneWayCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, oneWayCouplingInterface, fluidSolidInteraction
-);
-addToRunTimeSelectionTable
-(
     fluidSolidInterface, oneWayCouplingInterface, dictionary
 );
 

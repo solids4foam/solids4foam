@@ -49,12 +49,17 @@ Author
 \*---------------------------------------------------------------------------*/
 
 #include "argList.H"
-#include "foamTime.H"
 #include "polyMesh.H"
 #include "IFstream.H"
-#include "directTopoChange.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "Time.H"
+    #include "polyTopoChange.H"
+#else
+    #include "foamTime.H"
+    #include "directTopoChange.H"
+#endif
 #include "localPointRegion.H"
-#include "duplicatePoints.H"
+//#include "duplicatePoints.H"
 #include "processorPolyPatch.H"
 #include "faceSet.H"
 #include "polyRemoveFace.H"
@@ -69,7 +74,7 @@ bool readHeader(IFstream& inputStream)
 {
     while (!inputStream.eof())
     {
-	if (!inputStream.good())
+        if (!inputStream.good())
         {
             break;
         }
@@ -122,7 +127,7 @@ label countNodes(IFstream& inputStream, bool& threeD)
     bool checkThreeD = true;
     while (!inputStream.eof())
     {
-	if (!inputStream.good())
+        if (!inputStream.good())
         {
             break;
         }
@@ -155,7 +160,7 @@ label countNodes(IFstream& inputStream, bool& threeD)
         {
             error = true;
         }
-                
+
         inputStream.read(tok);
         if (!tok.isPunctuation())
         {
@@ -217,7 +222,7 @@ label countNodes(IFstream& inputStream, bool& threeD)
                 // Put the token back
                 inputStream.putBack(tok);
             }
-        }            
+        }
 
         if (error)
         {
@@ -248,7 +253,7 @@ label countNodes(IFstream& inputStream, bool& threeD)
         {
             // Put token back
             inputStream.putBack(tok);
-        }   
+        }
     }
 
     return nNodes;
@@ -314,7 +319,7 @@ label countElements(IFstream& inputStream, bool& threeD)
     inputStream.read(tok);
     word elemType = tok.wordToken();
     // Remove "type="
-    elemType = elemType(5, elemType.size());
+    elemType = elemType.substr(5);
     Info<< "Element type = " << elemType << endl;
     if (elemType != "C3D8R" && elemType != "C3D8")
     {
@@ -325,7 +330,7 @@ label countElements(IFstream& inputStream, bool& threeD)
     label nElements = 0;
     while (!inputStream.eof())
     {
-	if (!inputStream.good())
+        if (!inputStream.good())
         {
             break;
         }
@@ -343,7 +348,7 @@ label countElements(IFstream& inputStream, bool& threeD)
         // set or element set or something else
 
         bool error = false;
-        
+
 
         // Read element index and 8 node indices
         for (label i = 0; i < 9; i++)
@@ -399,7 +404,7 @@ label countElements(IFstream& inputStream, bool& threeD)
         {
             // Put token back
             inputStream.putBack(tok);
-        }   
+        }
     }
 
     return nElements;
@@ -422,7 +427,7 @@ void readElements
     inputStream.read(tok);
     word elemType = tok.wordToken();
     // Remove "type="
-    elemType = elemType(5, elemType.size());
+    elemType = elemType.substr(5);
     Info<< "Element type = " << elemType << endl;
     if (elemType != "C3D8R" && elemType != "C3D8")
     {
@@ -448,7 +453,7 @@ void readElements
         inputStream.read(tok);
 
         // Read the nodes in the element
-        labelList p(8, -1);
+        labelList p(label(8), label(-1));
         forAll(p, pI)
         {
             // Read node index
@@ -528,7 +533,7 @@ void readElements
         {
             // Put token back
             inputStream.putBack(tok);
-        }   
+        }
     }
 }
 
@@ -601,7 +606,11 @@ void insertDuplicateMerge
 (
     const polyMesh& mesh,
     const labelList& duplicates,
+#ifdef OPENFOAMESIORFOUNDATION
+    polyTopoChange& meshMod
+#else
     directTopoChange& meshMod
+#endif
 )
 {
     const faceList& faces = mesh.faces();
@@ -695,7 +704,11 @@ void mergeDuplicateFaces(polyMesh& mesh)
     }
 
     // Mesh change engine
+#ifdef OPENFOAMESIORFOUNDATION
+    polyTopoChange meshMod(mesh);
+#else
     directTopoChange meshMod(mesh);
+#endif
 
     // Get all duplicate face labels (in boundaryFaces indices!)
     labelList duplicates(findBaffles(mesh, boundaryFaces));
@@ -728,7 +741,11 @@ int main(int argc, char *argv[])
 #   include "createTime.H"
 
     // Read abaqus input file name
+#ifdef OPENFOAMESIORFOUNDATION
+    const fileName inputFileName(args[1]);
+#else
     const fileName inputFileName(args.additionalArgs()[0]);
+#endif
     Info<< "Reading " << inputFileName << nl << endl;
 
     // Read abaqus input file
@@ -806,13 +823,20 @@ int main(int argc, char *argv[])
             runTime,
             IOobject::NO_READ
         ),
+#ifdef OPENFOAMESIORFOUNDATION
+        std::move(points),
+        std::move(faces),
+        std::move(cells),
+#else
         Xfer<pointField>(points),
         Xfer<faceList>(faces),
         Xfer<cellList>(cells),
+#endif
         false
     );
 
-    // Add boundary patches                                                                                                                                                                         
+    // Add boundary patches
+
     // void addPatches
     // (
     //     const List<polyPatch*>&,
@@ -843,7 +867,7 @@ int main(int argc, char *argv[])
 
     // Optionally, we could add all sets or surfaces are zones
     // Leave for another day, or until I really need it!
-    // Add mesh zones                                                                                                                                                                               
+    // Add mesh zones
     // void addZones
     // (
     //     const List<pointZone*>& pz,

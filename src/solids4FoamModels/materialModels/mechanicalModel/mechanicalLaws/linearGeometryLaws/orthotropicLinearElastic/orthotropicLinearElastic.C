@@ -217,7 +217,6 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     E1_(dict.lookup("E1")),
     E2_(dict.lookup("E2")),
     E3_(dict.lookup("E3")),
@@ -419,32 +418,6 @@ Foam::orthotropicLinearElastic::~orthotropicLinearElastic()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::volScalarField> Foam::orthotropicLinearElastic::rho() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-    tresult().correctBoundaryConditions();
-
-    return tresult;
-}
-
 
 Foam::tmp<Foam::volScalarField> Foam::orthotropicLinearElastic::impK() const
 {

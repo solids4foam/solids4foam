@@ -72,6 +72,11 @@ class physicsModel
         //- Solid mesh pointer
         autoPtr<dynamicFvMesh> solidMeshPtr_;
 
+        //- Flag to indicate whether info statements should be printed to
+        //  std out or not. Defaults to true but can be modified by the
+        //  printInfo() access function
+        bool printInfo_;
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -89,38 +94,18 @@ public:
 
     // Declare run-time constructor selection table
 
-        declareRunTimeSelectionTable
+        declareRunTimeNewSelectionTable
         (
             autoPtr,
             physicsModel,
-            fluid,
+            physicsModel,
             (
-                Time& runTime
+                Time& runTime,
+                const word& region
             ),
-            (runTime)
+            (runTime, region)
         );
 
-        declareRunTimeSelectionTable
-        (
-            autoPtr,
-            physicsModel,
-            solid,
-            (
-                Time& runTime
-            ),
-            (runTime)
-        );
-
-        declareRunTimeSelectionTable
-        (
-            autoPtr,
-            physicsModel,
-            fluidSolidInteraction,
-            (
-                Time& runTime
-            ),
-            (runTime)
-        );
 
     // Constructors
 
@@ -128,8 +113,9 @@ public:
         physicsModel
         (
             const word& type,
-            Time& runTime
-        );
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
+       );
 
 
     // Selectors
@@ -137,7 +123,8 @@ public:
         //- Select constructor
         static autoPtr<physicsModel> New
         (
-            Time& runTime
+            Time& runTime,
+            const word& region = dynamicFvMesh::defaultRegion
         );
 
 
@@ -166,6 +153,12 @@ public:
             const dictionary& physicsProperties() const
             {
                 return dict_;
+            }
+
+            //- Return reference to the printInfo flag
+            bool& printInfo()
+            {
+                return printInfo_;
             }
 
         // Edit

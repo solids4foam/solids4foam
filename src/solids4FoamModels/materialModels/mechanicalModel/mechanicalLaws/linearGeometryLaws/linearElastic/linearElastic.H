@@ -57,9 +57,6 @@ class linearElastic
 {
     // Private data
 
-        //- Density
-        dimensionedScalar rho_;
-
         //- Shear modulus (second Lame parameter)
         dimensionedScalar mu_;
 
@@ -159,14 +156,8 @@ public:
 
     // Member Functions
 
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
-
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const;
-
-        //- Return density scale
-        virtual const dimensionedScalar& rhoScalar() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term

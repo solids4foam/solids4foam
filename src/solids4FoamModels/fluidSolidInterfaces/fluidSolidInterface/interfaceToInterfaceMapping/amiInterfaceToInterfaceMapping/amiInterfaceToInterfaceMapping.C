@@ -29,6 +29,7 @@ License
 #include "amiInterfaceToInterfaceMapping.H"
 #include "addToRunTimeSelectionTable.H"
 #include "FieldField.H"
+#include "triPointRef.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -70,7 +71,7 @@ void amiInterfaceToInterfaceMapping::makeInterpolator() const
             zoneB(),
             faceAreaIntersect::tmMesh, // triMode
             true,   // requireMatch
-            amiZoneInterpolation::imFaceAreaWeight, // interpolationMethodNames
+            //amiZoneInterpolation::imFaceAreaWeight, // interpolationMethodNames
             -1,     // lowWeightCorrection
             false,  // reverseTarget
             true    // use globalPolyPatch

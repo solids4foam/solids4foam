@@ -29,7 +29,7 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "surfaceFields.H"
-#include "OSspecific.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -62,13 +62,6 @@ bool Foam::solidForcesDisplacements::writeData()
     }
     const fvMesh& mesh = *meshPtr;
 
-    // Lookup the displacement field
-    const vectorField& D =
-        mesh.lookupObject<volVectorField>
-        (
-            "D"
-        ).boundaryField()[historyPatchID_];
-
     // Patch area vectors
     const vectorField& patchSf =
         mesh.Sf().boundaryField()[historyPatchID_];
@@ -83,12 +76,17 @@ bool Foam::solidForcesDisplacements::writeData()
             "sigma"
         ).boundaryField()[historyPatchID_];
 
+    // Lookup solid model
+    const solidModel& solMod = lookupSolidModel(mesh);
+
     // Check if it is a linear or nonlinear geometry case
-    if
-    (
-        !mesh.foundObject<volVectorField>("DD")
-     && mesh.foundObject<volTensorField>("F")
-    )
+    if (solMod.nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY)
+    {
+        // Linear geometry
+
+        force = gSum(patchSf & sigma);
+    }
+    else if (solMod.nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
         // Total Lagrangian
 
@@ -109,14 +107,13 @@ bool Foam::solidForcesDisplacements::writeData()
         // Calculate area vectors in the deformed configuration
         const vectorField patchDeformSf(J*Finv.T() & patchSf);
 
+        // Calculate unit area vectors in the deformed configuration
+        const vectorField patchDeformNf(patchDeformSf/mag(patchDeformSf));
+
         // It is assumed that sigma is the true (Cauchy) stress
         force = gSum(patchDeformSf & sigma);
     }
-    else if
-    (
-        mesh.foundObject<volVectorField>("DD")
-     && mesh.foundObject<volTensorField>("F")
-    )
+    else if (solMod.nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
         // Updated Lagrangian
 
@@ -128,10 +125,17 @@ bool Foam::solidForcesDisplacements::writeData()
     }
     else
     {
-        // Linear geometry
-
-        force = gSum(patchSf & sigma);
+        FatalErrorIn("bool Foam::solidForces::writeData()")
+            << "Unknown solidModel nonLinGeom type = "
+            << solMod.nonLinGeom() << abort(FatalError);
     }
+
+    // Lookup the displacement field
+    const vectorField& D =
+        mesh.lookupObject<volVectorField>
+        (
+            "D"
+        ).boundaryField()[historyPatchID_];
 
     // Arithmetic average disp and force on patch
     vector avDisp = average(D);

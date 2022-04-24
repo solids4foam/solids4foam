@@ -40,10 +40,6 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(weakCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, weakCouplingInterface, fluidSolidInteraction
-);
-addToRunTimeSelectionTable
-(
     fluidSolidInterface, weakCouplingInterface, dictionary
 );
 

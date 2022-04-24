@@ -35,6 +35,7 @@ Author
 #ifndef clampedMomentFaPatchField_H
 #define clampedMomentFaPatchField_H
 
+#include "foamTime.H"
 #include "fixedValueFaPatchField.H"
 #include "areaFields.H"
 

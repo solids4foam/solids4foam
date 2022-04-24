@@ -40,7 +40,6 @@ namespace fluidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(oneWayFsiFluid, 0);
-addToRunTimeSelectionTable(physicsModel, oneWayFsiFluid, fluid);
 addToRunTimeSelectionTable(fluidModel, oneWayFsiFluid, dictionary);
 
 

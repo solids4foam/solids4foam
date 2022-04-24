@@ -47,7 +47,6 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(kirchhoffPlateSolid, 0);
-addToRunTimeSelectionTable(physicsModel, kirchhoffPlateSolid, solid);
 addToRunTimeSelectionTable(solidModel, kirchhoffPlateSolid, dictionary);
 
 

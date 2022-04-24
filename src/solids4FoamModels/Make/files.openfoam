@@ -4,6 +4,7 @@ solidModels/solidModel/solidModel.C
 solidModels/solidModel/lookupSolidModel.C
 solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
+/*solidModels/coupledLinGeomPressureDisplacementSolid/coupledLinGeomPressureDisplacementSolid.C*/
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/coupledUnsLinGeomSolid/coupledUnsLinGeomSolid.C
 solidModels/explicitLinGeomTotalDispSolid/explicitLinGeomTotalDispSolid.C
@@ -24,9 +25,11 @@ solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 solidModels/finiteVolume/fvc/fvcCellLimitedGrad.C
 
 fluidModels/fluidModel/fluidModel.C
-fluidModels/icoFluid/icoFluid.C
+/*fluidModels/interFluid/interFluid.C*/
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
-fluidModels/pisoFluid/pisoFluid.C
+fluidModels/pimpleFluid/pimpleFluid.C
+fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
+fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
 
 fluidModels/finiteVolume/RBFMeshMotionSolver/RBFInterpolation.C
 fluidModels/finiteVolume/RBFMeshMotionSolver/RBFCoarsening.C
@@ -54,7 +57,9 @@ $(interfaceToInterface)/directMapInterfaceToInterfaceMapping/directMapInterfaceT
 $(interfaceToInterface)/rbfInterfaceToInterfaceMapping/rbfInterfaceToInterfaceMapping.C
 
 materialModels/mechanicalModel/mechanicalModel.C
-
+/*
+materialModels/mechanicalModel/solidSubMeshes/solidSubMeshes.C
+*/
 mechanicalLaws = materialModels/mechanicalModel/mechanicalLaws
 $(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
 $(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
@@ -63,13 +68,12 @@ linGeomLaws = $(mechanicalLaws)/linearGeometryLaws
 $(linGeomLaws)/linearElastic/linearElastic.C
 $(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
 $(linGeomLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
-$(linGeomLaws)/poroAnisotropicBiotElastic/poroAnisotropicBiotElastic.C
-$(linGeomLaws)/poroLinearElastic/poroLinearElastic.C
-$(linGeomLaws)/poroLinearElasticMohrCoulombPlastic/poroLinearElasticMohrCoulombPlastic.C
-$(linGeomLaws)/thermoLinearElastic/thermoLinearElastic.C
+/*$(linGeomLaws)/orthotropicLinearElastic/orthotropicLinearElastic.C*/
 $(linGeomLaws)/linearElasticFromFile/linearElasticFromFile.C
 $(linGeomLaws)/linearElasticCt/linearElasticCt.C
 $(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
+$(linGeomLaws)/poroMechanicalLaw/poroMechanicalLaw.C
+$(linGeomLaws)/thermoMechanicalLaw/thermoMechanicalLaw.C
 
 nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
 $(nonLinGeomLaws)/GentElastic/GentElastic.C
@@ -77,6 +81,7 @@ $(nonLinGeomLaws)/incompressibleMooneyRivlinElastic/incompressibleMooneyRivlinEl
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
 $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
+/*$(nonLinGeomLaws)/StVenantKirchhoffOrthotropicElastic/StVenantKirchhoffOrthotropicElastic.C*/
 $(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
 
 materialModels/thermalModel/thermalModel.C

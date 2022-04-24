@@ -50,10 +50,6 @@ namespace solidModels
 defineTypeNameAndDebug(unsNonLinGeomUpdatedLagSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, unsNonLinGeomUpdatedLagSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, unsNonLinGeomUpdatedLagSolid, dictionary
 );
 
@@ -73,7 +69,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "sigmaf",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
         mesh(),
@@ -86,7 +82,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "grad(" + DD().name() + ")f",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh(),
@@ -125,7 +121,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "J",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(F_)
@@ -137,7 +133,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "Jf",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(Ff_)
@@ -149,7 +145,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "relF",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         I + gradDD().T()
@@ -161,7 +157,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "relFf",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         I + gradDDf_.T()
@@ -173,7 +169,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "relFinv",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         inv(relF_)
@@ -185,7 +181,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "relFinvf",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         inv(relFf_)
@@ -197,7 +193,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "relJ",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(relF_)
@@ -209,7 +205,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "relJf",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(relFf_)
@@ -221,7 +217,7 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
             "rho",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mechanical().rho()
@@ -231,6 +227,26 @@ unsNonLinGeomUpdatedLagSolid::unsNonLinGeomUpdatedLagSolid
     rImpK_(1.0/impK_)
 {
     DDisRequired();
+
+    // For consistent restarts, we will update the relative kinematic fields
+    if (restart())
+    {
+        DD().correctBoundaryConditions();
+        mechanical().interpolate(DD(), pointDD(), false);
+        mechanical().grad(DD(), pointDD(), gradDD());
+        mechanical().grad(DD(), pointDD(), gradDDf_);
+        relFf_ = I + gradDDf_.T();
+        relFinvf_ = inv(relFf_);
+        Ff_ = relFf_ & Ff_.oldTime();
+        relJf_ = det(relFf_);
+        Jf_ = relJf_*Jf_.oldTime();
+
+        Ff_.storeOldTime();
+        Jf_.storeOldTime();
+
+        // Let the mechanical law know
+        mechanical().setRestart();
+    }
 }
 
 

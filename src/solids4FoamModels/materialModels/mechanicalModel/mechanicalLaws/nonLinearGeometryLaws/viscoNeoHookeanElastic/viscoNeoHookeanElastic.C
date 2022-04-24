@@ -31,6 +31,9 @@ License
 #include "fvm.H"
 #include "fixedGradientFvPatchFields.H"
 #include "zeroGradientFvPatchFields.H"
+#ifdef OPENFOAMESI
+    #include "realEigenValues.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -55,7 +58,6 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     EInf_(dict.lookup("EInfinity")),
     E_(dict.lookup("E")),
     tau_(dict.lookup("relaxationTimes")),
@@ -83,7 +85,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "s",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -96,7 +98,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "sf",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -109,7 +111,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "transformNeeded",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -122,7 +124,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "transformFbar",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -135,7 +137,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "transformNeededf",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -148,7 +150,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "transformFbarf",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh,
@@ -311,7 +313,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "transformH" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -329,7 +331,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "transformHf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -356,7 +358,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "h" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -374,7 +376,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "hf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -403,7 +405,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "H" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -421,7 +423,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                     "Hf" + Foam::name(MaxwellModelI),
                     mesh.time().timeName(),
                     mesh,
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh,
@@ -444,36 +446,6 @@ Foam::viscoNeoHookeanElastic::~viscoNeoHookeanElastic()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::rho() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-#ifdef OPENFOAMESIORFOUNDATION
-    tresult.ref().correctBoundaryConditions();
-#else
-    tresult().correctBoundaryConditions();
-#endif
-
-    return tresult;
-}
-
-
 Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::impK() const
 {
     if (nu_.value() == 0.5 || mesh().foundObject<volScalarField>("p"))
@@ -487,7 +459,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::impK() const
                     "impK",
                     mesh().time().timeName(),
                     mesh(),
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh(),
@@ -509,7 +481,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::impK() const
                     "impK",
                     mesh().time().timeName(),
                     mesh(),
-                    IOobject::NO_READ,
+                    IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
                 mesh(),
@@ -535,7 +507,7 @@ Foam::tmp<Foam::volScalarField> Foam::viscoNeoHookeanElastic::K() const
                 "K",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -588,7 +560,11 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     forAll(transformNeededI, cellI)
     {
         // Calculate principal stretches: lambda^2, which are eigenvalues of C
+#ifdef OPENFOAMESI
+        eigenValues = Foam::realEigenValues(CI[cellI]);
+#else
         eigenValues = Foam::eigenValues(CI[cellI]);
+#endif
 
         // Calculate modified principal stretches
         eigenValuesBar.x() = pow(JI[cellI], -1.0/3)*sqrt(eigenValues.x());
@@ -629,9 +605,13 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
         {
              // Calculate principal stretches: lambda^2, which are eigenvalues
              // of C
-             eigenValues = Foam::eigenValues(CP[faceI]);
+#ifdef OPENFOAMESI
+            eigenValues = Foam::realEigenValues(CP[faceI]);
+#else
+            eigenValues = Foam::eigenValues(CP[faceI]);
+#endif
 
-             // Calculate modified principal stretches
+            // Calculate modified principal stretches
              eigenValuesBar.x() = pow(JP[faceI], -1.0/3)*sqrt(eigenValues.x());
              eigenValuesBar.y() = pow(JP[faceI], -1.0/3)*sqrt(eigenValues.y());
              eigenValuesBar.z() = pow(JP[faceI], -1.0/3)*sqrt(eigenValues.z());
@@ -755,27 +735,31 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     vector eigenValues = vector::zero;
     vector eigenValuesBar = vector::zero;
 
-    forAll(transformNeededI, cellI)
+    forAll(transformNeededI, faceI)
     {
         // Calculate principal stretches: lambda^2, which are eigenvalues of C
-        eigenValues = Foam::eigenValues(CI[cellI]);
+#ifdef OPENFOAMESI
+        eigenValues = Foam::realEigenValues(CI[faceI]);
+#else
+        eigenValues = Foam::eigenValues(CI[faceI]);
+#endif
 
         // Calculate modified principal stretches
-        eigenValuesBar.x() = pow(JI[cellI], -1.0/3)*sqrt(eigenValues.x());
-        eigenValuesBar.y() = pow(JI[cellI], -1.0/3)*sqrt(eigenValues.y());
-        eigenValuesBar.z() = pow(JI[cellI], -1.0/3)*sqrt(eigenValues.z());
+        eigenValuesBar.x() = pow(JI[faceI], -1.0/3)*sqrt(eigenValues.x());
+        eigenValuesBar.y() = pow(JI[faceI], -1.0/3)*sqrt(eigenValues.y());
+        eigenValuesBar.z() = pow(JI[faceI], -1.0/3)*sqrt(eigenValues.z());
 
-        transformNeededI[cellI].xx() =
+        transformNeededI[faceI].xx() =
             mu0_.value()*pow(eigenValuesBar.x(), alpha_[0] - 1)
           + mu1_.value()*pow(eigenValuesBar.x(), alpha_[1] - 1)
           + mu2_.value()*pow(eigenValuesBar.x(), alpha_[2] - 1);
 
-        transformNeededI[cellI].yy() =
+        transformNeededI[faceI].yy() =
             mu0_.value()*pow(eigenValuesBar.y(), alpha_[0] - 1)
           + mu1_.value()*pow(eigenValuesBar.y(), alpha_[1] - 1)
           + mu2_.value()*pow(eigenValuesBar.y(), alpha_[2] - 1);
 
-        transformNeededI[cellI].zz() =
+        transformNeededI[faceI].zz() =
             mu0_.value()*pow(eigenValuesBar.z(), alpha_[0] - 1)
           + mu1_.value()*pow(eigenValuesBar.z(), alpha_[1] - 1)
           + mu2_.value()*pow(eigenValuesBar.z(), alpha_[2] - 1);
@@ -799,7 +783,11 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         {
              // Calculate principal stretches: lambda^2, which are eigenvalues
              // of C
-             eigenValues = Foam::eigenValues(CP[faceI]);
+#ifdef OPENFOAMESI
+            eigenValues = Foam::realEigenValues(CP[faceI]);
+#else
+            eigenValues = Foam::eigenValues(CP[faceI]);
+#endif
 
              // Calculate modified principal stretches
              eigenValuesBar.x() = pow(JP[faceI], -1.0/3)*sqrt(eigenValues.x());
@@ -882,6 +870,13 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     {
         sigma += gamma_[MaxwellModelI]*dev(transformHf_[MaxwellModelI]);
     }
+}
+
+
+void Foam::viscoNeoHookeanElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
 }
 
 

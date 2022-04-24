@@ -41,10 +41,6 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(fixedRelaxationCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, fixedRelaxationCouplingInterface, fluidSolidInteraction
-);
-addToRunTimeSelectionTable
-(
     fluidSolidInterface, fixedRelaxationCouplingInterface, dictionary
 );
 

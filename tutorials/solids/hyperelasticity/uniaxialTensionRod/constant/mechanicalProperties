@@ -34,20 +34,20 @@ mechanical
         // type            incompressibleMooneyRivlin;
         // rho             rho [1 -3 0 0 0 0 0] 1000;
         // K               K [1 -1 -2 0 0 0 0] 1e+10;
-		// c10             c10 [1 -1 -2 0 0 0 0] 80e+6;
-		// c01             c01 [1 -1 -2 0 0 0 0] 20e+6;
-		// c11             c11 [1 -1 -2 0 0 0 0] 40e+6;
-		// solvePressureEqn		yes;
-		// pressureSmoothingScaleFactor 100;
+        // c10             c10 [1 -1 -2 0 0 0 0] 80e+6;
+        // c01             c01 [1 -1 -2 0 0 0 0] 20e+6;
+        // c11             c11 [1 -1 -2 0 0 0 0] 40e+6;
+        // solvePressureEqn		yes;
+        // pressureSmoothingScaleFactor 100;
 
         type            GentElastic;
         rho             rho [1 -3 0 0 0 0 0] 1100;
         E               E [1 -1 -2 0 0 0 0] 6e+6;
         nu              nu [0 0 0 0 0 0 0] 0.4;
-        temperature	    temperature [0 0 0 1 0 0 0] 305;
-        ilim		    ilim [0 0 0 0 0 0 0] 7.04;
-        N 		        N [0 0 0 0 0 0 0] 0.0158;
-        Vs 		        Vs [0 3 0 0 0 0 0] 1.81e-5;
+        temperature	temperature [0 0 0 1 0 0 0] 305;
+        ilim		ilim [0 0 0 0 0 0 0] 7.04;
+        N 		N [0 0 0 0 0 0 0] 0.0158;
+        Vs 		Vs [0 3 0 0 0 0 0] 1.81e-5;
     }
 );
 

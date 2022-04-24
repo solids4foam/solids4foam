@@ -41,10 +41,6 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(IQNILSCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, IQNILSCouplingInterface, fluidSolidInteraction
-);
-addToRunTimeSelectionTable
-(
     fluidSolidInterface, IQNILSCouplingInterface, dictionary
 );
 

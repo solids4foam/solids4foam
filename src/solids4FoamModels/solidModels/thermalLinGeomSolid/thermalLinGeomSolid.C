@@ -44,7 +44,6 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(thermalLinGeomSolid, 0);
-addToRunTimeSelectionTable(physicsModel, thermalLinGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, thermalLinGeomSolid, dictionary);
 
 

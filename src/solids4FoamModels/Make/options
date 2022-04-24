@@ -1,9 +1,3 @@
-ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
-    DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-deprecated-declarations
-else
-    DISABLE_WARNING_FLAGS = -Wno-deprecated-copy -Wno-old-style-cast
-endif
-
 ifeq ($(WM_PROJECT), foam)
     VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
     ifeq ($(VER), 1)
@@ -12,8 +6,7 @@ ifeq ($(WM_PROJECT), foam)
         VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
     endif
 else
-    VERSION_SPECIFIC_INC = \
-        -DOPENFOAMESIORFOUNDATION -I$(LIB_SRC)/dynamicFvMesh/lnInclude/
+    VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
     ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
         ifeq (v1812,$(findstring v1812,$(WM_PROJECT_VERSION)))
             VERSION_SPECIFIC_INC += -DOPENFOAMESI=1812
@@ -21,14 +14,30 @@ else
             VERSION_SPECIFIC_INC += -DOPENFOAMESI=1912
         endif
     else
-        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION \
-            -I$(LIB_SRC)/MomentumTransportModels/momentumTransportModels/lnInclude \
-            -I$(LIB_SRC)/MomentumTransportModels/incompressible/lnInclude
+        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
     endif
+endif
+
+ifeq ($(WM_PROJECT), foam)
+    VERSION_SPECIFIC_LIBS = \
+        -lincompressibleTurbulenceModel -lincompressibleRASModels \
+        -lincompressibleLESModels -llduSolvers -linterfaceProperties \
+        -lfiniteArea
+    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
+    ifeq ($(VER), 1)
+        VERSION_SPECIFIC_LIBS += -loversetMesh -loversetDynamicFvMesh
+    endif
+else
+    VERSION_SPECIFIC_LIBS = \
+        -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
+        -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
+        -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
+        -lfluidThermophysicalModels -lturbulenceModels -lcompressibleTurbulenceModels
 endif
 
 EXE_INC = \
     -std=c++14 \
+    -Wno-old-style-cast -Wno-deprecated-declarations -Wno-deprecated-copy \
     $(DISABLE_WARNING_FLAGS) \
     $(VERSION_SPECIFIC_INC) \
     -I../../ThirdParty/eigen3 \
@@ -41,6 +50,7 @@ EXE_INC = \
     -I$(LIB_SRC)/dynamicMesh/dynamicMesh/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/topoChangerFvMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicFvMesh/lnInclude \
     -I$(LIB_SRC)/sampling/lnInclude \
     -I$(LIB_SRC)/surfMesh/lnInclude \
     -I$(LIB_SRC)/postProcessing/foamCalcFunctions/lnInclude \
@@ -77,4 +87,12 @@ EXE_INC = \
     -I$(LIB_SRC)/dynamicMesh/meshMotion/tetMotionSolver/lnInclude  \
     -I$(LIB_SRC)/overset/oversetMesh/lnInclude
 
-EXE_LIBS =
+LIB_LIBS = \
+    $(VERSION_SPECIFIC_LIBS) \
+    -L$(FOAM_USER_LIBBIN) -lblockCoupledSolids4FoamTools \
+    -lfiniteVolume \
+    -lincompressibleTransportModels \
+    -ldynamicFvMesh \
+    -ldynamicMesh \
+    -lmeshTools \
+    -ltopoChangerFvMesh

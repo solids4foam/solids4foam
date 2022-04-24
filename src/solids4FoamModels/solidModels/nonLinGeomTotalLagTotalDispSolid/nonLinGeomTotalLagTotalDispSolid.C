@@ -46,10 +46,6 @@ namespace solidModels
 defineTypeNameAndDebug(nonLinGeomTotalLagTotalDispSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, nonLinGeomTotalLagTotalDispSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, nonLinGeomTotalLagTotalDispSolid, dictionary
 );
 
@@ -112,7 +108,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
             "Finv",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         inv(F_)
@@ -124,7 +120,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
             "J",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(F_)
@@ -154,6 +150,23 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 << "If predictor is turned on, then the ddt(" << D().name()
                 << ") scheme should not be 'steadyState'!" << abort(FatalError);
         }
+    }
+
+    // For consistent restarts, we will update the relative kinematic fields
+    if (restart())
+    {
+        D().correctBoundaryConditions();
+        DD() = D() - D().oldTime();
+        mechanical().grad(D(), gradD());
+        gradDD() = gradD() - gradD().oldTime();
+        F_ = I + gradD().T();
+        Finv_ = inv(F_);
+        J_ = det(F_);
+
+        gradD().storeOldTime();
+
+        // Let the mechanical law know
+        mechanical().setRestart();
     }
 }
 

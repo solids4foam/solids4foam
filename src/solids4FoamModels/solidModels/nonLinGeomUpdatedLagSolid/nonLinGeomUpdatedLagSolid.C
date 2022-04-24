@@ -46,10 +46,6 @@ namespace solidModels
 defineTypeNameAndDebug(nonLinGeomUpdatedLagSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, nonLinGeomUpdatedLagSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, nonLinGeomUpdatedLagSolid, dictionary
 );
 
@@ -83,7 +79,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             "J",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(F_)
@@ -95,7 +91,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             "relF",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         I + gradDD().T()
@@ -107,7 +103,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             "relFinv",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         inv(relF_)
@@ -119,7 +115,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             "relJ",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(relF_)
@@ -131,7 +127,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             "rho",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
         mechanical().rho()
@@ -141,6 +137,22 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     rImpK_(1.0/impK_)
 {
     DDisRequired();
+
+    // For consistent restarts, we will update the relative kinematic fields
+    if (restart())
+    {
+        DD().correctBoundaryConditions();
+        mechanical().grad(DD(), gradDD());
+        relF_ = I + gradDD().T();
+        relFinv_ = inv(relF_);
+        relJ_ = det(relF_);
+
+        F_.storeOldTime();
+        J_.storeOldTime();
+
+        // Let the mechanical law know
+        mechanical().setRestart();
+    }
 }
 
 
@@ -173,7 +185,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
         fvVectorMatrix DDEqn
         (
             fvm::d2dt2(rho_, DD())
-          + fvc::d2dt2(rho_.oldTime(), D().oldTime())
+          + fvc::d2dt2(rho_, D().oldTime())
          == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           + fvc::div(relJ_*relFinv_ & sigma(), "div(sigma)")

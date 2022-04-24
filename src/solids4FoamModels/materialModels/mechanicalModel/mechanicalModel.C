@@ -1088,4 +1088,15 @@ void Foam::mechanicalModel::moveSubMeshes()
 #endif
 }
 
+
+void Foam::mechanicalModel::setRestart()
+{
+    PtrList<mechanicalLaw>& laws = *this;
+
+    forAll(laws, lawI)
+    {
+        laws[lawI].setRestart();
+    }
+}
+
 // ************************************************************************* //

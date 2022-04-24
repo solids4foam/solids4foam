@@ -7,6 +7,7 @@
 source solids4FoamScripts.sh
 
 cleanCase
+rm -rf constant/polyMesh
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

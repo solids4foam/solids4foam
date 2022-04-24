@@ -45,7 +45,6 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(linGeomTotalDispSolid, 0);
-addToRunTimeSelectionTable(physicsModel, linGeomTotalDispSolid, solid);
 addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 
 
