@@ -401,8 +401,11 @@ void Foam::interpolationTable<Type>::operator=
     List<Tuple2<scalar, Type>>::operator=(interpTable);
     boundsHandling_ = interpTable.boundsHandling_;
     fileName_ = interpTable.fileName_;
-    //reader_ = interpTable.reader_;    // note: steals reader. Used in write().
+#ifdef OPENFOAMESI
     reader_.reset(interpTable.reader_.clone());
+#else
+    reader_ = interpTable.reader_;  // note: steals reader. Used in write().
+#endif
 }
 
 
