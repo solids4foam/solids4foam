@@ -43,68 +43,11 @@ function solids4Foam::convertCaseFormat()
     # Exit if foam extend is loaded
     if [[ $WM_PROJECT = "foam" ]]
     then
-        if [ 1 -eq "$(echo "${WM_PROJECT_VERSION} > 4.0" | bc)" ]
-        then
-            echo "foam-extend-${WM_PROJECT_VERSION} loaded"
-            if [[ -n $(find "${CASE_DIR}" -name "nut") ]]
-            then
-                echo "Changing nutWallFunction in nut to nutkWallFunction"; echo
-                find "${CASE_DIR}" -name "nut" \
-                    | xargs sed -i 's\nutWallFunction\nutkWallFunction\g'
-            fi
-
-            return 0
-        else
-            echo "foam-extend-4.0 loaded: no changes made"; echo
-            return 0
-        fi
-    fi
-
-    # nutWallFunction becomes nutkWallFunction
-    if [[ -n $(find "${CASE_DIR}" -name "nut") ]]
-    then
-        echo "Changing nutWallFunction in nut to nutkWallFunction"; echo
-        find "${CASE_DIR}" -name "nut" \
-            | xargs sed -i 's\nutWallFunction\nutkWallFunction\g'
+        echo "foam-extend loaded: no changes made"; echo
+        return 0
     fi
 
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
-
-    # if [[ -n $(find "${CASE_DIR}" -name "D*") ]]
-    # then
-    #     echo "Changing symmetryPlane to symmetry in D*"; echo
-    #     find "${CASE_DIR}" -name "D*" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    # fi
-
-    # if [[ -n $(find "${CASE_DIR}" -name "pointD*") ]]
-    # then
-    #     echo "Changing symmetryPlane to symmetry in pointD*"; echo
-    #     find "${CASE_DIR}" -name "pointD*" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    # fi
-
-    # if [[ -n $(find "${CASE_DIR}" -name "U") ]]
-    # then
-    #     echo "Changing symmetryPlane to symmetry in U"; echo
-    #     find "${CASE_DIR}" -name "U" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    # fi
-
-    # if [[ -n $(find "${CASE_DIR}" -name "p") ]]
-    # then
-    #     echo "Changing symmetryPlane to symmetry in p"; echo
-    #     find "${CASE_DIR}" -name "p" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    # fi
-
-    # if [[ -n $(find "${CASE_DIR}" -name "T") ]]
-    # then
-    #     echo "Changing symmetryPlane to symmetry in T"; echo
-    #     find "${CASE_DIR}" -name "T" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    # fi
-
-    # if [[ -n $(find "${CASE_DIR}" -name "pointMotionU") ]]
-    # then
-    #     echo "Changing symmetryPlane to symmetry in pointMotionU"; echo
-    #     find "${CASE_DIR}" -name "pointMotionU" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    # fi
 
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict*) ]]
     then
@@ -118,11 +61,7 @@ function solids4Foam::convertCaseFormat()
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
 
-    # Then one final general pass of all files in the 0 directory, in case we
-    # missed any in the checks above
-    # Check: the checks above may not be needed, as this command should pick up
-    # all the files in the time directories
-    #for FILE in $(\ls [0-9]/*) ;
+    # Check all files in the 0 directory
     for FILE in $(find ./[0-9]* -type f)
     do
         if [[ -f "${FILE}" ]]
@@ -162,14 +101,14 @@ function solids4Foam::convertCaseFormat()
             "${CASE_DIR}"/system/functions
     fi
 
-    # Rename turbulence model
+    # 3. Rename turbulence model
     if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
     then
         echo "Changing RASModel to RAS in turbulenceProperties"
         find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RASModel;/RAS;/g"
     fi
 
-    # Check for boundaryData
+    # 4. Check for boundaryData
     if [[ -d "${CASE_DIR}"/constant/boundaryData && -d "${CASE_DIR}"/constant/boundaryData.openfoam ]]
     then
         echo "Moving constant/boundaryData to constant/boundaryData.foam-extend"
@@ -211,51 +150,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
 
     # Un-do changes made in convertCaseFormat, if any
 
-    # nut boundary condition
-    if [[ -n $(find "${CASE_DIR}" -name "nut") ]]
-    then
-        echo "Changing nutkWallFunction in nut to nutWallFunction"; echo
-        find "${CASE_DIR}" -name nut \
-            | xargs sed -i 's\nutkWallFunction\nutWallFunction\g'
-    fi
-
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
-
-    # if [[ -n $(find "${CASE_DIR}" -name "D*") ]]
-    # then
-    #     echo "Changing symmetry to symmetryPlane in D*"; echo
-    #     find "${CASE_DIR}" -name "D*" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    # fi
-
-    # if [[ -n $(find "${CASE_DIR}" -name "pointD*") ]]
-    # then
-    #     echo "Changing symmetry to symmetryPlane in pointD*"; echo
-    #     find "${CASE_DIR}" -name "pointD*" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    # fi
-
-    # if [[ -n $(find "${CASE_DIR}" -name "U") ]]
-    # then
-    #     echo "Changing symmetry to symmetryPlane in U"; echo
-    #     find "${CASE_DIR}" -name "U" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    # fi
-
-    # if [[ -n $(find "${CASE_DIR}" -name "p") ]]
-    # then
-    #     echo "Changing symmetry to symmetryPlane in p"; echo
-    #     find "${CASE_DIR}" -name "p" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    # fi
-
-    # if [[ -n $(find "${CASE_DIR}" -name "T") ]]
-    # then
-    #     echo "Changing symmetry to symmetryPlane in T"; echo
-    #     find "${CASE_DIR}" -name "T" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    # fi
-
-    # if [[ -n $(find "${CASE_DIR}" -name "pointMotionU") ]]
-    # then
-    #     echo "Changing symmetry to symmetryPlane in pointMotionU"; echo
-    #     find "${CASE_DIR}" -name "pointMotionU" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    # fi
 
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict) ]]
     then
@@ -269,11 +164,6 @@ function solids4Foam::convertCaseFormatFoamExtend()
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
-    # Then one final general pass of all files in the 0 directory, in case we
-    # missed any in the checks above
-    # Check: the checks above may not be needed, as this command should pick up
-    # all the files in the time directories
-    #for FILE in $(\ls [0-9]/*) ;
     for FILE in $(find ./[0-9]* -type f)
     do
         if [[ -f "${FILE}" ]]
@@ -313,12 +203,14 @@ function solids4Foam::convertCaseFormatFoamExtend()
             "${CASE_DIR}"/system/functions
     fi
 
+    # 3. Rename turbulence model
     if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
     then
         echo "Changing RAS to RASModel in turbulenceProperties"
         find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RAS;/RASModel;/g"
     fi
 
+    # 4. Check for boundaryData
     if [[ -d "${CASE_DIR}"/constant/boundaryData && -d "${CASE_DIR}"/constant/boundaryData.foam-extend ]]
     then
         echo "Moving constant/boundaryData to constant/boundaryData.openfoam"
