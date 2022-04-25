@@ -261,27 +261,21 @@ void elasticWallPressureFvPatchScalarField::patchFlux
     const fvMatrix<scalar>& matrix
 ) const
 {
-    const label patchI = patch().index();
+    scalarField rAU(patch().size(), 0.0);
+    if (db().foundObject<volScalarField>("rAU"))
+    {
+        rAU = patch().lookupPatchField<volScalarField, scalar>("rAU");
+    }
+    else
+    {
+        rAU = patch().lookupPatchField<surfaceScalarField, scalar>("rAUf");
+    }
 
 #ifdef OPENFOAMESIORFOUNDATION
-    const fvMesh& mesh = internalField().mesh();
+    flux.boundaryFieldRef()[patch().index()] = rAU*snGrad()*patch().magSf();
 #else
-    const fvMesh& mesh = dimensionedInternalField().mesh();
+    flux.boundaryField()[patch().index()] = rAU*snGrad()*patch().magSf();
 #endif
-
-    const fvsPatchField<scalar>& rAU =
-        patch().lookupPatchField<surfaceScalarField, scalar>
-        (
-            "rAUf"
-        );
-
-#ifdef OPENFOAMESIORFOUNDATION
-    flux.boundaryFieldRef()[patchI] =
-#else
-    flux.boundaryField()[patchI] =
-#endif
-        rAU*this->snGrad()
-       *mesh.magSf().boundaryField()[patchI];
 }
 
 

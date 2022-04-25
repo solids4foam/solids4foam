@@ -16,42 +16,44 @@ FoamFile
 
 ddtSchemes
 {
-    default     Euler;
+    default backward;
 }
 
 gradSchemes
 {
-    default     leastSquares;
+    default leastSquares;
 }
 
 divSchemes
 {
-    default     none;
-    div(phi,U)  Gauss linearUpwind cellLimited leastSquares 1;
+    default none;
+    // div(phi,U)   Gauss linear;
+    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
+    div((nuEff*dev(T(grad(U))))) Gauss linear;
 }
 
 laplacianSchemes
 {
-    default                 none;
-    laplacian(nu,U)         Gauss linear corrected;
-    laplacian(rAU,p)        Gauss linear corrected;
-    laplacian((1|A(U)),p)   Gauss linear corrected;
+    default none;
+    laplacian(nuEff,U) Gauss linear corrected;
+    laplacian(rAU,p) Gauss linear corrected;
+    laplacian((1|A(U)),p) Gauss linear corrected;
     laplacian(diffusivity,cellMotionU) Gauss linear corrected;
 }
 
 interpolationSchemes
 {
-    default     linear;
+    default linear;
 }
 
 snGradSchemes
 {
-    default     corrected;
+    default corrected;
 }
 
 fluxRequired
 {
-    default    no;
+    default         no;
     p;
 }
 

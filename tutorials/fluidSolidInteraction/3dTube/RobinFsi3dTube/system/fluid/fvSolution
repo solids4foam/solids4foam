@@ -64,17 +64,11 @@ solvers
     }
 }
 
-PISO
+PIMPLE
 {
-    predictor   yes;
-    nCorrectors 3;
+    nOuterCorrectors 1;
+    nCorrectors     3;
     nNonOrthogonalCorrectors 1;
-}
-
-relaxationFactors
-{
-	U   0.7;
-	p   0.3;
 }
 
 // ************************************************************************* //

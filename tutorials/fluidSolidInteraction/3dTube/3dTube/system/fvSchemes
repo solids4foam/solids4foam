@@ -14,47 +14,25 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+d2dt2Schemes
+{}
+
 ddtSchemes
-{
-    default backward;
-}
+{}
 
 gradSchemes
-{
-    default leastSquares;
-}
+{}
 
 divSchemes
-{
-    default none;
-    // div(phi,U)   Gauss linear;
-    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
-}
+{}
 
 laplacianSchemes
-{
-    default none;
-    laplacian(nuEff,U) Gauss linear corrected;
-    laplacian(rAU,p) Gauss linear corrected;
-    laplacian((1|A(U)),p) Gauss linear corrected;
-    laplacian(diffusivity,cellMotionU) Gauss linear corrected;
-}
-
-interpolationSchemes
-{
-    default linear;
-}
+{}
 
 snGradSchemes
-{
-    default corrected;
-}
+{}
 
-fluxRequired
-{
-    default         no;
-    p;
-}
-
+interpolationSchemes
+{}
 
 // ************************************************************************* //

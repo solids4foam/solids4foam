@@ -26,25 +26,12 @@ solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
-solidModels/finiteVolume/fvc/fvcCellLimitedGrad.C
-
 fluidModels/fluidModel/fluidModel.C
 fluidModels/interFluid/interFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pimpleFluid/pimpleFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
 fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
-
-fluidModels/finiteVolume/RBFMeshMotionSolver/RBFInterpolation.C
-fluidModels/finiteVolume/RBFMeshMotionSolver/RBFCoarsening.C
-fluidModels/finiteVolume/RBFMeshMotionSolver/RBFMeshMotionSolver.C
-fluidModels/finiteVolume/RBFMeshMotionSolver/twoDPointCorrectorRBF.C
-fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/TPSFunction.C
-fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/WendlandC0Function.C
-fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/WendlandC2Function.C
-fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/WendlandC4Function.C
-fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/WendlandC6Function.C
-fluidModels/finiteVolume/RBFMeshMotionSolver/RBFFunctions/LinearFunction.C
 
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
@@ -226,6 +213,7 @@ numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
+numerics/fvc/fvcCellLimitedGrad.C
 numerics/skewCorrectedSnGrad/skewCorrectedSnGrads.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
 numerics/logExpVolFields/eig3/eig3.C
@@ -238,5 +226,17 @@ numerics/globalPolyPatch/globalPolyPatch.C
 numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
 numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
 numerics/pointGaussLeastSquaresGrad/pointGaussLeastSquaresGrads.C
+
+numerics/RBFMeshMotionSolver/RBFInterpolation.C
+numerics/RBFMeshMotionSolver/RBFCoarsening.C
+numerics/RBFMeshMotionSolver/RBFMeshMotionSolver.C
+numerics/RBFMeshMotionSolver/twoDPointCorrectorRBF.C
+numerics/RBFMeshMotionSolver/RBFFunctions/TPSFunction.C
+numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC0Function.C
+numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC2Function.C
+numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC4Function.C
+numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC6Function.C
+numerics/RBFMeshMotionSolver/RBFFunctions/LinearFunction.C
+
 
 LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
