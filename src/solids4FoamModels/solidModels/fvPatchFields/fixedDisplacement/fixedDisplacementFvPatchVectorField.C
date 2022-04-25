@@ -186,7 +186,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 (
     const fixedDisplacementFvPatchVectorField& pivpvf
@@ -197,7 +197,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     dispSeries_(pivpvf.dispSeries_),
     interpPtr_()
 {}
-
+#endif
 
 fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 (

@@ -24,6 +24,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifndef OPENFOAMFOUNDATION
+
 #include "newLeastSquaresVolPointInterpolation.H"
 #include "fvMesh.H"
 #include "volFields.H"
@@ -952,8 +954,12 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaces() const
                 label curNgbPoint = ngbPatchPoints[pointI];
 
                 label curLocalPoint =
+#ifdef OPENFOAMFOUNDATION
+                    findIndex(procPatch.nbrPoints(), curNgbPoint);
+#else
                     findIndex(procPatch.neighbPoints(), curNgbPoint);
 //                     procPatch.neighbPoints()[curNgbPoint];
+#endif
 
                 List<labelPair> addressing
                 (
@@ -1356,8 +1362,12 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                 label curNgbPoint = ngbPatchPoints[pointI];
 
                 label curLocalPoint =
+#ifdef OPENFOAMFOUNDATION
+                    findIndex(procPatch.nbrPoints(), curNgbPoint);
+#else
                     findIndex(procPatch.neighbPoints(), curNgbPoint);
 //                     procPatch.neighbPoints()[curNgbPoint];
+#endif
 
                 List<labelPair> addressing
                 (
@@ -1678,7 +1688,11 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
             label sizeby2 = faceCells.size()/2;
 
+#ifdef OPENFOAMFOUNDATION
+            if (isA<processorPolyPatch>(cycPatch))
+#else
             if (cycPatch.parallel())
+#endif
             {
                 if (localFaceID < sizeby2)
                 {
@@ -1742,7 +1756,11 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
                     vector delta =
                         deltaOwn
+#ifdef OPENFOAMFOUNDATION
+                      - cycPatch.transform().transformPosition(deltaNgb);
+#else
                       - transform(cycPatch.forwardT()[0], deltaNgb);
+#endif
 
                     allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
                 }
@@ -1764,9 +1782,14 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
 
                     vector delta =
                         deltaNgb
+#ifdef OPENFOAMFOUNDATION
+                      - cycPatch.transform().transformPosition(deltaOwn);
+                    delta =
+                        -cycPatch.transform().invTransformPosition(delta);
+#else
                       - transform(cycPatch.forwardT()[0], deltaOwn);
-
                     delta = -transform(cycPatch.reverseT()[0], delta);
+#endif
 
                     allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
                 }
@@ -1817,7 +1840,11 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
                 }
             }
 
+#ifdef OPENFOAMFOUNDATION
+            if (isA<processorPolyPatch>(cycPatch))
+#else
             if (cycPatch.parallel())
+#endif
             {
                 vector deltaNgb = //dni
                     Cf[faceID] - p[ngbCycPointI];
@@ -1834,13 +1861,24 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
                 {
                     allPoints[pointID++] =
                         p[pointI]
+#ifdef OPENFOAMFOUNDATION
+                      + cycPatch.transform().transformPosition(deltaNgb);
+#else
                       + transform(cycPatch.forwardT()[0], deltaNgb);
+#endif
                 }
                 else
                 {
                     allPoints[pointID++] =
                         p[pointI]
+#ifdef OPENFOAMFOUNDATION
+                      + cycPatch.transform().invTransformPosition
+                        (
+                            deltaNgb
+                        );
+#else
                       + transform(cycPatch.reverseT()[0], deltaNgb);
+#endif
                 }
             }
         }
@@ -2278,7 +2316,11 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
             label sizeby2 = faceCells.size()/2;
 
+#ifdef OPENFOAMFOUNDATION
+            if (isA<processorPolyPatch>(cycPatch))
+#else
             if (cycPatch.parallel())
+#endif
             {
                 if (localFaceID < sizeby2)
                 {
@@ -2342,7 +2384,11 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
                     vector delta =
                         deltaOwn
+#ifdef OPENFOAMFOUNDATION
+                      - cycPatch.transform().transformPosition(deltaNgb);
+#else
                       - transform(cycPatch.forwardT()[0], deltaNgb);
+#endif
 
                     allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
 
@@ -2371,11 +2417,20 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
                         ]
                       - C[faceCells[localFaceID]];
 
+#ifdef OPENFOAMFOUNDATION
+                    vector delta =
+                        deltaNgb
+                      - cycPatch.transform().transformPosition(deltaOwn);
+
+                    delta =
+                        - cycPatch.transform().invTransformPosition(delta);
+#else
                     vector delta =
                         deltaNgb
                       - transform(cycPatch.forwardT()[0], deltaOwn);
 
                     delta = -transform(cycPatch.reverseT()[0], delta);
+#endif
 
                     allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
 
@@ -2469,7 +2524,11 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
                 }
             }
 
+#ifdef OPENFOAMFOUNDATION
+            if (isA<processorPolyPatch>(cycPatch))
+#else
             if (cycPatch.parallel())
+#endif
             {
                 vector deltaNgb = //dni
                     Cf[faceID] - p[ngbCycPointI];
@@ -2486,13 +2545,24 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
                 {
                     allPoints[pointID++] =
                         p[pointI]
+#ifdef OPENFOAMFOUNDATION
+                      + cycPatch.transform().transformPosition(deltaNgb);
+#else
                       + transform(cycPatch.forwardT()[0], deltaNgb);
+#endif
                 }
                 else
                 {
                     allPoints[pointID++] =
                         p[pointI]
+#ifdef OPENFOAMFOUNDATION
+                      + cycPatch.transform().invTransformPosition
+                        (
+                            deltaNgb
+                        );
+#else
                       + transform(cycPatch.reverseT()[0], deltaNgb);
+#endif
                 }
             }
         }
@@ -2939,7 +3009,11 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
             label sizeby2 = faceCells.size()/2;
 
+#ifdef OPENFOAMFOUNDATION
+            if (isA<processorPolyPatch>(cycPatch))
+#else
             if (cycPatch.parallel())
+#endif
             {
                 if (localFaceID < sizeby2)
                 {
@@ -3003,7 +3077,11 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
                     vector delta =
                         deltaOwn
+#ifdef OPENFOAMFOUNDATION
+                      - cycPatch.transform().transformPosition(deltaNgb);
+#else
                       - transform(cycPatch.forwardT()[0], deltaNgb);
+#endif
 
                     allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
 
@@ -3032,11 +3110,19 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
                         ]
                       - C[faceCells[localFaceID]];
 
+#ifdef OPENFOAMFOUNDATION
+                    vector delta =
+                        deltaNgb
+                      - cycPatch.transform().transformPosition(deltaOwn);
+
+                    delta = -cycPatch.transform().invTransformPosition(delta);
+#else
                     vector delta =
                         deltaNgb
                       - transform(cycPatch.forwardT()[0], deltaOwn);
 
                     delta = -transform(cycPatch.reverseT()[0], delta);
+#endif
 
                     allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
 
@@ -3130,7 +3216,11 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
                 }
             }
 
+#ifdef OPENFOAMFOUNDATION
+            if (isA<processorPolyPatch>(cycPatch))
+#else
             if (cycPatch.parallel())
+#endif
             {
                 vector deltaNgb = //dni
                     Cf[faceID] - p[ngbCycPointI];
@@ -3147,13 +3237,24 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
                 {
                     allPoints[pointID++] =
                         p[pointI]
+#ifdef OPENFOAMFOUNDATION
+                      + cycPatch.transform().transformPosition(deltaNgb);
+#else
                       + transform(cycPatch.forwardT()[0], deltaNgb);
+#endif
                 }
                 else
                 {
                     allPoints[pointID++] =
                         p[pointI]
+#ifdef OPENFOAMFOUNDATION
+                      + cycPatch.transform().invTransformPosition
+                        (
+                            deltaNgb
+                        );
+#else
                       + transform(cycPatch.reverseT()[0], deltaNgb);
+#endif
                 }
             }
         }
@@ -4094,3 +4195,5 @@ newLeastSquaresVolPointInterpolation::invLsMatrices() const
 } // End namespace Foam
 
 // ************************************************************************* //
+
+#endif

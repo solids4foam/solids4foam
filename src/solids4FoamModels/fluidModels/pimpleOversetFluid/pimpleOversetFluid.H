@@ -42,7 +42,7 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 
 #ifndef pimpleOversetFluid_H
 #define pimpleOversetFluid_H
@@ -153,6 +153,6 @@ public:
 
 #endif
 
-#endif // FOAMEXTEND > 40
+#endif // FOAMEXTEND
 
 // ************************************************************************* //

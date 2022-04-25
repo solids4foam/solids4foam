@@ -82,13 +82,13 @@ boundaryField
     symmx
     {
         type            solidSymmetry;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
     symmy
     {
         type            solidSymmetry;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
 }

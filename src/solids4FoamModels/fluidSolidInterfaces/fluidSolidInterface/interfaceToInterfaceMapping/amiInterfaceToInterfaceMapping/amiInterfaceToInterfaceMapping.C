@@ -98,7 +98,7 @@ amiInterfaceToInterfaceMapping::interpolator() const
 void amiInterfaceToInterfaceMapping::checkZoneAToZoneBError() const
 {
     // Reference to patch face centres
-    const vectorField& patchAFaceCentres = patchA().faceCentres();
+    const vectorField patchAFaceCentres(patchA().faceCentres());
 
     // Construct global zone field
     const vectorField zoneAFaceCentres

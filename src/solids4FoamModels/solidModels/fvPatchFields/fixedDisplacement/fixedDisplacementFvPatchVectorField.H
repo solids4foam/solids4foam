@@ -121,6 +121,9 @@ public:
         fixedDisplacementFvPatchVectorField
         (
             const fixedDisplacementFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -131,6 +134,7 @@ public:
                 new fixedDisplacementFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         fixedDisplacementFvPatchVectorField

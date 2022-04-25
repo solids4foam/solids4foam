@@ -129,7 +129,7 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
 (
     const solidSymmetryFvPatchVectorField& ptf
@@ -138,7 +138,7 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
     symmetryFvPatchField<vector>(ptf),
     secondOrder_(ptf.secondOrder_)
 {}
-
+#endif
 
 solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
 (

@@ -104,8 +104,13 @@ void Foam::mechanicalModel::makeVolToPoint() const
         )   << "pointer already set" << abort(FatalError);
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
-    volToPointPtr_ = new volPointInterpolation(mesh());        
+#ifdef OPENFOAMFOUNDATION
+    volToPointPtr_ = &const_cast<volPointInterpolation&>
+    (
+        volPointInterpolation::New(mesh())
+    );
+#elif OPENFOAMESI
+    volToPointPtr_ = new volPointInterpolation(mesh());
 #else
     volToPointPtr_ = new newLeastSquaresVolPointInterpolation(mesh());
 #endif
@@ -415,10 +420,12 @@ const Foam::fvMesh& Foam::mechanicalModel::mesh() const
 
 
 #ifdef OPENFOAMESIORFOUNDATION
-const Foam::volPointInterpolation&
+const Foam::volPointInterpolation& Foam::mechanicalModel::volToPoint() const
+{
+    return volPointInterpolation::New(mesh_);
+}
 #else
 const Foam::newLeastSquaresVolPointInterpolation&
-#endif
 Foam::mechanicalModel::volToPoint() const
 {
     if (!volToPointPtr_)
@@ -428,7 +435,7 @@ Foam::mechanicalModel::volToPoint() const
 
     return *volToPointPtr_;
 }
-
+#endif
 
 Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::rho() const
 {
@@ -1040,6 +1047,10 @@ Foam::scalar Foam::mechanicalModel::residual()
 
 void Foam::mechanicalModel::updateTotalFields()
 {
+#ifdef OPENFOAMFOUNDATION
+    volToPointPtr_ = nullptr;
+#endif
+
     PtrList<mechanicalLaw>& laws = *this;
 
     forAll(laws, lawI)

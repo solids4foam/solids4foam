@@ -281,7 +281,7 @@ bool Foam::solidTorque::start()
     return writeData();
 }
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidTorque::execute(const bool forceWrite)
 #else
 bool Foam::solidTorque::execute()

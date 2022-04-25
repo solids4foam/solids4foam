@@ -99,7 +99,7 @@ Foam::convectiveFluxFvPatchScalarField::convectiveFluxFvPatchScalarField
     // lambda_ = dimensionedScalar(transportProperties.lookup("lambda")).value();
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 Foam::convectiveFluxFvPatchScalarField::convectiveFluxFvPatchScalarField
 (
     const convectiveFluxFvPatchScalarField& wbppsf
@@ -114,7 +114,7 @@ Foam::convectiveFluxFvPatchScalarField::convectiveFluxFvPatchScalarField
     // rhoName_(wbppsf.rhoName_),
     // adjoint_(wbppsf.adjoint_)
 {}
-
+#endif
 
 Foam::convectiveFluxFvPatchScalarField::convectiveFluxFvPatchScalarField
 (

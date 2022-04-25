@@ -129,7 +129,7 @@ solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
     );
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
 (
     const solidWedgeFvPatchScalarField& ptf
@@ -137,7 +137,7 @@ solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
 :
     wedgeFvPatchField<scalar>(ptf)
 {}
-
+#endif
 
 solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
 (
@@ -165,7 +165,7 @@ tmp<Field<scalar> > solidWedgeFvPatchScalarField::snGrad() const
     const wedgePolyPatch& wedgePatch =
         refCast<const wedgePolyPatch>(patch().patch());
 
-    const vectorField& patchC = patch().patch().faceCentres();
+    const vectorField patchC(patch().patch().faceCentres());
     const vectorField n(patch().nf());
     const vector& centreN = wedgePatch.centreNormal();
     const scalarField d(((patch().Cn() - patchC) & centreN)/(n & centreN));
@@ -227,7 +227,7 @@ void solidWedgeFvPatchScalarField::evaluate(const Pstream::commsTypes)
         refCast<const wedgeFvPatch>(this->patch());
 
     // Rotate patchC field back to centre plane to find transformed cell centres
-    const vectorField& patchC = patch().patch().faceCentres();
+    const vectorField patchC(patch().patch().faceCentres());
     const vectorField transC(wedgePatch.faceT().T() & patchC);
 
     // Calculate correction vector which connects actual cell centre to the

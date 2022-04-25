@@ -29,19 +29,11 @@ solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 solidModels/finiteVolume/fvc/fvcCellLimitedGrad.C
 
 fluidModels/fluidModel/fluidModel.C
-fluidModels/buoyantBoussinesqPimpleFluid/buoyantBoussinesqPimpleFluid.C
-fluidModels/buoyantPimpleFluid/buoyantPimpleFluid.C
-fluidModels/icoFluid/icoFluid.C
 fluidModels/interFluid/interFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
-fluidModels/pisoFluid/pisoFluid.C
 fluidModels/pimpleFluid/pimpleFluid.C
-fluidModels/pUCoupledFluid/pUCoupledFluid.C
-fluidModels/stokesFluid/stokesFluid.C
-fluidModels/transientSimpleFluid/transientSimpleFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
 fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
-fluidModels/unsIcoFluid/unsIcoFluid.C
 
 fluidModels/finiteVolume/RBFMeshMotionSolver/RBFInterpolation.C
 fluidModels/finiteVolume/RBFMeshMotionSolver/RBFCoarsening.C
@@ -155,8 +147,6 @@ $(fluidFvPatchFields)/elasticWallPressure/elasticWallPressureFvPatchScalarField.
 $(fluidFvPatchFields)/elasticWallVelocity/elasticWallVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/extrapolated/extrapolatedFvPatchFields.C
 $(fluidFvPatchFields)/extrapolatedPressure/extrapolatedPressureFvPatchScalarField.C
-$(fluidFvPatchFields)/freeSurfacePressure/freeSurfacePressureFvPatchScalarField.C
-$(fluidFvPatchFields)/freeSurfaceVelocity/freeSurfaceVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/fixedVelocityPressure/fixedVelocityPressureFvPatchScalarField.C
 $(fluidFvPatchFields)/movingWallPressure/movingWallPressureFvPatchScalarField.C
 $(fluidFvPatchFields)/newMovingWallVelocity/newMovingWallVelocityFvPatchVectorField.C
@@ -171,7 +161,6 @@ $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocit
 fluidModels/pointPatchFields/timeVaryingVelocity/timeVaryingVelocityPointPatchVectorField.C
 
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
-functionObjects/setInletVelocity/setInletVelocity.C
 functionObjects/solidForces/solidForces.C
 functionObjects/solidForcesDisplacements/solidForcesDisplacements.C
 functionObjects/solidKineticEnergy/solidKineticEnergy.C

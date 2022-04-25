@@ -237,7 +237,7 @@ solidTractionFvPatchVectorField
     curTimeIndex_(stpvf.curTimeIndex_)
 {}
 
-
+#ifndef OPENFOAMFOUNDATION
 solidTractionFvPatchVectorField::
 solidTractionFvPatchVectorField
 (
@@ -256,7 +256,7 @@ solidTractionFvPatchVectorField
     relaxFac_(stpvf.relaxFac_),
     curTimeIndex_(stpvf.curTimeIndex_)
 {}
-
+#endif
 
 solidTractionFvPatchVectorField::
 solidTractionFvPatchVectorField

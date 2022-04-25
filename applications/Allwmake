@@ -1,8 +1,17 @@
 #!/bin/bash
 cd ${0%/*} || exit 1    # run from this directory
 
-wmake all solvers
-wmake all scripts
+targetType=""
+All="all"
+if [ "$WM_PROJECT" = "OpenFOAM" ]
+then
+    # Parse arguments for library compilation
+    . $WM_PROJECT_DIR/wmake/scripts/AllwmakeParseArguments
+    All="-all"
+fi
+
+wmake $All $targetType solvers
+wmake $All $targetType scripts
 
 if [ "$WM_PROJECT" = "foam" ]
 then

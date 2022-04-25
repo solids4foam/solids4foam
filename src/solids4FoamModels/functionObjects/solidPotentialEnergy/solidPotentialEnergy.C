@@ -30,6 +30,7 @@ License
 #include "pointFields.H"
 #include "surfaceFields.H"
 #include "lookupSolidModel.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -191,7 +192,7 @@ bool Foam::solidPotentialEnergy::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidPotentialEnergy::execute(const bool forceWrite)
 #else
 bool Foam::solidPotentialEnergy::execute()

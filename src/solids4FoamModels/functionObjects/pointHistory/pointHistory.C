@@ -35,6 +35,7 @@ Author
 #include "OStringStream.H"
 #include "IStringStream.H"
 #include "IOmanip.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -271,7 +272,7 @@ bool Foam::pointHistory::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::pointHistory::execute(const bool forceWrite)
 #else
 bool Foam::pointHistory::execute()

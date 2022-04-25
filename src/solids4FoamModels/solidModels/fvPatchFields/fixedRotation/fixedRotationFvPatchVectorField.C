@@ -161,7 +161,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 (
     const fixedRotationFvPatchVectorField& pivpvf
@@ -177,7 +177,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     dispSeries_(pivpvf.dispSeries_),
     originSeries_(pivpvf.originSeries_)
 {}
-
+#endif
 
 fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 (

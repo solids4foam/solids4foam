@@ -28,6 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -224,7 +225,7 @@ bool Foam::solidDisplacements::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidDisplacements::execute(const bool forceWrite)
 #else
 bool Foam::solidDisplacements::execute()

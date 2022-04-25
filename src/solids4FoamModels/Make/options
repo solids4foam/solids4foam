@@ -1,44 +1,35 @@
 ifeq ($(WM_PROJECT), foam)
-    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
-    ifeq ($(VER), 1)
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
-    else
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
-    endif
+    VERSION_SPECIFIC_INC = -DFOAMEXTEND
+
+    VERSION_SPECIFIC_LIBS = \
+        -lincompressibleTransportModels -lincompressibleTurbulenceModel \
+        -lincompressibleRASModels -lincompressibleLESModels -llduSolvers \
+        -linterfaceProperties -lfiniteArea -loversetMesh -loversetDynamicFvMesh
 else
     VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
     ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
-        ifeq (v1812,$(findstring v1812,$(WM_PROJECT_VERSION)))
-            VERSION_SPECIFIC_INC += -DOPENFOAMESI=1812
-        else
-            VERSION_SPECIFIC_INC += -DOPENFOAMESI=1912
-        endif
+        VERSION_SPECIFIC_INC += -DOPENFOAMESI
+
+        VERSION_SPECIFIC_LIBS = \
+            -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
+            -limmiscibleIncompressibleTwoPhaseMixture -lfvMotionSolvers \
+            -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
+            -lfluidThermophysicalModels -lcompressibleTurbulenceModels
     else
         VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
-    endif
-endif
 
-ifeq ($(WM_PROJECT), foam)
-    VERSION_SPECIFIC_LIBS = \
-        -lincompressibleTurbulenceModel -lincompressibleRASModels \
-        -lincompressibleLESModels -llduSolvers -linterfaceProperties \
-        -lfiniteArea
-    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
-    ifeq ($(VER), 1)
-        VERSION_SPECIFIC_LIBS += -loversetMesh -loversetDynamicFvMesh
+        VERSION_SPECIFIC_LIBS = \
+            -lmomentumTransportModels -lincompressibleMomentumTransportModels \
+            -lcompressibleMomentumTransportModels -ltwoPhaseMixture \
+            -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools \
+            -lfvMotionSolvers -lradiationModels -lfvModels -lfvConstraints \
+            -lspecie -lfluidThermophysicalModels
     endif
-else
-    VERSION_SPECIFIC_LIBS = \
-        -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
-        -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
-        -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
-        -lfluidThermophysicalModels -lturbulenceModels -lcompressibleTurbulenceModels
 endif
 
 EXE_INC = \
     -std=c++14 \
     -Wno-old-style-cast -Wno-deprecated-declarations -Wno-deprecated-copy \
-    $(DISABLE_WARNING_FLAGS) \
     $(VERSION_SPECIFIC_INC) \
     -I../../ThirdParty/eigen3 \
     -I../blockCoupledSolids4FoamTools/lnInclude \
@@ -63,15 +54,25 @@ EXE_INC = \
     -I$(LIB_SRC)/TurbulenceModels/turbulenceModels/lnInclude \
     -I$(LIB_SRC)/TurbulenceModels/incompressible/lnInclude \
     -I$(LIB_SRC)/TurbulenceModels/compressible/lnInclude \
+    -I$(LIB_SRC)/MomentumTransportModels/momentumTransportModels/lnInclude \
+    -I$(LIB_SRC)/MomentumTransportModels/compressible/lnInclude \
+    -I$(LIB_SRC)/MomentumTransportModels/incompressible/lnInclude \
+    -I$(LIB_SRC)/ThermophysicalTransportModels/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/radiation/lnInclude \
     -I$(LIB_SRC)/radiationModels/lnInclude \
     -I$(LIB_SRC)/transportModels/interfaceProperties/lnInclude \
     -I$(LIB_SRC)/transportModels \
+    -I$(LIB_SRC)/transportModels/lnInclude \
     -I$(LIB_SRC)/transportModels/compressible/lnInclude \
     -I$(LIB_SRC)/transportModels/incompressible/lnInclude \
     -I$(LIB_SRC)/transportModels/twoPhaseMixture/lnInclude \
     -I$(LIB_SRC)/transportModels/immiscibleIncompressibleTwoPhaseMixture/lnInclude \
+    -I$(LIB_SRC)/twoPhaseModels/twoPhaseMixture/lnInclude \
+    -I$(LIB_SRC)/twoPhaseModels/interfaceProperties/lnInclude \
+    -I$(LIB_SRC)/twoPhaseModels/incompressibleTwoPhaseMixture/lnInclude \
+    -I$(LIB_SRC)/twoPhaseModels/immiscibleIncompressibleTwoPhaseMixture/lnInclude \
+    -I$(LIB_SRC)/twoPhaseModels/twoPhaseChange/lnInclude \
     -I$(LIB_SRC)/tetFiniteElement/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/meshMotion/fvMotionSolver/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/meshMotion/tetMotionSolver/lnInclude  \
@@ -81,7 +82,6 @@ LIB_LIBS = \
     $(VERSION_SPECIFIC_LIBS) \
     -L$(FOAM_USER_LIBBIN) -lblockCoupledSolids4FoamTools \
     -lfiniteVolume \
-    -lincompressibleTransportModels \
     -ldynamicFvMesh \
     -ldynamicMesh \
     -lmeshTools \

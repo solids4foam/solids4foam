@@ -99,16 +99,20 @@ public:
         solidSymmetryFvPatchVectorField
         (
             const solidSymmetryFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
-        virtual tmp<fvPatchField<vector> > clone() const
+        virtual tmp<fvPatchVectorField> clone() const
         {
-            return tmp<fvPatchField<vector> >
+            return tmp<fvPatchVectorField>
             (
                 new solidSymmetryFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         solidSymmetryFvPatchVectorField

@@ -158,7 +158,7 @@ elasticSlipWallVelocityFvPatchVectorField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 elasticSlipWallVelocityFvPatchVectorField::
 elasticSlipWallVelocityFvPatchVectorField
 (
@@ -172,6 +172,7 @@ elasticSlipWallVelocityFvPatchVectorField
     oldoldFc_(pivpvf.oldoldFc_),
     movingWallVelocity_(pivpvf.movingWallVelocity_)
 {}
+#endif
 
 
 elasticSlipWallVelocityFvPatchVectorField::

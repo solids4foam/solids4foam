@@ -24,7 +24,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 
 #include "pimpleOversetFluid.H"
 #include "volFields.H"

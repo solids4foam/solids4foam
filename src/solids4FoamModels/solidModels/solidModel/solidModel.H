@@ -105,7 +105,11 @@ class solidModel
         volVectorField U_;
 
         //- Point mesh
+#ifdef OPENFOAMFOUNDATION
+        pointMesh& pMesh_;
+#else
         pointMesh pMesh_;
+#endif
 
         //- Point total displacement field
         pointVectorField pointD_;

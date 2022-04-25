@@ -91,6 +91,9 @@ public:
         fixedVelocityPressureFvPatchScalarField
         (
             const fixedVelocityPressureFvPatchScalarField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -101,6 +104,7 @@ public:
                 new fixedVelocityPressureFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         fixedVelocityPressureFvPatchScalarField

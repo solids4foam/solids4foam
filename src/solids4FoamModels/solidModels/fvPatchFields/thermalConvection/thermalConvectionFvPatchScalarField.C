@@ -80,7 +80,7 @@ Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
     fvPatchField<scalar>::operator=(patchInternalField());
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
 (
     const thermalConvectionFvPatchScalarField& wbppsf
@@ -91,7 +91,7 @@ Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
     alpha_(wbppsf.alpha_),
     Tinf_(wbppsf.Tinf_)
 {}
-
+#endif
 
 Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
 (

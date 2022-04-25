@@ -524,7 +524,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     // Do not copy pointer objects: they will be re-created.
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 (
     const solidContactFvPatchVectorField& ptf
@@ -559,7 +559,6 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 {
     // Do not copy pointer objects
 }
-
 
 Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 (
@@ -596,7 +595,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 {
     // Do not copy pointer objects
 }
-
+#endif // ifndef OPENFOAMFOUNDATION
 
 // * * * * * * * * * * * * * * * Destructors  * * * * * * * * * * * * * * * //
 
@@ -1537,7 +1536,11 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
         const polyMesh& mesh = patch().patch().boundaryMesh().mesh();
 
         // Create the point mesh, which is needed for the point field
+#ifdef OPENFOAMFOUNDATION
+        const pointMesh& pMesh = pointMesh::New(mesh);
+#else
         pointMesh pMesh(mesh);
+#endif
 
         // Create the point distance fields
 

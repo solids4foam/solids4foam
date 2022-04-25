@@ -108,6 +108,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 }
 
 
+#ifndef OPENFOAMFOUNDATION
 newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 (
     const newMovingWallVelocityFvPatchVectorField& pivpvf
@@ -119,6 +120,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     oldFc_(pivpvf.oldFc_),
     oldoldFc_(pivpvf.oldoldFc_)
 {}
+#endif
 
 
 newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
@@ -269,94 +271,97 @@ snGrad() const
     word UName = dimensionedInternalField().name();
 #endif
 
-    const fvPatchField<tensor>& gradU =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
-            "grad(" + UName + ")"
-        );
-
-    const vectorField n(patch().nf());
-    const vectorField delta(patch().delta());
-    const vectorField k((I - sqr(n)) & delta);
-
-    const vectorField dUP(k & gradU.patchInternalField());
-
-    if (secondOrder_)
+    if (db().foundObject<volTensorField>("grad(" + UName + ")"))
     {
-        const vectorField nGradUP(n & gradU.patchInternalField());
-
         tmp<Field<vector> > tnGradU
         (
             new vectorField(this->patch().size(), vector::zero)
         );
+        const fvPatchField<tensor>& gradU =
+            patch().lookupPatchField<volTensorField, tensor>
+            (
+                "grad(" + UName + ")"
+            );
 
-#ifdef OPENFOAMESIORFOUNDATION
-        tnGradU.ref() =
-            2
-           *(
-                *this
-              - (patchInternalField() + dUP)
-            )*this->patch().deltaCoeffs()
-          - nGradUP;
+        const vectorField n(patch().nf());
+        const vectorField delta(patch().delta());
+        const vectorField k((I - sqr(n)) & delta);
 
-        tnGradU.ref() -= n*(n&tnGradU());
-#else
-        tnGradU() =
-            2
-           *(
-                *this
-              - (patchInternalField() + dUP)
-            )*this->patch().deltaCoeffs()
-          - nGradUP;
+        const vectorField dUP(k & gradU.patchInternalField());
 
-        tnGradU() -= n*(n&tnGradU());
-#endif
+        if (secondOrder_)
+        {
+            const vectorField nGradUP(n & gradU.patchInternalField());
 
-        return tnGradU;
+            tmp<Field<vector> > tnGradU
+            (
+                new vectorField(this->patch().size(), vector::zero)
+            );
 
-//         return
-//             2
-//            *(
-//                 *this
-//               - (patchInternalField() + dUP)
-//             )*this->patch().deltaCoeffs()
-//           - nGradUP;
-    }
+    #ifdef OPENFOAMESIORFOUNDATION
+            tnGradU.ref() =
+                2
+               *(
+                    *this
+                  - (patchInternalField() + dUP)
+                )*this->patch().deltaCoeffs()
+              - nGradUP;
 
+            tnGradU.ref() -= n*(n&tnGradU());
+    #else
+            tnGradU() =
+                2
+               *(
+                    *this
+                  - (patchInternalField() + dUP)
+                )*this->patch().deltaCoeffs()
+              - nGradUP;
+
+            tnGradU() -= n*(n&tnGradU());
+    #endif
+
+            return tnGradU;
+
+        //         return
+        //             2
+        //            *(
+        //                 *this
+        //               - (patchInternalField() + dUP)
+        //             )*this->patch().deltaCoeffs()
+        //           - nGradUP;
+        }
 
     // First order
-//     vectorField dUP = (k&gradU.patchInternalField());
+    // vectorField dUP = (k&gradU.patchInternalField());
 
-    tmp<Field<vector> > tnGradU
+    #ifdef OPENFOAMESIORFOUNDATION
+        tnGradU.ref() =
+            (
+                *this
+              - (patchInternalField() + dUP)
+            )*this->patch().deltaCoeffs();
+
+        tnGradU.ref() -= n*(n&tnGradU());
+    #else
+        tnGradU() =
+            (
+                *this
+              - (patchInternalField() + dUP)
+            )*this->patch().deltaCoeffs();
+
+        tnGradU() -= n*(n&tnGradU());
+    #endif
+
+        return tnGradU;
+    }
+
+    return
     (
-        new vectorField(this->patch().size(), vector::zero)
+        (I - sqr(patch().nf()))
+      & (
+         *this - patchInternalField()
+         )*this->patch().deltaCoeffs()
     );
-
-#ifdef OPENFOAMESIORFOUNDATION
-    tnGradU.ref() =
-        (
-            *this
-          - (patchInternalField() + dUP)
-        )*this->patch().deltaCoeffs();
-
-    tnGradU.ref() -= n*(n&tnGradU());
-#else
-    tnGradU() =
-        (
-            *this
-          - (patchInternalField() + dUP)
-        )*this->patch().deltaCoeffs();
-
-    tnGradU() -= n*(n&tnGradU());
-#endif
-
-    return tnGradU;
-
-//     return
-//     (
-//         *this
-//       - (patchInternalField() + (k&gradU.patchInternalField()))
-//     )*this->patch().deltaCoeffs();
 }
 
 

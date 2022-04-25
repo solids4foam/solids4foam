@@ -74,20 +74,27 @@ void sonicLiquidFluid::solveRhoEqn()
     (
         fvm::ddt(rho_)
       + fvc::div(phi())
-#ifdef OPENFOAMESIORFOUNDATION
-          ==
-                fvOptions_(rho_)
+#ifdef OPENFOAMFOUNDATION
+      ==
+        models().source(rho_)
+#elif OEPNFOAMESI
+      ==
+        options()(rho_)
 #endif
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
-        fvOptions_.constrain(rhoEqn);
+#ifdef OPENFOAMFOUNDATION
+    constraints().constrain(rhoEqn);
+#elif OPENFOAMESI
+    options().constrain(rhoEqn);
+#endif
 
     rhoEqn.solve();
 
-        fvOptions_.correct(rho_);
-#else
-    rhoEqn.solve();
+#ifdef OPENFOAMFOUNDATION
+    constraints().constrain(rho_);
+#elif OPENFOAMESI
+    options().correct(rho_);
 #endif
 }
 
@@ -134,7 +141,9 @@ void sonicLiquidFluid::CorrectFlux()
 
         CorrectPhi
         (
+#ifndef OPENFOAMFOUNDATION
                 U(),
+#endif
                 phi(),
                 p(),
                 rho_,
@@ -142,7 +151,7 @@ void sonicLiquidFluid::CorrectFlux()
                 dimensionedScalar("rAUf", dimTime, 1),
                 divrhoU(),
                 pimple()
-#ifndef OPENFOAMESI
+#ifndef OPENFOAMESIORFOUNDATION
                 ,
                 true
 #endif
@@ -356,9 +365,6 @@ sonicLiquidFluid::sonicLiquidFluid
         ),
         rhoO_ + psi_*p()
     ),
-#ifdef OPENFOAMESIORFOUNDATION
-    fvOptions_(fv::options::New(mesh())),
-#endif
     rAU_
     (
         IOobject
@@ -406,12 +412,6 @@ sonicLiquidFluid::sonicLiquidFluid
                                 fvc::interpolate(rho_*U())
                         )
                 );
-        }
-
-        // Check if any finite volume option is present
-        if (!fvOptions_.optionList::size())
-        {
-                Info << "No finite volume options present\n" << endl;
         }
 #else
     mesh().schemesDict().setFluxRequired(p().name());
@@ -521,58 +521,64 @@ bool sonicLiquidFluid::evolve()
     while (pimple().loop())
     {
 #ifdef OPENFOAMFOUNDATION
-                if (!pimple().simpleRho())
-                {
-                        solveRhoEqn();
-                }
-#else
+        if (!pimple().simpleRho())
+        {
                 solveRhoEqn();
+        }
+#else
+        solveRhoEqn();
 #endif
 
         // --- Momentum equation
         // Time-derivative matrix
         fvVectorMatrix UEqn
-                (
-                        fvm::ddt(rho_, U())
-                  + fvm::div(phi(), U())
-                  - fvm::laplacian(mu_, U())
-#ifdef OPENFOAMESIORFOUNDATION
-                 ==
-                        fvOptions_(rho_, U())
+        (
+            fvm::ddt(rho_, U())
+          + fvm::div(phi(), U())
+          - fvm::laplacian(mu_, U())
+#ifdef OPENFOAMFOUNDATION
+         ==
+            models().source(rho_, U())
+#elif OPENFOAMESI
+          ==
+            options()(rho_, U())
+#endif
+        );
+
+        UEqn.relax();
+
+#ifdef OPENFOAMFOUNDATION
+        tmp<fvVectorMatrix> tUEqn(UEqn);
+        constraints().constrain(UEqn);
+#elif OPENFOAMESI
+        tmp<fvVectorMatrix> tUEqn(UEqn);
+        options().constrain(UEqn);
 #endif
 
-                );
-
-                UEqn.relax();
-
-#ifdef OPENFOAMESIORFOUNDATION
-                tmp<fvVectorMatrix> tUEqn(UEqn);
-
-                fvOptions_.constrain(UEqn);
-#endif
-
-                if (pimple().momentumPredictor())
-                {
-                        solve(UEqn == -fvc::grad(p()));
-                }
-                else
+        if (pimple().momentumPredictor())
+        {
+                solve(UEqn == -fvc::grad(p()));
+        }
+        else
         {
             // Explicit update
             U() = (UEqn.H() - fvc::grad(p()))/UEqn.A();
             U().correctBoundaryConditions();
         }
 
-#ifdef OPENFOAMESIORFOUNDATION
-        fvOptions_.correct(U());
+#ifdef OPENFOAMFOUNDATION
+        constraints().constrain(U());
+#elif OPENFOAMESI
+        options().correct(U());
 #endif
 
         // --- Pressure corrector loop
         while (pimple().correct())
         {
 #ifdef OPENFOAMESIORFOUNDATION
-                        solvePEqn(tUEqn.ref());
+            solvePEqn(tUEqn.ref());
 #else
-                        solvePEqn(UEqn);
+            solvePEqn(UEqn);
 #endif
         }
 
@@ -583,29 +589,29 @@ bool sonicLiquidFluid::evolve()
         gradU() = fvc::grad(U());
     }
 
-        // Update rho based on equation of state
-        rho_ = rhoO_ + psi_*p();
+    // Update rho based on equation of state
+    rho_ = rhoO_ + psi_*p();
 
     // Make the fluxes absolute to the mesh motion
     fvc::makeAbsolute(phi(), rho_, U());
 
-        // Print variables for inspection
-        // Density variation
-        scalar deltaRho = max(rho_).value() - min(rho_).value();
-        scalar refDeltaRho = 0.01*rho0_.value();
+    // Print variables for inspection
+    // Density variation
+    scalar deltaRho = max(rho_).value() - min(rho_).value();
+    scalar refDeltaRho = 0.01*rho0_.value();
 
-        // Info variable values
-        Info<< nl << "Density: min " << min(rho_).value()
-                << " max " << max(rho_).value() << endl;
+    // Info variable values
+    Info<< nl << "Density: min " << min(rho_).value()
+        << " max " << max(rho_).value() << endl;
 
-        Info<< "Density variation: " << deltaRho
-                << " ref: " << refDeltaRho << endl;
+    Info<< "Density variation: " << deltaRho
+        << " ref: " << refDeltaRho << endl;
 
-        Info<< "Pressure: min " << min(p()).value()
-                << " max " << max(p()).value() << endl;
+    Info<< "Pressure: min " << min(p()).value()
+        << " max " << max(p()).value() << endl;
 
-        Info<< "Velocity: min " << min(mag(U())).value()
-                << " max " << max(mag(U())).value() << nl << nl;
+    Info<< "Velocity: min " << min(mag(U())).value()
+        << " max " << max(mag(U())).value() << nl << nl;
 
     return 0;
 }

@@ -74,6 +74,7 @@ fixedVelocityPressureFvPatchScalarField
 {}
 
 
+#ifndef OPENFOAMFOUNDATION
 fixedVelocityPressureFvPatchScalarField::
 fixedVelocityPressureFvPatchScalarField
 (
@@ -82,6 +83,7 @@ fixedVelocityPressureFvPatchScalarField
 :
     fixedGradientFvPatchScalarField(ptf)
 {}
+#endif
 
 
 fixedVelocityPressureFvPatchScalarField::

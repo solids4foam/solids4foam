@@ -535,7 +535,7 @@ bool coupledNonLinGeomPressureDisplacementSolid::evolve()
         // Insert displacement equation into block system
         DpEqn.insertEquation(0, DEqn);
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 #       include "addBlockCoupledBC.H"
 #endif
 

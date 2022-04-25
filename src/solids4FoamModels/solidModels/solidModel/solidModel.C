@@ -729,7 +729,11 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedVector("0", dimLength/dimTime, vector::zero)
     ),
+#ifdef OPENFOAMFOUNDATION
+    pMesh_(pointMesh::New(meshPtr_())),
+#else
     pMesh_(mesh()),
+#endif
     pointD_
     (
         IOobject

@@ -32,9 +32,8 @@ Author
 #include "pointFields.H"
 #include "boundBox.H"
 #include "polyPatchID.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "surfaceFields.H"
-#endif
+#include "surfaceFields.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -226,7 +225,7 @@ bool Foam::patchAvgTractionHistory::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::patchAvgTractionHistory::execute(const bool forceWrite)
 #else
 bool Foam::patchAvgTractionHistory::execute()

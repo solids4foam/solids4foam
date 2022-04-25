@@ -119,7 +119,7 @@ bool Foam::hydrostaticPressure::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::hydrostaticPressure::execute(const bool forceWrite)
 #else
 bool Foam::hydrostaticPressure::execute()

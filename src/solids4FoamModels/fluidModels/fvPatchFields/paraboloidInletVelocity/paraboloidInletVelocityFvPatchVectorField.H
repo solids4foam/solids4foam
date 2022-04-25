@@ -116,6 +116,9 @@ public:
         paraboloidInletVelocityFvPatchVectorField
         (
             const paraboloidInletVelocityFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -126,6 +129,7 @@ public:
                 new paraboloidInletVelocityFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         paraboloidInletVelocityFvPatchVectorField

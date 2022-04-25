@@ -74,6 +74,7 @@ movingWallPressureFvPatchScalarField
 {}
 
 
+#ifndef OPENFOAMFOUNDATION
 movingWallPressureFvPatchScalarField::
 movingWallPressureFvPatchScalarField
 (
@@ -82,6 +83,7 @@ movingWallPressureFvPatchScalarField
 :
     fixedGradientFvPatchScalarField(ptf)
 {}
+#endif
 
 
 movingWallPressureFvPatchScalarField::

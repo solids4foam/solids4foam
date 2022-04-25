@@ -88,6 +88,7 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 }
 
 
+#ifndef OPENFOAMFOUNDATION
 normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 (
     const normalInletVelocityFvPatchVectorField& pivpvf
@@ -95,6 +96,7 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 :
     fixedValueFvPatchVectorField(pivpvf)
 {}
+#endif
 
 
 normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField

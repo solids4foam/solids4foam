@@ -30,6 +30,7 @@ License
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "lookupSolidModel.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -267,7 +268,7 @@ bool Foam::solidForces::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidForces::execute(const bool forceWrite)
 #else
 bool Foam::solidForces::execute()

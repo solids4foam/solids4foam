@@ -20,23 +20,18 @@ convertToMeters 1;
 vertices
 (
     (0 0 0)
-    (20 0 0)
-    (20 0.1 0)
+    (0.5 0 0)
+    (0.5 0.1 0)
     (0 0.1 0)
     (0 0 1)
-    (20 0 1)
-    (20 0.1 1)
+    (0.5 0 1)
+    (0.5 0.1 1)
     (0 0.1 1)
 );
 
 blocks
 (
-    //hex (0 1 2 3 4 5 6 7) (100 5 1) simpleGrading (1 1 1) // mesh1
-    hex (0 1 2 3 4 5 6 7) (200 10 1) simpleGrading (1 1 1) // mesh1.5
-    //hex (0 1 2 3 4 5 6 7) (300 15 1) simpleGrading (1 1 1) // mesh2
-    //hex (0 1 2 3 4 5 6 7) (500 25 1) simpleGrading (1 1 1) // mesh3
-    //hex (0 1 2 3 4 5 6 7) (1000 50 1) simpleGrading (1 1 1) // mesh4
-    //hex (0 1 2 3 4 5 6 7) (2000 100 1) simpleGrading (1 1 1) // mesh5
+    hex (0 1 2 3 4 5 6 7) (50 10 1) simpleGrading (1 1 1)
 );
 
 edges
