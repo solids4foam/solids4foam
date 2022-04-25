@@ -60,7 +60,7 @@ boundaryField
     }
     symmetry
     {
-        type            symmetry;
+        type            symmetryPlane;
     }
 }
 

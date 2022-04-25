@@ -32,7 +32,7 @@ boundaryField
     }
     symmetry
     {
-       type            symmetry;
+       type            symmetryPlane;
        value           uniform (0 0 0);
     }
 }

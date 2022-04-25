@@ -43,7 +43,7 @@ boundaryField
     symmPlane
     {
         type            solidSymmetry;
-        patchType       symmetry;
+        patchType       symmetryPlane;
         value           uniform (0 0 0);
     }
 

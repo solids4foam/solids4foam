@@ -24,19 +24,19 @@ boundaryField
     left
     {
         type            solidSymmetry;
-        patchType       symmetry;
+        patchType       symmetryPlane;
         value           uniform (0 0 0);
     }
     bottom
     {
         type            solidSymmetry;
-        patchType       symmetry;
+        patchType       symmetryPlane;
         value           uniform (0 0 0);
     }
     inside
     {
         type            normalDisplacement;
-        normalDisplacement uniform -1e-6;
+        normalDisplacement -1e-6;
         value           uniform (0 0 0);
     }
     outside

@@ -25,7 +25,7 @@ explicitLinearGeometryTotalDisplacementCoeffs
     linearBulkViscosityCoeff 0.06;
 
     // JST stabilisation
-    JSTScaleFactor 0.01;
+    JSTScaleFactor 0.0; //0.01;
 }
 
 

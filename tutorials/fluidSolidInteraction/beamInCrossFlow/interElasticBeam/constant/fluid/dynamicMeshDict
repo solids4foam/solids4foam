@@ -17,7 +17,6 @@ FoamFile
 dynamicFvMesh dynamicMotionSolverFvMesh;
 
 solver velocityLaplacian;
-motionSolver velocityLaplacian;
 
 diffusivity quadratic inverseDistance (interface);
 

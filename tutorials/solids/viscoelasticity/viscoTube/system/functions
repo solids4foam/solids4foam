@@ -1,5 +1,5 @@
 functions
-{
+(
     pointStressSymmy
     {
         type    solidPointStress;
@@ -15,4 +15,4 @@ functions
         type    solidPointDisplacement;
         point   (0.0075 0 0);
     }
-}
+);

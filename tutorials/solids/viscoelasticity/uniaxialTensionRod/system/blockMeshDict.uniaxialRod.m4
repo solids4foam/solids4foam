@@ -68,7 +68,7 @@ edges
 );
 
 patches
-(   symmetry symmPlane
+(   symmetryPlane symmPlane
     (
         (0 8 5 0)
     )
