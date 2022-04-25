@@ -331,7 +331,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
 #ifdef OPENFOAMFOUNDATION
             if (!isA<processorPolyPatch>(cycPolyPatch))
 #else
-            if (!(cycPolyPatch.parallel())
+            if (!(cycPolyPatch.parallel()))
 #endif
             {
                 if (cycLocalFaceID < sizeby2)

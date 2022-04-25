@@ -228,8 +228,15 @@ void Foam::interpolationTable<Type>::check() const
 template<class Type>
 void Foam::interpolationTable<Type>::write(Ostream& os) const
 {
+#ifdef OPENFOAMESIORFOUNDATION
     writeEntry(os, "file", fileName_);
     writeEntry(os, "outOfBounds", boundsHandlingToWord(boundsHandling_));
+#else
+    os.writeKeyword("fileName")
+        << fileName_ << token::END_STATEMENT << nl;
+    os.writeKeyword("outOfBounds")
+        << boundsHandlingToWord(boundsHandling_) << token::END_STATEMENT << nl;
+#endif
     if (reader_.valid())
     {
         reader_->write(os);
