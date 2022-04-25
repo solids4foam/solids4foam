@@ -78,7 +78,7 @@ void Foam::tableReader<Type>::write(Ostream& os) const
 {
     if (this->type() != "openFoam")
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
         writeEntry(os, "readerType", this->type());
 #else
         os.writeKeyword("readerType")

@@ -508,7 +508,7 @@ bool pimpleFluid::evolve()
 #elif OPENFOAMESI
           + turbulence_->divDevReff(U())
          ==
-            options()(U());
+            options()(U())
 #else
           + turbulence_->divDevReff()
 #endif

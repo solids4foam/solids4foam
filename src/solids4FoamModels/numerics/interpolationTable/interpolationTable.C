@@ -95,7 +95,7 @@ template<class Type>
 Foam::interpolationTable<Type>::interpolationTable(const dictionary& dict)
 :
     List<Tuple2<scalar, Type>>(),
-    boundsHandling_(wordToBoundsHandling(dict.lookup("outOfBounds"))),
+    boundsHandling_(wordToBoundsHandling(word(dict.lookup("outOfBounds")))),
     fileName_(dict.lookup("file")),
     reader_(tableReader<Type>::New(dict))
 {
@@ -228,7 +228,7 @@ void Foam::interpolationTable<Type>::check() const
 template<class Type>
 void Foam::interpolationTable<Type>::write(Ostream& os) const
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
     writeEntry(os, "file", fileName_);
     writeEntry(os, "outOfBounds", boundsHandlingToWord(boundsHandling_));
 #else
@@ -401,7 +401,8 @@ void Foam::interpolationTable<Type>::operator=
     List<Tuple2<scalar, Type>>::operator=(interpTable);
     boundsHandling_ = interpTable.boundsHandling_;
     fileName_ = interpTable.fileName_;
-    reader_ = interpTable.reader_;    // note: steals reader. Used in write().
+    //reader_ = interpTable.reader_;    // note: steals reader. Used in write().
+    reader_.reset(interpTable.reader_.clone());
 }
 
 

@@ -95,7 +95,7 @@ public:
             const fvPatchFieldMapper&
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
         solidDirectionMixedFvPatchVectorField
         (
             const solidDirectionMixedFvPatchVectorField&
