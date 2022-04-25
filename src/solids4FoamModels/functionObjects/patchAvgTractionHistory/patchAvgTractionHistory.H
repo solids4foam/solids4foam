@@ -114,7 +114,7 @@ public:
         virtual bool start();
 
         //- execute is called at each ++ or += of the time-loop
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
         virtual bool execute(const bool forceWrite);
 #else
         virtual bool execute();

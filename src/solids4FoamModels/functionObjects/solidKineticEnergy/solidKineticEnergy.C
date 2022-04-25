@@ -161,7 +161,7 @@ bool Foam::solidKineticEnergy::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidKineticEnergy::execute(const bool forceWrite)
 #else
 bool Foam::solidKineticEnergy::execute()

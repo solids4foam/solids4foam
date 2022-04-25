@@ -257,7 +257,7 @@ bool Foam::solidPointTemperature::start()
     return false;
 }
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidPointTemperature::execute(const bool forceWrite)
 #else
 bool Foam::solidPointTemperature::execute()

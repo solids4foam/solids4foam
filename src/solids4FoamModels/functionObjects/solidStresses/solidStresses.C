@@ -211,7 +211,7 @@ bool Foam::solidStresses::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidStresses::execute(const bool forceWrite)
 #else
 bool Foam::solidStresses::execute()

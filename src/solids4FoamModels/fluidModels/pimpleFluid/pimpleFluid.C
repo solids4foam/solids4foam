@@ -149,7 +149,7 @@ void pimpleFluid::CorrectPhi()
     {
         fvScalarMatrix pcorrEqn
         (
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
             fvm::laplacian(rAU_, pcorr)
 #else
             fvm::laplacian(1/aU_, pcorr)
@@ -177,7 +177,7 @@ void pimpleFluid::solvePEqn
 {
     p().boundaryField().updateCoeffs();
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
     // Prepare clean 1/a_p without time derivative and under-relaxation
     // contribution
     rAU_ = 1.0/HUEqn.A();
@@ -210,7 +210,7 @@ void pimpleFluid::solvePEqn
         (
             fvm::laplacian
             (
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
                 fvc::interpolate(rAU_)/pimple().aCoeff(U().name()),
                 p(),
                 "laplacian(rAU," + p().name() + ')'
@@ -247,7 +247,7 @@ void pimpleFluid::solvePEqn
         p().relax();
     }
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
     // Consistently reconstruct velocity after pressure equation.
     // Note: flux is made relative inside the function
     pimple().reconstructTransientVelocity(U(), phi(), ddtUEqn, rAU_, p());
@@ -294,7 +294,7 @@ pimpleFluid::pimpleFluid
     ),
     rho_(laminarTransport_.lookup("rho")),
 #ifdef FOAMEXTEND
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
     rAU_
     (
         IOobject
@@ -537,17 +537,9 @@ bool pimpleFluid::evolve()
 #endif
         }
 #else
-#if FOAMEXTEND < 41
-        // Get under-relaxation factor
-        scalar UUrf =
-            mesh.solutionDict().equationRelaxationFactor
-            (
-                U().select(pimple().finalIter())
-            );
-#endif
         if (pimple().momentumPredictor())
         {
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
             solve(relax(ddtUEqn + HUEqn) == -fvc::grad(p()));
 #else
             solve
@@ -574,7 +566,7 @@ bool pimpleFluid::evolve()
 #ifdef OPENFOAMESIORFOUNDATION
             solvePEqn(tUEqn.ref());
 #else
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
             solvePEqn(scalar(1), ddtUEqn, HUEqn);
 #else
             solvePEqn(UUrf, ddtUEqn, HUEqn);

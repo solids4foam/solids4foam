@@ -58,7 +58,7 @@ Foam::newSubsetMotionSolverFvMesh::newSubsetMotionSolverFvMesh(const IOobject& i
                 "dynamicMeshDict",
                 io.time().constant(),
                 *this,
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
                 IOobject::MUST_READ_IF_MODIFIED,
 #else
                 IOobject::MUST_READ,

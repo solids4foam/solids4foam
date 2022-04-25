@@ -7,31 +7,25 @@ then
     . $WM_PROJECT_DIR/wmake/scripts/AllwmakeParseArguments
 fi
 
-if [ "$WM_PROJECT_VERSION" = "9" ]
-then
-    if [ ! -d "interpolationTable" ]
-    then
-        cp -r ../../filesToReplaceInOF/interpolationTable ./
-    fi
-else
-    if [ -d "interpolationTable" ]
-    then
-        rm -r interpolationTable
-    fi
-fi
-
-echo "Updating Make/files link"
 if [ "$WM_PROJECT" = "foam" ]
 then
-    echo "Using Make/files.foamextend"
-    if [ $(readlink Make/files) != "files.foamextend" ]
+    if [[ ! -f Make/files ]]
     then
+        echo "Linking Make/files.foamextend to Make/files"
+        (cd Make && ln -s files.foamextend files)
+    elif [ $(readlink Make/files) != "files.foamextend" ]
+    then
+        echo "Updating Make/files link to Make/files.foamextend"
         (cd Make && ln -sf files.foamextend files)
     fi
 else
-    echo "Using Make/files.openfoam"
-    if [ $(readlink Make/files) != "files.openfoam" ]
+    if [[ ! -f Make/files ]]
     then
+        echo "Linking Make/files.openfoam to Make/files"
+        (cd Make && ln -sf files.openfoam files)
+    elif [ $(readlink Make/files) != "files.openfoam" ]
+    then
+        echo "Updating Make/files link to Make/files.openfoam"
         (cd Make && ln -sf files.openfoam files)
     fi
 fi

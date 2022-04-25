@@ -262,7 +262,7 @@ bool Foam::solidPointStress::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidPointStress::execute(const bool forceWrite)
 #else
 bool Foam::solidPointStress::execute()

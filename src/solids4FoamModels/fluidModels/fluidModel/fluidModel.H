@@ -56,7 +56,7 @@ SourceFiles
     #include "uniformDimensionedFields.H"
 #endif
 #include "globalPolyPatch.H"
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
     #include "oversetMesh.H"
 #endif
 #ifdef OPENFOAMFOUNDATION
@@ -224,7 +224,7 @@ protected:
         //- Calculate the Courant number
         void CourantNo() const;
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
         //- Calculate the Courant number
         void oversetCourantNo
         (
@@ -238,7 +238,7 @@ protected:
         //- Continuity errors
         void continuityErrs();
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
         //- Continuity errors
         void oversetContinuityErrs();
 #endif
@@ -326,7 +326,7 @@ public:
             //- Return non-const acess to the pimple control
             pimpleControl& pimple();
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
             //- Return non-const acess to the overset mesh
             const oversetMesh& osMesh() const;
 #endif

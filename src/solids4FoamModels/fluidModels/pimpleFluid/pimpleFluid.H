@@ -89,7 +89,7 @@ class pimpleFluid
         autoPtr<surfaceVectorField> Uf_;
 
 #else
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
         //- rAU field
         volScalarField rAU_;
 #else

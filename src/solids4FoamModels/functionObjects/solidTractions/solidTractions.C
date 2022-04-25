@@ -221,7 +221,7 @@ bool Foam::solidTractions::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidTractions::execute(const bool forceWrite)
 #else
 bool Foam::solidTractions::execute()

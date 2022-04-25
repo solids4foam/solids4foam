@@ -560,7 +560,6 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     // Do not copy pointer objects
 }
 
-#ifndef OPENFOAMFOUNDATION
 Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 (
     const solidContactFvPatchVectorField& ptf,
@@ -596,7 +595,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 {
     // Do not copy pointer objects
 }
-#endif
+#endif // ifndef OPENFOAMFOUNDATION
 
 // * * * * * * * * * * * * * * * Destructors  * * * * * * * * * * * * * * * //
 

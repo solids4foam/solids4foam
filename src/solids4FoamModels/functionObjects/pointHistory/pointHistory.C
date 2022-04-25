@@ -272,7 +272,7 @@ bool Foam::pointHistory::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::pointHistory::execute(const bool forceWrite)
 #else
 bool Foam::pointHistory::execute()

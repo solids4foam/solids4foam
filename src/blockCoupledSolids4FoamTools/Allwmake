@@ -1,14 +1,27 @@
 #!/bin/bash
 cd ${0%/*} || exit 1    # run from this directory
 
-echo "Updating Make/files link"
 if [ "$WM_PROJECT" = "foam" ]
 then
-    echo "Using Make/files.foamextend"
-    (cd Make && ln -sf files.foamextend files)
+    if [[ ! -f Make/files ]]
+    then
+        echo "Linking Make/files.foamextend to Make/files"
+        (cd Make && ln -s files.foamextend files)
+    elif [ $(readlink Make/files) != "files.foamextend" ]
+    then
+        echo "Updating Make/files link to Make/files.foamextend"
+        (cd Make && ln -sf files.foamextend files)
+    fi
 else
-    echo "Using Make/files.openfoam"
-    (cd Make && ln -sf files.openfoam files)
+    if [[ ! -f Make/files ]]
+    then
+        echo "Linking Make/files.openfoam to Make/files"
+        (cd Make && ln -sf files.openfoam files)
+    elif [ $(readlink Make/files) != "files.openfoam" ]
+    then
+        echo "Updating Make/files link to Make/files.openfoam"
+        (cd Make && ln -sf files.openfoam files)
+    fi
 fi
 
 wmake libso

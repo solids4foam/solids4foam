@@ -240,7 +240,7 @@ void Foam::fluidModel::CourantNo() const
     CourantNo(CoNum, meanCoNum, velMag);
 }
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 void Foam::fluidModel::oversetCourantNo
 (
     scalar& CoNum,
@@ -299,7 +299,7 @@ void Foam::fluidModel::continuityErrs()
         << endl;
 }
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 void Foam::fluidModel::oversetContinuityErrs()
 {
     const volScalarField contErr = osMesh().gamma()*fvc::div(phi());
@@ -603,7 +603,7 @@ Foam::fluidModel::fluidModel
                 mesh()
             ),
             mesh(),
-            dimensionedTensor("zero", dimVelocity/dimLength, Zero)
+            dimensionedTensor("zero", dimVelocity/dimLength, tensor::zero)
         )
     ),
     gradpPtr_
@@ -619,7 +619,7 @@ Foam::fluidModel::fluidModel
                 mesh()
             ),
             mesh(),
-            dimensionedVector("zero", p().dimensions()/dimLength, Zero)
+            dimensionedVector("zero", p().dimensions()/dimLength, vector::zero)
         )
     ),
     phiPtr_
@@ -734,7 +734,7 @@ Foam::pimpleControl& Foam::fluidModel::pimple()
     return pimplePtr_();
 }
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 const Foam::oversetMesh& Foam::fluidModel::osMesh() const
 {
     return oversetMesh::New(mesh());
