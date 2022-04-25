@@ -1,29 +1,11 @@
 ifeq ($(WM_PROJECT), foam)
     VERSION_SPECIFIC_INC = -DFOAMEXTEND
-
-    VERSION_SPECIFIC_LIBS = \
-        -lincompressibleTransportModels -lincompressibleTurbulenceModel \
-        -lincompressibleRASModels -lincompressibleLESModels -llduSolvers \
-        -linterfaceProperties -lfiniteArea -loversetMesh -loversetDynamicFvMesh
 else
     VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
     ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
         VERSION_SPECIFIC_INC += -DOPENFOAMESI
-
-        VERSION_SPECIFIC_LIBS = \
-            -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
-            -limmiscibleIncompressibleTwoPhaseMixture -lfvMotionSolvers \
-            -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
-            -lfluidThermophysicalModels -lcompressibleTurbulenceModels
     else
         VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
-
-        VERSION_SPECIFIC_LIBS = \
-            -lmomentumTransportModels -lincompressibleMomentumTransportModels \
-            -lcompressibleMomentumTransportModels -ltwoPhaseMixture \
-            -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools \
-            -lfvMotionSolvers -lradiationModels -lfvModels -lfvConstraints \
-            -lspecie -lfluidThermophysicalModels
     endif
 endif
 
@@ -44,7 +26,6 @@ EXE_INC = \
     -I$(LIB_SRC)/sampling/lnInclude
 
 LIB_LIBS = \
-    $(VERSION_SPECIFIC_LIBS) \
     -lfiniteVolume \
     -ldynamicFvMesh \
     -ldynamicMesh \

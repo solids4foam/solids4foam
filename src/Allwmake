@@ -10,7 +10,7 @@ then
 fi
 
 (cd blockCoupledSolids4FoamTools && ./Allwmake $targetType $*)
-(cd solids4FoamModels && ./Allwmake  $targetType $*)
+(cd solids4FoamModels && ./Allwmake $targetType $*)
 
 if [[ ! -z "${S4F_USE_GFORTRAN+x}" ]]
 then

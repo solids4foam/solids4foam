@@ -1,38 +1,30 @@
 ifeq ($(WM_PROJECT), foam)
-    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
-    ifeq ($(VER), 1)
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
-    else
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
-    endif
+    VERSION_SPECIFIC_INC = -DFOAMEXTEND
+
+    VERSION_SPECIFIC_LIBS = \
+        -lincompressibleTransportModels -lincompressibleTurbulenceModel \
+        -lincompressibleRASModels -lincompressibleLESModels -llduSolvers \
+        -linterfaceProperties -lfiniteArea -loversetMesh -loversetDynamicFvMesh
 else
     VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
     ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
-        ifeq (v1812,$(findstring v1812,$(WM_PROJECT_VERSION)))
-            VERSION_SPECIFIC_INC += -DOPENFOAMESI=1812
-        else
-            VERSION_SPECIFIC_INC += -DOPENFOAMESI=1912
-        endif
+        VERSION_SPECIFIC_INC += -DOPENFOAMESI
+
+        VERSION_SPECIFIC_LIBS = \
+            -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
+            -limmiscibleIncompressibleTwoPhaseMixture -lfvMotionSolvers \
+            -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
+            -lfluidThermophysicalModels -lcompressibleTurbulenceModels
     else
         VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
-    endif
-endif
 
-ifeq ($(WM_PROJECT), foam)
-    VERSION_SPECIFIC_LIBS = \
-        -lincompressibleTurbulenceModel -lincompressibleRASModels \
-        -lincompressibleLESModels -llduSolvers -linterfaceProperties \
-        -lfiniteArea
-    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
-    ifeq ($(VER), 1)
-        VERSION_SPECIFIC_LIBS += -loversetMesh -loversetDynamicFvMesh
+        VERSION_SPECIFIC_LIBS = \
+            -lmomentumTransportModels -lincompressibleMomentumTransportModels \
+            -lcompressibleMomentumTransportModels -ltwoPhaseMixture \
+            -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools \
+            -lfvMotionSolvers -lradiationModels -lfvModels -lfvConstraints \
+            -lspecie -lfluidThermophysicalModels
     endif
-else
-    VERSION_SPECIFIC_LIBS = \
-        -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
-        -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools -lfvMotionSolvers \
-        -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
-        -lfluidThermophysicalModels -lturbulenceModels -lcompressibleTurbulenceModels
 endif
 
 EXE_INC = \
@@ -91,7 +83,6 @@ LIB_LIBS = \
     $(VERSION_SPECIFIC_LIBS) \
     -L$(FOAM_USER_LIBBIN) -lblockCoupledSolids4FoamTools \
     -lfiniteVolume \
-    -lincompressibleTransportModels \
     -ldynamicFvMesh \
     -ldynamicMesh \
     -lmeshTools \
