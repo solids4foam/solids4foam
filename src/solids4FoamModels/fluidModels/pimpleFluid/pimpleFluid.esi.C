@@ -31,6 +31,7 @@ License
 #include "fvm.H"
 #include "constrainHbyA.H"
 #include "constrainPressure.H"
+#include "findRefCell.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -54,14 +55,13 @@ pimpleFluid::pimpleFluid
 )
 :
     fluidModel(typeName, runTime, region),
-    LTS_(fv::localEulerDdt::enabled(mesh())),
-    trDeltaT_(),
     Uf_(),
-    pressureReference_(p(), pimple().dict()),
+    pRefCell_(0),
+    pRefValue_(0),
     laminarTransport_(U(), phi()),
     turbulence_
     (
-        incompressible::momentumTransportModel::New
+        incompressible::turbulenceModel::New
         (
             U(), phi(), laminarTransport_
         )
@@ -78,6 +78,7 @@ pimpleFluid::pimpleFluid
     ),
     cumulativeContErr_(0)
 {
+    setRefCell(p(), pimple().dict(), pRefCell_, pRefValue_);
     mesh().setFluxRequired(p().name());
     turbulence_->validate();
 
@@ -85,48 +86,26 @@ pimpleFluid::pimpleFluid
     {
         Info<< "Constructing face velocity Uf\n" << endl;
 
-        Uf_ = new surfaceVectorField
+        Uf_.reset
         (
-            IOobject
-            (
-                "Uf",
-                runTime.timeName(),
-                mesh(),
-                IOobject::READ_IF_PRESENT,
-                IOobject::AUTO_WRITE
-            ),
-            fvc::interpolate(U())
-        );
-    }
-
-    if (LTS_)
-    {
-        Info<< "Using LTS" << endl;
-
-        trDeltaT_ = tmp<volScalarField>
-        (
-            new volScalarField
+            new surfaceVectorField
             (
                 IOobject
                 (
-                    fv::localEulerDdt::rDeltaTName,
+                    "Uf",
                     runTime.timeName(),
                     mesh(),
                     IOobject::READ_IF_PRESENT,
                     IOobject::AUTO_WRITE
                 ),
-                mesh(),
-                dimensionedScalar(dimless/dimTime, 1),
-                extrapolatedCalculatedFvPatchScalarField::typeName
+                fvc::interpolate(U())
             )
         );
     }
-    else
-    {
-        const fvMesh& mesh = this->mesh();
-        const surfaceScalarField& phi = this->phi();
-        #include "CourantNo.H"
-    }
+
+    const fvMesh& mesh = this->mesh();
+    const surfaceScalarField& phi = this->phi();
+    #include "CourantNo.H"
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -141,7 +120,7 @@ tmp<vectorField> pimpleFluid::patchViscousForce(const label patchID) const
     tvF.ref() = rho_.value()
        *(
             mesh().boundary()[patchID].nf()
-          & (-turbulence_->devTau()().boundaryField()[patchID])
+          & (-turbulence_->devReff()().boundaryField()[patchID])
         );
 
     return tvF;
@@ -167,7 +146,6 @@ bool pimpleFluid::evolve()
 
     // Take references
     const Time& runTime = fluidModel::runTime();
-    pressureReference& pressureReference = pressureReference_;
     dynamicFvMesh& mesh = this->mesh();
     pimpleControl& pimple = this->pimple();
     volVectorField& U = this->U();
@@ -182,7 +160,7 @@ bool pimpleFluid::evolve()
     // --- Pressure-velocity PIMPLE corrector loop
     while (pimple.loop())
     {
-        if (pimple.firstPimpleIter() || moveMeshOuterCorrectors)
+        if (pimple.firstIter() || moveMeshOuterCorrectors)
         {
             // fvModels not added yet
             //fvModels.preUpdateMesh();
@@ -196,7 +174,8 @@ bool pimpleFluid::evolve()
             }
             else
             {
-                mesh.update();
+                // Do any mesh changes
+                mesh.controlledUpdate();
             }
 
             if (mesh.changing())
@@ -206,7 +185,14 @@ bool pimpleFluid::evolve()
 
                 if (correctPhi)
                 {
-                    #include "correctPhi.foundation.H"
+                    // Calculate absolute flux
+                    // from the mapped surface velocity
+                    phi = mesh.Sf() & Uf();
+
+                    #include "correctPhi.esi.H"
+
+                    // Make the flux relative to the mesh motion
+                    fvc::makeRelative(phi, U);
                 }
 
                 if (checkMeshCourantNo)
@@ -215,9 +201,6 @@ bool pimpleFluid::evolve()
                 }
             }
         }
-
-        // fvModels not implemented yet
-        //fvModels.correct();
 
         // UEqn.H
 
@@ -230,23 +213,23 @@ bool pimpleFluid::evolve()
         (
             fvm::ddt(U) + fvm::div(phi, U)
             // + MRF.DDt(U)
-          + turbulence_->divDevSigma(U)
-         // ==
-         //    fvModels.source(U)
+          + turbulence_->divDevReff(U)
+            // ==
+            //    fvOptions(U)
         );
         fvVectorMatrix& UEqn = tUEqn.ref();
 
         UEqn.relax();
 
-        // fvConstraints not implemented yet
-        //fvConstraints.constrain(UEqn);
+        // fvOptions not implemented yet
+        //fvOptions.constrain(UEqn);
 
         if (pimple.momentumPredictor())
         {
             solve(UEqn == -fvc::grad(p));
 
-            // fvConstraints not implemented yet
-            //fvConstraints.constrain(U);
+            // fvOptions not implemented yet
+            // fvOptions.correct(U);
         }
 
         // --- Pressure corrector loop
@@ -256,14 +239,19 @@ bool pimpleFluid::evolve()
 
             volScalarField rAU(1.0/UEqn.A());
             volVectorField HbyA(constrainHbyA(rAU*UEqn.H(), U, p));
-            surfaceScalarField phiHbyA
-            (
-                "phiHbyA",
-                fvc::flux(HbyA)
-            //+ MRF.zeroFilter(fvc::interpolate(rAU)*fvc::ddtCorr(U, phi, Uf))
-            );
+            surfaceScalarField phiHbyA("phiHbyA", fvc::flux(HbyA));
 
-            //MRF.makeRelative(phiHbyA);
+            // MRF not yet implemented
+            // if (pimple.ddtCorr())
+            // {
+            //     phiHbyA +=
+            //     MRF.zeroFilter(fvc::interpolate(rAU)*fvc::ddtCorr(U, phi, Uf));
+            // }
+            // else
+            // {
+            //     phiHbyA += MRF.zeroFilter(fvc::interpolate(rAU));
+            // }
+            // MRF.makeRelative(phiHbyA);
 
             if (p.needReference())
             {
@@ -282,7 +270,7 @@ bool pimpleFluid::evolve()
                 HbyA -= (rAU - rAtU())*fvc::grad(p);
             }
 
-            if (pimple.nCorrPiso() <= 1)
+            if (pimple.nCorrPISO() <= 1)
             {
                 tUEqn.clear();
             }
@@ -299,13 +287,9 @@ bool pimpleFluid::evolve()
                     fvm::laplacian(rAtU(), p) == fvc::div(phiHbyA)
                 );
 
-                pEqn.setReference
-                (
-                    pressureReference.refCell(),
-                    pressureReference.refValue()
-                );
+                pEqn.setReference(pRefCell_, pRefValue_);
 
-                pEqn.solve();
+                pEqn.solve(mesh.solver(p.select(pimple.finalInnerIter())));
 
                 if (pimple.finalNonOrthogonalIter())
                 {
@@ -320,7 +304,7 @@ bool pimpleFluid::evolve()
 
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
-            //fvConstraints.constrain(U);
+            //fvOptions.correct(U);
 
             // Correct Uf if the mesh is moving
             fvc::correctUf(Uf, U, phi);

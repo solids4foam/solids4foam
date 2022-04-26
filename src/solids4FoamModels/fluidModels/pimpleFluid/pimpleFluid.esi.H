@@ -26,7 +26,7 @@ Class
     pimpleFluid
 
 Description
-    pimpleFoam fluid model from OpenFOAM-9.
+    pimpleFoam fluid model from OpenFOAM-v2012.
 
 Author
     Ported by Philip Cardiff, UCD.
@@ -40,10 +40,9 @@ SourceFiles
 #define pimpleFluid_H
 
 #include "fluidModel.H"
-#include "localEulerDdtScheme.H"
-#include "pressureReference.H"
 #include "singlePhaseTransportModel.H"
-#include "kinematicMomentumTransportModel.H"
+#include "turbulentTransportModel.H"
+#include "CorrectPhi.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -63,23 +62,20 @@ class pimpleFluid
 {
     // Private data
 
-        //- Local time stpe flag
-        bool LTS_;
-
-        //- Reciprocal of the local time-step field
-        tmp<volScalarField> trDeltaT_;
-
         //- Pointer to the velocity surface field
         autoPtr<surfaceVectorField> Uf_;
 
-        //- Pressure reference object
-        pressureReference pressureReference_;
+        //- Reference pressure cell
+        label pRefCell_;
+
+        //- Reference pressure value
+        scalar pRefValue_;
 
         //- Transport model
         singlePhaseTransportModel laminarTransport_;
 
         //- Turbulence model
-        autoPtr<incompressible::momentumTransportModel> turbulence_;
+        autoPtr<incompressible::turbulenceModel> turbulence_;
 
         //- Fluid density [kg/m3]
         dimensionedScalar rho_;
