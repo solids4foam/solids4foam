@@ -1745,6 +1745,15 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                 const symmTensorField& interfaceShadSigma =
                     interfaceShadowSigma()[matI];
 
+                // Use under-relaxation for correcting the interface
+                // displacement. This is particularly important for nonlinear
+                // geometry cases. Default to 0.1
+                scalar rf = 0.1;
+                if (mesh.relaxField("Dinterface"))
+                {
+                    rf = mesh.fieldRelaxationFactor("Dinterface");
+                }
+
                 // Calculate the interface displacements
                 forAll(Dinterface, faceI)
                 {
@@ -1820,7 +1829,7 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                         // Calculate the displacement at the interface
                         Dinterface[faceI] =
                             DinterfacePrev[faceI]
-                          + (da*db/(db*Ka + da*Kb))*(tractionb - tractiona);
+                          + rf*(da*db/(db*Ka + da*Kb))*(tractionb - tractiona);
                     }
                     else
                     {
@@ -1942,7 +1951,7 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                         // Calculate the displacement at the interface
                         Dinterface[faceI] =
                             DinterfacePrev[faceI]
-                          + (da*db/(db*Ka + da*Kb))*(tractionb - tractiona);
+                          + rf*(da*db/(db*Ka + da*Kb))*(tractionb - tractiona);
                     }
                 }
             }
