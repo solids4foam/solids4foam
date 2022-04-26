@@ -159,7 +159,7 @@ bool pimpleFluid::evolve()
     {
         // Fluxes will be corrected to absolute velocity
         // HJ, 6/Feb/2009
-#       include "correctPhi.H"
+#       include "correctPhi.foamextend.H"
     }
 
     // Make the fluxes relative to the mesh motion

@@ -26,7 +26,7 @@ Class
     pimpleFluid
 
 Description
-    pimpleDyMFoam fluid model from foam-extend-4.1.
+    pimpleDyMFoam fluid model from OpenFOAM-9.
 
 Author
     Ported by Philip Cardiff, UCD.
@@ -40,8 +40,10 @@ SourceFiles
 #define pimpleFluid_H
 
 #include "fluidModel.H"
+#include "localEulerDdtScheme.H"
+#include "pressureReference.H"
 #include "singlePhaseTransportModel.H"
-#include "turbulenceModel.H"
+#include "kinematicMomentumTransportModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -61,23 +63,26 @@ class pimpleFluid
 {
     // Private data
 
+        //- Local time stpe flag
+        bool LTS_;
+
+        //- Reciprocal of the local time-step field
+        tmp<volScalarField> trDeltaT_;
+
+        //- Pointer to the velocity surface field
+        autoPtr<surfaceVectorField> Uf_;
+
+        //- Pressure reference object
+        pressureReference pressureReference_;
+
         //- Transport model
         singlePhaseTransportModel laminarTransport_;
 
         //- Turbulence model
-        autoPtr<incompressible::turbulenceModel> turbulence_;
+        autoPtr<incompressible::momentumTransportModel> turbulence_;
 
         //- Fluid density [kg/m3]
         dimensionedScalar rho_;
-
-        //- rAU field
-        volScalarField rAU_;
-
-        //- Reference pressure cell
-        label pRefCell_;
-
-        //- Reference pressure value
-        scalar pRefValue_;
 
         //- Correct phi flag
         const bool correctPhi_;
@@ -85,9 +90,10 @@ class pimpleFluid
         //- Check Courant number flag
         const bool checkMeshCourantNo_;
 
+        // Move mesh in the outer corrector loop flag
+        const bool moveMeshOuterCorrectors_;
+
         //- Cumulative continuity errors
-        scalar sumLocalContErr_;
-        scalar globalContErr_;
         scalar cumulativeContErr_;
 
 
