@@ -14,9 +14,11 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidModel icoFluid;
+fluidModel pimpleFluid;
 
-icoFluidCoeffs
-{}
+pimpleFluidCoeffs
+{
+    // PIMPLE settings given in fvSolution
+}
 
 // ************************************************************************* //

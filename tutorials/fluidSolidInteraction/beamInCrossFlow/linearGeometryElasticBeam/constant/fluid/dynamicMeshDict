@@ -16,7 +16,7 @@ FoamFile
 
 dynamicFvMesh dynamicMotionSolverFvMesh;
 
-solver velocityLaplacian; // finite volume solver
+"solver|motionSolver" velocityLaplacian; // finite volume solver
 //solver laplace; // finite element solver
 //solver RBFMeshMotionSolver; // radial basis function solver
 
