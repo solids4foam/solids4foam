@@ -220,8 +220,6 @@ numerics/logExpVolFields/eig3/eig3.C
 numerics/logExpVolFields/eig3Field.C
 numerics/logExpVolFields/expVolFields.C
 numerics/logExpVolFields/logVolFields.C
-numerics/fvMotionSolvers/velocityLaplacianFvMotionSolver.C
-numerics/fvMotionSolvers/totalVelocityLaplacian/totalVelocityLaplacianFvMotionSolver.C
 numerics/globalPolyPatch/globalPolyPatch.C
 numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
 numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
