@@ -1719,6 +1719,12 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                     mesh.lookupObject<volScalarField>("impK");
                 const scalarField& KI = K.internalField();
 
+                // Base mesh displacement field
+                const vectorField& DI = D.internalField();
+
+                // Base mesh displacement field previous iteration
+                const vectorField& DPrevI = D.prevIter().internalField();
+
                 // Interface face centres
                 const vectorField& patchCf = subMesh.boundary()[patchI].Cf();
 
@@ -1744,33 +1750,6 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                 // subMesh on the other side)
                 const symmTensorField& interfaceShadSigma =
                     interfaceShadowSigma()[matI];
-
-                // Use under-relaxation for correcting the interface
-                // displacement. This is particularly important for nonlinear
-                // geometry cases. Default to 0.1
-                scalar rf = 0.1;
-#ifdef OPENFOAMESIORFOUNDATION
-                if (mesh.relaxField("Dinterface"))
-                {
-                    rf = mesh.fieldRelaxationFactor("Dinterface");
-                }
-                else if (mesh.relaxField(D.name()))
-                {
-                    rf = mesh.fieldRelaxationFactor(D.name());
-                }
-#else
-                if (mesh.solutionDict().relaxField("Dinterface"))
-                {
-                    rf = mesh.solutionDict().fieldRelaxationFactor
-                    (
-                        "Dinterface"
-                    );
-                }
-                else if (mesh.solutionDict().relaxField(D.name()))
-                {
-                    rf = mesh.solutionDict().fieldRelaxationFactor(D.name());
-                }
-#endif
 
                 // Calculate the interface displacements
                 forAll(Dinterface, faceI)
@@ -1832,22 +1811,37 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                         scalar Ka = KI[baseOwnID];
                         scalar Kb = KI[baseNeiID];
 
+                        // Lookup own and nei displacements (current and
+                        // previous iterations)
+                        vector Da = DI[baseOwnID];
+                        vector Db = DI[baseNeiID];
+                        vector DPreva = DPrevI[baseOwnID];
+                        vector DPrevb = DPrevI[baseNeiID];
+
                         // The base own cell should be side-a
                         if (baseOwnID != cellMap[faceCells[faceI]])
                         {
                             n = -n;
                             Swap(Ka, Kb);
                             Swap(da, db);
+                            Swap(Da, Db);
+                            Swap(DPreva, DPrevb);
                         }
 
                         // Calculate the traction at side-a and side-b
                         const vector tractiona = n & sigmaPatch[faceI];
                         const vector tractionb = n & interfaceShadSigma[faceI];
 
+                        // Weights
+                        const scalar wab = (da*db/(db*Ka + da*Kb));
+                        const scalar wa = db*Ka/(db*Ka + da*Kb);
+                        const scalar wb = 1 - wa;
+
                         // Calculate the displacement at the interface
                         Dinterface[faceI] =
                             DinterfacePrev[faceI]
-                          + rf*(da*db/(db*Ka + da*Kb))*(tractionb - tractiona);
+                            + wab*(tractionb - tractiona)
+                            + wa*(Da - DPreva) + wb*(Db - DPrevb);
                     }
                     else
                     {
@@ -1962,14 +1956,32 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                         const scalar Kb =
                             K.boundaryField()[basePatchID][baseLocalFaceID];
 
+                        // Lookup own and nei displacements (current and
+                        // previous iterations)
+                        const vector Da = DI[baseOwnID];
+                        const vector Db =
+                            D.boundaryField()[basePatchID][baseLocalFaceID];
+                        const vector DPreva = DPrevI[baseOwnID];
+                        const vector DPrevb =
+                            D.prevIter().boundaryField()
+                            [
+                                basePatchID
+                            ][baseLocalFaceID];
+
                         // Calculate the traction at side-a and side-b
                         const vector tractiona = n & sigmaPatch[faceI];
                         const vector tractionb = n & interfaceShadSigma[faceI];
 
+                        // Weights
+                        const scalar wab = (da*db/(db*Ka + da*Kb));
+                        const scalar wa = db*Ka/(db*Ka + da*Kb);
+                        const scalar wb = 1 - wa;
+
                         // Calculate the displacement at the interface
                         Dinterface[faceI] =
                             DinterfacePrev[faceI]
-                          + rf*(da*db/(db*Ka + da*Kb))*(tractionb - tractiona);
+                            + wab*(tractionb - tractiona)
+                            + wa*(Da - DPreva) + wb*(Db - DPrevb);
                     }
                 }
             }
