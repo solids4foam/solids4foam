@@ -413,7 +413,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                 {
                     FatalErrorIn
                     (
-                        "leastSquaresVolPointInterpolation"
+                        "newLeastSquaresVolPointInterpolation"
                         "::makePointFaces() const"
                     )
                         << "Can not find cyclic ggi patch ngb face id "
@@ -478,7 +478,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                 {
                     FatalErrorIn
                     (
-                        "leastSquaresVolPointInterpolation"
+                        "newLeastSquaresVolPointInterpolation"
                         "::makePointFaces() const"
                     )
                         << "Can not find cyclic ggi patch ngb point "
@@ -1943,7 +1943,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
             {
                 FatalErrorIn
                 (
-                    "leastSquaresVolPointInterpolation"
+                    "newLeastSquaresVolPointInterpolation"
                     "::makeWeights() const"
                 )
                     << "Can not find cyclic ggi patch ngb face id"
@@ -1999,7 +1999,7 @@ void newLeastSquaresVolPointInterpolation::makeWeights() const
             {
                 FatalErrorIn
                 (
-                    "leastSquaresVolPointInterpolation"
+                    "newLeastSquaresVolPointInterpolation"
                     "::makeWeights() const"
                 )
                     << "Can not find cyclic ggi patch ngb point"
@@ -2627,7 +2627,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
             {
                 FatalErrorIn
                 (
-                    "leastSquaresVolPointInterpolation"
+                    "newLeastSquaresVolPointInterpolation"
                     "::makeOrigins() const"
                 )
                     << "Can not find cyclic ggi patch ngb face id"
@@ -2692,7 +2692,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
             {
                 FatalErrorIn
                 (
-                    "leastSquaresVolPointInterpolation"
+                    "newLeastSquaresVolPointInterpolation"
                     "::makeOrigins() const"
                 )
                     << "Can not find cyclic ggi patch ngb point"
@@ -3319,7 +3319,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
             {
                 FatalErrorIn
                 (
-                    "leastSquaresVolPointInterpolation"
+                    "newLeastSquaresVolPointInterpolation"
                     "::makeInvLsMatrices() const"
                 )
                     << "Can not find cyclic ggi patch ngb face id"
@@ -3385,7 +3385,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
             {
                 FatalErrorIn
                 (
-                    "leastSquaresVolPointInterpolation"
+                    "newLeastSquaresVolPointInterpolation"
                     "::makeInvLsMatrices() const"
                 )
                     << "Can not find cyclic ggi patch ngb point"
