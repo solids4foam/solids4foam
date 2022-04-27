@@ -1754,6 +1754,10 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                 {
                     rf = mesh.fieldRelaxationFactor("Dinterface");
                 }
+                else if (mesh.relaxField(D.name()))
+                {
+                    rf = mesh.fieldRelaxationFactor(D.name());
+                }
 #else
                 if (mesh.solutionDict().relaxField("Dinterface"))
                 {
@@ -1761,6 +1765,10 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                     (
                         "Dinterface"
                     );
+                }
+                else if (mesh.solutionDict().relaxField(D.name()))
+                {
+                    rf = mesh.solutionDict().fieldRelaxationFactor(D.name());
                 }
 #endif
 
