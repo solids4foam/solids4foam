@@ -1723,7 +1723,8 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                 const vectorField& DI = D.internalField();
 
                 // Base mesh displacement field previous iteration
-                const vectorField& DPrevI = D.prevIter().internalField();
+                const volVectorField& DPrev = D.prevIter();
+                const vectorField& DPrevI = DPrev.internalField();
 
                 // Interface face centres
                 const vectorField& patchCf = subMesh.boundary()[patchI].Cf();
@@ -1963,7 +1964,7 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                             D.boundaryField()[basePatchID][baseLocalFaceID];
                         const vector DPreva = DPrevI[baseOwnID];
                         const vector DPrevb =
-                            D.prevIter().boundaryField()
+                            DPrev.boundaryField()
                             [
                                 basePatchID
                             ][baseLocalFaceID];
