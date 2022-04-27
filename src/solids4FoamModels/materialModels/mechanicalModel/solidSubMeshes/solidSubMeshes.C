@@ -1749,10 +1749,20 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                 // displacement. This is particularly important for nonlinear
                 // geometry cases. Default to 0.1
                 scalar rf = 0.1;
+#ifdef OPENFOAMESIORFOUNDATION
                 if (mesh.relaxField("Dinterface"))
                 {
                     rf = mesh.fieldRelaxationFactor("Dinterface");
                 }
+#else
+                if (mesh.solutionDict().relaxField("Dinterface"))
+                {
+                    rf = mesh.solutionDict().fieldRelaxationFactor
+                    (
+                        "Dinterface"
+                    );
+                }
+#endif
 
                 // Calculate the interface displacements
                 forAll(Dinterface, faceI)
