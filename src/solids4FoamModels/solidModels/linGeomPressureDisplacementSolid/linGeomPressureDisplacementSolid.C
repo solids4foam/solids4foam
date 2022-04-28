@@ -270,15 +270,7 @@ bool linGeomPressureDisplacementSolid::evolve()
                 iCorr,
 #ifdef OPENFOAMESIORFOUNDATION
                 mag(solverPerfD.initialResidual()),
-                max
-                (
-                    solverPerfD.nIterations()[0],
-                    max
-                    (
-                        solverPerfD.nIterations()[1],
-                        solverPerfD.nIterations()[2]
-                    )
-                ),
+                cmptMax(solverPerfD.nIterations()),
 #else
                 solverPerfD.initialResidual(),
                 solverPerfD.nIterations(),

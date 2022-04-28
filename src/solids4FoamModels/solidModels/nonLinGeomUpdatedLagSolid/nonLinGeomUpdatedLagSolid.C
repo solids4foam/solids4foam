@@ -246,15 +246,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
             iCorr,
 #ifdef OPENFOAMESIORFOUNDATION
             mag(solverPerfDD.initialResidual()),
-            max
-            (
-                solverPerfDD.nIterations()[0],
-                max
-                (
-                    solverPerfDD.nIterations()[1],
-                    solverPerfDD.nIterations()[2]
-                )
-            ),
+            cmptMax(solverPerfDD.nIterations()),
 #else
             solverPerfDD.initialResidual(),
             solverPerfDD.nIterations(),
