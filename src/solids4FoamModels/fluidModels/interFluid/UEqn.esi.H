@@ -1,4 +1,4 @@
-    MRF.correctBoundaryVelocity(U);
+    // MRF.correctBoundaryVelocity(U);
 
     fvVectorMatrix UEqn
     (

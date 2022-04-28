@@ -11,10 +11,14 @@ else
         VERSION_SPECIFIC_INC += -DOPENFOAMESI
 
         VERSION_SPECIFIC_LIBS = \
-            -lturbulenceModels -lincompressibleTurbulenceModels -ltwoPhaseMixture \
-            -limmiscibleIncompressibleTwoPhaseMixture -lfvMotionSolvers \
-            -lradiationModels -lfvOptions -lcompressibleTransportModels -lspecie \
-            -lfluidThermophysicalModels -lcompressibleTurbulenceModels
+            -lturbulenceModels -lincompressibleTurbulenceModels \
+            -ltwoPhaseMixture -limmiscibleIncompressibleTwoPhaseMixture \
+            -lfvMotionSolvers -lradiationModels -lfvOptions \
+            -lcompressibleTransportModels -lspecie -lfluidThermophysicalModels \
+            -lcompressibleTurbulenceModels -lsampling \
+            -lincompressibleTransportModels -linterfaceProperties -lwaveModels \
+            -lVoFphaseTurbulentTransportModels \
+            -lincompressibleInterPhaseTransportModels
     else
         VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
 
@@ -54,6 +58,7 @@ EXE_INC = \
     -I$(LIB_SRC)/TurbulenceModels/turbulenceModels/lnInclude \
     -I$(LIB_SRC)/TurbulenceModels/incompressible/lnInclude \
     -I$(LIB_SRC)/TurbulenceModels/compressible/lnInclude \
+    -I$(LIB_SRC)/TurbulenceModels/phaseIncompressible/lnInclude \
     -I$(LIB_SRC)/MomentumTransportModels/momentumTransportModels/lnInclude \
     -I$(LIB_SRC)/MomentumTransportModels/compressible/lnInclude \
     -I$(LIB_SRC)/MomentumTransportModels/incompressible/lnInclude \
@@ -76,7 +81,9 @@ EXE_INC = \
     -I$(LIB_SRC)/tetFiniteElement/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/meshMotion/fvMotionSolver/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/meshMotion/tetMotionSolver/lnInclude  \
-    -I$(LIB_SRC)/overset/oversetMesh/lnInclude
+    -I$(LIB_SRC)/overset/oversetMesh/lnInclude \
+    -I$(LIB_SRC)/phaseSystemModels/twoPhaseInter/incompressibleInterPhaseTransportModel/lnInclude \
+    -I$(LIB_SRC)/phaseSystemModels/twoPhaseInter/VoFphaseIncompressibleTurbulenceModels/lnInclude
 
 LIB_LIBS = \
     $(VERSION_SPECIFIC_LIBS) \

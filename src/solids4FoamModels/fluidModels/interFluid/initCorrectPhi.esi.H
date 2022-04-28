@@ -16,7 +16,7 @@ if (correctPhi)
         dimensionedScalar("rAU", dimTime/dimDensity, 1)
     );
 
-    #include "correctPhi.H"
+    #include "correctPhi.esi.H"
 }
 else
 {
