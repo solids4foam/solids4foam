@@ -22,8 +22,8 @@ else
             -lmomentumTransportModels -lincompressibleMomentumTransportModels \
             -lcompressibleMomentumTransportModels -ltwoPhaseMixture \
             -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools \
-            -lfvMotionSolvers -lradiationModels -lfvModels -lfvConstraints \
-            -lspecie -lfluidThermophysicalModels
+            -lfvMotionSolvers -lradiationModels -lfluidThermophysicalModels \
+            -ltwoPhaseChangeModels
     endif
 endif
 
