@@ -23,27 +23,37 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    pimpleFluid
+    interFluid
 
 Description
-    pimpleFoam fluid model from OpenFOAM-9.
+    interFoam fluid model based on interFoam from OpenFOAM-9.
 
 Author
+    Based on interFoam.
     Ported by Philip Cardiff, UCD.
 
 SourceFiles
-    pimpleFluid.foamextend.C
+    interFluid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef pimpleFluid_H
-#define pimpleFluid_H
+#ifndef interFluid_H
+#define interFluid_H
 
 #include "fluidModel.H"
+#include "CMULES.H"
+#include "EulerDdtScheme.H"
 #include "localEulerDdtScheme.H"
-#include "pressureReference.H"
-#include "singlePhaseTransportModel.H"
+#include "CrankNicolsonDdtScheme.H"
+#include "subCycle.H"
+#include "immiscibleIncompressibleTwoPhaseMixture.H"
+#include "noPhaseChange.H"
 #include "kinematicMomentumTransportModel.H"
+#include "pressureReference.H"
+// #include "fvModels.H"
+// #include "fvConstraints.H"
+#include "CorrectPhi.H"
+#include "fvcSmooth.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -54,10 +64,10 @@ namespace fluidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class pimpleFluid Declaration
+                        Class interFluid Declaration
 \*---------------------------------------------------------------------------*/
 
-class pimpleFluid
+class interFluid
 :
     public fluidModel
 {
@@ -72,17 +82,32 @@ class pimpleFluid
         //- Pointer to the velocity surface field
         autoPtr<surfaceVectorField> Uf_;
 
-        //- Pressure reference object
-        pressureReference pressureReference_;
-
         //- Transport model
-        singlePhaseTransportModel laminarTransport_;
+        immiscibleIncompressibleTwoPhaseMixture mixture_;
 
-        //- Turbulence model
+        //- Phase change model
+        autoPtr<twoPhaseChangeModel> phaseChangePtr_;
+
+        //- Average density field
+        volScalarField rho_;
+
+        //- Incompressible turbulence model
         autoPtr<incompressible::momentumTransportModel> turbulence_;
 
-        //- Fluid density [kg/m3]
-        dimensionedScalar rho_;
+        //- Pressure without rho*g*h component
+        volScalarField p_rgh_;
+
+        //- Gravity related fields
+        uniformDimensionedScalarField hRef_;
+        dimensionedScalar ghRef_;
+        volScalarField gh_;
+        surfaceScalarField ghf_;
+
+        //- Pressure reference object
+        autoPtr<pressureReference> pressureReferencePtr_;
+
+        //- Reciprocal of the momentum central coefficient 
+        tmp<volScalarField> rAU_;
 
         //- Correct phi flag
         const bool correctPhi_;
@@ -96,36 +121,37 @@ class pimpleFluid
         //- Cumulative continuity errors
         scalar cumulativeContErr_;
 
+        //- alpha flux header
+        IOobject alphaPhi10Header_;
+
+        //- alpha restart flag
+        const bool alphaRestart_;
+
+        // MULES flux from previous time-step
+        surfaceScalarField alphaPhi10_;
+
+        // MULES Correction
+        tmp<surfaceScalarField> talphaPhi1Corr0_;
+
 
     // Private Member Functions
 
-        //- Correct phi function
-        void correctPhi();
-
-        //- Solve pressure equation
-        void solvePEqn
-        (
-            const scalar& UUrf,
-            const fvVectorMatrix& ddtUEqn,
-            const fvVectorMatrix& HUEqn
-        );
-
         //- Disallow default bitwise copy construct
-        pimpleFluid(const pimpleFluid&);
+        interFluid(const interFluid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const pimpleFluid&);
+        void operator=(const interFluid&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("pimpleFluid");
+    TypeName("interFluid");
 
     // Constructors
 
         //- Construct from components
-        pimpleFluid
+        interFluid
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -134,7 +160,7 @@ public:
 
     // Destructor
 
-        virtual ~pimpleFluid()
+        virtual ~interFluid()
         {}
 
 

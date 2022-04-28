@@ -22,6 +22,7 @@ solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
+fluidModels/interFluid/interFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pimpleFluid/pimpleFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
