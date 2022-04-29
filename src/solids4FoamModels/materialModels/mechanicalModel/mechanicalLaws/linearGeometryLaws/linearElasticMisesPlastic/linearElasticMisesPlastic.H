@@ -89,22 +89,6 @@ class linearElasticMisesPlastic
         //- Table of post-yield stress versus plastic strain
         interpolationTable<scalar> stressPlasticStrainSeries_;
 
-        //- Switch to enable solution of pressure Laplacian equation
-        //  This can help quell oscillations in the hydrostatic stress
-        const Switch solvePressureEqn_;
-
-        //- Optional: it is possible to scale the amount of smoothing in the
-        //  pressure equation with this coefficient
-        scalar pressureSmoothingCoeff_;
-
-        //- Hydrostatic stress
-        //  Note: sigmaHyd_ == tr(sigma)/3.0 == -p,
-        //  where p is the hydrostatic pressure
-        volScalarField sigmaHyd_;
-
-        //- Hydrostatic stress surface field
-        surfaceScalarField sigmaHydf_;
-
         //- Yield stress
         volScalarField sigmaY_;
 
@@ -116,12 +100,6 @@ class linearElasticMisesPlastic
 
         //- Incremental change in sigmaY surface field
         surfaceScalarField DSigmaYf_;
-
-        //- Total strain
-        volSymmTensorField epsilon_;
-
-        //- Total strain surface field
-        surfaceSymmTensorField epsilonf_;
 
         //- Total plastic strain
         volSymmTensorField epsilonP_;

@@ -50,7 +50,7 @@ namespace Foam
 
 // * * * * * * * * * * *  Private Member Funtcions * * * * * * * * * * * * * //
 
-void Foam::mechanicalLaw::makeEpsilon()
+void Foam::mechanicalLaw::makeEpsilon() const
 {
     if (epsilonPtr_.valid())
     {
@@ -77,7 +77,7 @@ void Foam::mechanicalLaw::makeEpsilon()
 }
 
 
-void Foam::mechanicalLaw::makeEpsilonf()
+void Foam::mechanicalLaw::makeEpsilonf() const
 {
     if (epsilonfPtr_.valid())
     {
@@ -330,6 +330,16 @@ bool Foam::mechanicalLaw::planeStress() const
 }
 
 
+const Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon() const
+{
+    if (epsilonPtr_.empty())
+    {
+        makeEpsilon();
+    }
+
+    return epsilonPtr_();
+}
+
 Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon()
 {
     if (epsilonPtr_.empty())
@@ -340,8 +350,17 @@ Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon()
     return epsilonPtr_();
 }
 
-
 Foam::surfaceSymmTensorField& Foam::mechanicalLaw::epsilonf()
+{
+    if (epsilonfPtr_.empty())
+    {
+        makeEpsilonf();
+    }
+
+    return epsilonfPtr_();
+}
+
+const Foam::surfaceSymmTensorField& Foam::mechanicalLaw::epsilonf() const
 {
     if (epsilonfPtr_.empty())
     {

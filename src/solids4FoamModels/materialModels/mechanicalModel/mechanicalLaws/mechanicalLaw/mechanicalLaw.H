@@ -73,10 +73,10 @@ class mechanicalLaw
         const nonLinearGeometry::nonLinearType nonLinGeom_;
 
         // Small strain tensor
-        autoPtr<volSymmTensorField> epsilonPtr_;
+        mutable autoPtr<volSymmTensorField> epsilonPtr_;
 
         // Small strain tensor surface field
-        autoPtr<surfaceSymmTensorField> epsilonfPtr_;
+        mutable autoPtr<surfaceSymmTensorField> epsilonfPtr_;
 
         // Total deformation gradient volField
         autoPtr<volTensorField> FPtr_;
@@ -121,10 +121,10 @@ class mechanicalLaw
     // Private Member Functions
 
         //- Make the epsilon field
-        void makeEpsilon();
+        void makeEpsilon() const;
 
         //- Make the epsilonf field
-        void makeEpsilonf();
+        void makeEpsilonf() const;
 
         //- Make the F field
         void makeF();
@@ -168,6 +168,12 @@ protected:
         //- If the case is plane stress
         bool planeStress() const;
 
+        //- Return const access to solvePressureEqn switch
+        const Switch& solvePressureEqn() const
+        {
+            return solvePressureEqn_;
+        }
+
         //- Return the base mesh region name
         const word& baseMeshRegionName() const
         {
@@ -183,8 +189,14 @@ protected:
             );
         }
 
-        //- Return a reference to the Epsilon field
+        //- Return a const reference to the epsilon field
+        const volSymmTensorField& epsilon() const;
+
+        //- Return a reference to the epsilon field
         volSymmTensorField& epsilon();
+
+        //- Return a const reference to the epsilonf field
+        const surfaceSymmTensorField& epsilonf() const;
 
         //- Return a reference to the Epsilonf field
         surfaceSymmTensorField& epsilonf();
