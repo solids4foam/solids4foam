@@ -46,7 +46,7 @@ namespace Foam
 
 void Foam::orthotropicLinearElastic::makeElasticC() const
 {
-    if (elasticCPtr_)
+    if (elasticCPtr_.valid())
     {
         FatalErrorIn
         (
@@ -166,7 +166,7 @@ Foam::orthotropicLinearElastic::elasticC() const
 
 void Foam::orthotropicLinearElastic::makeElasticCf() const
 {
-    if (elasticCfPtr_)
+    if (elasticCfPtr_.valid())
     {
         FatalErrorIn
         (

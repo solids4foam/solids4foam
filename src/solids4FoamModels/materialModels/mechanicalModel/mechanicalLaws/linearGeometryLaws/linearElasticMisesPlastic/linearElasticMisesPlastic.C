@@ -626,7 +626,7 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
     // This is similar to the tangent matrix in FE procedures
 
     // Calculate deviatoric strain
-    const volSymmTensorField e(dev(epsilon_));
+    const volSymmTensorField e(dev(epsilon()));
 
     // Calculate deviatoric trial stress
     const volSymmTensorField sTrial(2.0*mu_*(e - dev(epsilonP_.oldTime())));
