@@ -50,6 +50,60 @@ namespace Foam
 
 // * * * * * * * * * * *  Private Member Funtcions * * * * * * * * * * * * * //
 
+void Foam::mechanicalLaw::makeEpsilon()
+{
+    if (epsilonPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeEpsilon()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    epsilonPtr_.set
+    (
+        new volSymmTensorField
+        (
+            IOobject
+            (
+                "epsilon_",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedSymmTensor("0", dimless, symmTensor::zero)
+        )
+    );
+}
+
+
+void Foam::mechanicalLaw::makeEpsilonf()
+{
+    if (epsilonfPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeEpsilonf()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    epsilonfPtr_.set
+    (
+        new surfaceSymmTensorField
+        (
+            IOobject
+            (
+                "epsilonf_",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedSymmTensor("0", dimless, symmTensor::zero)
+        )
+    );
+}
+
+
 void Foam::mechanicalLaw::makeF()
 {
     if (FPtr_.valid())
@@ -102,6 +156,7 @@ void Foam::mechanicalLaw::makeFf()
         )
     );
 }
+
 
 void Foam::mechanicalLaw::makeRelF()
 {
@@ -275,6 +330,28 @@ bool Foam::mechanicalLaw::planeStress() const
 }
 
 
+Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon()
+{
+    if (epsilonPtr_.empty())
+    {
+        makeEpsilon();
+    }
+
+    return epsilonPtr_();
+}
+
+
+Foam::surfaceSymmTensorField& Foam::mechanicalLaw::epsilonf()
+{
+    if (epsilonfPtr_.empty())
+    {
+        makeEpsilonf();
+    }
+
+    return epsilonfPtr_();
+}
+
+
 Foam::volTensorField& Foam::mechanicalLaw::F()
 {
     if (FPtr_.empty())
@@ -349,6 +426,48 @@ Foam::volSymmTensorField& Foam::mechanicalLaw::sigmaEff()
     }
 
     return sigmaEffPtr_();
+}
+
+
+void Foam::mechanicalLaw::updateEpsilon()
+{
+    if (incremental())
+    {
+        // Lookup gradient of displacement increment
+        const volTensorField& gradDD =
+            mesh().lookupObject<volTensorField>("grad(DD)");
+
+        epsilon() = epsilon().oldTime() + symm(gradDD);
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const volTensorField& gradD =
+            mesh().lookupObject<volTensorField>("grad(D)");
+
+        epsilon() = symm(gradD);
+    }
+}
+
+
+void Foam::mechanicalLaw::updateEpsilonf()
+{
+    if (incremental())
+    {
+        // Lookup gradient of displacement increment
+        const surfaceTensorField& gradDD =
+            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
+
+        epsilonf() = epsilonf().oldTime() + symm(gradDD);
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const surfaceTensorField& gradD =
+            mesh().lookupObject<surfaceTensorField>("grad(D)f");
+
+        epsilonf() = symm(gradD);
+    }
 }
 
 
@@ -741,6 +860,8 @@ Foam::mechanicalLaw::mechanicalLaw
     dict_(dict),
     baseMeshRegionName_(),
     nonLinGeom_(nonLinGeom),
+    epsilonPtr_(),
+    epsilonfPtr_(),
     FPtr_(),
     FfPtr_(),
     relFPtr_(),

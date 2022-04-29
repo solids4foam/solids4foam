@@ -72,6 +72,12 @@ class mechanicalLaw
         //- Nonlinear geometry enumerator
         const nonLinearGeometry::nonLinearType nonLinGeom_;
 
+        // Small strain tensor
+        autoPtr<volSymmTensorField> epsilonPtr_;
+
+        // Small strain tensor surface field
+        autoPtr<surfaceSymmTensorField> epsilonfPtr_;
+
         // Total deformation gradient volField
         autoPtr<volTensorField> FPtr_;
 
@@ -113,6 +119,12 @@ class mechanicalLaw
 
 
     // Private Member Functions
+
+        //- Make the epsilon field
+        void makeEpsilon();
+
+        //- Make the epsilonf field
+        void makeEpsilonf();
 
         //- Make the F field
         void makeF();
@@ -171,6 +183,12 @@ protected:
             );
         }
 
+        //- Return a reference to the Epsilon field
+        volSymmTensorField& epsilon();
+
+        //- Return a reference to the Epsilonf field
+        surfaceSymmTensorField& epsilonf();
+
         //- Return a reference to the F field
         volTensorField& F();
 
@@ -191,6 +209,12 @@ protected:
 
         //- Return a reference to the sigmaEff field
         volSymmTensorField& sigmaEff();
+
+        //- Update epsilon
+        void updateEpsilon();
+
+        //- Update epsilonf
+        void updateEpsilonf();
 
         //- Update the deformation gradient
         //  The lienarised shear and bulk modulii are used to enforce linear

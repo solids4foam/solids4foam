@@ -33,6 +33,19 @@ Description
     rotated to the global cartesian coordinates based on the specified
     material direction fields.
 
+    In foam-extend, we use the symmTensor4thOrder class to store the 4th order
+    stiffness tensor (9 components). In OpenFOAM, we use a tensor to store these
+    9 components with the following ordering assumed:
+        XXXX    ->    XX    ->    0
+        XXYY    ->    XY    ->    1
+        XXZZ    ->    XZ    ->    2
+        YYYY    ->    YX    ->    3
+        YYZZ    ->    YY    ->    4
+        ZZZZ    ->    YZ    ->    5
+        XYXY    ->    ZX    ->    6
+        YZYZ    ->    ZY    ->    7
+        ZXZX    ->    ZZ    ->    8
+
     For more details, see:
     P. Cardiff, A. Karać, A. Ivanković: A Large Strain Finite Volume Method
     for Orthotropic Bodies with General Material Orientations. Computer Methods
@@ -109,13 +122,23 @@ class orthotropicLinearElastic
         //- Shear modulus in local 31 plane
         dimensionedScalar G31_;
 
+#ifdef FOAMEXTEND
         //- Fourth order elasticity tensor volField
         //  Relative to the global Cartesian axis
-        mutable volSymmTensor4thOrderField* elasticCPtr_;
+        mutable autoPtr<volSymmTensor4thOrderField> elasticCPtr_;
 
         //- Fourth order elasticity tensor surfaceField
         //  Relative to the global Cartesian axis
-        mutable surfaceSymmTensor4thOrderField* elasticCfPtr_;
+        mutable autoPtr<surfaceSymmTensor4thOrderField> elasticCfPtr_;
+#else
+        //- Fourth order elasticity tensor volField
+        //  Relative to the global Cartesian axis
+        mutable autoPtr<volTensorField> elasticCPtr_;
+
+        //- Fourth order elasticity tensor surfaceField
+        //  Relative to the global Cartesian axis
+        mutable autoPtr<surfaceTensorField> elasticCfPtr_;
+#endif
 
         //- Material local x direction field
         volVectorField matDirX_;
@@ -132,14 +155,22 @@ class orthotropicLinearElastic
         //- Make elasticC field
         void makeElasticC() const;
 
-        //- Return elasticC field
-        const volSymmTensor4thOrderField& elasticC() const;
-
         //- Make elasticCf field
         void makeElasticCf() const;
 
+#ifdef FOAMEXTEND
+        //- Return elasticC field
+        const volSymmTensor4thOrderField& elasticC() const;
+
         //- Return elasticCf field
         const surfaceSymmTensor4thOrderField& elasticCf() const;
+#else
+        //- Return elasticC field
+        const volTensorField& elasticC() const;
+
+        //- Return elasticCf field
+        const surfaceTensorField& elasticCf() const;
+#endif
 
         //- Disallow default bitwise copy construct
         orthotropicLinearElastic(const orthotropicLinearElastic&);
