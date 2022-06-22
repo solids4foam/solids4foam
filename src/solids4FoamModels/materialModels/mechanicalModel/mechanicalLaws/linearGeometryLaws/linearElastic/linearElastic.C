@@ -159,7 +159,23 @@ Foam::linearElastic::linearElastic
     // Set first Lame parameter
     if (nu_.value() < 0.5)
     {
-        lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_));
+        if (planeStress())
+        {
+            lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - nu_));
+
+            if (solvePressureEqn())
+            {
+                FatalErrorIn
+                (
+                    "linearElasticMisesPlastic::linearElasticMisesPlastic::()"
+                )   << "planeStress must be 'off' when solvePressureEqn is "
+                    << "enabled" << abort(FatalError);
+            }
+        }
+        else
+        {
+            lambda_ = nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_));
+        }
     }
     else
     {
@@ -286,6 +302,20 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 }
 
 
+Foam::symmTensor4thOrder Foam::linearElastic::materialTangent() const
+{
+    return symmTensor4thOrder
+    (
+        2*mu_.value() + lambda().value(), lambda().value(), lambda().value(),
+                2*mu_.value() + lambda().value(), lambda().value(),
+                        2*mu_.value() + lambda().value(),
+        mu_.value(), // xyxy == yxyx == xyyx == yxxy
+        mu_.value(), // yzyz == zyzy == yzzy == zyyz
+        mu_.value()  // zxzx == xzxz == xzzx == zxxz
+    );
+}
+
+
 const Foam::dimensionedScalar& Foam::linearElastic::mu() const
 {
     return mu_;
@@ -321,37 +351,22 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
     // Update epsilon
     updateEpsilon();
 
-    // For planeStress, correct strain in the out of plane direction
-    if (planeStress())
+    if (solvePressureEqn())
     {
-        if (mesh().solutionD()[vector::Z] > -1)
-        {
-            FatalErrorIn
-            (
-                "void Foam::linearElasticMisesPlastic::"
-                "correct(volSymmTensorField& sigma)"
-            )   << "For planeStress, this material law assumes the empty "
-                << "direction is the Z direction!" << abort(FatalError);
-        }
+        // Calculate hydrostatic stress
+        updateSigmaHyd(K_*tr(epsilon()), 2*mu_ + lambda_);
 
-        epsilon().replace
-        (
-            symmTensor::ZZ,
-           -(nu_/E_)
-           *(sigma.component(symmTensor::XX) + sigma.component(symmTensor::YY))
-        );
+        // Hooke's law: partitioned deviatoric and dilation form
+        sigma = 2.0*mu_*dev(epsilon()) + sigmaHyd()*I + sigma0_;
     }
+    else
+    {
+        // Hooke's law: standard form
+        sigma = 2.0*mu_*epsilon() + lambda_*tr(epsilon())*I + sigma0_;
 
-    // Hooke's law : standard form
-    //sigma = 2.0*mu_*epsilon() + lambda_*tr(epsilon())*I + sigma0_;
-
-    // Hooke's law : partitioned deviatoric and dilation form
-
-    // Calculate hydrostatic stress
-    updateSigmaHyd(K_*tr(epsilon()), 2*mu_ + lambda_);
-
-    // Add deviatoric and initial stresses
-    sigma = 2.0*mu_*dev(epsilon()) + sigmaHyd()*I + sigma0_;
+        // Update sigmaHyd variable
+        sigmaHyd() = -K_*tr(epsilon());
+    }
 }
 
 
@@ -360,50 +375,24 @@ void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
     // Update epsilon
     updateEpsilonf();
 
-    // For planeStress, correct strain in the out of plane direction
-    if (planeStress())
-    {
-        if (mesh().solutionD()[vector::Z] > -1)
-        {
-            FatalErrorIn
-            (
-                "void Foam::linearElasticMisesPlastic::"
-                "correct(surfaceSymmTensorField& sigma)"
-            )   << "For planeStress, this material law assumes the empty "
-                << "direction is the Z direction!" << abort(FatalError);
-        }
-
-        epsilonf().replace
-        (
-            symmTensor::ZZ,
-           -(nu_/E_)
-           *(sigma.component(symmTensor::XX) + sigma.component(symmTensor::YY))
-        );
-    }
-
-    // Hooke's law : standard form
-    //sigma = 2.0*mu_*epsilonf() + lambda_*tr(epsilonf())*I + sigma0f();
-
-    // Calculate hydrostatic stress
-    surfaceScalarField* sigmaHydfPtr = NULL;
-    surfaceScalarField& sigmaHydf = *sigmaHydfPtr;
     if (solvePressureEqn())
     {
+        // Calculate hydrostatic stress at the cell-centres
         // Solve pressure equation at cells
         updateEpsilon();
         updateSigmaHyd(K_*tr(epsilon()), 2*mu_ + lambda_);
 
         // Interpolate to faces
-        sigmaHydf = fvc::interpolate(sigmaHyd());
+        const surfaceScalarField sigmaHydf(fvc::interpolate(sigmaHyd()));
+
+        // Add deviatoric and initial stresses
+        sigma = 2.0*mu_*dev(epsilonf()) + sigmaHydf*I + sigma0f();
     }
     else
     {
-        // Calculate hydrostatic stress at the faces
-        sigmaHydf = K_*tr(epsilonf());
+        // Hooke's law : standard form
+        sigma = 2.0*mu_*epsilonf() + lambda_*tr(epsilonf())*I + sigma0f();
     }
-
-    // Add deviatoric and initial stresses
-    sigma = 2.0*mu_*dev(epsilonf()) + sigmaHydf*I + sigma0f();
 }
 
 

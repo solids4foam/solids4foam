@@ -31,6 +31,11 @@ else
     endif
 endif
 
+ifdef PETSC_DIR
+    VERSION_SPECIFIC_INC += -I/opt/homebrew/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include
+    VERSION_SPECIFIC_LIBS += -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lpetsc
+endif
+
 EXE_INC = \
     -std=c++14 \
     -Wno-old-style-cast -Wno-deprecated-declarations -Wno-deprecated-copy \

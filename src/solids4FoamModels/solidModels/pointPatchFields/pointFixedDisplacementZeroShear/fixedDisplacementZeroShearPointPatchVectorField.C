@@ -1,0 +1,219 @@
+/*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | foam-extend: Open Source CFD
+   \\    /   O peration     | Version:     4.0
+    \\  /    A nd           | Web:         http://www.foam-extend.org
+     \\/     M anipulation  | For copyright notice see file Copyright
+-------------------------------------------------------------------------------
+License
+    This file is part of foam-extend.
+
+    foam-extend is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    foam-extend is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+
+\*---------------------------------------------------------------------------*/
+
+#include "fixedDisplacementZeroShearPointPatchVectorField.H"
+#include "addToRunTimeSelectionTable.H"
+#include "transformField.H"
+#include "PointPatchFieldMapper.H"
+#include "pointPatchFields.H"
+#include "pointBoundaryMesh.H"
+#include "pointMesh.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
+(
+    const pointPatch& p,
+    const DimensionedField<vector, pointMesh>& iF
+)
+:
+    componentMixedPointPatchVectorField(p, iF),
+    dispSeries_(),
+    curTimeIndex_(-1)
+{}
+
+
+fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
+(
+    const pointPatch& p,
+    const DimensionedField<vector, pointMesh>& iF,
+    const dictionary& dict
+)
+:
+    componentMixedPointPatchVectorField(p, iF),
+    dispSeries_(),
+    curTimeIndex_(-1)
+{
+    // Set value fraction to fixed normal direction
+    // valueFraction() = sqr(patch().pointNormals());
+    valueFraction() = patch().pointNormals();
+
+    // Set displacement
+    if (dict.found("dispSeries"))
+    {
+        if (debug)
+        {
+            Info<< "    disp is time-varying" << endl;
+        }
+
+        dispSeries_ =
+            interpolationTable<vector>(dict.subDict("dispSeries"));
+
+        refValue() = dispSeries_(db().time().timeOutputValue());
+    }
+    else
+    {
+        refValue() = vectorField("value", dict, p.size());
+    }
+
+    //this->updateBoundaryField();
+
+    // Set the boundary values
+
+    tmp<vectorField> internalValues = this->patchInternalField();
+
+    const vectorField values =
+        cmptMultiply(refValue(), valueFraction())
+      + cmptMultiply(internalValues, vector::one - valueFraction());
+
+    this->setInInternalField
+    (
+        const_cast<vectorField&>(this->internalField()), values
+    );
+}
+
+
+fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
+(
+    const fixedDisplacementZeroShearPointPatchVectorField& ptf,
+    const pointPatch& p,
+    const DimensionedField<vector, pointMesh>& iF,
+    const PointPatchFieldMapper& mapper
+)
+:
+    componentMixedPointPatchVectorField(p, iF),
+    dispSeries_(),
+    curTimeIndex_(-1)
+{
+    refValue() = vector::zero;
+    valueFraction() = patch().pointNormals();
+}
+
+
+fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
+(
+    const fixedDisplacementZeroShearPointPatchVectorField& ptf
+)
+:
+    componentMixedPointPatchVectorField(ptf),
+    dispSeries_(),
+    curTimeIndex_(-1)
+{}
+
+
+fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
+(
+    const fixedDisplacementZeroShearPointPatchVectorField& ptf,
+    const DimensionedField<vector, pointMesh>& iF
+)
+:
+    componentMixedPointPatchVectorField(ptf),
+    dispSeries_(),
+    curTimeIndex_(-1)
+{}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+// Map and resize from self given a mapper
+void fixedDisplacementZeroShearPointPatchVectorField::autoMap
+(
+    const PointPatchFieldMapper& m
+)
+{
+    componentMixedPointPatchVectorField::autoMap(m);
+}
+
+
+// Grab the values using rmap
+void fixedDisplacementZeroShearPointPatchVectorField::rmap
+(
+    const pointPatchField<vector>& ptf,
+    const labelList& addr
+)
+{
+    componentMixedPointPatchVectorField::rmap(ptf, addr);
+
+    // const fixedDisplacementZeroShearPointPatchVectorField& tiptf =
+    //   refCast<const fixedDisplacementZeroShearPointPatchVectorField>(ptf);
+}
+
+
+void fixedDisplacementZeroShearPointPatchVectorField::initEvaluate
+(
+    const Pstream::commsTypes commsType
+)
+{
+    if (curTimeIndex_ != db().time().timeIndex())
+    {
+        // If time-varying, update the displacement field
+        if (dispSeries_.size())
+        {
+            refValue() = dispSeries_(db().time().timeOutputValue());
+        }
+
+        curTimeIndex_ = db().time().timeIndex();
+    }
+
+    componentMixedPointPatchVectorField::initEvaluate(commsType);
+}
+
+
+void fixedDisplacementZeroShearPointPatchVectorField::write(Ostream& os) const
+{
+    componentMixedPointPatchVectorField::write(os);
+
+    if (dispSeries_.size())
+    {
+        os.writeKeyword("dispSeries") << nl;
+        os << token::BEGIN_BLOCK << nl;
+        dispSeries_.write(os);
+        os << token::END_BLOCK << nl;
+    }
+    else
+    {
+        refValue().writeEntry("value", os);
+    }
+}
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+makePointPatchTypeField
+(
+    pointPatchVectorField,
+    fixedDisplacementZeroShearPointPatchVectorField
+);
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// ************************************************************************* //

@@ -159,12 +159,6 @@ protected:
             return mesh_;
         }
 
-        //- Return const reference to dict
-        const dictionary& dict() const
-        {
-            return dict_;
-        }
-
         //- If the case is plane stress
         bool planeStress() const;
 
@@ -361,6 +355,12 @@ public:
             return name_;
         }
 
+        //- Return const reference to dict
+        const dictionary& dict() const
+        {
+            return dict_;
+        }
+    
         //- Return scalar density, if defined
         virtual dimensionedScalar rhoScalar() const;
 
@@ -374,6 +374,20 @@ public:
         //- Return the implicit stiffness surface field
         //  This is the diffusivity for the Laplacian term
         virtual tmp<surfaceScalarField> impKf() const;
+
+        //- Material tangent for Newton Raphson loop
+        virtual symmTensor4thOrder materialTangent() const
+        {
+            // We could use numerical differentiation for this if needed
+            notImplemented("Not yet implemented for this mechanical law");
+
+            // Keep compiler happy
+            return symmTensor4thOrder::zero;
+        }
+
+        //- Material tangent field for Newton Raphson loop
+        //  The size of this field should be mesh.nFaces()
+        virtual tmp<symmTensor4thOrderField> materialTangentField() const;
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const

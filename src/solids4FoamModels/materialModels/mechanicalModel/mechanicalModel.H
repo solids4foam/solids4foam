@@ -197,6 +197,9 @@ public:
             //- Calculate the stress surfaceField
             void correct(surfaceSymmTensorField& sigma);
 
+            //- Map grad field to subMeshes
+            void mapGradToSubMeshes(const volTensorField& gradD);
+
             //- Update the gradient of displacement vol field
             void grad
             (

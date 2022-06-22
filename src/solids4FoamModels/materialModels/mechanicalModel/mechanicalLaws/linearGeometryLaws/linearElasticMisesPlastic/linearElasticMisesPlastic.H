@@ -230,6 +230,13 @@ class linearElasticMisesPlastic
             const surfaceScalarField& trEpsilon
         );
 
+        //- Calculate stress given the strain
+        void calculateStress
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceSymmTensorField& epsilon
+        ) const;
+
 
 public:
 
@@ -261,6 +268,9 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
+
+        //- Material tangent for Newton Raphson loop
+        virtual tmp<symmTensor4thOrderField> materialTangentField() const;
 
         //- Return the implicit stiffness as a diagTensor
 #ifndef OPENFOAMESIORFOUNDATION

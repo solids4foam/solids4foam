@@ -1,0 +1,53 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// linearGeometry: assumes small strains and rotations
+// solidModel     linearGeometryTotalDisplacement;
+//solidModel     unsLinearGeometry;
+solidModel     vertexCentredLinearGeometry;
+
+"vertexCentredLinearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs|linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+{
+    // Update the stiffness matrix every outer iteration
+    fullNewton no;
+
+    // Maximum number of Newton-Raphson iterations
+    nCorrectors     1;
+
+    // Tolerance for Newton-Raphson loop
+    solutionTolerance 1e-6;
+
+    // Write linear system to matlab compatible format
+    //writeMatlabMatrix yes;
+
+    // Scaling of fixed DOF equations
+    //fixedDofScale 1;
+
+    // Fraction of compact edge direction gradient used
+    zeta 2.0;
+
+    // Line search settings
+    lineSearch no;
+    lineSearchRTol 0.5;
+
+    // Use PETSc, else use Eigen SparseLU
+    usePETSc no;
+    optionsFile "$FOAM_CASE/petscOptions";
+}
+
+
+// ************************************************************************* //

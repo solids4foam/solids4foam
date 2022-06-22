@@ -686,6 +686,23 @@ void Foam::mechanicalModel::correct(surfaceSymmTensorField& sigma)
 }
 
 
+void Foam::mechanicalModel::mapGradToSubMeshes(const volTensorField& gradD)
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        return;
+    }
+
+    forAll(laws, lawI)
+    {
+        solSubMeshes().subMeshGradD()[lawI] =
+            solSubMeshes().subMeshes()[lawI].interpolate(gradD);
+    }
+}
+
+
 void Foam::mechanicalModel::grad
 (
     const volVectorField& D,
