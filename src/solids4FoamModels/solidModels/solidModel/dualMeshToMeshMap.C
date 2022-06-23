@@ -309,7 +309,9 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
         // It is an error for internal faces to be not set
         if (countIntFace > 1)
         {
-            Info<< nl << "Details on up to the first 10 internal faces that were"
+            Info<< nl << "The dualFaceToCell map was not set for at least one "
+                << "internal face!" << nl
+                << "Details on up to the first 10 internal faces that were"
                 << " not set:" << endl;
             int i = 0;
             forAll(dualFaceToCell_, dfI)
