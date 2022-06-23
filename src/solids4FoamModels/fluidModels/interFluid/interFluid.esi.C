@@ -188,6 +188,7 @@ interFluid::interFluid
 
     {
         volVectorField& U = this->U();
+        volScalarField& p = this->p();
         volScalarField& p_rgh = p_rgh_;
         const dynamicFvMesh& mesh = this->mesh();
         pimpleControl& pimple = this->pimple();

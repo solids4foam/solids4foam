@@ -978,14 +978,14 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalLaw::impKf() const
 }
 
 
-Foam::tmp<Foam::symmTensor4thOrderField>
+Foam::tmp<Foam::Field<Foam::symmTensor4thOrder>>
 Foam::mechanicalLaw::materialTangentField() const
 {
     // Default to uniform field
     // This function can be overwritten in specific mechanical laws
-    tmp<symmTensor4thOrderField> tresult
+    tmp<Field<symmTensor4thOrder>> tresult
     (
-        new symmTensor4thOrderField(mesh().nFaces(), materialTangent())
+        new Field<symmTensor4thOrder>(mesh().nFaces(), materialTangent())
     );
 
     return tresult;

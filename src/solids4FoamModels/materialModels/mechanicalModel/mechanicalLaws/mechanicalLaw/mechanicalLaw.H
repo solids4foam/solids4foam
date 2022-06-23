@@ -43,6 +43,7 @@ SourceFiles
 #include "tmp.H"
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
+#include "symmTensor4thOrder.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -387,7 +388,7 @@ public:
 
         //- Material tangent field for Newton Raphson loop
         //  The size of this field should be mesh.nFaces()
-        virtual tmp<symmTensor4thOrderField> materialTangentField() const;
+        virtual tmp<Field<symmTensor4thOrder>> materialTangentField() const;
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const

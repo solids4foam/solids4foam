@@ -32,12 +32,13 @@ License
 #include "solidTractionFvPatchVectorField.H"
 #ifdef OPENFOAMESIORFOUNDATION
     #include "primitivePatchInterpolation.H"
+    #include "polyTopoChange.H"
 #else
     #include "blockSolidTractionFvPatchVectorField.H"
+    #include "directTopoChange.H"
 #endif
 #include "fvcGradf.H"
 #include "wedgePolyPatch.H"
-#include "directTopoChange.H"
 #include "meshDualiser.H"
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
@@ -80,10 +81,17 @@ void Foam::solidModel::makeDualMesh() const
                 runTime(),
                 Foam::IOobject::NO_READ
             ),
+#ifdef OPENFOAMESIORFOUNDATION
+            pointField(mesh().points()),
+            faceList(mesh().faces()),
+            labelList(mesh().faceOwner()),
+            labelList(mesh().faceNeighbour()),
+#else
             Xfer<pointField>(mesh().points()),
             Xfer<faceList>(mesh().faces()),
             Xfer<labelList>(mesh().faceOwner()),
             Xfer<labelList>(mesh().faceNeighbour()),
+#endif
             true
         )
     );
@@ -176,7 +184,11 @@ void Foam::solidModel::makeDualMesh() const
     }
 
     // Topo change container
+#ifdef OPENFOAMESIORFOUNDATION
+    polyTopoChange meshMod(dualMesh.boundaryMesh().size());
+#else
     directTopoChange meshMod(dualMesh.boundaryMesh().size());
+#endif
 
     // Mesh dualiser engine
     meshDualiser dualMaker(dualMesh);
@@ -207,7 +219,7 @@ void Foam::solidModel::makeDualMesh() const
     if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false))
     {
         dualMesh.setInstance(runTime().constant());
-        Info<< "Writing dualMesh to " << dualMesh.instance() << endl;
+        Info<< "Writing dualMesh to " << dualMesh.polyMesh::instance() << endl;
         dualMesh.write();
 
         // Write feature set fields
@@ -259,7 +271,11 @@ void Foam::solidModel::simpleMarkFeatures
     labelList& multiCellFeaturePoints
 ) const
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    scalar minCos = Foam::cos(featureAngle*constant::mathematical::pi/180.0);
+#else
     scalar minCos = Foam::cos(featureAngle*mathematicalConstant::pi/180.0);
+#endif
 
     const polyBoundaryMesh& patches = mesh.boundaryMesh();
 
