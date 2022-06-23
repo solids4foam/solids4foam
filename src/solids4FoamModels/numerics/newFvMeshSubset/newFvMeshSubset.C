@@ -268,7 +268,7 @@ void Foam::newFvMeshSubset::subsetZones()
         pZonePtrs[i] = new pointZone
         (
             pz.name(),
-            subset(baseMesh().allPoints().size(), pz, pointMap()),
+            subset(baseMesh().nPoints(), pz, pointMap()),
             i,
             newFvMeshSubsetPtr_->pointZones()
         );
@@ -293,14 +293,14 @@ void Foam::newFvMeshSubset::subsetZones()
         (
             subset
             (
-                baseMesh().allFaces().size(),
+                baseMesh().nFaces(),
                 fz,
                 faceMap()
             )
         );
 
         // Flipmap for all mesh faces
-        boolList fullFlipStatus(baseMesh().allFaces().size(), false);
+        boolList fullFlipStatus(baseMesh().nFaces(), false);
         forAll(fz, j)
         {
             fullFlipStatus[fz[j]] = fz.flipMap()[j];
@@ -366,10 +366,12 @@ void Foam::newFvMeshSubset::makeFvDictionaries()
         IOobject
         (
             "fvSchemes",
-            obr.time().system(),
+            bool(baseMesh().name() == dynamicFvMesh::defaultRegion)
+            ? obr.time().system()
+            : fileName(obr.time().system()/"solid"),
             obr,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
         )
     );
 
@@ -399,10 +401,12 @@ void Foam::newFvMeshSubset::makeFvDictionaries()
         IOobject
         (
             "fvSolution",
-            obr.time().system(),
+            bool(baseMesh().name() == dynamicFvMesh::defaultRegion)
+            ? obr.time().system()
+            : fileName(obr.time().system()/"solid"),
             obr,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
         )
     );
 
@@ -469,7 +473,7 @@ void Foam::newFvMeshSubset::setCellSubset
     // Initial check on patches before doing anything time consuming.
     const polyBoundaryMesh& oldPatches = baseMesh().boundaryMesh();
     const cellList& oldCells = baseMesh().cells();
-    const faceList& oldFaces = baseMesh().allFaces();
+    const faceList& oldFaces = baseMesh().faces();
     const pointField& oldPoints = baseMesh().points();
     const labelList& oldOwner = baseMesh().faceOwner();
     const labelList& oldNeighbour = baseMesh().faceNeighbour();
@@ -776,9 +780,9 @@ void Foam::newFvMeshSubset::setCellSubset
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        xferMove(newPoints),
-        xferMove(newFaces),
-        xferMove(newCells)
+        std::move(newPoints),//xferMove(newPoints),
+        std::move(newFaces),//xferMove(newFaces),
+        std::move(newCells)//xferMove(newCells),
     );
 
     // Clear point mesh

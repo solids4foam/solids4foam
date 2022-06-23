@@ -26,7 +26,9 @@ License
 #include "solidSubMeshes.H"
 #include "processorFvsPatchField.H"
 #include "processorPointPatchFields.H"
-#include "componentMixedPointPatchFields.H"
+#ifdef FOAMEXTEND
+    #include "componentMixedPointPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -202,7 +204,11 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 
             OPstream::write
             (
+#ifdef OPENFOAMESIORFOUNDATION
+                Pstream::commsTypes::blocking,
+#else
                 Pstream::blocking,
+#endif
                 procPatch.neighbProcNo(),
                 reinterpret_cast<const char*>(patchField.begin()),
                 patchField.byteSize()
@@ -227,7 +233,11 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 
             IPstream::read
             (
+#ifdef OPENFOAMESIORFOUNDATION
+                Pstream::commsTypes::blocking,
+#else
                 Pstream::blocking,
+#endif
                 procPatch.neighbProcNo(),
                 reinterpret_cast<char*>(ngbPatchField.begin()),
                 ngbPatchField.byteSize()
@@ -395,7 +405,11 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
 
                     OPstream::write
                     (
+#ifdef OPENFOAMESIORFOUNDATION
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procPatch.neighbProcNo(),
                         reinterpret_cast<const char*>(pif.begin()),
                         pif.byteSize()
@@ -430,11 +444,19 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
                     (
                         new vectorField(procPatchDispl.size(), vector::zero)
                     );
+#ifdef OPENFOAMESIORFOUNDATION
+                    vectorField& ngbProcPatchDispl = tNgbProcPatchDispl.ref();
+#else
                     vectorField& ngbProcPatchDispl = tNgbProcPatchDispl();
+#endif
 
                     IPstream::read
                     (
+#ifdef OPENFOAMESIORFOUNDATION
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procPatch.neighbProcNo(),
                         reinterpret_cast<char*>(ngbProcPatchDispl.begin()),
                         ngbProcPatchDispl.byteSize()
@@ -478,6 +500,7 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
 
     baseMeshField.correctBoundaryConditions();
 
+#ifdef FOAMEXTEND
     // Re-evaluate componentMixed patches
     forAll(baseMeshField.boundaryField(), patchI)
     {
@@ -490,6 +513,7 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
             baseMeshField.boundaryField()[patchI].evaluate();
         }
     }
+#endif
 }
 
 

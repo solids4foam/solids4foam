@@ -30,8 +30,8 @@ License
 #include "emptyFvPatchFields.H"
 #include "emptyFvsPatchFields.H"
 #include "calculatedPointPatchFields.H"
-#ifndef OPENFOAMESIORFOUNDATION
-#include "globalPointPatchFields.H"
+#ifdef FOAMEXTEND
+    #include "globalPointPatchFields.H"
 #endif
 
 #include "symmetryFvPatch.H"
@@ -525,7 +525,7 @@ newFvMeshSubset::interpolate
     // Create and map the patch field values
     PtrList<pointPatchField<Type> > patchFields(pm.size());
 
-    forAll (patchFields, patchI)
+    forAll(patchFields, patchI)
     {
         // Set the first one by hand as it corresponds to the
         // exposed internal faces.  Additional interpolation can be put here
@@ -535,6 +535,14 @@ newFvMeshSubset::interpolate
             patchFields.set
             (
                 patchI,
+#ifdef OPENFOAMESIORFOUNDATION
+                fvPatchField<Type>::New
+                (
+                    calculatedFvPatchField<Type>::typeName,
+                    sMesh.boundary()[patchI],
+                    DimensionedField<Type, pointMesh>::null()
+                )
+#else
                 new CalculatedPointPatchField
                 <
                     pointPatchField,
@@ -547,6 +555,7 @@ newFvMeshSubset::interpolate
                     sMesh.boundary()[patchI],
                     DimensionedField<Type, pointMesh>::null()
                 )
+#endif
             );
         }
         else
@@ -604,7 +613,7 @@ newFvMeshSubset::interpolate
         }
     }
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
     // Add the global patch
     if (isType<globalPointPatch>(sMesh.boundary()[sMesh.boundary().size()-1]))
     {

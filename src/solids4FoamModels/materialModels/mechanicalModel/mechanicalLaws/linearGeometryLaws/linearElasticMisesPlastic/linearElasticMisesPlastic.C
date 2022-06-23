@@ -700,15 +700,19 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
 #endif
 
 
-Foam::tmp<Foam::symmTensor4thOrderField>
+Foam::tmp<Foam::Field<Foam::symmTensor4thOrder>>
 Foam::linearElasticMisesPlastic::materialTangentField() const
 {
     // Prepare tmp field
-    tmp<symmTensor4thOrderField> tresult
+    tmp<Field<symmTensor4thOrder>> tresult
     (
-        new symmTensor4thOrderField(mesh().nFaces(), symmTensor4thOrder::zero)
+        new Field<symmTensor4thOrder>(mesh().nFaces(), symmTensor4thOrder::zero)
     );
-    symmTensor4thOrderField& result = tresult();
+#ifdef OPENFOAMESIORFOUNDATION
+    Field<symmTensor4thOrder>& result = tresult.ref();
+#else
+    Field<symmTensor4thOrder>& result = tresult();
+#endif
 
     // Calculated as per box 3.2 in Simo and Hughes
 

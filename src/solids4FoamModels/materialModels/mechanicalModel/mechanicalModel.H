@@ -49,11 +49,11 @@ Author
 #include "fvMesh.H"
 #include "mechanicalLaw.H"
 #include "Switch.H"
+#include "solidSubMeshes.H"
 #ifdef OPENFOAMESIORFOUNDATION
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
-    #include "solidSubMeshes.H"
 #endif
 #include "nonLinearGeometry.H"
 #include "volFields.H"
@@ -89,9 +89,7 @@ class mechanicalModel
         mutable wordList cellZoneNames_;
 
         //- Sub-meshes for each mechanicalLaw
-#ifndef OPENFOAMESIORFOUNDATION
         mutable autoPtr<solidSubMeshes> solSubMeshes_;
-#endif
 
         //- Volume field to point field interpolator for the base mesh
 #ifdef OPENFOAMESIORFOUNDATION
@@ -162,14 +160,10 @@ public:
 #endif
 
             //- Return a const reference to the solidSubMeshes
-#ifndef OPENFOAMESIORFOUNDATION
             const solidSubMeshes& solSubMeshes() const;
-#endif
 
             //- Return a const reference to the solidSubMeshes
-#ifndef OPENFOAMESIORFOUNDATION
             solidSubMeshes& solSubMeshes();
-#endif
 
             //- Return initial density
             tmp<volScalarField> rho() const;

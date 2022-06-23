@@ -270,7 +270,7 @@ public:
         virtual tmp<volScalarField> impK() const;
 
         //- Material tangent for Newton Raphson loop
-        virtual tmp<symmTensor4thOrderField> materialTangentField() const;
+        virtual tmp<Field<symmTensor4thOrder>> materialTangentField() const;
 
         //- Return the implicit stiffness as a diagTensor
 #ifndef OPENFOAMESIORFOUNDATION
