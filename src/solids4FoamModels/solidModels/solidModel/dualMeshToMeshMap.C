@@ -320,7 +320,7 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
                 {
                     if (dualMesh.isInternalFace(dfI))
                     {
-                        Info<< "dualFace " << dfI
+                        Pout<< "dualFace " << dfI
                             << ",  " << dualMesh.faceCentres()[dfI] << endl;
 
                         if (i++ == 10)
