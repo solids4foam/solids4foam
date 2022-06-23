@@ -38,6 +38,7 @@ Description
 #include "emptyPolyPatch.H"
 #include "demandDrivenData.H"
 #include "cyclicPolyPatch.H"
+#include "dynamicFvMesh.H"
 #if FOAMEXTEND
     #include "oversetPolyPatch.H"
 #endif
@@ -121,7 +122,11 @@ void Foam::newFvMeshSubset::doCoupledPatches
 
                 OPstream toNeighbour
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                 );
 
@@ -143,7 +148,11 @@ void Foam::newFvMeshSubset::doCoupledPatches
 
                 IPstream fromNeighbour
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                 );
 
@@ -367,7 +376,7 @@ void Foam::newFvMeshSubset::makeFvDictionaries()
         (
             "fvSchemes",
             bool(baseMesh().name() == dynamicFvMesh::defaultRegion)
-            ? obr.time().system()
+            ? fileName(obr.time().system())
             : fileName(obr.time().system()/"solid"),
             obr,
             IOobject::READ_IF_PRESENT,
@@ -402,7 +411,7 @@ void Foam::newFvMeshSubset::makeFvDictionaries()
         (
             "fvSolution",
             bool(baseMesh().name() == dynamicFvMesh::defaultRegion)
-            ? obr.time().system()
+            ? fileName(obr.time().system())
             : fileName(obr.time().system()/"solid"),
             obr,
             IOobject::READ_IF_PRESENT,
@@ -826,6 +835,10 @@ void Foam::newFvMeshSubset::setCellSubset
                 patchStart,
                 nNewPatches,
                 newFvMeshSubsetPtr_->boundaryMesh()
+#ifdef OPENFOAMESIORFOUNDATION
+                ,
+                word::null
+#endif
             );
 
             // The index for the first patch is -1 as it originates from
@@ -1276,9 +1289,15 @@ void Foam::newFvMeshSubset::setLargeCellSubset
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
+#ifdef OPENFOAMESIORFOUNDATION
+        std::move(newPoints),
+        std::move(newFaces),
+        std::move(newCells),
+#else
         xferMove(newPoints),
         xferMove(newFaces),
         xferMove(newCells),
+#endif
         syncPar           // parallel synchronisation
     );
 
@@ -1401,6 +1420,10 @@ void Foam::newFvMeshSubset::setLargeCellSubset
                 patchStart,
                 nNewPatches,
                 newFvMeshSubsetPtr_->boundaryMesh()
+#ifdef OPENFOAMESIORFOUNDATION
+                ,
+                word::null
+#endif
             );
 
             Pout<< "    oldInternalFaces : "
@@ -1511,7 +1534,11 @@ pointMesh& Foam::newFvMeshSubset::subPointMesh()
 {
     if (!pointMeshSubsetPtr_)
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        pointMeshSubsetPtr_ = new pointMesh(subMesh());
+#else
         pointMeshSubsetPtr_ = new pointMesh(subMesh(), true);
+#endif
     }
 
     return *pointMeshSubsetPtr_;

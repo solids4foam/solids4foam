@@ -28,7 +28,9 @@ License
 #include "polyMesh.H"
 #include "Random.H"
 #include "pointInNonConvexCell.H"
-#include "tetPolyMesh.H"
+#ifdef FOAMEXTEND
+    #include "tetPolyMesh.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -142,8 +144,10 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
 
     // This is only needed in foam extend: OF can use
     // polyMesh::pointInCell(CELL_TETS)
+#ifdef FOAMEXTEND
     tetPolyMesh tetMesh(mesh);
     const pointField tetPoints = tetMesh.points();
+#endif
 
     forAll(pointToDualCell_, pointI)
     {
@@ -192,7 +196,11 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
                 // Dual face centre
                 // We apply a small perturbation as pointInCell can fail when
                 // the point is exactly on the face (e.g. of a decomposed tetra)
+#ifdef FOAMEXTEND
                 vector perturb = Random(0).vector01();
+#else
+                vector perturb = Random(0).sample01<vector>();
+#endif
                 const vector dFaceC =
                     dualFaceCentres[dFaceID]
                   + 0.01*minEdgeLength*perturb/mag(perturb);
@@ -210,6 +218,7 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
 
                     if
                     (
+#ifdef FOAMEXTEND
                         pointInCellTetDecomp
                         (
                             mesh,
@@ -218,6 +227,12 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
                             dFaceC,
                             cellID
                         )
+#else
+                        mesh.polyMesh::pointInCell
+                        (
+                            dFaceC, cellID, polyMesh::CELL_TETS
+                        )
+#endif
                     )
                     {
                         if (debug)

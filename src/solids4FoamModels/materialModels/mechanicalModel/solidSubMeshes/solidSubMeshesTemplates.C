@@ -67,8 +67,13 @@ void Foam::solidSubMeshes::mapSubMeshVolFields
 
             if (patchMap[patchI] != -1)
             {
+#ifdef OPENFOAMESIORFOUNDATION
+                fvPatchField<Type>& baseMeshFieldP =
+                    baseMeshField.boundaryFieldRef()[patchMap[patchI]];
+#else
                 fvPatchField<Type>& baseMeshFieldP =
                     baseMeshField.boundaryField()[patchMap[patchI]];
+#endif
 
                 if (!baseMeshFieldP.coupled())
                 {
@@ -135,8 +140,13 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 
             if (patchMap[patchI] != -1)
             {
+#ifdef OPENFOAMESIORFOUNDATION
+                fvsPatchField<Type>& baseMeshFieldP =
+                    baseMeshField.boundaryFieldRef()[patchMap[patchI]];
+#else
                 fvsPatchField<Type>& baseMeshFieldP =
                     baseMeshField.boundaryField()[patchMap[patchI]];
+#endif
 
                 // Note: unlike volFields, we do map on the coupled patches for
                 // surface fields
@@ -176,15 +186,22 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
                             globalGlobalMeshFace
                             - baseMesh().boundaryMesh()[curPatch].start();
 
+#ifdef OPENFOAMESIORFOUNDATION
+                        baseMeshField.boundaryFieldRef()
+                        [
+                            curPatch
+                        ][curPatchFace] = subMeshFieldP[faceI];
+#else
                         baseMeshField.boundaryField()[curPatch][curPatchFace] =
                             subMeshFieldP[faceI];
+#endif
                     }
                 }
             }
         }
     }
 
-    baseMeshField.correctBoundaryConditions();
+    //baseMeshField.correctBoundaryConditions(); // not defined for surf fields
 
     // Make sure the field is consistent across processor patches
     forAll(baseMeshField.boundaryField(), patchI)
@@ -218,8 +235,13 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 
     forAll(baseMeshField.boundaryField(), patchI)
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        fvsPatchField<Type>& baseMeshFieldP =
+            baseMeshField.boundaryFieldRef()[patchI];
+#else
         fvsPatchField<Type>& baseMeshFieldP =
             baseMeshField.boundaryField()[patchI];
+#endif
 
         if (baseMeshFieldP.type() == processorFvsPatchField<Type>::typeName)
         {
@@ -261,7 +283,11 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
 {
     // Map internal field from sub-mesh to base mesh
 
+#ifdef OPENFOAMESIORFOUNDATION
+    vectorField& baseMeshFieldI = baseMeshField.ref();
+#else
     vectorField& baseMeshFieldI = baseMeshField.internalField();
+#endif
 
     // Reset the baseMeshField to zero as we take global averages later
     baseMeshFieldI = vector::zero;
@@ -388,7 +414,11 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
                     const processorPointPatchVectorField& procPatchDispl =
                         refCast<processorPointPatchVectorField>
                         (
+#ifdef OPENFOAMESIORFOUNDATION
+                            baseMeshField.boundaryFieldRef()[patchI]
+#else
                             baseMeshField.boundaryField()[patchI]
+#endif
                         );
 
                     const processorPolyPatch& procPatch =
@@ -397,11 +427,13 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
                             baseMesh().boundaryMesh()[patchI]
                         );
 
-                    vectorField pif =
+                    const vectorField pif
+                    (
                         procPatchDispl.patchInternalField
                         (
                             baseMeshField.internalField()
-                        );
+                        )
+                    );
 
                     OPstream::write
                     (
@@ -431,7 +463,11 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
                     const processorPointPatchVectorField& procPatchDispl =
                         refCast<processorPointPatchVectorField>
                         (
+#ifdef OPENFOAMESIORFOUNDATION
+                            baseMeshField.boundaryFieldRef()[patchI]
+#else
                             baseMeshField.boundaryField()[patchI]
+#endif
                         );
 
                     const processorPolyPatch& procPatch =

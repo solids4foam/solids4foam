@@ -36,7 +36,7 @@ SourceFiles
 #define labelSymmTensor4thOrder_H
 
 #include "SymmTensor4thOrderTemplate.H"
-#include "contiguous.H"
+//#include "contiguous.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -48,8 +48,8 @@ namespace Foam
 typedef SymmTensor4thOrder<label> labelSymmTensor4thOrder;
 
 //- Data associated with labelSymmTensor4thOrder type are contiguous
-template<>
-inline bool contiguous<labelSymmTensor4thOrder>() {return true;}
+// template<>
+// inline bool contiguous<labelSymmTensor4thOrder>() {return true;}
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

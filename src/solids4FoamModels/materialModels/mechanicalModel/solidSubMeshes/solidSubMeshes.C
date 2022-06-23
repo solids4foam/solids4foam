@@ -24,16 +24,22 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidSubMeshes.H"
-#include "ZoneID.H"
 #include "twoDPointCorrector.H"
 #include "wedgePolyPatch.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "ZoneIDs.H"
+#else
+    #include "ZoneID.H"
+#endif
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 const Foam::labelList& Foam::solidSubMeshes::curCellZone(const label matI) const
 {
-    const ZoneID<cellZone> cellZoneID =
-        ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
+    const cellZoneID cellZoneID
+    (
+        cellZoneNames_[matI], baseMesh().cellZones()
+    );
 
     if (!cellZoneID.active())
     {
@@ -68,7 +74,7 @@ void Foam::solidSubMeshes::makeSubMeshes() const
 
     forAll(cellZoneNames_, matI)
     {
-        const labelList& curCellZone = curCellZone(matI);
+        const labelList& curCellZone = this->curCellZone(matI);
 
         forAll(curCellZone, cI)
         {
@@ -180,7 +186,7 @@ void Foam::solidSubMeshes::checkCellZones() const
 
     forAll(cellZoneNames_, matI)
     {
-        const labelList& curCellZone = curCellZone(matI);
+        const labelList& curCellZone = this->curCellZone(matI);
 
         forAll(curCellZone, cI)
         {
@@ -695,7 +701,7 @@ void Foam::solidSubMeshes::makeInterfaceBaseFaces() const
 
         forAll(cellZoneNames_, matI)
         {
-            const labelList& curCellZone = curCellZone(matI);
+            const labelList& curCellZone = this->curCellZone(matI);
 
             forAll(curCellZone, cI)
             {
@@ -793,7 +799,7 @@ void Foam::solidSubMeshes::makePointNumOfMaterials() const
 
     forAll(cellZoneNames_, matI)
     {
-        const labelList& curCellZone = curCellZone(matI);
+        const labelList& curCellZone = this->curCellZone(matI);
 
         forAll(curCellZone, cI)
         {
@@ -851,7 +857,7 @@ void Foam::solidSubMeshes::makeIsolatedInterfacePoints() const
 
     forAll(cellZoneNames_, matI)
     {
-        const labelList& curCellZone = curCellZone(matI);
+        const labelList& curCellZone = this->curCellZone(matI);
 
         forAll(curCellZone, cI)
         {
@@ -1370,7 +1376,8 @@ Foam::solidSubMeshes::solidSubMeshes
             Info<< "Writing subMeshes "
                 << subMeshes[matI].subMesh().name() << endl;
             subMeshes[matI].subMesh().setInstance("constant");
-            subMeshes[matI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
+            subMeshes[matI].subMesh().polyMesh::writeOpt() =
+                IOobject::AUTO_WRITE;
             subMeshes[matI].subMesh().write();
         }
     }
@@ -1378,7 +1385,7 @@ Foam::solidSubMeshes::solidSubMeshes
     {
         forAll(subMeshes, matI)
         {
-            subMeshes[matI].subMesh().writeOpt() = IOobject::NO_WRITE;
+            subMeshes[matI].subMesh().polyMesh::writeOpt() = IOobject::NO_WRITE;
         }
     }
 }
@@ -1422,9 +1429,10 @@ Foam::PtrList<Foam::newFvMeshSubset>& Foam::solidSubMeshes::subMeshes()
 }
 
 #ifdef OPENFOAMESIORFOUNDATION
-const Foam::PtrList<Foam::volPointInterpolation>&
+    const Foam::PtrList<Foam::volPointInterpolation>&
 #else
-const Foam::PtrList<Foam::newLeastSquaresVolPointInterpolation>&
+    const Foam::PtrList<Foam::newLeastSquaresVolPointInterpolation>&
+#endif
 Foam::solidSubMeshes::subMeshVolToPoint() const
 {
     if (subMeshVolToPoint_.empty())
@@ -2182,7 +2190,8 @@ void Foam::solidSubMeshes::moveSubMeshes()
             {
                 Info<< "    Writing subMesh "
                     << subMeshes()[matI].subMesh().name() << endl;
-                subMeshes()[matI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
+                subMeshes()[matI].subMesh().polyMesh::writeOpt() =
+                    IOobject::AUTO_WRITE;
                 subMeshes()[matI].subMesh().setInstance
                 (
                     baseMesh().time().timeName()
