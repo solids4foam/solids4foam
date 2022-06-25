@@ -16,8 +16,8 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // linearGeometry: assumes small strains and rotations
-//solidModel     linearGeometryTotalDisplacement;
-solidModel     unsLinearGeometry;
+solidModel     linearGeometryTotalDisplacement;
+//solidModel     unsLinearGeometry;
 
 "linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
 {

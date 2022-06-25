@@ -52,19 +52,21 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     const volScalarField& gamma
 ) const
 {
+    const fvMesh& mesh = vf.mesh();
+
     tmp<volVectorField> tresult
     (
         new volVectorField
         (
             IOobject
             (
-                word(type() + "Field"),
-                vf.mesh().time().timeName(),
-                vf.mesh(),
+                word(type() + "Stabilisation"),
+                mesh.time().timeName(),
+                mesh,
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            vf.mesh(),
+            mesh,
             dimensionedVector
             (
                 "zero",
@@ -82,33 +84,141 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     // Lookup method
     const word method = word(dict_.lookup("type"));
 
+    // Merge scale factor into gamma field
+    volScalarField gammaMod("gammaStabilisation", gamma);
+    scalarField& gammaModI = gammaMod.primitiveFieldRef();
+
+    // Optional: cell zone scale factors
+    if (method != "none")
+    {
+        if (dict_.lookupOrDefault<Switch>("useCellZones", false))
+        {
+            forAll(vf.mesh().cellZones(), czI)
+            {
+                const cellZone& cz = vf.mesh().cellZones()[czI];
+
+                // Lookup the scale factor for this cell zone
+                const scalar czScaleFac =
+                    readScalar(dict_.lookup(cz.name() + "ScaleFactor"));
+
+                forAll(cz, cI)
+                {
+                    const label cellI = cz[cI];
+                    gammaModI[cellI] *= czScaleFac;
+                }
+            }
+
+            // Correct processor boundaries
+            gammaMod.correctBoundaryConditions();
+        }
+        else
+        {
+            // Read scale factor
+            const scalar scaleFactor = readScalar(dict_.lookup("scaleFactor"));
+
+            gammaMod *= scaleFactor;
+        }
+    }
+
+    // Interpolate gamma to faces
+    surfaceScalarField gammaf(fvc::interpolate(gammaMod));
+
+    // Specify different scale factor at material interfaces
+    const scalar interfaceScaleFactor
+    (
+        dict_.lookupOrDefault<scalar>("interfaceScaleFactor", 0.01)
+    );
+
+    const labelList& own = mesh.owner();
+    const labelList& nei = mesh.neighbour();
+    const scalarField& gammaI = gamma;
+
+#ifdef OPENFOAMESIORFOUNDATION
+    scalarField& gammafI = gammaf.ref();
+#else
+    scalarField& gammafI = gammaf.internalField();
+#endif
+
+    forAll(gammafI, faceI)
+    {
+        const scalar gOwn = gammaI[own[faceI]];
+        const scalar gNei = gammaI[nei[faceI]];
+
+        if (mag(gOwn - gNei) > SMALL)
+        {
+            // Harmonic
+            // gammafI[faceI] = interfaceScaleFactor*(gOwn*gNei)/(gOwn + gNei);
+
+            // Arithmetric average
+            gammafI[faceI] = interfaceScaleFactor*0.5*(gOwn + gNei);
+        }
+    }
+
+    // Correct processor patches
+    forAll(gammaf.boundaryField(), patchI)
+    {
+        if (vf.boundaryField()[patchI].coupled())
+        {
+            const scalarField pif
+            (
+                gamma.boundaryField()[patchI].patchInternalField()
+            );
+            const scalarField pnf
+            (
+                gamma.boundaryField()[patchI].patchNeighbourField()
+            );
+
+            if (vf.boundaryField()[patchI].type() == "processor")
+            {
+                // Some faces may be on a material interface but some may
+                // not
+                scalarField& gammafP = gammaf.boundaryFieldRef()[patchI];
+                forAll(gammafP, faceI)
+                {
+                    const scalar gOwn = pif[faceI];
+                    const scalar gNei = pnf[faceI];
+
+                    if (mag(gOwn - gNei) > SMALL)
+                    {
+                        // Harmonic
+                        // gammafP[faceI] =
+                        // interfaceScaleFactor*(gOwn*gNei)/(gOwn + gNei);
+
+                        // Arithmetric average
+                        gammafP[faceI] =
+                            interfaceScaleFactor*0.5*(gOwn + gNei);
+                    }
+                }
+            }
+            else
+            {
+                gammaf.boundaryFieldRef()[patchI] =
+                    interfaceScaleFactor*0.5*(pif + pnf);
+            }
+        }
+    }
+
     // Calculate stabilisation term
     if (method == "RhieChow")
     {
-        const scalar scaleFactor = readScalar(dict_.lookup("scaleFactor"));
-
-        result = scaleFactor
-       *(
-           fvc::laplacian(gamma, vf, "laplacian(DD,D)") - fvc::div(gamma*gradVf)
+        result =
+        (
+           fvc::laplacian(gammaf, vf, "laplacian(DD,D)")
+         - fvc::div(gammaf*mesh.Sf() & fvc::interpolate(gradVf))
         );
     }
     else if (method == "JamesonSchmidtTurkel")
     {
-        const scalar scaleFactor = readScalar(dict_.lookup("scaleFactor"));
-
-        result = -scaleFactor*fvc::laplacian
+        result = -fvc::laplacian
         (
             vf.mesh().magSf(),
-            //1.0/(vf.mesh().deltaCoeffs()*vf.mesh().deltaCoeffs()),
-            fvc::laplacian(gamma, vf, "JSTinner"),
+            fvc::laplacian(gammaf, vf, "JSTinner"),
             "JSTouter"
         );
     }
     else if (method == "Laplacian")
     {
-        const scalar scaleFactor = readScalar(dict_.lookup("scaleFactor"));
-
-        result = scaleFactor*fvc::laplacian(gamma, vf);
+        result = fvc::laplacian(gammaf, vf);
     }
     else if (method != "none")
     {

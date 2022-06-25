@@ -2182,7 +2182,11 @@ void Foam::solidSubMeshes::moveSubMeshes()
             subMeshes()[matI].subMesh().movePoints(newPoints);
             subMeshes()[matI].subMesh().V00();
             subMeshes()[matI].subMesh().moving(false);
-            //subMeshes()[matI].subMesh().changing(false);
+#ifdef OPENFOAMESIORFOUNDATION
+            subMeshes()[matI].subMesh().topoChanging(false);
+#else
+            subMeshes()[matI].subMesh().changing(false);
+#endif
             subMeshes()[matI].subMesh().setPhi().writeOpt() =
                 IOobject::NO_WRITE;
 

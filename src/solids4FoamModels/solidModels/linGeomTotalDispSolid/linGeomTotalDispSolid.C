@@ -84,6 +84,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     DisRequired();
 
     // For consistent restarts, we will calculate the gradient field
+    D().storePrevIter();
     mechanical().grad(D(), gradD());
 
     if (predictor_)

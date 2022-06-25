@@ -386,7 +386,7 @@ void Foam::newFvMeshSubset::makeFvDictionaries()
 
     if (!fvSchemes.headerOk())
     {
-        Info << "Cannot read " << fvSchemes.path()
+        Info<< "Cannot read " << fvSchemes.path()
             << ".  Copy from base" << endl;
 
         IOdictionary fvSchemesBase
@@ -421,7 +421,7 @@ void Foam::newFvMeshSubset::makeFvDictionaries()
 
     if (!fvSolution.headerOk())
     {
-        Info << "Cannot read " << fvSolution.path()
+        Info<< "Cannot read " << fvSolution.path()
             << ".  Copy from base" << endl;
 
         IOdictionary fvSolutionBase

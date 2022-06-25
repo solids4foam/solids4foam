@@ -27,7 +27,7 @@ ddtSchemes
 gradSchemes
 {
     default            none;
-    grad(D)            leastSquaresd;
+    grad(D)            leastSquares;
 }
 
 divSchemes
@@ -55,7 +55,7 @@ interpolationSchemes
 
     // For multi-material cases, linear seems better for linGeomSolid, whereas
     // harmonic seems better for unsLinGeomSolid
-    //interpolate(impK)  linear;
+    interpolate(gammaStabilisation) linear;
     interpolate(impK)  harmonic;
 
     interpolate(grad(D)) linear;

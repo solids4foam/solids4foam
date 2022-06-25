@@ -168,13 +168,13 @@ public:
             }
 
             #ifdef OPENFOAMESIORFOUNDATION
-			bool hasUnmapped() const
-			{
-				notImplemented("Hopefully this is not called, otherwise we need to understand what it does!");
-				return true;
-			}
+                        bool hasUnmapped() const
+                        {
+                                notImplemented("Hopefully this is not called, otherwise we need to understand what it does!");
+                                return true;
+                        }
             #endif
-            
+
             #ifdef OPENFOAMESIORFOUNDATION
             const labelList& directAddressing() const
             #else
