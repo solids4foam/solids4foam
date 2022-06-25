@@ -143,7 +143,7 @@ numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
 numerics/rotation/RodriguesRotation.C
-numerics/skewCorrectedSnGrad/skewCorrectedSnGrads.C
+/*numerics/skewCorrectedSnGrad/skewCorrectedSnGrads.C*/
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 

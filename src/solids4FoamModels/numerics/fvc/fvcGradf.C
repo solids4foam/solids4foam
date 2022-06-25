@@ -91,6 +91,12 @@ tmp
         )
     );
 
+#ifdef OPENFOAMESIORFOUNDATION
+    GeometricField<GradType, fvsPatchField, surfaceMesh>& grad = tGrad.ref();
+#else
+    GeometricField<GradType, fvsPatchField, surfaceMesh>& grad = tGrad();
+#endif
+
     if (interpolate)
     {
         const GeometricField<GradType, fvPatchField, volMesh>& gradVf =
@@ -98,23 +104,13 @@ tmp
             (
                 "grad(" + vf.name() + ")"
             );
-//         tGrad() = ((I - n*n) & linearInterpolate(gradVf));
-//         tGrad() += n*fvc::snGrad(vf);
-#ifdef OPENFOAMESIORFOUNDATION
-        tGrad.ref() = linearInterpolate(gradVf);
-#else
-        tGrad() = linearInterpolate(gradVf);
-#endif
+
+        grad = linearInterpolate(gradVf);
     }
     else
     {
-#ifdef OPENFOAMESIORFOUNDATION
-        tGrad.ref() = fsGrad(vf, pf);
-        tGrad.ref() += n*fvc::snGrad(vf);
-#else
-        tGrad() = fsGrad(vf, pf);
-        tGrad() += n*fvc::snGrad(vf);
-#endif
+        grad = fsGrad(vf, pf);
+        grad += n*fvc::snGrad(vf);
     }
 
     return tGrad;

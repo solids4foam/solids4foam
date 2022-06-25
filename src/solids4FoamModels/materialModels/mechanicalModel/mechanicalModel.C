@@ -823,7 +823,7 @@ void Foam::mechanicalModel::grad
         // Replace normal component
         // If we don't do this then we don't get convergence in many cases
         const surfaceVectorField n(mesh().Sf()/mesh().magSf());
-        gradDf += n*fvc::snGrad(D) - (sqr(n) & gradDf);
+        gradDf += n*fvc::snGrad(D) - (n*(n & gradDf));
     }
 }
 
@@ -896,7 +896,7 @@ void Foam::mechanicalModel::grad
 
         // Correct snGrad component of gradDf
         const surfaceVectorField n(mesh().Sf()/mesh().magSf());
-        gradDf += n*fvc::snGrad(D) - (sqr(n) & gradDf);
+        gradDf += n*fvc::snGrad(D) - (n*(n & gradDf));
     }
 }
 

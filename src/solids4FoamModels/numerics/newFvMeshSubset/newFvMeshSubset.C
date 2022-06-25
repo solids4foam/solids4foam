@@ -1286,7 +1286,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
             this->name() + "Subset",
             baseMesh().time().timeName(),
             baseMesh().time(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
 #ifdef OPENFOAMESIORFOUNDATION
