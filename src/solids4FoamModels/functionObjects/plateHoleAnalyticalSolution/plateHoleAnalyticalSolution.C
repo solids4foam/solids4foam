@@ -24,22 +24,22 @@ License
 
 \*----------------------------------------------------------------------------*/
 
-#include "cantileverAnalyticalSolution.H"
+#include "plateHoleAnalyticalSolution.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
-#include "cantileverStressDisplacement.H"
+#include "coordinateSystem.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(cantileverAnalyticalSolution, 0);
+    defineTypeNameAndDebug(plateHoleAnalyticalSolution, 0);
 
     addToRunTimeSelectionTable
     (
         functionObject,
-        cantileverAnalyticalSolution,
+        plateHoleAnalyticalSolution,
         dictionary
     );
 }
@@ -47,7 +47,84 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-bool Foam::cantileverAnalyticalSolution::writeData()
+Foam::symmTensor Foam::plateHoleAnalyticalSolution::plateHoleStress
+(
+    const vector& C
+)
+{
+    tensor sigma = tensor::zero;
+
+    // Calculate radial coordinate
+    const scalar r = ::sqrt(sqr(C.x()) + sqr(C.y()));
+
+    // Calculate circumferential coordinate
+    const scalar theta = Foam::atan2(C.y(), C.x());
+
+    const coordinateSystem cs("polarCS", C, vector(0, 0, 1), C/mag(C));
+
+    sigma.xx() =
+        T_*(1 - sqr(holeR_)/sqr(r))/2
+      + T_
+       *(1 + 3*pow(holeR_,4)/pow(r,4) - 4*sqr(holeR_)/sqr(r))*::cos(2*theta)/2;
+
+    sigma.xy() =
+      - T_
+       *(1 - 3*pow(holeR_,4)/pow(r,4) + 2*sqr(holeR_)/sqr(r))*::sin(2*theta)/2;
+
+    sigma.yx() = sigma.xy();
+
+    sigma.yy() =
+        T_*(1 + sqr(holeR_)/sqr(r))/2
+      - T_*(1 + 3*pow(holeR_,4)/pow(r,4))*::cos(2*theta)/2;
+
+
+    // Transformation to Cartesian coordinate system
+    sigma = ((cs.R() & sigma) & cs.R().T());
+
+    symmTensor S = symmTensor::zero;
+
+    S.xx() = sigma.xx();
+    S.xy() = sigma.xy();
+    S.yy() = sigma.yy();
+
+    return S;
+}
+
+
+Foam::vector Foam::plateHoleAnalyticalSolution::plateHoleDisplacement
+(
+    const vector& C, const symmTensor& sigma
+)
+{
+    // Shear modulus
+    const scalar mu = E_/(2*(1 + nu_));
+
+    // Kappa parameter
+    const scalar kappa = 3 - 4*nu_;
+
+    // Polar coordinates
+    const scalar r = ::sqrt(sqr(C.x()) + sqr(C.y()));
+    const scalar theta = atan2(C.y(), C.x());
+
+    return vector
+    (
+        (holeR_*T_/(8*mu))
+        *(
+            (r/holeR_)*(kappa + 1)*cos(theta)
+          + (2*holeR_/r)*((1 + kappa)*cos(theta) + cos(3*theta))
+          - (2*pow(holeR_, 3)/pow(r,3))*cos(3*theta)
+        ),
+        (holeR_*T_/(8*mu))
+        *(
+            (r/holeR_)*(kappa - 3)*sin(theta)
+          + (2*holeR_/r)*((1 - kappa)*sin(theta) + sin(3*theta))
+          - (2*pow(holeR_, 3)/pow(r,3))*sin(3*theta)
+        ),
+        0.0
+    );
+}
+
+bool Foam::plateHoleAnalyticalSolution::writeData()
 {
     // Lookup the solid mesh
     const fvMesh* meshPtr = NULL;
@@ -70,6 +147,13 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
     // Point coordinates
     const pointField& points = mesh.points();
+
+    if (gMin(mag(points)) < SMALL)
+    {
+        FatalErrorIn("bool Foam::plateHoleAnalyticalSolution::writeData()")
+            << "The hole should be centred on the origin!"
+            << abort(FatalError);
+    }
 
     // Cell analytical fields
     {
@@ -110,9 +194,8 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
         forAll(sI, cellI)
         {
-            sI[cellI] = cantileverStress(CI[cellI], P_, E_, nu_, L_, D_, I_);
-            aDI[cellI] =
-                cantileverDisplacement(CI[cellI], P_, E_, nu_, L_, D_, I_);
+            sI[cellI] = plateHoleStress(CI[cellI]);
+            aDI[cellI] = plateHoleDisplacement(CI[cellI], sI[cellI]);
         }
 
         forAll(analyticalStress.boundaryField(), patchI)
@@ -125,10 +208,8 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
                 forAll(sP, faceI)
                 {
-                    sP[faceI] =
-                        cantileverStress(CP[faceI], P_, E_, nu_, L_, D_, I_);
-                    aDP[faceI] =
-                        cantileverDisplacement(CP[faceI], P_, E_, nu_, L_, D_, I_);
+                    sP[faceI] = plateHoleStress(CP[faceI]);
+                    aDP[faceI] = plateHoleDisplacement(CP[faceI], sP[faceI]);
                 }
             }
         }
@@ -156,8 +237,8 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
             for (int cmpt = 0; cmpt < pTraits<symmTensor>::nComponents; cmpt++)
             {
-                // Only calculate for XX and XY
-                if (cmpt != 0 && cmpt != 1)
+                // Only calculate for XX, XY and ZZ
+                if (cmpt != 0 && cmpt != 1 && cmpt != 3)
                 {
                     continue;
                 }
@@ -229,10 +310,8 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
         forAll(sI, pointI)
         {
-            sI[pointI] =
-                cantileverStress(points[pointI], P_, E_, nu_, L_, D_, I_);
-            aDI[pointI] =
-                cantileverDisplacement(points[pointI], P_, E_, nu_, L_, D_, I_);
+            sI[pointI] = plateHoleStress(points[pointI]);
+            aDI[pointI] = plateHoleDisplacement(points[pointI], sI[pointI]);
         }
 
         // Write point analytical fields
@@ -269,7 +348,7 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::cantileverAnalyticalSolution::cantileverAnalyticalSolution
+Foam::plateHoleAnalyticalSolution::plateHoleAnalyticalSolution
 (
     const word& name,
     const Time& t,
@@ -279,19 +358,17 @@ Foam::cantileverAnalyticalSolution::cantileverAnalyticalSolution
     functionObject(name),
     name_(name),
     time_(t),
-    P_(readScalar(dict.lookup("P"))),
+    T_(readScalar(dict.lookup("farFieldTractionX"))),
+    holeR_(readScalar(dict.lookup("holeRadius"))),
     E_(readScalar(dict.lookup("E"))),
-    nu_(readScalar(dict.lookup("nu"))),
-    L_(readScalar(dict.lookup("L"))),
-    D_(readScalar(dict.lookup("D"))),
-    I_(Foam::pow(D_, 3.0)/12.0)
+    nu_(readScalar(dict.lookup("nu")))
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 
-    if (L_ < SMALL || D_ < SMALL)
+    if (holeR_ < SMALL)
     {
         FatalErrorIn(this->name() + " function object constructor")
-            << "L and D should both be greater than 0!"
+            << "holeRadius should be greater than 0!"
             << abort(FatalError);
     }
 
@@ -306,30 +383,30 @@ Foam::cantileverAnalyticalSolution::cantileverAnalyticalSolution
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-bool Foam::cantileverAnalyticalSolution::start()
+bool Foam::plateHoleAnalyticalSolution::start()
 {
     return true;
 }
 
 
-#ifdef FOAMEXTEND
-bool Foam::cantileverAnalyticalSolution::execute(const bool forceWrite)
+#if FOAMEXTEND
+    bool Foam::plateHoleAnalyticalSolution::execute(const bool forceWrite)
 #else
-bool Foam::cantileverAnalyticalSolution::execute()
+    bool Foam::plateHoleAnalyticalSolution::execute()
 #endif
 {
     return writeData();
 }
 
 
-bool Foam::cantileverAnalyticalSolution::read(const dictionary& dict)
+bool Foam::plateHoleAnalyticalSolution::read(const dictionary& dict)
 {
     return true;
 }
 
 
 #ifdef OPENFOAMESIORFOUNDATION
-bool Foam::cantileverAnalyticalSolution::write()
+bool Foam::plateHoleAnalyticalSolution::write()
 {
     return writeData();
 }
