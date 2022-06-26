@@ -59,6 +59,7 @@ interpolationSchemes
     interpolate(sigma)  linear;
     interpolate(sigma0) linear;
     interpolate((grad(D)-grad(D)_0)) linear;
+    interpolate(gammaStabilisation) linear;
 }
 
 // ************************************************************************* //

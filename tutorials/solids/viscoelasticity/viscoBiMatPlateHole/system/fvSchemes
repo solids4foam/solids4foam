@@ -53,16 +53,12 @@ snGradSchemes
 interpolationSchemes
 {
     default            none;
-
-    // For multi-material cases, linear seems better for linGeomSolid, whereas
-    // harmonic seems better for unsLinGeomSolid
-    //interpolate(impK)  linear;
-    interpolate(impK)  harmonic;
-
+    interpolate(impK)  linear;
     interpolate(grad(D)) linear;
     interpolate(sigma)  linear;
     interpolate(sigma0)  linear;
     interpolate((grad(D)-grad(D)_0)) linear;
+    interpolate(gammaStabilisation) linear;
 }
 
 // ************************************************************************* //

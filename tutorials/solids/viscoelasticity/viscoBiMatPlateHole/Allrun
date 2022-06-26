@@ -9,12 +9,6 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-if [[ $WM_PROJECT != "foam" ]]
-then
-    echo; echo "This case currently only runs in foam-extend"; echo
-    exit 0
-fi
-
 # Create mesh
 runApplication blockMesh
 
