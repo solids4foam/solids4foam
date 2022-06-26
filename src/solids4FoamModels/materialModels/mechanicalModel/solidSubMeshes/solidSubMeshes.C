@@ -1103,7 +1103,7 @@ void Foam::solidSubMeshes::updateInterfaceShadowSigma
 
         if (patchID == -1)
         {
-            // This sub mesh has not faces on a bi-material interface
+            // This sub mesh has no faces on a bi-material interface
             continue;
         }
 

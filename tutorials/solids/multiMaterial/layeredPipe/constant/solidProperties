@@ -25,10 +25,10 @@ solidModel     linearGeometryTotalDisplacement;
     //nCorrectors     10000;
 
     // Solution tolerance for displacement
-    solutionTolerance 1e-09;
+    solutionTolerance 1e-11;
 
     // Alternative solution tolerance for displacement
-    alternativeTolerance 1e-09;
+    alternativeTolerance 1e-11;
 
     // Material law solution tolerance
     // materialTolerance 1e-05;
