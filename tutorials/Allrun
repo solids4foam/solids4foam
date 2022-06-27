@@ -96,8 +96,12 @@ logReportDir()
 
 
 # Recursively run all cases
-# This command should work with OpenFOAM and foam extend
-foamRunTutorials -test cases
+if [[ $WM_PROJECT = "foam" ]]
+then
+    foamRunTutorials cases
+else
+    foamRunTutorials -test
+fi
 
 
 # Analyse all log files
