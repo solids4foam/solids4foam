@@ -28,7 +28,7 @@ sets
 (
     lineXX
     {
-        type            uniform;
+        type uniform;
         axis            x;
         nPoints         50;
         start (0.05 1e-6 0.0005);
@@ -36,7 +36,7 @@ sets
     }
     lineYY
     {
-        type            uniform;
+        type uniform;
         axis            y;
         nPoints         50;
         start (1e-6 0.05 0.0005);

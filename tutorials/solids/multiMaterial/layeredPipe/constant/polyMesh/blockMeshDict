@@ -53,11 +53,11 @@ patches
     (
         (6 5 1 2)
     )
-    symmetry symmX
+    symmetryPlane symmX
     (
         (7 6 2 3)
     )
-    symmetry symmY
+    symmetryPlane symmY
     (
         (0 1 5 4)
     )
