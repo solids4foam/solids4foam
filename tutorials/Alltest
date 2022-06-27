@@ -138,6 +138,15 @@ do
     ${SP}.org > ${SP}
 done
 
+for SP in `find . -name "fsiProperties"`
+do
+    mv ${SP} ${SP}.org
+    sed \
+   -e s/"//nOuterCorr.*;"/"nOuterCorr 1;"/g \
+   -e s/"nOuterCorr.*;"/"nOuterCorr 1;"/g \
+    ${SP}.org > ${SP}
+done
+
 ./Allrun
 
 sed -e :a -e '/\\$/N; s/\\\n//; ta' Allrun > temp
