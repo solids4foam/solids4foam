@@ -76,11 +76,7 @@ bool Foam::solidPointStress::writeData()
             mesh.lookupObject<volSymmTensorField>("sigma");
 
         // Create a point mesh
-#ifdef OPENFOAMFOUNDATION
         const pointMesh& pMesh = pointMesh::New(mesh);
-#else
-        pointMesh pMesh(mesh);
-#endif
 
         // Create a point stress field
         pointSymmTensorField pointSigma

@@ -75,11 +75,7 @@ bool Foam::solidPointTemperature::writeData()
         const volScalarField& T = mesh.lookupObject<volScalarField>("T");
 
         // Create a point mesh
-#ifdef OPENFOAMFOUNDATION
         const pointMesh& pMesh = pointMesh::New(mesh);
-#else
-        pointMesh pMesh(mesh);
-#endif
 
         // Create a point temperature field
         pointScalarField pointT
