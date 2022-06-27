@@ -789,9 +789,15 @@ void Foam::newFvMeshSubset::setCellSubset
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        std::move(newPoints),//xferMove(newPoints),
-        std::move(newFaces),//xferMove(newFaces),
-        std::move(newCells)//xferMove(newCells),
+#ifdef OPENFOAMESIORFOUNDATION
+        std::move(newPoints),
+        std::move(newFaces),
+        std::move(newCells)
+#else
+        xferMove(newPoints),
+        xferMove(newFaces),
+        xferMove(newCells)
+#endif
     );
 
     // Clear point mesh

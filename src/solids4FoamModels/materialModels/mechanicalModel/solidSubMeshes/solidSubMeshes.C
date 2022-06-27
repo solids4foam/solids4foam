@@ -26,11 +26,7 @@ License
 #include "solidSubMeshes.H"
 #include "twoDPointCorrector.H"
 #include "wedgePolyPatch.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "ZoneIDs.H"
-#else
-    #include "ZoneID.H"
-#endif
+#include "ZoneIDs.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 

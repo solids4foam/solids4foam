@@ -86,7 +86,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
 
     // Merge scale factor into gamma field
     volScalarField gammaMod("gammaStabilisation", gamma);
-    scalarField& gammaModI = gammaMod.primitiveFieldRef();
+    scalarField& gammaModI = gammaMod;
 
     // Optional: cell zone scale factors
     if (method != "none")
@@ -168,11 +168,16 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
                 gamma.boundaryField()[patchI].patchNeighbourField()
             );
 
+#ifdef OPENFOAMESIORFOUNDATION
+            scalarField& gammafP = gammaf.boundaryFieldRef()[patchI];
+#else
+            scalarField& gammafP = gammaf.boundaryField()[patchI];
+#endif
+
             if (vf.boundaryField()[patchI].type() == "processor")
             {
                 // Some faces may be on a material interface but some may
                 // not
-                scalarField& gammafP = gammaf.boundaryFieldRef()[patchI];
                 forAll(gammafP, faceI)
                 {
                     const scalar gOwn = pif[faceI];
@@ -192,8 +197,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
             }
             else
             {
-                gammaf.boundaryFieldRef()[patchI] =
-                    interfaceScaleFactor*0.5*(pif + pnf);
+                gammafP = interfaceScaleFactor*0.5*(pif + pnf);
             }
         }
     }
