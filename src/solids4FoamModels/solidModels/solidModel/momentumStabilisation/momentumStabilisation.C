@@ -121,7 +121,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     }
 
     // Interpolate gamma to faces
-    surfaceScalarField gammaf(fvc::interpolate(gammaMod));
+    surfaceScalarField gammaf(fvc::interpolate(gammaMod, "interpolate(impK)"));
 
     // Specify different scale factor at material interfaces
     const scalar interfaceScaleFactor

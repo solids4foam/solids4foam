@@ -173,8 +173,7 @@ public:
 
             bool hasUnmapped() const
             {
-                notImplemented("Hopefully this is not called, otherwise we need to understand what it does!");
-                return true;
+                return false;
             }
 
 #ifdef OPENFOAMESIORFOUNDATION
@@ -247,7 +246,6 @@ public:
 
             virtual bool hasUnmapped() const
             {
-                notImplemented("PC: when is this function called?");
                 return false;
             }
     };
