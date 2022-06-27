@@ -26,6 +26,7 @@
 #     Alltest
 #
 # Description
+#    Run all the solids4foam tutorials for only one time-step and one iteration.
 #
 #------------------------------------------------------------------------------
 
@@ -42,32 +43,6 @@ Options are:
 EOF
 }
 
-setDefaultFvSchemes () {
-cat<<EOF
-gradSchemes { default Gauss linear; }
-divSchemes
-{
-    default Gauss linear;
-    div(phi,fu_ft_h) Gauss multivariateSelection
-    {
-        fu upwind;
-        ft upwind;
-        h  upwind;
-    };
-    div(phi,ft_b_h_hu) Gauss multivariateSelection
-    {
-        fu upwind;
-        ft upwind;
-        b  upwind;
-        h  upwind;
-        hu upwind;
-    };
-}
-laplacianSchemes { default Gauss linear corrected; }
-interpolationSchemes { default linear; }
-snGradSchemes { default corrected; }
-EOF
-}
 #
 # VARIABLE
 #
@@ -109,26 +84,6 @@ SCHEMES_FILE="FvSchemes"
 SCHEMES_TEMP="FvSchemes.temp"
 SOLVERS_FILE="FvSolution"
 SOLVERS_TEMP="FvSolution.temp"
-DEFAULT_SCHEMES=0
-
-#
-# OPTIONS
-#
-OPTS=`getopt hd $*`
-if [ $? -ne 0 ] ; then
-    echo "Aborting due to invalid option"
-    printUsage
-    exit 1
-fi
-eval set -- "$OPTS"
-while [ $1 != -- ]; do
-    case $1 in
-        -d) DEFAULT_SCHEMES=1;;
-        -h) printUsage; exit 1;;
-    esac
-    shift
-done
-shift
 
 #
 # MAIN
@@ -173,18 +128,15 @@ do
     ${CD}.org > ${CD}
 done
 
-if [ $DEFAULT_SCHEMES = 1 ] ; then
-    echo "Modifying the fvSchemes to contain only default schemes"
-    for FV_SC in `find . -name fvSchemes`
-    do
-        for S in $FV_SCHEMES
-        do
-            mv ${FV_SC} ${FV_SC}.org
-            sed -e /"${S}"/,/$p/d ${FV_SC}.org > ${FV_SC}
-        done
-        setDefaultFvSchemes >> ${FV_SC}
-    done
-fi
+# set nCorrectors to 1 for solids4foam solvers
+for SP in `find . -name "solidProperties"`
+do
+    mv ${SP} ${SP}.org
+    sed \
+   -e s/"//nCorrectors.*;"/"nCorrectors 1;"/g \
+   -e s/"nCorrectors.*;"/"nCorrectors 1;"/g \
+    ${SP}.org > ${SP}
+done
 
 ./Allrun
 
