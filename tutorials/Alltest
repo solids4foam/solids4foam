@@ -121,7 +121,7 @@ for CD in `find . -name "controlDict*"`
 do
     mv ${CD} ${CD}.org
     sed \
-   -e s/"\(startFrom[ \t]*\)\([a-zA-Z]*\);"/"\1 latestTime;"/g \
+    -e s/"\(startFrom[ \t]*\)\([a-zA-Z]*\);"/"\1 latestTime;"/g \
     -e s/"\(stopAt[ \t]*\)\([a-zA-Z]*\);"/"\1 nextWrite;"/g \
     -e s/"\(writeControl[ \t]*\)\([a-zA-Z]*\);"/"\1 timeStep;"/g \
     -e s/"\(writeInterval[ \t]*\)\([0-9a-zA-Z.-]*\);"/"\1 1;"/g \
@@ -129,26 +129,30 @@ do
 done
 
 # set nCorrectors to 1 for solids4foam solvers
+echo "Modifying the solidProperties to run only one iteration"
 for SP in `find . -name "solidProperties"`
 do
     mv ${SP} ${SP}.org
     sed \
-   -e s/"//nCorrectors.*;"/"nCorrectors 1;"/g \
-   -e s/"nCorrectors.*;"/"nCorrectors 1;"/g \
+    -e "s|//nCorrectors.*;|nCorrectors 1;|g" \
+    -e "s|nCorrectors.*;|nCorrectors 1;|g" \
     ${SP}.org > ${SP}
 done
 
-for SP in `find . -name "fsiProperties"`
+echo "Modifying the fsiProperties to run only one iteration"
+for FP in `find . -name "fsiProperties"`
 do
-    mv ${SP} ${SP}.org
+    mv ${FP} ${FP}.org
     sed \
-   -e s/"//nOuterCorr.*;"/"nOuterCorr 1;"/g \
-   -e s/"nOuterCorr.*;"/"nOuterCorr 1;"/g \
-    ${SP}.org > ${SP}
+    -e "s|//nOuterCorr.*;|nOuterCorr 1;|g" \
+    -e "s|nOuterCorr.*;|nOuterCorr 1;|g" \
+    ${FP}.org > ${FP}
 done
 
+echo "Running the tutorials"
 ./Allrun
 
+echo "Preparing the summary files"
 sed -e :a -e '/\\$/N; s/\\\n//; ta' Allrun > temp
 APPLICATIONS=\
     `grep "applications=" temp | sed 's/applications=\"\([A-Za-z \t]*\)\"/\1/g'`
