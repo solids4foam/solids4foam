@@ -143,7 +143,6 @@ numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
 numerics/rotation/RodriguesRotation.C
-/*numerics/skewCorrectedSnGrad/skewCorrectedSnGrads.C*/
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 
@@ -161,7 +160,5 @@ numerics/RBFMeshMotionSolver/RBFFunctions/LinearFunction.C
 numerics/interpolationTable/tableReaders/tableReaders.C
 numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C
 numerics/interpolationTable/tableReaders/csv/csvTableReaders.C
-
-/*numerics/meshDualiser/meshDualiser.C*/
 
 LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels

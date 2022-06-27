@@ -59,9 +59,9 @@ SourceFiles
 #include "pointMesh.H"
 #include "fvPatchFieldMapper.H"
 #ifdef OPENFOAMESIORFOUNDATION
-#include "pointPatchFieldMapper.H"
+    #include "pointPatchFieldMapper.H"
 #else
-#include "PointPatchFieldMapper.H"
+    #include "PointPatchFieldMapper.H"
 #endif
 #include "GeometricField.H"
 #include "HashSet.H"
@@ -86,7 +86,11 @@ public:
     //- Patch-field subset interpolation class
     class patchFieldSubset
     :
+#ifdef OPENFOAMFOUNDATION
+        public generalFvPatchFieldMapper
+#else
         public fvPatchFieldMapper
+#endif
     {
         label sizeBeforeMapping_;
 
@@ -167,19 +171,17 @@ public:
                 return true;
             }
 
-            #ifdef OPENFOAMESIORFOUNDATION
-                        bool hasUnmapped() const
-                        {
-                                notImplemented("Hopefully this is not called, otherwise we need to understand what it does!");
-                                return true;
-                        }
-            #endif
+            bool hasUnmapped() const
+            {
+                notImplemented("Hopefully this is not called, otherwise we need to understand what it does!");
+                return true;
+            }
 
-            #ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
             const labelList& directAddressing() const
-            #else
+#else
             const unallocLabelList& directAddressing() const
-            #endif
+#endif
             {
                 return directAddressing_;
             }
@@ -189,11 +191,13 @@ public:
     //- Patch-field subset interpolation class
     class pointPatchFieldSubset
     :
-        #ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
+        public generalPointPatchFieldMapper
+#elif defined (OPENFOAMESI)
         public pointPatchFieldMapper
-        #else
+#else
         public PointPatchFieldMapper
-        #endif
+#endif
     {
         //- Addressing
         const labelList& directAddressing_;
@@ -232,22 +236,20 @@ public:
                 return true;
             }
 
-            #ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
             const labelList& directAddressing() const
-            #else
+#else
             const unallocLabelList& directAddressing() const
-            #endif
+#endif
             {
                 return directAddressing_;
             }
 
-            #ifdef OPENFOAMESIORFOUNDATION
             virtual bool hasUnmapped() const
             {
                 notImplemented("PC: when is this function called?");
                 return false;
             }
-            #endif
     };
 
 

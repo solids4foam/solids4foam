@@ -48,6 +48,12 @@ Description
 namespace Foam
 {
 
+#ifdef OPENFOAMFOUNDATION
+    typedef meshPointZones pointZoneMesh;
+    typedef meshFaceZones faceZoneMesh;
+    typedef meshCellZones cellZoneMesh;
+#endif
+
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 bool Foam::newFvMeshSubset::checkCellSubset() const

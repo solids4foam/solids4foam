@@ -50,6 +50,10 @@ namespace Foam
     defineTypeNameAndDebug(solidModel, 0);
     defineRunTimeSelectionTable(solidModel, dictionary);
     addToRunTimeSelectionTable(physicsModel, solidModel, physicsModel);
+
+#ifdef OPENFOAMFOUNDATION
+    typedef meshFaceZones faceZoneMesh;
+#endif
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
