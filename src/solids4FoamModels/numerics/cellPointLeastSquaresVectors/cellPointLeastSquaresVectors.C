@@ -39,7 +39,11 @@ namespace Foam
 
 Foam::cellPointLeastSquaresVectors::cellPointLeastSquaresVectors(const fvMesh& mesh)
 :
+#ifdef OPENFOAMESIORFOUNDATION
+    MeshObject<fvMesh, MoveableMeshObject, cellPointLeastSquaresVectors>(mesh),
+#else
     MeshObject<fvMesh, cellPointLeastSquaresVectors>(mesh),
+#endif
     vectorsPtr_()
 {}
 
@@ -63,15 +67,17 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
             << endl;
     }
 
-    vectorsPtr_.set(new List<vectorList>(mesh().nCells()));
+    const fvMesh& mesh = mesh_;
+
+    vectorsPtr_.set(new List<vectorList>(mesh.nCells()));
     List<vectorList>& ls = vectorsPtr_();
 
     // Set local references to mesh data
-    const labelListList& cellPoints = mesh().cellPoints();
-    const vectorField& points = mesh().points();
+    const labelListList& cellPoints = mesh.cellPoints();
+    const vectorField& points = mesh.points();
 
     // Calculate average position in each cell
-    vectorField cellAvPoint(mesh().nCells(), vector::zero);
+    vectorField cellAvPoint(mesh.nCells(), vector::zero);
     forAll(cellAvPoint, cellI)
     {
         const labelList& curCellPoints = cellPoints[cellI];
@@ -87,7 +93,7 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
     }
 
     // Set up temporary storage for the dd tensor (before inversion)
-    symmTensorField dd(mesh().nCells(), symmTensor::zero);
+    symmTensorField dd(mesh.nCells(), symmTensor::zero);
 
     forAll(dd, cellI)
     {
@@ -114,8 +120,11 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
 
     // Invert least squares matrix using Householder transformations to avoid
     // badly posed cells
-    //const symmTensorField invDd = inv(dd);
-    const symmTensorField invDd = hinv(dd);
+#ifdef OPENFOAMESIORFOUNDATION
+    const symmTensorField invDd(inv(dd));
+#else
+    const symmTensorField invDd(hinv(dd));
+#endif
 
     // Revisit all cells and calculate the ls vectors
     forAll(ls, cellI)
@@ -184,7 +193,11 @@ Foam::cellPointLeastSquaresVectors::vectors() const
 }
 
 
-bool Foam::cellPointLeastSquaresVectors::movePoints() const
+#ifdef OPENFOAMESIORFOUNDATION
+    bool Foam::cellPointLeastSquaresVectors::movePoints()
+#else
+    bool Foam::cellPointLeastSquaresVectors::movePoints() const
+#endif
 {
     if (debug)
     {

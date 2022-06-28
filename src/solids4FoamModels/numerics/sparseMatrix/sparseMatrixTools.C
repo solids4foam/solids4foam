@@ -219,7 +219,11 @@ void Foam::sparseMatrixTools::solveLinearSystemEigen
 }
 
 
-Foam::BlockSolverPerformance<Foam::vector>
+#ifdef OPENFOAMESIORFOUNDATION
+    Foam::SolverPerformance<Foam::vector>
+#else
+    Foam::BlockSolverPerformance<Foam::vector>
+#endif
 Foam::sparseMatrixTools::solveLinearSystemPETSc
 (
     const sparseMatrix& matrix,
@@ -793,6 +797,18 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         finalRes.z() = 0;
     }
 
+#ifdef OPENFOAMESIORFOUNDATION
+    return SolverPerformance<vector>
+    (
+        "PETSc", // solver name
+        "pointD", // field name
+        initRes, // initial residual
+        finalRes, // final residual
+        vector(its, its, its) // nIteration
+        //false, // converged
+        //false // singular
+    );
+#else
     return BlockSolverPerformance<vector>
     (
         "PETSc", // solver name
@@ -803,6 +819,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         //false, // converged
         //false // singular
     );
+#endif
 }
 
 

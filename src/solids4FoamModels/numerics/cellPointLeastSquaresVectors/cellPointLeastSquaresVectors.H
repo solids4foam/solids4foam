@@ -42,7 +42,7 @@ Author
 #include "MeshObject.H"
 #include "fvMesh.H"
 #include "vectorList.H"
-#include "tolerancesSwitch.H"
+//#include "tolerancesSwitch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -57,7 +57,11 @@ class mapPolyMesh;
 
 class cellPointLeastSquaresVectors
 :
+#ifdef OPENFOAMESIORFOUNDATION
+    public MeshObject<fvMesh, MoveableMeshObject, cellPointLeastSquaresVectors>
+#else
     public MeshObject<fvMesh, cellPointLeastSquaresVectors>
+#endif
 {
     // Private data
 
@@ -96,7 +100,11 @@ public:
 
         //- Update after mesh motion:
         //  Delete the least square vectors when the mesh moves
+#ifdef OPENFOAMESIORFOUNDATION
+        virtual bool movePoints();
+#else
         virtual bool movePoints() const;
+#endif
 
         //- Update after topo change:
         //  Delete the least square vectors when mesh changes

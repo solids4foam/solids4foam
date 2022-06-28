@@ -135,6 +135,7 @@ numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
 numerics/fvc/fvcCellLimitedGrad.C
+numerics/globalPointIndices/globalPointIndices.C
 numerics/globalPolyPatch/globalPolyPatch.C
 numerics/logExpVolFields/eig3/eig3.C
 numerics/logExpVolFields/eig3Field.C
@@ -161,5 +162,11 @@ numerics/RBFMeshMotionSolver/RBFFunctions/LinearFunction.C
 numerics/interpolationTable/tableReaders/tableReaders.C
 numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C
 numerics/interpolationTable/tableReaders/csv/csvTableReaders.C
+
+numerics/meshDualiser/meshDualiser.C
+numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
+numerics/multiplyCoeff/multiplyCoeff.C
+numerics/sparseMatrix/sparseMatrix.C
+numerics/sparseMatrix/sparseMatrixTools.C
 
 LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
