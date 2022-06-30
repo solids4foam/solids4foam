@@ -26,7 +26,6 @@ License
 #include "solidTractionPointPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
-#include "PointPatchFieldMapper.H"
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
@@ -128,7 +127,13 @@ solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
     const solidTractionPointPatchVectorField& ptf,
     const pointPatch& p,
     const DimensionedField<vector, pointMesh>& iF,
-    const PointPatchFieldMapper& mapper
+#ifdef OPENFOAMFOUNDATION
+    const generalPointPatchFieldMapper&
+#elif defined (OPENFOAMESI)
+    const pointPatchFieldMapper&
+#else
+    const PointPatchFieldMapper&
+#endif
 )
 :
     calculatedPointPatchVectorField(p, iF),
@@ -174,7 +179,13 @@ solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
 // Map and resize from self given a mapper
 void solidTractionPointPatchVectorField::autoMap
 (
-    const PointPatchFieldMapper& m
+#ifdef OPENFOAMFOUNDATION
+    const generalPointPatchFieldMapper&
+#elif defined (OPENFOAMESI)
+    const pointPatchFieldMapper&
+#else
+    const PointPatchFieldMapper&
+#endif
 )
 {
     //Field<vector>::autoMap(m);

@@ -105,7 +105,13 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
     const fixedDisplacementZeroShearPointPatchVectorField& ptf,
     const pointPatch& p,
     const DimensionedField<vector, pointMesh>& iF,
-    const PointPatchFieldMapper& mapper
+#ifdef OPENFOAMFOUNDATION
+    const generalPointPatchFieldMapper&
+#elif defined (OPENFOAMESI)
+    const pointPatchFieldMapper&
+#else
+    const PointPatchFieldMapper&
+#endif
 )
 :
     componentMixedPointPatchVectorField(p, iF),
@@ -145,7 +151,13 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
 // Map and resize from self given a mapper
 void fixedDisplacementZeroShearPointPatchVectorField::autoMap
 (
-    const PointPatchFieldMapper& m
+#ifdef OPENFOAMFOUNDATION
+    const generalPointPatchFieldMapper&
+#elif defined (OPENFOAMESI)
+    const pointPatchFieldMapper&
+#else
+    const PointPatchFieldMapper&
+#endif
 )
 {
     componentMixedPointPatchVectorField::autoMap(m);
