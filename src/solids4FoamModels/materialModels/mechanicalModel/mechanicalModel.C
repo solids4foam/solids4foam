@@ -233,7 +233,7 @@ Foam::mechanicalModel::mechanicalModel
     incremental_(incremental),
     cellZoneNames_(),
     solSubMeshes_(),
-    impKfcorrPtr_(NULL)
+    impKfcorrPtr_()
 {
     Info<< "Creating the mechanicalModel" << endl;
 
