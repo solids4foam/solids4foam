@@ -1,0 +1,55 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// linearGeometry: assumes small strains and rotations
+// solidModel     linearGeometryTotalDisplacement;
+//solidModel     unsLinearGeometry;
+solidModel     vertexCentredLinearGeometry;
+
+"vertexCentredLinearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs|linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+{
+    // Maximum number of Newton-Raphson iterations
+    // Set to 1 for linear cases, otherwise the solver may perform a second
+    // iteration
+    nCorrectors     1;
+
+    // Tolerance for Newton-Raphson loop
+    // This obviouosly has no effect if nCorrectors is set to 1
+    solutionTolerance 1e-6;
+
+    // Update the stiffness matrix every outer iteration
+    fullNewton no;
+
+    // Scaling of fixed DOF equations
+    //fixedDofScale 1;
+
+    // Fraction of compact edge direction gradient used
+    alpha 0.2;
+
+    // Use PETSc. If "no" then Eigen LU direct solver is used.
+    usePETSc yes;
+
+    // PETSc options file
+    optionsFile "$FOAM_CASE/petscOptions";
+
+    // Line search settings for nonlinear cases
+    lineSearch no;
+    lineSearchRTol 0.5;
+}
+
+
+// ************************************************************************* //

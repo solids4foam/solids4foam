@@ -1,0 +1,29 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                |
+| \\      /  F ield         | cfMesh: A library for mesh generation          |
+|  \\    /   O peration     |                                                |
+|   \\  /    A nd           | Author: Franjo Juretic                         |
+|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version   2.0;
+    format    ascii;
+    class     dictionary;
+    location  "system";
+    object    meshDict;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// You can download the original full resolution file from
+// https://b2b.partcommunity.com/community/partcloud/index?route=part&model_id=60447
+//surfaceFile "newton.stl";
+surfaceFile "newtonDecimated.stl";
+
+maxCellSize 0.005;
+
+boundaryCellSize 0.0025;
+
+// ************************************************************************* //

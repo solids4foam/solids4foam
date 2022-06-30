@@ -91,24 +91,14 @@ class mechanicalModel
         //- Sub-meshes for each mechanicalLaw
         mutable autoPtr<solidSubMeshes> solSubMeshes_;
 
-        //- Volume field to point field interpolator for the base mesh
-#ifdef OPENFOAMESIORFOUNDATION
-        mutable volPointInterpolation* volToPointPtr_;
-#else
-        mutable newLeastSquaresVolPointInterpolation* volToPointPtr_;
-#endif
-
        //- The implicit stiffness surface field for Rhie-Chow correction
-        mutable surfaceScalarField* impKfcorrPtr_;
+        mutable autoPtr<surfaceScalarField> impKfcorrPtr_;
 
 
     // Private Member Functions
 
         //- Make material sub-meshes
         void makeSolSubMeshes() const;
-
-        //- Make base mesh vol-to-point interpolator
-        void makeVolToPoint() const;
 
         //- Calculate the impKf field for Rhie-Chow correction
         //  This field is zero on bi-material interfaces

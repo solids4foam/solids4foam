@@ -1,0 +1,68 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+d2dt2Schemes
+{
+    //d2dt2(pointD)      steadyState;
+
+    // 1st order backward Euler
+    //d2dt2(pointD)      Euler;
+
+    // 2nd order backward
+    //d2dt2(pointD)      backward;
+
+    // Newmark-beta with beta and gamma parameters
+    // beta = 0.25, gamma = 0.5 for 2nd order with no dissipation
+    // For unconditional stability, beta >= gamma/2 >= 0.25
+    d2dt2(pointD)      NewmarkBeta 0.25 0.5;
+    //d2dt2(pointD)      NewmarkBeta 0.1666666667 0.5;
+}
+
+ddtSchemes
+{
+    default          none;
+    ddt(pointD)      NewmarkBeta 0.25 0.5;
+    ddt(pointU)      NewmarkBeta 0.25 0.5;
+}
+
+gradSchemes
+{
+    default          none;
+}
+
+divSchemes
+{
+    default            none;
+}
+
+laplacianSchemes
+{
+    default            none;
+}
+
+snGradSchemes
+{
+    default            none;
+}
+
+interpolationSchemes
+{
+    default            none;
+    interpolate(sigma0) linear;
+    interpolate((((materialDirectionsX*materialDirectionsX)+(materialDirectionsY*materialDirectionsY))+(materialDirectionsZ*materialDirectionsZ))) linear;
+}
+
+// ************************************************************************* //

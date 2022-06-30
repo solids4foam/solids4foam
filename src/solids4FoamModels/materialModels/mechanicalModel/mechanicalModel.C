@@ -92,32 +92,9 @@ Foam::solidSubMeshes& Foam::mechanicalModel::solSubMeshes()
 }
 
 
-void Foam::mechanicalModel::makeVolToPoint() const
-{
-    if (volToPointPtr_)
-    {
-        FatalErrorIn
-        (
-            "void Foam::mechanicalModel::makeVolToPoint() const"
-        )   << "pointer already set" << abort(FatalError);
-    }
-
-#ifdef OPENFOAMFOUNDATION
-    volToPointPtr_ = &const_cast<volPointInterpolation&>
-    (
-        volPointInterpolation::New(mesh())
-    );
-#elif OPENFOAMESI
-    volToPointPtr_ = new volPointInterpolation(mesh());
-#else
-    volToPointPtr_ = new newLeastSquaresVolPointInterpolation(mesh());
-#endif
-}
-
-
 void Foam::mechanicalModel::calcImpKfcorr() const
 {
-    if (impKfcorrPtr_)
+    if (impKfcorrPtr_.valid())
     {
         FatalErrorIn
         (
@@ -126,7 +103,8 @@ void Foam::mechanicalModel::calcImpKfcorr() const
         )   << "pointer already set" << abort(FatalError);
     }
 
-    impKfcorrPtr_ =
+    impKfcorrPtr_.set
+    (
         new surfaceScalarField
         (
             IOobject
@@ -138,7 +116,8 @@ void Foam::mechanicalModel::calcImpKfcorr() const
                 IOobject::NO_WRITE
             ),
             impKf()
-        );
+        )
+    );
 
     const PtrList<mechanicalLaw>& laws = *this;
 
@@ -148,8 +127,8 @@ void Foam::mechanicalModel::calcImpKfcorr() const
         // To disable Rhie-Chow correction on bi-material interface, we will set
         // impKfcorr to zero on bi-material interface faces
 
-        surfaceScalarField& impKfcorr = *impKfcorrPtr_;
-        scalarField& impKfcorrI = impKfcorrPtr_->internalField();
+        surfaceScalarField& impKfcorr = impKfcorrPtr_();
+        scalarField& impKfcorrI = impKfcorrPtr_().internalField();
 
         forAll(laws, lawI)
         {
@@ -193,7 +172,7 @@ void Foam::mechanicalModel::calcImpKfcorr() const
             }
         }
 
-        impKfcorrPtr_->correctBoundaryConditions();
+        impKfcorrPtr_().correctBoundaryConditions();
 #else
         FatalErrorIn(type())
             << "Not implemented for this version of OpenFOAM"
@@ -205,20 +184,17 @@ void Foam::mechanicalModel::calcImpKfcorr() const
 
 const Foam::surfaceScalarField& Foam::mechanicalModel::impKfcorr() const
 {
-    if (!impKfcorrPtr_)
+    if (impKfcorrPtr_.empty())
     {
         calcImpKfcorr();
     }
 
-    return *impKfcorrPtr_;
+    return impKfcorrPtr_();
 }
 
 
 void Foam::mechanicalModel::clearOut()
 {
-    deleteDemandDrivenData(volToPointPtr_);
-    deleteDemandDrivenData(impKfcorrPtr_);
-
     // Clear the list of mechanical laws
     // Note: we should do this before clearing the subMeshes, as the mechanical
     // laws can store geometricFields that must be deleted before deleting
@@ -257,7 +233,6 @@ Foam::mechanicalModel::mechanicalModel
     incremental_(incremental),
     cellZoneNames_(),
     solSubMeshes_(),
-    volToPointPtr_(),
     impKfcorrPtr_(NULL)
 {
     Info<< "Creating the mechanicalModel" << endl;
@@ -414,15 +389,9 @@ const Foam::volPointInterpolation& Foam::mechanicalModel::volToPoint() const
     return volPointInterpolation::New(mesh_);
 }
 #else
-const Foam::newLeastSquaresVolPointInterpolation&
-Foam::mechanicalModel::volToPoint() const
+const Foam::newLeastSquaresVolPointInterpolation& Foam::mechanicalModel::volToPoint() const
 {
-    if (!volToPointPtr_)
-    {
-        makeVolToPoint();
-    }
-
-    return *volToPointPtr_;
+    return newLeastSquaresVolPointInterpolation::New(mesh_);
 }
 #endif
 
@@ -1018,10 +987,6 @@ Foam::scalar Foam::mechanicalModel::residual()
 
 void Foam::mechanicalModel::updateTotalFields()
 {
-#ifdef OPENFOAMFOUNDATION
-    volToPointPtr_ = nullptr;
-#endif
-
     PtrList<mechanicalLaw>& laws = *this;
 
     forAll(laws, lawI)
