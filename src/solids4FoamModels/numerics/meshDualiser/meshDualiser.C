@@ -29,7 +29,11 @@ Class
 #include "meshDualiser.H"
 #include "meshTools.H"
 #include "polyMesh.H"
-#include "directTopoChange.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "polyTopoChange.H"
+#else
+    #include "directTopoChange.H"
+#endif
 #include "mapPolyMesh.H"
 #include "edgeFaceCirculator.H"
 #include "mergePoints.H"
@@ -37,7 +41,10 @@ Class
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(Foam::meshDualiser, 0);
+namespace Foam
+{
+    defineTypeNameAndDebug(meshDualiser, 0);
+}
 
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //

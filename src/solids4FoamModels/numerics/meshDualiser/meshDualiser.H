@@ -60,6 +60,7 @@ namespace Foam
 class polyMesh;
 #ifdef OPENFOAMESIORFOUNDATION
     class polyTopoChange;
+    typedef polyTopoChange directTopoChange;
 #else
     class directTopoChange;
 #endif
@@ -214,13 +215,18 @@ class meshDualiser
 public:
 
     //- Runtime type information
-    ClassName("meshDualiser");
+    TypeName("meshDualiser");
 
 
     // Constructors
 
         //- Construct from mesh
         meshDualiser(const polyMesh&);
+
+    // Destructor
+
+        virtual ~meshDualiser()
+        {}
 
 
     // Member Functions
