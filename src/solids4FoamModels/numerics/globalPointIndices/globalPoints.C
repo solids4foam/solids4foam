@@ -30,8 +30,10 @@ License
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(Foam::globalPoints, 0);
-
+namespace Foam
+{
+    defineTypeNameAndDebug(globalPoints, 0);
+}
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -329,7 +331,11 @@ void Foam::globalPoints::sendPatchPoints(const labelHashSet& changedPoints)
 
                 OPstream toNeighbour
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                 );
 
@@ -368,7 +374,11 @@ void Foam::globalPoints::receivePatchPoints(labelHashSet& changedPoints)
             {
                 IPstream fromNeighbour
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                 );
                 fromNeighbour >> patchFaces >> indexInFace >> nbrInfo;
@@ -642,7 +652,14 @@ void Foam::globalPoints::sendSharedPoints(const labelList& changedIndices) const
             const processorPolyPatch& procPatch =
                 refCast<const processorPolyPatch>(pp);
 
+#ifdef OPENFOAMESIORFOUNDATION
+            OPstream toNeighbour
+            (
+                Pstream::commsTypes::blocking, procPatch.neighbProcNo()
+            );
+#else
             OPstream toNeighbour(Pstream::blocking, procPatch.neighbProcNo());
+#endif
 
             if (debug)
             {
@@ -693,7 +710,11 @@ void Foam::globalPoints::receiveSharedPoints(labelList& changedIndices)
                 {
                     IPstream fromNeighbour
                     (
+#ifdef OPENFOAMESIORFOUNDATION
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procPatch.neighbProcNo()
                     );
                     fromNeighbour >> nbrSharedPointAddr >> nbrSharedPointLabels;
