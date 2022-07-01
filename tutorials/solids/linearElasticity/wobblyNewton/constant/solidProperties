@@ -15,12 +15,13 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// linearGeometry: assumes small strains and rotations
-// solidModel     linearGeometryTotalDisplacement;
-//solidModel     unsLinearGeometry;
 solidModel     vertexCentredLinearGeometry;
+// solidModel     linearGeometry;
+// solidModel     linearGeometryTotalDisplacement;
+// solidModel     explicitUnsLinearGeometryTotalDisplacement;
+// solidModel     explicitLinearGeometryTotalDisplacement;
 
-"vertexCentredLinearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs|linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+vertexCentredLinearGeometryCoeffs
 {
     // Maximum number of Newton-Raphson iterations
     // Set to 1 for linear cases, otherwise the solver may perform a second
@@ -38,9 +39,10 @@ solidModel     vertexCentredLinearGeometry;
     //fixedDofScale 1;
 
     // Fraction of compact edge direction gradient used
+    // Must be greater than 0.0 for stability
     alpha 0.2;
 
-    // Use PETSc. If "no" then Eigen LU direct solver is used.
+    // Use PETSc. If "no" then Eigen LU direct solver (serial only) is used.
     usePETSc yes;
 
     // PETSc options file
@@ -49,6 +51,41 @@ solidModel     vertexCentredLinearGeometry;
     // Line search settings for nonlinear cases
     lineSearch no;
     lineSearchRTol 0.5;
+}
+
+"linearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs"
+{
+    // Maximum number of momentum correctors
+    nCorrectors     10000;
+
+    // Solution tolerance for displacement
+    solutionTolerance 1e-04;
+
+    // Alternative solution tolerance for displacement
+    alternativeTolerance 1e-04;
+
+    // Material law solution tolerance
+    materialTolerance 1e-05;
+
+    // Write frequency for the residuals
+    infoFrequency   100;
+}
+
+"explicitLinearGeometryTotalDisplacementCoeffs|explicitUnsLinearGeometryTotalDisplacementCoeffs"
+{
+    // Linear bulk viscosity coefficient to kill high frequency oscillations
+    // Defaults to 0.06
+    linearBulkViscosityCoeff 0.06;
+
+    // Scale factor for JST smoothing term to quell checkerboarding
+    // Note: the solver can explode if this is too small or too large :)
+    JSTScaleFactor   0.5;
+
+    // Numerical viscosity for 1st temporal derivative term
+    numericalViscosity    eta [ 0 0 -1 0 0 0 0 ] 0;
+
+    // Frequency at which time-step energy information is printed to the std out
+    infoFrequency 100;
 }
 
 

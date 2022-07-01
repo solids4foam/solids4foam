@@ -16,53 +16,96 @@ FoamFile
 
 d2dt2Schemes
 {
-    //d2dt2(pointD)      steadyState;
+    default          none;
 
-    // 1st order backward Euler
-    //d2dt2(pointD)      Euler;
-
-    // 2nd order backward
-    //d2dt2(pointD)      backward;
-
+    // Vertex-centred schemes
+    // d2dt2(pointD)    steadyState;
+    // d2dt2(pointD)    Euler;
+    // d2dt2(pointD)    backward;
     // Newmark-beta with beta and gamma parameters
     // beta = 0.25, gamma = 0.5 for 2nd order with no dissipation
     // For unconditional stability, beta >= gamma/2 >= 0.25
-    d2dt2(pointD)      NewmarkBeta 0.25 0.5;
-    //d2dt2(pointD)      NewmarkBeta 0.1666666667 0.5;
+    d2dt2(pointD)    NewmarkBeta 0.25 0.5;
+
+    // Cell-centred schemes
+    // d2dt2(DD)         steadyState;
+    // d2dt2(DD)         Euler;
+    d2dt2(DD)         backward;
 }
 
 ddtSchemes
 {
     default          none;
+
+    // Vertex-centred schemes
     ddt(pointD)      NewmarkBeta 0.25 0.5;
     ddt(pointU)      NewmarkBeta 0.25 0.5;
+
+    // Cell-centred schemes
+    // ddt(D)           steadyState;
+    // ddt(D)           Euler;
+    ddt(D)           backward;
+    d2dt2(D_0)       backward;
+
+    // Explicit schemes
+    ddt(epsilonVol)  Euler;
 }
 
 gradSchemes
 {
     default          none;
+
+    // For explicit solids
+    grad(D)          cellLimited leastSquares 1.0;
+    snGradCorr(U)    cellLimited leastSquares 1.0;
+    snGradCorr(laplacian(((0.5*(deltaT+deltaT0))*interpolate(impK)),U)) cellLimited leastSquares 1.0;
+
+    // For segregated solids
+    grad(DD)          extendedLeastSquares 0;
 }
 
 divSchemes
 {
-    default            none;
+    default          none;
+
+    // For explicit and some segregated solids
+    div(sigma)       Gauss linear;
 }
 
 laplacianSchemes
 {
-    default            none;
+    default          none;
+
+    // For explicit and some segregated solids
+    laplacian(DD,D)  Gauss linear skewCorrected 1;
+    laplacian(DDD,DD) Gauss linear skewCorrected 1;
+    laplacian(DU,U)  Gauss linear skewCorrected 1;
 }
 
 snGradSchemes
 {
-    default            none;
+    default          none;
+
+    // For explicit and some segregated solids
+    snGrad(D)        skewCorrected 1;
 }
 
 interpolationSchemes
 {
-    default            none;
+    default          none;
     interpolate(sigma0) linear;
     interpolate((((materialDirectionsX*materialDirectionsX)+(materialDirectionsY*materialDirectionsY))+(materialDirectionsZ*materialDirectionsZ))) linear;
+    interpolate(impK) linear;
+    interpolate(grad(D)) linear;
+    interpolate(grad(DD)) linear;
+    interpolate(sqrt((impK|rho))) linear;
+    interpolate((rho*ddt(epsilonVol))) linear;
+    interpolate(grad(sigmaHyd)) linear;
+    interpolate(sigma) linear;
+    interpolate(sigma0) linear;
+    interpolate(rho) linear;
+    interpolate(grad(U)) linear;
+    interpolate(grad(laplacian(((0.5*(deltaT+deltaT0))*interpolate(impK)),U))) linear;
 }
 
 // ************************************************************************* //

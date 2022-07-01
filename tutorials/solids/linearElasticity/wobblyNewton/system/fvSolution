@@ -17,13 +17,16 @@ FoamFile
 
 solvers
 {
-    D
+    "D|DD"
     {
         solver          PCG;
         preconditioner  FDIC;
         tolerance       1e-09;
         relTol          0.1;
     }
+
+    // For explicit solids, the so-called "diagonal" solver is used regardless
+    // of what is spedcified here
 }
 
 relaxationFactors
@@ -32,14 +35,14 @@ relaxationFactors
     // some cases, in particular when there are solidContact boundaries
     equations
     {
-        //D    0.999;
+        //"D|DD"    0.999;
     }
 
     // Under-relaxating the D field by 0.1-0.9 can improve convergence in some
     // cases
     fields
     {
-        //D       0.7;
+        //"D|DD"       0.7;
     }
 }
 
