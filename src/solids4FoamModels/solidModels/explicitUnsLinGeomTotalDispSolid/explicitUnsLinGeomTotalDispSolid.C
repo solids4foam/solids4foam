@@ -160,6 +160,8 @@ explicitUnsLinGeomTotalDispSolid::explicitUnsLinGeomTotalDispSolid
         "zeroGradient"
     )
 {
+    DisRequired();
+
     a_.oldTime();
     U().oldTime();
 
