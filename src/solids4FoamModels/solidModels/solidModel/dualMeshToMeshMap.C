@@ -141,6 +141,7 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
     const pointField& points = mesh.points();
     const faceList& faces = mesh.faces();
     const vectorField& dualFaceCentres = dualMesh.faceCentres();
+    const vectorField& CI = mesh.cellCentres();
 
     // This is only needed in foam extend: OF can use
     // polyMesh::pointInCell(CELL_TETS)
@@ -203,7 +204,7 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
 #endif
                 const vector dFaceC =
                     dualFaceCentres[dFaceID]
-                  + 0.01*minEdgeLength*perturb/mag(perturb);
+                  + 0.0001*minEdgeLength*perturb/mag(perturb);
 
                 // Check if the centre of the dual face dFaceID is within one of the
                 // point cells
@@ -243,6 +244,28 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
                         break;
                     }
                 }
+
+                // If we didn't find it then we will pick the closest cell of
+                // the point cells. This is not ideal, but how bad can it be...
+                // if (dualFaceToCell_[dFaceID] == -1)
+                // {
+                //     label closestCellID = -1;
+                //     scalar dist = GREAT;
+                //     forAll(curPointCells, pcI)
+                //     {
+                //         const label cellID = curPointCells[pcI];
+                //         const vector& curC = CI[cellID];
+                //         const scalar newDist = mag(dFaceC - curC);
+
+                //         if (newDist < dist)
+                //         {
+                //             dist = newDist;
+                //             closestCellID = cellID;
+                //         }
+                //     }
+
+                //     dualFaceToCell_[dFaceID] = closestCellID;
+                // }
             }
             else // boundary dual face
             {
