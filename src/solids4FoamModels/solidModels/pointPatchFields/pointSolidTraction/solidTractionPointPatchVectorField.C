@@ -29,6 +29,9 @@ License
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "Time.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -127,18 +130,17 @@ solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
     const solidTractionPointPatchVectorField& ptf,
     const pointPatch& p,
     const DimensionedField<vector, pointMesh>& iF,
-#ifdef OPENFOAMFOUNDATION
-    const generalPointPatchFieldMapper&
-#elif defined (OPENFOAMESI)
-    const pointPatchFieldMapper&
-#else
-    const PointPatchFieldMapper&
-#endif
+    const PointPatchFieldMapper& mapper
 )
 :
     calculatedPointPatchVectorField(p, iF),
+#ifdef OPENFOAMESIORFOUNDATION
+    traction_(mapper(ptf.traction_)),
+    pressure_(mapper(ptf.pressure_)),
+#else
     traction_(ptf.traction_, mapper),
     pressure_(ptf.pressure_, mapper),
+#endif
     tractionSeries_(),
     pressureSeries_(),
     curTimeIndex_(-1)
@@ -179,18 +181,17 @@ solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
 // Map and resize from self given a mapper
 void solidTractionPointPatchVectorField::autoMap
 (
-#ifdef OPENFOAMFOUNDATION
-    const generalPointPatchFieldMapper&
-#elif defined (OPENFOAMESI)
-    const pointPatchFieldMapper&
-#else
-    const PointPatchFieldMapper&
-#endif
+    const PointPatchFieldMapper& m
 )
 {
     //Field<vector>::autoMap(m);
+#ifdef OPENFOAMFOUNDATION
+    m(traction_, traction_);
+    m(pressure_, pressure_);
+#else
     traction_.autoMap(m);
     pressure_.autoMap(m);
+#endif
 }
 
 

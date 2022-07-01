@@ -158,9 +158,7 @@ functionObjects/cantileverAnalyticalSolution/cantileverAnalyticalSolution.C
 functionObjects/cantileverAnalyticalSolution/cantileverStressDisplacement.C
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
-functionObjects/patchAvgTractionHistory/patchAvgTractionHistory.C
 functionObjects/plateHoleAnalyticalSolution/plateHoleAnalyticalSolution.C
-functionObjects/pointHistory/pointHistory.C
 functionObjects/principalStresses/principalStresses.C
 functionObjects/principalStresses/principalStressFields.C
 functionObjects/solidDisplacements/solidDisplacements.C
@@ -234,7 +232,6 @@ numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
-numerics/skewCorrectedSnGrad/skewCorrectedSnGrads.C
 
 numerics/RBFMeshMotionSolver/RBFInterpolation.C
 numerics/RBFMeshMotionSolver/RBFCoarsening.C

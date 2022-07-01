@@ -53,6 +53,11 @@ Author
 
 namespace Foam
 {
+#ifdef OPENFOAMFOUNDATION
+    typedef generalPointPatchFieldMapper PointPatchFieldMapper;
+#elif defined (OPENFOAMESI)
+    typedef pointPatchFieldMapper PointPatchFieldMapper;
+#endif
 
 /*---------------------------------------------------------------------------*\
             Class solidTractionPointPatchVectorField Declaration
@@ -110,13 +115,7 @@ public:
             const solidTractionPointPatchVectorField&,
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&,
-#ifdef OPENFOAMFOUNDATION
-            const generalPointPatchFieldMapper&
-#elif defined (OPENFOAMESI)
-            const pointPatchFieldMapper&
-#else
             const PointPatchFieldMapper&
-#endif
         );
 
         //- Construct as copy
@@ -188,13 +187,7 @@ public:
             //- Map (and resize as needed) from self given a mapping object
             virtual void autoMap
             (
-#ifdef OPENFOAMFOUNDATION
-                const generalPointPatchFieldMapper&
-#elif defined (OPENFOAMESI)
-                const pointPatchFieldMapper&
-#else
                 const PointPatchFieldMapper&
-#endif
             );
 
             //- Reverse map the given pointPatchField onto

@@ -57,6 +57,12 @@ namespace Foam
 
 #ifdef OPENFOAMESIORFOUNDATION
     typedef slipPointPatchField<vector> componentMixedPointPatchVectorField;
+
+    #ifdef OPENFOAMFOUNDATION
+        typedef generalPointPatchFieldMapper PointPatchFieldMapper;
+    #elif defined (OPENFOAMESI)
+        typedef pointPatchFieldMapper PointPatchFieldMapper;
+    #endif
 #endif
 
 /*---------------------------------------------------------------------------* \
@@ -106,13 +112,7 @@ public:
             const fixedDisplacementZeroShearPointPatchVectorField&,
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&,
-#ifdef OPENFOAMFOUNDATION
-            const generalPointPatchFieldMapper&
-#elif defined (OPENFOAMESI)
-            const pointPatchFieldMapper&
-#else
             const PointPatchFieldMapper&
-#endif
         );
 
         //- Construct as copy
@@ -157,13 +157,7 @@ public:
             //- Map (and resize as needed) from self given a mapping object
             virtual void autoMap
             (
-#ifdef OPENFOAMFOUNDATION
-                const generalPointPatchFieldMapper&
-#elif defined (OPENFOAMESI)
-                const pointPatchFieldMapper&
-#else
                 const PointPatchFieldMapper&
-#endif
             );
 
             //- Reverse map the given pointPatchField onto

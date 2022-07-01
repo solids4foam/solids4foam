@@ -26,10 +26,12 @@ License
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
-#include "PointPatchFieldMapper.H"
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "Time.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -61,9 +63,15 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
     dispSeries_(),
     curTimeIndex_(-1)
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    vectorField refValue(patch().size(), vector::zero);
+#else
     // Set value fraction to fixed normal direction
     // valueFraction() = sqr(patch().pointNormals());
     valueFraction() = patch().pointNormals();
+
+    vectorField& refValue = this->refValue();
+#endif
 
     // Set displacement
     if (dict.found("dispSeries"))
@@ -76,11 +84,11 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
         dispSeries_ =
             interpolationTable<vector>(dict.subDict("dispSeries"));
 
-        refValue() = dispSeries_(db().time().timeOutputValue());
+        refValue = dispSeries_(db().time().timeOutputValue());
     }
     else
     {
-        refValue() = vectorField("value", dict, p.size());
+        refValue = vectorField("value", dict, p.size());
     }
 
     //this->updateBoundaryField();
@@ -89,14 +97,24 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
 
     tmp<vectorField> internalValues = this->patchInternalField();
 
-    const vectorField values =
-        cmptMultiply(refValue(), valueFraction())
-      + cmptMultiply(internalValues, vector::one - valueFraction());
-
+#ifdef OPENFOAMESIORFOUNDATION
+    this->setInInternalField
+    (
+        const_cast<vectorField&>(this->primitiveField()),
+        refValue
+    );
+#else
     this->setInInternalField
     (
         const_cast<vectorField&>(this->internalField()), values
     );
+
+    const vectorField values
+    (
+        cmptMultiply(refValue, valueFraction())
+      + cmptMultiply(internalValues, vector::one - valueFraction())
+    );
+#endif
 }
 
 
@@ -105,21 +123,17 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
     const fixedDisplacementZeroShearPointPatchVectorField& ptf,
     const pointPatch& p,
     const DimensionedField<vector, pointMesh>& iF,
-#ifdef OPENFOAMFOUNDATION
-    const generalPointPatchFieldMapper&
-#elif defined (OPENFOAMESI)
-    const pointPatchFieldMapper&
-#else
     const PointPatchFieldMapper&
-#endif
 )
 :
     componentMixedPointPatchVectorField(p, iF),
     dispSeries_(),
     curTimeIndex_(-1)
 {
+#ifdef FOAMEXTEND
     refValue() = vector::zero;
     valueFraction() = patch().pointNormals();
+#endif
 }
 
 
@@ -151,13 +165,7 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
 // Map and resize from self given a mapper
 void fixedDisplacementZeroShearPointPatchVectorField::autoMap
 (
-#ifdef OPENFOAMFOUNDATION
-    const generalPointPatchFieldMapper&
-#elif defined (OPENFOAMESI)
-    const pointPatchFieldMapper&
-#else
-    const PointPatchFieldMapper&
-#endif
+    const PointPatchFieldMapper& m
 )
 {
     componentMixedPointPatchVectorField::autoMap(m);
@@ -185,11 +193,13 @@ void fixedDisplacementZeroShearPointPatchVectorField::initEvaluate
 {
     if (curTimeIndex_ != db().time().timeIndex())
     {
+#ifdef FOAMEXTEND
         // If time-varying, update the displacement field
         if (dispSeries_.size())
         {
             refValue() = dispSeries_(db().time().timeOutputValue());
         }
+#endif
 
         curTimeIndex_ = db().time().timeIndex();
     }
@@ -209,10 +219,12 @@ void fixedDisplacementZeroShearPointPatchVectorField::write(Ostream& os) const
         dispSeries_.write(os);
         os << token::END_BLOCK << nl;
     }
+#ifdef FOAMEXTEND
     else
     {
         refValue().writeEntry("value", os);
     }
+#endif
 }
 
 
