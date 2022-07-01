@@ -4,4 +4,4 @@
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
 cleanCase
-\rm -f *.log case.foam
+\rm -rf *.log case.foam constant/polyMesh
