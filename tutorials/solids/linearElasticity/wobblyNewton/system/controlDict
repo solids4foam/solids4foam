@@ -26,9 +26,9 @@ endTime         0.36;
 
 deltaT          0.01;
 
-writeControl    timeStep;
+writeControl    runTime;
 
-writeInterval   1;
+writeInterval   0.01;
 
 // maxCo is only used by the explicit solid models
 maxCo           0.05;

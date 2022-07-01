@@ -28,9 +28,9 @@ d2dt2Schemes
     d2dt2(pointD)    NewmarkBeta 0.25 0.5;
 
     // Cell-centred schemes
-    // d2dt2(D)         steadyState;
-    // d2dt2(D)         Euler;
-    // d2dt2(D)         backward;
+    // d2dt2(DD)         steadyState;
+    // d2dt2(DD)         Euler;
+    d2dt2(DD)         backward;
 }
 
 ddtSchemes
@@ -44,7 +44,11 @@ ddtSchemes
     // Cell-centred schemes
     // ddt(D)           steadyState;
     // ddt(D)           Euler;
-    // ddt(D)           backward;
+    ddt(D)           backward;
+    d2dt2(D_0)       backward;
+
+    // Explicit schemes
+    ddt(epsilonVol)  Euler;
 }
 
 gradSchemes
@@ -52,13 +56,12 @@ gradSchemes
     default          none;
 
     // For explicit solids
-    // grad(D)          cellLimited leastSquares 1.0;
-    // snGradCorr(U)    cellLimited leastSquares 1.0;
-    // snGradCorr(laplacian(((0.5*(deltaT+deltaT0))*interpolate(impK)),U)) cellLimited leastSquares 1.0;
+    grad(D)          cellLimited leastSquares 1.0;
+    snGradCorr(U)    cellLimited leastSquares 1.0;
+    snGradCorr(laplacian(((0.5*(deltaT+deltaT0))*interpolate(impK)),U)) cellLimited leastSquares 1.0;
 
     // For segregated solids
-    // grad(D)          extendedLeastSquares 0;
-    // snGradCorr(D)    extendedLeastSquares 0;
+    grad(DD)          extendedLeastSquares 0;
 }
 
 divSchemes
@@ -66,7 +69,7 @@ divSchemes
     default          none;
 
     // For explicit and some segregated solids
-    // div(sigma)       Gauss linear;
+    div(sigma)       Gauss linear;
 }
 
 laplacianSchemes
@@ -74,10 +77,9 @@ laplacianSchemes
     default          none;
 
     // For explicit and some segregated solids
-    // laplacian(DD,D)  Gauss linear skewCorrected 1;
-    // laplacian(DDD,DD) Gauss linear skewCorrected 1;
-    // laplacian(p)     Gauss linear skewCorrected 1;
-    // laplacian(DU,U)  Gauss linear skewCorrected 1;
+    laplacian(DD,D)  Gauss linear skewCorrected 1;
+    laplacian(DDD,DD) Gauss linear skewCorrected 1;
+    laplacian(DU,U)  Gauss linear skewCorrected 1;
 }
 
 snGradSchemes
@@ -85,10 +87,7 @@ snGradSchemes
     default          none;
 
     // For explicit and some segregated solids
-    // snGrad(D)        skewCorrected 1;
-    // snGrad(DD)       skewCorrected 1;
-    // snGrad(U)        skewCorrected 1;
-    // snGrad(U_0)      skewCorrected 1;
+    snGrad(D)        skewCorrected 1;
 }
 
 interpolationSchemes
