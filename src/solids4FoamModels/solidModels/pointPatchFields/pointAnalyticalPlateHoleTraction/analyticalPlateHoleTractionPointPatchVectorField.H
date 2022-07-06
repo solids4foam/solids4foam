@@ -99,7 +99,13 @@ public:
             const analyticalPlateHoleTractionPointPatchVectorField&,
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&,
+#ifdef OPENFOAMFOUNDATION
+            const generalPointPatchFieldMapper&
+#elif defined (OPENFOAMESI)
+            const pointPatchFieldMapper&
+#else
             const PointPatchFieldMapper&
+#endif
         );
 
         //- Construct as copy
@@ -144,7 +150,13 @@ public:
             //- Map (and resize as needed) from self given a mapping object
             virtual void autoMap
             (
+#ifdef OPENFOAMFOUNDATION
+                const generalPointPatchFieldMapper&
+#elif defined (OPENFOAMESI)
+                const pointPatchFieldMapper&
+#else
                 const PointPatchFieldMapper&
+#endif
             );
 
             //- Reverse map the given pointPatchField onto
@@ -161,7 +173,11 @@ public:
         //  there's nothing to do
         virtual void initEvaluate
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
+#else
             const Pstream::commsTypes commsType = Pstream::blocking
+#endif
         );
 
         //- Write

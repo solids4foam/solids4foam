@@ -41,7 +41,11 @@ SourceFiles
 #include "sparseMatrix.H"
 #include "vectorField.H"
 #include "polyMesh.H"
-#include "BlockSolverPerformance.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "SolverPerformance.H"
+#else
+    #include "BlockSolverPerformance.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -68,7 +72,11 @@ namespace sparseMatrixTools
     );
 
     //- Solve the linear system using PETSc
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solveLinearSystemPETSc
+#else
     BlockSolverPerformance<vector> solveLinearSystemPETSc
+#endif
     (
         const sparseMatrix& matrix,
         const vectorField& source,

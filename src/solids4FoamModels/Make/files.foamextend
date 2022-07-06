@@ -158,9 +158,7 @@ functionObjects/cantileverAnalyticalSolution/cantileverAnalyticalSolution.C
 functionObjects/cantileverAnalyticalSolution/cantileverStressDisplacement.C
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
-functionObjects/patchAvgTractionHistory/patchAvgTractionHistory.C
 functionObjects/plateHoleAnalyticalSolution/plateHoleAnalyticalSolution.C
-functionObjects/pointHistory/pointHistory.C
 functionObjects/principalStresses/principalStresses.C
 functionObjects/principalStresses/principalStressFields.C
 functionObjects/solidDisplacements/solidDisplacements.C
@@ -217,24 +215,24 @@ $(cellRemovalLaws)/cellRemovalLaw/newCellRemovalLaw.C
 $(cellRemovalLaws)/epsilonPEqCellRemovalLaw/epsilonPEqCellRemovalLaw.C
 
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
-numerics/mechanicalEnergies/mechanicalEnergies.C
-numerics/newGGIInterpolation/newGGIInterpolationName.C
-numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
+numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
+numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
-numerics/globalPointIndices/globalPointIndices.C
 numerics/fvc/fvcCellLimitedGrad.C
-numerics/skewCorrectedSnGrad/skewCorrectedSnGrads.C
-numerics/newFvMeshSubset/newFvMeshSubset.C
+numerics/globalPointIndices/globalPointIndices.C
+numerics/globalPointIndices/globalPoints.C
+numerics/globalPolyPatch/globalPolyPatch.C
 numerics/logExpVolFields/eig3/eig3.C
 numerics/logExpVolFields/eig3Field.C
 numerics/logExpVolFields/expVolFields.C
 numerics/logExpVolFields/logVolFields.C
-numerics/globalPolyPatch/globalPolyPatch.C
-numerics/dynamicFvMesh/newDynamicBodyFvMesh/newDynamicBodyFvMesh.C
-numerics/dynamicFvMesh/newSubsetMotionSolverFvMesh/newSubsetMotionSolverFvMesh.C
 numerics/pointGaussLeastSquaresGrad/pointGaussLeastSquaresGrads.C
+numerics/mechanicalEnergies/mechanicalEnergies.C
+numerics/newGGIInterpolation/newGGIInterpolationName.C
+numerics/newAMIInterpolation/newAMIInterpolationName.C
+numerics/newFvMeshSubset/newFvMeshSubset.C
 
 numerics/RBFMeshMotionSolver/RBFInterpolation.C
 numerics/RBFMeshMotionSolver/RBFCoarsening.C

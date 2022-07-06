@@ -26,10 +26,12 @@ License
 #include "cantileverTractionPointPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
-#include "PointPatchFieldMapper.H"
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "Time.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

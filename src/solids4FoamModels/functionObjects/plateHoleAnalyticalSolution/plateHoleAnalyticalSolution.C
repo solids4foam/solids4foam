@@ -143,7 +143,7 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
 
     // Cell-centres coordinates
     const volVectorField& C = mesh.C();
-    const vectorField& CI = C.internalField();
+    const vectorField& CI = C;
 
     // Point coordinates
     const pointField& points = mesh.points();
@@ -189,8 +189,8 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
             "calculated"
         );
 
-        symmTensorField& sI = analyticalStress.internalField();
-        vectorField& aDI = analyticalD.internalField();
+        symmTensorField& sI = analyticalStress;
+        vectorField& aDI = analyticalD;
 
         forAll(sI, cellI)
         {
@@ -202,8 +202,13 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
         {
             if (mesh.boundary()[patchI].type() != "empty")
             {
+#ifdef OPENFOAMESIORFOUNDATION
+                symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
+                vectorField& aDP = analyticalD.boundaryFieldRef()[patchI];
+#else
                 symmTensorField& sP = analyticalStress.boundaryField()[patchI];
                 vectorField& aDP = analyticalD.boundaryField()[patchI];
+#endif
                 const vectorField& CP = C.boundaryField()[patchI];
 
                 forAll(sP, faceI)
@@ -243,13 +248,14 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
                     continue;
                 }
 
-                const scalarField diffI = diff.internalField().component(cmpt);
+                const symmTensorField& diffI = diff;
+                const scalarField diffIcmptI(diffI.component(cmpt));
 
                 Info<< "    Component: " << cmpt << endl;
                 Info<< "    Norms: mean L1, mean L2, LInf: " << nl
-                    << "    " << gAverage(mag(diffI))
-                    << " " << Foam::sqrt(gAverage(magSqr(diffI)))
-                    << " " << gMax(mag(diffI))
+                    << "    " << gAverage(mag(diffIcmptI))
+                    << " " << Foam::sqrt(gAverage(magSqr(diffIcmptI)))
+                    << " " << gMax(mag(diffIcmptI))
                     << endl;
             }
         }
@@ -266,7 +272,7 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
             Info<< "Writing DDifference field" << endl;
             diff.write();
 
-            const vectorField& diffI = diff.internalField();
+            const vectorField& diffI = diff;
             Info<< "    Norms: mean L1, mean L2, LInf: " << nl
                 << "    " << gAverage(mag(diffI))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI)))
@@ -305,8 +311,8 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
             dimensionedVector("zero", dimLength, vector::zero)
         );
 
-        symmTensorField& sI = analyticalStress.internalField();
-        vectorField& aDI = analyticalD.internalField();
+        symmTensorField& sI = analyticalStress;
+        vectorField& aDI = analyticalD;
 
         forAll(sI, pointI)
         {
@@ -334,7 +340,7 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
             Info<< "Writing pointDDifference field" << endl;
             diff.write();
 
-            const vectorField& diffI = diff.internalField();
+            const vectorField& diffI = diff;
             Info<< "    Norms: mean L1, mean L2, LInf: " << nl
                 << "    " << gAverage(mag(diffI))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI)))

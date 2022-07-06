@@ -83,7 +83,7 @@ void Foam::solidModel::makeDualMesh() const
                 "dualMesh",
                 runTime().constant(),
                 runTime(),
-                Foam::IOobject::NO_READ
+                Foam::IOobject::READ_IF_PRESENT
             ),
 #ifdef OPENFOAMESIORFOUNDATION
             pointField(mesh().points()),
@@ -1536,7 +1536,7 @@ void Foam::solidModel::DDisRequired()
 void Foam::solidModel::pointDisRequired()
 {
 #ifdef OPENFOAMESIORFOUNDATION
-    if (!pointDheader_.typeHeaderOk<volVectorField>(true))
+    if (!pointDheader_.typeHeaderOk<pointVectorField>(true))
 #else
     if (!pointDheader_.headerOk())
 #endif

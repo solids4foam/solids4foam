@@ -105,8 +105,8 @@ bool Foam::cantileverAnalyticalSolution::writeData()
             "calculated"
         );
 
-        symmTensorField& sI = analyticalStress.internalField();
-        vectorField& aDI = analyticalD.internalField();
+        symmTensorField& sI = analyticalStress;
+        vectorField& aDI = analyticalD;
 
         forAll(sI, cellI)
         {
@@ -119,8 +119,13 @@ bool Foam::cantileverAnalyticalSolution::writeData()
         {
             if (mesh.boundary()[patchI].type() != "empty")
             {
+#ifdef OPENFOAMESIORFOUNDATION
+                symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
+                vectorField& aDP = analyticalD.boundaryFieldRef()[patchI];
+#else
                 symmTensorField& sP = analyticalStress.boundaryField()[patchI];
                 vectorField& aDP = analyticalD.boundaryField()[patchI];
+#endif
                 const vectorField& CP = C.boundaryField()[patchI];
 
                 forAll(sP, faceI)
@@ -224,8 +229,8 @@ bool Foam::cantileverAnalyticalSolution::writeData()
             dimensionedVector("zero", dimLength, vector::zero)
         );
 
-        symmTensorField& sI = analyticalStress.internalField();
-        vectorField& aDI = analyticalD.internalField();
+        symmTensorField& sI = analyticalStress;
+        vectorField& aDI = analyticalD;
 
         forAll(sI, pointI)
         {

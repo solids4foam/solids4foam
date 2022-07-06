@@ -90,13 +90,15 @@ bool Foam::solidTorque::writeData()
             )
             {
                 // Calculate moment arms
-                const vectorField patchC =
-                    mesh.C().boundaryField()[historyPatchID_];
-                vectorField r = patchC - pointOnAxis_;
+                const vectorField patchC
+                (
+                    mesh.C().boundaryField()[historyPatchID_]
+                );
+                vectorField r(patchC - pointOnAxis_);
                 r -= axis_*(axis_ & r);
 
                 // Calculate force
-                const vectorField force = patchSf & sigma;
+                const vectorField force(patchSf & sigma);
 
                 // Calculate torque
                 torque = gSum(axis_ & (r ^ force));
@@ -111,11 +113,13 @@ bool Foam::solidTorque::writeData()
                     ).boundaryField()[historyPatchID_];
 
                 // Calculate deformed patch face centres
-                const vectorField patchDeformC =
-                    mesh.C().boundaryField()[historyPatchID_] + D;
+                const vectorField patchDeformC
+                (
+                    mesh.C().boundaryField()[historyPatchID_] + D
+                );
 
                 // Calculate moment arms
-                vectorField r = patchDeformC - pointOnAxis_;
+                vectorField r(patchDeformC - pointOnAxis_);
                 r -= axis_*(axis_ & r);
 
                 // Lookup the inverse of the deformation gradient
@@ -133,10 +137,10 @@ bool Foam::solidTorque::writeData()
                     ).boundaryField()[historyPatchID_];
 
                 // Calculate area vectors in the deformed configuration
-                const vectorField patchDeformSf = (J*Finv.T() & patchSf);
+                const vectorField patchDeformSf(J*Finv.T() & patchSf);
 
                 // Calculate force
-                const vectorField force = patchDeformSf & sigma;
+                const vectorField force(patchDeformSf & sigma);
 
                 // Calculate torque
                 torque = gSum(axis_ & (r ^ force));
@@ -295,5 +299,12 @@ bool Foam::solidTorque::read(const dictionary& dict)
 {
     return true;
 }
+
+#ifdef OPENFOAMESIORFOUNDATION
+bool Foam::solidTorque::write()
+{
+    return writeData();
+}
+#endif
 
 // ************************************************************************* //

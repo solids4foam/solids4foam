@@ -403,8 +403,11 @@ namespace rbf
                 Info << "RBFCoarsening::debug 3. convergence check = " << runTimeConvergence << " s" << endl;
             }
 
-            Info << "RBF interpolation coarsening: selected " << selectedPositions.rows() << "/" << positions.rows() << " points, 2-norm(error) = "
-                 << error << ", max(error) = " << errorMax << ", tol = " << tol << endl;
+            Info<< "RBF interpolation coarsening: selected "
+                << int(selectedPositions.rows()) << "/" << int(positions.rows())
+                << " points, 2-norm(error) = "
+                << error << ", max(error) = " << errorMax << ", tol = " << tol
+                << endl;
 
             rbf::matrix positionsCoarse( selectedPositions.rows(), positions.cols() );
 

@@ -172,13 +172,13 @@ void Foam::vfvm::divSigma
 
 void Foam::vfvm::d2dt2
 (
-    const fvSchemes& schemesDict,   // fvSchemes
-    const scalar& deltaT,           // time-step
+    ITstream& d2dt2Scheme,
+    const scalar& deltaT,
     const word& pointDname,
     sparseMatrix& matrix,
     const scalarField& pointRhoI,
     const scalarField& pointVolI,
-    const debug::debugSwitch& debug  // debug switch
+    const int debug
 )
 {
     if (debug)
@@ -187,21 +187,17 @@ void Foam::vfvm::d2dt2
     }
 
     // Read time scheme
-    ITstream is
-    (
-        schemesDict.d2dt2Scheme("d2dt2(" + pointDname +')')
-    );
-    const word d2dt2Scheme(is);
+    const word d2dt2SchemeName(d2dt2Scheme);
 
     // Second order identity as a 9 component tensor
     const tensor I2(I);
 
     // Add transient term coefficients
-    if (d2dt2Scheme == "steadyState")
+    if (d2dt2SchemeName == "steadyState")
     {
         // Do nothing
     }
-    else if (d2dt2Scheme == "Euler")
+    else if (d2dt2SchemeName == "Euler")
     {
         forAll(pointRhoI, pointI)
         {
@@ -209,7 +205,7 @@ void Foam::vfvm::d2dt2
                 I2*pointVolI[pointI]*pointRhoI[pointI]/sqr(deltaT);
         }
     }
-    else if (d2dt2Scheme == "backward")
+    else if (d2dt2SchemeName == "backward")
     {
         forAll(pointRhoI, pointI)
         {
@@ -217,9 +213,9 @@ void Foam::vfvm::d2dt2
                 (9.0/4.0)*I2*pointVolI[pointI]*pointRhoI[pointI]/sqr(deltaT);
         }
     }
-    else if (d2dt2Scheme == "NewmarkBeta")
+    else if (d2dt2SchemeName == "NewmarkBeta")
     {
-        const scalar beta(readScalar(is));
+        const scalar beta(readScalar(d2dt2Scheme));
         forAll(pointRhoI, pointI)
         {
             matrix(pointI, pointI) -=

@@ -80,13 +80,13 @@ namespace vfvm
     // side
     void d2dt2
     (
-        const fvSchemes& schemesDict,   // fvSchemes
+        ITstream& d2dt2Scheme,
         const scalar& deltaT,           // time-step
         const word& pointDname,
         sparseMatrix& matrix,
         const scalarField& pointRhoI,
         const scalarField& pointVolI,
-        const debug::debugSwitch& debug  // debug switch
+        const int debug  // debug switch
     );
 
 } // End namespace vfvc

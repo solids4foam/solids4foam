@@ -335,7 +335,7 @@ const Foam::fvMesh& Foam::dualMechanicalModel::mesh() const
 }
 
 
-Foam::tmp<Foam::symmTensor4thOrderField>
+Foam::tmp<Foam::Field<Foam::symmTensor4thOrder>>
 Foam::dualMechanicalModel::materialTangentFaceField() const
 {
     const PtrList<mechanicalLaw>& laws = *this;
@@ -345,7 +345,11 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
     (
         new Field<symmTensor4thOrder>(mesh().nFaces(), symmTensor4thOrder::zero)
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    Field<symmTensor4thOrder>& result = tresult.ref();
+#else
     Field<symmTensor4thOrder>& result = tresult();
+#endif
 
     if (laws.size() == 1)
     {
@@ -364,8 +368,10 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
         // Note: the value on each dual face is uniquely set by one material law
         forAll(laws, lawI)
         {
-            const symmTensor4thOrderField matTanI =
-                laws[lawI].materialTangentField();
+            const Field<symmTensor4thOrder> matTanI
+            (
+                laws[lawI].materialTangentField()
+            );
 
             if (matTanI.size() != mesh().nFaces())
             {

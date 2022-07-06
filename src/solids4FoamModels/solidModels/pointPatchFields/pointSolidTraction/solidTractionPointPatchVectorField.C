@@ -26,10 +26,12 @@ License
 #include "solidTractionPointPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
-#include "PointPatchFieldMapper.H"
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "Time.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -132,8 +134,13 @@ solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
 )
 :
     calculatedPointPatchVectorField(p, iF),
+#ifdef OPENFOAMESIORFOUNDATION
+    traction_(mapper(ptf.traction_)),
+    pressure_(mapper(ptf.pressure_)),
+#else
     traction_(ptf.traction_, mapper),
     pressure_(ptf.pressure_, mapper),
+#endif
     tractionSeries_(),
     pressureSeries_(),
     curTimeIndex_(-1)
@@ -178,8 +185,13 @@ void solidTractionPointPatchVectorField::autoMap
 )
 {
     //Field<vector>::autoMap(m);
+#ifdef OPENFOAMFOUNDATION
+    m(traction_, traction_);
+    m(pressure_, pressure_);
+#else
     traction_.autoMap(m);
     pressure_.autoMap(m);
+#endif
 }
 
 
