@@ -299,10 +299,8 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     optionsFile.expand();
     // static char help[] = "Solves a linear system with KSP.\n\n";
     PetscErrorCode ierr;
-    Pout<< __LINE__ << endl;
     // ierr = PetscInitialize(&argc, &args, optionsFile.c_str(), help); checkErr(ierr);
     ierr = PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL); checkErr(ierr);
-    Pout<< __LINE__ << endl;
 
     //MPI_Comm_size(PETSC_COMM_WORLD,&size);
 
