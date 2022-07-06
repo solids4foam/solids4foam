@@ -396,7 +396,7 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
             );
 
             // Velocity
-            result = pointUbar + gamma*deltaT*pointA.internalField();
+            result = pointUbar + gamma*deltaT*pointA;
         }
         else
         {

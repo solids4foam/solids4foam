@@ -137,7 +137,7 @@ void vertexCentredLinGeomSolid::updateSource
         pointA_,
         pointRho_,
         pointVol_,
-        debug
+        int(bool(debug))
     );
 
     if (debug)
@@ -789,7 +789,7 @@ bool vertexCentredLinGeomSolid::evolve()
             matrix,
             pointRho_.internalField(),
             pointVol_.internalField(),
-            debug
+            int(bool(debug))
         );
     }
 
@@ -864,7 +864,7 @@ bool vertexCentredLinGeomSolid::evolve()
                 matrix,
                 pointRho_.internalField(),
                 pointVol_.internalField(),
-                debug
+                int(bool(debug))
             );
         }
 

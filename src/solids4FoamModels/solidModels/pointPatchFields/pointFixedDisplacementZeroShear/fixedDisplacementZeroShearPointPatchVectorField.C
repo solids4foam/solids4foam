@@ -104,15 +104,15 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
         refValue
     );
 #else
-    this->setInInternalField
-    (
-        const_cast<vectorField&>(this->internalField()), values
-    );
-
     const vectorField values
     (
         cmptMultiply(refValue, valueFraction())
       + cmptMultiply(internalValues, vector::one - valueFraction())
+    );
+
+    this->setInInternalField
+    (
+        const_cast<vectorField&>(this->internalField()), values
     );
 #endif
 }

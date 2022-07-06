@@ -67,7 +67,11 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
             << endl;
     }
 
+#ifdef OPENFOAMESIORFOUNDATION
     const fvMesh& mesh = mesh_;
+#else
+    const fvMesh& mesh = this->mesh();
+#endif
 
     vectorsPtr_.set(new List<vectorList>(mesh.nCells()));
     List<vectorList>& ls = vectorsPtr_();
