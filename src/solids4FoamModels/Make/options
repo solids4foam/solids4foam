@@ -32,7 +32,9 @@ else
 endif
 
 ifdef PETSC_DIR
-    VERSION_SPECIFIC_INC += -I/opt/homebrew/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include
+    VERSION_SPECIFIC_INC += \
+        -I/opt/homebrew/include \
+        -I$(PETSC_DIR)/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include
     VERSION_SPECIFIC_LIBS += -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lpetsc
 endif
 

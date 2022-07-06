@@ -96,6 +96,10 @@ namespace sparseMatrixTools
         const labelList& stencilSizeNotOwned
     );
 
+    //- Check the PETSc error
+    //  Exit with a FatalError if it is greater than 0
+    void checkErr(const int ierr);
+
     //- Enforce fixed DOF contributions on the linear system
     void enforceFixedDof
     (

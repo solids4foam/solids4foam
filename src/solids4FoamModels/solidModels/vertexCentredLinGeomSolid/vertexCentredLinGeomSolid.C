@@ -860,7 +860,7 @@ bool vertexCentredLinGeomSolid::evolve()
                 localToGlobalPointMap,
                 globalPointIndices_.stencilSizeOwned(),
                 globalPointIndices_.stencilSizeNotOwned(),
-                debug
+                solidModelDict().lookupOrDefault<bool>("debugPETSc", false)
             );
         }
         else
