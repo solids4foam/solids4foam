@@ -141,7 +141,7 @@ Foam::dualMeshToMeshMap::dualMeshToMeshMap
     const pointField& points = mesh.points();
     const faceList& faces = mesh.faces();
     const vectorField& dualFaceCentres = dualMesh.faceCentres();
-    const vectorField& CI = mesh.cellCentres();
+    // const vectorField& CI = mesh.cellCentres();
 
     // This is only needed in foam extend: OF can use
     // polyMesh::pointInCell(CELL_TETS)

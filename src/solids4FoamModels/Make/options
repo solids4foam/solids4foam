@@ -40,7 +40,7 @@ endif
 
 EXE_INC = \
     -std=c++14 \
-    -Wno-old-style-cast -Wno-deprecated-declarations -Wno-deprecated-copy \
+    -Wno-old-style-cast -Wno-deprecated-declarations \
     $(VERSION_SPECIFIC_INC) \
     -I../../ThirdParty/eigen3 \
     -I../blockCoupledSolids4FoamTools/lnInclude \
