@@ -381,6 +381,17 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // const label nz = 81; // way too much in 2-D!
     // MatMPIAIJSetPreallocation(A, nz, NULL, nz, NULL);
 
+    // Optional: no error if additional memory allocation is required
+    // If false, then an error is thrown for additional allocations
+    // If preallocation was correct (or conservative) then an error should never
+    // be thrown
+    // For now, we will disable this check in debug mode so we can see how many
+    // mallocs were made
+    if (debug)
+    { 
+        MatSetOption(A, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+    }
+
     // Not sure if this set is needed but it does not hurt
     ierr = MatSetUp(A); checkErr(ierr);
 
@@ -435,7 +446,14 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
             ierr = MatSetValuesBlocked
             (
                 A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
-            ); checkErr(ierr);
+            );
+            if (ierr > 0)
+            {
+                Pout<< "MatSetValuesBlocked returned ierr = " << ierr
+                    << " for " << blockRowI << " " << blockColI << ": "
+                    << coeff << endl;
+            }
+            checkErr(ierr);
         }
     }
     if (debug)
