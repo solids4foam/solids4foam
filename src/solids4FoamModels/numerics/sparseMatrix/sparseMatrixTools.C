@@ -345,9 +345,10 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // off-core). For now, we will just use the max on-core non-zeros to
     // initialise not-owned values
 
-    // Should I use malloc for these?
-    label d_nnz[n];
-    label o_nnz[n];
+    int* d_nnz = (int*)malloc(n*sizeof(int));
+    int* o_nnz = (int*)malloc(n*sizeof(int));
+    // label d_nnz[n];
+    // label o_nnz[n];
     label d_nz = 0;
     setNonZerosPerRow
     (
@@ -375,11 +376,12 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
 
     // Parallel matrix
     ierr = MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz); checkErr(ierr);
-    // MatMPIAIJSetPreallocation(A, 0, d_nnz, d_nz, NULL);
+    //ierr = MatMPIAIJSetPreallocation(A, 0, d_nnz, d_nz, NULL); checkErr(ierr);
     // or conservatively as
-    // MatMPIAIJSetPreallocation(A, d_nz, NULL, o_nz, NULL);
+    // ierr = MatMPIAIJSetPreallocation(A, d_nz, NULL, o_nz, NULL);
+    // ierr = MatMPIAIJSetPreallocation(A, d_nz, NULL, d_nz, NULL); checkErr(ierr);
     // const label nz = 81; // way too much in 2-D!
-    // MatMPIAIJSetPreallocation(A, nz, NULL, nz, NULL);
+    // ierr = MatMPIAIJSetPreallocation(A, nz, NULL, nz, NULL);
 
     // Optional: no error if additional memory allocation is required
     // If false, then an error is thrown for additional allocations
@@ -579,7 +581,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
     // ierr = PCSetType(pc,PCJACOBI);CHKERRQ(ierr);
     // ierr = KSPSetTolerances(ksp,1.e-5,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);CHKERRQ(ierr);
-    PC             pc;           /* preconditioner context */
+    PC pc;
     ierr = KSPGetPC(ksp, &pc); checkErr(ierr);
     //ierr = KSPSetType(ksp, KSPFGMRES);
     // ierr = PCSetType(pc, PCJACOBI);
@@ -777,7 +779,6 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     }
 
 
-    // Check the error
     // ierr = VecAXPY(x,neg_one,u);CHKERRQ(ierr);
     // ierr = VecNorm(x,NORM_2,&norm);CHKERRQ(ierr);
     // ierr = KSPGetIterationNumber(ksp,&its);CHKERRQ(ierr);
