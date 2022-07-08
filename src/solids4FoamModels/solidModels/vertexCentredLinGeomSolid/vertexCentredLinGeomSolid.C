@@ -128,9 +128,9 @@ void vertexCentredLinGeomSolid::updateSource
     source += vfvc::d2dt2
     (
 #ifdef OPENFOAMESIORFOUNDATION
-        mesh().d2dt2Scheme("pointD"),
+        mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
-        mesh().schemesDict().d2dt2Scheme("pointD"),
+        mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
 #endif
         pointD(),
         pointU_,
@@ -780,9 +780,9 @@ bool vertexCentredLinGeomSolid::evolve()
         vfvm::d2dt2
         (
 #ifdef OPENFOAMESIORFOUNDATION
-            mesh().d2dt2Scheme("pointD"),
+            mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
-            mesh().schemesDict().d2dt2Scheme("pointD"),
+            mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
 #endif
             runTime().deltaTValue(),
             pointD().name(),
@@ -855,9 +855,9 @@ bool vertexCentredLinGeomSolid::evolve()
             vfvm::d2dt2
             (
 #ifdef OPENFOAMESIORFOUNDATION
-                mesh().d2dt2Scheme("pointD"),
+                mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
-                mesh().schemesDict().d2dt2Scheme("pointD"),
+                mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
 #endif
                 runTime().deltaTValue(),
                 pointD().name(),
@@ -1045,8 +1045,8 @@ bool vertexCentredLinGeomSolid::evolve()
         pointA_.primitiveFieldRef() =
             vfvc::ddt
             (
-                mesh().ddtScheme("pointU"),
-                mesh().d2dt2Scheme("pointD"),
+                mesh().ddtScheme("ddt(pointU)"),
+                mesh().d2dt2Scheme("d2dt2(pointD)"),
                 pointU_
             );
 
@@ -1054,16 +1054,16 @@ bool vertexCentredLinGeomSolid::evolve()
         pointU_.primitiveFieldRef() =
             vfvc::ddt
             (
-                mesh().ddtScheme("pointD"),
-                mesh().d2dt2Scheme("pointD"),
+                mesh().ddtScheme("ddt(pointD)"),
+                mesh().d2dt2Scheme("d2dt2(pointD)"),
                 pointD()
             );
 #else
         pointA_.internalField() =
             vfvc::ddt
             (
-                mesh().schemesDict().ddtScheme("pointU"),
-                mesh().schemesDict().d2dt2Scheme("pointD"),
+                mesh().schemesDict().ddtScheme("ddt(pointU)"),
+                mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
                 pointU_
             );
 
@@ -1071,8 +1071,8 @@ bool vertexCentredLinGeomSolid::evolve()
         pointU_.internalField() =
             vfvc::ddt
             (
-                mesh().schemesDict().ddtScheme("pointD"),
-                mesh().schemesDict().d2dt2Scheme("pointD"),
+                mesh().schemesDict().ddtScheme("ddt(pointD)"),
+                mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
                 pointD()
             );
 #endif
