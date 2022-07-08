@@ -272,7 +272,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         }
     }
     const label startID = blockSize*blockStartID;
-    const label endID = blockSize*blockEndID;
+    const label endID = blockSize*(blockEndID + 1) - 1;
     if (debug)
     {
         Pout<< "blockStartID = " << blockStartID
@@ -288,28 +288,28 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         Pout<< "blockn = " << blockn << ", n = " << n << endl;
     }
 
-    // Define PETSc variables
-    static char help[] = "Solves a linear system with KSP.\n\n";
-    Vec            x, b;         /* approx solution, RHS */
-    Mat            A;            /* linear system matrix */
-    KSP            ksp;          /* linear solver context */
-    PC             pc;           /* preconditioner context */
-    PetscReal      norm;         /* norm of solution error */
-    PetscErrorCode ierr;
-    PetscInt       its;
-    PetscScalar*   xArr;
-    MatInfo        matinfo;
-    //PetscBool      nonzeroguess = PETSC_FALSE;
 
     // To keep PETSc happy, we will give it dummy command-line arguments
-    int argc = 1;
-    char * args1[argc];
-    args1[0] = (char*)"solids4Foam";
-    char** args = args1;
+    // int argc = 1;
+    // char * args1[argc];
+    // args1[0] = (char*)"solids4Foam";
+    // char** args = args1;
 
     // Initialise PETSc with options file
     optionsFile.expand();
-    PetscInitialize(&argc, &args, optionsFile.c_str(), help);
+    // static char help[] = "Solves a linear system with KSP.\n\n";
+    PetscErrorCode ierr;
+    // ierr = PetscInitialize(&argc, &args, optionsFile.c_str(), help); checkErr(ierr);
+    if (debug)
+    {
+        Pout<< "PetscInitialize: start" << endl;
+    }
+    ierr = PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL); checkErr(ierr);
+    if (debug)
+    {
+        Pout<< "PetscInitialize: end" << endl;
+    }
+
 
     //MPI_Comm_size(PETSC_COMM_WORLD,&size);
 
@@ -320,20 +320,22 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
 
     // Create PETSc matrix
 
-    MatCreate(PETSC_COMM_WORLD, &A);
+    Mat A;
+    ierr = MatCreate(PETSC_COMM_WORLD, &A); checkErr(ierr);
 
     // Set the local and global matrix size
     // (matrix, local rows, local cols, global rows, global cols)
     //MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,n,n);
-    MatSetSizes(A, n, n, N, N);
+    ierr = MatSetSizes(A, n, n, N, N); checkErr(ierr);
+    //ierr = MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, N, N); checkErr(ierr);
 
-    MatSetFromOptions(A);
+    ierr = MatSetFromOptions(A); checkErr(ierr);
 
     // Set matrix to parallel type
-    MatSetType(A, MATMPIAIJ);
+    ierr = MatSetType(A, MATMPIAIJ); checkErr(ierr);
 
     // Set the block coefficient size
-    MatSetBlockSize(A, blockSize);
+    ierr = MatSetBlockSize(A, blockSize); checkErr(ierr);
 
     // Pre-allocate matrix memory: this is critical for performance
 
@@ -342,6 +344,8 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // and off-core instead of owned (all on-core) vs not-owned (on-core and
     // off-core). For now, we will just use the max on-core non-zeros to
     // initialise not-owned values
+
+    // Should I use malloc for these?
     label d_nnz[n];
     label o_nnz[n];
     label d_nz = 0;
@@ -370,7 +374,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // MatSeqAIJSetPreallocation(A, nz, NULL);
 
     // Parallel matrix
-    MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz);
+    ierr = MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz); checkErr(ierr);
     // MatMPIAIJSetPreallocation(A, 0, d_nnz, d_nz, NULL);
     // or conservatively as
     // MatMPIAIJSetPreallocation(A, d_nz, NULL, o_nz, NULL);
@@ -378,7 +382,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // MatMPIAIJSetPreallocation(A, nz, NULL, nz, NULL);
 
     // Not sure if this set is needed but it does not hurt
-    MatSetUp(A);
+    ierr = MatSetUp(A); checkErr(ierr);
 
 
     // Insert coefficients into the matrix
@@ -386,7 +390,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
 
     if (debug)
     {
-        Info<< "    Inserting PETSc matrix coefficients: start" << endl;
+        Pout<< "    Inserting PETSc matrix coefficients: start" << endl;
     }
 
     const sparseMatrixData& data = matrix.data();
@@ -411,12 +415,10 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
             };
 
             // Insert tensor coefficient
-            MatSetValuesBlocked
+            ierr = MatSetValuesBlocked
             (
                 A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
-            );
-            // Pout<< "Mat insert: blockRow = " << blockRowI
-            //     << ", row = " << blockRowI*blockSize << endl;
+            ); checkErr(ierr);
         }
         else // 3-D
         {
@@ -433,27 +435,30 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
             ierr = MatSetValuesBlocked
             (
                 A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
-            );
-
-            if (ierr > 0)
-            {
-                FatalErrorIn("sparseMatrixTools::solveLinearSystemPETSc(...)")
-                    << "PETSc returned the error code "<< ierr << nl
-                    << "    blockRowI = " << blockRowI
-                    << ", blockColI = " << blockColI
-                    << ", coeff = " << coeff
-                    << abort(FatalError);
-            }
+            ); checkErr(ierr);
         }
     }
+    if (debug)
+    {
+        Pout<< "    Inserting PETSc matrix coefficients: end" << endl;
+    }
 
-    MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
-    MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+    if (debug)
+    {
+        Pout<< "        Assembling the matrix: start" << endl;
+    }
+    ierr = MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY); checkErr(ierr);
+    ierr = MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY); checkErr(ierr);
+    if (debug)
+    {
+        Pout<< "        Assembling the matrix: end" << endl;
+    }
 
     // Check pre-allocation effectiveness, i.e. were additional memory
     // allocations needed or was space left unused
     if (debug)
     {
+        MatInfo        matinfo;
         //MatGetInfo(A, MAT_LOCAL, &matinfo);
         MatGetInfo(A, MAT_GLOBAL_SUM, &matinfo);
         // MatGetInfo(A, MAT_GLOBAL_MAX, &matinfo);
@@ -465,11 +470,6 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
             << ", mallocs = " << matinfo.mallocs << endl;
     }
 
-    if (debug)
-    {
-        Info<< "    Inserting PETSc matrix coefficients: end" << endl;
-    }
-
     //MatView(A, PETSC_VIEWER_STDOUT_WORLD);
 
     // Populate the PETSc source vector
@@ -477,7 +477,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
 
     if (debug)
     {
-        Info<< "        Populating the source vector" << endl;
+        Pout<< "        Populating the source vector" << endl;
     }
 
     // Create PETSc vectors
@@ -487,17 +487,19 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // proc. To acess the values not-owned by the proc, we will use an
     // xWithGhosts vector
     // x is the global solution vector
-    VecCreate(PETSC_COMM_WORLD, &x);
-    VecSetSizes(x, n, N);
-    VecSetBlockSize(x, blockSize);
-    VecSetType(x, VECMPI);
-    PetscObjectSetName((PetscObject) x, "Solution");
+    Vec x;
+    ierr = VecCreate(PETSC_COMM_WORLD, &x); checkErr(ierr);
+    ierr = VecSetSizes(x, n, N); checkErr(ierr);
+    ierr = VecSetBlockSize(x, blockSize); checkErr(ierr);
+    ierr = VecSetType(x, VECMPI); checkErr(ierr);
+    ierr =  PetscObjectSetName((PetscObject) x, "Solution"); checkErr(ierr);
     // VecSetSizes(x, PETSC_DECIDE, N);
-    VecSetFromOptions(x);
+    ierr = VecSetFromOptions(x); checkErr(ierr);
 
     // Create the source (b) using the same settings as b
-    VecDuplicate(x, &b);
-    PetscObjectSetName((PetscObject) b, "Source");
+    Vec b;
+    ierr =  VecDuplicate(x, &b); checkErr(ierr);
+    ierr = PetscObjectSetName((PetscObject) b, "Source"); checkErr(ierr);
 
     {
         forAll(source, localBlockRowI)
@@ -511,7 +513,10 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
                 const PetscScalar values[2] = {sourceI.x(), sourceI.y()};
 
                 // Insert values
-                VecSetValuesBlocked(b, 1, &blockRowI, values, ADD_VALUES);
+                ierr = VecSetValuesBlocked
+                (
+                    b, 1, &blockRowI, values, ADD_VALUES
+                ); checkErr(ierr);
             }
             else
             {
@@ -522,23 +527,27 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
                 };
 
                 // Insert values
-                VecSetValuesBlocked(b, 1, &blockRowI, values, ADD_VALUES);
+                ierr = VecSetValuesBlocked
+                (
+                    b, 1, &blockRowI, values, ADD_VALUES
+                ); checkErr(ierr);
             }
         }
     }
 
-    VecAssemblyBegin(b);
-    VecAssemblyEnd(b);
+    ierr = VecAssemblyBegin(b); checkErr(ierr);
+    ierr = VecAssemblyEnd(b); checkErr(ierr);
 
 
     // Create KSP linear solver
-    // Info<< "    Creating the linear solver" << endl;
-    KSPCreate(PETSC_COMM_WORLD, &ksp);
+    // Pout<< "    Creating the linear solver" << endl;
+    KSP            ksp;          /* linear solver context */
+    ierr = KSPCreate(PETSC_COMM_WORLD, &ksp); checkErr(ierr);
 
 
     // Set operators. Here the matrix that defines the linear system
     // also serves as the preconditioning matrix.
-    KSPSetOperators(ksp, A, A);
+    ierr = KSPSetOperators(ksp, A, A); checkErr(ierr);
 
 
     // Set linear solver defaults for this problem
@@ -552,14 +561,15 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
     // ierr = PCSetType(pc,PCJACOBI);CHKERRQ(ierr);
     // ierr = KSPSetTolerances(ksp,1.e-5,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);CHKERRQ(ierr);
-    ierr = KSPGetPC(ksp, &pc);
+    PC             pc;           /* preconditioner context */
+    ierr = KSPGetPC(ksp, &pc); checkErr(ierr);
     //ierr = KSPSetType(ksp, KSPFGMRES);
     // ierr = PCSetType(pc, PCJACOBI);
     //ierr = PCSetType(pc, PCILU);
     ierr = KSPSetTolerances
     (
         ksp, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT
-    );
+    ); checkErr(ierr);
 
     // Set runtime options, e.g.,
     //     -ksp_type <type> -pc_type <type> -ksp_monitor -ksp_rtol <rtol>
@@ -567,8 +577,9 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // KSPSetFromOptions() is called _after_ any other customization
     // routines.
     //ierr = KSPSetFromOptions(ksp);CHKERRQ(ierr);
-    ierr = KSPSetFromOptions(ksp);
+    ierr = KSPSetFromOptions(ksp); checkErr(ierr);
 
+    // PetscBool      nonzeroguess = PETSC_FALSE;
     // if (nonzeroguess)
     // {
     //     PetscScalar p = .5;
@@ -584,7 +595,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         PC pc;
         void (*f)(void) = NULL;
 
-        KSPGetPC(ksp, &pc);
+        ierr = KSPGetPC(ksp, &pc); checkErr(ierr);
         PetscObjectQueryFunction((PetscObject)pc, "PCSetCoordinates_C", &f);
 
         if (f)
@@ -609,7 +620,8 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
                 }
             }
 
-            PCSetCoordinates(pc, sdim, n, petscPoints.data());
+            ierr = PCSetCoordinates(pc, sdim, n, petscPoints.data());
+            checkErr(ierr);
         }
     }
 
@@ -617,20 +629,14 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // Solve linear system
     if (debug)
     {
-        Info<< "        Solving the linear solver: start" << endl;
+        Pout<< "        Solving the linear solver: start" << endl;
     }
 
-    ierr = KSPSolve(ksp, b, x);
-    if (ierr > 0)
-    {
-        FatalErrorIn("sparseMatrixTools::solveLinearSystemPETSc(...)")
-            << "PETSc linear solver returned the error code "<< ierr
-            << abort(FatalError);
-    }
+    ierr = KSPSolve(ksp, b, x); checkErr(ierr);
 
     if (debug)
     {
-        Info<< "        Solving the linear solver: end" << endl;
+        Pout<< "        Solving the linear solver: end" << endl;
     }
 
 
@@ -638,12 +644,12 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
 
     if (debug)
     {
-        Info<< "        Copying the solution vector" << endl;
+        Pout<< "        Copying the solution vector" << endl;
     }
 
-    // TODO: this only copies in the values owned by this proc
-    // I still need to sync the points not owned by this proc
-    VecGetArray(x, &xArr);
+    // Insert local process values
+    PetscScalar*   xArr;
+    ierr = VecGetArray(x, &xArr); checkErr(ierr);
     {
         label index = 0;
         forAll(solution, i)
@@ -660,7 +666,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
             }
         }
     }
-    VecRestoreArray(x, &xArr);
+    ierr = VecRestoreArray(x, &xArr); checkErr(ierr);
 
     // Sync values not owned by this proc
 
@@ -693,32 +699,36 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         }
 
         IS indexSet;
-        ISCreateGeneral
+        ierr = ISCreateGeneral
         (
             PETSC_COMM_WORLD,
             nNotOwnedByThisProc,
             indices,
             PETSC_COPY_VALUES,
             &indexSet
-        );
+        ); checkErr(ierr);
 
         // Local vector for holding not-owned values
         Vec xNotOwned;
-        VecCreate(PETSC_COMM_WORLD, &xNotOwned);
-        VecSetSizes(xNotOwned, nNotOwnedByThisProc, PETSC_DECIDE);
-        VecSetType(xNotOwned, VECMPI);
-        VecSetUp(xNotOwned);
+        ierr = VecCreate(PETSC_COMM_WORLD, &xNotOwned); checkErr(ierr);
+        ierr = VecSetSizes(xNotOwned, nNotOwnedByThisProc, PETSC_DECIDE);
+        checkErr(ierr);
+        ierr = VecSetType(xNotOwned, VECMPI); checkErr(ierr);
+        ierr = VecSetUp(xNotOwned); checkErr(ierr);
 
         // Context for syncing data
         VecScatter ctx;
-        VecScatterCreate(x, indexSet, xNotOwned, NULL, &ctx);
-        VecScatterBegin(ctx, x, xNotOwned, INSERT_VALUES, SCATTER_FORWARD);
-        VecScatterEnd(ctx, x, xNotOwned, INSERT_VALUES, SCATTER_FORWARD);
-        VecScatterDestroy(&ctx);
+        ierr = VecScatterCreate(x, indexSet, xNotOwned, NULL, &ctx);
+        checkErr(ierr);
+        ierr = VecScatterBegin(ctx, x, xNotOwned, INSERT_VALUES, SCATTER_FORWARD);
+        checkErr(ierr);
+        ierr = VecScatterEnd(ctx, x, xNotOwned, INSERT_VALUES, SCATTER_FORWARD);
+        checkErr(ierr);
+        ierr = VecScatterDestroy(&ctx); checkErr(ierr);
 
         // Populate not-owned values
         PetscScalar* xNotOwnedArr;
-        VecGetArray(xNotOwned, &xNotOwnedArr);
+        ierr = VecGetArray(xNotOwned, &xNotOwnedArr); checkErr(ierr);
         {
             label index = 0;
             forAll(solution, i)
@@ -735,18 +745,17 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
                 }
             }
         }
-        VecRestoreArray(xNotOwned, &xNotOwnedArr);
+        ierr = VecRestoreArray(xNotOwned, &xNotOwnedArr); checkErr(ierr);
 
         // Destroy the index set
-        ISDestroy(&indexSet);
+        ierr = ISDestroy(&indexSet); checkErr(ierr);
     }
 
     // View solver info; we could instead use the option -ksp_view to
     // print this info to the screen at the conclusion of KSPSolve().
     if (debug)
     {
-        ierr = KSPView(ksp,PETSC_VIEWER_STDOUT_WORLD);
-        //CHKERRQ(ierr);
+        ierr = KSPView(ksp,PETSC_VIEWER_STDOUT_WORLD); checkErr(ierr);
     }
 
 
@@ -756,23 +765,25 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // ierr = KSPGetIterationNumber(ksp,&its);CHKERRQ(ierr);
     // ierr = PetscPrintf(PETSC_COMM_WORLD,"Norm of error %g, Iterations %D\n",(double)norm,its);CHKERRQ(ierr);
     //ierr = VecAXPY(x,neg_one,u);
-    ierr = VecNorm(x, NORM_2, &norm);
-    ierr = KSPGetIterationNumber(ksp, &its);
+    PetscInt       its;
+    PetscReal      norm;         /* norm of solution error */
+    ierr = VecNorm(x, NORM_2, &norm); checkErr(ierr);
+    ierr = KSPGetIterationNumber(ksp, &its); checkErr(ierr);
     //ierr = PetscPrintf(PETSC_COMM_WORLD,"Norm of error %g, Iterations %D\n",(double)norm,its);
-    // Info<< "    Error norm: " << norm << ", nIters = " << its << endl;
+    // Pout<< "    Error norm: " << norm << ", nIters = " << its << endl;
 
 
     // Free work space.  All PETSc objects should be destroyed when they
     // are no longer needed.
-    // Info<< "        Freeing memory" << endl;
+    // Pout<< "        Freeing memory" << endl;
     // ierr = VecDestroy(&x);CHKERRQ(ierr); ierr = VecDestroy(&u);CHKERRQ(ierr);
     // ierr = VecDestroy(&b);CHKERRQ(ierr); ierr = MatDestroy(&A);CHKERRQ(ierr);
     // ierr = KSPDestroy(&ksp);CHKERRQ(ierr);
-    ierr = VecDestroy(&x);
+    ierr = VecDestroy(&x); checkErr(ierr);
     //ierr = VecDestroy(&u);
-    ierr = VecDestroy(&b);
-    ierr = MatDestroy(&A);
-    ierr = KSPDestroy(&ksp);
+    ierr = VecDestroy(&b); checkErr(ierr);
+    ierr = MatDestroy(&A); checkErr(ierr);
+    ierr = KSPDestroy(&ksp); checkErr(ierr);
 
 
     // I should not call this here otherwise I cannot call this function again
@@ -784,7 +795,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
 
     if (debug)
     {
-        Info<< "BlockSolverPerformance<vector> "
+        Pout<< "BlockSolverPerformance<vector> "
             << "sparseMatrixTools::solveLinearSystemPETSc: end" << endl;
     }
 
@@ -876,6 +887,17 @@ void Foam::sparseMatrixTools::setNonZerosPerRow
                     << abort(FatalError);
             }
         }
+    }
+}
+
+
+void Foam::sparseMatrixTools::checkErr(const int ierr)
+{
+    if (ierr > 0)
+    {
+        FatalError
+            << "PETSc returned the error code "<< ierr
+            << abort(FatalError);
     }
 }
 
