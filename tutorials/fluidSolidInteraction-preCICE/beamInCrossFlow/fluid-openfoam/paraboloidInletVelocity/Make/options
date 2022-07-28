@@ -1,0 +1,7 @@
+EXE_INC = \
+    -DOPENFOAMESIORFOUNDATION \
+    -DOPENFOAMESI=1912 \
+    -I$(LIB_SRC)/finiteVolume/lnInclude
+
+LIB_LIBS = \
+    -lfiniteVolume
