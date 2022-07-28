@@ -113,7 +113,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
         }
         else if (debug)
         {
-            Pout<< "Proc " << Pstream::myProcNo() << " owns point "
+            Pout<< "Proc " << Pstream::myProcNo() << " owns global point "
                 << mesh_.points()[pointID] << endl;
         }
     }
