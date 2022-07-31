@@ -132,6 +132,9 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
 {
     DisRequired();
 
+    // Force all required old-time fields to be created
+    fvm::d2dt2(D());
+
     if (predictor_)
     {
         // Check ddt scheme for D is not steadyState

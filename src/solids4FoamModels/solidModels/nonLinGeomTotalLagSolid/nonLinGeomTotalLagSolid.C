@@ -105,6 +105,9 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid
 {
     DDisRequired();
 
+    // Force all required old-time fields to be created
+    fvm::d2dt2(DD());
+
     // For consistent restarts, we will update the relative kinematic fields
     if (restart())
     {

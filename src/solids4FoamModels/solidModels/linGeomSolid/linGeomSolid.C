@@ -60,6 +60,9 @@ linGeomSolid::linGeomSolid
     rImpK_(1.0/impK_)
 {
     DDisRequired();
+
+    // Force all required old-time fields to be created
+    fvm::d2dt2(DD());
 }
 
 
