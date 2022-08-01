@@ -37,9 +37,9 @@ Author
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
-#include "directTopoChange.H"
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * *  Helper Functions * * * * * * * * * * * * * * * * * //
+
 label findPatchID(const polyMesh& mesh, const word& name)
 {
     label patchI = mesh.boundaryMesh().findPatchID(name);
@@ -50,8 +50,12 @@ label findPatchID(const polyMesh& mesh, const word& name)
             << "Patch " << name << "already exists" << endl
             << exit(FatalError);
     }
+
     return patchI;
 }
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+//  Main program:
 
 int main(int argc, char *argv[])
 {
@@ -64,8 +68,13 @@ int main(int argc, char *argv[])
 #   include "createTime.H"
 #   include "createPolyMesh.H"
 
+#ifdef OPENFOAMESIORFOUNDATION
+    const word patchName(args[1]);
+    const word patchType(args[2]);
+#else
     const word patchName(args.additionalArgs()[0]);
     const word patchType(args.additionalArgs()[1]);
+#endif
 
     wordList allPatches(1, patchName);
     wordList allPatchTypes(1, patchType);
