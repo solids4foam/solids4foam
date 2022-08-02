@@ -11,11 +11,5 @@ then
 fi
 
 wmake $All $targetType solvers
+wmake $All $targetType utilities
 wmake $All $targetType scripts
-
-if [ "$WM_PROJECT" = "foam" ]
-then
-    wmake all utilities
-else
-    echo "utilities currently not compiled for this version"
-fi
