@@ -1,136 +1,192 @@
 #!/bin/sh
 #------------------------------------------------------------------------------
-# =========                 |
-# \\      /  F ield         | foam-extend: Open Source CFD
-#  \\    /   O peration     | Version:     4.1
-#   \\  /    A nd           | Web:         http://www.foam-extend.org
-#    \\/     M anipulation  | For copyright notice see file Copyright
-#------------------------------------------------------------------------------
 # License
-#     This file is part of foam-extend.
-#
-#     foam-extend is free software: you can redistribute it and/or modify it
-#     under the terms of the GNU General Public License as published by the
-#     Free Software Foundation, either version 3 of the License, or (at your
-#     option) any later version.
-#
-#     foam-extend is distributed in the hope that it will be useful, but
-#     WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-#     General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+#     This file is part of solids4foam, licensed under GNU General Public
+#     License <http://www.gnu.org/licenses/>.
 #
 # Script
 #     Alltest
 #
 # Description
-#    Run all the solids4foam tutorials for only one time-step and one iteration.
+#     Quickly test the tutorials and write out the scheme/solver information
+#     Adapted from foam-extend-4.0 and OpenFOAM-v2012 tutorials/Alltest scripts.
 #
 #------------------------------------------------------------------------------
+cd "${0%/*}" || exit  # Run from this directory
 
-# FUNCTIONS
 #
-printUsage () {
-cat <<EOF
-Usage: $0
-Quickly tests the tutorials and writes out the scheme/solver information
+# FUNCTION DEFINITIONS
+#
 
-Options are:
--d         sets up a default scheme on all schemes
--h         help
-EOF
+function usage()
+{
+    exec 1>&2
+    while [ "$#" -ge 1 ]; do echo "$1"; shift; done
+    cat<<USAGE
+
+usage: ${0##*/} [OPTION]
+
+options:
+  -help         Print the usage
+
+Quickly tests the tutorials and writes out the scheme/solver information.
+
+USAGE
+    exit 1
 }
 
-#
-# VARIABLE
-#
-MAIN_CONTROL_DICT=
+# Report error and exit
+function die()
+{
+    exec 1>&2
+    echo
+    echo "Error encountered:"
+    while [ "$#" -ge 1 ]; do echo "    $1"; shift; done
+    echo
+    echo "See '${0##*/} -help' for usage"
+    echo
+    exit 1
+}
 
-for i in \
-  $HOME/.$WM_PROJECT-$WM_PROJECT_VERSION \
-  $HOME/.$WM_PROJECT/$WM_PROJECT_VERSION \
-  $HOME/.$WM_PROJECT \
-  $WM_PROJECT_DIR/etc \
-  ;
+# logReport <logfile>
+# Extracts useful info from log file.
+function logReport ()
+{
+    case=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
+    app=`echo $1 | sed s/"\(.*\)\."/""/g`
+    if [[ "${app}" == "solid" || "${app}" == "fluid" ]]
+    then
+        app=`echo $1 | rev | cut -d'.' -f 2,1 | rev`
+    fi
+    appAndCase="Application $app - case $case"
+
+    fatalError=`grep "FOAM FATAL" $1`
+    UxSS=`grep -E "Ux[:| ]*solution singularity" $1`
+    UySS=`grep -E "Uy[:| ]*solution singularity" $1`
+    UzSS=`grep -E "Uz[:| ]*solution singularity" $1`
+    completed=`grep -E "^[\t ]*[eE]nd" $1`
+
+    if [ "$fatalError" ]
+    then
+        echo "$appAndCase: ** FOAM FATAL ERROR **"
+        return
+    elif [ "$UxSS" -a "$UySS" -a "$UzSS" ]
+    then
+        echo "$appAndCase: ** Solution singularity **"
+        return
+    elif [ "$completed" ]
+    then
+        completionTime=`tail -20 $log | grep Execution | cut -d= -f2 | sed 's/^[ \t]*//'`
+        if [ "$completionTime" ]
+        then
+            completionTime="in $completionTime"
+        fi
+        echo "$appAndCase: completed $completionTime"
+        return
+    else
+        echo "$appAndCase: unconfirmed completion"
+    fi
+}
+
+# Run cases (similar to foamRunTutorials)
+function runCases()
+{
+    thisScript=$0
+    if [ "/${thisScript#/}" != "$thisScript" ]
+    then
+        thisScript="$PWD/$thisScript"
+    fi
+
+    # If an argument is supplied do not execute ./Allrun to avoid recursion
+    if [ $# = 0 -a -f "./Allrun" ]
+    then
+        echo; echo "execute Allrun"
+        # Specialised script.
+        ./Allrun
+    else
+        # Loop over sub-directories and compile any applications
+        for case in *
+        do
+            if [ -d $case -a -d "$case/Make" ]
+            then
+                (compileApplication $case)
+            fi
+        done
+
+        # Recurse to subdirectories
+        for case in *
+        do
+            if [ -d $case ]
+            then
+                echo "cd $case and runCases"
+                (cd $case && runCases)
+            fi
+        done
+    fi
+}
+
+
+#
+# PRELIMINARIES
+#
+
+rootDir="./"
+
+# Parse options
+while [ "$#" -gt 0 ]
 do
-  if [ -f "$i/controlDict" ]; then
-     MAIN_CONTROL_DICT="$i/controlDict"
-     break
-  fi
+    case "$1" in
+    -h | -help)
+        usage
+        ;;
+    *)
+        die "Unknown option/argument: '$1'"
+        ;;
+    esac
+    shift
 done
 
-# Check if the main control dict was found
-if [[ ! -z "${MAIN_CONTROL_DICT}" ]]
-then
-    echo "The MAIN_CONTROL_DICT was not found!"
-    echo "You can create one with: "
-    echo "cp ${WM_PROJECT_DIR}/etc/controlDict-EXAMPLE ${WM_PROJECT_DIR}/etc/controlDict"
-fi
+# Sets FOAM_TUTORIALS directory location, as required
+. "${WM_PROJECT_DIR:?}"/bin/tools/RunFunctions
 
-TUTORIALS_DIR=.
+# Set test directory
 TEST_RUN_DIR=../tutorialsTest
-FV_SCHEMES=\
-" \
-    gradScheme \
-    divScheme \
-    laplacianScheme \
-    interpolationScheme \
-    snGradScheme \
-    fluxRequired \
-"
-SCHEMES_FILE="FvSchemes"
-SCHEMES_TEMP="FvSchemes.temp"
-SOLVERS_FILE="FvSolution"
-SOLVERS_TEMP="FvSolution.temp"
+
 
 #
 # MAIN
 #
 
-if [ -d "$TEST_RUN_DIR" ] ; then
-    rm -rf $TEST_RUN_DIR
-fi
-
-echo "Modifying ${MAIN_CONTROL_DICT}"
-if [ -e ${MAIN_CONTROL_DICT}.org ]
+if [ -d "$TEST_RUN_DIR" ]
 then
-    echo "File " ${MAIN_CONTROL_DICT}.org " already exists"
-    echo "Did Alltest fail in some way and then run again?"
+    echo "Directory already exists: $TEST_RUN_DIR" 1>&2
+    echo "Please remove it" 1>&2
     exit 1
 fi
 
-# Clean up on termination and on Ctrl-C
-trap 'mv ${MAIN_CONTROL_DICT}.org ${MAIN_CONTROL_DICT} 2>/dev/null; exit 0' \
-    EXIT TERM INT
-cp ${MAIN_CONTROL_DICT} ${MAIN_CONTROL_DICT}.org
+# Copy tutorials
+cp -a "$rootDir" "$TEST_RUN_DIR"
 
-sed \
--e s/"\(fvSchemes[ \t]*\)\([0-9]\);"/"\1 1;"/g \
--e s/"\(fvSolution[ \t]*\)\([0-9]\);"/"\1 1;"/g \
-${MAIN_CONTROL_DICT}.org > ${MAIN_CONTROL_DICT}
+# Enter test directory
+cd "$TEST_RUN_DIR" || exit
 
-echo "Copying the tutorials"
-cp -a ${TUTORIALS_DIR} ${TEST_RUN_DIR}
-
-echo "Modifying the controlDicts to run only one time step"
-cd ${TEST_RUN_DIR}
-
-for CD in `find . -name "controlDict*"`
+# Modify controlDicts
+echo "Modifying the case controlDicts to run only one time step"
+for CD in $(find . -name "controlDict*" -type f)
 do
-    mv ${CD} ${CD}.org
+    cp -f "${CD}" "${CD}.orig"
     sed \
-    -e s/"\(startFrom[ \t]*\)\([a-zA-Z]*\);"/"\1 latestTime;"/g \
-    -e s/"\(stopAt[ \t]*\)\([a-zA-Z]*\);"/"\1 nextWrite;"/g \
-    -e s/"\(writeControl[ \t]*\)\([a-zA-Z]*\);"/"\1 timeStep;"/g \
-    -e s/"\(writeInterval[ \t]*\)\([0-9a-zA-Z.-]*\);"/"\1 1;"/g \
-    ${CD}.org > ${CD}
+        -e 's/\(startFrom[ \t]*\)\([a-zA-Z]*\);/\1 latestTime;/g' \
+        -e 's/\(stopAt[ \t]*\)\([a-zA-Z]*\);/\1 nextWrite;/g' \
+        -e 's/\(writeControl[ \t]*\)\([a-zA-Z]*\);/\1 timeStep;/g' \
+        -e 's/\(writeInterval[ \t]*\)\([0-9a-zA-Z.-]*\);/\1 1;/g' \
+        "${CD}.orig" > "${CD}"
 done
 
+# Modify solidProperties
 # set nCorrectors to 1 for solids4foam solvers
 echo "Modifying the solidProperties to run only one iteration"
-for SP in `find . -name "solidProperties"`
+for SP in $(find . -name "solidProperties")
 do
     mv ${SP} ${SP}.org
     sed \
@@ -139,8 +195,9 @@ do
     ${SP}.org > ${SP}
 done
 
+# Modify fsiProperties
 echo "Modifying the fsiProperties to run only one iteration"
-for FP in `find . -name "fsiProperties"`
+for FP in $(find . -name "fsiProperties")
 do
     mv ${FP} ${FP}.org
     sed \
@@ -149,39 +206,36 @@ do
     ${FP}.org > ${FP}
 done
 
-echo "Running the tutorials"
-./Allrun
+# Source tutorial functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-echo "Preparing the summary files"
-sed -e :a -e '/\\$/N; s/\\\n//; ta' Allrun > temp
-APPLICATIONS=\
-    `grep "applications=" temp | sed 's/applications=\"\([A-Za-z \t]*\)\"/\1/g'`
+# Remove high-level Allrun
+rm Allrun*
 
-rm $SCHEMES_FILE > /dev/null 2>&1
-for APP in $APPLICATIONS
+# Run cases recursively
+echo "Running cases "; echo "    $PWD"; echo
+runCases
+
+# Prepare summary files
+echo; echo "Preparing testLoopReport"
+rm testLoopReport > /dev/null 2>&1 &
+touch testLoopReport
+for application in *
 do
-    echo $APP >> $SCHEMES_FILE
-    echo "$APP: " | tr -d "\n" >> $SOLVERS_FILE
-    for ST in $FV_SCHEMES
-    do
-        rm $SCHEMES_TEMP > /dev/null 2>&1
-        rm $SOLVERS_TEMP > /dev/null 2>&1
-        echo "  ${ST}" >> $SCHEMES_FILE
-        for LOG in `find ${APP} -name "log.${APP}"`
+    if [ -d $application ]
+    then
+        cd $application
+        for log in `find . -name "log.*" | xargs ls -rt`
         do
-            for S in `grep ${ST} ${LOG} | cut -d" " -f4`
-            do
-                echo "    ${S}" >> $SCHEMES_TEMP
-            done
-        echo `grep solver ${LOG} | cut -d" " -f4` >> $SOLVERS_TEMP
+            logReport $log >> ../testLoopReport
         done
-        if [ -f $SCHEMES_TEMP ] ; then
-            cat $SCHEMES_TEMP | sort -u >> $SCHEMES_FILE
-        fi
-    done
-    cat $SOLVERS_TEMP | tr " " "\n" | sort -u | tr "\n" " " >> $SOLVERS_FILE
-    echo "" >> $SOLVERS_FILE
+        echo "" >> ../testLoopReport
+        cd ..
+    fi
 done
 
+# Create concatenated logs file
+echo; echo "Preparing logs"; echo
+find . -name "log.*" -exec cat {} \; >> logs
 
-# ----------------------------------------------------------------- end-of-file
+#------------------------------------------------------------------------------
