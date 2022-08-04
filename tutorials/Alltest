@@ -176,7 +176,6 @@ for CD in $(find . -name "controlDict*" -type f)
 do
     cp -f "${CD}" "${CD}.orig"
     sed \
-        -e 's/\(startFrom[ \t]*\)\([a-zA-Z]*\);/\1 latestTime;/g' \
         -e 's/\(stopAt[ \t]*\)\([a-zA-Z]*\);/\1 nextWrite;/g' \
         -e 's/\(writeControl[ \t]*\)\([a-zA-Z]*\);/\1 timeStep;/g' \
         -e 's/\(writeInterval[ \t]*\)\([0-9a-zA-Z.-]*\);/\1 1;/g' \
