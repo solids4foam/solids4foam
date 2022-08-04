@@ -16,7 +16,7 @@ FoamFile
 
 ddtSchemes
 {
-    default         Euler;
+    default         backward;
 }
 
 gradSchemes
@@ -28,12 +28,13 @@ divSchemes
 {
     default         none;
     div(phi,U)      Gauss upwind;
+    div((nuEff*dev2(T(grad(U))))) Gauss linear;
 }
 
 laplacianSchemes
 {
     default         none;
-    laplacian(nu,U) Gauss linear corrected;
+    laplacian(nuEff,U) Gauss linear corrected;
     laplacian(diffusivity,cellMotionU) Gauss linear corrected;
     laplacian(rAU,p) Gauss linear corrected;
     laplacian((1|A(U)),p) Gauss linear corrected;
