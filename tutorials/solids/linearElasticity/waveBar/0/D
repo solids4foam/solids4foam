@@ -44,6 +44,7 @@ boundaryField
     bottom
     {
         type            symmetryPlane;
+    }
     back
     {
         type            empty;

@@ -1,4 +1,0 @@
-paraboloidInletVelocityFvPatchVectorField.C
-
-
-LIB = $(FOAM_USER_LIBBIN)/libparaboloidInletVelocity

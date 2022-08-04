@@ -9,37 +9,21 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-if [[ "${WM_PROJECT}" == "foam" ]]
-then
-    runApplication -l log.blockMesh.solid blockMesh -region solid
-    runApplication -l log.blockMesh.fluid blockMesh -region fluid
+# Create meshes
+runApplication -s solid blockMesh -region solid
+runApplication -s fluid blockMesh -region fluid
 
-    if [[ "$1" == "parallel" ]]; then
-        # Run parallel
-        runApplication -l log.decomposePar.fluid decomposePar -region fluid
-        runApplication -l log.decomposePar.solid decomposePar -region solid
-        runParallel solids4Foam 4
-        runApplication -l log.reconstructPar.fluid reconstructPar -region fluid
-        runApplication -l log.reconstructPar.solid reconstructPar -region solid
-    else
-        # Run serial
-        runApplication solids4Foam
-    fi
+# Run solver
+if [[ "$1" == "parallel" ]]; then
+    # Run parallel
+    runApplication -s fluid decomposePar -region fluid
+    runApplication -s solid decomposePar -region solid
+    runParallel solids4Foam
+    runApplication -s fluid reconstructPar -region fluid
+    runApplication -s solid reconstructPar -region solid
 else
-    runApplication -s solid blockMesh -region solid
-    runApplication -s fluid blockMesh -region fluid
-
-    if [[ "$1" == "parallel" ]]; then
-        # Run parallel
-        runApplication -s fluid decomposePar -region fluid
-        runApplication -s solid decomposePar -region solid
-        mpirun -np 4 solids4Foam -noFunctionObjects -parallel &> log.solids4Foam
-        runApplication -s fluid reconstructPar -region fluid
-        runApplication -s solid reconstructPar -region solid
-    else
-        # Run serial
-        runApplication solids4Foam -noFunctionObjects
-    fi
+    # Run serial
+    runApplication solids4Foam -noFunctionObjects
 fi
 
 # Create plots

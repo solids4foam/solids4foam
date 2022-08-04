@@ -68,7 +68,7 @@ edges
 );
 
 patches
-(   symmetryPlane symmPlane
+(   symmetry symmPlane
     (
         (0 8 5 0)
     )
@@ -84,13 +84,13 @@ patches
         (4 5 8 7)
     )
 
-    wedge back
+    symmetry back
     (
         (5 4 1 0)
         (4 3 2 1)
     )
 
-    wedge front
+    symmetry front
     (
         (0 1 7 8)
         (1 2 6 7)

@@ -3,6 +3,14 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+if ! command -v cartesianMesh &> /dev/null
+then
+    echo
+    echo "cartesianMesh command not found, which is required for this case"
+    echo
+    exit 0
+fi
+
 # Create mesh
 runApplication cartesianMesh
 
@@ -12,6 +20,3 @@ rm -rf constant/polyMesh; mv 0.01/polyMesh constant/; rm -rf 0.01
 
 # Run solver
 runApplication solids4Foam
-
-# ----------------------------------------------------------------- end-of-file
-

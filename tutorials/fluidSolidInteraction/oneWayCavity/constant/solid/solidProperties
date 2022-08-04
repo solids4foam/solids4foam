@@ -17,7 +17,6 @@ FoamFile
 solidModel    linearGeometryTotalDisplacement;
 
 linearGeometryTotalDisplacementCoeffs
-{
-}
+{}
 
 // ************************************************************************* //
