@@ -4,4 +4,4 @@
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
 cleanCase
-\rm -rf processor* *.ps history VTK forces case.foam
+rm -rf processor* force.pdf case.foam

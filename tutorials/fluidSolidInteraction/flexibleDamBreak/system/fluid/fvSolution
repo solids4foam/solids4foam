@@ -19,7 +19,23 @@ solvers
 {
     rho
     {}
-    pcorr
+
+    "alpha.water.*"
+    {
+        nAlphaCorr      2;
+        nAlphaSubCycles 1;
+        cAlpha          1;
+
+        MULESCorr       yes;
+        nLimiterIter    5;
+
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-8;
+        relTol          0;
+    }
+
+    "pcorr|pcorrFinal"
     {
         solver          PCG;
         preconditioner  DIC;
@@ -27,7 +43,7 @@ solvers
         relTol          0;
     }
 
-    pd
+    "pd|p_rgh"
     {
         solver          PCG;
         preconditioner  DIC;
@@ -35,7 +51,7 @@ solvers
         relTol          0.05;
     }
 
-    pdFinal
+    "pdFinal|p_rghFinal"
     {
         solver          PCG;
         preconditioner  DIC;
@@ -43,10 +59,10 @@ solvers
         relTol          0;
     }
 
-    U
+    "U|UFinal"
     {
-        solver          BiCGStab;
-        preconditioner  DILU;
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
         tolerance       1e-06;
         relTol          0;
     }

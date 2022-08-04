@@ -75,11 +75,7 @@ bool Foam::solidPointTemperature::writeData()
         const volScalarField& T = mesh.lookupObject<volScalarField>("T");
 
         // Create a point mesh
-#ifdef OPENFOAMFOUNDATION
         const pointMesh& pMesh = pointMesh::New(mesh);
-#else
-        pointMesh pMesh(mesh);
-#endif
 
         // Create a point temperature field
         pointScalarField pointT
@@ -220,11 +216,11 @@ Foam::solidPointTemperature::solidPointTemperature
             {
                 // Put in undecomposed case (Note: gives problems for
                 // distributed data running)
-                historyDir = time_.path()/".."/"history"/startTimeName;
+                historyDir = time_.path()/".."/"postProcessing"/startTimeName;
             }
             else
             {
-                historyDir = time_.path()/"history"/startTimeName;
+                historyDir = time_.path()/"postProcessing"/startTimeName;
             }
 
             // Create directory if does not exist.

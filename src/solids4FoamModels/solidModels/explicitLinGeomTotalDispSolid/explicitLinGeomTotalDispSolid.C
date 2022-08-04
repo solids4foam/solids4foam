@@ -130,6 +130,8 @@ explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
         "zeroGradient"
     )
 {
+    DisRequired();
+
     a_.oldTime();
     U().oldTime();
 
@@ -169,7 +171,7 @@ void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
     // calculating the required stable time-step
     // i.e.e deltaT = (1.0/(0.5*deltaCoeff)/waveSpeed
     // For safety, we should use a time-step smaller than this e.g. Abaqus uses
-    // 1/sqrt(2)*stableTimeStep: we will default to this value
+    // stableTimeStep/sqrt(2): we will default to this value
     const scalar requiredDeltaT =
         1.0/
         gMax
@@ -187,7 +189,7 @@ void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
 
     // Lookup the desired Courant number
     const scalar maxCo =
-        runTime.controlDict().lookupOrDefault<scalar>("maxCo", 0.7071);
+        runTime.controlDict().lookupOrDefault<scalar>("maxCo", 0.1);
 
     const scalar newDeltaT = maxCo*requiredDeltaT;
 
@@ -238,8 +240,8 @@ bool explicitLinGeomTotalDispSolid::evolve()
             
         // Compute acceleration
         // Note the inclusion of a linear bulk viscosity pressure term to
-        // dissipate high frequency energies, and a Rhie-Chow term to avoid
-        // checker-boarding
+        // dissipate high frequency energies, and a Rhie-Chow or JST term to
+        // suppress checker-boarding
 #ifdef OPENFOAMESIORFOUNDATION
         a_.primitiveFieldRef() =
 #else
@@ -254,6 +256,11 @@ bool explicitLinGeomTotalDispSolid::evolve()
                         rho(), waveSpeed_, gradD()
                     )
                 )().internalField()
+              // + JSTScaleFactor_ // actually Rhie-Chow
+              //  *(
+              //       fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
+              //     - fvc::div(impKf_*mesh().Sf() & fvc::interpolate(gradD()))
+              //   )().internalField()
                 // This corresponds to Lax–Friedrichs smoothing
                 // + LFScaleFactor_*fvc::laplacian
                 //   (

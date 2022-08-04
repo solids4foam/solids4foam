@@ -15,7 +15,13 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-phase1
+phases
+(
+    water
+    air
+);
+
+water
 {
     transportModel  Newtonian;
     nu              nu [ 0 2 -1 0 0 0 0 ] 1e-06;
@@ -37,7 +43,7 @@ phase1
     }
 }
 
-phase2
+air
 {
     transportModel  Newtonian;
     nu              nu [ 0 2 -1 0 0 0 0 ] 1.48e-05;

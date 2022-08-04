@@ -113,7 +113,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
         }
         else if (debug)
         {
-            Pout<< "Proc " << Pstream::myProcNo() << " owns point "
+            Pout<< "Proc " << Pstream::myProcNo() << " owns global point "
                 << mesh_.points()[pointID] << endl;
         }
     }
@@ -202,7 +202,11 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
                 // Send
                 OPstream::write
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo(),
                     reinterpret_cast<const char*>(toSend.begin()),
                     toSend.byteSize()
@@ -229,8 +233,12 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
 
                 // Receive
                 IPstream::read
-                (
+                ( 
+#ifdef OPENFOAMESIORFOUNDATION
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo(),
                     reinterpret_cast<char*>(toReceive.begin()),
                     toReceive.byteSize()
@@ -387,7 +395,11 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
             // Send
             OPstream::write
             (
+#ifdef OPENFOAMESIORFOUNDATION
+                Pstream::commsTypes::blocking,
+#else
                 Pstream::blocking,
+#endif
                 procPatch.neighbProcNo(),
                 reinterpret_cast<const char*>(toSend.begin()),
                 toSend.byteSize()
@@ -409,7 +421,11 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
             // Receive
             IPstream::read
             (
+#ifdef OPENFOAMESIORFOUNDATION
+                Pstream::commsTypes::blocking,
+#else
                 Pstream::blocking,
+#endif
                 procPatch.neighbProcNo(),
                 reinterpret_cast<char*>(toReceive.begin()),
                 toReceive.byteSize()

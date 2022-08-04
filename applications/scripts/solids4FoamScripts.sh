@@ -287,3 +287,37 @@ function solids4Foam::caseOnlyRunsWithFoamExtend()
         exit 0
     fi
 }
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# removeEmptyDirs
+#     Ported from preCICE toolbox
+#     Remove empty time directories that are generated when running FSI cases
+#     with preCICE
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::removeEmptyDirs()
+{
+    (
+	set -e -u
+	echo "Removing time directories without results"
+
+	for f in [0-9]* [0-9]*.[0-9]*; do
+	    if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
+		rm -rfv "${f}"
+	    fi
+	done
+	if [ -d processor0 ]; then
+	    for d in processor*; do
+		cd "${d}"
+		for f in [0-9]* [0-9]*.[0-9]*; do
+		    if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
+			rm -rfv "${f}"
+		    fi
+		done
+		cd ..
+	    done
+	fi
+    )
+}

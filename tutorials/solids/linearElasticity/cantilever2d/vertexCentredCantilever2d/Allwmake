@@ -1,5 +1,4 @@
 #!/bin/bash
 
-wmake libso cantileverAnalyticalSolution
 wmake libso cantileverTraction
 wmake libso cantileverDisplacement

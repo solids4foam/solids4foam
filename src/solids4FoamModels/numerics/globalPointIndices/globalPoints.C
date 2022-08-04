@@ -30,8 +30,10 @@ License
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(Foam::globalPoints, 0);
-
+namespace Foam
+{
+    defineTypeNameAndDebug(globalPoints, 0);
+}
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -71,8 +73,8 @@ void Foam::globalPoints::addToSend
     const label patchPointI,
     const procPointList& knownInfo,
 
-    dynamicLabelList& patchFaces,
-    dynamicLabelList& indexInFace,
+    DynamicList<label>& patchFaces,
+    DynamicList<label>& indexInFace,
     DynamicList<procPointList>& allInfo
 )
 {
@@ -105,7 +107,7 @@ bool Foam::globalPoints::mergeInfo
 )
 {
     // Indices of entries in nbrInfo not yet in myInfo.
-    dynamicLabelList newInfo(nbrInfo.size());
+    DynamicList<label> newInfo(nbrInfo.size());
 
     forAll(nbrInfo, i)
     {
@@ -275,9 +277,9 @@ void Foam::globalPoints::sendPatchPoints(const labelHashSet& changedPoints)
         {
             // Information to send:
             // patch face
-            dynamicLabelList patchFaces(pp.nPoints());
+            DynamicList<label> patchFaces(pp.nPoints());
             // index in patch face
-            dynamicLabelList indexInFace(pp.nPoints());
+            DynamicList<label> indexInFace(pp.nPoints());
             // all information I currently hold about this patchPoint
             DynamicList<procPointList> allInfo(pp.nPoints());
 
@@ -329,7 +331,11 @@ void Foam::globalPoints::sendPatchPoints(const labelHashSet& changedPoints)
 
                 OPstream toNeighbour
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                 );
 
@@ -368,7 +374,11 @@ void Foam::globalPoints::receivePatchPoints(labelHashSet& changedPoints)
             {
                 IPstream fromNeighbour
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                 );
                 fromNeighbour >> patchFaces >> indexInFace >> nbrInfo;
@@ -642,7 +652,14 @@ void Foam::globalPoints::sendSharedPoints(const labelList& changedIndices) const
             const processorPolyPatch& procPatch =
                 refCast<const processorPolyPatch>(pp);
 
+#ifdef OPENFOAMESIORFOUNDATION
+            OPstream toNeighbour
+            (
+                Pstream::commsTypes::blocking, procPatch.neighbProcNo()
+            );
+#else
             OPstream toNeighbour(Pstream::blocking, procPatch.neighbProcNo());
+#endif
 
             if (debug)
             {
@@ -693,7 +710,11 @@ void Foam::globalPoints::receiveSharedPoints(labelList& changedIndices)
                 {
                     IPstream fromNeighbour
                     (
+#ifdef OPENFOAMESIORFOUNDATION
+                        Pstream::commsTypes::blocking,
+#else
                         Pstream::blocking,
+#endif
                         procPatch.neighbProcNo()
                     );
                     fromNeighbour >> nbrSharedPointAddr >> nbrSharedPointLabels;

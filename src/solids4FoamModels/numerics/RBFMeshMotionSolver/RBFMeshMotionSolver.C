@@ -39,6 +39,19 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
     motionSolver(mesh),
 #endif
     motionCenters(mesh.boundaryMesh().size(), vectorField(0)),
+    motionCentersField_
+    (
+        IOobject
+        (
+            "rbfMotionCentersField",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh.lookupObject<fvMesh>(mesh.name()),
+        dimensionedVector("0", dimLength, vector::zero)
+    ),
 #ifdef OPENFOAMESIORFOUNDATION
     staticPatches(coeffDict().lookup("staticPatches")),
     staticPatchIDs(staticPatches.size()),
@@ -324,6 +337,9 @@ void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
 
         if (not faceCellCenters && movingPatch)
             assert(mpatch.size() == mesh().boundaryMesh()[ipatch].meshPoints().size());
+
+        // Set values on motionCentersField boundary
+        motionCentersField_.boundaryFieldRef()[ipatch] = motion[ipatch];
     }
 
     motionCenters = motion;
@@ -337,6 +353,12 @@ void RBFMeshMotionSolver::updateMesh(const mapPolyMesh &)
 void RBFMeshMotionSolver::solve()
 {
     assert(motionCenters.size() == mesh().boundaryMesh().size());
+
+    // Copy motionCentersField to motionCenters
+    forAll(motionCentersField_.boundaryField(), patchI)
+    {
+        motionCenters[patchI] = motionCentersField_.boundaryFieldRef()[patchI];
+    }
 
     /*
      * RBF interpolator from face centers to local complete mesh vertices

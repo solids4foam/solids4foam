@@ -41,7 +41,11 @@ SourceFiles
 #include "sparseMatrix.H"
 #include "vectorField.H"
 #include "polyMesh.H"
-#include "BlockSolverPerformance.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "SolverPerformance.H"
+#else
+    #include "BlockSolverPerformance.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -67,8 +71,14 @@ namespace sparseMatrixTools
         const bool debug = false
     );
 
+#ifdef USE_PETSC
+
     //- Solve the linear system using PETSc
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solveLinearSystemPETSc
+#else
     BlockSolverPerformance<vector> solveLinearSystemPETSc
+#endif
     (
         const sparseMatrix& matrix,
         const vectorField& source,
@@ -83,6 +93,8 @@ namespace sparseMatrixTools
         const bool debug = false
     );
 
+#endif
+
     //- Set the number of non-zeros in per row in the given array
     void setNonZerosPerRow
     (
@@ -95,6 +107,10 @@ namespace sparseMatrixTools
         const labelList& stencilSizeOwned,
         const labelList& stencilSizeNotOwned
     );
+
+    //- Check the PETSc error
+    //  Exit with a FatalError if it is greater than 0
+    void checkErr(const int ierr);
 
     //- Enforce fixed DOF contributions on the linear system
     void enforceFixedDof

@@ -9,35 +9,14 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-solids4Foam::caseOnlyRunsWithFoamExtend
+# Create meshes
+runApplication -s solid blockMesh -region solid
+runApplication -s fluid blockMesh -region fluid
 
-if [[ "${WM_PROJECT}" == "foam" ]]
-then
-    # Create meshes
-    runApplication -l log.blockMesh.solid blockMesh -region solid
-    runApplication -l log.blockMesh.fluid blockMesh -region fluid
-
-    # Set water volume fraction field (alpha) in the fluid
-    # Note: setField does not have a '-region' option so we will use a
-    # work-around
-    \mv constant/fluid/polyMesh constant/
-    \mv system/fluid/setFieldsDict system/
-    \cp 0/fluid/alpha1.org 0/alpha1
-    runApplication setFields
-    \mv constant/polyMesh constant/fluid/
-    \mv system/setFieldsDict system/fluid/
-    \mv 0/alpha1 0/fluid/alpha1
-else
-    # Create meshes
-    runApplication -s solid blockMesh -region solid
-    runApplication -s fluid blockMesh -region fluid
-
-    # Set water volume fraction field (alpha) in the fluid
-    runApplication setFields -region fluid
-fi
+# Set water volume fraction field (alpha) in the fluid
+cp 0/fluid/alpha1.org 0/fluid/alpha1
+(cd 0/fluid && ln -s alpha1 alpha.water)
+runApplication setFields -region fluid
 
 # Run solver
 runApplication solids4Foam
-
-# ----------------------------------------------------------------- end-of-file
-

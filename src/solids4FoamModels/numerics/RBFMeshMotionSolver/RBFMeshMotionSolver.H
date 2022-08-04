@@ -33,7 +33,14 @@ namespace Foam
             // Disallow default bitwise assignment
             void operator=( const RBFMeshMotionSolver & );
 
+            //- Store motion as a field
             Field<vectorField> motionCenters;
+
+            //- Store a duplicate of the motionCenters on the boundary of a
+            //  volVectorField. This allows this mesh motion solver to be used
+            //  in a similar way to standard motion solvers, i.e. we just access
+            //  and set the cellMotion volVectorField
+            volVectorField motionCentersField_;
 
             wordList staticPatches;
             labelList staticPatchIDs;

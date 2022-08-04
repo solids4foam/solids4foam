@@ -48,12 +48,21 @@ Author
 #define cantileverTractionPointPatchVectorField_H
 
 #include "solidTractionPointPatchVectorField.H"
-#include "PointPatchFieldMapper.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "pointPatchFieldMapper.H"
+#else
+    #include "PointPatchFieldMapper.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+#ifdef OPENFOAMFOUNDATION
+    typedef generalPointPatchFieldMapper PointPatchFieldMapper;
+#elif defined (OPENFOAMESI)
+    typedef pointPatchFieldMapper PointPatchFieldMapper;
+#endif
 
 /*---------------------------------------------------------------------------*\
             Class cantileverTractionPointPatchVectorField Declaration
@@ -179,7 +188,11 @@ public:
         //  there's nothing to do
         virtual void initEvaluate
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
+#else
             const Pstream::commsTypes commsType = Pstream::blocking
+#endif
         );
 
         //- Write

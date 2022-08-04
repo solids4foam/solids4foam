@@ -13,14 +13,8 @@ solids4Foam::convertCaseFormat .
 # First run the fluid case to completion
 #
 
-if [[ $WM_PROJECT == "foam" ]]
-then
-    # Create fluid mesh
-    runApplication -l log.blockMesh.fluid blockMesh
-else
-    # Create fluid mesh
-    runApplication -s fluid blockMesh
-fi
+# Create fluid mesh
+runApplication -s fluid blockMesh
 
 # Run fluid solver
 runApplication icoFoam
@@ -30,12 +24,7 @@ runApplication icoFoam
 #
 
 # Prepare the solid mesh
-if [[ $WM_PROJECT == "foam" ]]
-then
-    runApplication -l log.blockMesh.solid blockMesh -region solid
-else
-    runApplication -s solid blockMesh -region solid
-fi
+runApplication -s solid blockMesh -region solid
 
 # Create links as the solid solver expects the fluid to be a sub-region
 echo "Creating links to the fluid results"

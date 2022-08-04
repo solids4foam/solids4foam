@@ -64,7 +64,8 @@ Foam::tmp<Foam::volTensorField> Foam::vfvc::grad
 #endif
 
     // Take references for clarity and efficiency
-    tensorField& resultI = result.internalField();
+
+    tensorField& resultI = result;
     const labelListList& cellPoints = mesh.cellPoints();
     const vectorField& pointDI = pointD.internalField();
     const cellPointLeastSquaresVectors& cellPointLeastSquaresVecs =
@@ -145,7 +146,7 @@ Foam::tmp<Foam::surfaceTensorField> Foam::vfvc::fGrad
 #endif
 
     // Take references for clarity and efficiency
-    tensorField& resultI = result.internalField();
+    tensorField& resultI = result;
     const vectorField& pointDI = pointD.internalField();
     const pointField& points = mesh.points();
     const labelList& dualOwn = dualMesh.faceOwner();
@@ -157,7 +158,7 @@ Foam::tmp<Foam::surfaceTensorField> Foam::vfvc::fGrad
     //         replace the component in the edge direction
 
     // Calculate constant gradient in each primary mesh cell
-    const volTensorField gradD = vfvc::grad(pointD, mesh);
+    const volTensorField gradD(vfvc::grad(pointD, mesh));
     const tensorField& gradDI = gradD.internalField();
 
     // Set dual face gradient to primary mesh constant cell gradient and
@@ -215,13 +216,13 @@ Foam::tmp<Foam::surfaceTensorField> Foam::vfvc::fGrad
 
 Foam::tmp<Foam::vectorField> Foam::vfvc::d2dt2
 (
-    const fvSchemes& schemesDict,   // fvSchemes
+    ITstream& d2dt2Scheme,
     const pointVectorField& pointD, // displacement
     const pointVectorField& pointU, // velocity
     const pointVectorField& pointA, // acceleration
     const scalarField& pointRho,    // density
     const scalarField& pointVol,    // volumes
-    const debug::debugSwitch& debug // debug switch
+    const int debug // debug switch
 )
 {
     // Take a reference to the internal field
@@ -229,62 +230,61 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::d2dt2
 
     // Create result field
     tmp<vectorField> tresult(new vectorField(pointDI.size(), vector::zero));
+#ifdef OPENFOAMESIORFOUNDATION
+    vectorField& result = tresult.ref();
+#else
     vectorField& result = tresult();
+#endif
 
     // Read the time-scheme
-    ITstream is
-    (
-        schemesDict.d2dt2Scheme("d2dt2(" + pointD.name() +')')
-    );
-    const word d2dt2Scheme(is);
+    const word d2dt2SchemeName(d2dt2Scheme);
 
     // Time-step: assumed uniform
-    const scalar deltaT = pointD.time().deltaTValue();
+    const dimensionedScalar deltaT = pointD.time().deltaT();
 
-    if (d2dt2Scheme == "steadyState")
+    if (d2dt2SchemeName == "steadyState")
     {
         // Do nothing
     }
-    else if (d2dt2Scheme == "Euler")
+    else if (d2dt2SchemeName == "Euler")
     {
         result =
         (
-            pointDI
-          - 2.0*pointD.oldTime().internalField()
-          + pointD.oldTime().oldTime().internalField()
-        )*pointVol*pointRho/Foam::pow(deltaT, 2.0);
+            pointD - 2.0*pointD.oldTime() + pointD.oldTime().oldTime()
+        )().internalField()*pointVol*pointRho/Foam::pow(deltaT.value(), 2.0);
     }
-    else if (d2dt2Scheme == "backward")
+    else if (d2dt2SchemeName == "backward")
     {
         result =
         (
             1.5*
             (
-                1.5*pointDI
-              - 2.0*pointD.oldTime().internalField()
-              + 0.5*pointD.oldTime().oldTime().internalField()
+                1.5*pointD
+              - 2.0*pointD.oldTime()
+              + 0.5*pointD.oldTime().oldTime()
             )/deltaT
-          - 2.0*pointU.oldTime().internalField()
-          + 0.5*pointU.oldTime().oldTime().internalField()
-        )*pointVol*pointRho/deltaT;
+          - 2.0*pointU.oldTime()
+          + 0.5*pointU.oldTime().oldTime()
+        )().internalField()*pointVol*pointRho/deltaT.value();
     }
-    else if (d2dt2Scheme == "NewmarkBeta")
+    else if (d2dt2SchemeName == "NewmarkBeta")
     {
-        const scalar beta(readScalar(is));
+        const scalar beta(readScalar(d2dt2Scheme));
 
         const pointField pointDbar
         (
-            pointD.oldTime().internalField()
-          + deltaT*pointU.oldTime().internalField()
-          + 0.5*sqr(deltaT)*(1.0 - 2.0*beta)*pointA.oldTime().internalField()
+            pointD.oldTime()
+          + deltaT*pointU.oldTime()
+          + 0.5*sqr(deltaT)*(1.0 - 2.0*beta)*pointA.oldTime()
         );
 
-        result = (pointDI - pointDbar)*pointVol*pointRho/(beta*sqr(deltaT));
+        result =
+            (pointDI - pointDbar)*pointVol*pointRho/(beta*sqr(deltaT.value()));
     }
     else
     {
         FatalErrorIn("Foam::tmp<Foam::vectorField> Foam::vfvc::d2dt2(...)")
-            << "Not implemented for d2dt2Scheme = " << d2dt2Scheme << nl
+            << "Not implemented for d2dt2Scheme = " << d2dt2SchemeName << nl
             << "Available d2dt2Schemes are: " << nl
             << "    steadyState" << nl
             << "    Euler" << nl
@@ -299,7 +299,8 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::d2dt2
 
 Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
 (
-    const fvSchemes& schemesDict,
+    ITstream& ddtScheme,
+    ITstream& d2dt2Scheme,
     const pointVectorField& pointP
 )
 {
@@ -308,22 +309,22 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
 
     // Create result field
     tmp<vectorField> tresult(new vectorField(pointPI.size(), vector::zero));
+#ifdef OPENFOAMESIORFOUNDATION
+    vectorField& result = tresult.ref();
+#else
     vectorField& result = tresult();
+#endif
 
     // Read ddt time-scheme
-    ITstream is
-    (
-        schemesDict.ddtScheme("ddt(" + pointP.name() +')')
-    );
-    const word ddtScheme(is);
+    const word ddtSchemeName(ddtScheme);
 
     // Check that ddt and d2dt2 schemes are consistent for pointD and pointU
+    word d2dt2SchemeName("none");
     if (pointP.name() == "pointD" || pointP.name() == "pointU")
     {
-        ITstream is2(schemesDict.d2dt2Scheme("d2dt2(pointD)"));
-        const word d2dt2Scheme(is2);
+        d2dt2SchemeName = word(d2dt2Scheme);
 
-        if (ddtScheme != d2dt2Scheme)
+        if (ddtSchemeName != d2dt2SchemeName)
         {
             FatalErrorIn("Foam::tmp<Foam::vectorField> Foam::vfvc::ddt(...)")
                 << "The ddtScheme and d2dt2Scheme for " << pointP.name()
@@ -333,30 +334,28 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
     }
 
     // Time-step: assumed uniform
-    const scalar deltaT = pointP.time().deltaTValue();
+    const dimensionedScalar deltaT = pointP.time().deltaT();
 
-    if (ddtScheme == "steadyState")
+    if (ddtSchemeName == "steadyState")
     {
         // Do nothing
     }
-    else if (ddtScheme == "Euler")
+    else if (ddtSchemeName == "Euler")
     {
         result = (pointP - pointP.oldTime())/deltaT;
     }
-    else if (ddtScheme == "backward")
+    else if (ddtSchemeName == "backward")
     {
         result =
         (
             1.5*pointP - 2.0*pointP.oldTime() + 0.5*pointP.oldTime().oldTime()
         )/deltaT;
     }
-    else if (ddtScheme == "NewmarkBeta")
+    else if (ddtSchemeName == "NewmarkBeta")
     {
         // Read the beta and gamma parameters
-        ITstream is2(schemesDict.d2dt2Scheme("d2dt2(pointD)"));
-        const word d2dt2Scheme(is2);
-        const scalar beta(readScalar(is2));
-        const scalar gamma(readScalar(is2));
+        const scalar beta(readScalar(d2dt2Scheme));
+        const scalar gamma(readScalar(d2dt2Scheme));
 
         if (pointP.name() == "pointU")
         {
@@ -371,15 +370,15 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
             const pointVectorField& pointA =
                 pointP.mesh().db().lookupObject<pointVectorField>("pointA");
 
-            const pointField pointDbar
+            const pointVectorField pointDbar
             (
-                pointD.oldTime().internalField()
-              + deltaT*pointU.oldTime().internalField()
-              + 0.5*sqr(deltaT)*(1.0 - 2.0*beta)*pointA.oldTime().internalField()
+                pointD.oldTime()
+              + deltaT*pointU.oldTime()
+              + 0.5*sqr(deltaT)*(1.0 - 2.0*beta)*pointA.oldTime()
             );
 
             // Acceleration
-            result = (pointD.internalField() - pointDbar)/(beta*sqr(deltaT));
+            result = (pointD - pointDbar)/(beta*sqr(deltaT));
         }
         else if (pointP.name() == "pointD")
         {
@@ -391,14 +390,13 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
             const pointVectorField& pointA =
                 pointP.mesh().db().lookupObject<pointVectorField>("pointA");
 
-            const pointField pointUbar
+            const pointVectorField pointUbar
             (
-                pointU.oldTime().internalField()
-              + (1.0 - gamma)*deltaT*pointA.oldTime().internalField()
+                pointU.oldTime() + (1.0 - gamma)*deltaT*pointA.oldTime()
             );
 
             // Velocity
-            result = pointUbar + gamma*deltaT*pointA.internalField();
+            result = pointUbar + gamma*deltaT*pointA;
         }
         else
         {
@@ -410,7 +408,7 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
     else
     {
         FatalErrorIn("Foam::tmp<Foam::vectorField> Foam::vfvc::ddt(...)")
-            << "Not implemented for ddtScheme = " << ddtScheme << nl
+            << "Not implemented for ddtScheme = " << ddtSchemeName << nl
             << "Available ddtSchemes are: " << nl
             << "    steadyState" << nl
             << "    Euler" << nl

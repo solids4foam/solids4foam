@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [[ -d tutorials ]]
+then
+    echo; echo "tutorials directory present: pulling latest changes"; echo
+    (cd tutorials && git pull)
+else
+    echo; echo "Downloading the preCICE tutorials"; echo
+    git clone --branch=master --depth 1 https://github.com/precice/tutorials.git
+fi

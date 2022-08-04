@@ -140,7 +140,7 @@ public:
         virtual bool write();
 #endif
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
         //- Update for changes of mesh
         virtual void updateMesh(const mapPolyMesh&)
         {}

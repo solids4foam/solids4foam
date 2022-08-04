@@ -79,19 +79,20 @@ namespace vfvc
     // Second time derivative pointVectorField pointD
     tmp<vectorField> d2dt2
     (
-        const fvSchemes& schemesDict,   // fvSchemes
+        ITstream& d2dt2Scheme,
         const pointVectorField& pointD, // displacement
         const pointVectorField& pointU, // velocity
         const pointVectorField& pointA, // acceleration
         const scalarField& pointRho,    // density
         const scalarField& pointVol,    // volumes
-        const debug::debugSwitch& debug // debug switch
+        const int debug // debug switch
     );
 
     // First time derivative pointVectorField pointP
     tmp<vectorField> ddt
     (
-        const fvSchemes& schemesDict,   // fvSchemes
+        ITstream& ddtScheme,
+        ITstream& d2dt2Scheme,
         const pointVectorField& pointP // displacement
     );
 

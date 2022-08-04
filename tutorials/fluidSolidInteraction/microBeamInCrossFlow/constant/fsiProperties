@@ -14,11 +14,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// fluidSolidInterface    fixedRelaxation;
 fluidSolidInterface    Aitken;
-// fluidSolidInterface    IQNILS;
 
-"fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
+AitkenCoeffs
 {
     // Solid interface patch list
     solidPatch interface;
@@ -28,7 +26,7 @@ fluidSolidInterface    Aitken;
 
     // Fixed under-relaxation factor
     // Some methods use this as the initial factor
-    relaxationFactor 0.05;
+    relaxationFactor 0.02;
 
     // The entire fluid domain mesh is moved when the interface moves more
     // than this limit
@@ -38,16 +36,13 @@ fluidSolidInterface    Aitken;
     outerCorrTolerance 1e-3;
 
     // Maximum number of FSI outer iterations
-    nOuterCorr 20;
+    nOuterCorr 50;
 
     // Frequency at which the weights of interpolator between the fluid and
     // solid interface is updated
     // 0 means there will be no interpolator update during simulation, whereas
     // 10 means the interpolator will be updated every 10 time-steps
     interpolatorUpdateFrequency 0;
-
-    // Re-use of the coupling
-    couplingReuse 0;
 
     // Enable FSI coupling
     coupled    yes;

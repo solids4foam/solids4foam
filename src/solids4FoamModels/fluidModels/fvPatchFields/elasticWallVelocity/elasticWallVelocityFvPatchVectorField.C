@@ -145,12 +145,11 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
 
 #ifdef OPENFOAMESIORFOUNDATION
     const fvMesh& mesh = internalField().mesh();
-    const pointField& points = mesh.points();
 #else
     const fvMesh& mesh = dimensionedInternalField().mesh();
-    const pointField& points = mesh.allPoints();
 #endif
 
+    const pointField& points = mesh.points();
     const fvPatch& p = patch();
     const polyPatch& pp = p.patch();
 
@@ -179,11 +178,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     // Compute velocity vector
     if (ddtScheme == fv::backwardDdtScheme<vector>::typeName)
     {
-        //Info<< "void elasticWallVelocityFvPatchVectorField::updateCoeffs() - "
-        //    << "backward"
-        //    << endl;
-
-        if(timeIndex_ < mesh.time().timeIndex())
+        if (timeIndex_ < mesh.time().timeIndex())
         {
             oldOldFc_ = oldFc_;
             oldFc_ = Fc_;
@@ -197,8 +192,9 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
             Fc_[i] = pp[i].centre(points);
         }
 
-        scalar deltaT = mesh.time().deltaT().value();
+        const scalar deltaT = mesh.time().deltaT().value();
         scalar deltaT0 = mesh.time().deltaT0().value();
+
         if
         (
             U.oldTime().timeIndex() == U.oldTime().oldTime().timeIndex()
@@ -209,21 +205,19 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
         }
 
         //Set coefficients based on deltaT and deltaT0
-        scalar coefft   = 1 + deltaT/(deltaT + deltaT0);
-        scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
-        //scalar coefft0  = coefft + coefft00;
+        const scalar coefft = 1 + deltaT/(deltaT + deltaT0);
+        const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
 
         Up = coefft*(Fc_ - oldFc_)/deltaT
              - coefft00*(oldFc_ - oldOldFc_)/deltaT;
     }
-    else // Euler
+    else // Assume Euler
     {
         if (timeIndex_ < mesh.time().timeIndex())
         {
             oldOldFc_ = oldFc_;
             oldFc_ = Fc_;
 
-            //Fc_ = pp.faceCentres();
             timeIndex_ = mesh.time().timeIndex();
         }
 
@@ -236,8 +230,10 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     }
 
     // Compute normal velocity component (from mesh flux
-    const scalarField phip =
-        p.patchField<surfaceScalarField, scalar>(fvc::meshPhi(U));
+    const scalarField phip
+    (
+        p.patchField<surfaceScalarField, scalar>(fvc::meshPhi(U))
+    );
 
     const vectorField n(p.nf());
     const scalarField& magSf = p.magSf();
@@ -254,9 +250,6 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
         );
 
         Un = phipNew/(magSf + VSMALL);
-
-        // Info << "Un " << max(mag(Un)) << ", "
-        //     << average(mag(Un)) << endl;
     }
     else
     {

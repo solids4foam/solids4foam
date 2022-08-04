@@ -6,11 +6,18 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-solids4Foam::caseOnlyRunsWithFoamExtend
-
 # Create the mesh
 runApplication fluentMeshToFoam cylinderInChannel.msh
 runApplication changeDictionary
 
 # Run the solver
 runApplication solids4Foam
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating force.pdf using gnuplot"
+    gnuplot force.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

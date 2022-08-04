@@ -41,6 +41,7 @@ Author
 #define multiplyCoeff_H
 
 #include "fieldTypes.H"
+#include "symmTensor4thOrder.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

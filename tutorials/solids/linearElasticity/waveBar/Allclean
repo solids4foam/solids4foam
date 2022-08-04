@@ -7,8 +7,8 @@
 source solids4FoamScripts.sh
 
 cleanCase
-\rm -rf constant/polyMesh/boundary case.foam system/*Subset history \
-    energies.dat postProcessing probe
+\rm -rf constant/polyMesh/boundary case.foam system/*Subset \
+    energies.dat postProcessing probe *.pdf
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

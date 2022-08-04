@@ -149,9 +149,7 @@ public:
 #ifdef OPENFOAMESIORFOUNDATION
         //- Write
         virtual bool write();
-#endif
-
-#ifndef OPENFOAMESIORFOUNDATION
+#else
         //- Update for changes of mesh
         virtual void updateMesh(const mapPolyMesh&)
         {}

@@ -83,6 +83,9 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 {
     DisRequired();
 
+    // Force all required old-time fields to be created
+    fvm::d2dt2(D());
+
     // For consistent restarts, we will calculate the gradient field
     D().storePrevIter();
     mechanical().grad(D(), gradD());

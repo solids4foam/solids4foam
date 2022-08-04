@@ -61,7 +61,7 @@ AitkenCouplingInterface::AitkenCouplingInterface
     (
         fsiProperties().lookupOrDefault<scalar>
         (
-            "relaxationFactorMax", relaxationFactor_
+            "relaxationFactorMax", 1.0
         )
     ),
     predictSolid_(fsiProperties().lookupOrDefault<Switch>("predictSolid", true)),

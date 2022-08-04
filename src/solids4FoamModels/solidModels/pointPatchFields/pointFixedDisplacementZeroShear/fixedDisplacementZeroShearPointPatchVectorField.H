@@ -41,16 +41,31 @@ Author
 #ifndef fixedDisplacementZeroShearPointPatchVectorField_H
 #define fixedDisplacementZeroShearPointPatchVectorField_H
 
-#include "componentMixedPointPatchFields.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "slipPointPatchField.H"
+    #include "pointPatchFieldMapper.H"
+#else
+    #include "componentMixedPointPatchFields.H"
+    #include "PointPatchFieldMapper.H"
+#endif
 #include "interpolationTable.H"
-#include "PointPatchFieldMapper.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-/*---------------------------------------------------------------------------*\
+#ifdef OPENFOAMESIORFOUNDATION
+    typedef slipPointPatchField<vector> componentMixedPointPatchVectorField;
+
+    #ifdef OPENFOAMFOUNDATION
+        typedef generalPointPatchFieldMapper PointPatchFieldMapper;
+    #elif defined (OPENFOAMESI)
+        typedef pointPatchFieldMapper PointPatchFieldMapper;
+    #endif
+#endif
+
+/*---------------------------------------------------------------------------* \
             Class fixedDisplacementZeroShearPointPatchVectorField Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -159,7 +174,11 @@ public:
         //  there's nothing to do
         virtual void initEvaluate
         (
+#ifdef OPENFOAMESIORFOUNDATION
+            const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
+#else
             const Pstream::commsTypes commsType = Pstream::blocking
+#endif
         );
 
         //- Write

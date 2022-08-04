@@ -14,11 +14,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidModel icoFluid;
-//fluidModel pisoFluid;
-//fluidModel pimpleFluid;
+fluidModel pimpleFluid;
 
-"icoFluidCoeffs|pisoFluidCoeffs|pimpleFluidCoeffs"
+pimpleFluidCoeffs
 {}
 
 // ************************************************************************* //

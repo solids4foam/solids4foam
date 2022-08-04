@@ -59,7 +59,6 @@ Author
     #include "directTopoChange.H"
 #endif
 #include "localPointRegion.H"
-//#include "duplicatePoints.H"
 #include "processorPolyPatch.H"
 #include "faceSet.H"
 #include "polyRemoveFace.H"

@@ -60,6 +60,7 @@ namespace Foam
 class polyMesh;
 #ifdef OPENFOAMESIORFOUNDATION
     class polyTopoChange;
+    typedef polyTopoChange directTopoChange;
 #else
     class directTopoChange;
 #endif
@@ -93,17 +94,9 @@ class meshDualiser
 
     // Private Member Functions
 
-#ifdef OPENFOAMESIORFOUNDATION
-        static void checkPolyTopoChange(const polyTopoChange&);
-#else
         static void checkPolyTopoChange(const directTopoChange&);
-#endif
 
-#ifdef OPENFOAMESIORFOUNDATION
-        static void dumpPolyTopoChange(const polyTopoChange&, const fileName&);
-#else
         static void dumpPolyTopoChange(const directTopoChange&, const fileName&);
-#endif
 
         //- Find dual cell given point and cell
         label findDualCell(const label cellI, const label pointI) const;
@@ -114,11 +107,7 @@ class meshDualiser
         (
             const PackedBoolList&,
             const label pointI,
-#ifdef OPENFOAMESIORFOUNDATION
-            polyTopoChange&
-#else
             directTopoChange&
-#endif
         );
 
         //- Check that owner and neighbour of face have same dual cell
@@ -139,11 +128,7 @@ class meshDualiser
             const label dualCell0,
             const label dualCell1,
             const DynamicList<label>& verts,
-#ifdef OPENFOAMESIORFOUNDATION
-            polyTopoChange& meshMod
-#else
             directTopoChange& meshMod
-#endif
         ) const;
 
         //- Add boundary face
@@ -156,11 +141,7 @@ class meshDualiser
             const label dualCellI,
             const label patchI,
             const DynamicList<label>& verts,
-#ifdef OPENFOAMESIORFOUNDATION
-            polyTopoChange& meshMod
-#else
             directTopoChange& meshMod
-#endif
         ) const;
 
         //- Create internal faces walking around edge
@@ -170,11 +151,7 @@ class meshDualiser
             const PackedBoolList&,
             const label edgeI,
             const label startFaceI,
-#ifdef OPENFOAMESIORFOUNDATION
-            polyTopoChange& meshMod,
-#else
             directTopoChange& meshMod,
-#endif
             boolList& doneEFaces
         ) const;
 
@@ -183,11 +160,7 @@ class meshDualiser
         (
             const label faceI,
             label& fp,
-#ifdef OPENFOAMESIORFOUNDATION
-            polyTopoChange& meshMod
-#else
             directTopoChange& meshMod
-#endif
         ) const;
 
         //- Creates boundary faces walking around point on patchI.
@@ -196,11 +169,7 @@ class meshDualiser
             const label patchI,
             const label patchPointI,
             const label startFaceI,
-#ifdef OPENFOAMESIORFOUNDATION
-            polyTopoChange& meshMod,
-#else
             directTopoChange& meshMod,
-#endif
             boolList& donePFaces            // pFaces visited
         ) const;
 
@@ -214,13 +183,18 @@ class meshDualiser
 public:
 
     //- Runtime type information
-    ClassName("meshDualiser");
+    TypeName("meshDualiser");
 
 
     // Constructors
 
         //- Construct from mesh
         meshDualiser(const polyMesh&);
+
+    // Destructor
+
+        virtual ~meshDualiser()
+        {}
 
 
     // Member Functions
@@ -281,11 +255,7 @@ public:
                 const labelList& featureEdges,
                 const labelList& singleCellFeaturePoints,
                 const labelList& multiCellFeaturePoints,
-#ifdef OPENFOAMESIORFOUNDATION
-                polyTopoChange& meshMod
-#else
                 directTopoChange& meshMod
-#endif
             );
 };
 

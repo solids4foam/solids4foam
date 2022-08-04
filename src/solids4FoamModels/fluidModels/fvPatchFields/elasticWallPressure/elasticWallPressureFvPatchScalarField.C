@@ -211,10 +211,13 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         transportProperties.lookup("rho")
     );
 
-    Info<< "rhoSolid = " << max(rhoSolid)
-        << ", hs = " << max(hs)
-        << ", rhoFluid = " << rhoFluid.value()
-        << endl;
+    if (debug)
+    {
+        Info<< "rhoSolid = " << max(rhoSolid)
+            << ", hs = " << max(hs)
+            << ", rhoFluid = " << rhoFluid.value()
+            << endl;
+    }
 
     // Update velocity and acceleration
 

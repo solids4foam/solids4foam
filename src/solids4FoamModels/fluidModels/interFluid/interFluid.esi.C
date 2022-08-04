@@ -58,7 +58,21 @@ interFluid::interFluid
     fluidModel(typeName, runTime, region),
     LTS_(fv::localEulerDdt::enabled(mesh())),
     trDeltaT_(),
-    Uf_(),
+    Uf_
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "Uf",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            fvc::interpolate(U())
+        )
+    ),
     mixture_(U(), phi()),
     rho_
     (

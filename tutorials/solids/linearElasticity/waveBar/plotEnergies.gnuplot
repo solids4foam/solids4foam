@@ -1,3 +1,10 @@
+# You can run this interactively if you comment the first two lines and
+#  uncomment the "pause 1" and "reread" commands below
+# Then run this script with:
+# $> gnuplot plotEnergies.gnuplot -p
+set terminal pdfcairo enhanced color solid
+set output "energies.pdf"
+
 set xlabel "Time (in s)"
 set ylabel "Energy (in J)"
 
@@ -19,5 +26,5 @@ plot \
     "" u 1:6 w l lw 2 t "Viscous (V)", \
     "" u 1:($3 + $4 + $5 + $6) w l lw 2 t "Sum(I+K+S+V)"
 
-pause 1
-reread
+#pause 1
+#reread
