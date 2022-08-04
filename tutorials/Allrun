@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #------------------------------------------------------------------------------
 # License
 #     This file is part of solids4foam, licensed under GNU General Public
@@ -24,7 +24,7 @@ cd ${0%/*} || exit 1    # Run from this directory
 
 # logReport <logfile>
 # Extracts useful info from log file
-logReport()
+function logReport()
 {
     caseName=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
     app=`echo $1 | sed s/"\(.*\)log\."/""/g`
@@ -62,7 +62,7 @@ logReport()
 
 # logReportDir <directory>
 # Extracts useful info from all log files in a directory
-logReportDir()
+function logReportDir()
 (
     [ -d $1 ] || return 0
 
