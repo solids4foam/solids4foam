@@ -9,54 +9,47 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      fvSchemes;
+    class       pointVectorField;
+    object      pointDD;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-ddtSchemes
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
 {
-    default backward;
+    symmetry-x
+    {
+        type            symmetry;
+        value           uniform (0 0 0);
+    }
+    symmetry-y
+    {
+        type            symmetry;
+        value           uniform (0 0 0);
+    }
+    outlet
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    inlet
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    inner-wall
+    {
+        type            calculated;
+        value           uniform (0 0 0);
+    }
+    outer-wall
+    {
+        type            calculated;
+        value           uniform (0 0 0);
+    }
 }
-
-gradSchemes
-{
-    default leastSquares;
-}
-
-divSchemes
-{
-    default none;
-    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
-    div((nuEff*dev2(T(grad(U))))) Gauss linear;
-}
-
-laplacianSchemes
-{
-    default none;
-    laplacian(nuEff,U) Gauss linear skewCorrected 1;
-    laplacian((1|A(U)),p) Gauss linear skewCorrected 1;
-    laplacian(diffusivity,cellMotionU) Gauss linear skewCorrected 1;
-
-    laplacian(rAU,p) Gauss linear skewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default linear;
-    interpolate(U) skewCorrected linear;
-}
-
-snGradSchemes
-{
-    default skewCorrected 1;
-}
-
-fluxRequired
-{
-    default no;
-    p;
-}
-
 
 // ************************************************************************* //

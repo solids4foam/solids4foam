@@ -39,7 +39,7 @@ solvers
     {
         solver          GAMG;
         tolerance       1e-06;
-        relTol          0;
+        relTol          0.001;
         minIter         1;
         maxIter         100;
         smoother        GaussSeidel;
@@ -58,7 +58,7 @@ solvers
     {
         solver          PBiCG;
         preconditioner  DILU;
-        tolerance       1e-06;
+        tolerance       1e-08;
         relTol          0;
         minIter         1;
     }
@@ -66,9 +66,8 @@ solvers
 
 PIMPLE
 {
-    momentumPredictor   on;
-    nOuterCorrectors    1;
-    nCorrectors         3;
+    nOuterCorrectors 1;
+    nCorrectors     3;
     nNonOrthogonalCorrectors 1;
 }
 

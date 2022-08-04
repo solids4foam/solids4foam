@@ -10,53 +10,39 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      fsiProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-ddtSchemes
+fluidSolidInterface    Aitken;
+
+AitkenCoeffs
 {
-    default backward;
+    // Solid interface patch
+    solidPatch          inner-wall;
+
+    // Fluid interface patch
+    fluidPatch          wall;
+
+    // Initial relaxation factor
+    relaxationFactor    0.4;
+
+    // FSI loop tolerance
+    outerCorrTolerance  1e-6;
+
+    // Max number of FSI correctors per time-step
+    nOuterCorr          100;
+
+    // Frequency of time-step at which the fluid-solid interface interpolation
+    // weights are updated
+    interpolatorUpdateFrequency 0;
+
+    // Move the entire fluid mesh when the interface moves further than this
+    // limit
+    interfaceDeformationLimit   0;
+
+    // Coupled from the start
+    coupled yes;
 }
-
-gradSchemes
-{
-    default leastSquares;
-}
-
-divSchemes
-{
-    default none;
-    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
-    div((nuEff*dev2(T(grad(U))))) Gauss linear;
-}
-
-laplacianSchemes
-{
-    default none;
-    laplacian(nuEff,U) Gauss linear skewCorrected 1;
-    laplacian((1|A(U)),p) Gauss linear skewCorrected 1;
-    laplacian(diffusivity,cellMotionU) Gauss linear skewCorrected 1;
-
-    laplacian(rAU,p) Gauss linear skewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default linear;
-    interpolate(U) skewCorrected linear;
-}
-
-snGradSchemes
-{
-    default skewCorrected 1;
-}
-
-fluxRequired
-{
-    default no;
-    p;
-}
-
 
 // ************************************************************************* //

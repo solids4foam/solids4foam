@@ -9,53 +9,43 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      fvSchemes;
+    class       volVectorField;
+    object      U;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-ddtSchemes
-{
-    default backward;
-}
+dimensions      [0 1 -1 0 0 0 0];
 
-gradSchemes
-{
-    default leastSquares;
-}
+internalField   uniform (0 0 0);
 
-divSchemes
+boundaryField
 {
-    default none;
-    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
-    div((nuEff*dev2(T(grad(U))))) Gauss linear;
-}
+    symmetry-x
+    {
+        type         symmetry;
+    }
+    symmetry-y
+    {
+        type         symmetry;
+    }
+    outlet
+    {
+        type         fluxCorrectedVelocity;
+    }
+    inlet
+    {
+        type         fluxCorrectedVelocity;
+    }
+    wall
+    {
+        // Default Dirichlet-Neumann approach
+        // type         newMovingWallVelocity;
+        // value        uniform (0 0 0);
 
-laplacianSchemes
-{
-    default none;
-    laplacian(nuEff,U) Gauss linear skewCorrected 1;
-    laplacian((1|A(U)),p) Gauss linear skewCorrected 1;
-    laplacian(diffusivity,cellMotionU) Gauss linear skewCorrected 1;
-
-    laplacian(rAU,p) Gauss linear skewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default linear;
-    interpolate(U) skewCorrected linear;
-}
-
-snGradSchemes
-{
-    default skewCorrected 1;
-}
-
-fluxRequired
-{
-    default no;
-    p;
+        // Robin condition approach
+        type         elasticWallVelocity;
+        value        uniform (0 0 0);
+    }
 }
 
 

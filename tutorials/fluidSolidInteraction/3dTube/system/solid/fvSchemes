@@ -14,49 +14,46 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+d2dt2Schemes
+{
+    default            backward;
+}
+
 ddtSchemes
 {
-    default backward;
+    default            backward;
 }
 
 gradSchemes
 {
-    default leastSquares;
+    default            extendedLeastSquares 0;
 }
 
 divSchemes
 {
-    default none;
-    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
-    div((nuEff*dev2(T(grad(U))))) Gauss linear;
+    default            Gauss linear;
 }
 
 laplacianSchemes
 {
-    default none;
-    laplacian(nuEff,U) Gauss linear skewCorrected 1;
-    laplacian((1|A(U)),p) Gauss linear skewCorrected 1;
-    laplacian(diffusivity,cellMotionU) Gauss linear skewCorrected 1;
-
-    laplacian(rAU,p) Gauss linear skewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default linear;
-    interpolate(U) skewCorrected linear;
+    default            none;
+    laplacian(DD,D)    Gauss linear skewCorrected 1;
+    laplacian(DDD,DD)  Gauss linear skewCorrected 1;
 }
 
 snGradSchemes
 {
-    default skewCorrected 1;
+    default            none;
+    snGrad(D)          skewCorrected 1;
+    snGrad(DD)         skewCorrected 1;
 }
 
-fluxRequired
+interpolationSchemes
 {
-    default no;
-    p;
+    default            none;
+    interpolate(impK)  linear;
+    interpolate(sigma0) linear;
+    interpolate(grad(DD)) linear;
 }
-
 
 // ************************************************************************* //

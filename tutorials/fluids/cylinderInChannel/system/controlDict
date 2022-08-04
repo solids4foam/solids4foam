@@ -50,7 +50,7 @@ adjustTimeStep no;
 maxCo 10;
 
 functions
-(
+{
    forces
    {
        type                forces;
@@ -65,8 +65,6 @@ functions
        rhoInf              1;
        CofR                (0.5 0.1 0);
    }
-);
-
-
+}
 
 // ************************************************************************* //

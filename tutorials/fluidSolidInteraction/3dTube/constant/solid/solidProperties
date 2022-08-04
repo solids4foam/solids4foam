@@ -10,53 +10,28 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fvSchemes;
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-ddtSchemes
+solidModel nonLinearGeometryUpdatedLagrangian;
+
+nonLinearGeometryUpdatedLagrangianCoeffs
 {
-    default backward;
+    // Maximum number of momentum correctors
+    nCorrectors             20000;
+
+    // Solution tolerance for displacement
+    solutionTolerance       1e-09;
+
+    // Alternative solution tolerance for displacement
+    alternativeTolerance    1e-09;
+
+    // Material law solution tolerance
+    materialTolerance       1e-09;
+
+    // Write frequency for the residuals
+    infoFrequency           100;
 }
-
-gradSchemes
-{
-    default leastSquares;
-}
-
-divSchemes
-{
-    default none;
-    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
-    div((nuEff*dev2(T(grad(U))))) Gauss linear;
-}
-
-laplacianSchemes
-{
-    default none;
-    laplacian(nuEff,U) Gauss linear skewCorrected 1;
-    laplacian((1|A(U)),p) Gauss linear skewCorrected 1;
-    laplacian(diffusivity,cellMotionU) Gauss linear skewCorrected 1;
-
-    laplacian(rAU,p) Gauss linear skewCorrected 1;
-}
-
-interpolationSchemes
-{
-    default linear;
-    interpolate(U) skewCorrected linear;
-}
-
-snGradSchemes
-{
-    default skewCorrected 1;
-}
-
-fluxRequired
-{
-    default no;
-    p;
-}
-
 
 // ************************************************************************* //
