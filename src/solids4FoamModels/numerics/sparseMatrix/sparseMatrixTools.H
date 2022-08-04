@@ -71,6 +71,8 @@ namespace sparseMatrixTools
         const bool debug = false
     );
 
+#ifdef USE_PETSC
+
     //- Solve the linear system using PETSc
 #ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector> solveLinearSystemPETSc
@@ -90,6 +92,8 @@ namespace sparseMatrixTools
         const labelList& stencilSizeNotOwned,
         const bool debug = false
     );
+
+#endif
 
     //- Set the number of non-zeros in per row in the given array
     void setNonZerosPerRow

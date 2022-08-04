@@ -27,7 +27,9 @@ License
 #include "OFstream.H"
 #include <Eigen/Sparse>
 #include <unsupported/Eigen/SparseExtra>
-#include <petscksp.h>
+#ifdef USE_PETSC
+    #include <petscksp.h>
+#endif
 
 // * * * * * * * * * * * * * * * * * Functions  * * * * * * * * * * * * * * * //
 
@@ -218,6 +220,8 @@ void Foam::sparseMatrixTools::solveLinearSystemEigen
     }
 }
 
+
+#ifdef USE_PETSC
 
 #ifdef OPENFOAMESIORFOUNDATION
     Foam::SolverPerformance<Foam::vector>
@@ -851,6 +855,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     );
 #endif
 }
+#endif
 
 
 void Foam::sparseMatrixTools::setNonZerosPerRow

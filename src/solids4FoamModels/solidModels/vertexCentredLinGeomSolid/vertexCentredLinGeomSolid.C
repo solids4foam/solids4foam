@@ -36,7 +36,9 @@ License
 #include "sparseMatrixTools.H"
 #include "symmetryPointPatchFields.H"
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
-#include <petscksp.h>
+#ifdef USE_PETSC
+    #include <petscksp.h>
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -722,10 +724,12 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
 
 vertexCentredLinGeomSolid::~vertexCentredLinGeomSolid()
 {
-    // if (Switch(solidModelDict().lookup("usePETSc")))
-    // {
-    //     PetscFinalize();
-    // }
+#ifdef USE_PETSC
+    if (Switch(solidModelDict().lookup("usePETSc")))
+    {
+        PetscFinalize();
+    }
+#endif
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -892,6 +896,7 @@ bool vertexCentredLinGeomSolid::evolve()
 
         if (Switch(solidModelDict().lookup("usePETSc")))
         {
+#ifdef USE_PETSC
             fileName optionsFile(solidModelDict().lookup("optionsFile"));
             solverPerf = sparseMatrixTools::solveLinearSystemPETSc
             (
@@ -907,6 +912,11 @@ bool vertexCentredLinGeomSolid::evolve()
                 globalPointIndices_.stencilSizeNotOwned(),
                 solidModelDict().lookupOrDefault<bool>("debugPETSc", false)
             );
+#else
+            FatalErrorIn("vertexCentredLinGeomSolid::evolve()")
+                << "PETSc not available. Please set the PETSC_DIR environment "
+                << "variable and re-compile solids4foam" << abort(FatalError);
+#endif
         }
         else
         {

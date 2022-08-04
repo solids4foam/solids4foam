@@ -1,6 +1,5 @@
 ifeq ($(WM_PROJECT), foam)
     VERSION_SPECIFIC_INC = -DFOAMEXTEND
-
     VERSION_SPECIFIC_LIBS = \
         -lincompressibleTransportModels -lincompressibleTurbulenceModel \
         -lincompressibleRASModels -lincompressibleLESModels -llduSolvers \
@@ -9,7 +8,6 @@ else
     VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
     ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
         VERSION_SPECIFIC_INC += -DOPENFOAMESI
-
         VERSION_SPECIFIC_LIBS = \
             -lturbulenceModels -lincompressibleTurbulenceModels \
             -ltwoPhaseMixture -limmiscibleIncompressibleTwoPhaseMixture \
@@ -21,7 +19,6 @@ else
             -lincompressibleInterPhaseTransportModels
     else
         VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
-
         VERSION_SPECIFIC_LIBS = \
             -lmomentumTransportModels -lincompressibleMomentumTransportModels \
             -lcompressibleMomentumTransportModels -ltwoPhaseMixture \
@@ -32,9 +29,10 @@ else
 endif
 
 ifdef PETSC_DIR
+    include $(GENERAL_RULES)/mpi-rules
     VERSION_SPECIFIC_INC += \
-        -I/opt/homebrew/include \
-        -I$(PETSC_DIR)/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include
+        $(PINC) -I$(PETSC_DIR)/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include \
+        -DUSE_PETSC
     VERSION_SPECIFIC_LIBS += -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lpetsc
 endif
 
