@@ -17,8 +17,6 @@ FoamFile
 fluidModel pimpleFluid;
 
 pimpleFluidCoeffs
-{
-    // Settings given in the fvSolution/PIMPLE
-}
+{}
 
 // ************************************************************************* //

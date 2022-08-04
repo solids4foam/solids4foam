@@ -25,10 +25,10 @@ AitkenCoeffs
     fluidPatch          wall;
 
     // Initial relaxation factor
-    relaxationFactor    0.4;
+    relaxationFactor    0.02;
 
     // FSI loop tolerance
-    outerCorrTolerance  1e-6;
+    outerCorrTolerance  1e-5;
 
     // Max number of FSI correctors per time-step
     nOuterCorr          100;

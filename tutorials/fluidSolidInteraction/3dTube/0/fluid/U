@@ -22,11 +22,11 @@ boundaryField
 {
     symmetry-x
     {
-        type         symmetry;
+        type         symmetryPlane;
     }
     symmetry-y
     {
-        type         symmetry;
+        type         symmetryPlane;
     }
     outlet
     {
@@ -39,12 +39,12 @@ boundaryField
     wall
     {
         // Default Dirichlet-Neumann approach
-        // type         newMovingWallVelocity;
-        // value        uniform (0 0 0);
+        type         newMovingWallVelocity;
+        value        uniform (0 0 0);
 
         // Robin condition approach
-        type         elasticWallVelocity;
-        value        uniform (0 0 0);
+        // type         elasticWallVelocity;
+        // value        uniform (0 0 0);
     }
 }
 
