@@ -22,12 +22,12 @@ boundaryField
 {
     symmetry-x
     {
-        type            symmetry;
+        type            symmetryPlane;
         value           uniform (0 0 0);
     }
     symmetry-y
     {
-        type            symmetry;
+        type            symmetryPlane;
         value           uniform (0 0 0);
     }
     outlet

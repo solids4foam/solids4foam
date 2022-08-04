@@ -20,7 +20,8 @@ mechanical
 (
     pipe
     {
-        type            StVenantKirchhoffElastic;
+        //type            StVenantKirchhoffElastic;
+        type            linearElastic;
         rho             rho [1 -3 0 0 0 0 0]  1200;
         E               E   [1 -1 -2 0 0 0 0] 3e5;
         nu              nu  [0 0 0 0 0 0 0]   0.3;
