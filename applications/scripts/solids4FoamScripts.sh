@@ -118,6 +118,13 @@ function solids4Foam::convertCaseFormat()
         \mv "${CASE_DIR}"/constant/boundaryData.openfoam "${CASE_DIR}"/constant/boundaryData
     fi
 
+    # 5. Check for sample
+    if [[ -f "${CASE_DIR}"/system/sample ]]
+    then
+        echo "Replacing 'uniform' with 'lineUniform' in system/sample"
+        sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
+    fi
+
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -218,6 +225,13 @@ function solids4Foam::convertCaseFormatFoamExtend()
 
         echo "Moving constant/boundaryData.foam-extend to constant/boundaryData"
         \mv "${CASE_DIR}"/constant/boundaryData.foam-extend "${CASE_DIR}"/constant/boundaryData
+    fi
+
+    # 5. Check for sample
+    if [[ -f "${CASE_DIR}"/system/sample ]]
+    then
+        echo "Replacing 'lineUniform' with 'uniform' in system/sample"
+        sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
     fi
 
     echo
