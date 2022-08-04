@@ -23,6 +23,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAMFOUNDATION
+
 #include "openFoamTableReader.H"
 #include "tableReaders.H"
 #include "addToRunTimeSelectionTable.H"
@@ -35,3 +37,5 @@ namespace Foam
 }
 
 // ************************************************************************* //
+
+#endif
