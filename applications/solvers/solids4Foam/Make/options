@@ -33,5 +33,5 @@ EXE_INC = \
     -I$(LIB_SRC)/dynamicFvMesh/lnInclude
 
 EXE_LIBS = \
-    -L$(FOAM_USER_LIBBIN) -lsolids4FoamModels \
+    -L$(FOAM_USER_LIBBIN) -lsolids4FoamModels -lRBFMeshMotionSolver \
     $(GFORTRAN_LIBS)

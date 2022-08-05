@@ -234,17 +234,6 @@ numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
 
-numerics/RBFMeshMotionSolver/RBFInterpolation.C
-numerics/RBFMeshMotionSolver/RBFCoarsening.C
-numerics/RBFMeshMotionSolver/RBFMeshMotionSolver.C
-numerics/RBFMeshMotionSolver/twoDPointCorrectorRBF.C
-numerics/RBFMeshMotionSolver/RBFFunctions/TPSFunction.C
-numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC0Function.C
-numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC2Function.C
-numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC4Function.C
-numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC6Function.C
-numerics/RBFMeshMotionSolver/RBFFunctions/LinearFunction.C
-
 numerics/meshDualiser/meshDualiser.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/multiplyCoeff/multiplyCoeff.C

@@ -339,7 +339,11 @@ void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
             assert(mpatch.size() == mesh().boundaryMesh()[ipatch].meshPoints().size());
 
         // Set values on motionCentersField boundary
+#ifdef OPENFOAMESIORFOUNDATION
         motionCentersField_.boundaryFieldRef()[ipatch] = motion[ipatch];
+#else
+        motionCentersField_.boundaryField()[ipatch] = motion[ipatch];
+#endif
     }
 
     motionCenters = motion;
@@ -357,7 +361,7 @@ void RBFMeshMotionSolver::solve()
     // Copy motionCentersField to motionCenters
     forAll(motionCentersField_.boundaryField(), patchI)
     {
-        motionCenters[patchI] = motionCentersField_.boundaryFieldRef()[patchI];
+        motionCenters[patchI] = motionCentersField_.boundaryField()[patchI];
     }
 
     /*

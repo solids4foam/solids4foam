@@ -159,17 +159,6 @@ numerics/rotation/RodriguesRotation.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 
-numerics/RBFMeshMotionSolver/RBFInterpolation.C
-numerics/RBFMeshMotionSolver/RBFCoarsening.C
-numerics/RBFMeshMotionSolver/RBFMeshMotionSolver.C
-numerics/RBFMeshMotionSolver/twoDPointCorrectorRBF.C
-numerics/RBFMeshMotionSolver/RBFFunctions/TPSFunction.C
-numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC0Function.C
-numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC2Function.C
-numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC4Function.C
-numerics/RBFMeshMotionSolver/RBFFunctions/WendlandC6Function.C
-numerics/RBFMeshMotionSolver/RBFFunctions/LinearFunction.C
-
 numerics/interpolationTable/tableReaders/tableReaders.C
 numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C
 numerics/interpolationTable/tableReaders/csv/csvTableReaders.C
