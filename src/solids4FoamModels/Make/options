@@ -29,10 +29,14 @@ else
 endif
 
 ifdef PETSC_DIR
-    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
-        include $(GENERAL_RULES)/mpi-rules
+    ifeq ($(WM_PROJECT), foam)
+        include $(RULES)/mplib$(WM_MPLIB)
     else
-        -include $(GENERAL_RULES)/mplibType
+        ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+            include $(GENERAL_RULES)/mpi-rules
+        else
+            -include $(GENERAL_RULES)/mplibType
+        endif
     endif
     VERSION_SPECIFIC_INC += \
         $(PINC) -I$(PETSC_DIR)/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include \
