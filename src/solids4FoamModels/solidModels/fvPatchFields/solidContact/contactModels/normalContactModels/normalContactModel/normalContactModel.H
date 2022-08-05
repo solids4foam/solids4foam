@@ -46,7 +46,6 @@ Author
 #include "volFields.H"
 #include "tmp.H"
 #include "autoPtr.H"
-#include "newGgiInterpolation.H"
 #include "standAlonePatch.H"
 
 

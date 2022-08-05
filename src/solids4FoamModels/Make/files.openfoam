@@ -100,6 +100,12 @@ $(pointPatchFields)/pointAnalyticalPlateHoleTraction/analyticalPlateHoleTraction
 $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
 
+contactModels = $(solidFvPatchFields)/solidContact/contactModels
+normalContactModels = $(contactModels)/normalContactModels
+$(normalContactModels)/normalContactModel/normalContactModel.C
+$(normalContactModels)/normalContactModel/newNormalContactModel.C
+$(normalContactModels)/standardPenalty/standardPenalty.C
+
 fluidFvPatchFields = fluidModels/fvPatchFields
 $(fluidFvPatchFields)/elasticSlipWallVelocity/elasticSlipWallVelocityFvPatchVectorField.C
 $(fluidFvPatchFields)/elasticWallPressure/elasticWallPressureFvPatchScalarField.C

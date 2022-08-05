@@ -37,6 +37,9 @@ InClass
 
 namespace Foam
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    typedef labelUList unallocLabelList;
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -89,7 +92,13 @@ void standardPenalty::calcPenaltyFactor() const
         // Average contact patch cell volume
         scalarField masterV(mesh_.boundary()[masterPatchIndex].size(), 0.0);
         scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
-        const volScalarField::DimensionedInternalField& V = mesh_.V();
+
+#ifdef OPENFOAMESIORFOUNDATION
+    const DimensionedField<scalar, volMesh>& V = mesh_.V();
+#else
+    const volScalarField::DimensionedInternalField& V = mesh_.V();
+#endif
+
         {
             const unallocLabelList& faceCells =
                 mesh_.boundary()[masterPatchIndex].faceCells();
@@ -124,7 +133,13 @@ void standardPenalty::calcPenaltyFactor() const
 
         // Average contact patch cell volume
         scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
-        const volScalarField::DimensionedInternalField& V = mesh_.V();
+
+#ifdef OPENFOAMESIORFOUNDATION
+    const DimensionedField<scalar, volMesh>& V = mesh_.V();
+#else
+    const volScalarField::DimensionedInternalField& V = mesh_.V();
+#endif
+
         {
             const unallocLabelList& faceCells =
                 mesh_.boundary()[slavePatchIndex].faceCells();
@@ -357,11 +372,13 @@ void standardPenalty::correct
 
     // Interpolate point pressures to the face centres and apply in the negative
     // normal direction
-    vectorField newSlaveTraction =
+    const vectorField newSlaveTraction
+    (
         localSlaveInterpolator.pointToFaceInterpolate<scalar>
         (
             totalSlavePointPressure
-        )*(-slavePatchFaceNormals);
+        )*(-slavePatchFaceNormals)
+    );
 
     // Under-relax pressure/traction
     // Note: slavePressure_ is really a traction vector
@@ -417,8 +434,13 @@ void standardPenalty::autoMap(const fvPatchFieldMapper& m)
 
     // The internal fields for the volFields should always be zero
     // We will reset them as they may not be zero after field advection
+#ifdef OPENFOAMESIORFOUNDATION
+    slavePressureVolField_.primitiveFieldRef() = vector::zero;
+    areaInContactVolField_.primitiveFieldRef() = 0.0;
+#else
     slavePressureVolField_.internalField() = vector::zero;
     areaInContactVolField_.internalField() = 0.0;
+#endif
 }
 
 
