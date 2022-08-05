@@ -39,15 +39,15 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
     motionSolver(mesh),
 #endif
     motionCenters(mesh.boundaryMesh().size(), vectorField(0)),
-    motionCentersField_
+    accumulatedMotionCentersField_
     (
         IOobject
         (
             "rbfMotionCentersField",
             mesh.time().timeName(),
             mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
         ),
         mesh.parent().lookupObject<fvMesh>(mesh.name()),
         dimensionedVector("0", dimLength, vector::zero)
@@ -86,6 +86,9 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
 #else
     const dictionary& coeffDict = *this;
 #endif
+
+    // Create previous iteration field
+    accumulatedMotionCentersField_.storePrevIter();
 
     // Find IDs of staticPatches
     forAll(staticPatches, patchI)
@@ -340,9 +343,9 @@ void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
 
         // Set values on motionCentersField boundary
 #ifdef OPENFOAMESIORFOUNDATION
-        motionCentersField_.boundaryFieldRef()[ipatch] = motion[ipatch];
+        accumulatedMotionCentersField_.boundaryFieldRef()[ipatch] = motion[ipatch];
 #else
-        motionCentersField_.boundaryField()[ipatch] = motion[ipatch];
+        accumulatedMotionCentersField_.boundaryField()[ipatch] = motion[ipatch];
 #endif
     }
 
@@ -359,10 +362,16 @@ void RBFMeshMotionSolver::solve()
     assert(motionCenters.size() == mesh().boundaryMesh().size());
 
     // Copy motionCentersField to motionCenters
-    forAll(motionCentersField_.boundaryField(), patchI)
+    forAll(accumulatedMotionCentersField_.boundaryField(), patchI)
     {
-        motionCenters[patchI] = motionCentersField_.boundaryField()[patchI];
+        motionCenters[patchI] =
+            accumulatedMotionCentersField_.boundaryField()[patchI]
+          - accumulatedMotionCentersField_.prevIter().boundaryField()[patchI];
     }
+
+    // Update previous field
+    accumulatedMotionCentersField_.storePrevIter();
+
 
     /*
      * RBF interpolator from face centers to local complete mesh vertices
@@ -428,10 +437,15 @@ void RBFMeshMotionSolver::solve()
             forAll(meshPoints, j)
             {
                 if (twoDCorrector.marker()[meshPoints[j]] != 0)
+                {
                     continue;
+                }
 
                 if (staticControlPointLabels.find(meshPoints[j]) == staticControlPointLabels.end())
-                    staticControlPointLabels[meshPoints[j]] = staticControlPointLabels.size() - 1;
+                {
+                    // staticControlPointLabels[meshPoints[j]] = staticControlPointLabels.size() - 1;
+                    staticControlPointLabels[meshPoints[j]] = staticControlPointLabels.size();
+                }
             }
         }
 
@@ -448,7 +462,8 @@ void RBFMeshMotionSolver::solve()
 
                 if (staticControlPointLabels.find(meshPoints[j]) == staticControlPointLabels.end()
                     && fixedControlPointLabels.find(meshPoints[j]) == fixedControlPointLabels.end())
-                    fixedControlPointLabels[meshPoints[j]] = fixedControlPointLabels.size() - 1;
+                    fixedControlPointLabels[meshPoints[j]] = fixedControlPointLabels.size();
+                    // fixedControlPointLabels[meshPoints[j]] = fixedControlPointLabels.size() - 1;
             }
         }
 
@@ -689,6 +704,7 @@ void RBFMeshMotionSolver::solve()
     nbStaticFaceCenters = sum(nbGlobalStaticFaceCenters);
     nbFixedFaceCenters = sum(nbGlobalFixedFaceCenters);
     nbFaceCenters = sum(nbGlobalFaceCenters);
+
 
     // Determine the offset taking into account multiple processors
 
