@@ -26,6 +26,7 @@ License
 
 #include "standardPenaltyFriction.H"
 #include "addToRunTimeSelectionTable.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -38,6 +39,10 @@ namespace Foam
         standardPenaltyFriction,
         dictionary
     );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    typedef labelUList unallocLabelList;
+#endif
 }
 
 
@@ -87,7 +92,13 @@ void Foam::standardPenaltyFriction::calcFrictionPenaltyFactor()
         // average contact patch cell volume
         scalarField masterV(mesh_.boundary()[masterPatchIndex].size(), 0.0);
         scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
-        const volScalarField::DimensionedInternalField& V = mesh_.V();
+
+#ifdef OPENFOAMESIORFOUNDATION
+    const DimensionedField<scalar, volMesh>& V = mesh_.V();
+#else
+    const volScalarField::DimensionedInternalField& V = mesh_.V();
+#endif
+
         {
             const unallocLabelList& faceCells =
                 mesh_.boundary()[masterPatchIndex].faceCells();
@@ -122,7 +133,13 @@ void Foam::standardPenaltyFriction::calcFrictionPenaltyFactor()
 
         // average contact patch cell volume
         scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
-        const volScalarField::DimensionedInternalField& V = mesh_.V();
+
+#ifdef OPENFOAMESIORFOUNDATION
+    const DimensionedField<scalar, volMesh>& V = mesh_.V();
+#else
+    const volScalarField::DimensionedInternalField& V = mesh_.V();
+#endif
+
         {
             const unallocLabelList& faceCells =
                 mesh_.boundary()[slavePatchIndex].faceCells();
@@ -210,7 +227,7 @@ Foam::standardPenaltyFriction::standardPenaltyFriction
     (
         frictionLaw::New
         (
-            frictionContactModelDict_.lookup("frictionLaw"),
+            word(frictionContactModelDict_.lookup("frictionLaw")),
             *this,
             frictionContactModelDict_
         ).ptr()
@@ -259,7 +276,7 @@ void Foam::standardPenaltyFriction::correct
     const label slavePatchIndex = slavePatchID();
 
     // Calculate slave shear traction increments
-    const scalarField magSlavePressure = mag(slavePressure);
+    const scalarField magSlavePressure(mag(slavePressure));
     label numSlipFaces = 0;
     label numStickFaces = 0;
     scalarField& stickSlip = stickSlipFaces();
@@ -362,7 +379,11 @@ void Foam::standardPenaltyFriction::autoMap(const fvPatchFieldMapper& m)
 
     // The internal fields for the volFields should always be zero
     // We will reset them as they may not be zero after field advection
+#ifdef OPENFOAMESIORFOUNDATION
+    slaveTractionVolField_.primitiveFieldRef() = vector::zero;
+#else
     slaveTractionVolField_.internalField() = vector::zero;
+#endif
 }
 
 

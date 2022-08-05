@@ -105,6 +105,14 @@ normalContactModels = $(contactModels)/normalContactModels
 $(normalContactModels)/normalContactModel/normalContactModel.C
 $(normalContactModels)/normalContactModel/newNormalContactModel.C
 $(normalContactModels)/standardPenalty/standardPenalty.C
+frictionContactModels = $(contactModels)/frictionContactModels
+$(frictionContactModels)/frictionContactModel/frictionContactModel.C
+$(frictionContactModels)/frictionContactModel/newFrictionContactModel.C
+$(frictionContactModels)/frictionless/frictionless.C
+$(frictionContactModels)/standardPenaltyFriction/standardPenaltyFriction.C
+$(frictionContactModels)/frictionLaws/frictionLaw/frictionLaw.C
+$(frictionContactModels)/frictionLaws/frictionLaw/newFrictionLaw.C
+$(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C
 
 fluidFvPatchFields = fluidModels/fvPatchFields
 $(fluidFvPatchFields)/elasticSlipWallVelocity/elasticSlipWallVelocityFvPatchVectorField.C
