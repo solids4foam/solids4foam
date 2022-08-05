@@ -85,6 +85,8 @@ $(solidFvPatchFields)/fixedTemperature/fixedTemperatureFvPatchScalarField.C
 $(solidFvPatchFields)/linearSpatialDisplacement/linearSpatialDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/normalDisplacement/normalDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/rigidCylinderContact/rigidCylinderContactFvPatchVectorField.C
+$(solidFvPatchFields)/solidContact/solidContactFvPatchVectorField.C
+$(solidFvPatchFields)/solidContact/solidContactFvPatchVectorFieldCalcContact.C
 $(solidFvPatchFields)/solidForce/solidForceFvPatchVectorField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
