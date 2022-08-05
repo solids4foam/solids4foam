@@ -29,7 +29,11 @@ else
 endif
 
 ifdef PETSC_DIR
-    include $(GENERAL_RULES)/mpi-rules
+    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        include $(GENERAL_RULES)/mpi-rules
+    else
+        -include $(GENERAL_RULES)/mplibType
+    endif
     VERSION_SPECIFIC_INC += \
         $(PINC) -I$(PETSC_DIR)/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include \
         -DUSE_PETSC
