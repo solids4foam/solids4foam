@@ -49,15 +49,15 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        mesh.lookupObject<fvMesh>(mesh.name()),
+        mesh.parent().lookupObject<fvMesh>(mesh.name()),
         dimensionedVector("0", dimLength, vector::zero)
     ),
 #ifdef OPENFOAMESIORFOUNDATION
-    staticPatches(coeffDict().lookup("staticPatches")),
+    staticPatches(msData.subDict("RBFMeshMotionSolverCoeffs").lookup("staticPatches")),
     staticPatchIDs(staticPatches.size()),
-    movingPatches(coeffDict().lookup("movingPatches")),
+    movingPatches(msData.subDict("RBFMeshMotionSolverCoeffs").lookup("movingPatches")),
     movingPatchIDs(movingPatches.size()),
-    fixedPatches(coeffDict().lookup("fixedPatches")),
+    fixedPatches(msData.subDict("RBFMeshMotionSolverCoeffs").lookup("fixedPatches")),
     fixedPatchIDs(fixedPatches.size()),
 #else
     staticPatches(lookup("staticPatches")),
@@ -82,7 +82,7 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
     k(0)
 {
 #ifdef OPENFOAMESIORFOUNDATION
-    const dictionary& coeffDict = this->coeffDict();
+    const dictionary& coeffDict = msData.subDict("RBFMeshMotionSolverCoeffs");
 #else
     const dictionary& coeffDict = *this;
 #endif
