@@ -359,7 +359,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     zonePtr_(NULL),
     shadowZones_(),
     zoneToZones_(),
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
     writeZoneVTK_(false),
     quickReject_(Foam::newGgiInterpolation::AABB),
     regionOfInterestTopCorner_(vector::max),
@@ -396,7 +396,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     zonePtr_(NULL),
     shadowZones_(),
     zoneToZones_(),
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
     writeZoneVTK_(dict.lookupOrDefault<Switch>("writeZoneVTK", false)),
     quickReject_
     (
@@ -518,7 +518,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     zonePtr_(NULL),
     shadowZones_(),
     zoneToZones_(),
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
     writeZoneVTK_(ptf.writeZoneVTK_),
     quickReject_(ptf.quickReject_),
     regionOfInterestTopCorner_(ptf.regionOfInterestTopCorner_),
@@ -556,7 +556,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     zonePtr_(NULL),
     shadowZones_(),
     zoneToZones_(),
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
     writeZoneVTK_(ptf.writeZoneVTK_),
     quickReject_(ptf.quickReject_),
     regionOfInterestTopCorner_(ptf.regionOfInterestTopCorner_),
@@ -594,7 +594,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     zonePtr_(NULL),
     shadowZones_(),
     zoneToZones_(),
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
     writeZoneVTK_(ptf.writeZoneVTK_),
     quickReject_(ptf.quickReject_),
     regionOfInterestTopCorner_(ptf.regionOfInterestTopCorner_),
@@ -1053,7 +1053,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                 normalModels()[shadPatchI].newTimeStep();
                 frictionModels()[shadPatchI].newTimeStep();
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
                 // Force N^2 contact search at least once per time-step
                 zoneToZones()[shadPatchI].clearPrevCandidateMasterNeighbors();
 #endif
@@ -1495,7 +1495,7 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
         shadowPatchNames().writeEntry("shadowPatches", os);
     }
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
     os.writeKeyword("regionOfInterest")
         << regionOfInterest_ << token::END_STATEMENT << nl;
     os.writeKeyword("regionOfInterestTopCorner")
@@ -1588,7 +1588,7 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
         }
     }
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
     if (writeZoneVTK_)
     {
         if
@@ -1650,7 +1650,7 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
             dimensionedScalar("zero", dimless, 0.0)
         );
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
         pointVectorField distVecs
         (
             IOobject
@@ -1675,18 +1675,17 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
                 (
 #ifdef OPENFOAMESIORFOUNDATION
                     zoneToZones()[0].sourcePointDistanceToIntersection()
-                )
-            );
 #else
                     zoneToZones()[0].masterPointDistanceToIntersection()
+#endif
                 )
             );
 
+#ifdef FOAMEXTEND
             const vectorField masterpdVecs
             (
                 zone().globalPointToPatch
                 (
-                    zoneToZones()[0].sourcePointDistanceVectorsToIntersection()
                     zoneToZones()[0].masterPointDistanceVectorsToIntersection()
                 )
             );
@@ -1698,7 +1697,7 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
             {
                 const label pointID = masterMeshPoints[pI];
                 dist[pointID] = masterpd[pI];
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
                 distVecs[pointID] = masterpdVecs[pI];
 #endif
             }
@@ -1711,18 +1710,17 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
                 (
 #ifdef OPENFOAMESIORFOUNDATION
                     zoneToZones()[0].targetPointDistanceToIntersection()
-                )
-            );
 #else
                     zoneToZones()[0].slavePointDistanceToIntersection()
+#endif
                 )
             );
 
+#ifdef FOAMEXTEND
             const vectorField slavepdVecs
             (
                 shadowZones()[0].globalPointToPatch
                 (
-                    zoneToZones()[0].targetPointDistanceVectorsToIntersection()
                     zoneToZones()[0].slavePointDistanceVectorsToIntersection()
                 )
             );
@@ -1738,7 +1736,7 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
             {
                 const label pointID = slaveMeshPoints[pI];
                 dist[pointID] = slavepd[pI];
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
                 distVecs[pointID] = slavepdVecs[pI];
 #endif
             }
@@ -1750,12 +1748,12 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
             "void Foam::solidContactFvPatchVectorField::"
             "write(Ostream& os) const"
         )   << "Writing point distance fields: " << dist.name()
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
             << " and " << distVecs.name()
 #endif
             << endl;
         dist.write();
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
         distVecs.write();
 #endif
     }
