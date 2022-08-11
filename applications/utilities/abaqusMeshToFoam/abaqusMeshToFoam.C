@@ -614,7 +614,11 @@ void insertDuplicateMerge
 {
     const faceList& faces = mesh.faces();
     const labelList& faceOwner = mesh.faceOwner();
+#ifdef OPENFOAMFOUNDATION
+    const meshFaceZones& faceZones = mesh.faceZones();
+#else
     const faceZoneMesh& faceZones = mesh.faceZones();
+#endif
 
     forAll(duplicates, bFaceI)
     {

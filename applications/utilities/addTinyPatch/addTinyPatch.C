@@ -71,7 +71,11 @@ int main(int argc, char *argv[])
 #ifdef OPENFOAMESIORFOUNDATION
     const word currentPatchName(args[0]);
     const word newTinyPatchName(args[1]);
+    #ifdef OPENFOAMESI
     const vector approxFaceC(args.get<vector>(2));
+    #else
+    const vector approxFaceC(args.argRead<vector>(2));
+    #endif
 #else
     const word currentPatchName(args.additionalArgs()[0]);
     const word newTinyPatchName(args.additionalArgs()[1]);
