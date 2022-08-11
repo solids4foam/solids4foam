@@ -141,9 +141,6 @@ class solidPolyMesh
         //- Boundary faces implicit bonds connected to other boundary faces
         mutable labelListList* bFaceImplicitBondsPtr_;
 
-        // Vol-to-point least squares interpolator
-        newLeastSquaresVolPointInterpolation volToPointInterp_;
-
         // Global coefficients
         mutable List< Map<tensorField> >* pointProcFacesCoeffsPtr_;
         mutable List< Map<tensorField> >* pointProcBndFacesCoeffsPtr_;
@@ -240,7 +237,7 @@ public:
             // Return const reference to the volume-to-point interpolator
             const newLeastSquaresVolPointInterpolation& volToPointInterp() const
             {
-                return volToPointInterp_;
+                return newLeastSquaresVolPointInterpolation::New(fMesh_);
             }
 
             //- Return implicit bonds
