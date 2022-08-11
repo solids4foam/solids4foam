@@ -119,11 +119,11 @@ function solids4Foam::convertCaseFormat()
     fi
 
     # 5. Check for sample
-    if [[ -f "${CASE_DIR}"/system/sample ]]
-    then
-        echo "Replacing 'uniform' with 'lineUniform' in system/sample"
-        sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
-    fi
+    #if [[ -f "${CASE_DIR}"/system/sample ]]
+    #then
+    #    echo "Replacing 'uniform' with 'lineUniform' in system/sample"
+    #    sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
+    #fi
 
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
@@ -228,11 +228,11 @@ function solids4Foam::convertCaseFormatFoamExtend()
     fi
 
     # 5. Check for sample
-    if [[ -f "${CASE_DIR}"/system/sample ]]
-    then
-        echo "Replacing 'lineUniform' with 'uniform' in system/sample"
-        sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
-    fi
+    #if [[ -f "${CASE_DIR}"/system/sample ]]
+    #then
+    #    echo "Replacing 'lineUniform' with 'uniform' in system/sample"
+    #    sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
+    #fi
 
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
