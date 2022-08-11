@@ -9,7 +9,7 @@ source solids4FoamScripts.sh
 rm constant/polyMesh/blockMeshDict
 cleanCase
 rm -rf constant/polyMesh/sets constant/polyMesh/*Zones*
-rm -rf VTK case.foam history constant/polyMesh/boundary
+rm -rf VTK case.foam postProcessing constant/polyMesh/boundary
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

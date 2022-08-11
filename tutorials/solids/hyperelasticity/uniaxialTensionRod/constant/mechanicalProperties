@@ -21,25 +21,6 @@ mechanical
 (
     rubber
     {
-        // type            neoHookeanElastic;
-        // rho             rho [ 1 -3 0 0 0 0 0 ] 1100;
-        // E               E [ 1 -1 -2 0 0 0 0 ] 6e+6;
-        // nu              nu [ 0 0 0 0 0 0 0 ] 0.3;
-
-        // type            StVenantKirchhoffElastic;
-        // rho             rho [ 1 -3 0 0 0 0 0 ] 1100;
-        // E               E [ 1 -1 -2 0 0 0 0 ] 6e+6;
-        // nu              nu [ 0 0 0 0 0 0 0 ] 0.3;
-
-        // type            incompressibleMooneyRivlin;
-        // rho             rho [1 -3 0 0 0 0 0] 1000;
-        // K               K [1 -1 -2 0 0 0 0] 1e+10;
-        // c10             c10 [1 -1 -2 0 0 0 0] 80e+6;
-        // c01             c01 [1 -1 -2 0 0 0 0] 20e+6;
-        // c11             c11 [1 -1 -2 0 0 0 0] 40e+6;
-        // solvePressureEqn		yes;
-        // pressureSmoothingScaleFactor 100;
-
         type            GentElastic;
         rho             rho [1 -3 0 0 0 0 0] 1100;
         E               E [1 -1 -2 0 0 0 0] 6e+6;

@@ -4,4 +4,4 @@
 . $WM_PROJECT_DIR/bin/tools/CleanFunctions
 
 cleanCase
-\rm -rf *.log case.foam constant/polyMesh history energies.dat
+\rm -rf *.log case.foam constant/polyMesh postProcessing energies.dat

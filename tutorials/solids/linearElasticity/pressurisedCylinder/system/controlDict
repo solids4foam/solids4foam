@@ -46,10 +46,10 @@ runTimeModifiable no;
 
 functions
 {
-    pointHistory
+    disp
     {
-       type pointHistory;
-       refHistoryPoint (7.0 0 0);
+       type    solidPointDisplacement;
+       point   (7.0 0 0);
     }
 }
 

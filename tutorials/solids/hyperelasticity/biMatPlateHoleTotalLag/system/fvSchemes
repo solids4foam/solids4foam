@@ -53,6 +53,7 @@ interpolationSchemes
     default            none;
     interpolate(impK)  harmonic;
     interpolate(grad(D)) linear;
+    interpolate(grad(DD)) linear;
 }
 
 // ************************************************************************* //

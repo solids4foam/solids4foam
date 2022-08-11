@@ -8,7 +8,7 @@ source solids4FoamScripts.sh
 
 cleanCase
 \rm -rf constant/polyMesh/sets constant/polyMesh/*Zones*
-\rm -rf VTK case.foam history constant/polyMesh/boundary
+\rm -rf VTK case.foam postProcessing constant/polyMesh/boundary
 \rm -rf system/cellsToSmoothSubset
 
 # Convert case version to FOAM EXTEND

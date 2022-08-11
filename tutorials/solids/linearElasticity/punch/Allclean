@@ -7,7 +7,7 @@
 source solids4FoamScripts.sh
 
 cleanCase
-\rm -rf constant/polyMesh case.foam history 0/polyMesh 0/cellToRegion
+\rm -rf constant/polyMesh case.foam postProcessing 0/polyMesh 0/cellToRegion
 \rm -rf constant/punch_top constant/punch_bottom system/meshDict
 \rm -rf system/punch_bottomSubset system/punch_topSubset
 \rm -rf 0/D[x,y,z]

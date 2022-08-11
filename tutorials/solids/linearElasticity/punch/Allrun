@@ -20,19 +20,19 @@ then
 fi
 
 # Create top mesh
-\cp system/punch_top/meshDict system/meshDict
-solids4Foam::runApplication -l log.cartesianMesh.punch_top cartesianMesh
+cp system/punch_top/meshDict system/meshDict
+solids4Foam::runApplication -s punch_top cartesianMesh
 mkdir constant/punch_top
-\mv constant/polyMesh constant/punch_top/
+mv constant/polyMesh constant/punch_top/
 
 # Create bottom mesh
-\cp system/punch_bottom/meshDict system/meshDict
-solids4Foam::runApplication -l log.cartesianMesh.punch_bottom cartesianMesh
+cp system/punch_bottom/meshDict system/meshDict
+solids4Foam::runApplication -s punch_bottom cartesianMesh
 mkdir constant/punch_bottom
-\mv constant/polyMesh constant/punch_bottom/
+mv constant/polyMesh constant/punch_bottom/
 
 # Merge sub meshes
-solids4Foam::runApplication mergeSubMeshesNew punch_top punch_bottom
+solids4Foam::runApplication mergeSubMeshesS4F punch_top punch_bottom
 
 # Scale the geometry to metres
 echo "Running transformPoints"
@@ -44,7 +44,7 @@ solids4Foam::runApplication createPatch -overwrite
 solids4Foam::runApplication splitPatch -overwrite
 
 # Remove the sub meshes
-\rm -rf constant/punch_top constant/punch_bottom system/meshDict
+rm -rf constant/punch_top constant/punch_bottom system/meshDict
 
 # Run the solver
 solids4Foam::runApplication solids4Foam

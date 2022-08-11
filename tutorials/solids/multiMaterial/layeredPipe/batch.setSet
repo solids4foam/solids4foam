@@ -1,0 +1,3 @@
+cellSet outer new cylinderToCell (0.0 0.0 -100) (0.0 0.0 100) 100e-3
+cellSet inner new cylinderToCell (0.0 0.0 -100) (0.0 0.0 100) 70e-3
+cellSet outer delete cellToCell inner

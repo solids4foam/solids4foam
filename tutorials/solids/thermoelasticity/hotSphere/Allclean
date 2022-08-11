@@ -7,7 +7,7 @@
 source solids4FoamScripts.sh
 
 cleanCase
-rm -rf VTK case.foam history
+rm -rf VTK case.foam postProcessing
 rm -rf constant/polyMesh
 
 # Convert case version to FOAM EXTEND
