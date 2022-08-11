@@ -19,18 +19,18 @@ then
     echo
     exit 0
 fi
-runApplication cartesianMesh
+solids4Foam::runApplication cartesianMesh
 
 # Scale the geometry to metres
 echo "Running transformPoints"
 transformPoints -scale "(0.001 0.001 0.001)" >& log.transformPoints
 
 # Create patches
-runApplication autoPatch 45 -overwrite
-runApplication createPatch -overwrite
+solids4Foam::runApplication autoPatch 45 -overwrite
+solids4Foam::runApplication createPatch -overwrite
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 

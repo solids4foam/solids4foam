@@ -10,10 +10,10 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 

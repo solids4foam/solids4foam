@@ -321,3 +321,141 @@ function solids4Foam::removeEmptyDirs()
 	fi
     )
 }
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# runApplication
+#     runApplication that works that same irrespective of the OpenFOAM version
+#     Copied from OpenFOAM-v2012
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::runApplication()
+{
+    local appName appRun logFile logMode
+
+    # Any additional parsed arguments (eg, decomposeParDict)
+    local appArgs
+
+    # Parse options until executable is encountered
+    while [ "$#" -gt 0 ] && [ -z "$appRun" ]
+    do
+        case "$1" in
+            -a | -append)
+                logMode=append
+                ;;
+            -o | -overwrite)
+                logMode=overwrite
+                ;;
+            -s | -suffix)
+                logFile=".$2"
+                shift
+                ;;
+            -decomposeParDict)
+                appArgs="$appArgs $1 $2"
+                shift
+                ;;
+            '')
+                ;;
+            *)
+                appRun="$1"
+                ;;
+        esac
+        shift
+    done
+
+    appName="${appRun##*/}"
+    logFile="log.$appName$logFile"
+
+    if [ -f "$logFile" ] && [ -z "$logMode" ]
+    then
+        echo "$appName already run on $PWD:" \
+             "remove log file '$logFile' to re-run"
+    else
+        echo "Running $appRun on $PWD"
+        if [ "$logMode" = append ]
+        then
+            $appRun $appArgs "$@" >> $logFile 2>&1
+        else
+            $appRun $appArgs "$@" > $logFile 2>&1
+        fi
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# runParallel
+#     runParallel that works that same irrespective of the OpenFOAM version
+#     Copied from OpenFOAM-v2012
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::runParallel()
+{
+    local appName appRun logFile logMode nProcs
+
+    # Any additional parsed arguments (eg, decomposeParDict)
+    local appArgs="-parallel"
+
+    local mpirun="mpirun"
+    if [ "$FOAM_MPI" = msmpi ]
+    then
+        mpirun="mpiexec"
+    fi
+
+    # Parse options until executable is encountered
+    while [ "$#" -gt 0 ] && [ -z "$appRun" ]
+    do
+        case "$1" in
+            -a | -append)
+                logMode=append
+                ;;
+            -o | -overwrite)
+                logMode=overwrite
+                ;;
+            -s | -suffix)
+                logFile=".$2"
+                shift
+                ;;
+            -n | -np)
+                nProcs="$2"
+                shift
+                ;;
+            -decomposeParDict)
+                appArgs="$appArgs $1 $2"
+                nProcs=$(getNumberOfProcessors "$2")
+                shift
+                ;;
+            '')
+                ;;
+            *)
+                appRun="$1"
+                ;;
+        esac
+        shift
+    done
+
+    [ -n "$nProcs" ] || nProcs=$(getNumberOfProcessors system/decomposeParDict)
+
+    appName="${appRun##*/}"
+    logFile="log.$appName$logFile"
+
+    if [ -f "$logFile" ] && [ -z "$logMode" ]
+    then
+        echo "$appName already run on $PWD:" \
+             "remove log file '$logFile' to re-run"
+    else
+        echo "Running $appRun ($nProcs processes) on $PWD "
+        # Options '-n' and '-np' are synonymous, but msmpi only supports '-n'
+        if [ "$logMode" = append ]
+        then
+        (
+            $mpirun -n $nProcs $appRun $appArgs "$@" </dev/null >> $logFile 2>&1
+        )
+        else
+        (
+            $mpirun -n $nProcs $appRun $appArgs "$@" </dev/null > $logFile 2>&1
+        )
+        fi
+    fi
+}

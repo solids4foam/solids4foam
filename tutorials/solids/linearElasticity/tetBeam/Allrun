@@ -12,7 +12,7 @@ solids4Foam::convertCaseFormat .
 solids4Foam::caseOnlyRunsWithFoamExtend
 
 # Create mesh
-runApplication ideasUnvToFoam box.unv
+solids4Foam::runApplication ideasUnvToFoam box.unv
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

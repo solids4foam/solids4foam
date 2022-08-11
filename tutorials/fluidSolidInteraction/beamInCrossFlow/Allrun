@@ -10,20 +10,20 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Create meshes
-runApplication -s solid blockMesh -region solid
-runApplication -s fluid blockMesh -region fluid
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
 if [[ "$1" == "parallel" ]]; then
     # Run parallel
-    runApplication -s fluid decomposePar -region fluid
-    runApplication -s solid decomposePar -region solid
-    runParallel solids4Foam
-    runApplication -s fluid reconstructPar -region fluid
-    runApplication -s solid reconstructPar -region solid
+    solids4Foam::runApplication -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -s solid decomposePar -region solid
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -s solid reconstructPar -region solid
 else
     # Run serial
-    runApplication solids4Foam
+    solids4Foam::runApplication solids4Foam
 fi
 
 # Create plots

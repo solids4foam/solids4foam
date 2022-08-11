@@ -12,12 +12,12 @@ solids4Foam::convertCaseFormat .
 solids4Foam::caseOnlyRunsWithFoamExtend
 
 # Create volume mesh
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Create finite area mesh
-runApplication makeFaMesh
+solids4Foam::runApplication makeFaMesh
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file

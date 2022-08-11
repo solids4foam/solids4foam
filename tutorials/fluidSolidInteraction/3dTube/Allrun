@@ -11,15 +11,15 @@ solids4Foam::convertCaseFormat .
 
 if [[ "${WM_PROJECT}" == "foam" ]]
 then
-    runApplication -l log.blockMesh.solid blockMesh -region solid
-    runApplication -l log.blockMesh.fluid blockMesh -region fluid
+    solids4Foam::runApplication -l log.blockMesh.solid blockMesh -region solid
+    solids4Foam::runApplication -l log.blockMesh.fluid blockMesh -region fluid
 else
-    runApplication -s solid blockMesh -region solid
-    runApplication -s fluid blockMesh -region fluid
+    solids4Foam::runApplication -s solid blockMesh -region solid
+    solids4Foam::runApplication -s fluid blockMesh -region fluid
 fi
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 

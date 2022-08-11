@@ -21,4 +21,4 @@ runAnsysToFoam()
 }
 
 runAnsysToFoam flange.ans 0.001
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

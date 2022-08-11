@@ -10,18 +10,18 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Run solver
 if [[ "${1}" -gt 1 ]]
 then
     # Number of cores passed as an argument
-    runApplication decomposePar
-    runParallel solids4Foam "${1}"
-    runApplication reconstructPar
+    solids4Foam::runApplication decomposePar
+    solids4Foam::runParallel solids4Foam "${1}"
+    solids4Foam::runApplication reconstructPar
 else
     # Case runs in serial if no argument is passed or if the argument is 1
-    runApplication solids4Foam
+    solids4Foam::runApplication solids4Foam
 fi
 
 # ----------------------------------------------------------------- end-of-file

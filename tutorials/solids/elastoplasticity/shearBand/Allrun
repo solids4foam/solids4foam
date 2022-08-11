@@ -10,11 +10,11 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Create the mesh
-runApplication fluentMeshToFoam plate.msh
+solids4Foam::runApplication fluentMeshToFoam plate.msh
 
 if [[ $WM_PROJECT = "foam" ]]
 then
-    runApplication changeDictionary
+    solids4Foam::runApplication changeDictionary
 else
     echo "Running foamDictionary"
     foamDictionary \
@@ -26,4 +26,4 @@ else
 fi
 
 # Run the solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

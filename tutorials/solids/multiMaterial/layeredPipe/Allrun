@@ -10,14 +10,14 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-runApplication blockMesh
-runApplication topoSet
+solids4Foam::runApplication blockMesh
+solids4Foam::runApplication topoSet
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam
 
 # Create graphs
-runApplication postProcess -func sample -latestTime
+solids4Foam::runApplication postProcess -func sample -latestTime
 gnuplot plot.gnuplot
 
 # ----------------------------------------------------------------- end-of-file

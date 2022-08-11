@@ -15,8 +15,8 @@ source solids4FoamScripts.sh
 
 
 # Create meshes
-runApplication -s solid blockMesh -region solid
-runApplication -s fluid blockMesh -region fluid
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Set fluid wave parameters
 # As the waves2Foam utilities do not have the "-region" option, we will
@@ -34,10 +34,10 @@ mv 0/fluid/U 0/
 mv 0/fluid/pd 0/
 
 # Compute the wave parameters
-runApplication -s fluid setWaveParameters
+solids4Foam::runApplication -s fluid setWaveParameters
 
 # Set the wave field
-runApplication -s fluid setWaveField
+solids4Foam::runApplication -s fluid setWaveField
 
 # Move fluid back to fluid sub-directory
 mv constant/waveProperties.input constant/fluid/
@@ -50,4 +50,4 @@ mv 0/U 0/fluid/
 mv 0/pd 0/fluid/
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

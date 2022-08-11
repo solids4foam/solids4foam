@@ -13,10 +13,10 @@ solids4Foam::caseOnlyRunsWithFoamExtend
 
 # Create the mesh
 m4 system/blockMeshDict.cylinder.m4 > constant/polyMesh/blockMeshDict
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Set the initial conditions
-runApplication setFields
+solids4Foam::runApplication setFields
 
 # Run the solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

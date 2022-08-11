@@ -12,10 +12,10 @@ solids4Foam::convertCaseFormat .
 solids4Foam::caseOnlyRunsWithFoamExtend
 
 # Create mesh
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Smooth mesh
-runApplication simpleSmoothMesh -noFields
+solids4Foam::runApplication simpleSmoothMesh -noFields
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

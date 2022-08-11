@@ -12,11 +12,11 @@ then
 fi
 
 # Create mesh
-runApplication cartesianMesh
+solids4Foam::runApplication cartesianMesh
 
 # Create patches
-runApplication surfaceToPatch base.stl -noFunctionObjects
+solids4Foam::runApplication surfaceToPatch base.stl -noFunctionObjects
 rm -rf constant/polyMesh; mv 0.01/polyMesh constant/; rm -rf 0.01
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

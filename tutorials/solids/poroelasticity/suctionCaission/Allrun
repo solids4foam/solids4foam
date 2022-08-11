@@ -10,8 +10,8 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 
-runApplication blockMesh
-runApplication solids4Foam
+solids4Foam::runApplication blockMesh
+solids4Foam::runApplication solids4Foam
 
 # ----------------------------------------------------------------- end-of-file
 

@@ -11,7 +11,7 @@ solids4Foam::convertCaseFormat .
 
 # Create mesh
 m4 system/blockMeshDict.uniaxialRod.m4 > constant/polyMesh/blockMeshDict
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

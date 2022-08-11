@@ -11,7 +11,7 @@ solids4Foam::convertCaseFormat .
 (cd hotCylinderTemperatureField && solids4Foam::convertCaseFormat .)
 
 # Create the mesh
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Run the solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

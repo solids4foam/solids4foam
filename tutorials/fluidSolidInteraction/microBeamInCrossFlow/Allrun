@@ -18,22 +18,22 @@ then
 fi
 
 # Create solid mesh
-\cp system/solid/meshDict system/
-runApplication -s solid cartesian2DMesh
+cp system/solid/meshDict system/
+solids4Foam::solids4Foam::runApplication -s solid cartesian2DMesh
 mkdir -p constant/solid/polyMesh
 \mv constant/polyMesh/* constant/solid/polyMesh/
 
 # Create fluid mesh
-\cp system/fluid/meshDict system/
-runApplication -s fluid cartesian2DMesh 
+cp system/fluid/meshDict system/
+solids4Foam::solids4Foam::runApplication -s fluid cartesian2DMesh
 mkdir -p constant/fluid/polyMesh
 \mv constant/polyMesh/* constant/fluid/polyMesh/
 
 if [[ "${WM_PROJECT}" == "foam" ]]
 then
     # Correct patch types
-    runApplication -s fluid createPatch -overwrite -region fluid
-    runApplication -s solid createPatch -overwrite -region solid
+    solids4Foam::solids4Foam::runApplication -s fluid createPatch -overwrite -region fluid
+    solids4Foam::solids4Foam::runApplication -s solid createPatch -overwrite -region solid
 else
     # Correct patch types
     foamDictionary constant/fluid/polyMesh/boundary \
@@ -57,4 +57,4 @@ echo "Running transformPoints on the solid"
 transformPoints -scale "(1e-6 1e-6 1e-6)" -region solid > log.transformPoints.solid
 
 # Run the solver
-runApplication solids4Foam
+solids4Foam::solids4Foam::runApplication solids4Foam
