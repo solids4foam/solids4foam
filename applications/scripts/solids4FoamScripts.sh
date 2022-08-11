@@ -252,6 +252,9 @@ function solids4Foam::convertCaseFormatFoamExtend()
             xargs sed -i "s|type.*uniformFixedValue;|//type          uniformFixedValue;|g"
         find "${CASE_DIR}" -name p | \
             xargs sed -i "s|//type.*timeVaryingUniformFixedValue;|type        timeVaryingUniformFixedValue;|g"
+
+        # Remove any //// that were introdued
+        find "${CASE_DIR}" -name p | xargs sed -i "s|////|//|g"
     fi
 
     echo
