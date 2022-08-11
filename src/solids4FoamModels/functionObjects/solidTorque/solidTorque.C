@@ -29,6 +29,7 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "lookupSolidModel.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

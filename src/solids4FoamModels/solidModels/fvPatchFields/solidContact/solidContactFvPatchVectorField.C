@@ -644,14 +644,23 @@ void Foam::solidContactFvPatchVectorField::autoMap
 
     solidTractionFvPatchVectorField::autoMap(m);
 
+#ifdef OPENFOAMFOUNDATION
+    m(contact_, contact_);
+#else
     contact_.autoMap(m);
+#endif
+
     scaleTractionFieldPtr_.clear();
 
     if (contactPerShadow_.size())
     {
         forAll(contactPerShadow_, shadI)
         {
+#ifdef OPENFOAMFOUNDATION
+            m(contactPerShadow_[shadI], contactPerShadow_[shadI]);
+#else
             contactPerShadow_[shadI].autoMap(m);
+#endif
         }
     }
 
@@ -1471,10 +1480,17 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
         // Write the dictionary
         dict_.write(os, false);
 
+#ifdef OPENFOAMFOUNDATION
+        writeEntry(os, "gradient", gradient());
+        writeEntry(os, "value", patchValue);
+        writeEntry(os, "traction", traction());
+        writeEntry(os, "pressure", pressure());
+#else
         gradient().writeEntry("gradient", os);
         patchValue.writeEntry("value", os);
         traction().writeEntry("traction", os);
         pressure().writeEntry("pressure", os);
+#endif
 
         return;
     }
@@ -1492,7 +1508,11 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
+#ifdef OPENFOAMFOUNDATION
+        writeEntry(os, "shadowPatches", shadowPatchNames());
+#else
         shadowPatchNames().writeEntry("shadowPatches", os);
+#endif
     }
 
 #ifdef FOAMEXTEND

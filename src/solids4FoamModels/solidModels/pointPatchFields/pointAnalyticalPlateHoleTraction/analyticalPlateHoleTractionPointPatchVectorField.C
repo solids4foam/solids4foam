@@ -141,6 +141,7 @@ analyticalPlateHoleTractionPointPatchVectorField::analyticalPlateHoleTractionPoi
 {}
 
 
+#ifndef OPENFOAMFOUNDATION
 analyticalPlateHoleTractionPointPatchVectorField::analyticalPlateHoleTractionPointPatchVectorField
 (
     const analyticalPlateHoleTractionPointPatchVectorField& ptf
@@ -150,6 +151,7 @@ analyticalPlateHoleTractionPointPatchVectorField::analyticalPlateHoleTractionPoi
     T_(ptf.T_),
     holeR_(ptf.holeR_)
 {}
+#endif
 
 
 analyticalPlateHoleTractionPointPatchVectorField::analyticalPlateHoleTractionPointPatchVectorField
@@ -158,7 +160,7 @@ analyticalPlateHoleTractionPointPatchVectorField::analyticalPlateHoleTractionPoi
     const DimensionedField<vector, pointMesh>& iF
 )
 :
-    solidTractionPointPatchVectorField(ptf),
+    solidTractionPointPatchVectorField(ptf, iF),
     T_(ptf.T_),
     holeR_(ptf.holeR_)
 {}

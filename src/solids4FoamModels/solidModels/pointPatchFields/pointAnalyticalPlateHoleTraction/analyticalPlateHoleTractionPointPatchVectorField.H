@@ -45,6 +45,9 @@ Author
 
 namespace Foam
 {
+#ifdef OPENFOAMESIORFOUNDATION
+    typedef pointPatchFieldMapper PointPatchFieldMapper;
+#endif
 
 /*---------------------------------------------------------------------------*\
             Class analyticalPlateHoleTractionPointPatchVectorField Declaration
@@ -99,15 +102,10 @@ public:
             const analyticalPlateHoleTractionPointPatchVectorField&,
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&,
-#ifdef OPENFOAMFOUNDATION
-            const generalPointPatchFieldMapper&
-#elif defined (OPENFOAMESI)
-            const pointPatchFieldMapper&
-#else
             const PointPatchFieldMapper&
-#endif
         );
 
+#ifndef OPENFOAMFOUNDATION
         //- Construct as copy
         analyticalPlateHoleTractionPointPatchVectorField
         (
@@ -122,6 +120,7 @@ public:
                 new analyticalPlateHoleTractionPointPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         analyticalPlateHoleTractionPointPatchVectorField
@@ -150,13 +149,7 @@ public:
             //- Map (and resize as needed) from self given a mapping object
             virtual void autoMap
             (
-#ifdef OPENFOAMFOUNDATION
-                const generalPointPatchFieldMapper&
-#elif defined (OPENFOAMESI)
-                const pointPatchFieldMapper&
-#else
                 const PointPatchFieldMapper&
-#endif
             );
 
             //- Reverse map the given pointPatchField onto

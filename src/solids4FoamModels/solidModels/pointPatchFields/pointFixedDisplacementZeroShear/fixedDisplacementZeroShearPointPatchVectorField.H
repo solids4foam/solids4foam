@@ -58,9 +58,7 @@ namespace Foam
 #ifdef OPENFOAMESIORFOUNDATION
     typedef slipPointPatchField<vector> componentMixedPointPatchVectorField;
 
-    #ifdef OPENFOAMFOUNDATION
-        typedef generalPointPatchFieldMapper PointPatchFieldMapper;
-    #elif defined (OPENFOAMESI)
+    #ifdef OPENFOAMESIORFOUNDATION
         typedef pointPatchFieldMapper PointPatchFieldMapper;
     #endif
 #endif
@@ -115,6 +113,7 @@ public:
             const PointPatchFieldMapper&
         );
 
+#ifndef OPENFOAMFOUNDATION
         //- Construct as copy
         fixedDisplacementZeroShearPointPatchVectorField
         (
@@ -129,6 +128,7 @@ public:
                 new fixedDisplacementZeroShearPointPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         fixedDisplacementZeroShearPointPatchVectorField

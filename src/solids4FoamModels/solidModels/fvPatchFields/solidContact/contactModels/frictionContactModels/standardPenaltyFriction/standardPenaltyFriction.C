@@ -375,7 +375,11 @@ void Foam::standardPenaltyFriction::autoMap(const fvPatchFieldMapper& m)
         )   << "autoMap" << endl;
     }
 
+#ifdef OPENFOAMFOUNDATION
+    m(slip_, slip_);
+#else
     slip_.autoMap(m);
+#endif
 
     // The internal fields for the volFields should always be zero
     // We will reset them as they may not be zero after field advection
