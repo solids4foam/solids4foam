@@ -28,11 +28,21 @@ boundaryField
     }
     upperWall
     {
-        type            noSlip;
+        // Can be used in openfoam but not available in foam extend
+        //type            noSlip;
+
+        // Can be used in all versions 
+        type              fixedValue;
+        value             uniform (0 0 0);
     }
     lowerWall
     {
-        type            noSlip;
+        // Can be used in openfoam but not available in foam extend
+        //type            noSlip;
+
+        // Can be used in all versions 
+        type              fixedValue;
+        value             uniform (0 0 0);
     }
     frontAndBack
     {

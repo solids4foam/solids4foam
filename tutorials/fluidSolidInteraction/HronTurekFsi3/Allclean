@@ -17,7 +17,7 @@ else
     foamCleanPolyMesh -region fluid
     foamCleanPolyMesh -region solid
 fi
-rm -rf case.foam residuals force.pdf deflection.pdf
+rm -rf case.foam residuals force.pdf deflection.pdf postProcessing
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

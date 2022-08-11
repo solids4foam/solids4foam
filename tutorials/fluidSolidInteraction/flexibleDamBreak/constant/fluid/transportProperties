@@ -21,7 +21,7 @@ phases
     air
 );
 
-water
+"water|phase1"
 {
     transportModel  Newtonian;
     nu              nu [ 0 2 -1 0 0 0 0 ] 1e-06;
@@ -43,7 +43,7 @@ water
     }
 }
 
-air
+"air|phase2"
 {
     transportModel  Newtonian;
     nu              nu [ 0 2 -1 0 0 0 0 ] 1.48e-05;
