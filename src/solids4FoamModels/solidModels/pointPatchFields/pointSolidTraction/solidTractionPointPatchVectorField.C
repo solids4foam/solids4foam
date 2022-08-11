@@ -147,6 +147,7 @@ solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
 {}
 
 
+#ifndef OPENFOAMFOUNDATION
 solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
 (
     const solidTractionPointPatchVectorField& ptf
@@ -159,6 +160,7 @@ solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
     pressureSeries_(),
     curTimeIndex_(-1)
 {}
+#endif
 
 
 solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
@@ -167,7 +169,7 @@ solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
     const DimensionedField<vector, pointMesh>& iF
 )
 :
-    calculatedPointPatchVectorField(ptf),
+    calculatedPointPatchVectorField(ptf, iF),
     traction_(ptf.traction_),
     pressure_(ptf.pressure_),
     tractionSeries_(),

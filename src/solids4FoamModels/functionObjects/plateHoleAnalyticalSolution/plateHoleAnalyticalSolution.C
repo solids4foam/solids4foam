@@ -79,7 +79,11 @@ Foam::symmTensor Foam::plateHoleAnalyticalSolution::plateHoleStress
 
 
     // Transformation to Cartesian coordinate system
+#ifdef OPENFOAMFOUNDATION
+    sigma = ((cs.R().R() & sigma) & cs.R().R().T());
+#else
     sigma = ((cs.R() & sigma) & cs.R().T());
+#endif
 
     symmTensor S = symmTensor::zero;
 

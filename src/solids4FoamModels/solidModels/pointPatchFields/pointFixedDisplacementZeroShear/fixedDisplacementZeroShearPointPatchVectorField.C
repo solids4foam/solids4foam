@@ -137,6 +137,7 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
 }
 
 
+#ifndef OPENFOAMFOUNDATION
 fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
 (
     const fixedDisplacementZeroShearPointPatchVectorField& ptf
@@ -146,6 +147,7 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
     dispSeries_(),
     curTimeIndex_(-1)
 {}
+#endif
 
 
 fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
@@ -154,7 +156,7 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
     const DimensionedField<vector, pointMesh>& iF
 )
 :
-    componentMixedPointPatchVectorField(ptf),
+    componentMixedPointPatchVectorField(ptf, iF),
     dispSeries_(),
     curTimeIndex_(-1)
 {}

@@ -53,9 +53,7 @@ Author
 
 namespace Foam
 {
-#ifdef OPENFOAMFOUNDATION
-    typedef generalPointPatchFieldMapper PointPatchFieldMapper;
-#elif defined (OPENFOAMESI)
+#ifdef OPENFOAMESIORFOUNDATION
     typedef pointPatchFieldMapper PointPatchFieldMapper;
 #endif
 
@@ -118,6 +116,7 @@ public:
             const PointPatchFieldMapper&
         );
 
+#ifndef OPENFOAMFOUNDATION
         //- Construct as copy
         solidTractionPointPatchVectorField
         (
@@ -132,6 +131,7 @@ public:
                 new solidTractionPointPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         solidTractionPointPatchVectorField

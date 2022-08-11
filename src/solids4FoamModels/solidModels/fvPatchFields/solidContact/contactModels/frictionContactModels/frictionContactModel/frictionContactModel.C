@@ -75,7 +75,11 @@ frictionContactModel::frictionContactModel(const frictionContactModel& fm)
 
 void frictionContactModel::autoMap(const fvPatchFieldMapper& m)
 {
+#ifdef OPENFOAMFOUNDATION
+    m(stickSlipFaces_, stickSlipFaces_);
+#else
     stickSlipFaces_.autoMap(m);
+#endif
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
