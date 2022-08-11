@@ -125,6 +125,16 @@ function solids4Foam::convertCaseFormat()
     #    sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
     #fi
 
+    # 6. Check for timeVaryingUniformFixedValue
+    if [[ -n $(find "${CASE_DIR}" -name p) ]]
+    then
+        echo "Changing timeVaryingUniformFixedValue to uniformValue in p"
+        find "${CASE_DIR}" -name p | \
+            xargs sed -i "s|//type.*uniformFixedValue;|type          uniformFixedValue;|g"
+        find "${CASE_DIR}" -name p | \
+            xargs sed -i "s|type.*timeVaryingUniformFixedValue;|//type        timeVaryingUniformFixedValue;|g"
+    fi
+
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -233,6 +243,16 @@ function solids4Foam::convertCaseFormatFoamExtend()
     #    echo "Replacing 'lineUniform' with 'uniform' in system/sample"
     #    sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
     #fi
+
+    # 6. Check for timeVaryingUniformFixedValue
+    if [[ -n $(find "${CASE_DIR}" -name p) ]]
+    then
+        echo "Changing uniformValue to timeVaryingUniformFixedValue in p"
+        find "${CASE_DIR}" -name p | \
+            xargs sed -i "s|type.*uniformFixedValue;|//type          uniformFixedValue;|g"
+        find "${CASE_DIR}" -name p | \
+            xargs sed -i "s|//type.*timeVaryingUniformFixedValue;|type        timeVaryingUniformFixedValue;|g"
+    fi
 
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
