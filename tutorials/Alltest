@@ -182,6 +182,15 @@ do
         "${CD}.orig" > "${CD}"
 done
 
+# Modify fvSolution
+# Set maxIter to 1 for linear solvers
+echo "Modifying the fvSolution linear solvers to run only one iteration"
+for FVS in $(find . -name "fvSolution")
+do
+    mv ${FVS} ${FVS}.org
+    sed -e "s|maxIter.*;|maxIter 1;|g" ${FVS}.org > ${FVS}
+done
+
 # Modify solidProperties
 # set nCorrectors to 1 for solids4foam solvers
 echo "Modifying the solidProperties to run only one iteration"
