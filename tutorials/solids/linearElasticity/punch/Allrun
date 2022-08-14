@@ -32,7 +32,7 @@ mkdir constant/punch_bottom
 mv constant/polyMesh constant/punch_bottom/
 
 # Merge sub meshes
-solids4Foam::runApplication mergeSubMeshesS4F punch_top punch_bottom
+solids4Foam::runApplication mergeSubMeshes punch_top punch_bottom
 
 # Scale the geometry to metres
 echo "Running transformPoints"
@@ -42,6 +42,10 @@ transformPoints -scale "(0.001 0.001 0.001)" >& log.transformPoints
 solids4Foam::runApplication autoPatch 45 -overwrite
 solids4Foam::runApplication createPatch -overwrite
 solids4Foam::runApplication splitPatch -overwrite
+
+# Create cell zones needed by the mechanical law
+solids4Foam::runApplication setSet -batch batch.setSet
+solids4Foam::runApplication setsToZones
 
 # Remove the sub meshes
 rm -rf constant/punch_top constant/punch_bottom system/meshDict
