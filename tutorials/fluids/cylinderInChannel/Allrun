@@ -6,6 +6,9 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
 # Create the mesh
 solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh
 solids4Foam::runApplication changeDictionary

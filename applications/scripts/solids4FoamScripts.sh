@@ -138,6 +138,15 @@ function solids4Foam::convertCaseFormat()
             xargs sed -i "s|type.*timeVaryingUniformFixedValue;|//type        timeVaryingUniformFixedValue;|g"
     fi
 
+    # 7. Check for changeDictionaryDict.openfoam
+    if [[ -f "${CASE_DIR}/system/changeDictionaryDict.openfoam" ]]
+    then
+        echo "Moving ${CASE_DIR}/system/changeDictionaryDict to system/changeDictionaryDict.foamextend"
+        mv "${CASE_DIR}/system/changeDictionaryDict" "system/changeDictionaryDict.foamextend"
+        echo "Moving ${CASE_DIR}/system/changeDictionaryDict.openfoam to system/changeDictionaryDict"
+        mv "${CASE_DIR}/system/changeDictionaryDict.openfoam" "system/changeDictionaryDict"
+    fi
+
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -261,6 +270,15 @@ function solids4Foam::convertCaseFormatFoamExtend()
 
         # Remove any //// that were introdued
         find "${CASE_DIR}" -name p | xargs sed -i "s|////|//|g"
+    fi
+
+    # 7. Check for changeDictionaryDict.openfoam
+    if [[ -f "${CASE_DIR}/system/changeDictionaryDict.foamextend" ]]
+    then
+        echo "Moving ${CASE_DIR}/system/changeDictionaryDict to system/changeDictionaryDict.openfoam"
+        mv "${CASE_DIR}/system/changeDictionaryDict" "system/changeDictionaryDict.openfoam"
+        echo "Moving ${CASE_DIR}/system/changeDictionaryDict.foamextend to system/changeDictionaryDict"
+        mv "${CASE_DIR}/system/changeDictionaryDict.foamextend" "system/changeDictionaryDict"
     fi
 
     echo
