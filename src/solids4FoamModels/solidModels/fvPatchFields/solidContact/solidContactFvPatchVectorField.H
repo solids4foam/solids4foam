@@ -268,13 +268,11 @@ public:
             const fvPatchFieldMapper&
         );
 
+#ifndef OPENFOAMFOUNDATION
         //- Construct as copy
         solidContactFvPatchVectorField
         (
             const solidContactFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
-        ) = delete;
-#else
         );
 
         //- Construct and return a clone

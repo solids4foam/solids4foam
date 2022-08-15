@@ -556,13 +556,13 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     zonePtr_(NULL),
     shadowZones_(),
     zoneToZones_(),
-#ifdef FOAMEXTEND
+    #ifdef FOAMEXTEND
     writeZoneVTK_(ptf.writeZoneVTK_),
     quickReject_(ptf.quickReject_),
     regionOfInterestTopCorner_(ptf.regionOfInterestTopCorner_),
     regionOfInterestBottomCorner_(ptf.regionOfInterestBottomCorner_),
     regionOfInterest_(ptf.regionOfInterest_),
-#endif
+    #endif
     contact_(ptf.contact_),
     contactPerShadow_(),
     scaleFaceTractionsNearDownstreamPatch_
@@ -574,6 +574,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 {
     // Do not copy pointer objects
 }
+#endif // ifndef OPENFOAMFOUNDATION
 
 Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 (
@@ -612,7 +613,6 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 {
     // Do not copy pointer objects
 }
-#endif // ifndef OPENFOAMFOUNDATION
 
 // * * * * * * * * * * * * * * * Destructors  * * * * * * * * * * * * * * * //
 
