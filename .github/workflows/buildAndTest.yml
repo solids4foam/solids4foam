@@ -22,6 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Allwmake
-        run: ./Allwmake
+        run: source /opt/OpenFOAM/OpenFOAM-v1912/etc/bashrc &> /dev/null && ./Allwmake
       - name: Alltest
-        run: (cd tutorials && ./Alltest)
+        run: (cd tutorials && source /opt/OpenFOAM/OpenFOAM-v1912/etc/bashrc &> /dev/null && ./Alltest)
