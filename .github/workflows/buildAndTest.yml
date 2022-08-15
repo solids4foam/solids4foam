@@ -1,0 +1,24 @@
+# Build and test solids4foam using Docker containers
+name: Build and test
+
+on:
+  push:
+    branches: [ "nextRelease" ]
+  pull_request:
+    branches: [ "nextRelease" ]
+  workflow_dispatch:
+
+jobs:
+  build_and_test:
+    name: Build on ${{matrix.container }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.container }}
+    strategy:
+      matrix:
+        container: ['philippic/openfoam-v2012-centos73.gfortran', 'philippic/openfoam9-graphical-apps.gfortran', 'philippic/foam-extend-4.1.ubuntu18.04.gfortran']
+    steps:
+      - uses: actions/checkout@v3
+      - name: Allwmake
+        run: ./Allwmake
+      - name: Alltest
+        run: (cd tutorials && ./Alltest)
