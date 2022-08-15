@@ -118,12 +118,15 @@ function solids4Foam::convertCaseFormat()
         \mv "${CASE_DIR}"/constant/boundaryData.openfoam "${CASE_DIR}"/constant/boundaryData
     fi
 
-    # 5. Check for sample
-    #if [[ -f "${CASE_DIR}"/system/sample ]]
-    #then
-    #    echo "Replacing 'uniform' with 'lineUniform' in system/sample"
-    #    sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
-    #fi
+    # 5. Check for sample for foundation version
+    if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
+    then
+        if [[ -f "${CASE_DIR}"/system/sample ]]
+        then
+           echo "OpenFOAM.org specific: replacing 'uniform' with 'lineUniform' in system/sample"
+           sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
+        fi
+    fi
 
     # 6. Check for timeVaryingUniformFixedValue
     if [[ -n $(find "${CASE_DIR}" -name p) ]]
@@ -238,11 +241,14 @@ function solids4Foam::convertCaseFormatFoamExtend()
     fi
 
     # 5. Check for sample
-    #if [[ -f "${CASE_DIR}"/system/sample ]]
-    #then
-    #    echo "Replacing 'lineUniform' with 'uniform' in system/sample"
-    #    sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
-    #fi
+    if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
+    then
+        if [[ -f "${CASE_DIR}"/system/sample ]]
+        then
+           echo "OpenFOAM.org specific: replacing 'lineUniform' with 'uniform' in system/sample"
+           sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
+        fi
+    fi
 
     # 6. Check for timeVaryingUniformFixedValue
     if [[ -n $(find "${CASE_DIR}" -name p) ]]

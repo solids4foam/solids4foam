@@ -35,11 +35,11 @@ divSchemes
 laplacianSchemes
 {
     default none;
-    laplacian(nuEff,U) Gauss linear skewCorrected 1;
-    laplacian((1|A(U)),p) Gauss linear skewCorrected 1;
-    laplacian(diffusivity,cellMotionU) Gauss linear skewCorrected 1;
+    laplacian(nuEff,U) Gauss linear corrected;
+    laplacian((1|A(U)),p) Gauss linear corrected;
+    laplacian(diffusivity,cellMotionU) Gauss linear corrected;
 
-    laplacian(rAU,p) Gauss linear skewCorrected 1;
+    laplacian(rAU,p) Gauss linear corrected;
 }
 
 interpolationSchemes
@@ -50,7 +50,7 @@ interpolationSchemes
 
 snGradSchemes
 {
-    default skewCorrected 1;
+    default corrected;
 }
 
 fluxRequired
