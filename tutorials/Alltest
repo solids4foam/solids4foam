@@ -245,7 +245,7 @@ N_RUN_CASES=$(grep "solids4Foam" ../tutorialsTest/testLoopReport | wc -l)
 N_FAILED_SOLVER=$(grep "ERROR" testLoopReport | grep "solids4Foam" | wc -l)
 N_FAILED_COMMANDS=$(grep "ERROR" testLoopReport | wc -l)
 N_FAILED_OTHER=$((N_FAILED_COMMANDS-N_FAILED_SOLVER))
-echo "    Number of cases where run was attempted: ${N_RUN_CASES}"
+echo "    Number of cases where a run was attempted: ${N_RUN_CASES}"
 echo "    Number of cases where the solver failed: ${N_FAILED_SOLVER}"
 echo "    Number of cases where another command failed: ${N_FAILED_OTHER}"
 echo
