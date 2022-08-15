@@ -50,7 +50,7 @@ function die()
 
 # logReport <logfile>
 # Extracts useful info from log file.
-function logReport ()
+function logReport()
 {
     case=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
     app=`echo $1 | sed s/"\(.*\)\."/""/g`
@@ -61,18 +61,11 @@ function logReport ()
     appAndCase="Application $app - case $case"
 
     fatalError=`grep "FOAM FATAL" $1`
-    UxSS=`grep -E "Ux[:| ]*solution singularity" $1`
-    UySS=`grep -E "Uy[:| ]*solution singularity" $1`
-    UzSS=`grep -E "Uz[:| ]*solution singularity" $1`
     completed=`grep -E "^[\t ]*[eE]nd" $1`
 
     if [ "$fatalError" ]
     then
         echo "$appAndCase: ** FOAM FATAL ERROR **"
-        return
-    elif [ "$UxSS" -a "$UySS" -a "$UzSS" ]
-    then
-        echo "$appAndCase: ** Solution singularity **"
         return
     elif [ "$completed" ]
     then
@@ -248,11 +241,24 @@ find . -name "log.*" -exec cat {} \; >> logs
 
 # Output summary statistics
 echo; echo "Summary statistics"
-echo "    Number of cases where run was attempted: " \
-     $(grep "solids4Foam" ../tutorialsTest/testLoopReport | wc -l)
-echo "    Number of cases where the solver failed: " \
-     $(grep "ERROR" testLoopReport | grep "solids4Foam" | wc -l)
-echo "    Number of cases where a command failed (including the solver): " \
-     $(grep "ERROR" testLoopReport | wc -l)
+N_RUN_CASES=$(grep "solids4Foam" ../tutorialsTest/testLoopReport | wc -l)
+N_FAILED_SOLVER=$(grep "ERROR" testLoopReport | grep "solids4Foam" | wc -l)
+N_FAILED_COMMANDS=$(grep "ERROR" testLoopReport | wc -l)
+N_FAILED_OTHER=$((N_FAILED_COMMANDS-N_FAILED_SOLVER))
+echo "    Number of cases where run was attempted: ${N_RUN_CASES}"
+echo "    Number of cases where the solver failed: ${N_FAILED_SOLVER}"
+echo "    Number of cases where another command failed: ${N_FAILED_OTHER}"
+echo
 
-#------------------------------------------------------------------------------
+if [[ $N_FAILED_SOLVER -gt 0 ]]
+then
+    echo "The solids4Foam solver failed on the following cases:"
+    grep "ERROR" testLoopReport | grep "solids4Foam"
+elif [[ $N_FAILED_OTHER -gt 0 ]]
+then
+    echo "The following commands failed:"
+    grep "ERROR" testLoopReport
+else
+    echo "All tests passed: enjoy solids4foam."
+fi
+echo
