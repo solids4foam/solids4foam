@@ -62,7 +62,7 @@ function solids4Foam::convertCaseFormat()
     fi
 
     # Check all files in the 0 directory
-    for FILE in $(find ./[0-9]* -type f)
+    for FILE in $(find "${CASE_DIR}" -type f)
     do
         if [[ -f "${FILE}" ]]
         then
@@ -181,7 +181,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
 
-    for FILE in $(find ./[0-9]* -type f)
+    for FILE in $(find "${CASE_DIR}" -type f)
     do
         if [[ -f "${FILE}" ]]
         then

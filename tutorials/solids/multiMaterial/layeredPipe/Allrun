@@ -13,13 +13,8 @@ solids4Foam::convertCaseFormat .
 solids4Foam::runApplication blockMesh
 
 # Create material cellZones
-if [[ $WM_PROJECT = "foam" ]]
-then
-    solids4Foam::runApplication setSet -batch batch.setSet
-    solids4Foam::runApplication setsToZones
-else
-    solids4Foam::runApplication topoSet
-fi
+solids4Foam::runApplication setSet -batch batch.setSet
+solids4Foam::runApplication setsToZones
 
 # Run solver
 solids4Foam::runApplication solids4Foam

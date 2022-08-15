@@ -263,12 +263,6 @@ bool Foam::thermoMechanicalLaw::readTField()
                 (
                     new volScalarField
                     (
-#ifdef OPENFOAMESIORFOUNDATION
-                        baseMesh().lookupObject<mechanicalModel>
-                        (
-                            "mechanicalProperties"
-                        ).mesh().lookupObject<volScalarField>("TbaseMesh")
-#else
                         baseMesh().lookupObject<mechanicalModel>
                         (
                             "mechanicalProperties"
@@ -276,7 +270,6 @@ bool Foam::thermoMechanicalLaw::readTField()
                         (
                             "TbaseMesh", mesh()
                         )()
-#endif
                     )
                 );
             }
