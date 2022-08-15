@@ -14,19 +14,16 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dictionaryReplacement
+boundary
 {
-    boundary
+    cylinder
     {
-        cylinder
-        {
-            type            patch;
-        }
+        type            patch;
+    }
 
-        frontAndBackPlanes
-        {
-            type            empty;
-        }
+    frontAndBackPlanes
+    {
+        type            empty;
     }
 }
 
