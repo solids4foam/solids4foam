@@ -243,7 +243,16 @@ do
 done
 
 # Create concatenated logs file
-echo; echo "Preparing logs"; echo
+echo; echo "Preparing logs"
 find . -name "log.*" -exec cat {} \; >> logs
+
+# Output summary statistics
+echo; echo "Summary statistics"
+echo "    Number of cases where run was attempted: " \
+     $(grep "solids4Foam" ../tutorialsTest/testLoopReport | wc -l)
+echo "    Number of cases where the solver failed: " \
+     $(grep "ERROR" testLoopReport | grep "solids4Foam" | wc -l)
+echo "    Number of cases where a command failed (including the solver): " \
+     $(grep "ERROR" testLoopReport | wc -l)
 
 #------------------------------------------------------------------------------

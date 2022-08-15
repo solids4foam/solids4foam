@@ -35,4 +35,3 @@ find . -type d -name "[0-9]*" | while read i; do \ln -v -s ../$i $i/fluid ; done
 # Run the solid solver
 solids4Foam::runApplication solids4Foam
 
-# ----------------------------------------------------------------- end-of-file

@@ -20,4 +20,3 @@ solids4Foam::runApplication makeFaMesh
 # Run solver
 solids4Foam::runApplication solids4Foam
 
-# ----------------------------------------------------------------- end-of-file

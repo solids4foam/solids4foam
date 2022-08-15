@@ -13,5 +13,4 @@ solids4Foam::convertCaseFormat .
 solids4Foam::runApplication blockMesh
 solids4Foam::runApplication solids4Foam
 
-# ----------------------------------------------------------------- end-of-file
 

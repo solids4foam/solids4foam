@@ -32,5 +32,4 @@ solids4Foam::runApplication createPatch -overwrite
 # Run solver
 solids4Foam::runApplication solids4Foam
 
-# ----------------------------------------------------------------- end-of-file
 

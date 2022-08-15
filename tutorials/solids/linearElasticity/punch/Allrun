@@ -53,5 +53,4 @@ rm -rf constant/punch_top constant/punch_bottom system/meshDict
 # Run the solver
 solids4Foam::runApplication solids4Foam
 
-# ----------------------------------------------------------------- end-of-file
 

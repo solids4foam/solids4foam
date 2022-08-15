@@ -1,1 +1,0 @@
-../../../../../../src/solids4FoamModels/solidModels/pointPatchFields/pointSolidTraction/solidTractionPointPatchVectorField.H

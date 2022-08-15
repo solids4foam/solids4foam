@@ -106,6 +106,7 @@ cantileverTractionPointPatchVectorField::cantileverTractionPointPatchVectorField
 {}
 
 
+#ifndef OPENFOAMFOUNDATION
 cantileverTractionPointPatchVectorField::cantileverTractionPointPatchVectorField
 (
     const cantileverTractionPointPatchVectorField& ptf
@@ -120,6 +121,7 @@ cantileverTractionPointPatchVectorField::cantileverTractionPointPatchVectorField
     I_(ptf.I_),
     curTimeIndex_(ptf.curTimeIndex_)
 {}
+#endif
 
 
 cantileverTractionPointPatchVectorField::cantileverTractionPointPatchVectorField
@@ -128,7 +130,7 @@ cantileverTractionPointPatchVectorField::cantileverTractionPointPatchVectorField
     const DimensionedField<vector, pointMesh>& iF
 )
 :
-    solidTractionPointPatchVectorField(ptf),
+    solidTractionPointPatchVectorField(ptf, iF),
     P_(ptf.P_),
     E_(ptf.E_),
     nu_(ptf.nu_),

@@ -24,5 +24,4 @@ else
     solids4Foam::runApplication solids4Foam
 fi
 
-# ----------------------------------------------------------------- end-of-file
 

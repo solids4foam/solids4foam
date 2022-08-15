@@ -24,5 +24,4 @@ solids4Foam::runApplication blockMesh
 # Run solver
 solids4Foam::runApplication solids4Foam
 
-# ----------------------------------------------------------------- end-of-file
 

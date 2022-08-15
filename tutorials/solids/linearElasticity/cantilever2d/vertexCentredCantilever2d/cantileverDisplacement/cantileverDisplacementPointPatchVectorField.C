@@ -106,6 +106,7 @@ cantileverDisplacementPointPatchVectorField::cantileverDisplacementPointPatchVec
 {}
 
 
+#ifndef OPENFOAMFOUNDATION
 cantileverDisplacementPointPatchVectorField::cantileverDisplacementPointPatchVectorField
 (
     const cantileverDisplacementPointPatchVectorField& ptf
@@ -120,7 +121,7 @@ cantileverDisplacementPointPatchVectorField::cantileverDisplacementPointPatchVec
     I_(ptf.I_),
     curTimeIndex_(ptf.curTimeIndex_)
 {}
-
+#endif
 
 cantileverDisplacementPointPatchVectorField::cantileverDisplacementPointPatchVectorField
 (
@@ -128,7 +129,7 @@ cantileverDisplacementPointPatchVectorField::cantileverDisplacementPointPatchVec
     const DimensionedField<vector, pointMesh>& iF
 )
 :
-    fixedValuePointPatchVectorField(ptf),
+    fixedValuePointPatchVectorField(ptf, iF),
     P_(ptf.P_),
     E_(ptf.E_),
     nu_(ptf.nu_),

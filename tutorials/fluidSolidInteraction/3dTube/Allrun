@@ -15,6 +15,3 @@ solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
 solids4Foam::runApplication solids4Foam
-
-# ----------------------------------------------------------------- end-of-file
-
