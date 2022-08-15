@@ -13,7 +13,6 @@ jobs:
     name: Build on ${{matrix.container }}
     runs-on: ubuntu-latest
     container:
-    container:
       image: ${{ matrix.container }}
       options: --user ${{ matrix.user }}
     strategy:
