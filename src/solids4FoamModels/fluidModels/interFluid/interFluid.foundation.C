@@ -58,7 +58,21 @@ interFluid::interFluid
     fluidModel(typeName, runTime, region),
     LTS_(fv::localEulerDdt::enabled(mesh())),
     trDeltaT_(),
-    Uf_(),
+    Uf_
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "Uf",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            fvc::interpolate(U())
+        )
+    ),
     mixture_(U(), phi()),
     phaseChangePtr_(twoPhaseChangeModel::New(mixture_)),
     rho_
@@ -173,7 +187,7 @@ interFluid::interFluid
         volScalarField& p_rgh = p_rgh_;
         const dynamicFvMesh& mesh = this->mesh();
         pimpleControl& pimple = this->pimple();
-        surfaceScalarField& phi = this->phi();    
+        surfaceScalarField& phi = this->phi();
         pressureReference& pressureReference = pressureReferencePtr_();
         const bool correctPhi = correctPhi_;
         const volScalarField& rho = rho_;
@@ -262,7 +276,7 @@ bool interFluid::evolve()
     volVectorField& U = this->U();
     volScalarField& p = this->p();
     volScalarField& p_rgh = p_rgh_;
-    surfaceScalarField& phi = this->phi();    
+    surfaceScalarField& phi = this->phi();
     pressureReference& pressureReference = pressureReferencePtr_();
     autoPtr<incompressible::momentumTransportModel>& turbulence = turbulence_;
     immiscibleIncompressibleTwoPhaseMixture& mixture = mixture_;
