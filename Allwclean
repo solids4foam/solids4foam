@@ -20,6 +20,13 @@ fi
 # Clean all tutorials
 (cd tutorials && ./Allclean)
 
+# Clear the tutorialsTest directory
+if [[ -d tutorialsTest ]]
+then
+    echo; echo "Removing tutorialsTest"
+    rm -rf tutorialsTest
+fi
+
 # Clear all build logs
 echo; echo "Removing all log.Allwmake build logs"; echo
 find . -name log.Allwmake | xargs rm
