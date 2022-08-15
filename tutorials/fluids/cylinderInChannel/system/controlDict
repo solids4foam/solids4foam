@@ -55,7 +55,7 @@ functions
    {
        type                forces;
        functionObjectLibs  ( "libforces.so" );
-       outputControl       timeStep;
+       "writeControl|outputControl" timeStep;
        outputInterval      1;
        patches             (cylinderWall);
        "pName|p"           p;
