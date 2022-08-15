@@ -19,7 +19,7 @@ then
     exit 0
 fi
 
-# Create top mesh
+# Create top mesh and move it to a new region
 cp system/punch_top/meshDict system/meshDict
 solids4Foam::runApplication -s punch_top cartesianMesh
 mkdir constant/punch_top
@@ -28,11 +28,12 @@ mv constant/polyMesh constant/punch_top/
 # Create bottom mesh
 cp system/punch_bottom/meshDict system/meshDict
 solids4Foam::runApplication -s punch_bottom cartesianMesh
-mkdir constant/punch_bottom
-mv constant/polyMesh constant/punch_bottom/
 
-# Merge sub meshes
-solids4Foam::runApplication mergeSubMeshes punch_top punch_bottom
+# Merge the punch_top into the main mesh (punch_bottom)
+solids4Foam::runApplication mergeMeshes . . . . \
+                            -addRegion punch_top -noFunctionObjects
+rm -rf constant/polyMesh
+mv 1/polyMesh constant/
 
 # Scale the geometry to metres
 echo "Running transformPoints"
@@ -48,9 +49,7 @@ solids4Foam::runApplication setSet -batch batch.setSet
 solids4Foam::runApplication setsToZones
 
 # Remove the sub meshes
-rm -rf constant/punch_top constant/punch_bottom system/meshDict
+rm -rf constant/punch_top system/meshDict
 
 # Run the solver
 solids4Foam::runApplication solids4Foam
-
-

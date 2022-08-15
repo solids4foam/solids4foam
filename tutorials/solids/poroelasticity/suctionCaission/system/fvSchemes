@@ -57,6 +57,7 @@ interpolationSchemes
     interpolate(impK)  linear;
     interpolate(grad(D)) linear;
     interpolate(grad(DD)) linear;
+    interpolate(grad(p)) linear;
 }
 
 // ************************************************************************* //
