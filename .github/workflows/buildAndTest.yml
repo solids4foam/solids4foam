@@ -9,44 +9,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-test-on-openfoam-v2012:
+  build_and_test:
     name: Build on OpenFOAM-v2012
     runs-on: ubuntu-latest
     container:
       image: philippic/openfoam-v2012-ubuntu20.04:latest
     steps:
       - uses: actions/checkout@v3
-
       - name: Allwmake
         shell: bash -l {0}
         run: |
           source /usr/lib/openfoam/openfoam2012/etc/bashrc
           ./Allwmake
-
       - name: Alltest
         shell: bash -l {0}
         run: |
           source /usr/lib/openfoam/openfoam2012/etc/bashrc
-          cd tutorials
-          ./Alltest
-
-  build-and-test-on-openfoam-9:
-    name: Build on OpenFOAM-9
-    runs-on: ubuntu-latest
-    container:
-      image: philippic/openfoam-9-ubuntu20.04:latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Allwmake
-        shell: bash -l {0}
-        run: |
-          source /opt/openfoam9/etc/bashrc
-          ./Allwmake
-
-      - name: Alltest
-        shell: bash -l {0}
-        run: |
-          source /opt/openfoam9/etc/bashrc
           cd tutorials
           ./Alltest
