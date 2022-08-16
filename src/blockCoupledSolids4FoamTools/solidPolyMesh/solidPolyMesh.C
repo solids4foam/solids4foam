@@ -1216,12 +1216,6 @@ solidPolyMesh::solidPolyMesh(fvMesh& fMesh)
     cellImplicitBondsPtr_(NULL),
     cellBFaceImplicitBondsPtr_(NULL),
     bFaceImplicitBondsPtr_(NULL),
-    volToPointInterp_
-    (
-        fMesh.thisDb().parent().foundObject<fvMesh>("solid")
-      ? fMesh.thisDb().parent().lookupObject<fvMesh>("solid")
-      : fMesh.thisDb().parent().lookupObject<fvMesh>("region0")
-    ),
     pointProcFacesCoeffsPtr_(NULL),
     pointProcBndFacesCoeffsPtr_(NULL),
     pointProcCellsCoeffsPtr_(NULL),

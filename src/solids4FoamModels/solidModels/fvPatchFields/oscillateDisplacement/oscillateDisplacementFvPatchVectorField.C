@@ -72,7 +72,7 @@ oscillateDisplacementFvPatchVectorField::oscillateDisplacementFvPatchVectorField
     frequency_(readScalar(dict.lookup("frequency")))
 {}
 
-
+#ifndef OPENFOAMFOUNDATION
 oscillateDisplacementFvPatchVectorField::oscillateDisplacementFvPatchVectorField
 (
     const oscillateDisplacementFvPatchVectorField& pivpvf
@@ -82,7 +82,7 @@ oscillateDisplacementFvPatchVectorField::oscillateDisplacementFvPatchVectorField
     amplitude_(pivpvf.amplitude_),
     frequency_(pivpvf.frequency_)
 {}
-
+#endif
 
 oscillateDisplacementFvPatchVectorField::oscillateDisplacementFvPatchVectorField
 (

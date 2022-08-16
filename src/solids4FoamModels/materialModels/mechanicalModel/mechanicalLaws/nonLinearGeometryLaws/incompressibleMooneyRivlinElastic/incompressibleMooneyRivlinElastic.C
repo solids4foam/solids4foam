@@ -52,7 +52,6 @@ Foam::incompressibleMooneyRivlinElastic::incompressibleMooneyRivlinElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     c10_(dict.lookup("c10")),
     c01_(dict.lookup("c01")),
     c11_(dict.lookup("c11")),
@@ -81,28 +80,6 @@ Foam::incompressibleMooneyRivlinElastic::~incompressibleMooneyRivlinElastic()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volScalarField> Foam::incompressibleMooneyRivlinElastic::rho() const
-{
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rhoLaw",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            calculatedFvPatchScalarField::typeName
-        )
-    );
-}
-
-
 Foam::tmp<Foam::volScalarField> Foam::incompressibleMooneyRivlinElastic::impK() const
 {
     return tmp<volScalarField>
@@ -114,7 +91,7 @@ Foam::tmp<Foam::volScalarField> Foam::incompressibleMooneyRivlinElastic::impK() 
                 "impK",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -138,7 +115,7 @@ void Foam::incompressibleMooneyRivlinElastic::correct
     }
 
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J = det(F());
+    const volScalarField J(det(F()));
 
     // Calculate the hydrostatic stress
     updateSigmaHyd
@@ -148,14 +125,15 @@ void Foam::incompressibleMooneyRivlinElastic::correct
     );
 
     // Calculate the left Cauchy-Green deformation tensor
-    const volSymmTensorField B = symm(F() & F().T());
+    const volSymmTensorField B(symm(F() & F().T()));
 
     // Compute invariants fields
-    const volScalarField I1 = tr(B);
-    const volScalarField I2 = 0.5*(pow(tr(B), 2.0) - tr(B & B));
+    const volScalarField I1(tr(B));
+    const volScalarField I2(0.5*(pow(tr(B), 2.0) - tr(B & B)));
 
     // Calculate the deviatoric part of the Cauchy stress
-    const volSymmTensorField s =
+    const volSymmTensorField s
+    (
         2*
         (   c10_
           + I1*c01_
@@ -165,7 +143,8 @@ void Foam::incompressibleMooneyRivlinElastic::correct
         (
             c01_
           + c11_*(I1 - 3)
-        )*symm(B & B);
+        )*symm(B & B)
+    );
 
     // Calculate the Cauchy stress
     // for the Mooney-Rivlin model
@@ -187,22 +166,23 @@ void Foam::incompressibleMooneyRivlinElastic::correct(surfaceSymmTensorField& si
     }
 
     // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J = det(Ff());
+    const surfaceScalarField J(det(Ff()));
 
     // Calculate pressure field with bulk modulus to approximate
     // incompressibility
     // Note: updateSigmaHyd is not used
-    const surfaceScalarField sigmaHydf = 0.5*K_*(pow(J, 2.0) - 1.0);
+    const surfaceScalarField sigmaHydf(0.5*K_*(pow(J, 2.0) - 1.0));
 
     // Calculate the left Cauchy-Green deformation tensor
-    const surfaceSymmTensorField Bf = symm(Ff() & Ff().T());
+    const surfaceSymmTensorField Bf(symm(Ff() & Ff().T()));
 
     // Compute invariants fields
-    const surfaceScalarField I1 = tr(Bf);
-    const surfaceScalarField I2 = 0.5*(pow(tr(Bf), 2.0) - tr(Bf & Bf));
+    const surfaceScalarField I1(tr(Bf));
+    const surfaceScalarField I2(0.5*(pow(tr(Bf), 2.0) - tr(Bf & Bf)));
 
     // Calculate the deviatoric part of the Cauchy stress
-    const surfaceSymmTensorField s =
+    const surfaceSymmTensorField s
+    (
         2*
         (   c10_
           + I1*c01_
@@ -212,7 +192,8 @@ void Foam::incompressibleMooneyRivlinElastic::correct(surfaceSymmTensorField& si
         (
             c01_
           + c11_*(I1 - 3)
-        )*symm(Bf & Bf);
+        )*symm(Bf & Bf)
+    );
 
     // Calculate the Cauchy stress
     // for the Mooney-Rivlin model
@@ -220,6 +201,13 @@ void Foam::incompressibleMooneyRivlinElastic::correct(surfaceSymmTensorField& si
     // This term is important to assure the underformed configuration
     // to be stress-free
     sigma = sigmaHydf*I + s - 2.0*(c10_ + 2.0*c01_)*I;
+}
+
+
+void Foam::incompressibleMooneyRivlinElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
 }
 
 

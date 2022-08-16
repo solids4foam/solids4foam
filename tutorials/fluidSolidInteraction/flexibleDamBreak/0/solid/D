@@ -22,17 +22,15 @@ boundaryField
 {
     interface
     {
-        //type            solidTraction;
-        type            blockSolidTraction;
+        type            solidTraction;
         traction        uniform ( 0 0 0 );
         pressure        uniform 0;
         value           uniform (0 0 0);
     }
     base
     {
-        //type            fixedDisplacement;
-       type            blockFixedDisplacement;
-       value           uniform (0 0 0);
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
     }
     defaultFaces
     {

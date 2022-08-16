@@ -1,19 +1,7 @@
-ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
-    DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-deprecated-declarations
-else
-    DISABLE_WARNING_FLAGS =
-endif
-
 ifeq ($(WM_PROJECT), foam)
-    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
-    ifeq ($(VER), 1)
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
-    else
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
-    endif
+    VERSION_SPECIFIC_INC = -DFOAMEXTEND
 else
-    VERSION_SPECIFIC_INC = \
-        -DOPENFOAMESIORFOUNDATION -I$(LIB_SRC)/dynamicFvMesh/lnInclude/
+    VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
     ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
         VERSION_SPECIFIC_INC += -DOPENFOAMESI
     else
@@ -22,8 +10,8 @@ else
 endif
 
 EXE_INC = \
-    -std=c++11 \
-    $(DISABLE_WARNING_FLAGS) \
+    -std=c++14 \
+    -Wno-old-style-cast -Wno-deprecated-declarations \
     $(VERSION_SPECIFIC_INC) \
     -I../../ThirdParty/eigen3 \
     -I../solids4FoamModels/lnInclude \
@@ -37,4 +25,9 @@ EXE_INC = \
     -I$(LIB_SRC)/lagrangian/lnInclude \
     -I$(LIB_SRC)/sampling/lnInclude
 
-EXE_LIBS =
+LIB_LIBS = \
+    -lfiniteVolume \
+    -ldynamicFvMesh \
+    -ldynamicMesh \
+    -lmeshTools \
+    -ltopoChangerFvMesh

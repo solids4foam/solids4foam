@@ -126,7 +126,7 @@ void Foam::linearElasticMisesPlastic::updatePlasticity
                 DLambda /= 1.0 + Hp_/(3*mu_.value());
 
                 // Update increment of yield stress
-                DSigmaY = DLambda*Hp_;
+                DSigmaY = sqrtTwoOverThree_*DLambda*Hp_;
 
                 // Update yield stress
                 sigmaY = sigmaYOld + DSigmaY;
@@ -237,109 +237,149 @@ void Foam::linearElasticMisesPlastic::newtonLoop
 }
 
 
-void Foam::linearElasticMisesPlastic::calculateHydrostaticStress
+void Foam::linearElasticMisesPlastic::calculateStress
 (
-    volScalarField& sigmaHyd,
-    const volScalarField& trEpsilon
-)
+ surfaceSymmTensorField& sigma,
+ const surfaceSymmTensorField& epsilon
+ ) const
 {
-    if (solvePressureEqn_)
+    // Calculate deviatoric strain
+    const surfaceSymmTensorField e(dev(epsilon));
+    
+    // Calculate deviatoric trial stress
+    const surfaceSymmTensorField sTrial
+    (
+     2.0*mu_*(e - dev(epsilonPf_.oldTime()))
+     );
+    
+    // Calculate the yield function
+    const surfaceScalarField fTrial(mag(sTrial) - sqrtTwoOverThree_*sigmaYf_);
+    
+    // Make a copy of history fields that are updated
+    surfaceSymmTensorField plasticN("plasticNtmp", 1.0*plasticNf_);
+    surfaceScalarField DSigmaY("DSigmaYtmp", 1.0*DSigmaYf_);
+    surfaceScalarField DLambda("DLambdatmp", 1.0*DLambdaf_);
+    surfaceScalarField sigmaY("sigmaYtmp", 1.0*sigmaYf_);
+    
+#ifdef OPENFOAMESIORFOUNDATION
+    // Normalise residual in Newton method with respect to mag(bE)
+    const scalar maxMagBE = max(gMax(mag(epsilon.primitiveField())), SMALL);
+    
+    // Take references to the internal fields for efficiency
+    const scalarField& fTrialI = fTrial.primitiveField();
+    const symmTensorField& sTrialI = sTrial.primitiveField();
+    symmTensorField& plasticNI = plasticN.primitiveFieldRef();
+    scalarField& DSigmaYI = DSigmaY.primitiveFieldRef();
+    scalarField& DLambdaI = DLambda.primitiveFieldRef();
+    scalarField& sigmaYI = sigmaY.primitiveFieldRef();
+    const scalarField& sigmaYOldI = sigmaYf_.oldTime().primitiveField();
+    const scalarField& epsilonPEqOldI = epsilonPEqf_.oldTime().primitiveField();
+#else
+    // Normalise residual in Newton method with respect to mag(bE)
+    const scalar maxMagBE = max(gMax(mag(epsilon.internalField())), SMALL);
+    
+    // Take references to the internal fields for efficiency
+    const scalarField& fTrialI = fTrial.internalField();
+    const symmTensorField& sTrialI = sTrial.internalField();
+    symmTensorField& plasticNI = plasticN.internalField();
+    scalarField& DSigmaYI = DSigmaY.internalField();
+    scalarField& DLambdaI = DLambda.internalField();
+    scalarField& sigmaYI = sigmaY.internalField();
+    const scalarField& sigmaYOldI = sigmaYf_.oldTime().internalField();
+    const scalarField& epsilonPEqOldI = epsilonPEqf_.oldTime().internalField();
+#endif
+    
+    // Calculate DLambdaf_ and plasticNf_
+    // int numYield = 0;
+    forAll(fTrialI, faceI)
     {
-        // Store previous iteration to allow relaxation, if needed
-        sigmaHyd.storePrevIter();
-
-        // Lookup the momentum equation inverse diagonal field
-        const volScalarField* ADPtr = NULL;
-        if (mesh().foundObject<volScalarField>("DEqnA"))
+        // Update plasticN, DLambda, DSigmaY and sigmaY for this face
+        updatePlasticity
+        (
+         plasticNI[faceI],
+         DLambdaI[faceI],
+         DSigmaYI[faceI],
+         sigmaYI[faceI],
+         sigmaYOldI[faceI],
+         fTrialI[faceI],
+         sTrialI[faceI],
+         epsilonPEqOldI[faceI],
+         mu_.value(),
+         maxMagBE
+         );
+        
+        // if (fTrialI[faceI] > 0)
+        // {
+        //     numYield++;
+        // }
+    }
+    // Info<< "        tang: numYield = " <<  numYield << endl;
+    
+    forAll(fTrial.boundaryField(), patchI)
+    {
+        // Take references to the boundary patch fields for efficiency
+        const scalarField& fTrialP = fTrial.boundaryField()[patchI];
+        const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+        symmTensorField& plasticNP = plasticN.boundaryFieldRef()[patchI];
+        scalarField& DSigmaYP = DSigmaY.boundaryFieldRef()[patchI];
+        scalarField& DLambdaP = DLambda.boundaryFieldRef()[patchI];
+        scalarField& sigmaYP = sigmaY.boundaryFieldRef()[patchI];
+#else
+        symmTensorField& plasticNP = plasticN.boundaryField()[patchI];
+        scalarField& DSigmaYP = DSigmaY.boundaryField()[patchI];
+        scalarField& DLambdaP = DLambda.boundaryField()[patchI];
+        scalarField& sigmaYP = sigmaY.boundaryField()[patchI];
+#endif
+        const scalarField& sigmaYOldP =
+        sigmaYf_.oldTime().boundaryField()[patchI];
+        const scalarField& epsilonPEqOldP =
+        epsilonPEqf_.oldTime().boundaryField()[patchI];
+        
+        forAll(fTrialP, faceI)
         {
-            ADPtr = &mesh().lookupObject<volScalarField>("DEqnA");
-        }
-        else if (mesh().foundObject<volScalarField>("DDEqnA"))
-        {
-            ADPtr = &mesh().lookupObject<volScalarField>("DDEqnA");
-        }
-        else
-        {
-            FatalErrorIn
+            // Update plasticN, DLambda, DSigmaY and sigmaY for this face
+            updatePlasticity
             (
-                "void Foam::linearElasticMisesPlastic::"
-                "calculateHydrostaticStress\n"
-                "(\n"
-                "    volScalarField& sigmaHyd,\n"
-                "    const volScalarField& trEpsilon\n"
-                ")"
-            )   << "Cannot find the DEqnA or DDEqnA field: this should be "
-                << "stored in the solidModel" << abort(FatalError);
+             plasticNP[faceI],
+             DLambdaP[faceI],
+             DSigmaYP[faceI],
+             sigmaYP[faceI],
+             sigmaYOldP[faceI],
+             fTrialP[faceI],
+             sTrialP[faceI],
+             epsilonPEqOldP[faceI],
+             mu_.value(),
+             maxMagBE
+             );
         }
-        const volScalarField& AD = *ADPtr;
-
-        // Pressure diffusivity field multiple by (4.0/3.0)*mu + K, which is
-        // equivalent to (2*mu + lambda)
-        // Note: we can scale this coefficient by pressureSmoothingCoeff to
-        // provide greater smoothing
-        const surfaceScalarField rDAf
-        (
-            "rDAf",
-            pressureSmoothingCoeff_
-           *fvc::interpolate
-            (
-                ((4.0/3.0)*mu_ + K_)/AD, "interpolate(grad(sigmaHyd))"
-            )
-        );
-
-        // Solve pressure laplacian
-        // Note: the the laplacian and div terms combine to produce a
-        // third-order smoothing/dissipation term
-        // If we only used the laplacian term then the smoothing/dissipation
-        // would be second-order.
-        // It would be interesting to see how this compares to the JST 2nd/4th
-        // order dissipation term
-        fvScalarMatrix sigmaHydEqn
-        (
-            fvm::Sp(1.0, sigmaHyd)
-          - fvm::laplacian(rDAf, sigmaHyd, "laplacian(DA,sigmaHyd)")
-          + fvc::div(rDAf*fvc::interpolate(fvc::grad(sigmaHyd)) & mesh().Sf())
-         ==
-            K_*trEpsilon
-        );
-
-        // Solve the pressure equation
-        sigmaHydEqn.solve();
-
-        // Relax the field
-        sigmaHyd.relax();
     }
-    else
-    {
-        // Directly calculate hydrostatic stress from displacement field
-        sigmaHyd = K_*trEpsilon;
-    }
-}
-
-
-void Foam::linearElasticMisesPlastic::calculateHydrostaticStress
-(
-    surfaceScalarField& sigmaHyd,
-    const surfaceScalarField& trEpsilon
-)
-{
-    if (solvePressureEqn_)
-    {
-        FatalErrorIn
-        (
-            "void Foam::linearElasticMisesPlastic::calculateHydrostaticStress\n"
-            "(\n"
-            "    surfaceScalarField& sigmaHyd,\n"
-            "    const surfaceScalarField& trEpsilon\n"
-            ")"
-        )   << "'solvePressureEqn' option only implemented for volField stress "
-            << "calculation" << abort(FatalError);
-    }
-    else
-    {
-        // Directly calculate hydrostatic stress from displacement field
-        sigmaHyd = K_*trEpsilon;
-    }
+    
+    // Update DEpsilonPEq
+    // DEpsilonPEqf_ = sqrtTwoOverThree_*DLambdaf_;
+    
+    // Store previous iteration for residual calculation
+    // DEpsilonPf_.storePrevIter();
+    
+    // Update DEpsilonP
+    const surfaceSymmTensorField DEpsilonP(DLambda*plasticN);
+    
+    // Update total plastic strain
+    // epsilonPf_ = epsilonPf_.oldTime() + DEpsilonPf_;
+    
+    // Update equivalent total plastic strain
+    // epsilonPEqf_ = epsilonPEqf_.oldTime() + DEpsilonPEqf_;
+    
+    // Calculate deviatoric stress
+    const surfaceSymmTensorField s(sTrial - 2*mu_*DEpsilonP);
+    
+    // Calculate the hydrostatic pressure directly from the displacement
+    // field
+    // const surfaceScalarField trEpsilon(tr(epsilon));
+    // calculateHydrostaticStress(sigmaHydf_, trEpsilon);
+    
+    // Update the stress
+    sigma = K_*tr(epsilon)*I + s;
 }
 
 
@@ -355,44 +395,11 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
     E_("zero", dimPressure, 0.0),
     nu_("zero", dimless, 0.0),
     stressPlasticStrainSeries_(dict),
-    solvePressureEqn_(dict.lookup("solvePressureEqn")),
-    pressureSmoothingCoeff_
-    (
-        dict.lookupOrDefault<scalar>("pressureSmoothingCoeff", 1.0)
-    ),
-    sigmaHyd_
-    (
-        IOobject
-        (
-            "sigmaHyd",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0.0),
-        zeroGradientFvPatchScalarField::typeName
-    ),
-    sigmaHydf_
-    (
-        IOobject
-        (
-            "sigmaHydf",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0.0)
-    ),
     sigmaY_
     (
         IOobject
@@ -450,32 +457,6 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
         ),
         mesh,
         dimensionedScalar("0", dimPressure, 0.0)
-    ),
-    epsilon_
-    (
-        IOobject
-        (
-            "epsilon",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    ),
-    epsilonf_
-    (
-        IOobject
-        (
-            "epsilonf",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     epsilonP_
     (
@@ -653,8 +634,19 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
         mesh.time().controlDict().lookupOrDefault<scalar>("maxDeltaErr", 0.01)
     )
 {
+    if (planeStress())
+    {
+        FatalErrorIn
+        (
+            "linearElasticMisesPlastic::linearElasticMisesPlastic::()"
+        )   << "Not implemented for planeStress. If needed, you can solve the "
+            << "case in 3-D and set the back to a symmetryPlane and the front "
+            << "to traction-free" << abort(FatalError);
+    }
+
     // Force storage of old-time fields
-    epsilon_.oldTime();
+    epsilon().oldTime();
+    epsilonf().oldTime();
     epsilonP_.oldTime();
     epsilonPf_.oldTime();
     epsilonPEq_.oldTime();
@@ -729,13 +721,6 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
                 );
         }
     }
-
-    if (solvePressureEqn_)
-    {
-        Info<< "    Laplacian equation will be solved for pressure" << nl
-            << "    pressureSmoothingCoeff: " << pressureSmoothingCoeff_
-            << endl;
-    }
 }
 
 
@@ -747,28 +732,6 @@ Foam::linearElasticMisesPlastic::~linearElasticMisesPlastic()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volScalarField> Foam::linearElasticMisesPlastic::rho() const
-{
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            calculatedFvPatchScalarField::typeName
-        )
-    );
-}
-
-
 Foam::tmp<Foam::volScalarField>
 Foam::linearElasticMisesPlastic::impK() const
 {
@@ -776,17 +739,19 @@ Foam::linearElasticMisesPlastic::impK() const
     // This is similar to the tangent matrix in FE procedures
 
     // Calculate deviatoric strain
-    const volSymmTensorField e = dev(epsilon_);
+    const volSymmTensorField e(dev(epsilon()));
 
     // Calculate deviatoric trial stress
-    const volSymmTensorField sTrial = 2.0*mu_*(e - dev(epsilonP_.oldTime()));
+    const volSymmTensorField sTrial(2.0*mu_*(e - dev(epsilonP_.oldTime())));
 
     // Magnitude of the deviatoric trial stress
-    const volScalarField magSTrial =
-        max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL));
+    const volScalarField magSTrial
+    (
+        max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL))
+    );
 
     // Calculate scaling factor
-    const volScalarField scaleFactor = 1.0 - (2.0*mu_*DLambda_/magSTrial);
+    const volScalarField scaleFactor(1.0 - (2.0*mu_*DLambda_/magSTrial));
 
     return tmp<volScalarField>
     (
@@ -817,20 +782,22 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
     // This is similar to the tangent matrix in FE procedures
 
     // Calculate deviatoric strain
-    const volSymmTensorField e = dev(epsilon_);
+    const volSymmTensorField e(dev(epsilon()));
 
     // Calculate deviatoric trial stress
-    const volSymmTensorField sTrial = 2.0*mu_*(e - dev(epsilonP_.oldTime()));
+    const volSymmTensorField sTrial(2.0*mu_*(e - dev(epsilonP_.oldTime())));
 
     // Magnitude of the deviatoric trial stress
-    const volScalarField magSTrial =
-        max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL));
+    const volScalarField magSTrial
+    (
+        max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL))
+    );
 
     // Calculate scaling factor
-    const volScalarField theta = 1.0 - (2.0*mu_*DLambda_/magSTrial);
+    const volScalarField theta(1.0 - (2.0*mu_*DLambda_/magSTrial));
 
     // Calculate N squared where N is the plastic return direction
-    const volTensorField NsquaredTensor = plasticN_ & plasticN_;
+    const volTensorField NsquaredTensor(plasticN_ & plasticN_);
     volDiagTensorField Nsquared
     (
         IOobject
@@ -879,64 +846,320 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
 #endif
 
 
+Foam::tmp<Foam::Field<Foam::symmTensor4thOrder>>
+Foam::linearElasticMisesPlastic::materialTangentField() const
+{
+    // Prepare tmp field
+    tmp<Field<symmTensor4thOrder>> tresult
+    (
+        new Field<symmTensor4thOrder>(mesh().nFaces(), symmTensor4thOrder::zero)
+    );
+#ifdef OPENFOAMESIORFOUNDATION
+    Field<symmTensor4thOrder>& result = tresult.ref();
+#else
+    Field<symmTensor4thOrder>& result = tresult();
+#endif
+
+    // Calculated as per box 3.2 in Simo and Hughes
+
+    // Info<< "max(mag(epsilonf)) = " << max(mag(epsilonf_)) << endl;
+
+    // Update total strain
+    const_cast<linearElasticMisesPlastic&>(*this).updateEpsilonf();
+
+    // Calculate deviatoric strain
+    const surfaceSymmTensorField e(dev(epsilonf()));
+
+    // Calculate deviatoric trial stress
+    const surfaceSymmTensorField sTrial(2.0*mu_*(e - dev(epsilonPf_.oldTime())));
+
+    // Magnitude of the deviatoric trial stress
+    const surfaceScalarField magSTrial
+    (
+        max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL))
+    );
+ 
+    // Calculate the yield function
+    const surfaceScalarField fTrial
+    (
+        mag(sTrial) - sqrtTwoOverThree_*sigmaYf_.oldTime()
+    );
+    const scalarField& fTrialI = fTrial.internalField();
+
+    // Return direction
+    const surfaceSymmTensorField plasticN(sTrial/magSTrial);
+    const symmTensorField& plasticNI = plasticN.internalField();
+
+    // Calculate tangent field
+    const Switch numericalTangent(dict().lookup("numericalTangent"));
+    if (numericalTangent)
+    {
+        // Lookup current stress and store it as the reference
+        const surfaceSymmTensorField& sigmaRef = 
+            mesh().lookupObject<surfaceSymmTensorField>("sigmaf");
+        const surfaceSymmTensorField& epsilonRef = epsilonf();
+
+        // Create fields to be used for perturbations
+        surfaceSymmTensorField sigmaPerturb("sigmaPerturb", sigmaRef);
+        surfaceSymmTensorField epsilonPerturb("epsilonPerturb", epsilonRef);
+
+        // Small number used for perturbations
+        const scalar eps(readScalar(dict().lookup("tangentEps")));
+
+        // For each component of epsilon, sequentially apply a perturbation and
+        // then calculate the resulting sigma
+        for (label cmptI = 0; cmptI < symmTensor::nComponents; cmptI++)
+        {
+            // Reset epsilonPerturb
+            // We multiply by 1.0 to avoid issues with epsilonf being removed
+            // from the object registry
+            epsilonPerturb = 1.0*epsilonRef;
+
+            // Perturb this component of epsilon
+            epsilonPerturb.replace(cmptI, epsilonPerturb.component(cmptI) + eps);
+
+            // Calculate perturbed stress
+            calculateStress(sigmaPerturb, epsilonPerturb);
+
+            // Calculate tangent component
+            const surfaceSymmTensorField tangCmpt((sigmaPerturb - sigmaRef)/eps);
+            const symmTensorField& tangCmptI = tangCmpt.internalField();
+
+            // Insert tangent component
+            forAll(tangCmptI, faceI)
+            {
+                if (cmptI == symmTensor::XX)
+                {
+                    // Is xxyy == yyxx? etc. check!
+                    result[faceI].xxxx() = tangCmptI[faceI][symmTensor::XX];
+                    // result[faceI].yyxx() = tangCmptI[faceI][symmTensor::YY];
+                    // result[faceI].zzxx() = tangCmptI[faceI][symmTensor::ZZ];
+                }
+                else if (cmptI == symmTensor::YY)
+                {
+                    result[faceI].xxyy() = tangCmptI[faceI][symmTensor::XX];
+                    result[faceI].yyyy() = tangCmptI[faceI][symmTensor::YY];
+                    // result[faceI].zzyy() = tangCmptI[faceI][symmTensor::ZZ];
+                }
+                else if (cmptI == symmTensor::ZZ)
+                {
+                    result[faceI].xxzz() = tangCmptI[faceI][symmTensor::XX];
+                    result[faceI].yyzz() = tangCmptI[faceI][symmTensor::YY];
+                    result[faceI].zzzz() = tangCmptI[faceI][symmTensor::ZZ];
+                }
+                else if (cmptI == symmTensor::XY)
+                {
+                    result[faceI].xyxy() = tangCmptI[faceI][symmTensor::XY];
+                }
+                else if (cmptI == symmTensor::YZ)
+                {
+                    result[faceI].yzyz() = tangCmptI[faceI][symmTensor::YZ];
+                }
+                else // if (cmptI == symmTensor::XZ)
+                {
+                    result[faceI].zxzx() = tangCmptI[faceI][symmTensor::XZ];
+                }
+            }
+
+            forAll(tangCmpt.boundaryField(), patchI)
+            {
+                const symmTensorField& tangCmptP =
+                    tangCmpt.boundaryField()[patchI];
+                const label start = mesh().boundaryMesh()[patchI].start();
+
+                forAll(tangCmptP, fI)
+                {
+                    const label faceID = start + fI;
+
+                    if (cmptI == symmTensor::XX)
+                    {
+                        // Is xxyy == yyxx? etc.
+                        result[faceID].xxxx() = tangCmptP[fI][symmTensor::XX];
+                        // result[faceID].yyxx() = tangCmptP[fI][symmTensor::YY];
+                        // result[faceID].zzxx() = tangCmptP[fI][symmTensor::ZZ];
+                    }
+                    else if (cmptI == symmTensor::YY)
+                    {
+                        result[faceID].xxyy() = tangCmptP[fI][symmTensor::XX];
+                        result[faceID].yyyy() = tangCmptP[fI][symmTensor::YY];
+                        // result[faceID].zzyy() = tangCmptP[fI][symmTensor::ZZ];
+                    }
+                    else if (cmptI == symmTensor::ZZ)
+                    {
+                        result[faceID].xxzz() = tangCmptP[fI][symmTensor::XX];
+                        result[faceID].yyzz() = tangCmptP[fI][symmTensor::YY];
+                        result[faceID].zzzz() = tangCmptP[fI][symmTensor::ZZ];
+                    }
+                    else if (cmptI == symmTensor::XY)
+                    {
+                        result[faceID].xyxy() = tangCmptP[fI][symmTensor::XY];
+                    }
+                    else if (cmptI == symmTensor::YZ)
+                    {
+                        result[faceID].yzyz() = tangCmptP[fI][symmTensor::YZ];
+                    }
+                    else // if (cmptI == symmTensor::XZ)
+                    {
+                        result[faceID].zxzx() = tangCmptP[fI][symmTensor::XZ];
+                    }
+                }
+            }
+        }
+
+        // Include 0.5 factor for shear components
+        forAll(result, faceI)
+        {
+            result[faceI].xyxy() *= 0.5;
+            result[faceI].yzyz() *= 0.5;
+            result[faceI].zxzx() *= 0.5;
+        }
+    }
+    else // Analytical tangent
+    {
+        // Calculate scaling factor
+        // For now, assume theta == thetaBar i.e. ignore hardening
+        const surfaceScalarField theta(1.0 - (2.0*mu_*DLambdaf_/magSTrial));
+        //const surfaceScalarField theta(min(sqrtTwoOverThree_*sigmaYf_/magSTrial, 1.0));
+
+        // int numYield = 0;
+
+        // Create 4th order identity tensor
+        symmTensor4thOrder I4 = symmTensor4thOrder::zero;
+        I4.xxxx() = 1.0;
+        I4.yyyy() = 1.0;
+        I4.zzzz() = 1.0;
+        I4.xyxy() = 1.0;
+        I4.yzyz() = 1.0;
+        I4.zxzx() = 1.0;
+
+        // Create I squared: outer product of the 2nd order identity tensor with
+        // itself
+        symmTensor4thOrder I2 = symmTensor4thOrder::zero;
+        I2.xxxx() = 1.0;
+        I2.xxyy() = 1.0;
+        I2.xxzz() = 1.0;
+        I2.yyyy() = 1.0;
+        I2.yyzz() = 1.0;
+        I2.zzzz() = 1.0;
+
+        // Calculate N squared 4th order tensor
+        const scalarField& thetaI = theta.internalField();
+        symmTensor4thOrder nSquared = symmTensor4thOrder::zero;
+        //const dimensionedScalar lambda = K_ - (2.0/3.0)*mu_;
+        forAll(plasticNI, faceI)
+        {
+            if (fTrialI[faceI] > 0.0)
+            {
+                // numYield++;
+
+                // Calculate outer product of N tensor with itself
+                nSquared.xxxx() = plasticNI[faceI].xx()*plasticNI[faceI].xx();
+                nSquared.xxyy() = plasticNI[faceI].xx()*plasticNI[faceI].yy();
+                nSquared.xxzz() = plasticNI[faceI].xx()*plasticNI[faceI].zz();
+
+                nSquared.yyyy() = plasticNI[faceI].yy()*plasticNI[faceI].yy();
+                nSquared.yyzz() = plasticNI[faceI].yy()*plasticNI[faceI].zz();
+
+                nSquared.zzzz() = plasticNI[faceI].zz()*plasticNI[faceI].zz();
+
+                nSquared.xyxy() = plasticNI[faceI].xy()*plasticNI[faceI].xy();
+                nSquared.yzyz() = plasticNI[faceI].yz()*plasticNI[faceI].yz();
+                nSquared.zxzx() = plasticNI[faceI].xz()*plasticNI[faceI].xz();
+
+                // Elasto-plastic tangent
+                result[faceI] =
+                    K_.value()*I2
+                  + 2*mu_.value()*thetaI[faceI]*(I4 - I2/3.0)
+                  - 2*mu_.value()*thetaI[faceI]*nSquared;
+            }
+            else
+            {
+                // Elastic tangent
+                result[faceI] = K_.value()*I2 + 2*mu_.value()*(I4 - I2/3.0);
+            }
+
+            // We assume half value for shears
+            result[faceI].xyxy() *= 0.5;
+            result[faceI].yzyz() *= 0.5;
+            result[faceI].zxzx() *= 0.5;
+        }
+
+        forAll(plasticN.boundaryField(), patchI)
+        {
+            const symmTensorField& plasticNP = plasticN.boundaryField()[patchI];
+            const scalarField& thetaP = theta.boundaryField()[patchI];
+            const scalarField& fTrialP = fTrial.boundaryField()[patchI];
+            const label start = mesh().boundaryMesh()[patchI].start();
+            forAll(plasticNP, fI)
+            {
+                const label faceID = start + fI;
+
+                if (fTrialP[fI] > 0.0)
+                {
+                    // numYield++;
+
+                    // Calculate outer product of N tensor with itself
+                    nSquared.xxxx() = plasticNP[fI].xx()*plasticNP[fI].xx();
+                    nSquared.xxyy() = plasticNP[fI].xx()*plasticNP[fI].yy();
+                    nSquared.xxzz() = plasticNP[fI].xx()*plasticNP[fI].zz();
+
+                    nSquared.yyyy() = plasticNP[fI].yy()*plasticNP[fI].yy();
+                    nSquared.yyzz() = plasticNP[fI].yy()*plasticNP[fI].zz();
+
+                    nSquared.zzzz() = plasticNP[fI].zz()*plasticNP[fI].zz();
+
+                    nSquared.xyxy() = plasticNP[fI].xy()*plasticNP[fI].xy();
+                    nSquared.yzyz() = plasticNP[fI].yz()*plasticNP[fI].yz();
+                    nSquared.zxzx() = plasticNP[fI].xz()*plasticNP[fI].xz();
+
+                    // Elasto-plastic tangent
+                    result[faceID] =
+                        K_.value()*I2
+                      + 2*mu_.value()*thetaP[fI]*(I4 - I2/3.0)
+                      - 2*mu_.value()*thetaP[fI]*nSquared;
+                }
+                else
+                {
+                    // Elastic tangent
+                    result[faceID] =
+                        K_.value()*I2 + 2*mu_.value()*(I4 - I2/3.0);
+                }
+
+                // We assume half value for shears
+                result[faceID].xyxy() *= 0.5;
+                result[faceID].yzyz() *= 0.5;
+                result[faceID].zxzx() *= 0.5;
+            }
+        }
+
+        // Info<< "    tang: numYield = " << numYield << endl;
+            // << ", % = " << (100*numYield/result.size()) << endl;
+    }
+
+    return tresult;
+}
+
+
 void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
 {
     // Calculate total strain
-    if (incremental())
-    {
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        epsilon_ = epsilon_.oldTime() + symm(gradDD);
-    }
-    else
-    {
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        epsilon_ = symm(gradD);
-    }
-
-    // For planeStress, correct strain in the out of plane direction
-    if (planeStress())
-    {
-        if (mesh().solutionD()[vector::Z] > -1)
-        {
-            FatalErrorIn
-            (
-                "void Foam::linearElasticMisesPlastic::"
-                "correct(volSymmTensorField& sigma)"
-            )   << "For planeStress, this material law assumes the empty "
-                << "direction is the Z direction!" << abort(FatalError);
-        }
-
-        epsilon_.replace
-        (
-            symmTensor::ZZ,
-           -(nu_/E_)
-           *(sigma.component(symmTensor::XX) + sigma.component(symmTensor::YY))
-          - (
-                epsilonP_.component(symmTensor::XX)
-              + epsilonP_.component(symmTensor::YY)
-            )
-        );
-    }
+    updateEpsilon();
 
     // Calculate deviatoric strain
-    const volSymmTensorField e = dev(epsilon_);
+    const volSymmTensorField e(dev(epsilon()));
 
     // Calculate deviatoric trial stress
-    const volSymmTensorField sTrial = 2.0*mu_*(e - dev(epsilonP_.oldTime()));
+    const volSymmTensorField sTrial(2.0*mu_*(e - dev(epsilonP_.oldTime())));
 
     // Calculate the yield function
-    const volScalarField fTrial =
-        mag(sTrial) - sqrtTwoOverThree_*sigmaY_.oldTime();
+    const volScalarField fTrial
+    (
+        mag(sTrial) - sqrtTwoOverThree_*sigmaY_.oldTime()
+    );
 
 #ifdef OPENFOAMESIORFOUNDATION
     // Normalise residual in Newton method with respect to mag(bE)
-    const scalar maxMagBE = max(gMax(mag(epsilon_.primitiveField())), SMALL);
+    const scalar maxMagBE = max(gMax(mag(epsilon().primitiveField())), SMALL);
 
     // Take references to the internal fields for efficiency
     const scalarField& fTrialI = fTrial.primitiveField();
@@ -948,7 +1171,7 @@ void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
     const scalarField& sigmaYOldI = sigmaY_.oldTime().primitiveField();
     const scalarField& epsilonPEqOldI = epsilonPEq_.oldTime().primitiveField();
 #else
-    const scalar maxMagBE = max(gMax(mag(epsilon_.internalField())), SMALL);
+    const scalar maxMagBE = max(gMax(mag(epsilon().internalField())), SMALL);
 
     // Take references to the internal fields for efficiency
     const scalarField& fTrialI = fTrial.internalField();
@@ -1035,75 +1258,36 @@ void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
     epsilonPEq_ = epsilonPEq_.oldTime() + DEpsilonPEq_;
 
     // Calculate deviatoric stress
-    const volSymmTensorField s = sTrial - 2*mu_*DEpsilonP_;
+    const volSymmTensorField s(sTrial - 2*mu_*DEpsilonP_);
 
-    // Calculate the hydrostatic pressure
-    const volScalarField trEpsilon = tr(epsilon_);
-    calculateHydrostaticStress(sigmaHyd_, trEpsilon);
+    // Update hydrostatic stress
+    updateSigmaHyd(K_*tr(epsilon()), (4.0/3.0)*mu_ + K_);
 
     // Update the stress
-    sigma = sigmaHyd_*I + s;
+    sigma = sigmaHyd()*I + s;
 }
 
 
 void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 {
     // Calculate total strain
-    if (incremental())
-    {
-        // Lookup gradient of displacement increment
-        const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-        epsilonf_ = epsilonf_.oldTime() + symm(gradDD);
-    }
-    else
-    {
-        // Lookup gradient of displacement
-        const surfaceTensorField& gradD =
-            mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-        epsilonf_ = symm(gradD);
-    }
-
-    // For planeStress, correct strain in the out of plane direction
-    if (planeStress())
-    {
-        if (mesh().solutionD()[vector::Z] > -1)
-        {
-            FatalErrorIn
-            (
-                "void Foam::linearElasticMisesPlastic::"
-                "correct(surfaceSymmTensorField& sigma)"
-            )   << "For planeStress, this material law assumes the empty "
-                << "direction is the Z direction!" << abort(FatalError);
-        }
-
-        epsilonf_.replace
-        (
-            symmTensor::ZZ,
-           -(nu_/E_)
-           *(sigma.component(symmTensor::XX) + sigma.component(symmTensor::YY))
-          - (
-                epsilonPf_.component(symmTensor::XX)
-              + epsilonPf_.component(symmTensor::YY)
-            )
-        );
-    }
+    updateEpsilonf();
 
     // Calculate deviatoric strain
-    const surfaceSymmTensorField e = dev(epsilonf_);
+    const surfaceSymmTensorField e(dev(epsilonf()));
 
     // Calculate deviatoric trial stress
-    const surfaceSymmTensorField sTrial =
-        2.0*mu_*(e - dev(epsilonPf_.oldTime()));
+    const surfaceSymmTensorField sTrial
+    (
+        2.0*mu_*(e - dev(epsilonPf_.oldTime()))
+    );
 
     // Calculate the yield function
-    const surfaceScalarField fTrial = mag(sTrial) - sqrtTwoOverThree_*sigmaYf_;
+    const surfaceScalarField fTrial(mag(sTrial) - sqrtTwoOverThree_*sigmaYf_);
 
 #ifdef OPENFOAMESIORFOUNDATION
     // Normalise residual in Newton method with respect to mag(bE)
-    const scalar maxMagBE = max(gMax(mag(epsilonf_.primitiveField())), SMALL);
+    const scalar maxMagBE = max(gMax(mag(epsilonf().primitiveField())), SMALL);
 
     // Take references to the internal fields for efficiency
     const scalarField& fTrialI = fTrial.primitiveField();
@@ -1116,7 +1300,7 @@ void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     const scalarField& epsilonPEqOldI = epsilonPEqf_.oldTime().primitiveField();
 #else
     // Normalise residual in Newton method with respect to mag(bE)
-    const scalar maxMagBE = max(gMax(mag(epsilonf_.internalField())), SMALL);
+    const scalar maxMagBE = max(gMax(mag(epsilonf().internalField())), SMALL);
 
     // Take references to the internal fields for efficiency
     const scalarField& fTrialI = fTrial.internalField();
@@ -1204,15 +1388,28 @@ void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     epsilonPEqf_ = epsilonPEqf_.oldTime() + DEpsilonPEqf_;
 
     // Calculate deviatoric stress
-    const surfaceSymmTensorField s = sTrial - 2*mu_*DEpsilonPf_;
+    const surfaceSymmTensorField s(sTrial - 2*mu_*DEpsilonPf_);
 
-    // Calculate the hydrostatic pressure directly from the displacement
-    // field
-    const surfaceScalarField trEpsilon = tr(epsilonf_);
-    calculateHydrostaticStress(sigmaHydf_, trEpsilon);
+    if (solvePressureEqn())
+    {
+        // Solve pressure equation at cells
+        updateEpsilon();
+        updateSigmaHyd(K_*tr(epsilon()), (4.0/3.0)*mu_ + K_);
 
-    // Update the stress
-    sigma = sigmaHydf_*I + s;
+        // Interpolate to faces
+        const surfaceScalarField sigmaHydf(fvc::interpolate(sigmaHyd()));
+
+        // Update the stress
+        sigma = sigmaHydf*I + s;
+    }
+    else
+    {
+        // Calculate hydrostatic stress at the faces
+        const surfaceScalarField sigmaHydf(K_*tr(epsilonf()));
+
+        // Update the stress
+        sigma = sigmaHydf*I + s;
+    }
 }
 
 
@@ -1378,7 +1575,7 @@ Foam::scalar Foam::linearElasticMisesPlastic::newDeltaT()
     // Analysis and Design 16 (1994) 99-139.
 
     // Calculate equivalent strain, for normalisation of the error
-    const volScalarField epsilonEq = sqrt((2.0/3.0)*magSqr(dev(epsilon_)));
+    const volScalarField epsilonEq(sqrt((2.0/3.0)*magSqr(dev(epsilon()))));
 
     // Take reference to internal fields
 #ifdef OPENFOAMESIORFOUNDATION
@@ -1394,9 +1591,11 @@ Foam::scalar Foam::linearElasticMisesPlastic::newDeltaT()
 #endif
 
     // Calculate error field
-    const symmTensorField DEpsilonPErrorI =
+    const symmTensorField DEpsilonPErrorI
+    (
         Foam::sqrt(3.0/8.0)*DEpsilonPI*mag(plasticNI - plasticNIold)
-       /(epsilonEqI + SMALL);
+       /(epsilonEqI + SMALL)
+    );
 
     // Max error
     const scalar maxMagDEpsilonPErr = gMax(mag(DEpsilonPErrorI));

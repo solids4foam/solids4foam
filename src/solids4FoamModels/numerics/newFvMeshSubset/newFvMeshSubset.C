@@ -38,7 +38,8 @@ Description
 #include "emptyPolyPatch.H"
 #include "demandDrivenData.H"
 #include "cyclicPolyPatch.H"
-#if FOAMEXTEND > 40
+#include "dynamicFvMesh.H"
+#if FOAMEXTEND
     #include "oversetPolyPatch.H"
 #endif
 
@@ -46,6 +47,12 @@ Description
 
 namespace Foam
 {
+
+#ifdef OPENFOAMFOUNDATION
+    typedef meshPointZones pointZoneMesh;
+    typedef meshFaceZones faceZoneMesh;
+    typedef meshCellZones cellZoneMesh;
+#endif
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -121,7 +128,11 @@ void Foam::newFvMeshSubset::doCoupledPatches
 
                 OPstream toNeighbour
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                 );
 
@@ -143,7 +154,11 @@ void Foam::newFvMeshSubset::doCoupledPatches
 
                 IPstream fromNeighbour
                 (
+#ifdef OPENFOAMESIORFOUNDATION
+                    Pstream::commsTypes::blocking,
+#else
                     Pstream::blocking,
+#endif
                     procPatch.neighbProcNo()
                 );
 
@@ -268,7 +283,7 @@ void Foam::newFvMeshSubset::subsetZones()
         pZonePtrs[i] = new pointZone
         (
             pz.name(),
-            subset(baseMesh().allPoints().size(), pz, pointMap()),
+            subset(baseMesh().nPoints(), pz, pointMap()),
             i,
             newFvMeshSubsetPtr_->pointZones()
         );
@@ -293,14 +308,14 @@ void Foam::newFvMeshSubset::subsetZones()
         (
             subset
             (
-                baseMesh().allFaces().size(),
+                baseMesh().nFaces(),
                 fz,
                 faceMap()
             )
         );
 
         // Flipmap for all mesh faces
-        boolList fullFlipStatus(baseMesh().allFaces().size(), false);
+        boolList fullFlipStatus(baseMesh().nFaces(), false);
         forAll(fz, j)
         {
             fullFlipStatus[fz[j]] = fz.flipMap()[j];
@@ -366,16 +381,18 @@ void Foam::newFvMeshSubset::makeFvDictionaries()
         IOobject
         (
             "fvSchemes",
-            obr.time().system(),
+            bool(baseMesh().name() == dynamicFvMesh::defaultRegion)
+            ? fileName(obr.time().system())
+            : fileName(obr.time().system()/"solid"),
             obr,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
         )
     );
 
     if (!fvSchemes.headerOk())
     {
-        Info << "Cannot read " << fvSchemes.path()
+        Info<< "Cannot read " << fvSchemes.path()
             << ".  Copy from base" << endl;
 
         IOdictionary fvSchemesBase
@@ -399,16 +416,18 @@ void Foam::newFvMeshSubset::makeFvDictionaries()
         IOobject
         (
             "fvSolution",
-            obr.time().system(),
+            bool(baseMesh().name() == dynamicFvMesh::defaultRegion)
+            ? fileName(obr.time().system())
+            : fileName(obr.time().system()/"solid"),
             obr,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
         )
     );
 
     if (!fvSolution.headerOk())
     {
-        Info << "Cannot read " << fvSolution.path()
+        Info<< "Cannot read " << fvSolution.path()
             << ".  Copy from base" << endl;
 
         IOdictionary fvSolutionBase
@@ -469,7 +488,7 @@ void Foam::newFvMeshSubset::setCellSubset
     // Initial check on patches before doing anything time consuming.
     const polyBoundaryMesh& oldPatches = baseMesh().boundaryMesh();
     const cellList& oldCells = baseMesh().cells();
-    const faceList& oldFaces = baseMesh().allFaces();
+    const faceList& oldFaces = baseMesh().faces();
     const pointField& oldPoints = baseMesh().points();
     const labelList& oldOwner = baseMesh().faceOwner();
     const labelList& oldNeighbour = baseMesh().faceNeighbour();
@@ -776,9 +795,15 @@ void Foam::newFvMeshSubset::setCellSubset
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
+#ifdef OPENFOAMESIORFOUNDATION
+        std::move(newPoints),
+        std::move(newFaces),
+        std::move(newCells)
+#else
         xferMove(newPoints),
         xferMove(newFaces),
         xferMove(newCells)
+#endif
     );
 
     // Clear point mesh
@@ -822,6 +847,10 @@ void Foam::newFvMeshSubset::setCellSubset
                 patchStart,
                 nNewPatches,
                 newFvMeshSubsetPtr_->boundaryMesh()
+#ifdef OPENFOAMESIORFOUNDATION
+                ,
+                word::null
+#endif
             );
 
             // The index for the first patch is -1 as it originates from
@@ -1269,12 +1298,18 @@ void Foam::newFvMeshSubset::setLargeCellSubset
             this->name() + "Subset",
             baseMesh().time().timeName(),
             baseMesh().time(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
+#ifdef OPENFOAMESIORFOUNDATION
+        std::move(newPoints),
+        std::move(newFaces),
+        std::move(newCells),
+#else
         xferMove(newPoints),
         xferMove(newFaces),
         xferMove(newCells),
+#endif
         syncPar           // parallel synchronisation
     );
 
@@ -1346,7 +1381,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
     {
         label newSize = boundaryPatchSizes[globalPatchMap[oldPatchI]];
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
         if (isA<oversetPolyPatch>(oldPatches[oldPatchI]))
         {
             newBoundary[nNewPatches] = new polyPatch
@@ -1397,6 +1432,10 @@ void Foam::newFvMeshSubset::setLargeCellSubset
                 patchStart,
                 nNewPatches,
                 newFvMeshSubsetPtr_->boundaryMesh()
+#ifdef OPENFOAMESIORFOUNDATION
+                ,
+                word::null
+#endif
             );
 
             Pout<< "    oldInternalFaces : "
@@ -1507,7 +1546,11 @@ pointMesh& Foam::newFvMeshSubset::subPointMesh()
 {
     if (!pointMeshSubsetPtr_)
     {
+#ifdef OPENFOAMESIORFOUNDATION
+        pointMeshSubsetPtr_ = new pointMesh(subMesh());
+#else
         pointMeshSubsetPtr_ = new pointMesh(subMesh(), true);
+#endif
     }
 
     return *pointMeshSubsetPtr_;

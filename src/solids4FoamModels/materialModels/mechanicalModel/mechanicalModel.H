@@ -49,11 +49,11 @@ Author
 #include "fvMesh.H"
 #include "mechanicalLaw.H"
 #include "Switch.H"
+#include "solidSubMeshes.H"
 #ifdef OPENFOAMESIORFOUNDATION
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
-    #include "solidSubMeshes.H"
 #endif
 #include "nonLinearGeometry.H"
 #include "volFields.H"
@@ -89,28 +89,16 @@ class mechanicalModel
         mutable wordList cellZoneNames_;
 
         //- Sub-meshes for each mechanicalLaw
-#ifndef OPENFOAMESIORFOUNDATION
         mutable autoPtr<solidSubMeshes> solSubMeshes_;
-#endif
-
-        //- Volume field to point field interpolator for the base mesh
-#ifdef OPENFOAMESIORFOUNDATION
-        mutable volPointInterpolation* volToPointPtr_;
-#else
-        mutable newLeastSquaresVolPointInterpolation* volToPointPtr_;
-#endif
 
        //- The implicit stiffness surface field for Rhie-Chow correction
-        mutable surfaceScalarField* impKfcorrPtr_;
+        mutable autoPtr<surfaceScalarField> impKfcorrPtr_;
 
 
     // Private Member Functions
 
         //- Make material sub-meshes
         void makeSolSubMeshes() const;
-
-        //- Make base mesh vol-to-point interpolator
-        void makeVolToPoint() const;
 
         //- Calculate the impKf field for Rhie-Chow correction
         //  This field is zero on bi-material interfaces
@@ -162,14 +150,10 @@ public:
 #endif
 
             //- Return a const reference to the solidSubMeshes
-#ifndef OPENFOAMESIORFOUNDATION
             const solidSubMeshes& solSubMeshes() const;
-#endif
 
             //- Return a const reference to the solidSubMeshes
-#ifndef OPENFOAMESIORFOUNDATION
             solidSubMeshes& solSubMeshes();
-#endif
 
             //- Return initial density
             tmp<volScalarField> rho() const;
@@ -196,6 +180,9 @@ public:
 
             //- Calculate the stress surfaceField
             void correct(surfaceSymmTensorField& sigma);
+
+            //- Map grad field to subMeshes
+            void mapGradToSubMeshes(const volTensorField& gradD);
 
             //- Update the gradient of displacement vol field
             void grad
@@ -261,6 +248,10 @@ public:
 
             //- Move subMeshes
             void moveSubMeshes();
+
+            //- Set restart: some mechanical laws may change the writeOpt of
+            //  fields accordingly
+            void setRestart();
 };
 
 

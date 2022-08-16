@@ -45,7 +45,6 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(linGeomTotalDispSolid, 0);
-addToRunTimeSelectionTable(physicsModel, linGeomTotalDispSolid, solid);
 addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 
 
@@ -84,7 +83,11 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 {
     DisRequired();
 
+    // Force all required old-time fields to be created
+    fvm::d2dt2(D());
+
     // For consistent restarts, we will calculate the gradient field
+    D().storePrevIter();
     mechanical().grad(D(), gradD());
 
     if (predictor_)
@@ -201,15 +204,7 @@ bool linGeomTotalDispSolid::evolve()
                 iCorr,
 #ifdef OPENFOAMESIORFOUNDATION
                 mag(solverPerfD.initialResidual()),
-                max
-                (
-                    solverPerfD.nIterations()[0],
-                    max
-                    (
-                        solverPerfD.nIterations()[1],
-                        solverPerfD.nIterations()[2]
-                    )
-                ),
+                cmptMax(solverPerfD.nIterations()),
 #else
                 solverPerfD.initialResidual(),
                 solverPerfD.nIterations(),
@@ -233,7 +228,9 @@ bool linGeomTotalDispSolid::evolve()
     }
     while (mesh().update());
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
 
@@ -264,7 +261,7 @@ tmp<vectorField> linGeomTotalDispSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>

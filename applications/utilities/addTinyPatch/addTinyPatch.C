@@ -44,7 +44,11 @@ Author
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
-#include "directTopoChange.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "polyTopoChange.H"
+#else
+    #include "directTopoChange.H"
+#endif
 #include "polyModifyFace.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -64,9 +68,19 @@ int main(int argc, char *argv[])
     const word pointsInstance = mesh.pointsInstance();
 
     // Read arguments
+#ifdef OPENFOAMESIORFOUNDATION
+    const word currentPatchName(args[0]);
+    const word newTinyPatchName(args[1]);
+    #ifdef OPENFOAMESI
+    const vector approxFaceC(args.get<vector>(2));
+    #else
+    const vector approxFaceC(args.argRead<vector>(2));
+    #endif
+#else
     const word currentPatchName(args.additionalArgs()[0]);
     const word newTinyPatchName(args.additionalArgs()[1]);
     const vector approxFaceC(IStringStream(args.additionalArgs()[2])());
+#endif
 
     // Method:
     // Step 1: Add new patch with no faces to the end of the boundary list
@@ -131,7 +145,11 @@ int main(int argc, char *argv[])
 
     // Create topo changer to perform mesh changes
     // This class records what changes are to be made to the mesh
+#ifdef OPENFOAMESIORFOUNDATION
+    polyTopoChange meshMod(mesh);
+#else
     directTopoChange meshMod(mesh);
+#endif
 
     // Find patch ID of specified patch
 

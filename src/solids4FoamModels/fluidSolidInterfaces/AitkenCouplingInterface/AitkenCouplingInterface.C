@@ -40,10 +40,6 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(AitkenCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, AitkenCouplingInterface, fluidSolidInteraction
-);
-addToRunTimeSelectionTable
-(
     fluidSolidInterface, AitkenCouplingInterface, dictionary
 );
 
@@ -60,6 +56,13 @@ AitkenCouplingInterface::AitkenCouplingInterface
     relaxationFactor_
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
+    ),
+    relaxationFactorMax_
+    (
+        fsiProperties().lookupOrDefault<scalar>
+        (
+            "relaxationFactorMax", 1.0
+        )
     ),
     predictSolid_(fsiProperties().lookupOrDefault<Switch>("predictSolid", true)),
     aitkenRelaxationFactors_(nGlobalPatches(), relaxationFactor_)
@@ -204,12 +207,16 @@ void AitkenCouplingInterface::updateDisplacement()
             aitkenRelaxationFactors_[interfaceI] =
                 mag(aitkenRelaxationFactors_[interfaceI]);
 
-            if (aitkenRelaxationFactors_[interfaceI] > 1)
+            if (aitkenRelaxationFactors_[interfaceI] > relaxationFactorMax_)
             {
                 // PC: in this case, would 1.0 be a better option?
                 // Of course, the current option is more more stable
                 // aitkenRelaxationFactors_[interfaceI] = relaxationFactor_;
-                aitkenRelaxationFactors_[interfaceI] = 1.0;
+                // aitkenRelaxationFactors_[interfaceI] = 1.0;
+                // MT: switched from 1.0 or relaxationFactor_ to a
+                // relaxationFactorMax, as discussed at
+                // https://bitbucket.org/philip_cardiff/solids4foam-release/issues/30/aitken-coupling-under-relaxation-factor
+                aitkenRelaxationFactors_[interfaceI] = relaxationFactorMax_;
             }
 
             Info<< "Current fsi under-relaxation factor (Aitken) of "

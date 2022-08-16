@@ -29,6 +29,7 @@ License
 #include "amiInterfaceToInterfaceMapping.H"
 #include "addToRunTimeSelectionTable.H"
 #include "FieldField.H"
+#include "triPointRef.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -70,7 +71,7 @@ void amiInterfaceToInterfaceMapping::makeInterpolator() const
             zoneB(),
             faceAreaIntersect::tmMesh, // triMode
             true,   // requireMatch
-            amiZoneInterpolation::imFaceAreaWeight, // interpolationMethodNames
+            //amiZoneInterpolation::imFaceAreaWeight, // interpolationMethodNames
             -1,     // lowWeightCorrection
             false,  // reverseTarget
             true    // use globalPolyPatch
@@ -97,25 +98,30 @@ amiInterfaceToInterfaceMapping::interpolator() const
 void amiInterfaceToInterfaceMapping::checkZoneAToZoneBError() const
 {
     // Reference to patch face centres
-    const vectorField& patchAFaceCentres = patchA().faceCentres();
+    const vectorField patchAFaceCentres(patchA().faceCentres());
 
     // Construct global zone field
-    const vectorField zoneAFaceCentres =
-        globalPatchA().patchFaceToGlobal(patchAFaceCentres);
+    const vectorField zoneAFaceCentres
+    (
+        globalPatchA().patchFaceToGlobal(patchAFaceCentres)
+    );
 
     // Interpolate global zone field from A to B
-    const vectorField zoneBFaceCentres =
-        interpolator().interpolateToTarget(zoneAFaceCentres);
+    const vectorField zoneBFaceCentres
+    (
+        interpolator().interpolateToTarget(zoneAFaceCentres)
+    );
 
     // Extract local patch field
-    const vectorField patchBFaceCentres =
-        globalPatchB().globalFaceToPatch(zoneBFaceCentres);
+    const vectorField patchBFaceCentres
+    (
+        globalPatchB().globalFaceToPatch(zoneBFaceCentres)
+    );
 
     // Print maximum error
     Info<< "interface-to-interface face error: "
         << gMax(mag(patchBFaceCentres - patchB().faceCentres()))
         << endl;
-
 }
 
 

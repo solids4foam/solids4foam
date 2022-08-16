@@ -19,7 +19,7 @@ libs            ("libsampling.so");
 
 application     solids4Foam;
 
-startFrom       latestTime;
+startFrom       startTime;
 
 startTime       0;
 

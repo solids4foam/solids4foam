@@ -46,7 +46,7 @@ void Foam::newDirectAMI<SourcePatch, TargetPatch>::appendToDirectSeeds
     const pointField& srcPoints = this->srcPatch_.points();
     const pointField& tgtPoints = this->tgtPatch_.points();
 
-    const vectorField& srcCf = this->srcPatch_.faceCentres();
+    const vectorField& srcCf(this->srcPatch_.faceCentres());
 
     forAll(srcNbr, i)
     {

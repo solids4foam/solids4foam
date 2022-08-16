@@ -10,15 +10,8 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-runApplication fluentMeshToFoam cylinderRotation.msh
-
-if [[ $WM_PROJECT = "foam" ]]
-then
-    runApplication changeDictionary
-else
-    echo "Running foamDictionary"
-    foamDictionary constant/polyMesh/boundary -entry entry0.frontAndBackPlanes.type -set empty &> log.foamDictionary
-fi
+solids4Foam::runApplication fluentMeshToFoam cylinderRotation.msh
+solids4Foam::runApplication changeDictionary
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

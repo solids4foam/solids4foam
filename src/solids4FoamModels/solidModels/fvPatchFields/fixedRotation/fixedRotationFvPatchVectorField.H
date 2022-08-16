@@ -124,6 +124,9 @@ public:
         fixedRotationFvPatchVectorField
         (
             const fixedRotationFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -134,6 +137,7 @@ public:
                 new fixedRotationFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         fixedRotationFvPatchVectorField

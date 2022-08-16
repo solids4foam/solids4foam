@@ -75,9 +75,6 @@ class neoHookeanElasticMisesPlastic
 {
     // Private data
 
-        //- Initial density
-        const dimensionedScalar rho_;
-
         //- Shear modulus
         dimensionedScalar mu_;
 
@@ -280,9 +277,6 @@ public:
 
     // Member Functions
 
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
-
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
@@ -302,6 +296,10 @@ public:
 
         //- Return the desired new time-step
         virtual scalar newDeltaT();
+
+        //- Set restart: some mechanical laws may change the writeOpt of fields
+        //  accordingly
+        virtual void setRestart();
 };
 
 

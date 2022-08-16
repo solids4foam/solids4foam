@@ -94,7 +94,7 @@ extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 template<class Type>
 extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
 (
@@ -105,6 +105,7 @@ extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
     iPoints_(ptf.size()),
     zeroGradient_(ptf.zeroGradient_)
 {}
+#endif
 
 
 template<class Type>
@@ -173,12 +174,12 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
 #endif
 
     const surfaceScalarField& weights = mesh.weights();
-    const vectorField& faceCentres = mesh.faceCentres();
-    const vectorField& cellCentres = mesh.cellCentres();
+    const vectorField faceCentres(mesh.faceCentres());
+    const vectorField cellCentres(mesh.cellCentres());
 
     skewCorrectionVectors scv(mesh);
 
-    vectorField n = this->patch().nf();
+    const vectorField n(this->patch().nf());
 
     iPoints_.clear();
     iPoints_.setSize(this->patch().size());
@@ -339,8 +340,8 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
 #endif
 
     const surfaceScalarField& weights = mesh.weights();
-//     const vectorField& faceCentres = mesh.faceCentres();
-    const vectorField& cellCentres = mesh.cellCentres();
+//     const vectorField faceCentres(mesh.faceCentres());
+    const vectorField cellCentres(mesh.cellCentres());
 
 #ifdef OPENFOAMESIORFOUNDATION
     const Field<Type>& phiI = this->primitiveField();
@@ -360,7 +361,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
             fieldName
         );
 
-    vectorField n = this->patch().nf();
+    const vectorField n(this->patch().nf());
     const vectorField& C = this->patch().Cf();
 
     Field<Type> patchPhi(this->patch().size(), pTraits<Type>::zero);

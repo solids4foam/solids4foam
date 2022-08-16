@@ -150,7 +150,7 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
         const unallocLabelList& faceCells = p.faceCells();
 #endif
         // Better version of d-vectors: Zeljko Tukovic, 25/Apr/2010
-        vectorField pd = p.delta();
+        vectorField pd(p.delta());
 
         forAll(pd, patchFaceI)
         {
@@ -159,7 +159,7 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
         }
     }
 
-    scalarField detdd = det(dd);
+    scalarField detdd(det(dd));
 
     label nAddCells = 0;
     label maxNaddCells = 4*detdd.size();
@@ -229,7 +229,7 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
     additionalCells_.setSize(nAddCells);
 
     // Invert the dd tensor
-    symmTensorField invDd = inv(dd);
+    symmTensorField invDd(inv(dd));
 
 
     // Revisit all faces and calculate the lsP and lsN vectors
@@ -248,7 +248,7 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
 
     forAll(lsP.boundaryField(), patchI)
     {
-        vectorField pd = mesh().boundary()[patchI].delta();
+        const vectorField pd(mesh().boundary()[patchI].delta());
 
         fvsPatchVectorField& patchLsP = lsP.boundaryFieldRef()[patchI];
 

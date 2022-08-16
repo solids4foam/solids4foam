@@ -53,10 +53,6 @@ namespace solidModels
 defineTypeNameAndDebug(coupledUnsLinGeomLinearElasticSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, coupledUnsLinGeomLinearElasticSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, coupledUnsLinGeomLinearElasticSolid, dictionary
 );
 
@@ -360,6 +356,8 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
 
     // Velocity
     U() = fvc::ddt(D());
+
+    BlockLduMatrix<vector>::debug = 1;
 #else
     notImplemented("Not implemented for this version of OpenFOAM/FOAM");
 #endif
@@ -388,7 +386,7 @@ tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField pN = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>
@@ -396,8 +394,8 @@ tmp<vectorField> coupledUnsLinGeomLinearElasticSolid::tractionBoundarySnGrad
         new vectorField
         (
             (
-                (traction - pN*pressure)
-              - (pN & (pSigma - (2.0*mu + lambda)*pGradD))
+                (traction - n*pressure)
+              - (n & (pSigma - (2.0*mu + lambda)*pGradD))
             )/(2.0*mu + lambda)
         )
     );

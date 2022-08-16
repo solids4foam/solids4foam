@@ -17,10 +17,8 @@ else
     foamCleanPolyMesh -region fluid
     foamCleanPolyMesh -region solid
 fi
-\rm -rf history constant/solid/polyMesh/boundary
-\rm -rf constant/solid/polyMesh/[c-z]*
-\rm -rf case.foam
-\rm 0/fluid/alpha1
+rm -rf constant/solid/polyMesh/boundary constant/solid/polyMesh/[c-z]* case.foam
+rm 0/fluid/alpha1 0/fluid/alpha.water
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

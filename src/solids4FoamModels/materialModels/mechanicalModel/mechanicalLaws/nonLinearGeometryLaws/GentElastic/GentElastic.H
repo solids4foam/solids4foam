@@ -66,32 +66,37 @@ class GentElastic
 {
     // Private data
 
-        // Initial density
-        const dimensionedScalar rho_;
-
-        // Young's modulus
+        //- Young's modulus
         const dimensionedScalar E_;
 
-        // Poisson's ratio
+        //- Poisson's ratio
         const dimensionedScalar nu_;
 
-        // Shear modulus
+        //- Shear modulus
         const dimensionedScalar mu_;
 
-        // Temperature
+        //- Temperature
         const dimensionedScalar temperature_;
 
-        // ilim = 3*( pow(Jlim,2/3) - 1 ) where Jlim is the maximum volume fraction
+        //- ilim = 3*( pow(Jlim,2/3) - 1 ) where Jlim is the maximum volume
+        //  fraction
         const dimensionedScalar ilim_;
 
-        // Number of crosslinks
+        //- Bulk modulus
+        const dimensionedScalar K_;
+
+        //- Avogadro's number
+        const dimensionedScalar Na_;
+
+        //- Boltzmann constant
+        const dimensionedScalar kb_;
+
+        //- Volume per solvent molecule
+        const dimensionedScalar omega_;
+
+        //- Number of crosslinks normalised with respect to Avogadro's number
         const dimensionedScalar N_;
 
-        // Unit volume of solvent
-        const dimensionedScalar Vs_;
-
-        // Bulk modulus
-        const dimensionedScalar K_;
 
     // Private Member Functions
 
@@ -128,9 +133,6 @@ public:
 
     // Member Functions
 
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
-
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
@@ -140,6 +142,10 @@ public:
 
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Set restart: some mechanical laws may change the writeOpt of fields
+        //  accordingly
+        virtual void setRestart();
 };
 
 

@@ -41,10 +41,6 @@ namespace fluidSolidInterfaces
 defineTypeNameAndDebug(oneWayCouplingInterface, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, oneWayCouplingInterface, fluidSolidInteraction
-);
-addToRunTimeSelectionTable
-(
     fluidSolidInterface, oneWayCouplingInterface, dictionary
 );
 
@@ -115,11 +111,15 @@ void oneWayCouplingInterface::updateTraction()
 
     forAll(fluid().globalPatches(), interfaceI)
     {
-        const vectorField fluidZoneTraction =
-            fluid().faceZoneViscousForce(interfaceI);
+        const vectorField fluidZoneTraction
+        (
+            fluid().faceZoneViscousForce(interfaceI)
+        );
 
-        const scalarField fluidZonePressure =
-            fluid().faceZonePressureForce(interfaceI);
+        const scalarField fluidZonePressure
+        (
+            fluid().faceZonePressureForce(interfaceI)
+        );
 
         // Calculate fluid traction
         const vectorField& p =
@@ -135,8 +135,10 @@ void oneWayCouplingInterface::updateTraction()
             n[faceI] /= mag(n[faceI]);
         }
 
-        const vectorField fluidZonesTraction =
-            fluidZoneTraction - fluidZonePressure*n;
+        const vectorField fluidZonesTraction
+        (
+            fluidZoneTraction - fluidZonePressure*n
+        );
 
         interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
         (

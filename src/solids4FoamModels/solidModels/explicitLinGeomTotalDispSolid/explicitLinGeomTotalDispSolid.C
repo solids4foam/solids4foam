@@ -46,10 +46,6 @@ namespace solidModels
 defineTypeNameAndDebug(explicitLinGeomTotalDispSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, explicitLinGeomTotalDispSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, explicitLinGeomTotalDispSolid, dictionary
 );
 
@@ -134,6 +130,8 @@ explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
         "zeroGradient"
     )
 {
+    DisRequired();
+
     a_.oldTime();
     U().oldTime();
 
@@ -149,6 +147,16 @@ explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
         fvc::div(sigma(), "div(sigma)")().internalField()
        /(rho().internalField());
     a_.correctBoundaryConditions();
+
+    // Set the printInfo
+    physicsModel::printInfo() = bool
+    (
+        runTime.timeIndex() % infoFrequency() == 0
+     || mag(runTime.value() - runTime.endTime().value()) < SMALL
+    );
+
+    Info<< "Frequency at which info is printed: every " << infoFrequency()
+        << " time-steps" << endl;
 }
 
 
@@ -163,7 +171,7 @@ void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
     // calculating the required stable time-step
     // i.e.e deltaT = (1.0/(0.5*deltaCoeff)/waveSpeed
     // For safety, we should use a time-step smaller than this e.g. Abaqus uses
-    // 1/sqrt(2)*stableTimeStep: we will default to this value
+    // stableTimeStep/sqrt(2): we will default to this value
     const scalar requiredDeltaT =
         1.0/
         gMax
@@ -181,12 +189,22 @@ void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
 
     // Lookup the desired Courant number
     const scalar maxCo =
-        runTime.controlDict().lookupOrDefault<scalar>("maxCo", 0.7071);
+        runTime.controlDict().lookupOrDefault<scalar>("maxCo", 0.1);
 
     const scalar newDeltaT = maxCo*requiredDeltaT;
 
-    Info<< "maxCo = " << maxCo << nl
-        << "deltaT = " << newDeltaT << nl << endl;
+    // Update print info
+    physicsModel::printInfo() = bool
+    (
+        runTime.timeIndex() % infoFrequency() == 0
+     || mag(runTime.value() - runTime.endTime().value()) < SMALL
+    );
+
+    if (physicsModel::printInfo())
+    {
+        Info<< nl << "Setting deltaT = " << newDeltaT
+            << ", maxCo = " << maxCo << endl;
+    }
 
     runTime.setDeltaT(newDeltaT);
 }
@@ -194,12 +212,13 @@ void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
 
 bool explicitLinGeomTotalDispSolid::evolve()
 {
-    Info<< "Evolving solid solver" << endl;
-
     // Mesh update loop
     do
     {
-        Info<< "Solving the momentum equation for D" << endl;
+        if (physicsModel::printInfo())
+        {
+            Info<< "Solving the solid momentum equation for D" << endl;
+        }
 
         // Central difference scheme
 
@@ -221,8 +240,8 @@ bool explicitLinGeomTotalDispSolid::evolve()
             
         // Compute acceleration
         // Note the inclusion of a linear bulk viscosity pressure term to
-        // dissipate high frequency energies, and a Rhie-Chow term to avoid
-        // checker-boarding
+        // dissipate high frequency energies, and a Rhie-Chow or JST term to
+        // suppress checker-boarding
 #ifdef OPENFOAMESIORFOUNDATION
         a_.primitiveFieldRef() =
 #else
@@ -237,6 +256,11 @@ bool explicitLinGeomTotalDispSolid::evolve()
                         rho(), waveSpeed_, gradD()
                     )
                 )().internalField()
+              // + JSTScaleFactor_ // actually Rhie-Chow
+              //  *(
+              //       fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
+              //     - fvc::div(impKf_*mesh().Sf() & fvc::interpolate(gradD()))
+              //   )().internalField()
                 // This corresponds to Lax–Friedrichs smoothing
                 // + LFScaleFactor_*fvc::laplacian
                 //   (
@@ -266,7 +290,7 @@ bool explicitLinGeomTotalDispSolid::evolve()
         energies_.checkEnergies
         (
             rho(), U(), D(), DD(), sigma(), gradD(), gradDD(), waveSpeed_, g(),
-            0.0, impKf_
+            0.0, impKf_, physicsModel::printInfo()
         );
     }
     while (mesh().update());
@@ -298,7 +322,7 @@ tmp<vectorField> explicitLinGeomTotalDispSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>

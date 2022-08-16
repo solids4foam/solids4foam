@@ -1,0 +1,70 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       pointVectorField;
+    object      pointD;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    left
+    {
+        // type            uniformFixedValue;
+        // uniformValue    (0 0 0);
+        type            pointCantileverDisplacement;
+        P 0.1e6;
+        //E 219780219780.2198;
+        E 200e9;
+        nu 0.3;
+        L 2;
+        D 0.1;
+    }
+    right
+    {
+        // type            pointSolidTraction;
+        // traction        uniform (0 0 0);
+        // pressure        uniform 0;
+        type            pointCantileverTraction;
+        P 0.1e6;
+        //E 219780219780.2198;
+        E 200e9;
+        nu 0.3;
+        L 2;
+        D 0.1;
+    }
+    top
+    {
+        type            pointSolidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform 0;
+    }
+    bottom
+    {
+        type            pointSolidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform 0;
+    }
+    front
+    {
+        type            empty;
+    }
+    back
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

@@ -93,6 +93,9 @@ public:
         movingWallPressureFvPatchScalarField
         (
             const movingWallPressureFvPatchScalarField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -103,6 +106,7 @@ public:
                 new movingWallPressureFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         movingWallPressureFvPatchScalarField

@@ -208,7 +208,6 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     E1_(dict.lookup("E1")),
     E2_(dict.lookup("E2")),
     E3_(dict.lookup("E3")),
@@ -393,33 +392,6 @@ Foam::StVenantKirchhoffOrthotropicElastic::
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 Foam::tmp<Foam::volScalarField> Foam::
-StVenantKirchhoffOrthotropicElastic::rho() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-    tresult().correctBoundaryConditions();
-
-    return tresult;
-}
-
-
-Foam::tmp<Foam::volScalarField> Foam::
 StVenantKirchhoffOrthotropicElastic::impK() const
 {
     // We could employ a diagTensor as the implicit stiffness; however, the
@@ -469,7 +441,7 @@ void Foam::StVenantKirchhoffOrthotropicElastic::correct
     const volSymmTensorField S = elasticC() && E;
 
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J = det(F());
+    const volScalarField J(det(F()));
 
     // Convert the 2nd Piola Kirchhoff stress to the Cauchy stress
     // sigma = (1.0/J)*symm(F() & S & F().T());
@@ -500,12 +472,18 @@ void Foam::StVenantKirchhoffOrthotropicElastic::correct
     const surfaceSymmTensorField S = elasticCf() && E;
 
     // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J = det(Ff());
+    const surfaceScalarField J(det(Ff()));
 
     // Convert the 2nd Piola Kirchhoff stress to the Cauchy stress
     // sigma = (1.0/J)*symm(Ff() & S & Ff().T());
     sigma = (1.0/J)*transform(Ff(), S);
 }
 
+
+void Foam::StVenantKirchhoffOrthotropicElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
+}
 
 // ************************************************************************* //

@@ -84,7 +84,7 @@ robinFvPatchField<Type>::robinFvPatchField
 #endif
 {}
 
-
+#ifndef OPENFOAMFOUNDATION
 template<class Type>
 robinFvPatchField<Type>::robinFvPatchField
 (
@@ -96,7 +96,7 @@ robinFvPatchField<Type>::robinFvPatchField
     coeff1_(ptf.coeff1_),
     rhs_(ptf.rhs_)
 {}
-
+#endif
 
 template<class Type>
 robinFvPatchField<Type>::robinFvPatchField
@@ -159,7 +159,7 @@ void robinFvPatchField<Type>::evaluate(const Pstream::commsTypes)
         this->updateCoeffs();
     }
 
-    scalarField dn = 1.0/this->patch().deltaCoeffs();
+    const scalarField dn(1.0/this->patch().deltaCoeffs());
 
     Field<Type>::operator=
     (

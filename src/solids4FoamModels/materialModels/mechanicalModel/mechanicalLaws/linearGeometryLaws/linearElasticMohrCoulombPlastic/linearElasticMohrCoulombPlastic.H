@@ -74,9 +74,6 @@ class linearElasticMohrCoulombPlastic
 {
     // Private data
 
-        //- Density
-        const dimensionedScalar rho_;
-
         //- Modulus of elasticity
         const dimensionedScalar E_;
 
@@ -205,9 +202,6 @@ public:
 
 
     // Member Functions
-
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term

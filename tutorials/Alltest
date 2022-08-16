@@ -1,214 +1,264 @@
-#!/bin/sh
-#------------------------------------------------------------------------------
-# =========                 |
-# \\      /  F ield         | foam-extend: Open Source CFD
-#  \\    /   O peration     | Version:     3.2
-#   \\  /    A nd           | Web:         http://www.foam-extend.org
-#    \\/     M anipulation  | For copyright notice see file Copyright
+#!/bin/bash
 #------------------------------------------------------------------------------
 # License
-#     This file is part of foam-extend.
-#
-#     foam-extend is free software: you can redistribute it and/or modify it
-#     under the terms of the GNU General Public License as published by the
-#     Free Software Foundation, either version 3 of the License, or (at your
-#     option) any later version.
-#
-#     foam-extend is distributed in the hope that it will be useful, but
-#     WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-#     General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+#     This file is part of solids4foam, licensed under GNU General Public
+#     License <http://www.gnu.org/licenses/>.
 #
 # Script
 #     Alltest
 #
 # Description
+#     Quickly test the tutorials and write out the scheme/solver information
+#     Adapted from foam-extend-4.0 and OpenFOAM-v2012 tutorials/Alltest scripts.
 #
 #------------------------------------------------------------------------------
+cd "${0%/*}" || exit  # Run from this directory
 
-# FUNCTIONS
 #
-printUsage () {
-cat <<EOF
-Usage: $0
-Quickly tests the tutorials and writes out the scheme/solver information
+# FUNCTION DEFINITIONS
+#
 
-Options are:
--d         sets up a default scheme on all schemes
--h         help
-EOF
-}
-
-setDefaultFvSchemes () {
-cat<<EOF
-gradSchemes { default Gauss linear; }
-divSchemes
+function usage()
 {
-    default Gauss linear;
-    div(phi,fu_ft_h) Gauss multivariateSelection
-    {
-        fu upwind;
-        ft upwind;
-        h  upwind;
-    };
-    div(phi,ft_b_h_hu) Gauss multivariateSelection
-    {
-        fu upwind;
-        ft upwind;
-        b  upwind;
-        h  upwind;
-        hu upwind;
-    };
-}
-laplacianSchemes { default Gauss linear corrected; }
-interpolationSchemes { default linear; }
-snGradSchemes { default corrected; }
-fluxRequired { default yes; }
-EOF
-}
-#
-# VARIABLE
-#
-MAIN_CONTROL_DICT=
+    exec 1>&2
+    while [ "$#" -ge 1 ]; do echo "$1"; shift; done
+    cat<<USAGE
 
-for i in \
-  $HOME/.$WM_PROJECT-$WM_PROJECT_VERSION \
-  $HOME/.$WM_PROJECT/$WM_PROJECT_VERSION \
-  $HOME/.$WM_PROJECT \
-  $WM_PROJECT_DIR/etc \
-  ;
-do
-  if [ -f "$i/controlDict" ]; then
-     MAIN_CONTROL_DICT="$i/controlDict"
-     break
-  fi
-done
-TUTORIALS_DIR=.
-TEST_RUN_DIR=../tutorialsTest
-FV_SCHEMES=\
-" \
-    gradScheme \
-    divScheme \
-    laplacianScheme \
-    interpolationScheme \
-    snGradScheme \
-    fluxRequired \
-"
-SCHEMES_FILE="FvSchemes"
-SCHEMES_TEMP="FvSchemes.temp"
-SOLVERS_FILE="FvSolution"
-SOLVERS_TEMP="FvSolution.temp"
-DEFAULT_SCHEMES=0
+usage: ${0##*/} [OPTION]
 
-#
-# OPTIONS
-#
-OPTS=`getopt hd $*`
-if [ $? -ne 0 ] ; then
-    echo "Aborting due to invalid option"
-    printUsage
+options:
+  -help         Print the usage
+
+Quickly tests the tutorials and writes out the scheme/solver information.
+
+USAGE
     exit 1
-fi
-eval set -- "$OPTS"
-while [ $1 != -- ]; do
-    case $1 in
-        -d) DEFAULT_SCHEMES=1;;
-        -h) printUsage; exit 1;;
+}
+
+# Report error and exit
+function die()
+{
+    exec 1>&2
+    echo
+    echo "Error encountered:"
+    while [ "$#" -ge 1 ]; do echo "    $1"; shift; done
+    echo
+    echo "See '${0##*/} -help' for usage"
+    echo
+    exit 1
+}
+
+# logReport <logfile>
+# Extracts useful info from log file.
+function logReport()
+{
+    case=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
+    app=`echo $1 | sed s/"\(.*\)\."/""/g`
+    if [[ "${app}" == "solid" || "${app}" == "fluid" ]]
+    then
+        app=`echo $1 | rev | cut -d'.' -f 2,1 | rev`
+    fi
+    appAndCase="Application $app - case $case"
+
+    fatalError=`grep "FOAM FATAL" $1`
+    completed=`grep -E "^[\t ]*[eE]nd" $1`
+
+    if [ "$fatalError" ]
+    then
+        echo "$appAndCase: ** FOAM FATAL ERROR **"
+        return
+    elif [ "$completed" ]
+    then
+        completionTime=`tail -20 $log | grep Execution | cut -d= -f2 | sed 's/^[ \t]*//'`
+        if [ "$completionTime" ]
+        then
+            completionTime="in $completionTime"
+        fi
+        echo "$appAndCase: completed $completionTime"
+        return
+    else
+        echo "$appAndCase: unconfirmed completion"
+    fi
+}
+
+# Run cases (similar to foamRunTutorials)
+function runCases()
+{
+    thisScript=$0
+    if [ "/${thisScript#/}" != "$thisScript" ]
+    then
+        thisScript="$PWD/$thisScript"
+    fi
+
+    # If an argument is supplied do not execute ./Allrun to avoid recursion
+    if [ $# = 0 -a -f "./Allrun" ]
+    then
+        echo; echo "execute Allrun"
+        # Specialised script.
+        ./Allrun
+    else
+        # Loop over sub-directories and compile any applications
+        for case in *
+        do
+            if [ -d $case -a -d "$case/Make" ]
+            then
+                (compileApplication $case)
+            fi
+        done
+
+        # Recurse to subdirectories
+        for case in *
+        do
+            if [ -d $case ]
+            then
+                echo "cd $case and runCases"
+                (cd $case && runCases)
+            fi
+        done
+    fi
+}
+
+
+#
+# PRELIMINARIES
+#
+
+rootDir="./"
+
+# Parse options
+while [ "$#" -gt 0 ]
+do
+    case "$1" in
+    -h | -help)
+        usage
+        ;;
+    *)
+        die "Unknown option/argument: '$1'"
+        ;;
     esac
     shift
 done
-shift
+
+# Sets FOAM_TUTORIALS directory location, as required
+. "${WM_PROJECT_DIR:?}"/bin/tools/RunFunctions
+
+# Set test directory
+TEST_RUN_DIR=../tutorialsTest
+
 
 #
 # MAIN
 #
 
-if [ -d "$TEST_RUN_DIR" ] ; then
-    rm -rf $TEST_RUN_DIR
-fi
-
-echo "Modifying ${MAIN_CONTROL_DICT}"
-if [ -e ${MAIN_CONTROL_DICT}.org ]
+if [ -d "$TEST_RUN_DIR" ]
 then
-    echo "File " ${MAIN_CONTROL_DICT}.org " already exists"
-    echo "Did Alltest fail in some way and then run again?"
+    echo "Directory already exists: $TEST_RUN_DIR" 1>&2
+    echo "Please remove it" 1>&2
     exit 1
 fi
 
-# Clean up on termination and on Ctrl-C
-trap 'mv ${MAIN_CONTROL_DICT}.org ${MAIN_CONTROL_DICT} 2>/dev/null; exit 0' \
-    EXIT TERM INT
-cp ${MAIN_CONTROL_DICT} ${MAIN_CONTROL_DICT}.org
+# Copy tutorials
+cp -a "$rootDir" "$TEST_RUN_DIR"
 
-sed \
--e s/"\(fvSchemes[ \t]*\)\([0-9]\);"/"\1 1;"/g \
--e s/"\(fvSolution[ \t]*\)\([0-9]\);"/"\1 1;"/g \
-${MAIN_CONTROL_DICT}.org > ${MAIN_CONTROL_DICT}
+# Enter test directory
+cd "$TEST_RUN_DIR" || exit
 
-echo "Copying the tutorials"
-cp -a ${TUTORIALS_DIR} ${TEST_RUN_DIR}
-
-echo "Modifying the controlDicts to run only one time step"
-cd ${TEST_RUN_DIR}
-
-for CD in `find . -name "controlDict*"`
+# Modify controlDicts
+echo "Modifying the case controlDicts to run only one time step"
+for CD in $(find . -name "controlDict*" -type f)
 do
-    mv ${CD} ${CD}.org
+    cp -f "${CD}" "${CD}.orig"
     sed \
-   -e s/"\(startFrom[ \t]*\)\([a-zA-Z]*\);"/"\1 latestTime;"/g \
-    -e s/"\(stopAt[ \t]*\)\([a-zA-Z]*\);"/"\1 nextWrite;"/g \
-    -e s/"\(writeControl[ \t]*\)\([a-zA-Z]*\);"/"\1 timeStep;"/g \
-    -e s/"\(writeInterval[ \t]*\)\([0-9a-zA-Z.-]*\);"/"\1 1;"/g \
-    ${CD}.org > ${CD}
+        -e 's/\(stopAt[ \t]*\)\([a-zA-Z]*\);/\1 nextWrite;/g' \
+        -e 's/\(writeControl[ \t]*\)\([a-zA-Z]*\);/\1 timeStep;/g' \
+        -e 's/\(writeInterval[ \t]*\)\([0-9a-zA-Z.-]*\);/\1 1;/g' \
+        "${CD}.orig" > "${CD}"
 done
 
-if [ $DEFAULT_SCHEMES = 1 ] ; then
-    echo "Modifying the fvSchemes to contain only default schemes"
-    for FV_SC in `find . -name fvSchemes`
-    do
-        for S in $FV_SCHEMES
-        do
-            mv ${FV_SC} ${FV_SC}.org
-            sed -e /"${S}"/,/$p/d ${FV_SC}.org > ${FV_SC}
-        done
-        setDefaultFvSchemes >> ${FV_SC}
-    done
-fi
-
-./Allrun
-
-sed -e :a -e '/\\$/N; s/\\\n//; ta' Allrun > temp
-APPLICATIONS=\
-    `grep "applications=" temp | sed 's/applications=\"\([A-Za-z \t]*\)\"/\1/g'`
-
-rm $SCHEMES_FILE > /dev/null 2>&1
-for APP in $APPLICATIONS
+# Modify fvSolution
+# Set maxIter to 1 for linear solvers
+echo "Modifying the fvSolution linear solvers to run only one iteration"
+for FVS in $(find . -name "fvSolution")
 do
-    echo $APP >> $SCHEMES_FILE
-    echo "$APP: " | tr -d "\n" >> $SOLVERS_FILE
-    for ST in $FV_SCHEMES
-    do
-        rm $SCHEMES_TEMP > /dev/null 2>&1
-        rm $SOLVERS_TEMP > /dev/null 2>&1
-        echo "  ${ST}" >> $SCHEMES_FILE
-        for LOG in `find ${APP} -name "log.${APP}"`
-        do
-            for S in `grep ${ST} ${LOG} | cut -d" " -f4`
-            do
-                echo "    ${S}" >> $SCHEMES_TEMP
-            done
-        echo `grep solver ${LOG} | cut -d" " -f4` >> $SOLVERS_TEMP
-        done
-        if [ -f $SCHEMES_TEMP ] ; then
-            cat $SCHEMES_TEMP | sort -u >> $SCHEMES_FILE
-        fi
-    done
-    cat $SOLVERS_TEMP | tr " " "\n" | sort -u | tr "\n" " " >> $SOLVERS_FILE
-    echo "" >> $SOLVERS_FILE
+    mv ${FVS} ${FVS}.org
+    sed -e "s|maxIter.*;|maxIter 1;|g" ${FVS}.org > ${FVS}
 done
 
+# Modify solidProperties
+# set nCorrectors to 1 for solids4foam solvers
+echo "Modifying the solidProperties to run only one iteration"
+for SP in $(find . -name "solidProperties")
+do
+    mv ${SP} ${SP}.org
+    sed \
+    -e "s|//nCorrectors.*;|nCorrectors 1;|g" \
+    -e "s|nCorrectors.*;|nCorrectors 1;|g" \
+    ${SP}.org > ${SP}
+done
 
-# ----------------------------------------------------------------- end-of-file
+# Modify fsiProperties
+echo "Modifying the fsiProperties to run only one iteration"
+for FP in $(find . -name "fsiProperties")
+do
+    mv ${FP} ${FP}.org
+    sed \
+    -e "s|//nOuterCorr.*;|nOuterCorr 1;|g" \
+    -e "s|nOuterCorr.*;|nOuterCorr 1;|g" \
+    ${FP}.org > ${FP}
+done
+
+# Source tutorial functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Remove high-level Allrun
+rm Allrun*
+
+# Run cases recursively
+echo "Running cases "; echo "    $PWD"; echo
+runCases
+
+# Prepare summary files
+echo; echo "Preparing testLoopReport"
+rm testLoopReport > /dev/null 2>&1 &
+touch testLoopReport
+for application in *
+do
+    if [ -d $application ]
+    then
+        cd $application
+        for log in `find . -name "log.*" | xargs ls -rt`
+        do
+            logReport $log >> ../testLoopReport
+        done
+        echo "" >> ../testLoopReport
+        cd ..
+    fi
+done
+
+# Create concatenated logs file
+echo; echo "Preparing logs"
+find . -name "log.*" -exec cat {} \; >> logs
+
+# Output summary statistics
+echo; echo "Summary statistics"
+N_RUN_CASES=$(grep "solids4Foam" ../tutorialsTest/testLoopReport | wc -l)
+N_FAILED_SOLVER=$(grep "ERROR" testLoopReport | grep "solids4Foam" | wc -l)
+N_FAILED_COMMANDS=$(grep "ERROR" testLoopReport | wc -l)
+N_FAILED_OTHER=$((N_FAILED_COMMANDS-N_FAILED_SOLVER))
+echo "    Number of cases where a run was attempted: ${N_RUN_CASES}"
+echo "    Number of cases where the solver failed: ${N_FAILED_SOLVER}"
+echo "    Number of cases where another command failed: ${N_FAILED_OTHER}"
+echo
+
+if [[ $N_FAILED_SOLVER -gt 0 ]]
+then
+    echo "The solids4Foam solver failed on the following cases:"
+    grep "ERROR" testLoopReport | grep "solids4Foam"
+elif [[ $N_FAILED_OTHER -gt 0 ]]
+then
+    echo "The following commands failed:"
+    grep "ERROR" testLoopReport
+else
+    echo "All tests passed: enjoy solids4foam."
+fi
+echo

@@ -49,10 +49,6 @@ namespace solidModels
 defineTypeNameAndDebug(linGeomPressureDisplacementSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, linGeomPressureDisplacementSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, linGeomPressureDisplacementSolid, dictionary
 );
 
@@ -178,7 +174,7 @@ bool linGeomPressureDisplacementSolid::evolve()
             gradDD() = gradD() - gradD().oldTime();
 
             // Store reciprocal of diagonal
-            const surfaceScalarField rAUf = fvc::interpolate(1.0/DEqn.A());
+            const surfaceScalarField rAUf(fvc::interpolate(1.0/DEqn.A()));
 
             // Calculate hydrostatic pressure
             if (solvePressureEquationImplicitly_)
@@ -274,15 +270,7 @@ bool linGeomPressureDisplacementSolid::evolve()
                 iCorr,
 #ifdef OPENFOAMESIORFOUNDATION
                 mag(solverPerfD.initialResidual()),
-                max
-                (
-                    solverPerfD.nIterations()[0],
-                    max
-                    (
-                        solverPerfD.nIterations()[1],
-                        solverPerfD.nIterations()[2]
-                    )
-                ),
+                cmptMax(solverPerfD.nIterations()),
 #else
                 solverPerfD.initialResidual(),
                 solverPerfD.nIterations(),
@@ -306,7 +294,9 @@ bool linGeomPressureDisplacementSolid::evolve()
     }
     while (mesh().update());
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
 
@@ -337,7 +327,7 @@ tmp<vectorField> linGeomPressureDisplacementSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>

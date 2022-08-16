@@ -11,6 +11,21 @@ Automated scripts are provided to test the build as described further in [Test S
 
 --------
 
+## [Optional] Dependencies
+
+solids4foam has the same default dependencies as OpenFOAM/foam-extend, so there is no requirement to install anything else. However, if you would like to use the Abaqus UMAT material law functionality then you need to install gfortran. For example, this can be done on Ubuntu with:
+```
+$> sudo apt install gfortran-5
+```
+where the version of gfortran should match the version of gcc that is used. In the above example, it is assumed that gcc-5 is used. If using clang or Intel compilers then the version should not matter.
+
+To let solids4foam know that you want to use gfortran, you should set the `S4F_USE_GFORTRAN` environmental variable:
+```
+$> export S4F_USE_GFORTRAN=1
+```
+
+--------
+
 ## Installing solids4foam **natively**
 
 - The latest version of solids4foam currently compiles with foam-extend-4.0, foam-extend-4.1, OpenFOAM-v1812, OpenFOAM-v1912, and OpenFOAM-7.

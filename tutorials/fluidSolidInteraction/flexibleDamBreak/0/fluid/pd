@@ -22,7 +22,7 @@ boundaryField
 {
     interface
     {
-        type            extrapolatedPressure;
+        type            zeroGradient;
         value           uniform 0;
     }
 

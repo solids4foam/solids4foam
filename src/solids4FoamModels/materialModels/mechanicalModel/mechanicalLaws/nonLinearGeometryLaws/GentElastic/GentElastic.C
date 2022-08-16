@@ -50,20 +50,27 @@ Foam::GentElastic::GentElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
     mu_(E_/(2.0*(1.0 + nu_))),
     temperature_(dict.lookup("temperature")),
     ilim_(dict.lookup("ilim")),
-    N_(dict.lookup("N")),
-    Vs_(dict.lookup("Vs")),
     K_
     (
         planeStress()
       ? (nu_*E_/((1.0 + nu_)*(1.0 - nu_))) + (2.0/3.0)*mu_
       : (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))) + (2.0/3.0)*mu_
-    )
+    ),
+    Na_
+    (
+        "Na", dimensionSet(0, 0, 0, 0, 0, 0, 0), 6.022141e23
+    ),
+    kb_
+    (
+        "kb", dimensionSet(1, 2, -2, -1, 0, 0, 0), 1.38064852e-23
+    ),
+    omega_(dimensionedScalar(dict.lookup("Vs"))/Na_),
+    N_(dimensionedScalar(dict.lookup("N"))/omega_)
 {}
 
 
@@ -74,28 +81,6 @@ Foam::GentElastic::~GentElastic()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::volScalarField> Foam::GentElastic::rho() const
-{
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rhoLaw",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            calculatedFvPatchScalarField::typeName
-        )
-    );
-}
-
 
 Foam::tmp<Foam::volScalarField> Foam::GentElastic::impK() const
 {
@@ -108,7 +93,7 @@ Foam::tmp<Foam::volScalarField> Foam::GentElastic::impK() const
                 "impK",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -128,41 +113,17 @@ void Foam::GentElastic::correct(volSymmTensorField& sigma)
         return;
     }
 
-    // Global Constants
-
-    // Avocado number
-    const dimensionedScalar Na
-    (
-        "Na",
-        dimensionSet(0,0,0,0,0,0,0),
-        scalar(6.022141*pow(10,9)*pow(10,9)*pow(10,5))
-    );
-
-    // Volume per solvent molecule
-    const dimensionedScalar omega = Vs_/Na;
-
-    // Boltzmann constant
-    const dimensionedScalar kb
-    (
-        "kb",
-        dimensionSet(1,2,-2,-1,0,0,0),
-        scalar(1.38064852/pow(10,9)/pow(10,9)/pow(10,5))
-    );
-
-    // Crosslinking density
-    const dimensionedScalar N = N_/omega;
-
     // Jacobian of the deformation gradient
-    volScalarField J = det(F());
+    const volScalarField J(det(F()));
 
     // Right tensor product
-    const volSymmTensorField B = symm(F() & F().T());
+    const volSymmTensorField B(symm(F() & F().T()));
 
     // Left tensor product
-    const volSymmTensorField C = symm(F().T() & F());
+    const volSymmTensorField C(symm(F().T() & F()));
 
     // Calculate the sigma Terzaghi (Gent)
-    sigma = kb*temperature_*(N/J)*((ilim_/(ilim_ - tr(B) + 3))*C - I);
+    sigma = kb_*temperature_*(N_/J)*((ilim_/(ilim_ - tr(B) + 3))*C - I);
 }
 
 
@@ -176,41 +137,24 @@ void Foam::GentElastic::correct(surfaceSymmTensorField& sigma)
         return;
     }
 
-    // Global Constants
-
-    // Avocado number
-    const dimensionedScalar Na
-    (
-        "Na",
-        dimensionSet(0,0,0,0,0,0,0),
-        scalar(6.022141*pow(10,9)*pow(10,9)*pow(10,5))
-    );
-
-    // Volume per solvent molecule
-    const dimensionedScalar omega = Vs_/Na;
-
-    // Boltzmann constant
-    const dimensionedScalar kb
-    (
-        "kb",
-        dimensionSet(1,2,-2,-1,0,0,0),
-        scalar(1.38064852/pow(10,9)/pow(10,9)/pow(10,5))
-    );
-
-    const dimensionedScalar N = N_/omega;
-
     // Jacobian of the deformation gradient
-    const surfaceScalarField Jf = det(Ff());
+    const surfaceScalarField Jf(det(Ff()));
 
     // Right tensor product
-    const surfaceSymmTensorField Bf = symm(Ff() & Ff().T());
+    const surfaceSymmTensorField Bf(symm(Ff() & Ff().T()));
 
     // Left tensor product
-    const surfaceSymmTensorField Cf = symm(Ff().T() & Ff());
+    const surfaceSymmTensorField Cf(symm(Ff().T() & Ff()));
 
     // Calculate the sigma Terzaghi (Gent)
-    sigma = kb*temperature_*(N/Jf)*((ilim_/(ilim_ - tr(Bf) + 3))*Cf - I);
+    sigma = kb_*temperature_*(N_/Jf)*((ilim_/(ilim_ - tr(Bf) + 3))*Cf - I);
 }
 
+
+void Foam::GentElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
+}
 
 // ************************************************************************* //

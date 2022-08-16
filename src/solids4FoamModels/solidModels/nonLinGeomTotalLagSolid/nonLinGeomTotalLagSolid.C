@@ -49,10 +49,6 @@ namespace solidModels
 defineTypeNameAndDebug(nonLinGeomTotalLagSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, nonLinGeomTotalLagSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, nonLinGeomTotalLagSolid, dictionary
 );
 
@@ -86,7 +82,7 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid
             "Finv",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         inv(F_)
@@ -98,7 +94,7 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid
             "J",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(F_)
@@ -108,6 +104,25 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid
     rImpK_(1.0/impK_)
 {
     DDisRequired();
+
+    // Force all required old-time fields to be created
+    fvm::d2dt2(DD());
+
+    // For consistent restarts, we will update the relative kinematic fields
+    if (restart())
+    {
+        DD().correctBoundaryConditions();
+        mechanical().grad(DD(), gradDD());
+        gradD() = gradD().oldTime() + gradDD();
+        F_ = I + gradD().T();
+        Finv_ = inv(F_);
+        J_ = det(F_);
+
+        gradD().storeOldTime();
+
+        // Let the mechanical law know
+        mechanical().setRestart();
+    }
 }
 
 
@@ -226,15 +241,7 @@ bool nonLinGeomTotalLagSolid::evolve()
             iCorr,
 #ifdef OPENFOAMESIORFOUNDATION
             mag(solverPerfDD.initialResidual()),
-            max
-            (
-                solverPerfDD.nIterations()[0],
-                max
-                (
-                    solverPerfDD.nIterations()[1],
-                    solverPerfDD.nIterations()[2]
-                )
-            ),
+            cmptMax(solverPerfDD.nIterations()),
 #else
             solverPerfDD.initialResidual(),
             solverPerfDD.nIterations(),
@@ -255,7 +262,9 @@ bool nonLinGeomTotalLagSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
 
@@ -286,7 +295,7 @@ tmp<vectorField> nonLinGeomTotalLagSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals (initial configuration)
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     if (enforceLinear())
     {
@@ -309,7 +318,7 @@ tmp<vectorField> nonLinGeomTotalLagSolid::tractionBoundarySnGrad
         const tensorField& Finv = Finv_.boundaryField()[patchID];
 
         // Patch unit normals (deformed configuration)
-        vectorField nCurrent = Finv.T() & n;
+        vectorField nCurrent(Finv.T() & n);
         nCurrent /= mag(nCurrent);
 
         // Return patch snGrad

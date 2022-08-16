@@ -1,0 +1,2 @@
+cellSet punch_top new boxToCell (0 0 0) (50 50 100)
+cellSet punch_bottom new boxToCell (0 0 -200) (100 100 0)

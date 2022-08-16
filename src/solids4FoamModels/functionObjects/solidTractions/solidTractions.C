@@ -137,9 +137,11 @@ bool Foam::solidTractions::writeData()
             {
                 if (!traction.boundaryField()[patchI].coupled())
                 {
-                    vectorField nCurrent =
+                    vectorField nCurrent
+                    (
                         Finv.boundaryField()[patchI].T()
-                      & mesh.boundary()[patchI].nf();
+                      & mesh.boundary()[patchI].nf()
+                    );
                     nCurrent /= mag(nCurrent);
 
                    // It is assumed that sigma is the true (Cauchy) stress
@@ -219,7 +221,7 @@ bool Foam::solidTractions::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidTractions::execute(const bool forceWrite)
 #else
 bool Foam::solidTractions::execute()

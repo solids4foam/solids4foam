@@ -50,6 +50,60 @@ namespace Foam
 
 // * * * * * * * * * * *  Private Member Funtcions * * * * * * * * * * * * * //
 
+void Foam::mechanicalLaw::makeEpsilon() const
+{
+    if (epsilonPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeEpsilon()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    epsilonPtr_.set
+    (
+        new volSymmTensorField
+        (
+            IOobject
+            (
+                "epsilon_",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedSymmTensor("0", dimless, symmTensor::zero)
+        )
+    );
+}
+
+
+void Foam::mechanicalLaw::makeEpsilonf() const
+{
+    if (epsilonfPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeEpsilonf()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    epsilonfPtr_.set
+    (
+        new surfaceSymmTensorField
+        (
+            IOobject
+            (
+                "epsilonf_",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedSymmTensor("0", dimless, symmTensor::zero)
+        )
+    );
+}
+
+
 void Foam::mechanicalLaw::makeF()
 {
     if (FPtr_.valid())
@@ -67,7 +121,7 @@ void Foam::mechanicalLaw::makeF()
                 "F_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -94,7 +148,7 @@ void Foam::mechanicalLaw::makeFf()
                 "Ff_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -102,6 +156,7 @@ void Foam::mechanicalLaw::makeFf()
         )
     );
 }
+
 
 void Foam::mechanicalLaw::makeRelF()
 {
@@ -120,7 +175,7 @@ void Foam::mechanicalLaw::makeRelF()
                 "relF_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -147,7 +202,7 @@ void Foam::mechanicalLaw::makeRelFf()
                 "relFf_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mesh(),
@@ -219,7 +274,7 @@ void Foam::mechanicalLaw::makeSigmaEff()
                 "sigmaEff_",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::AUTO_WRITE
             ),
             mesh(),
@@ -235,35 +290,84 @@ bool Foam::mechanicalLaw::planeStress() const
 {
     if (mesh_.foundObject<IOdictionary>("mechanicalProperties"))
     {
-        return
-            Switch
+        return Switch
+        (
+            mesh_.lookupObject<IOdictionary>
             (
-                mesh_.lookupObject<IOdictionary>
-                (
-                    "mechanicalProperties"
-                ).lookup("planeStress")
-            );
+                "mechanicalProperties"
+            ).lookup("planeStress")
+        );
+    }
+    else if
+    (
+        mesh_.objectRegistry::parent().foundObject<objectRegistry>("region0")
+    )
+    {
+        return Switch
+        (
+            mesh_.objectRegistry::parent().subRegistry
+            (
+                "region0"
+            ).lookupObject<IOdictionary>
+            (
+                "mechanicalProperties"
+            ).lookup("planeStress")
+        );
     }
     else
     {
-        // It is not straight-forward to lookup the mechanicalProperties from
-        // here as we only have access to a subMesh fvMesh objectRegistry
-        // We will read it here again; this switch only gets called at the start
-        // of a simulation so it is not a problem
-        IOdictionary mechProp
+        return Switch
         (
-            IOobject
+            mesh_.objectRegistry::parent().subRegistry
             (
-                "mechanicalProperties",
-                "constant",
-                mesh_.time(),
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
+                "solid"
+            ).lookupObject<IOdictionary>
+            (
+                "mechanicalProperties"
+            ).lookup("planeStress")
         );
-
-        return Switch(mechProp.lookup("planeStress"));
     }
+}
+
+
+const Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon() const
+{
+    if (epsilonPtr_.empty())
+    {
+        makeEpsilon();
+    }
+
+    return epsilonPtr_();
+}
+
+Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon()
+{
+    if (epsilonPtr_.empty())
+    {
+        makeEpsilon();
+    }
+
+    return epsilonPtr_();
+}
+
+Foam::surfaceSymmTensorField& Foam::mechanicalLaw::epsilonf()
+{
+    if (epsilonfPtr_.empty())
+    {
+        makeEpsilonf();
+    }
+
+    return epsilonfPtr_();
+}
+
+const Foam::surfaceSymmTensorField& Foam::mechanicalLaw::epsilonf() const
+{
+    if (epsilonfPtr_.empty())
+    {
+        makeEpsilonf();
+    }
+
+    return epsilonfPtr_();
 }
 
 
@@ -344,6 +448,48 @@ Foam::volSymmTensorField& Foam::mechanicalLaw::sigmaEff()
 }
 
 
+void Foam::mechanicalLaw::updateEpsilon()
+{
+    if (incremental())
+    {
+        // Lookup gradient of displacement increment
+        const volTensorField& gradDD =
+            mesh().lookupObject<volTensorField>("grad(DD)");
+
+        epsilon() = epsilon().oldTime() + symm(gradDD);
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const volTensorField& gradD =
+            mesh().lookupObject<volTensorField>("grad(D)");
+
+        epsilon() = symm(gradD);
+    }
+}
+
+
+void Foam::mechanicalLaw::updateEpsilonf()
+{
+    if (incremental())
+    {
+        // Lookup gradient of displacement increment
+        const surfaceTensorField& gradDD =
+            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
+
+        epsilonf() = epsilonf().oldTime() + symm(gradDD);
+    }
+    else
+    {
+        // Lookup gradient of displacement
+        const surfaceTensorField& gradD =
+            mesh().lookupObject<surfaceTensorField>("grad(D)f");
+
+        epsilonf() = symm(gradD);
+    }
+}
+
+
 bool Foam::mechanicalLaw::updateF
 (
     volSymmTensorField& sigma,
@@ -351,6 +497,12 @@ bool Foam::mechanicalLaw::updateF
     const dimensionedScalar& K
 )
 {
+    if (curTimeIndex_ != mesh().time().timeIndex())
+    {
+        curTimeIndex_ = mesh().time().timeIndex();
+        warnAboutEnforceLinear_ = true;
+    }
+
     // Check if the mathematical model is in total or updated Lagrangian form
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
@@ -373,11 +525,16 @@ bool Foam::mechanicalLaw::updateF
 
         if (enforceLinear())
         {
-            WarningIn
-            (
-                "void Foam::MooneyRivlinThreeParametersElastic::"
-                "correct(volSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
+            if (warnAboutEnforceLinear_)
+            {
+                warnAboutEnforceLinear_ = false;
+
+                WarningIn
+                (
+                    "void " + type() + "::"
+                    "correct(volSymmTensorField& sigma)"
+                )   << "Material linearity enforced for stability!" << endl;
+            }
 
             // Calculate stress using Hooke's law
             sigma =
@@ -404,10 +561,15 @@ bool Foam::mechanicalLaw::updateF
 
             if (enforceLinear())
             {
-                WarningIn
-                (
-                    "void " + type() + "::correct(volSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
+                if (warnAboutEnforceLinear_)
+                {
+                    warnAboutEnforceLinear_ = false;
+
+                    WarningIn
+                    (
+                        "void " + type() + "::correct(volSymmTensorField& sigma)"
+                    )   << "Material linearity enforced for stability!" << endl;
+                }
 
                 // Calculate stress using Hooke's law
                 sigma =
@@ -431,10 +593,15 @@ bool Foam::mechanicalLaw::updateF
 
             if (enforceLinear())
             {
-                WarningIn
-                (
-                    "void " + type() + "::correct(volSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
+                if (warnAboutEnforceLinear_)
+                {
+                    warnAboutEnforceLinear_ = false;
+
+                    WarningIn
+                    (
+                        "void " + type() + "::correct(volSymmTensorField& sigma)"
+                    )   << "Material linearity enforced for stability!" << endl;
+                }
 
                 // Calculate stress using Hooke's law
                 sigma = 2.0*mu*dev(symm(gradD)) + K*tr(gradD)*I;
@@ -585,13 +752,41 @@ void Foam::mechanicalLaw::updateSigmaHyd
 
         // Lookup the momentum equation inverse diagonal field
         const volScalarField* ADPtr = NULL;
-        if (mesh().foundObject<volScalarField>("DEqnA"))
+        bool allocatedMemory = false;
+        if (baseMesh().foundObject<volScalarField>("DEqnA"))
         {
-            ADPtr = &mesh().lookupObject<volScalarField>("DEqnA");
+            if (mesh() == baseMesh())
+            {
+                ADPtr = &mesh().lookupObject<volScalarField>("DEqnA");
+            }
+            else
+            {
+#ifdef OPENFOAMESIORFOUNDATION
+                FatalErrorIn("void Foam::mechanicalLaw::updateSigmaHyd(...)")
+                    << "Multi-materials are not yet ported for this version of "
+                    << "OpenFOAM" << abort(FatalError);
+#else
+                ADPtr =
+                    new volScalarField
+                    (
+                        baseMesh().lookupObject<mechanicalModel>
+                        (
+                            "mechanicalProperties"
+                        ).solSubMeshes().lookupBaseMeshVolField<scalar>
+                        (
+                            "DEqnA", mesh()
+                        )
+                    );
+                allocatedMemory = true;
+#endif
+            }
         }
-        else if (mesh().foundObject<volScalarField>("DDEqnA"))
+        else if (baseMesh().foundObject<volScalarField>("DDEqnA"))
         {
-            ADPtr = &mesh().lookupObject<volScalarField>("DDEqnA");
+            notImplemented
+            (
+                "DDEqnA in solidModels should instead be called DEqnA"
+            );
         }
         else
         {
@@ -632,6 +827,11 @@ void Foam::mechanicalLaw::updateSigmaHyd
 
         // Relax the pressure field
         sigmaHyd().relax();
+
+        if (allocatedMemory)
+        {
+            delete ADPtr;
+        }
     }
     else
     {
@@ -679,6 +879,8 @@ Foam::mechanicalLaw::mechanicalLaw
     dict_(dict),
     baseMeshRegionName_(),
     nonLinGeom_(nonLinGeom),
+    epsilonPtr_(),
+    epsilonfPtr_(),
     FPtr_(),
     FfPtr_(),
     relFPtr_(),
@@ -693,7 +895,9 @@ Foam::mechanicalLaw::mechanicalLaw
     ),
     sigmaHydPtr_(),
     gradSigmaHydPtr_(),
-    sigmaEffPtr_()
+    sigmaEffPtr_(),
+    curTimeIndex_(-1),
+    warnAboutEnforceLinear_(true)
 {
     // Set the base mesh region name
     // For an FSI case, the region will be called solid, else it will be called
@@ -732,9 +936,59 @@ Foam::mechanicalLaw::mechanicalLaw
 // * * * * * * * * * * * * * * * Member functions * * * * * * * * * * * * * * //
 
 
+Foam::dimensionedScalar Foam::mechanicalLaw::rhoScalar() const
+{
+    return dimensionedScalar(dict_.lookup("rho"));
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::mechanicalLaw::rho() const
+{
+    tmp<volScalarField> tresult
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "rho",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            rhoScalar(),
+            zeroGradientFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    tresult.ref().correctBoundaryConditions();
+#else
+    tresult().correctBoundaryConditions();
+#endif
+
+    return tresult;
+}
+
+
 Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalLaw::impKf() const
 {
     return fvc::interpolate(impK());
+}
+
+
+Foam::tmp<Foam::Field<Foam::symmTensor4thOrder>>
+Foam::mechanicalLaw::materialTangentField() const
+{
+    // Default to uniform field
+    // This function can be overwritten in specific mechanical laws
+    tmp<Field<symmTensor4thOrder>> tresult
+    (
+        new Field<symmTensor4thOrder>(mesh().nFaces(), materialTangent())
+    );
+
+    return tresult;
 }
 
 

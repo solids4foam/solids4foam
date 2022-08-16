@@ -158,7 +158,11 @@ public:
         //- Return non-const reference to slave friction traction
         virtual vectorField& slaveTraction()
         {
+#ifdef OPENFOAMESIORFOUNDATION
+            return slaveTractionVolField_.boundaryFieldRef()[slavePatchID()];
+#else
             return slaveTractionVolField_.boundaryField()[slavePatchID()];
+#endif
         }
 
         //- calculate penalty factor

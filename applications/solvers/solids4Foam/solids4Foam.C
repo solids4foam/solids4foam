@@ -56,7 +56,10 @@ int main(int argc, char *argv[])
 
         runTime++;
 
-        Info<< "Time = " << runTime.timeName() << nl << endl;
+        if (physics().printInfo())
+        {
+            Info<< "Time = " << runTime.timeName() << nl << endl;
+        }
 
         // Solve the mathematical model
         physics().evolve();
@@ -69,9 +72,12 @@ int main(int argc, char *argv[])
             physics().writeFields(runTime);
         }
 
-        Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
-            << "  ClockTime = " << runTime.elapsedClockTime() << " s"
-            << nl << endl;
+        if (physics().printInfo())
+        {
+            Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
+                << "  ClockTime = " << runTime.elapsedClockTime() << " s"
+                << nl << endl;
+        }
     }
 
     physics().end();

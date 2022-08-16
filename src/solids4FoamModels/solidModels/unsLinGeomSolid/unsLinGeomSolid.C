@@ -44,7 +44,6 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(unsLinGeomSolid, 0);
-addToRunTimeSelectionTable(physicsModel, unsLinGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, unsLinGeomSolid, dictionary);
 
 
@@ -169,15 +168,7 @@ bool unsLinGeomSolid::evolve()
             iCorr,
 #ifdef OPENFOAMESIORFOUNDATION
             mag(solverPerfD.initialResidual()),
-            max
-            (
-                solverPerfD.nIterations()[0],
-                max
-                (
-                    solverPerfD.nIterations()[1],
-                    solverPerfD.nIterations()[2]
-                )
-            ),
+            cmptMax(solverPerfD.nIterations()),
 #else
             solverPerfD.initialResidual(),
             solverPerfD.nIterations(),
@@ -192,7 +183,9 @@ bool unsLinGeomSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
     
@@ -223,7 +216,7 @@ tmp<vectorField> unsLinGeomSolid::tractionBoundarySnGrad
     const symmTensorField& sigma = sigmaf_.boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>

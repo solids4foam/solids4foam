@@ -24,7 +24,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 
 #include "pimpleOversetFluid.H"
 #include "volFields.H"
@@ -49,7 +49,6 @@ namespace fluidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(pimpleOversetFluid, 0);
-addToRunTimeSelectionTable(physicsModel, pimpleOversetFluid, fluid);
 addToRunTimeSelectionTable(fluidModel, pimpleOversetFluid, dictionary);
 
 

@@ -1,8 +1,0 @@
-meshSmoother/meshSmoother.C
-taubinSmoother/taubinSmoother.C
-laplacianSmoother/laplacianSmoother.C
-volumeSmoother/volumeSmoother.C
-implicitVolumeSmoother/implicitVolumeSmoother.C
-explicitVolumeSmoother/explicitVolumeSmoother.C
-
-LIB = $(FOAM_USER_LIBBIN)/libsimpleMeshSmoothers

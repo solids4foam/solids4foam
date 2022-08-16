@@ -56,10 +56,10 @@ bool Foam::stressTriaxiality::writeData()
             mesh_.lookupObject<volSymmTensorField>("sigma");
 
         // Calculate hydrostatic stress
-        const volScalarField sigmaHyd = -tr(sigma)/3.0;
+        const volScalarField sigmaHyd(-tr(sigma)/3.0);
 
         // Calculate equivalent stress
-        volScalarField sigmaEq = sqrt((3.0/2.0)*magSqr(dev(sigma)));
+        volScalarField sigmaEq(sqrt((3.0/2.0)*magSqr(dev(sigma))));
 
         // Limit sigmaEq to at least SMALL to avid division by zero
         sigmaEq = max(sigmaEq, dimensionedScalar("SMALL", dimPressure, SMALL));
@@ -116,7 +116,7 @@ bool Foam::stressTriaxiality::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::stressTriaxiality::execute(const bool forceWrite)
 #else
 bool Foam::stressTriaxiality::execute()

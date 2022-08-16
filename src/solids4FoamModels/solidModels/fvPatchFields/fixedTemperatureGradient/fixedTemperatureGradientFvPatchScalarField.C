@@ -72,7 +72,7 @@ fixedTemperatureGradientFvPatchScalarField
     fieldName_(stpvf.fieldName_)
 {}
 
-
+#ifndef OPENFOAMFOUNDATION
 fixedTemperatureGradientFvPatchScalarField::
 fixedTemperatureGradientFvPatchScalarField
 (
@@ -82,7 +82,7 @@ fixedTemperatureGradientFvPatchScalarField
     fixedGradientFvPatchScalarField(stpvf),
     fieldName_(stpvf.fieldName_)
 {}
-
+#endif
 
 fixedTemperatureGradientFvPatchScalarField::
 fixedTemperatureGradientFvPatchScalarField
@@ -147,8 +147,8 @@ void fixedTemperatureGradientFvPatchScalarField::evaluate
             "grad(" + fieldName_ + ")"
         );
 
-    vectorField n = patch().nf();
-    vectorField delta = patch().delta();
+    vectorField n(patch().nf());
+    vectorField delta(patch().delta());
 
     // Correction vectors
     vectorField k = delta - n*(n&delta);

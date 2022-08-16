@@ -65,16 +65,19 @@ Author
 #ifndef solidContactFvPatchVectorField_H
 #define solidContactFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "normalContactModel.H"
 #include "frictionContactModel.H"
 #include "globalPolyPatch.H"
-#include "newGgiInterpolation.H"
 #include "Switch.H"
 #include "boundBox.H"
 #include "standAlonePatch.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "amiZoneInterpolation.H"
+#else
+    #include "newGgiInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -98,9 +101,6 @@ class solidContactFvPatchVectorField
 
         //- Is this patch the master
         const Switch master_;
-
-        //- Write the deformed contact zones to VTK surface files
-        const Switch writeZoneVTK_;
 
         //- Write the contact point distances fields for viewing
         const Switch writePointDistanceFields_;
@@ -131,7 +131,13 @@ class solidContactFvPatchVectorField
         mutable PtrList<globalPolyPatch> shadowZones_;
 
         //- Zone-to-zone interpolations
+#ifdef OPENFOAMESIORFOUNDATION
+        mutable PtrList<amiZoneInterpolation> zoneToZones_;
+#else
         mutable PtrList<newGgiStandAlonePatchInterpolation> zoneToZones_;
+
+        //- Write the deformed contact zones to VTK surface files
+        const Switch writeZoneVTK_;
 
         //- GGI quick reject algorithm
         newGgiInterpolation::quickReject quickReject_;
@@ -147,6 +153,7 @@ class solidContactFvPatchVectorField
         //- Region where the contact is expected to be
         //  This aims to save time in the GGI distance calculations
         const boundBox regionOfInterest_;
+#endif
 
         //- Contact field for all the contacts, stored on the current patch
         //  1 means in contact
@@ -261,6 +268,7 @@ public:
             const fvPatchFieldMapper&
         );
 
+#ifndef OPENFOAMFOUNDATION
         //- Construct as copy
         solidContactFvPatchVectorField
         (
@@ -268,13 +276,14 @@ public:
         );
 
         //- Construct and return a clone
-        virtual tmp<fvPatchField<vector> > clone() const
+        virtual tmp<fvPatchVectorField> clone() const
         {
-            return tmp<fvPatchField<vector> >
+            return tmp<fvPatchVectorField>
             (
                 new solidContactFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         solidContactFvPatchVectorField
@@ -351,18 +360,30 @@ public:
             //- Return reference to deformed shadow zones
             PtrList<globalPolyPatch>& shadowZones();
 
+#ifdef OPENFOAMESIORFOUNDATION
+            //- Return const reference to patch-to-patch interpolation
+            const PtrList<amiZoneInterpolation>& zoneToZones() const;
+
+            //- Return reference to patch-to-patch interpolation
+            PtrList<amiZoneInterpolation>& zoneToZones();
+#else
             //- Return const reference to patch-to-patch interpolation
             const PtrList<newGgiStandAlonePatchInterpolation>&
                 zoneToZones() const;
 
             //- Return reference to patch-to-patch interpolation
             PtrList<newGgiStandAlonePatchInterpolation>& zoneToZones();
+#endif
 
             //- Return const reference to zone-to-zone interpolation for the
             //  current slave patch; an error is thrown if the master calls this
             //  function
+#ifdef OPENFOAMESIORFOUNDATION
+            const amiZoneInterpolation& zoneToZoneForThisSlave() const;
+#else
             const newGgiStandAlonePatchInterpolation&
             zoneToZoneForThisSlave() const;
+#endif    
 
             //- Return the global patch for the current slave patch
             //  An error is thrown if the master calls this function

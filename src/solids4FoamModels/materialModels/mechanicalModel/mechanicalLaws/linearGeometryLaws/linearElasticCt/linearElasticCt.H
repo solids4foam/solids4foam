@@ -60,9 +60,6 @@ class linearElasticCt
 {
     // Private data
 
-        //- Density
-        dimensionedScalar rho_;
-
         //- Young's modulus field
         volScalarField E_;
 
@@ -128,9 +125,6 @@ public:
 
 
     // Member Functions
-
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
 
         //- Return density
         virtual tmp<volScalarField> impK() const;

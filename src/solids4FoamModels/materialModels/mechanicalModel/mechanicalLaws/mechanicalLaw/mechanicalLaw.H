@@ -43,6 +43,7 @@ SourceFiles
 #include "tmp.H"
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
+#include "symmTensor4thOrder.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -71,6 +72,12 @@ class mechanicalLaw
 
         //- Nonlinear geometry enumerator
         const nonLinearGeometry::nonLinearType nonLinGeom_;
+
+        // Small strain tensor
+        mutable autoPtr<volSymmTensorField> epsilonPtr_;
+
+        // Small strain tensor surface field
+        mutable autoPtr<surfaceSymmTensorField> epsilonfPtr_;
 
         // Total deformation gradient volField
         autoPtr<volTensorField> FPtr_;
@@ -105,8 +112,20 @@ class mechanicalLaw
         //      p is the pore pressure
         autoPtr<volSymmTensorField> sigmaEffPtr_;
 
+        //- Current time index
+        label curTimeIndex_;
+
+        //- Enforce linearity warning flag
+        bool warnAboutEnforceLinear_;
+
 
     // Private Member Functions
+
+        //- Make the epsilon field
+        void makeEpsilon() const;
+
+        //- Make the epsilonf field
+        void makeEpsilonf() const;
 
         //- Make the F field
         void makeF();
@@ -141,14 +160,14 @@ protected:
             return mesh_;
         }
 
-        //- Return const reference to dict
-        const dictionary& dict() const
-        {
-            return dict_;
-        }
-
         //- If the case is plane stress
         bool planeStress() const;
+
+        //- Return const access to solvePressureEqn switch
+        const Switch& solvePressureEqn() const
+        {
+            return solvePressureEqn_;
+        }
 
         //- Return the base mesh region name
         const word& baseMeshRegionName() const
@@ -164,6 +183,18 @@ protected:
                 baseMeshRegionName()
             );
         }
+
+        //- Return a const reference to the epsilon field
+        const volSymmTensorField& epsilon() const;
+
+        //- Return a reference to the epsilon field
+        volSymmTensorField& epsilon();
+
+        //- Return a const reference to the epsilonf field
+        const surfaceSymmTensorField& epsilonf() const;
+
+        //- Return a reference to the Epsilonf field
+        surfaceSymmTensorField& epsilonf();
 
         //- Return a reference to the F field
         volTensorField& F();
@@ -185,6 +216,12 @@ protected:
 
         //- Return a reference to the sigmaEff field
         volSymmTensorField& sigmaEff();
+
+        //- Update epsilon
+        void updateEpsilon();
+
+        //- Update epsilonf
+        void updateEpsilonf();
 
         //- Update the deformation gradient
         //  The lienarised shear and bulk modulii are used to enforce linear
@@ -319,8 +356,17 @@ public:
             return name_;
         }
 
-        //- Return density
-        virtual tmp<volScalarField> rho() const = 0;
+        //- Return const reference to dict
+        const dictionary& dict() const
+        {
+            return dict_;
+        }
+    
+        //- Return scalar density, if defined
+        virtual dimensionedScalar rhoScalar() const;
+
+        //- Return density field
+        virtual tmp<volScalarField> rho() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
@@ -329,6 +375,20 @@ public:
         //- Return the implicit stiffness surface field
         //  This is the diffusivity for the Laplacian term
         virtual tmp<surfaceScalarField> impKf() const;
+
+        //- Material tangent for Newton Raphson loop
+        virtual symmTensor4thOrder materialTangent() const
+        {
+            // We could use numerical differentiation for this if needed
+            notImplemented("Not yet implemented for this mechanical law");
+
+            // Keep compiler happy
+            return symmTensor4thOrder::zero;
+        }
+
+        //- Material tangent field for Newton Raphson loop
+        //  The size of this field should be mesh.nFaces()
+        virtual tmp<Field<symmTensor4thOrder>> materialTangentField() const;
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const
@@ -355,6 +415,11 @@ public:
 
         //- Return the desired new time-step
         virtual scalar newDeltaT();
+
+        //- Set restart: some mechanical laws may change the writeOpt of fields
+        //  accordingly
+        virtual void setRestart()
+        {}
 };
 
 

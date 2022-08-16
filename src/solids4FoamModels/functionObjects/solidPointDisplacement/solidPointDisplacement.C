@@ -28,10 +28,14 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "OSspecific.H"
 #ifdef OPENFOAMESIORFOUNDATION
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
+#endif
+#ifdef OPENFOAMFOUNDATION
+    #include "OSspecific.H"
 #endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -56,40 +60,11 @@ bool Foam::solidPointDisplacement::writeData()
     // Lookup the solid mesh
     const fvMesh& mesh = time_.lookupObject<fvMesh>(region_);
 
-    if (mesh.foundObject<volVectorField>("D"))
+    if (mesh.foundObject<pointVectorField>("pointD"))
     {
-        // Read the displacement field
-        const volVectorField& D = mesh.lookupObject<volVectorField>("D");
-
-        // Create a point mesh
-        pointMesh pMesh(mesh);
-
-        // Create a point field
-        pointVectorField pointD
-        (
-            IOobject
-            (
-                "volToPoint(D)",
-                mesh.time().timeName(),
-                mesh,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            pMesh,
-            dimensionedVector("zero", D.dimensions(), vector::zero)
-        );
-
-#ifdef OPENFOAMESIORFOUNDATION
-        mesh.lookupObject<volPointInterpolation>
-        (
-            "volPointInterpolation"
-        ).interpolate(D, pointD);
-#else
-        mesh.lookupObject<newLeastSquaresVolPointInterpolation>
-        (
-            "newLeastSquaresVolPointInterpolation"
-        ).interpolate(D, pointD);
-#endif
+        // Lookup the point displacement field
+        const pointVectorField& pointD =
+            mesh.lookupObject<pointVectorField>("pointD");
 
         vector pointDValue = vector::zero;
         if (pointID_ > -1)
@@ -112,7 +87,7 @@ bool Foam::solidPointDisplacement::writeData()
     else
     {
         InfoIn(this->name() + " function object constructor")
-            << "volVectorField D not found" << endl;
+            << "pointVectorField pointD not found" << endl;
     }
 
     return true;
@@ -226,11 +201,11 @@ Foam::solidPointDisplacement::solidPointDisplacement
             {
                 // Put in undecomposed case (Note: gives problems for
                 // distributed data running)
-                historyDir = time_.path()/".."/"history"/startTimeName;
+                historyDir = time_.path()/".."/"postProcessing"/startTimeName;
             }
             else
             {
-                historyDir = time_.path()/"history"/startTimeName;
+                historyDir = time_.path()/"postProcessing"/startTimeName;
             }
 
             // Create directory if does not exist.
@@ -264,7 +239,7 @@ bool Foam::solidPointDisplacement::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidPointDisplacement::execute(const bool forceWrite)
 #else
 bool Foam::solidPointDisplacement::execute()

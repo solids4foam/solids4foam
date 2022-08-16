@@ -98,6 +98,9 @@ public:
         extrapolatedPressureValueFvPatchScalarField
         (
             const extrapolatedPressureValueFvPatchScalarField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -108,6 +111,7 @@ public:
                 new extrapolatedPressureValueFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         extrapolatedPressureValueFvPatchScalarField

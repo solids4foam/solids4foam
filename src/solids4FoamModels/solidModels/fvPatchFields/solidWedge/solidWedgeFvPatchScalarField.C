@@ -129,7 +129,7 @@ solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
     );
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
 (
     const solidWedgeFvPatchScalarField& ptf
@@ -137,7 +137,7 @@ solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
 :
     wedgeFvPatchField<scalar>(ptf)
 {}
-
+#endif
 
 solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
 (
@@ -165,18 +165,17 @@ tmp<Field<scalar> > solidWedgeFvPatchScalarField::snGrad() const
     const wedgePolyPatch& wedgePatch =
         refCast<const wedgePolyPatch>(patch().patch());
 
-    const vectorField& patchC = patch().patch().faceCentres();
-    vectorField nHat = this->patch().nf();
+    const vectorField patchC(patch().patch().faceCentres());
+    const vectorField n(patch().nf());
     const vector& centreN = wedgePatch.centreNormal();
-    scalarField d = ((patch().Cn() - patchC) & centreN)/(nHat & centreN);
-    vectorField projC = d*nHat + patchC;
-
+    const scalarField d(((patch().Cn() - patchC) & centreN)/(n & centreN));
+    const vectorField projC(d*n + patchC);
 
     // Calculate correction vector which connects actual cell centre to the
     // transformed cell centre
-    const vectorField k = projC - patch().Cn();
+    const vectorField k(projC - patch().Cn());
 
-    Field<scalar> pif = this->patchInternalField();
+    const Field<scalar> pif(this->patchInternalField());
 
     const fvPatchField<vector>& gradU =
         patch().lookupPatchField<volVectorField, vector>
@@ -188,13 +187,17 @@ tmp<Field<scalar> > solidWedgeFvPatchScalarField::snGrad() const
 #endif
         );
 
-    Field<scalar> projU =
-        this->patchInternalField() + (k & gradU.patchInternalField());
+    const Field<scalar> projU
+    (
+        this->patchInternalField() + (k & gradU.patchInternalField())
+    );
 
     // Calculate delta coeffs from proj position on centre plane to transformed
     // projected position
-    scalarField projDeltaCoeff =
-        1.0/mag(transform(wedgePatch.cellT(), projC) - projC);
+    const scalarField projDeltaCoeff
+    (
+        1.0/mag(transform(wedgePatch.cellT(), projC) - projC)
+    );
 
     return
     (
@@ -224,12 +227,12 @@ void solidWedgeFvPatchScalarField::evaluate(const Pstream::commsTypes)
         refCast<const wedgeFvPatch>(this->patch());
 
     // Rotate patchC field back to centre plane to find transformed cell centres
-    const vectorField& patchC = patch().patch().faceCentres();
-    vectorField transC = wedgePatch.faceT().T() & patchC;
+    const vectorField patchC(patch().patch().faceCentres());
+    const vectorField transC(wedgePatch.faceT().T() & patchC);
 
     // Calculate correction vector which connects actual cell centre to the
     // transformed cell centre
-    const vectorField k = transC - patch().Cn();
+    const vectorField k(transC - patch().Cn());
 
     const fvPatchField<vector>& gradU =
         patch().lookupPatchField<volVectorField, vector>
@@ -241,7 +244,7 @@ void solidWedgeFvPatchScalarField::evaluate(const Pstream::commsTypes)
 #endif
         );
 
-    Field<scalar> pif = this->patchInternalField();
+    Field<scalar> pif(this->patchInternalField());
     pif += (k & gradU.patchInternalField());
 
     Field<scalar>::operator=

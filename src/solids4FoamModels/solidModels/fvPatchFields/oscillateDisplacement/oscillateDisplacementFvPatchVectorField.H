@@ -101,6 +101,9 @@ public:
         oscillateDisplacementFvPatchVectorField
         (
             const oscillateDisplacementFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -111,6 +114,7 @@ public:
                 new oscillateDisplacementFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         oscillateDisplacementFvPatchVectorField

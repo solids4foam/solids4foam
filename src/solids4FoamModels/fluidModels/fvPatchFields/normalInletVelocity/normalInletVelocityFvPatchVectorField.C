@@ -88,6 +88,7 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 }
 
 
+#ifndef OPENFOAMFOUNDATION
 normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 (
     const normalInletVelocityFvPatchVectorField& pivpvf
@@ -95,6 +96,7 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 :
     fixedValueFvPatchVectorField(pivpvf)
 {}
+#endif
 
 
 normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
@@ -243,14 +245,14 @@ snGrad() const
             "grad(" + UName + ")"
         );
 
-    vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
-    vectorField k = delta - n*(n&delta);
+    const vectorField n(patch().nf());
+    const vectorField delta(patch().delta());
+    const vectorField k((I - sqr(n)) & delta);
 
     if (secondOrder_)
     {
-        vectorField dUP = (k&gradU.patchInternalField());
-        vectorField nGradUP = (n&gradU.patchInternalField());
+        const vectorField dUP(k & gradU.patchInternalField());
+        const vectorField nGradUP(n & gradU.patchInternalField());
 
         tmp<Field<vector> > tnGradU
         (
@@ -289,7 +291,7 @@ snGrad() const
 
 
     // First order
-    vectorField dUP = (k&gradU.patchInternalField());
+    const vectorField dUP(k & gradU.patchInternalField());
 
     tmp<Field<vector> > tnGradU
     (
@@ -339,14 +341,14 @@ gradientBoundaryCoeffs() const
             "grad(" + UName + ")"
         );
 
-    vectorField n = this->patch().nf();
-    vectorField delta = this->patch().delta();
-    vectorField k = delta - n*(n&delta);
+    const vectorField n(patch().nf());
+    const vectorField delta(patch().delta());
+    const vectorField k((I - sqr(n)) & delta);
 
     if (secondOrder_)
     {
-        vectorField dUP = (k&gradU.patchInternalField());
-        vectorField nGradUP = (n&gradU.patchInternalField());
+        const vectorField dUP(k & gradU.patchInternalField());
+        const vectorField nGradUP(n & gradU.patchInternalField());
 
 //         vectorField nGradU =
 //             2
@@ -393,7 +395,7 @@ gradientBoundaryCoeffs() const
 
 
     // First order
-    vectorField dUP = (k&gradU.patchInternalField());
+    const vectorField dUP(k & gradU.patchInternalField());
 
 //     vectorField nGradU =
 //         (

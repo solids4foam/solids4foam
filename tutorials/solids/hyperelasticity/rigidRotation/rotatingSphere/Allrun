@@ -10,7 +10,7 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-runApplication fluentMeshToFoam rotateSphere.msh
+solids4Foam::runApplication fluentMeshToFoam rotateSphere.msh
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

@@ -1,0 +1,79 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     solids4Foam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         0.005;
+
+deltaT          1e-4;
+
+writeControl    runTime;
+
+writeInterval   2e-4; //1e-3;
+
+purgeWrite      0;
+
+writeFormat     binary;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  no;
+
+functions
+{
+    displacement
+    {
+        type            solidPointDisplacement;
+        region          solid;
+        point           (0 0.005 0.025);
+    }
+    solidForce
+    {
+        type           solidForces;
+        historyPatch   inner-wall;
+    }
+    forces
+    {
+        type                forces;
+        "libs|functionObjectLibs" ( "libforces.so" );
+        outputControl       timeStep;
+        outputInterval      1;
+        patches             (wall);
+        "pName|p"           p;
+	"UName|U"           U;
+        "rhoName|rho"       rhoInf;
+        log                 false;
+        rhoInf              1000;
+        CofR                (0.5 0.1 0);
+        region              fluid;
+    }
+}
+
+// ************************************************************************* //

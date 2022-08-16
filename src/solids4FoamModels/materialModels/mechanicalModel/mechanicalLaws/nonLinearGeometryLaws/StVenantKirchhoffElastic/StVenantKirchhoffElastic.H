@@ -67,9 +67,6 @@ class StVenantKirchhoffElastic
 {
     // Private data
 
-        // Initial density
-        const dimensionedScalar rho_;
-
         // First Lame parameter
         dimensionedScalar lambda_;
 
@@ -115,9 +112,6 @@ public:
 
     // Member Functions
 
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
-
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
@@ -127,6 +121,10 @@ public:
 
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Set restart: some mechanical laws may change the writeOpt of fields
+        //  accordingly
+        virtual void setRestart();
 };
 
 

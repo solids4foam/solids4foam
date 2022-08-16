@@ -6,13 +6,15 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+# Create the blockMeshDict
+mkdir -p constant/polyMesh
+m4 system/blockMeshDict.neckingBar.m4 > constant/polyMesh/blockMeshDict
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-mkdir -p constant/polyMesh
-m4 system/blockMeshDict.neckingBar.m4 > constant/polyMesh/blockMeshDict
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam
