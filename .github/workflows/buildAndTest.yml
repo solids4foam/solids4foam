@@ -29,7 +29,9 @@ jobs:
       - name: T1
         run: /lib/openfoam/openfoam2012/etc/openfoam && echo $FOAM_APPBIN
       - name: Source bash
-        run: . /usr/lib/openfoam/openfoam2012/etc/bashrc
+        run: |
+            chmod 777 /usr/lib/openfoam/openfoam2012/etc/bashrc
+            source /usr/lib/openfoam/openfoam2012/etc/bashrc
       - name: Check persistence
         run: echo "${FOAM_APPBIN}"
       - name: Allwmake
