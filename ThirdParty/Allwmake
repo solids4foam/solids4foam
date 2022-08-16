@@ -26,10 +26,9 @@ else
             echo
             exit 1
         fi
-        \tar xvf eigen-3.3.7.tar.gz
-        \rm -f eigen-3.3.7.tar.gz
-        \mv eigen-3.3.7 eigen3
-        (cd eigen3 && wmakeLnInclude .)
+        tar xvf eigen-3.3.7.tar.gz &> /dev/null
+        rm -f eigen-3.3.7.tar.gz
+        mv eigen-3.3.7 eigen3
     else
         #  If EIGEN_DIR is set then then we will create a symbolic link to it
         echo "EIGEN_DIR is set: creating symbolic link"
