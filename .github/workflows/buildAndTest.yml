@@ -50,3 +50,24 @@ jobs:
           source /opt/openfoam9/etc/bashrc
           cd tutorials
           ./Alltest
+
+  build-and-test-on-foam-extend-4.1:
+    name: Build on foam-extend-4.1
+    runs-on: ubuntu-latest
+    container:
+      image: philippic/foam-extend-4.1.ubuntu18.04.gfortran:latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Allwmake
+        shell: bash -l {0}
+        run: |
+          source /home/dockeruser/foam/foam-extend-4.1/etc/bashrc
+          ./Allwmake
+
+      - name: Alltest
+        shell: bash -l {0}
+        run: |
+          source /home/dockeruser/foam/foam-extend-4.1/etc/bashrc
+          cd tutorials
+          ./Alltest
