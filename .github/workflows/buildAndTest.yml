@@ -22,12 +22,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Allwmake
         shell: bash -l {0}
-        run: |
-            source /usr/lib/openfoam/openfoam2012/etc/bashrc
-            ./Allwmake
+        run: source /usr/lib/openfoam/openfoam2012/etc/bashrc && ./Allwmake
       - name: Alltest
         shell: bash -l {0}
-        run: |
-            source /usr/lib/openfoam/openfoam2012/etc/bashrc
-            cd tutorials
-            ./Alltest
+        run: source /usr/lib/openfoam/openfoam2012/etc/bashrc && cd tutorials && ./Alltest
