@@ -20,14 +20,16 @@ jobs:
         container: ['openfoamplus/of_v2012_centos73:release']
     steps:
       - uses: actions/checkout@v3
+      - name: PWD
+        run: pwd
+      - name: ls
+        run: ls -al
+      - name: Who am I
+        run: whoami
       - name: Source bash
         run: source /usr/lib/openfoam/openfoam2012/etc/bashrc
       - name: Check persistence
         run: echo "${FOAM_APPBIN}"
-      - name: PWD
-        run: pwd
-      - name: Who am I
-        run: whoami
       - name: Allwmake
         run: source /usr/lib/openfoam/openfoam2012/etc/bashrc &> /dev/null && ./Allwmake
       - name: Alltest
