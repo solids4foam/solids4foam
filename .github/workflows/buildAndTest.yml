@@ -10,15 +10,13 @@ on:
 
 jobs:
   build_and_test:
-    name: Build on ${{matrix.container }}
+    name: Build on ${{ matrix.container }}
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.container }}
-      options: --user ${{ matrix.user }} --entrypoint /bin/bash
     strategy:
       matrix:
-        container: ['philippic/openfoam-v2012-centos73.gfortran']
-        user: ['dockeruser']
+        container: ['openfoamplus/of_v2012_centos73']
     steps:
       - uses: actions/checkout@v3
       - name: Source bash
