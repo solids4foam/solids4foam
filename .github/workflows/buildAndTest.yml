@@ -8,6 +8,10 @@ on:
     branches: [ "nextRelease" ]
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash -leo pipefail {0}
+
 jobs:
   build_and_test:
     name: Build on ${{ matrix.container }}
@@ -22,20 +26,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: PWD
         run: pwd
-      - name: ls
-        run: ls -al
-      - name: ls root
-        run: ls -al /
-      - name: ls root start
-        run: ls -al /*
-      - name: ls root usr openfoam
-        run: ls -al /usr/lib/openfoam/openfoam2012/etc/
       - name: T1
-        run: echo $SHELL
-      - name: T2
-        run: bash
-      - name: T3
-        run: echo $SHELL
+        run: /lib/openfoam/openfoam2012/etc/openfoam && echo $FOAM_APPBIN
       - name: Source bash
         run: . /usr/lib/openfoam/openfoam2012/etc/bashrc
       - name: Check persistence
