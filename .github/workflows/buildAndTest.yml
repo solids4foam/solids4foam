@@ -56,6 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: philippic/foam-extend-4.1.ubuntu18.04.gfortran:latest
+      options: --user dockeruser
     steps:
       - uses: actions/checkout@v3
 
