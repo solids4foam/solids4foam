@@ -30,10 +30,12 @@ jobs:
         run: ls -al /*
       - name: ls root usr openfoam
         run: ls -al /usr/lib/openfoam/openfoam2012/etc/
-      - name: Cat
-        run: cat /usr/lib/openfoam/openfoam2012/etc/bashrc
-      - name: Who am I
-        run: whoami
+      - name: T1
+        run: echo $SHELL
+      - name: T2
+        run: bash
+      - name: T3
+        run: echo $SHELL
       - name: Source bash
         run: . /usr/lib/openfoam/openfoam2012/etc/bashrc
       - name: Check persistence
