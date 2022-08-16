@@ -20,12 +20,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Source bash
-        run: source /opt/OpenFOAM/OpenFOAM-v2012/etc/bashrc
+        run: source /usr/lib/openfoam/openfoam2012/etc/bashrc
+      - name: Check persistence
+        run: echo "${FOAM_APPBIN}"
       - name: PWD
         run: pwd
       - name: Who am I
         run: whoami
       - name: Allwmake
-        run: source /opt/OpenFOAM/OpenFOAM-v2012/etc/bashrc &> /dev/null && ./Allwmake
+        run: source /usr/lib/openfoam/openfoam2012/etc/bashrc &> /dev/null && ./Allwmake
       - name: Alltest
-        run: (cd tutorials && source /opt/OpenFOAM/OpenFOAM-v2012/etc/bashrc &> /dev/null && ./Alltest)
+        run: (cd tutorials && source /usr/lib/openfoam/openfoam2012/etc/bashrc &> /dev/null && ./Alltest)
