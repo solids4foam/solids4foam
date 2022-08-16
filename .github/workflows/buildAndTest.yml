@@ -16,7 +16,7 @@ jobs:
       image: ${{ matrix.container }}
     strategy:
       matrix:
-        container: ['openfoamplus/of_v2012_centos73']
+        container: ['openfoamplus/of_v2012_centos73:release']
     steps:
       - uses: actions/checkout@v3
       - name: Source bash
