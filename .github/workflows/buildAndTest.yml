@@ -24,6 +24,14 @@ jobs:
         run: pwd
       - name: ls
         run: ls -al
+      - name: ls root
+        run: ls -al /
+      - name: ls root start
+        run: ls -al /*
+      - name: ls root usr
+        run: ls -al /usr
+      - name: ls root usr openfoam
+        run: ls -al /usr/lib/openfoam
       - name: Who am I
         run: whoami
       - name: Source bash
