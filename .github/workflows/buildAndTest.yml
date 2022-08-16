@@ -10,14 +10,10 @@ on:
 
 jobs:
   build_and_test:
-    name: Build on ${{ matrix.container }}
+    name: Build on OpenFOAM-v2012
     runs-on: ubuntu-latest
     container:
-      image: ${{ matrix.container }}
-      options: --entrypoint /bin/bash
-    strategy:
-      matrix:
-        container: ['openfoamplus/of_v2012_centos73:release']
+      image: philippic/openfoam-v2012-ubuntu20.04:latest
     steps:
       - uses: actions/checkout@v3
       - name: Allwmake
