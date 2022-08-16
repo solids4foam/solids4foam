@@ -30,6 +30,7 @@ License
 #include "pointFields.H"
 #include "surfaceFields.H"
 #include "lookupSolidModel.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -75,7 +76,7 @@ bool Foam::solidKineticEnergy::writeData()
     const volScalarField& rho = lookupSolidModel(mesh).rho();
 
     // Calculate the kinetic energy per unit volume field
-    const volScalarField kinEnergyPerVol = 0.5*rho*(U & U);
+    const volScalarField kinEnergyPerVol(0.5*rho*(U & U));
 
     // Calculate the total kinetic energy
     const scalar kinEnergy =
@@ -122,11 +123,11 @@ Foam::solidKineticEnergy::solidKineticEnergy
             {
                 // Put in undecomposed case (Note: gives problems for
                 // distributed data running)
-                historyDir = time_.path()/".."/"history"/startTimeName;
+                historyDir = time_.path()/".."/"postProcessing"/startTimeName;
             }
             else
             {
-                historyDir = time_.path()/"history"/startTimeName;
+                historyDir = time_.path()/"postProcessing"/startTimeName;
             }
 
             // Create directory if does not exist.
@@ -160,7 +161,7 @@ bool Foam::solidKineticEnergy::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidKineticEnergy::execute(const bool forceWrite)
 #else
 bool Foam::solidKineticEnergy::execute()

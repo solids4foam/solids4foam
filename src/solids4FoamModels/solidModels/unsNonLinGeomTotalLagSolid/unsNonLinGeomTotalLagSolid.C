@@ -46,10 +46,6 @@ namespace solidModels
 defineTypeNameAndDebug(unsNonLinGeomTotalLagSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, unsNonLinGeomTotalLagSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, unsNonLinGeomTotalLagSolid, dictionary
 );
 
@@ -104,7 +100,7 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
             "sigmaf",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
         mesh(),
@@ -117,7 +113,7 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
             "grad(" + D().name() + ")f",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         mesh(),
@@ -156,7 +152,7 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
             "Finv",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         inv(F_)
@@ -168,7 +164,7 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
             "Finvf",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         inv(Ff_)
@@ -180,7 +176,7 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
             "J",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(F_)
@@ -192,7 +188,7 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
             "Jf",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(Ff_)
@@ -220,6 +216,24 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
     )
 {
     DisRequired();
+
+    // For consistent restarts, we will update the relative kinematic fields
+    if (restart())
+    {
+        D().correctBoundaryConditions();
+        mechanical().interpolate(D(), pointD(), false);
+        mechanical().grad(D(), pointD(), gradD());
+        mechanical().grad(D(), pointD(), gradDf_);
+        gradDD() = gradD() - gradD().oldTime();
+        Ff_ = I + gradDf_.T();
+        Finvf_ = inv(Ff_);
+        Jf_ = det(Ff_);
+
+        gradD().storeOldTime();
+
+        // Let the mechanical law know
+        mechanical().setRestart();
+    }
 }
 
 
@@ -444,7 +458,7 @@ tmp<vectorField> unsNonLinGeomTotalLagSolid::tractionBoundarySnGrad
     const symmTensorField& sigma = sigmaf_.boundaryField()[patchID];
 
     // Patch unit normals (initial configuration)
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     if (enforceLinear())
     {
@@ -470,7 +484,7 @@ tmp<vectorField> unsNonLinGeomTotalLagSolid::tractionBoundarySnGrad
         const scalarField& J = Jf_.boundaryField()[patchID];
 
         // Patch unit normals (deformed configuration)
-        const vectorField nCurrent = J*Finv.T() & n;
+        const vectorField nCurrent(J*Finv.T() & n);
 
         // Return patch snGrad
         return tmp<vectorField>

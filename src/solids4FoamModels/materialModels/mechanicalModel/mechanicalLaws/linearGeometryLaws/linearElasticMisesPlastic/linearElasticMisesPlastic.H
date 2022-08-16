@@ -74,9 +74,6 @@ class linearElasticMisesPlastic
 {
     // Private data
 
-        //- Initial density
-        const dimensionedScalar rho_;
-
         //- Shear modulus
         dimensionedScalar mu_;
 
@@ -92,22 +89,6 @@ class linearElasticMisesPlastic
         //- Table of post-yield stress versus plastic strain
         interpolationTable<scalar> stressPlasticStrainSeries_;
 
-        //- Switch to enable solution of pressure Laplacian equation
-        //  This can help quell oscillations in the hydrostatic stress
-        const Switch solvePressureEqn_;
-
-        //- Optional: it is possible to scale the amount of smoothing in the
-        //  pressure equation with this coefficient
-        scalar pressureSmoothingCoeff_;
-
-        //- Hydrostatic stress
-        //  Note: sigmaHyd_ == tr(sigma)/3.0 == -p,
-        //  where p is the hydrostatic pressure
-        volScalarField sigmaHyd_;
-
-        //- Hydrostatic stress surface field
-        surfaceScalarField sigmaHydf_;
-
         //- Yield stress
         volScalarField sigmaY_;
 
@@ -119,12 +100,6 @@ class linearElasticMisesPlastic
 
         //- Incremental change in sigmaY surface field
         surfaceScalarField DSigmaYf_;
-
-        //- Total strain
-        volSymmTensorField epsilon_;
-
-        //- Total strain surface field
-        surfaceSymmTensorField epsilonf_;
 
         //- Total plastic strain
         volSymmTensorField epsilonP_;
@@ -255,6 +230,13 @@ class linearElasticMisesPlastic
             const surfaceScalarField& trEpsilon
         );
 
+        //- Calculate stress given the strain
+        void calculateStress
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceSymmTensorField& epsilon
+        ) const;
+
 
 public:
 
@@ -283,12 +265,12 @@ public:
 
     // Member Functions
 
-        //- Return density
-        virtual tmp<volScalarField> rho() const;
-
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
+
+        //- Material tangent for Newton Raphson loop
+        virtual tmp<Field<symmTensor4thOrder>> materialTangentField() const;
 
         //- Return the implicit stiffness as a diagTensor
 #ifndef OPENFOAMESIORFOUNDATION

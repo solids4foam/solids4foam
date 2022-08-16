@@ -49,10 +49,6 @@ namespace solidModels
 defineTypeNameAndDebug(coupledNonLinGeomPressureDisplacementSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, coupledNonLinGeomPressureDisplacementSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, coupledNonLinGeomPressureDisplacementSolid, dictionary
 );
 
@@ -539,7 +535,7 @@ bool coupledNonLinGeomPressureDisplacementSolid::evolve()
         // Insert displacement equation into block system
         DpEqn.insertEquation(0, DEqn);
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 #       include "addBlockCoupledBC.H"
 #endif
 
@@ -668,6 +664,8 @@ bool coupledNonLinGeomPressureDisplacementSolid::evolve()
 
     mechanical().correct(sigma());
 
+    blockLduMatrix::debug = 1;
+
     return true;
 }
 
@@ -692,7 +690,7 @@ tmp<vectorField> coupledNonLinGeomPressureDisplacementSolid::tractionBoundarySnG
     const scalarField& pP = pf_.boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Patch total deformation gradient inverse
     const tensorField& Finv = Finvf_.boundaryField()[patchID];

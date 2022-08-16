@@ -28,6 +28,7 @@ License
 #include "transformField.H"
 #include "transformGeometricField.H"
 #include "fvc.H"
+#include "doubleDotProduct.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -45,7 +46,7 @@ namespace Foam
 
 void Foam::orthotropicLinearElastic::makeElasticC() const
 {
-    if (elasticCPtr_)
+    if (elasticCPtr_.valid())
     {
         FatalErrorIn
         (
@@ -73,7 +74,9 @@ void Foam::orthotropicLinearElastic::makeElasticC() const
     // Set elasticC in local coordinate system and then we will rotate it to the
     // global coordinate system
 
-    elasticCPtr_ =
+#ifdef FOAMEXTEND
+    elasticCPtr_.set
+    (
         new volSymmTensor4thOrderField
         (
             IOobject
@@ -99,9 +102,9 @@ void Foam::orthotropicLinearElastic::makeElasticC() const
                     A66.value()
                 )
             )
-        );
-
-    volSymmTensor4thOrderField& C = *elasticCPtr_;
+        )
+    );
+    volSymmTensor4thOrderField& C = elasticCPtr_();
 
     // Calculate rotating matrix from local directions to global directions
     const volTensorField matDir =
@@ -109,24 +112,61 @@ void Foam::orthotropicLinearElastic::makeElasticC() const
 
     // Rotate C from local directions to global directions
     C = transform(matDir, C);
+#else
+    elasticCPtr_.set
+    (
+        new volTensorField
+        (
+            IOobject
+            (
+                "elasticC",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor
+            (
+                "localElasticC",
+                dimPressure,
+                tensor
+                (
+                    A11.value(), A12.value(), A31.value(),
+                    A22.value(), A23.value(),
+                    A33.value(),
+                    A44.value(),
+                    A55.value(),
+                    A66.value()
+                )
+            )
+        )
+    );
+
+    // Rotation not performed for OpenFOAM versions
+#endif
 }
 
 
+#ifdef FOAMEXTEND
 const Foam::volSymmTensor4thOrderField&
+#else
+const Foam::volTensorField&
+#endif
 Foam::orthotropicLinearElastic::elasticC() const
 {
-    if (!elasticCPtr_)
+    if (elasticCPtr_.empty())
     {
         makeElasticC();
     }
 
-    return *elasticCPtr_;
+    return elasticCPtr_();
 }
 
 
 void Foam::orthotropicLinearElastic::makeElasticCf() const
 {
-    if (elasticCfPtr_)
+    if (elasticCfPtr_.valid())
     {
         FatalErrorIn
         (
@@ -154,7 +194,9 @@ void Foam::orthotropicLinearElastic::makeElasticCf() const
     // Set elasticC in local coordinate system and then we will rotate it to the
     // global coordinate system
 
-    elasticCfPtr_ =
+#ifdef FOAMEXTEND
+    elasticCfPtr_.set
+    (
         new surfaceSymmTensor4thOrderField
         (
             IOobject
@@ -180,9 +222,10 @@ void Foam::orthotropicLinearElastic::makeElasticCf() const
                     A66.value()
                 )
             )
-        );
+        )
+    );
 
-    surfaceSymmTensor4thOrderField& C = *elasticCfPtr_;
+    surfaceSymmTensor4thOrderField& C = elasticCfPtr_();
 
     // Calculate rotating matrix from local directions to global directions
     const volTensorField matDir =
@@ -190,18 +233,55 @@ void Foam::orthotropicLinearElastic::makeElasticCf() const
 
     // Rotate C from local directions to global directions
     C = transform(fvc::interpolate(matDir), C);
+#else
+    elasticCfPtr_.set
+    (
+        new surfaceTensorField
+        (
+            IOobject
+            (
+                "elasticCf",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor
+            (
+                "localElasticC",
+                dimPressure,
+                tensor
+                (
+                    A11.value(), A12.value(), A31.value(),
+                    A22.value(), A23.value(),
+                    A33.value(),
+                    A44.value(),
+                    A55.value(),
+                    A66.value()
+                )
+            )
+        )
+    );
+
+    // Rotation not performed for OpenFOAM versions
+#endif
 }
 
 
+#ifdef FOAMEXTEND
 const Foam::surfaceSymmTensor4thOrderField&
+#else
+const Foam::surfaceTensorField&
+#endif
 Foam::orthotropicLinearElastic::elasticCf() const
 {
-    if (!elasticCfPtr_)
+    if (elasticCfPtr_.empty())
     {
         makeElasticCf();
     }
 
-    return *elasticCfPtr_;
+    return elasticCfPtr_();
 }
 
 
@@ -217,7 +297,6 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     E1_(dict.lookup("E1")),
     E2_(dict.lookup("E2")),
     E3_(dict.lookup("E3")),
@@ -230,57 +309,85 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
     G12_(dict.lookup("G12")),
     G23_(dict.lookup("G23")),
     G31_(dict.lookup("G31")),
-    elasticCPtr_(NULL),
-    elasticCfPtr_(NULL),
+    elasticCPtr_(),
+    elasticCfPtr_(),
     matDirX_
     (
         IOobject
         (
             "materialDirectionsX",
-             mesh.time().timeName(),
-             mesh,
-             IOobject::READ_IF_PRESENT,
-             IOobject::NO_WRITE
+            mesh.time().timeName(),
+            mesh,
+#ifdef FOAMEXTEND
+            IOobject::READ_IF_PRESENT,
+#else
+            IOobject::NO_READ, // Only global directions allowed
+#endif
+            IOobject::NO_WRITE
         ),
         mesh,
         dimensionedVector
         (
+#ifdef FOAMEXTEND
             dict.lookupOrDefault<vector>("materialDirectionX", vector(1,0,0))
+#else
+            vector(1,0,0) // Only global directions allowed
+#endif
         )
     ),
     matDirY_
     (
         IOobject
         (
-            "materialDirectionsY",
-             mesh.time().timeName(),
-             mesh,
-             IOobject::READ_IF_PRESENT,
-             IOobject::NO_WRITE
+           "materialDirectionsY",
+            mesh.time().timeName(),
+            mesh,
+#ifdef FOAMEXTEND
+            IOobject::READ_IF_PRESENT,
+#else
+            IOobject::NO_READ, // Only global directions allowed
+#endif
+            IOobject::NO_WRITE
         ),
         mesh,
         dimensionedVector
         (
-            dict.lookupOrDefault<vector>("materialDirectionY", vector(0,1,0))
+#ifdef FOAMEXTEND
+            dict.lookupOrDefault<vector>("materialDirectionX", vector(0,1,0))
+#else
+            vector(0,1,0) // Only global directions allowed
+#endif
         )
     ),
     matDirZ_
     (
         IOobject
         (
-            "materialDirectionsZ",
-             mesh.time().timeName(),
-             mesh,
-             IOobject::READ_IF_PRESENT,
-             IOobject::NO_WRITE
+           "materialDirectionsZ",
+            mesh.time().timeName(),
+            mesh,
+#ifdef FOAMEXTEND
+            IOobject::READ_IF_PRESENT,
+#else
+            IOobject::NO_READ, // Only global directions allowed
+#endif
+            IOobject::NO_WRITE
         ),
         mesh,
         dimensionedVector
         (
-            dict.lookupOrDefault<vector>("materialDirectionZ", vector(0,0,1))
+#ifdef FOAMEXTEND
+            dict.lookupOrDefault<vector>("materialDirectionX", vector(0,0,1))
+#else
+            vector(0,0,1) // Only global directions allowed
+#endif
         )
     )
 {
+    // Store old-time epsilon fields
+    epsilon().storeOldTime();
+    epsilonf().storeOldTime();
+
     if (planeStress())
     {
         FatalErrorIn
@@ -412,39 +519,10 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::orthotropicLinearElastic::~orthotropicLinearElastic()
-{
-    deleteDemandDrivenData(elasticCPtr_);
-    deleteDemandDrivenData(elasticCfPtr_);
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::volScalarField> Foam::orthotropicLinearElastic::rho() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-    tresult().correctBoundaryConditions();
-
-    return tresult;
-}
-
 
 Foam::tmp<Foam::volScalarField> Foam::orthotropicLinearElastic::impK() const
 {
@@ -463,9 +541,9 @@ Foam::tmp<Foam::volScalarField> Foam::orthotropicLinearElastic::impK() const
                 IOobject::NO_WRITE
             ),
             (
-                elasticC().component(symmTensor4thOrder::XXXX)
-              + elasticC().component(symmTensor4thOrder::YYYY)
-              + elasticC().component(symmTensor4thOrder::ZZZZ)
+                elasticC().component(0) // symmTensor4thOrder::XXXX
+              + elasticC().component(3) //symmTensor4thOrder::YYYY
+              + elasticC().component(5) // symmTensor4thOrder::ZZZZ
             )/3.0
         )
     );
@@ -474,47 +552,29 @@ Foam::tmp<Foam::volScalarField> Foam::orthotropicLinearElastic::impK() const
 
 void Foam::orthotropicLinearElastic::correct(volSymmTensorField& sigma)
 {
-    if (incremental())
-    {
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
+    // Update epsilon field
+    updateEpsilon();
 
-        // Calculate stress
-        sigma = sigma.oldTime() + (elasticC() && symm(gradDD));
-    }
-    else
-    {
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        // Calculate stress
-        sigma = elasticC() && symm(gradD);
-    }
+    // Calculate stress
+#ifdef FOAMEXTEND
+    sigma = elasticC() && epsilon();
+#else
+    doubleDotProduct(sigma, elasticC(), epsilon());
+#endif
 }
 
 
 void Foam::orthotropicLinearElastic::correct(surfaceSymmTensorField& sigma)
 {
-    if (incremental())
-    {
-        // Lookup gradient of displacement increment
-        const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
+    // Update epsilonf field
+    updateEpsilonf();
 
-        // Calculate stress based on incremental form of Hooke's law
-        sigma = sigma.oldTime() + (elasticCf() && symm(gradDD));
-    }
-    else
-    {
-        // Lookup gradient of displacement
-        const surfaceTensorField& gradD =
-            mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-        // Calculate stress based on Hooke's law
-        sigma = elasticCf() && symm(gradD);
-    }
+    // Calculate stress
+#ifdef FOAMEXTEND
+    sigma = elasticCf() && epsilonf();
+#else
+    doubleDotProduct(sigma, elasticCf(), epsilonf());
+#endif
 }
 
 

@@ -87,7 +87,7 @@ rigidCylinderContactFvPatchVectorField
     relaxFactor_(tdpvf.relaxFactor_)
 {}
 
-
+#ifndef OPENFOAMFOUNDATION
 rigidCylinderContactFvPatchVectorField::
 rigidCylinderContactFvPatchVectorField
 (
@@ -100,7 +100,7 @@ rigidCylinderContactFvPatchVectorField
     penaltyStiffness_(tdpvf.penaltyStiffness_),
     relaxFactor_(tdpvf.relaxFactor_)
 {}
-
+#endif
 
 rigidCylinderContactFvPatchVectorField::
 rigidCylinderContactFvPatchVectorField
@@ -153,7 +153,7 @@ void rigidCylinderContactFvPatchVectorField::updateCoeffs()
     // Let us first calculate the deformed position of the patch face centres
     // Note: patch().Cf() are the initial undeformed face centre positions and
     // *this are the current displacements
-    const vectorField deformedCf = patch().Cf() + *this;
+    const vectorField deformedCf(patch().Cf() + *this);
 
     // Calculate the cylinder centre position fo rthe current time
     const vector curCylinderCentre =
@@ -167,7 +167,7 @@ void rigidCylinderContactFvPatchVectorField::updateCoeffs()
 
     // Take a copy of previous traction field so we can apply under-relaxation
     // later
-    const vectorField prevTraction = traction_;
+    const vectorField prevTraction(traction_);
 
     // Loop through all the faces in the patch
     forAll(deformedCf, faceI)

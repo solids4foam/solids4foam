@@ -147,7 +147,10 @@ void transitionalParabolicVelocityFvPatchVectorField::updateCoeffs()
     const vectorField& c = patch().Cf();
 
     // Calculate local 1-D coordinate for the parabolic profile
-    scalarField coord = 2*((c - ctr) & y_)/((boundBoxMax_ - boundBoxMin_) & y_);
+    const scalarField coord
+    (
+        2*((c - ctr) & y_)/((boundBoxMax_ - boundBoxMin_) & y_)
+    );
 
     vectorField::operator=(n_*curMaxValue*(1.0 - sqr(coord)));
 }

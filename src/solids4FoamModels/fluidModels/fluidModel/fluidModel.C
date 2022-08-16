@@ -32,8 +32,8 @@ License
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "EulerDdtScheme.H"
-//#include "CrankNicolsonDdtScheme.H"
 #include "backwardDdtScheme.H"
+#include "addToRunTimeSelectionTable.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -41,6 +41,7 @@ namespace Foam
 {
     defineTypeNameAndDebug(fluidModel, 0);
     defineRunTimeSelectionTable(fluidModel, dictionary);
+    addToRunTimeSelectionTable(physicsModel, fluidModel, physicsModel);
 }
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
@@ -200,7 +201,7 @@ void Foam::fluidModel::CourantNo
 {
     if (mesh().nInternalFaces())
     {
-        surfaceScalarField magPhi = mag(phi());
+        surfaceScalarField magPhi(mag(phi()));
 
         if (phi().dimensions() == dimVelocity*dimArea*dimDensity)
         {
@@ -210,8 +211,10 @@ void Foam::fluidModel::CourantNo
             magPhi /= fvc::interpolate(rho);
         }
 
-        const surfaceScalarField SfUfbyDelta =
-            mesh().surfaceInterpolation::deltaCoeffs()*magPhi;
+        const surfaceScalarField SfUfbyDelta
+        (
+            mesh().surfaceInterpolation::deltaCoeffs()*magPhi
+        );
 
         const scalar deltaT = runTime().deltaT().value();
 
@@ -237,7 +240,7 @@ void Foam::fluidModel::CourantNo() const
     CourantNo(CoNum, meanCoNum, velMag);
 }
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 void Foam::fluidModel::oversetCourantNo
 (
     scalar& CoNum,
@@ -280,7 +283,7 @@ void Foam::fluidModel::oversetCourantNo() const
 
 void Foam::fluidModel::continuityErrs()
 {
-    const volScalarField contErr = fvc::div(phi());
+    const volScalarField contErr(fvc::div(phi()));
 
     const scalar sumLocalContErr = runTime().deltaT().value()*
         mag(contErr)().weightedAverage(mesh().V()).value();
@@ -296,7 +299,7 @@ void Foam::fluidModel::continuityErrs()
         << endl;
 }
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 void Foam::fluidModel::oversetContinuityErrs()
 {
     const volScalarField contErr = osMesh().gamma()*fvc::div(phi());
@@ -337,15 +340,17 @@ void Foam::fluidModel::boundPU
     }
 
     // Bound the velocity
-    volScalarField magU = mag(U);
-    dimensionedScalar U1 = max(magU);
+    volScalarField magU(mag(U));
+    dimensionedScalar U1(max(magU));
 
     if (U1 > UMax_)
     {
         Info<< "U: " << U1.value() << ".  Bounding." << endl;
 
-        volScalarField Ulimiter = pos(magU - UMax_)*UMax_/(magU + smallU_)
-            + neg(magU - UMax_);
+        volScalarField Ulimiter
+        (
+            pos(magU - UMax_)*UMax_/(magU + smallU_) + neg(magU - UMax_)
+        );
         Ulimiter.max(scalar(0));
         Ulimiter.min(scalar(1));
 
@@ -422,7 +427,9 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
     #else
         return meshObjects::gravity
         (
-            runTime(),
+            runTime()
+#if OPENFOAM < 1912
+	    ,
             IOobject
             (
                 "g",
@@ -431,6 +438,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE
             )
+#endif
         );
     #endif
 #else
@@ -457,7 +465,9 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
     #else
         return meshObjects::gravity
         (
-            runTime(),
+            runTime()
+#if OPENFOAM < 1912
+	    ,
             IOobject
             (
                 "g",
@@ -466,6 +476,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             )
+#endif
         );
     #endif
 #else
@@ -492,7 +503,8 @@ Foam::fluidModel::fluidModel
 (
     const word& type,
     Time& runTime,
-    const word& region
+    const word& region,
+    const bool constructNull
 )
 :
     physicsModel(type, runTime),
@@ -542,45 +554,90 @@ Foam::fluidModel::fluidModel
     g_(readG()),
     Uheader_("U", runTime.timeName(), mesh(), IOobject::MUST_READ),
     pheader_("p", runTime.timeName(), mesh(), IOobject::MUST_READ),
-    U_
+    UPtr_
     (
-        IOobject
+        constructNull
+      ? nullptr
+      : new volVectorField
         (
-            "U",
-            runTime.timeName(),
+            IOobject
+            (
+                "U",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
             mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedVector("zero", dimVelocity, vector::zero)
+            dimensionedVector("zero", dimVelocity, vector::zero)
+        )
     ),
-    p_
+    pPtr_
     (
-        IOobject
+        constructNull
+      ? nullptr
+      : new volScalarField
         (
-            "p",
-            runTime.timeName(),
+            IOobject
+            (
+                "p",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
             mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedScalar("zero", dimPressure, 0.0)
+            dimensionedScalar("zero", dimPressure, 0.0)
+        )
     ),
-    gradU_(fvc::grad(U_)),
-    gradp_(fvc::grad(p_)),
-    phi_
+    gradUPtr_
     (
-        IOobject
+        constructNull
+      ? nullptr
+      : new volTensorField
         (
-            "phi",
-            runTime.timeName(),
+            IOobject
+            (
+                "grad(U)",
+                runTime.timeName(),
+                mesh()
+            ),
             mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        fvc::interpolate(U_) & mesh().Sf()
+            dimensionedTensor("zero", dimVelocity/dimLength, tensor::zero)
+        )
+    ),
+    gradpPtr_
+    (
+        constructNull
+      ? nullptr
+      : new volVectorField
+        (
+            IOobject
+            (
+                "grad(p)",
+                runTime.timeName(),
+                mesh()
+            ),
+            mesh(),
+            dimensionedVector("zero", p().dimensions()/dimLength, vector::zero)
+        )
+    ),
+    phiPtr_
+    (
+        constructNull
+      ? nullptr
+      : new surfaceScalarField
+        (
+            IOobject
+            (
+                "phi",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            fvc::interpolate(U()) & mesh().Sf()
+        )
     ),
     adjustTimeStep_
     (
@@ -594,23 +651,57 @@ Foam::fluidModel::fluidModel
     (
         runTime.controlDict().lookupOrDefault<scalar>("maxDeltaT", GREAT)
     ),
-    pMin_("pMin", p_.dimensions(), 0),
-    pMax_("pMax", p_.dimensions(), 0),
-    UMax_("UMax", U_.dimensions(), 0),
+    pMin_("pMin", dimPressure, 0),
+    pMax_("pMax", dimPressure, 0),
+    UMax_("UMax", dimVelocity, 0),
     smallU_("smallU", dimVelocity, 1e-10),
     cumulativeContErr_(0.0),
+#ifdef OPENFOAMFOUNDATION
+    fvModels_(fvModels::New(mesh())),
+    fvConstraints_(fvConstraints::New(mesh())),
+#elif OPENFOAMESI
+    fvOptions_(fv::options::New(mesh())),
+#endif
     fsiMeshUpdate_(false),
     fsiMeshUpdateChanged_(false),
     globalPatchesPtrList_()
 {
-    if (mesh().solutionDict().found("fieldBounds"))
+    if (!constructNull)
     {
-        dictionary fieldBounds = mesh().solutionDict().subDict("fieldBounds");
-        fieldBounds.lookup(p().name())
-            >> pMin_.value() >> pMax_.value();
-        fieldBounds.lookup(U().name())
-            >> UMax_.value();
+        gradUPtr_() = fvc::grad(UPtr_());
+        gradpPtr_() = fvc::grad(pPtr_());
+
+        pMin_.dimensions().reset(p().dimensions());
+        pMax_.dimensions().reset(p().dimensions());
+        if (mesh().solutionDict().found("fieldBounds"))
+        {
+            dictionary fieldBounds = mesh().solutionDict().subDict("fieldBounds");
+            fieldBounds.lookup(p().name())
+                >> pMin_.value() >> pMax_.value();
+            fieldBounds.lookup(U().name())
+                >> UMax_.value();
+        }
     }
+
+#ifdef OPENFOAMFOUNDATION
+    // Check if any finite volume models is present
+    if (!fvModels_.PtrListDictionary<fvModel>::size())
+    {
+        Info << "No fvModels present" << endl;
+    }
+
+    // Check if any finite volume constrains is present
+    if (!fvConstraints_.PtrListDictionary<fvConstraint>::size())
+    {
+        Info << "No fvConstraints present" << endl;
+    }
+#elif OPENFOAMESI
+    // Check if any finite volume option is present
+    if (!fvOptions_.optionList::size())
+    {
+        Info << "No finite volume options present\n" << endl;
+    }
+#endif
 }
 
 
@@ -643,7 +734,7 @@ Foam::pimpleControl& Foam::fluidModel::pimple()
     return pimplePtr_();
 }
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 const Foam::oversetMesh& Foam::fluidModel::osMesh() const
 {
     return oversetMesh::New(mesh());
@@ -655,8 +746,10 @@ Foam::tmp<Foam::vectorField> Foam::fluidModel::faceZoneViscousForce
     const label interfaceI
 ) const
 {
-    const vectorField patchVF =
-        patchViscousForce(globalPatches()[interfaceI].patch().index());
+    const vectorField patchVF
+    (
+        patchViscousForce(globalPatches()[interfaceI].patch().index())
+    );
 
     return globalPatches()[interfaceI].patchFaceToGlobal(patchVF);
 }
@@ -667,8 +760,10 @@ Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce
     const label interfaceI
 ) const
 {
-    const scalarField patchPF =
-        patchPressureForce(globalPatches()[interfaceI].patch().index());
+    const scalarField patchPF
+    (
+        patchPressureForce(globalPatches()[interfaceI].patch().index())
+    );
 
     return globalPatches()[interfaceI].patchFaceToGlobal(patchPF);
 }
@@ -757,7 +852,7 @@ void Foam::fluidModel::setDeltaT(Time& runTime)
     {
         // Calculate the maximum Courant number
         // Careful to use the relative flux in the calculation
-        // We  have to be careufl when we call makeRelative and makeAbsolute
+        // We have to be careful when we call makeRelative and makeAbsolute
         scalar CoNum = 0.0;
         scalar meanCoNum = 0.0;
         scalar velMag = 0.0;
@@ -800,7 +895,9 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
             IOobject
             (
                 "fluidProperties",
-                runTime.caseConstant()/region,
+                 bool(region == dynamicFvMesh::defaultRegion)
+              ? fileName(runTime.caseConstant())
+              : fileName(runTime.caseConstant()/region),
                 runTime,
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE

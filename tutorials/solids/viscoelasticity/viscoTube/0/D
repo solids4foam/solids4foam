@@ -36,7 +36,7 @@ boundaryField
     inside
     {
         type            normalDisplacement;
-        normalDisplacement -1e-6;
+        normalDisplacement uniform -1e-6;
         value           uniform (0 0 0);
     }
     outside

@@ -420,7 +420,6 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
     lambda_
@@ -583,37 +582,6 @@ Foam::linearElasticMohrCoulombPlastic::~linearElasticMohrCoulombPlastic()
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 Foam::tmp<Foam::volScalarField>
-Foam::linearElasticMohrCoulombPlastic::rho() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rho",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-#ifdef OPENFOAMESIORFOUNDATION
-    tresult.ref().correctBoundaryConditions();
-#else
-    tresult().correctBoundaryConditions();
-#endif
-
-    return tresult;
-}
-
-
-Foam::tmp<Foam::volScalarField>
 Foam::linearElasticMohrCoulombPlastic::impK() const
 {
     return tmp<volScalarField>
@@ -689,14 +657,16 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
             mesh().lookupObject<volTensorField>("grad(D)");
 
         // Calculate gradient of displacement increment
-        const volTensorField gradDD = gradD - gradD.oldTime();
+        const volTensorField gradDD(gradD - gradD.oldTime());
 
         DEpsilon = symm(gradDD);
     }
 
     // Calculate trial elastic stress assuming Hooke's elastic law
-    const volSymmTensorField DSigmaTrial =
-        2.0*mu_*DEpsilon + lambda_*I*tr(DEpsilon);
+    const volSymmTensorField DSigmaTrial
+    (
+        2.0*mu_*DEpsilon + lambda_*I*tr(DEpsilon)
+    );
 
     // Set sigma to sigma effective trial
     sigma = sigmaEff_.oldTime() + DSigmaTrial;
@@ -795,14 +765,16 @@ void Foam::linearElasticMohrCoulombPlastic::correct
             mesh().lookupObject<surfaceTensorField>("grad(D)f");
 
         // Calculate gradient of displacement increment
-        const surfaceTensorField gradDD = gradD - gradD.oldTime();
+        const surfaceTensorField gradDD(gradD - gradD.oldTime());
 
         DEpsilon = symm(gradDD);
     }
 
     // Calculate trial elastic stress assuming Hooke's elastic law
-    const surfaceSymmTensorField DSigmaTrial =
-        2.0*mu_*DEpsilon + lambda_*I*tr(DEpsilon);
+    const surfaceSymmTensorField DSigmaTrial
+    (
+        2.0*mu_*DEpsilon + lambda_*I*tr(DEpsilon)
+    );
 
     // Set sigma to sigma effective trial
     sigma = sigmaEfff_.oldTime() + DSigmaTrial;
@@ -969,7 +941,7 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
             mesh().lookupObject<volTensorField>("grad(D)");
 
         // Calculate gradient of displacement increment
-        const volTensorField gradDD = gradD - gradD.oldTime();
+        const volTensorField gradDD(gradD - gradD.oldTime());
 
         DEpsilon = symm(gradDD);
     }
@@ -1035,7 +1007,7 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
     //   - dev(sigma - sigmaEff_.oldTime())/(2.0*mu_);
 
     // Calculate the increment of equivalent plastic strain
-    const volScalarField DEpsilonPEq = sqrt((2.0/3.0)*magSqr(dev(DEpsilonP_)));
+    const volScalarField DEpsilonPEq(sqrt((2.0/3.0)*magSqr(dev(DEpsilonP_))));
 
     // Update the total plastic strain
     epsilonP_ = epsilonP_.oldTime() + DEpsilonP_;

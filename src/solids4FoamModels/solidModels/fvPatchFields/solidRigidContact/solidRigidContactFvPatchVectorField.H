@@ -240,16 +240,20 @@ public:
         solidRigidContactFvPatchVectorField
         (
             const solidRigidContactFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
-        virtual tmp<fvPatchField<vector> > clone() const
+        virtual tmp<fvPatchVectorField> clone() const
         {
-            return tmp<fvPatchField<vector> >
+            return tmp<fvPatchVectorField>
             (
                 new solidRigidContactFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         solidRigidContactFvPatchVectorField

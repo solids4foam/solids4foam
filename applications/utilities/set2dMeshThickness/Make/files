@@ -1,3 +1,0 @@
-set2dMeshThickness.C  
-
-EXE = $(FOAM_USER_APPBIN)/set2dMeshThickness

@@ -119,7 +119,7 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 (
     const solidSymmetryFvPatchScalarField& ptf
@@ -127,7 +127,7 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 :
     symmetryFvPatchField<scalar>(ptf)
 {}
-
+#endif
 
 solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 (
@@ -143,13 +143,13 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 tmp<Field<scalar> > solidSymmetryFvPatchScalarField::snGrad() const
 {
     // Unit normals
-    const vectorField nHat = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Non-orthogonal correction vectors
-    const vectorField k = ((I - sqr(nHat)) & delta);
+    const vectorField k((I - sqr(n)) & delta);
 
     // Lookup the gradient of displacement field
     const fvPatchField<vector>& gradU =
@@ -163,12 +163,12 @@ tmp<Field<scalar> > solidSymmetryFvPatchScalarField::snGrad() const
         );
 
     // Calculate the corrected patch internal field
-    scalarField UP = patchInternalField();
+    scalarField UP(patchInternalField());
     UP += (k & gradU.patchInternalField());
 
     return
     (
-        transform(I - 2.0*sqr(nHat), UP)
+        transform(I - 2.0*sqr(n), UP)
       - UP
     )*(patch().deltaCoeffs()/2.0);
 }
@@ -183,13 +183,13 @@ void solidSymmetryFvPatchScalarField::evaluate(const Pstream::commsTypes)
     }
 
     // Unit normals
-    const vectorField nHat = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Non-orthogonal correction vectors
-    const vectorField k = ((I - sqr(nHat)) & delta);
+    const vectorField k((I - sqr(n)) & delta);
 
     // Lookup the gradient of displacement field
     const fvPatchField<vector>& gradU =
@@ -203,14 +203,14 @@ void solidSymmetryFvPatchScalarField::evaluate(const Pstream::commsTypes)
         );
 
     // Calculate the corrected patch internal field
-    scalarField UP = patchInternalField();
+    scalarField UP(patchInternalField());
     UP += (k & gradU.patchInternalField());
 
     Field<scalar>::operator=
     (
         (
             UP
-          + transform(I - 2.0*sqr(nHat), UP)
+          + transform(I - 2.0*sqr(n), UP)
         )/2.0
     );
 }

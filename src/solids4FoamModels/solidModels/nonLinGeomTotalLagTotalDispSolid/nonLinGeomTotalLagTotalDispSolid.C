@@ -46,10 +46,6 @@ namespace solidModels
 defineTypeNameAndDebug(nonLinGeomTotalLagTotalDispSolid, 0);
 addToRunTimeSelectionTable
 (
-    physicsModel, nonLinGeomTotalLagTotalDispSolid, solid
-);
-addToRunTimeSelectionTable
-(
     solidModel, nonLinGeomTotalLagTotalDispSolid, dictionary
 );
 
@@ -112,7 +108,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
             "Finv",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         inv(F_)
@@ -124,7 +120,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
             "J",
             runTime.timeName(),
             mesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         det(F_)
@@ -135,6 +131,9 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
 {
     DisRequired();
+
+    // Force all required old-time fields to be created
+    fvm::d2dt2(D());
 
     if (predictor_)
     {
@@ -154,6 +153,23 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 << "If predictor is turned on, then the ddt(" << D().name()
                 << ") scheme should not be 'steadyState'!" << abort(FatalError);
         }
+    }
+
+    // For consistent restarts, we will update the relative kinematic fields
+    if (restart())
+    {
+        D().correctBoundaryConditions();
+        DD() = D() - D().oldTime();
+        mechanical().grad(D(), gradD());
+        gradDD() = gradD() - gradD().oldTime();
+        F_ = I + gradD().T();
+        Finv_ = inv(F_);
+        J_ = det(F_);
+
+        gradD().storeOldTime();
+
+        // Let the mechanical law know
+        mechanical().setRestart();
     }
 }
 
@@ -249,15 +265,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
             iCorr,
 #ifdef OPENFOAMESIORFOUNDATION
             mag(solverPerfD.initialResidual()),
-            max
-            (
-                solverPerfD.nIterations()[0],
-                max
-                (
-                    solverPerfD.nIterations()[1],
-                    solverPerfD.nIterations()[2]
-                )
-            ),
+            cmptMax(solverPerfD.nIterations()),
 #else
             solverPerfD.initialResidual(),
             solverPerfD.nIterations(),
@@ -275,7 +283,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
     
@@ -309,10 +319,10 @@ tmp<vectorField> nonLinGeomTotalLagTotalDispSolid::tractionBoundarySnGrad
     const tensorField& Finv = Finv_.boundaryField()[patchID];
 
     // Patch unit normals (initial configuration)
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Patch unit normals (deformed configuration)
-    vectorField nCurrent = Finv.T() & n;
+    vectorField nCurrent(Finv.T() & n);
     nCurrent /= mag(nCurrent);
 
     // Return patch snGrad

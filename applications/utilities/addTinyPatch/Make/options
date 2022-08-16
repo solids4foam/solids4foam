@@ -1,8 +1,26 @@
+ifeq ($(WM_PROJECT), foam)
+    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
+    ifeq ($(VER), 1)
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
+    else
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
+    endif
+else
+    VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
+    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        VERSION_SPECIFIC_INC += -DOPENFOAMESI
+    else
+        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
+    endif
+endif
+
 EXE_INC = \
+    $(VERSION_SPECIFIC_INC) \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/finiteArea/lnInclude \
     -I$(LIB_SRC)/sampling/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/dynamicMesh/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/dynamicFvMesh/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/topoChangerFvMesh/lnInclude \
@@ -12,10 +30,5 @@ EXE_INC = \
 EXE_LIBS = \
     -lmeshTools \
     -lfiniteVolume \
-    -lfiniteArea \
     -ldynamicMesh \
-    -ldynamicFvMesh \
-    -ltopoChangerFvMesh \
-    -llagrangian \
-    -lsampling \
-    -lfoam
+    -ldynamicFvMesh

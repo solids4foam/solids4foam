@@ -1,3 +1,7 @@
+set terminal pdfcairo enhanced color solid
+
+set output "stress.pdf"
+
 set xlabel "Time (in s)"
 set ylabel "Stress (in MPa)"
 

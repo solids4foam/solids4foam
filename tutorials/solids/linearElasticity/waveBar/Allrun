@@ -10,14 +10,18 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam
 
-# Plot energies, if gnuplot is installed
-echo "If gnuplot is installed, view plots with:"
-echo "$> gnuplot plotStress.gnuplot -p"
-echo "$> gnuplot plotEnergies.gnuplot -p"
-#gnuplot plotStress.gnuplot -p
-#gnuplot plotEnergies.gnuplot -p
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating stress.pdf using gnuplot"
+    gnuplot plotStress.gnuplot &> /dev/null
+    echo "Generating energies.pdf using gnuplot"
+    gnuplot plotEnergies.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

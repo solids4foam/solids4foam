@@ -186,7 +186,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 (
     const fixedDisplacementFvPatchVectorField& pivpvf
@@ -197,7 +197,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     dispSeries_(pivpvf.dispSeries_),
     interpPtr_()
 {}
-
+#endif
 
 fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 (
@@ -309,13 +309,13 @@ fixedDisplacementFvPatchVectorField::snGrad() const
         );
 
     // Unit normals
-    vectorField n = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     //- Non-orthogonal correction vectors
-    vectorField k = ((I - sqr(n)) & delta);
+    const vectorField k((I - sqr(n)) & delta);
 
     return
     (
@@ -338,13 +338,13 @@ fixedDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
         );
 
     // Unit normals
-    vectorField n = patch().nf();
+    vectorField n(patch().nf());
 
     // Delta vectors
-    vectorField delta = patch().delta();
+    vectorField delta(patch().delta());
 
     //- Non-orthogonal correction vectors
-    vectorField k = ((I - sqr(n)) & delta);
+    vectorField k((I - sqr(n)) & delta);
 
     return
     (

@@ -92,16 +92,20 @@ public:
         solidSymmetryFvPatchScalarField
         (
             const solidSymmetryFvPatchScalarField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
-        virtual tmp<fvPatchField<scalar> > clone() const
+        virtual tmp<fvPatchScalarField> clone() const
         {
-            return tmp<fvPatchField<scalar> >
+            return tmp<fvPatchScalarField>
             (
                 new solidSymmetryFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         solidSymmetryFvPatchScalarField

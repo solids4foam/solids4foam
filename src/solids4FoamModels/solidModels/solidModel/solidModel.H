@@ -56,13 +56,15 @@ SourceFiles
 #include "setCellDisplacements.H"
 #include "OFstream.H"
 #include "fvMatricesFwd.H"
+#include "PackedBoolList.H"
+#include "dualMeshToMeshMap.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------* \
                            Class solidModel Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -75,6 +77,12 @@ class solidModel
 
         //- Mesh
         autoPtr<dynamicFvMesh> meshPtr_;
+
+        //- Dual mesh
+        mutable autoPtr<fvMesh> dualMeshPtr_;
+
+        //- Dual mesh to primary mesh map
+        mutable autoPtr<dualMeshToMeshMap> dualMeshToMeshMapPtr_;
 
         //- Solid properties dictionary
         IOdictionary solidProperties_;
@@ -94,6 +102,9 @@ class solidModel
         //- Increment of displacement field header
         IOobject DDheader_;
 
+        //- Point total displacement field header
+        IOobject pointDheader_;
+
         //- Total displacement field
         volVectorField D_;
 
@@ -105,7 +116,7 @@ class solidModel
         volVectorField U_;
 
         //- Point mesh
-        pointMesh pMesh_;
+        const pointMesh& pMesh_;
 
         //- Point total displacement field
         pointVectorField pointD_;
@@ -204,6 +215,10 @@ class solidModel
         //- Optional: set displacement at internal cells
         mutable autoPtr<setCellDisplacements> setCellDispsPtr_;
 
+        //- Optional: restart flag
+        //  Write out all fields required for a consistent restart
+        const Switch restart_;
+
 
     // Private Member Functions
 
@@ -244,6 +259,24 @@ class solidModel
 protected:
 
     // Protected member functions
+
+        //- Make the dual mesh from the mesh
+        void makeDualMesh() const;
+
+        //- Mark features for dual mesh
+        //  Copied from polyDualMeshApp.C
+        void simpleMarkFeatures
+        (
+            const polyMesh& mesh,
+            const PackedBoolList& isBoundaryEdge,
+            const scalar featureAngle,
+            const bool concaveMultiCells,
+            const bool doNotPreserveFaceZones,
+            labelList& featureFaces,
+            labelList& featureEdges,
+            labelList& singleCellFeaturePoints,
+            labelList& multiCellFeaturePoints
+        ) const;
 
         //- Return non-const reference to solid properties dictionary
         IOdictionary& solidProperties()
@@ -383,14 +416,17 @@ public:
                 return meshPtr_();
             }
 
+            //- Return dualMesh
+            const fvMesh& dualMesh() const;
+
+            //- Return non-const dualMesh
+            fvMesh& dualMesh();
+
+            //- Return const dualMeshToMeshMap
+            const dualMeshToMeshMap& dualMeshMap() const;
+
             //- Return point mesh
             const pointMesh& pMesh() const
-            {
-                return pMesh_;
-            }
-
-            //- Return non-const point mesh
-            pointMesh& pMesh()
             {
                 return pMesh_;
             }
@@ -561,6 +597,12 @@ public:
                 return enforceLinear_;
             }
 
+            //- Return restart switch
+            const Switch& restart() const
+            {
+                return restart_;
+            }
+
             //- Does this model take an incremental approach?
             //  i.e. does it solve for DD instead of D?
             //  This defaults to false but can be overwritten
@@ -580,6 +622,9 @@ public:
 
             //- This function will check that the DD field was read from disk
             virtual void DDisRequired();
+
+            //- This function will check that the pointD field was read from disk
+            virtual void pointDisRequired();
 
             //- Make the global poly patches
             void makeGlobalPatches
@@ -610,6 +655,7 @@ public:
                 const scalarField& pressure
             );
 
+            //- Set traction at specified patch
             virtual void setTraction
             (
                 const label interfaceI,

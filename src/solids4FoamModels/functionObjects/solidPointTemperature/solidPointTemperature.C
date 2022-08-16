@@ -28,10 +28,14 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "OSspecific.H"
 #ifdef OPENFOAMESIORFOUNDATION
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
+#endif
+#ifdef OPENFOAMFOUNDATION
+    #include "OSspecific.H"
 #endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -71,7 +75,7 @@ bool Foam::solidPointTemperature::writeData()
         const volScalarField& T = mesh.lookupObject<volScalarField>("T");
 
         // Create a point mesh
-        pointMesh pMesh(mesh);
+        const pointMesh& pMesh = pointMesh::New(mesh);
 
         // Create a point temperature field
         pointScalarField pointT
@@ -88,7 +92,9 @@ bool Foam::solidPointTemperature::writeData()
             dimensionedScalar("zero", T.dimensions(), 0.0)
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
+        volPointInterpolation::New(mesh).interpolate(T, pointT);
+#elif OPENFOAMESI
         mesh.lookupObject<volPointInterpolation>
         (
             "volPointInterpolation"
@@ -210,11 +216,11 @@ Foam::solidPointTemperature::solidPointTemperature
             {
                 // Put in undecomposed case (Note: gives problems for
                 // distributed data running)
-                historyDir = time_.path()/".."/"history"/startTimeName;
+                historyDir = time_.path()/".."/"postProcessing"/startTimeName;
             }
             else
             {
-                historyDir = time_.path()/"history"/startTimeName;
+                historyDir = time_.path()/"postProcessing"/startTimeName;
             }
 
             // Create directory if does not exist.
@@ -247,7 +253,7 @@ bool Foam::solidPointTemperature::start()
     return false;
 }
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidPointTemperature::execute(const bool forceWrite)
 #else
 bool Foam::solidPointTemperature::execute()

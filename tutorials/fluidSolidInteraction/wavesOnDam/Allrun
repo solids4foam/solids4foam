@@ -13,19 +13,10 @@ fi
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-solids4Foam::caseOnlyRunsWithFoamExtend
 
 # Create meshes
-if [[ "${WM_PROJECT}" == "foam" ]]
-then
-    # Create meshes
-    runApplication -l log.blockMesh.solid blockMesh -region solid
-    runApplication -l log.blockMesh.fluid blockMesh -region fluid
-else
-    # Create meshes
-    runApplication -s solid blockMesh -region solid
-    runApplication -s fluid blockMesh -region fluid
-fi
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Set fluid wave parameters
 # As the waves2Foam utilities do not have the "-region" option, we will
@@ -33,40 +24,30 @@ fi
 # and run the waves2Foam utility and then move the fluid mesh and setting back 
 
 # Move fluid to default directory
-\mv constant/fluid/waveProperties.input constant/
-\mv constant/fluid/waveProperties constant/
-\mv constant/fluid/transportProperties constant/
-\mv constant/fluid/g constant/
-\mv constant/fluid/polyMesh constant/
-\mv 0/fluid/alpha1 0/
-\mv 0/fluid/U 0/
-\mv 0/fluid/pd 0/
+mv constant/fluid/waveProperties.input constant/
+mv constant/fluid/waveProperties constant/
+mv constant/fluid/transportProperties constant/
+mv constant/fluid/g constant/
+mv constant/fluid/polyMesh constant/
+mv 0/fluid/alpha1 0/
+mv 0/fluid/U 0/
+mv 0/fluid/pd 0/
 
 # Compute the wave parameters
-runApplication  -l log.setWaveParameters.fluid  setWaveParameters
+solids4Foam::runApplication -s fluid setWaveParameters
 
 # Set the wave field
-runApplication -l log.setWaveField.fluid setWaveField
+solids4Foam::runApplication -s fluid setWaveField
 
 # Move fluid back to fluid sub-directory
-\mv constant/waveProperties.input constant/fluid/
-\mv constant/waveProperties constant/fluid/
-\mv constant/transportProperties constant/fluid/
-\mv constant/g constant/fluid/
-\mv constant/polyMesh constant/fluid/
-\mv 0/alpha1 0/fluid/
-\mv 0/U 0/fluid/
-\mv 0/pd 0/fluid/
+mv constant/waveProperties.input constant/fluid/
+mv constant/waveProperties constant/fluid/
+mv constant/transportProperties constant/fluid/
+mv constant/g constant/fluid/
+mv constant/polyMesh constant/fluid/
+mv 0/alpha1 0/fluid/
+mv 0/U 0/fluid/
+mv 0/pd 0/fluid/
 
-# Run solver in serial
-runApplication solids4Foam
-
-# Run parallel
-#runApplication -l log.decomposePar.fluid decomposePar -region fluid
-#runApplication -l log.decomposePar.solid decomposePar -region solid
-#runParallel solids4Foam 4
-#runApplication -l log.reconstructPar.fluid reconstructPar -region fluid
-#runApplication -l log.reconstructPar.solid reconstructPar -region solid
-
-# ----------------------------------------------------------------- end-of-file
-
+# Run solver
+solids4Foam::runApplication solids4Foam

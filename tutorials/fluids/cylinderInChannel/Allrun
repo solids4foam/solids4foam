@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Source tutorial clean functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create the mesh
+solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh
+solids4Foam::runApplication changeDictionary
+
+# Run the solver
+solids4Foam::runApplication solids4Foam
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    if [[ -f "./postProcessing/forces/0/forces.dat" ]]
+    then
+        echo "Generating force.pdf using gnuplot"
+        gnuplot force.of9.gnuplot &> /dev/null
+    else
+        echo "Generating force.pdf using gnuplot"
+        gnuplot force.gnuplot &> /dev/null
+    fi
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

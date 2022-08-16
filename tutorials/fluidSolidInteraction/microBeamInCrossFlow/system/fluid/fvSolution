@@ -54,7 +54,7 @@ solvers
         mergeLevels     1;
     }
 
-    U
+    "U|UFinal"
     {
         solver          PBiCG;
         preconditioner  DILU;
@@ -64,8 +64,9 @@ solvers
     }
 }
 
-PISO
+PIMPLE
 {
+    nOuterCorrectors 1;
     nCorrectors 3;
     nNonOrthogonalCorrectors 1;
 }

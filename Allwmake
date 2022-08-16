@@ -12,15 +12,15 @@ then
 fi
 
 # Replace files in the main foam libraries
-(cd filesToReplaceInOF && ./Allcheck)
-if [ $? -ne 0 ]
-then
-    echo "Please fix the filesToReplaceInOF above!"
-    exit 1
-fi
+#(cd filesToReplaceInOF && ./Allcheck)
+#if [ $? -ne 0 ]
+#then
+#    echo "Please fix the filesToReplaceInOF above!"
+#    exit 1
+#fi
 
 # Download ThirdParty software
-(cd ThirdParty && ./Allwmake)
+(cd ThirdParty && ./Allwmake 2>&1 | tee log.Allwmake)
 if [ $? -ne 0 ]
 then
     echo "Please fix the ThirdParty errors above!"
@@ -28,7 +28,23 @@ then
 fi
 
 # Compile libraries
-(cd src && ./Allwmake)
+(cd src && ./Allwmake 2>&1 | tee log.Allwmake)
 
 # Compile applications
-(cd applications && ./Allwmake)
+(cd applications && ./Allwmake 2>&1 | tee log.Allwmake)
+
+# Check if the build succeeded
+echo "Checking if the installation was a success:"
+N_ERRORS=$(find . -name log.Allwmake | xargs grep "\ Error\ " | wc -l)
+if [[ $N_ERRORS -gt 0 ]]
+then
+    echo "** BUILD ERROR **"
+    echo "There were build errors in the following logs:"
+    find . -name log.Allwmake | xargs grep "\ Error\ "
+    echo; echo "Please examine these logs for additional details"
+else
+    echo "There were no build errors: enjoy solids4foam!"; echo
+    echo "To test the installation, run:"
+    echo "    > cd tutorials && ./Alltest"
+fi
+echo

@@ -59,9 +59,9 @@ SourceFiles
 #include "pointMesh.H"
 #include "fvPatchFieldMapper.H"
 #ifdef OPENFOAMESIORFOUNDATION
-#include "pointPatchFieldMapper.H"
+    #include "pointPatchFieldMapper.H"
 #else
-#include "PointPatchFieldMapper.H"
+    #include "PointPatchFieldMapper.H"
 #endif
 #include "GeometricField.H"
 #include "HashSet.H"
@@ -86,7 +86,11 @@ public:
     //- Patch-field subset interpolation class
     class patchFieldSubset
     :
+#ifdef OPENFOAMFOUNDATION
+        public generalFvPatchFieldMapper
+#else
         public fvPatchFieldMapper
+#endif
     {
         label sizeBeforeMapping_;
 
@@ -167,7 +171,16 @@ public:
                 return true;
             }
 
+            bool hasUnmapped() const
+            {
+                return false;
+            }
+
+#ifdef OPENFOAMESIORFOUNDATION
+            const labelList& directAddressing() const
+#else
             const unallocLabelList& directAddressing() const
+#endif
             {
                 return directAddressing_;
             }
@@ -177,7 +190,13 @@ public:
     //- Patch-field subset interpolation class
     class pointPatchFieldSubset
     :
+#ifdef OPENFOAMFOUNDATION
+        public generalPointPatchFieldMapper
+#elif defined (OPENFOAMESI)
+        public pointPatchFieldMapper
+#else
         public PointPatchFieldMapper
+#endif
     {
         //- Addressing
         const labelList& directAddressing_;
@@ -216,9 +235,18 @@ public:
                 return true;
             }
 
+#ifdef OPENFOAMESIORFOUNDATION
+            const labelList& directAddressing() const
+#else
             const unallocLabelList& directAddressing() const
+#endif
             {
                 return directAddressing_;
+            }
+
+            virtual bool hasUnmapped() const
+            {
+                return false;
             }
     };
 

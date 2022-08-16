@@ -1,43 +1,34 @@
 #!/bin/bash
 #------------------------------------------------------------------------------
-# =========                 |
-# \\      /  F ield         | foam-extend: Open Source CFD
-#  \\    /   O peration     | Version:     3.2
-#   \\  /    A nd           | Web:         http://www.foam-extend.org
-#    \\/     M anipulation  | For copyright notice see file Copyright
-#------------------------------------------------------------------------------
 # License
-#     This file is part of foam-extend.
-#
-#     foam-extend is free software: you can redistribute it and/or modify it
-#     under the terms of the GNU General Public License as published by the
-#     Free Software Foundation, either version 3 of the License, or (at your
-#     option) any later version.
-#
-#     foam-extend is distributed in the hope that it will be useful, but
-#     WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-#     General Public License for more details.
-#
-#     You should have received a copy of the GNU General Public License
-#     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+#     This file is part of solids4foam, licensed under GNU General Public
+#     License <http://www.gnu.org/licenses/>.
 #
 # Script
 #     Allrun
 #
 # Description
+#    Recursively run all cases in this directory and sub-directories.
+#    Adapted from foam-extend-4.0 and OpenFOAM-v2012 tutorials/Alltest scripts.
 #
 #------------------------------------------------------------------------------
+cd ${0%/*} || exit 1    # Run from this directory
+
+#
+# FUNCTION DEFINITIONS
+#
 
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+
 # logReport <logfile>
-# Extracts useful info from log file.
-logReport () {
-    case=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
-    app=`echo $1 | sed s/"\(.*\)\."/""/g`
-    appAndCase="Application $app - case $case"
+# Extracts useful info from log file
+function logReport()
+{
+    caseName=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
+    app=`echo $1 | sed s/"\(.*\)log\."/""/g`
+    appAndCase="Application $app - case $caseName"
 
     fatalError=`grep "FOAM FATAL" $1`
     UxSS=`grep -E "Ux[:| ]*solution singularity" $1`
@@ -45,47 +36,78 @@ logReport () {
     UzSS=`grep -E "Uz[:| ]*solution singularity" $1`
     completed=`grep -E "^[\t ]*[eE]nd" $1`
 
-    if [ "$fatalError" ] ; then
+    if [ "$fatalError" ]
+    then
         echo "$appAndCase: ** FOAM FATAL ERROR **"
-        return
-    elif [ "$UxSS" -a "$UySS" -a "$UzSS" ] ; then
+        return 1
+    elif [ "$UxSS" -a "$UySS" -a "$UzSS" ]
+    then
         echo "$appAndCase: ** Solution singularity **"
-        return
-    elif [ "$completed" ] ; then
+        return 1
+    elif [ "$completed" ]
+    then
         completionTime=`tail -10 $log | grep Execution | cut -d= -f2 | sed 's/^[ \t]*//'`
-        if [ "$completionTime" ] ; then
+        if [ "$completionTime" ]
+        then
             completionTime="in $completionTime"
         fi
         echo "$appAndCase: completed $completionTime"
-        return
+        return 0
     else
         echo "$appAndCase: unconfirmed completion"
+        return 1
     fi
 }
 
 
-# Recursively run all tutorials
-foamRunTutorials cases
+# logReportDir <directory>
+# Extracts useful info from all log files in a directory
+function logReportDir()
+(
+    [ -d $1 ] || return 0
+
+    cd $1 || return 1
+
+    logs=`find . -name "log.*"`
+    [ -n "$logs" ] || return 0
+
+    retVal=0
+
+    for log in `echo $logs | xargs ls -rt`
+    do
+        logReport $log >> ../testLoopReport || retVal=1
+    done
+    echo "" >> ../testLoopReport
+
+    return $retVal
+)
+
+
+#
+# MAIN
+#
+
+# Recursively run all cases
+if [[ $WM_PROJECT = "foam" ]]
+then
+    foamRunTutorials cases
+else
+    foamRunTutorials
+fi
 
 
 # Analyse all log files
-rm testLoopReport > /dev/null 2>&1 &
-touch testLoopReport
-for application in *
+rm -f testLoopReport && touch testLoopReport
+
+retVal=0
+
+for appDir in *
 do
-    if [ -d $application ]
-    then
-        cd $application
-        for log in `find . -name "log.*" | xargs ls -rt`
-        do
-            logReport $log >> ../testLoopReport
-        done
-        echo "" >> ../testLoopReport
-        cd ..
-    fi
+    logReportDir $appDir || retVal=1
 done
 
 find . -name "log.*" -exec cat {} \; >> logs
 
+exit $retVal
 
-# ----------------------------------------------------------------- end-of-file
+#------------------------------------------------------------------------------

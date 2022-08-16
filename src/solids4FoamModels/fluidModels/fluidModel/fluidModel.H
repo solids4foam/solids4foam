@@ -35,7 +35,6 @@ Author
 
 SourceFiles
     fluidModel.C
-    newFluidModel.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -57,8 +56,14 @@ SourceFiles
     #include "uniformDimensionedFields.H"
 #endif
 #include "globalPolyPatch.H"
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
     #include "oversetMesh.H"
+#endif
+#ifdef OPENFOAMFOUNDATION
+    #include "fvModels.H"
+    #include "fvConstraints.H"
+#elif OPENFOAMESI
+    #include "fvOptions.H"
 #endif
 
 
@@ -107,19 +112,19 @@ class fluidModel
         IOobject pheader_;
 
         //- Velocity field
-        volVectorField U_;
+        autoPtr<volVectorField> UPtr_;
 
         //- Pressure field
-        volScalarField p_;
+        autoPtr<volScalarField> pPtr_;
 
         //- Velocity gradient
-        volTensorField gradU_;
+        autoPtr<volTensorField> gradUPtr_;
 
         //- Pressure gradient
-        volVectorField gradp_;
+        autoPtr<volVectorField> gradpPtr_;
 
         //- Flux field
-        surfaceScalarField phi_;
+        autoPtr<surfaceScalarField> phiPtr_;
 
         //- Adjustable time-step switch
         const Switch adjustTimeStep_;
@@ -144,6 +149,17 @@ class fluidModel
 
         //- Cumulative continuity error
         scalar cumulativeContErr_;
+
+#ifdef OPENFOAMFOUNDATION
+        //- fvModels
+        fvModels& fvModels_;
+
+        //- fvConstraints
+        fvConstraints& fvConstraints_;
+#elif OPENFOAMESI
+        //- fvOptions
+        fv::options& fvOptions_;
+#endif
 
         //- Flag to let the fluid model know that the fsi interface is in charge
         //  of calling fluid mesh.update()
@@ -208,7 +224,7 @@ protected:
         //- Calculate the Courant number
         void CourantNo() const;
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
         //- Calculate the Courant number
         void oversetCourantNo
         (
@@ -222,7 +238,7 @@ protected:
         //- Continuity errors
         void continuityErrs();
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
         //- Continuity errors
         void oversetContinuityErrs();
 #endif
@@ -263,7 +279,8 @@ public:
         (
             const word& type,
             Time& runTime,
-            const word& region = dynamicFvMesh::defaultRegion
+            const word& region = dynamicFvMesh::defaultRegion,
+            const bool constructNull = false
         );
 
 
@@ -309,7 +326,7 @@ public:
             //- Return non-const acess to the pimple control
             pimpleControl& pimple();
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
             //- Return non-const acess to the overset mesh
             const oversetMesh& osMesh() const;
 #endif
@@ -327,62 +344,100 @@ public:
             //- Return const velocity field
             virtual const volVectorField& U() const
             {
-                return U_;
+                return UPtr_();
             }
 
             //- Return velocity field
             virtual volVectorField& U()
             {
-                return U_;
+                return UPtr_();
             }
 
             //- Return const pressure field
             virtual const volScalarField& p() const
             {
-                return p_;
+                return pPtr_();
             }
 
             //- Return pressure field
             virtual volScalarField& p()
             {
-                return p_;
+                return pPtr_();
             }
 
             //- Return const velocity gradient field
             virtual const volTensorField& gradU() const
             {
-                return gradU_;
+                return gradUPtr_();
             }
 
             //- Return velocity gradient field
             virtual volTensorField& gradU()
             {
-                return gradU_;
+                return gradUPtr_();
             }
 
             //- Return const pressure gradient field
             virtual const volVectorField& gradp() const
             {
-                return gradp_;
+                return gradpPtr_();
             }
 
             //- Return pressure gradient field
             virtual volVectorField& gradp()
             {
-                return gradp_;
+                return gradpPtr_();
             }
 
             //- Return const reference to flux field
             virtual const surfaceScalarField& phi() const
             {
-                return phi_;
+                return phiPtr_();
             }
 
             //- Return reference to flux field
             virtual surfaceScalarField& phi()
             {
-                return phi_;
+                return phiPtr_();
             }
+
+#ifdef OPENFOAMFOUNDATION
+            //- Return fvModels
+            const fvModels& models() const
+            {
+                return fvModels_;
+            }
+
+            //- Access fvModels
+            fvModels& models()
+            {
+                return fvModels_;
+            }
+
+            //- Return  fvConstraints
+            const fvConstraints& constraints() const
+            {
+                return fvConstraints_;
+            }
+
+            //- Access fvConstraints
+            fvConstraints& constraints()
+            {
+                return fvConstraints_;
+            }
+#elif OPENFOAMESI
+            //- Return fvOptions
+            const fv::options& options() const
+            {
+                return fvOptions_;
+            }
+
+            //- Access fvOptions
+            fv::options& options()
+            {
+                return fvOptions_;
+            }
+#endif
 
             //- Non-const access to the fsiMeshUpdate flag
             virtual bool& fsiMeshUpdate()

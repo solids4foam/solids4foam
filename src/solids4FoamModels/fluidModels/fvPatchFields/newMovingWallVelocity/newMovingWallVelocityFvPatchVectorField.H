@@ -98,6 +98,9 @@ public:
         newMovingWallVelocityFvPatchVectorField
         (
             const newMovingWallVelocityFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -108,6 +111,7 @@ public:
                 new newMovingWallVelocityFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         newMovingWallVelocityFvPatchVectorField

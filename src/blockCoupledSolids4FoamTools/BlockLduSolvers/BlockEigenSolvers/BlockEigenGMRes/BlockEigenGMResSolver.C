@@ -139,7 +139,7 @@ Foam::BlockEigenGMResSolver::solve
         solver.set_restart(restart_);
     }
 
-    Info<< "    Using a restart frequency of " << solver.get_restart() << endl;
+    Info<< "    Using a restart frequency of " << int(solver.get_restart()) << endl;
 
     // solver.preconditioner().setDroptol(0.0001);
     // solver.preconditioner().setFillfactor(100);

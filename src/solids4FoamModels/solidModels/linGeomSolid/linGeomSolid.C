@@ -43,7 +43,6 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(linGeomSolid, 0);
-addToRunTimeSelectionTable(physicsModel, linGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, linGeomSolid, dictionary);
 
 
@@ -61,6 +60,9 @@ linGeomSolid::linGeomSolid
     rImpK_(1.0/impK_)
 {
     DDisRequired();
+
+    // Force all required old-time fields to be created
+    fvm::d2dt2(DD());
 }
 
 
@@ -140,15 +142,7 @@ bool linGeomSolid::evolve()
                 iCorr,
 #ifdef OPENFOAMESIORFOUNDATION
                 mag(solverPerfDD.initialResidual()),
-                max
-                (
-                    solverPerfDD.nIterations()[0],
-                    max
-                    (
-                        solverPerfDD.nIterations()[1],
-                        solverPerfDD.nIterations()[2]
-                    )
-                ),
+                cmptMax(solverPerfDD.nIterations()),
 #else
                 solverPerfDD.initialResidual(),
                 solverPerfDD.nIterations(),
@@ -168,7 +162,9 @@ bool linGeomSolid::evolve()
     }
     while (mesh().update());
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
 
@@ -199,7 +195,7 @@ tmp<vectorField> linGeomSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField pN = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>
@@ -207,8 +203,8 @@ tmp<vectorField> linGeomSolid::tractionBoundarySnGrad
         new vectorField
         (
             (
-                (traction - pN*pressure)
-              - (pN & (pSigma - pImpK*pGradDD))
+                (traction - n*pressure)
+              - (n & (pSigma - pImpK*pGradDD))
             )*pRImpK
         )
     );

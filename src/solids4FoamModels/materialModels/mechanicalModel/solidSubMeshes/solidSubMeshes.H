@@ -49,13 +49,22 @@ Author
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "newFvMeshSubset.H"
-#include "newLeastSquaresVolPointInterpolation.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "volPointInterpolation.H"
+#else
+    #include "newLeastSquaresVolPointInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
-/*---------------------------------------------------------------------------*\
+    // labelUList in OpenFOAM is the same as unallocLabelList in foam extend
+#ifdef OPENFOAMESIORFOUNDATION
+    typedef labelUList unallocLabelList;
+#endif
+
+/*---------------------------------------------------------------------------* \
                         Class solidSubMeshes Declaration
 \*---------------------------------------------------------------------------*/
 
@@ -80,8 +89,12 @@ class solidSubMeshes
         mutable PtrList<newFvMeshSubset> subMeshes_;
 
         //- Volume field to point field interpolator for each sub-mesh
+        #ifdef OPENFOAMESIORFOUNDATION
+        mutable PtrList<volPointInterpolation> subMeshVolToPoint_;
+        #else
         mutable PtrList<newLeastSquaresVolPointInterpolation>
             subMeshVolToPoint_;
+        #endif
 
         //- Stress volField for each sub-mesh
         mutable PtrList<volSymmTensorField> subMeshSigma_;
@@ -133,6 +146,9 @@ class solidSubMeshes
 
 
     // Private Member Functions
+
+        //- Return reference to cellZone for material matI
+        const labelList& curCellZone(const label matI) const;
 
         //- Make material sub-meshes
         void makeSubMeshes() const;
@@ -252,8 +268,12 @@ public:
             PtrList<newFvMeshSubset>& subMeshes();
 
             //- Return a const reference to the vol-to-point interpolators
+            #ifdef OPENFOAMESIORFOUNDATION
+            const PtrList<volPointInterpolation>& subMeshVolToPoint() const;
+            #else
             const PtrList<newLeastSquaresVolPointInterpolation>&
                 subMeshVolToPoint() const;
+            #endif
 
             //- Return the subMesh sigma volFields
             PtrList<volSymmTensorField>& subMeshSigma();

@@ -83,6 +83,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 }
 
 
+#ifndef OPENFOAMFOUNDATION
 elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 (
     const elasticWallPressureFvPatchScalarField& pivpvf
@@ -92,6 +93,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
     prevPressure_(pivpvf.prevPressure_),
     prevAcceleration_(pivpvf.prevAcceleration_)
 {}
+#endif
 
 
 elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
@@ -146,7 +148,30 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
             "fsiProperties"
         );
 
-    label patchID = this->patch().index();
+    // Bug-fix, Mike Tree, see:
+    // https://bitbucket.org/philip_cardiff/solids4foam-release/issues/27/elasticwallpressurefvpatchscalarfieldc
+    // label patchID = this->patch().index(); // this is the fluid patch ID!
+
+    // Find the solid patch ID corresponding to the current fluid patch
+    label patchID = -1;
+    forAll(fsi.fluidPatchIndices(), interfaceI)
+    {
+        if (fsi.fluidPatchIndices()[interfaceI] == patch().index())
+        {
+            // Take the corresponding solid patch ID
+            patchID = fsi.solidPatchIndices()[interfaceI];
+            break;
+        }
+    }
+
+    if (patchID == -1)
+    {
+        FatalErrorIn
+        (
+            "void elasticWallPressureFvPatchScalarField::updateCoeffs()"
+        )   << "Are you sure this patch is an FSI interface?"
+            << abort(FatalError);
+    }
 
     // Solid properties
     // PC: hmnn what if the solidModel does not use mu and lambda...
@@ -163,13 +188,13 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         fsi.solid().mechanical().impK()().boundaryField()[patchID];
 
     // p-wave propagation speed, ap
-    const scalarField ap = sqrt(impK/rhoSolid);
+    const scalarField ap(sqrt(impK/rhoSolid));
 
     // Solid "virtual thickness"
-    scalarField hs = ap*mesh.time().deltaT().value();
+    const scalarField hs(ap*mesh.time().deltaT().value());
 
     // Fluid properties
-    IOdictionary transportProperties
+    const IOdictionary transportProperties
     (
         IOobject
         (
@@ -186,16 +211,18 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         transportProperties.lookup("rho")
     );
 
-    Info<< "rhoSolid = " << max(rhoSolid)
-        << ", hs = " << max(hs)
-        << ", rhoFluid = " << rhoFluid.value()
-        << endl;
+    if (debug)
+    {
+        Info<< "rhoSolid = " << max(rhoSolid)
+            << ", hs = " << max(hs)
+            << ", rhoFluid = " << rhoFluid.value()
+            << endl;
+    }
 
     // Update velocity and acceleration
 
     const fvPatch& p = patch();
-
-    vectorField n = p.nf();
+    const vectorField n(p.nf());
 
 #ifdef OPENFOAMESIORFOUNDATION
     const word fieldName = internalField().name();
@@ -208,7 +235,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
 
     // The previous acceleration is updated at the end of each
     // time step in the fluidSolidInterface
-    scalarField prevDdtUn = (n & prevAcceleration_);
+    const scalarField prevDdtUn(n & prevAcceleration_);
 
     if (pressure.dimensions() == dimPressure/dimDensity)
     {
@@ -237,27 +264,21 @@ void elasticWallPressureFvPatchScalarField::patchFlux
     const fvMatrix<scalar>& matrix
 ) const
 {
-    const label patchI = this->patch().index();
+    scalarField rAU(patch().size(), 0.0);
+    if (db().foundObject<volScalarField>("rAU"))
+    {
+        rAU = patch().lookupPatchField<volScalarField, scalar>("rAU");
+    }
+    else
+    {
+        rAU = patch().lookupPatchField<surfaceScalarField, scalar>("rAUf");
+    }
 
 #ifdef OPENFOAMESIORFOUNDATION
-    const fvMesh& mesh = internalField().mesh();
+    flux.boundaryFieldRef()[patch().index()] = rAU*snGrad()*patch().magSf();
 #else
-    const fvMesh& mesh = dimensionedInternalField().mesh();
+    flux.boundaryField()[patch().index()] = rAU*snGrad()*patch().magSf();
 #endif
-
-    const fvsPatchField<scalar>& rAU =
-        patch().lookupPatchField<surfaceScalarField, scalar>
-        (
-            "rAUf"
-        );
-
-#ifdef OPENFOAMESIORFOUNDATION
-    flux.boundaryFieldRef()[patchI] =
-#else
-    flux.boundaryField()[patchI] =
-#endif
-        rAU*this->snGrad()
-       *mesh.magSf().boundaryField()[patchI];
 }
 
 

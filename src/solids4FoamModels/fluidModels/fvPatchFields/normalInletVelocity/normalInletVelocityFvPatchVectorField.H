@@ -98,6 +98,9 @@ public:
         normalInletVelocityFvPatchVectorField
         (
             const normalInletVelocityFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -108,6 +111,7 @@ public:
                 new normalInletVelocityFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         normalInletVelocityFvPatchVectorField

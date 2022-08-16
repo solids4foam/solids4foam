@@ -98,7 +98,7 @@ solidTractionFreeFvPatchVectorField
     pressure() = 0.0;
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 solidTractionFreeFvPatchVectorField::
 solidTractionFreeFvPatchVectorField
 (
@@ -110,7 +110,7 @@ solidTractionFreeFvPatchVectorField
     traction() = vector::zero;
     pressure() = 0.0;
 }
-
+#endif
 
 solidTractionFreeFvPatchVectorField::
 solidTractionFreeFvPatchVectorField

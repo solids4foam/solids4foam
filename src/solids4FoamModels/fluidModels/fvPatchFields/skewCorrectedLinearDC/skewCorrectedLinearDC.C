@@ -68,8 +68,7 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
         typename outerProduct<vector, Type>::type,
         fvPatchField,
         volMesh
-    >
-        gradVf = gradScheme_().grad(vf);
+    >   gradVf(gradScheme_().grad(vf));
 
 
     // Since grad is used on coupled boundaries, correctBoundaryConditions
@@ -125,7 +124,7 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
     const scalarField& magSf = mesh.magSf().internalField();
 #endif
 
-    vectorField nf = Sf/magSf;
+    const vectorField nf(Sf/magSf);
 
     kPI = Cf - vectorField(C, owner);
     kPI -= Sf*(Sf&kPI)/sqr(magSf);
@@ -218,19 +217,23 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
 
         if (vf.boundaryField()[patchI].coupled())
         {
-            Field<Type> vfOwn =
+            const Field<Type> vfOwn
+            (
                 vf.boundaryField()[patchI].patchInternalField()
               + (
                     kP.boundaryField()[patchI]
                   & gradVf.boundaryField()[patchI].patchInternalField()
-                );
+                )
+            );
 
-            Field<Type> vfNei =
+            const Field<Type> vfNei
+            (
                 vf.boundaryField()[patchI].patchNeighbourField()
               + (
                     kN.boundaryField()[patchI]
                   & gradVf.boundaryField()[patchI].patchNeighbourField()
-                );
+                )
+            );
 
 #ifdef OPENFOAMESIORFOUNDATION
             sf.boundaryFieldRef()[patchI] = pw*(vfOwn - vfNei) + vfNei;

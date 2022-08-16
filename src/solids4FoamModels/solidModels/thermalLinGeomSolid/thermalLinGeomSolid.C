@@ -44,7 +44,6 @@ namespace solidModels
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 defineTypeNameAndDebug(thermalLinGeomSolid, 0);
-addToRunTimeSelectionTable(physicsModel, thermalLinGeomSolid, solid);
 addToRunTimeSelectionTable(solidModel, thermalLinGeomSolid, dictionary);
 
 
@@ -279,6 +278,7 @@ bool thermalLinGeomSolid::evolve()
 #ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector> solverPerfD;
     SolverPerformance<scalar> solverPerfT;
+    SolverPerformance<scalar>::debug = 0;
     SolverPerformance<vector>::debug = 0;
 #else
     lduSolverPerformance solverPerfD;
@@ -384,7 +384,10 @@ bool thermalLinGeomSolid::evolve()
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<scalar>::debug = 1;
+    SolverPerformance<vector>::debug = 1;
+#else
     blockLduMatrix::debug = 1;
 #endif
 
@@ -415,7 +418,7 @@ tmp<vectorField> thermalLinGeomSolid::tractionBoundarySnGrad
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals
-    const vectorField n = patch.nf();
+    const vectorField n(patch.nf());
 
     // Return patch snGrad
     return tmp<vectorField>

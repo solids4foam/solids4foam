@@ -28,10 +28,14 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "OSspecific.H"
 #ifdef OPENFOAMESIORFOUNDATION
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
+#endif
+#ifdef OPENFOAMFOUNDATION
+    #include "OSspecific.H"
 #endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -72,7 +76,7 @@ bool Foam::solidPointStress::writeData()
             mesh.lookupObject<volSymmTensorField>("sigma");
 
         // Create a point mesh
-        pointMesh pMesh(mesh);
+        const pointMesh& pMesh = pointMesh::New(mesh);
 
         // Create a point stress field
         pointSymmTensorField pointSigma
@@ -89,7 +93,9 @@ bool Foam::solidPointStress::writeData()
             dimensionedSymmTensor("zero", sigma.dimensions(), symmTensor::zero)
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
+        volPointInterpolation::New(mesh).interpolate(sigma, pointSigma);
+#elif OPENFOAMESI
         mesh.lookupObject<volPointInterpolation>
         (
             "volPointInterpolation"
@@ -217,11 +223,11 @@ Foam::solidPointStress::solidPointStress
             {
                 // Put in undecomposed case (Note: gives problems for
                 // distributed data running)
-                historyDir = time_.path()/".."/"history"/startTimeName;
+                historyDir = time_.path()/".."/"postProcessing"/startTimeName;
             }
             else
             {
-                historyDir = time_.path()/"history"/startTimeName;
+                historyDir = time_.path()/"postProcessing"/startTimeName;
             }
 
             // Create directory if does not exist.
@@ -252,7 +258,7 @@ bool Foam::solidPointStress::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidPointStress::execute(const bool forceWrite)
 #else
 bool Foam::solidPointStress::execute()

@@ -1,0 +1,48 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidSolidInterface    Aitken;
+
+AitkenCoeffs
+{
+    // Solid interface patch
+    solidPatch          inner-wall;
+
+    // Fluid interface patch
+    fluidPatch          wall;
+
+    // Initial relaxation factor
+    relaxationFactor    0.02;
+
+    // FSI loop tolerance
+    outerCorrTolerance  1e-5;
+
+    // Max number of FSI correctors per time-step
+    nOuterCorr          100;
+
+    // Frequency of time-step at which the fluid-solid interface interpolation
+    // weights are updated
+    interpolatorUpdateFrequency 0;
+
+    // Move the entire fluid mesh when the interface moves further than this
+    // limit
+    interfaceDeformationLimit   0;
+
+    // Coupled from the start
+    coupled yes;
+}
+
+// ************************************************************************* //

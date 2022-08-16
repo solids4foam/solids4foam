@@ -37,50 +37,15 @@ solvers
         relTol          0.1;
     }
 
-	sigmaHyd
-	{
-		solver          PCG;
-		preconditioner  FDIC;
-		tolerance       1e-09;
-		relTol          0.1;
-	}
+    sigmaHyd
+    {
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-09;
+        relTol          0.1;
+    }
 }
 
-//PIMPLE
-//{
-//    nOuterCorrectors 1000;
-//    nCorrectors     5;
-//    nNonOrthogonalCorrectors 0;
-
-//    pRefCell 0;
-//    pRefValue 0;-3.3333333e6;
-
-//    //Controls outer correctors (if not achieved, run for nOuterCorrectors)
-//    //so, similar to the solutionTolerance of solids4foam
-//    //and similar to the one used in solidMechanics dict below
-//    residualControl
-//    {
-//        U
-//        {
-//            tolerance   1e-8;
-//            relTol      0;
-//        }
-
-//        Up
-//        {
-//            tolerance   1e-8;
-//            relTol      0;
-//        }
-//    }
-//}
-
-//solidMechanics
-//{
-//    //nCorrectors           5000;
-//    //transformStress         no;
-
-//    convergence 1e-9;
-//}
 
 relaxationFactors
 {

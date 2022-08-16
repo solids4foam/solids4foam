@@ -72,7 +72,11 @@ symmTensor analyticalPlateHoleTractionFvPatchVectorField::plateHoleSolution
 
 
     // Transformation to Cartesian coordinate system
+#ifdef OPENFOAMFOUNDATION
+    sigma = ((cs.R().R() & sigma) & cs.R().R().T());
+#else
     sigma = ((cs.R() & sigma) & cs.R().T());
+#endif
 
     symmTensor S = symmTensor::zero;
 
@@ -127,7 +131,7 @@ analyticalPlateHoleTractionFvPatchVectorField
     holeR_(stpvf.holeR_)
 {}
 
-
+#ifndef OPENFOAMFOUNDATION
 analyticalPlateHoleTractionFvPatchVectorField::
 analyticalPlateHoleTractionFvPatchVectorField
 (
@@ -138,7 +142,7 @@ analyticalPlateHoleTractionFvPatchVectorField
     T_(stpvf.T_),
     holeR_(stpvf.holeR_)
 {}
-
+#endif
 
 analyticalPlateHoleTractionFvPatchVectorField::
 analyticalPlateHoleTractionFvPatchVectorField
@@ -184,7 +188,7 @@ void analyticalPlateHoleTractionFvPatchVectorField::updateCoeffs()
     }
 
     // Patch unit normals
-    vectorField n = patch().nf();
+    vectorField n(patch().nf());
 
     // Patch face centres
     const vectorField& Cf = patch().Cf();

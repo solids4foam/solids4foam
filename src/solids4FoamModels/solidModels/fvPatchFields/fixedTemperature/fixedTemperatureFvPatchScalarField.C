@@ -84,7 +84,7 @@ fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
     }
 }
 
-
+#ifndef OPENFOAMFOUNDATION
 fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
 (
     const fixedTemperatureFvPatchScalarField& pivpvf
@@ -93,7 +93,7 @@ fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
     fixedValueFvPatchScalarField(pivpvf),
     temperatureSeries_(pivpvf.temperatureSeries_)
 {}
-
+#endif
 
 fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
 (
@@ -141,13 +141,13 @@ tmp<Foam::Field<scalar> > fixedTemperatureFvPatchScalarField::snGrad() const
         );
 
     // Unit normals
-    const vectorField n = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Correction vectors
-    const vectorField k = (I - sqr(n)) & delta;
+    const vectorField k((I - sqr(n)) & delta);
 
     // Correction sngrad
     return
@@ -171,13 +171,13 @@ gradientBoundaryCoeffs() const
         );
 
     // Unit normals
-    const vectorField n = patch().nf();
+    const vectorField n(patch().nf());
 
     // Delta vectors
-    const vectorField delta = patch().delta();
+    const vectorField delta(patch().delta());
 
     // Correction vectors
-    const vectorField k = (I - sqr(n)) & delta;
+    const vectorField k((I - sqr(n)) & delta);
 
     return patch().deltaCoeffs()*(*this - (k & gradField.patchInternalField()));
 }

@@ -3,6 +3,10 @@
 
 notes.txt
 
+# Library files which are replaced by links
+src/blockCoupledSolids4FoamTools/Make/files
+src/solids4FoamModels/Make/files
+
 # ignore eigen and ltensor libraries
 ThirdParty/eigen3
 
@@ -50,6 +54,7 @@ linux*Icc*/
 darwin*Gcc*/
 darwin*Intel*/
 darwin*Arm*/
+darwin*Clang*/
 linuxming*/
 SiCortex*Gcc*/
 solaris*Gcc*/

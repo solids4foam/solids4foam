@@ -148,8 +148,8 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBFaceMap() const
         // We will take 0.1% of the minEdgeLength as the exact match
         // relative tolerance
 
-        const vectorField& zoneACf = zoneA().faceCentres();
-        const vectorField& zoneBCf = zoneB().faceCentres();
+        const vectorField zoneACf(zoneA().faceCentres());
+        const vectorField zoneBCf(zoneB().faceCentres());
         const scalar tol = relTol_*gMin(minEdgeLengths());
 
         forAll(zoneBCf, zoneBFaceI)
@@ -269,8 +269,8 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAFaceMap() const
         // We will take 0.1% of the minEdgeLength as the exact match
         // tolerance
 
-        const vectorField& zoneACf = zoneA().faceCentres();
-        const vectorField& zoneBCf = zoneB().faceCentres();
+        const vectorField zoneACf(zoneA().faceCentres());
+        const vectorField zoneBCf(zoneB().faceCentres());
         const scalar tol = relTol_*gMin(minEdgeLengths());
 
         forAll(zoneACf, zoneAFaceI)

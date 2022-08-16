@@ -21,12 +21,16 @@ mechanical
 (
     material0
     {
-        type            thermoLinearElastic;
+        type            thermoMechanicalLaw;
         rho             rho [1 -3 0 0 0 0 0] 7854;
-        E               E [1 -1 -2 0 0 0 0] 69e+9;
-        nu              nu [0 0 0 0 0 0 0] 0.33;
         alpha           alpha [0 0 0 -1 0 0 0] 2.3e-05;
         T0              T0 [0 0 0 1 0 0 0] 800;
+        mechanicalLaw
+        {
+            type            linearElastic;
+            E               E [1 -1 -2 0 0 0 0] 69e+9;
+            nu              nu [0 0 0 0 0 0 0] 0.33;
+        }
     }
 );
 

@@ -76,6 +76,12 @@ class solidTractionFvPatchVectorField
         //- Pressure time series
         interpolationTable<scalar> pressureSeries_;
 
+        //- Traction field given as a vol field
+        autoPtr<volVectorField> tractionFieldPtr_;
+
+        //- Pressure field given as a vol field
+        autoPtr<volScalarField> pressureFieldPtr_;
+
         //- Second order accuracy correction
         const Switch secondOrder_;
 
@@ -83,11 +89,11 @@ class solidTractionFvPatchVectorField
         //  total traction. This only applies to porous flow based solids
         const Switch setEffectiveTraction_;
 
-        //- Limiter coefficient for snGrad correction
-        const scalar limitCoeff_;
-
         //- Optional: under-relaxation factor
         const scalar relaxFac_;
+
+        //- Current time index
+        label curTimeIndex_;
 
 
 public:
@@ -127,6 +133,9 @@ public:
         solidTractionFvPatchVectorField
         (
             const solidTractionFvPatchVectorField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -137,6 +146,7 @@ public:
                 new solidTractionFvPatchVectorField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         solidTractionFvPatchVectorField

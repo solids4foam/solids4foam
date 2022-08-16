@@ -28,6 +28,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -172,11 +173,11 @@ Foam::solidStresses::solidStresses
             {
                 // Put in undecomposed case (Note: gives problems for
                 // distributed data running)
-                historyDir = time_.path()/".."/"history"/startTimeName;
+                historyDir = time_.path()/".."/"postProcessing"/startTimeName;
             }
             else
             {
-                historyDir = time_.path()/"history"/startTimeName;
+                historyDir = time_.path()/"postProcessing"/startTimeName;
             }
 
             // Create directory if does not exist.
@@ -210,7 +211,7 @@ bool Foam::solidStresses::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidStresses::execute(const bool forceWrite)
 #else
 bool Foam::solidStresses::execute()

@@ -14,7 +14,7 @@ solids4Foam::caseOnlyRunsWithFoamExtend
 # Create mesh
 mkdir -p constant/polyMesh
 m4 system/blockMeshDict.cylinder.m4 > constant/polyMesh/blockMeshDict
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Run solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

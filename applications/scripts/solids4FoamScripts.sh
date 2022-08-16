@@ -43,68 +43,11 @@ function solids4Foam::convertCaseFormat()
     # Exit if foam extend is loaded
     if [[ $WM_PROJECT = "foam" ]]
     then
-        if [ 1 -eq "$(echo "${WM_PROJECT_VERSION} > 4.0" | bc)" ]
-        then
-            echo "foam-extend-${WM_PROJECT_VERSION} loaded"
-            if [[ -n $(find "${CASE_DIR}" -name "nut") ]]
-            then
-                echo "Changing nutWallFunction in nut to nutkWallFunction"; echo
-                find "${CASE_DIR}" -name "nut" \
-                    | xargs sed -i 's\nutWallFunction\nutkWallFunction\g'
-            fi
-
-            return 0
-        else
-            echo "foam-extend-4.0 loaded: no changes made"; echo
-            return 0
-        fi
-    fi
-
-    # nutWallFunction becomes nutkWallFunction
-    if [[ -n $(find "${CASE_DIR}" -name "nut") ]]
-    then
-        echo "Changing nutWallFunction in nut to nutkWallFunction"; echo
-        find "${CASE_DIR}" -name "nut" \
-            | xargs sed -i 's\nutWallFunction\nutkWallFunction\g'
+        echo "foam-extend loaded: no changes made"; echo
+        return 0
     fi
 
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
-
-    if [[ -n $(find "${CASE_DIR}" -name "D*") ]]
-    then
-        echo "Changing symmetryPlane to symmetry in D*"; echo
-        find "${CASE_DIR}" -name "D*" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name "pointD*") ]]
-    then
-        echo "Changing symmetryPlane to symmetry in pointD*"; echo
-        find "${CASE_DIR}" -name "pointD*" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name "U") ]]
-    then
-        echo "Changing symmetryPlane to symmetry in U"; echo
-        find "${CASE_DIR}" -name "U" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name "p") ]]
-    then
-        echo "Changing symmetryPlane to symmetry in p"; echo
-        find "${CASE_DIR}" -name "p" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name "T") ]]
-    then
-        echo "Changing symmetryPlane to symmetry in T"; echo
-        find "${CASE_DIR}" -name "T" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name "pointMotionU") ]]
-    then
-        echo "Changing symmetryPlane to symmetry in pointMotionU"; echo
-        find "${CASE_DIR}" -name "pointMotionU" | xargs sed -i 's\symmetryPlane\symmetry\g'
-    fi
 
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict*) ]]
     then
@@ -117,6 +60,19 @@ function solids4Foam::convertCaseFormat()
         echo "Changing symmetryPlane to symmetry in boundary"; echo
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetryPlane\symmetry\g'
     fi
+
+    # Check all files in the 0 directory
+    for FILE in $(find "${CASE_DIR}" -type f)
+    do
+        if [[ -f "${FILE}" ]]
+        then
+            if grep -q "symmetryPlane;" "${FILE}"
+            then
+                echo "Changing symmetryPlane to symmetry in ${FILE}"; echo
+                sed -i 's\symmetryPlane;\symmetry;\g' "${FILE}"
+            fi
+        fi
+    done
 
     # 2. If found, move the blockMeshDict to the system directory
     if [[ -f "${CASE_DIR}"/constant/polyMesh/blockMeshDict ]]
@@ -145,11 +101,50 @@ function solids4Foam::convertCaseFormat()
             "${CASE_DIR}"/system/functions
     fi
 
-    # Rename turbulence model
+    # 3. Rename turbulence model
     if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
     then
         echo "Changing RASModel to RAS in turbulenceProperties"
         find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RASModel;/RAS;/g"
+    fi
+
+    # 4. Check for boundaryData
+    if [[ -d "${CASE_DIR}"/constant/boundaryData && -d "${CASE_DIR}"/constant/boundaryData.openfoam ]]
+    then
+        echo "Moving constant/boundaryData to constant/boundaryData.foam-extend"
+        \mv "${CASE_DIR}"/constant/boundaryData "${CASE_DIR}"/constant/boundaryData.foam-extend
+
+        echo "Moving constant/boundaryData.openfoam to constant/boundaryData"
+        \mv "${CASE_DIR}"/constant/boundaryData.openfoam "${CASE_DIR}"/constant/boundaryData
+    fi
+
+    # 5. Check for sample for foundation version
+    if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
+    then
+        if [[ -f "${CASE_DIR}"/system/sample ]]
+        then
+           echo "OpenFOAM.org specific: replacing 'uniform' with 'lineUniform' in system/sample"
+           sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
+        fi
+    fi
+
+    # 6. Check for timeVaryingUniformFixedValue
+    if [[ -n $(find "${CASE_DIR}" -name p) ]]
+    then
+        echo "Changing timeVaryingUniformFixedValue to uniformValue in p"
+        find "${CASE_DIR}" -name p | \
+            xargs sed -i "s|//type.*uniformFixedValue;|type          uniformFixedValue;|g"
+        find "${CASE_DIR}" -name p | \
+            xargs sed -i "s|type.*timeVaryingUniformFixedValue;|//type        timeVaryingUniformFixedValue;|g"
+    fi
+
+    # 7. Check for changeDictionaryDict.openfoam
+    if [[ -f "${CASE_DIR}/system/changeDictionaryDict.openfoam" ]]
+    then
+        echo "Moving ${CASE_DIR}/system/changeDictionaryDict to system/changeDictionaryDict.foamextend"
+        mv "${CASE_DIR}/system/changeDictionaryDict" "system/changeDictionaryDict.foamextend"
+        echo "Moving ${CASE_DIR}/system/changeDictionaryDict.openfoam to system/changeDictionaryDict"
+        mv "${CASE_DIR}/system/changeDictionaryDict.openfoam" "system/changeDictionaryDict"
     fi
 
     echo
@@ -184,51 +179,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
 
     # Un-do changes made in convertCaseFormat, if any
 
-    # nut boundary condition
-    if [[ -n $(find "${CASE_DIR}" -name "nut") ]]
-    then
-        echo "Changing nutkWallFunction in nut to nutWallFunction"; echo
-        find "${CASE_DIR}" -name nut \
-            | xargs sed -i 's\nutkWallFunction\nutWallFunction\g'
-    fi
-
     # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
-
-    if [[ -n $(find "${CASE_DIR}" -name "D*") ]]
-    then
-        echo "Changing symmetry to symmetryPlane in D*"; echo
-        find "${CASE_DIR}" -name "D*" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name "pointD*") ]]
-    then
-        echo "Changing symmetry to symmetryPlane in pointD*"; echo
-        find "${CASE_DIR}" -name "pointD*" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name "U") ]]
-    then
-        echo "Changing symmetry to symmetryPlane in U"; echo
-        find "${CASE_DIR}" -name "U" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name "p") ]]
-    then
-        echo "Changing symmetry to symmetryPlane in p"; echo
-        find "${CASE_DIR}" -name "p" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name "T") ]]
-    then
-        echo "Changing symmetry to symmetryPlane in T"; echo
-        find "${CASE_DIR}" -name "T" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name "pointMotionU") ]]
-    then
-        echo "Changing symmetry to symmetryPlane in pointMotionU"; echo
-        find "${CASE_DIR}" -name "pointMotionU" | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    fi
 
     if [[ -n $(find "${CASE_DIR}" -name blockMeshDict) ]]
     then
@@ -241,6 +192,18 @@ function solids4Foam::convertCaseFormatFoamExtend()
     echo "Changing symmetry to symmetryPlane in boundary"; echo
         find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
     fi
+
+    for FILE in $(find "${CASE_DIR}" -type f)
+    do
+        if [[ -f "${FILE}" ]]
+        then
+            if grep -q "symmetry;" "${FILE}"
+            then
+                echo "Changing symmetry to symmetryPlane in ${FILE}"; echo
+                sed -i 's\symmetry;\symmetryPlane;\g' "${FILE}"
+            fi
+        fi
+    done
 
     # 2. If found, move the blockMeshDict to the system directory
     if [[ -f "${CASE_DIR}"/system/blockMeshDict ]]
@@ -269,10 +232,53 @@ function solids4Foam::convertCaseFormatFoamExtend()
             "${CASE_DIR}"/system/functions
     fi
 
+    # 3. Rename turbulence model
     if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
     then
         echo "Changing RAS to RASModel in turbulenceProperties"
         find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RAS;/RASModel;/g"
+    fi
+
+    # 4. Check for boundaryData
+    if [[ -d "${CASE_DIR}"/constant/boundaryData && -d "${CASE_DIR}"/constant/boundaryData.foam-extend ]]
+    then
+        echo "Moving constant/boundaryData to constant/boundaryData.openfoam"
+        \mv "${CASE_DIR}"/constant/boundaryData "${CASE_DIR}"/constant/boundaryData.openfoam
+
+        echo "Moving constant/boundaryData.foam-extend to constant/boundaryData"
+        \mv "${CASE_DIR}"/constant/boundaryData.foam-extend "${CASE_DIR}"/constant/boundaryData
+    fi
+
+    # 5. Check for sample
+    if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
+    then
+        if [[ -f "${CASE_DIR}"/system/sample ]]
+        then
+           echo "OpenFOAM.org specific: replacing 'lineUniform' with 'uniform' in system/sample"
+           sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
+        fi
+    fi
+
+    # 6. Check for timeVaryingUniformFixedValue
+    if [[ -n $(find "${CASE_DIR}" -name p) ]]
+    then
+        echo "Changing uniformValue to timeVaryingUniformFixedValue in p"
+        find "${CASE_DIR}" -name p | \
+            xargs sed -i "s|type.*uniformFixedValue;|//type          uniformFixedValue;|g"
+        find "${CASE_DIR}" -name p | \
+            xargs sed -i "s|//type.*timeVaryingUniformFixedValue;|type        timeVaryingUniformFixedValue;|g"
+
+        # Remove any //// that were introdued
+        find "${CASE_DIR}" -name p | xargs sed -i "s|////|//|g"
+    fi
+
+    # 7. Check for changeDictionaryDict.openfoam
+    if [[ -f "${CASE_DIR}/system/changeDictionaryDict.foamextend" ]]
+    then
+        echo "Moving ${CASE_DIR}/system/changeDictionaryDict to system/changeDictionaryDict.openfoam"
+        mv "${CASE_DIR}/system/changeDictionaryDict" "system/changeDictionaryDict.openfoam"
+        echo "Moving ${CASE_DIR}/system/changeDictionaryDict.foamextend to system/changeDictionaryDict"
+        mv "${CASE_DIR}/system/changeDictionaryDict.foamextend" "system/changeDictionaryDict"
     fi
 
     echo
@@ -326,5 +332,177 @@ function solids4Foam::caseOnlyRunsWithFoamExtend()
     then
         echo; echo "This case currently only runs in foam-extend"; echo
         exit 0
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# removeEmptyDirs
+#     Ported from preCICE toolbox
+#     Remove empty time directories that are generated when running FSI cases
+#     with preCICE
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::removeEmptyDirs()
+{
+    (
+	set -e -u
+	echo "Removing time directories without results"
+
+	for f in [0-9]* [0-9]*.[0-9]*; do
+	    if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
+		rm -rfv "${f}"
+	    fi
+	done
+	if [ -d processor0 ]; then
+	    for d in processor*; do
+		cd "${d}"
+		for f in [0-9]* [0-9]*.[0-9]*; do
+		    if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
+			rm -rfv "${f}"
+		    fi
+		done
+		cd ..
+	    done
+	fi
+    )
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# runApplication
+#     runApplication that works that same irrespective of the OpenFOAM version
+#     Copied from OpenFOAM-v2012
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::runApplication()
+{
+    local appName appRun logFile logMode
+
+    # Any additional parsed arguments (eg, decomposeParDict)
+    local appArgs
+
+    # Parse options until executable is encountered
+    while [ "$#" -gt 0 ] && [ -z "$appRun" ]
+    do
+        case "$1" in
+            -a | -append)
+                logMode=append
+                ;;
+            -o | -overwrite)
+                logMode=overwrite
+                ;;
+            -s | -suffix)
+                logFile=".$2"
+                shift
+                ;;
+            -decomposeParDict)
+                appArgs="$appArgs $1 $2"
+                shift
+                ;;
+            '')
+                ;;
+            *)
+                appRun="$1"
+                ;;
+        esac
+        shift
+    done
+
+    appName="${appRun##*/}"
+    logFile="log.$appName$logFile"
+
+    if [ -f "$logFile" ] && [ -z "$logMode" ]
+    then
+        echo "$appName already run on $PWD:" \
+             "remove log file '$logFile' to re-run"
+    else
+        echo "Running $appRun on $PWD"
+        if [ "$logMode" = append ]
+        then
+            $appRun $appArgs "$@" >> $logFile 2>&1
+        else
+            $appRun $appArgs "$@" > $logFile 2>&1
+        fi
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# runParallel
+#     runParallel that works that same irrespective of the OpenFOAM version
+#     Copied from OpenFOAM-v2012
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::runParallel()
+{
+    local appName appRun logFile logMode nProcs
+
+    # Any additional parsed arguments (eg, decomposeParDict)
+    local appArgs="-parallel"
+
+    local mpirun="mpirun"
+    if [ "$FOAM_MPI" = msmpi ]
+    then
+        mpirun="mpiexec"
+    fi
+
+    # Parse options until executable is encountered
+    while [ "$#" -gt 0 ] && [ -z "$appRun" ]
+    do
+        case "$1" in
+            -a | -append)
+                logMode=append
+                ;;
+            -o | -overwrite)
+                logMode=overwrite
+                ;;
+            -s | -suffix)
+                logFile=".$2"
+                shift
+                ;;
+            -n | -np)
+                nProcs="$2"
+                shift
+                ;;
+            -decomposeParDict)
+                appArgs="$appArgs $1 $2"
+                nProcs=$(getNumberOfProcessors "$2")
+                shift
+                ;;
+            '')
+                ;;
+            *)
+                appRun="$1"
+                ;;
+        esac
+        shift
+    done
+
+    [ -n "$nProcs" ] || nProcs=$(getNumberOfProcessors system/decomposeParDict)
+
+    appName="${appRun##*/}"
+    logFile="log.$appName$logFile"
+
+    if [ -f "$logFile" ] && [ -z "$logMode" ]
+    then
+        echo "$appName already run on $PWD:" \
+             "remove log file '$logFile' to re-run"
+    else
+        echo "Running $appRun ($nProcs processes) on $PWD "
+        # Options '-n' and '-np' are synonymous, but msmpi only supports '-n'
+        if [ "$logMode" = append ]
+        then
+        (
+            $mpirun -n $nProcs $appRun $appArgs "$@" </dev/null >> $logFile 2>&1
+        )
+        else
+        (
+            $mpirun -n $nProcs $appRun $appArgs "$@" </dev/null > $logFile 2>&1
+        )
+        fi
     fi
 }

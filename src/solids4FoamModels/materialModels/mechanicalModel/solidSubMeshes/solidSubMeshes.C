@@ -24,11 +24,28 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidSubMeshes.H"
-#include "ZoneID.H"
 #include "twoDPointCorrector.H"
 #include "wedgePolyPatch.H"
+#include "ZoneIDs.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+const Foam::labelList& Foam::solidSubMeshes::curCellZone(const label matI) const
+{
+    const cellZoneID cellZoneID
+    (
+        cellZoneNames_[matI], baseMesh().cellZones()
+    );
+
+    if (!cellZoneID.active())
+    {
+        FatalErrorIn("const labelList& solidSubMeshes::curCellZone() const")
+            << "cellZone not found for material " << cellZoneNames_[matI]
+            << abort(FatalError);
+    }
+
+    return baseMesh().cellZones()[cellZoneID.index()];
+}
 
 
 void Foam::solidSubMeshes::makeSubMeshes() const
@@ -53,18 +70,7 @@ void Foam::solidSubMeshes::makeSubMeshes() const
 
     forAll(cellZoneNames_, matI)
     {
-        const ZoneID<cellZone> cellZoneID =
-            ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
-
-        if (!cellZoneID.active())
-        {
-            FatalErrorIn("void Foam::solidSubMeshes::makeSubMeshes() const")
-                << "cellZone not found for material " << cellZoneNames_[matI]
-                << abort(FatalError);
-        }
-
-        const labelList& curCellZone =
-            baseMesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone = this->curCellZone(matI);
 
         forAll(curCellZone, cI)
         {
@@ -133,7 +139,11 @@ void Foam::solidSubMeshes::makeSubMeshVolToPoint() const
         subMeshVolToPoint_.set
         (
             matI,
+#ifdef OPENFOAMESIORFOUNDATION
+            new volPointInterpolation
+#else
             new newLeastSquaresVolPointInterpolation
+#endif
             (
                 subMeshes()[matI].subMesh()
             )
@@ -164,24 +174,15 @@ void Foam::solidSubMeshes::checkCellZones() const
         baseMesh(),
         dimensionedScalar("zero", dimless, 0.0)
     );
-
+#ifdef OPENFOAMESIORFOUNDATION
+    scalarField& nCellZonesI = nCellZones.ref();
+#else
     scalarField& nCellZonesI = nCellZones.internalField();
+#endif
 
     forAll(cellZoneNames_, matI)
     {
-        const ZoneID<cellZone> cellZoneID =
-            ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
-
-        if (!cellZoneID.active())
-        {
-            FatalErrorIn("void Foam::solidSubMeshes::checkCellZones()")
-                << "cellZone " << cellZoneNames_[matI]
-                << " not found for material " << cellZoneNames_[matI]
-                << abort(FatalError);
-        }
-
-        const labelList& curCellZone =
-            baseMesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone = this->curCellZone(matI);
 
         forAll(curCellZone, cI)
         {
@@ -688,26 +689,15 @@ void Foam::solidSubMeshes::makeInterfaceBaseFaces() const
             baseMesh(),
             dimensionedScalar("0", dimless, 0)
         );
-
+#ifdef OPENFOAMESIORFOUNDATION
+        scalarField& materialsI = materials.ref();
+#else
         scalarField& materialsI = materials.internalField();
+#endif
 
         forAll(cellZoneNames_, matI)
         {
-            const ZoneID<cellZone> cellZoneID =
-                ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
-
-            if (!cellZoneID.active())
-            {
-                FatalErrorIn
-                (
-                    "void Foam::solidSubMeshes::makeInterfaceBaseFaces() const"
-                )   << "cellZone " << cellZoneNames_[matI]
-                    << " not found for material " << cellZoneNames_[matI]
-                    << abort(FatalError);
-            }
-
-            const labelList& curCellZone =
-                baseMesh().cellZones()[cellZoneID.index()];
+            const labelList& curCellZone = this->curCellZone(matI);
 
             forAll(curCellZone, cI)
             {
@@ -718,7 +708,6 @@ void Foam::solidSubMeshes::makeInterfaceBaseFaces() const
 
         // Sync coupled boundaries
         materials.correctBoundaryConditions();
-
         const unallocLabelList& owner = baseMesh().owner();
         const unallocLabelList& neighbour = baseMesh().neighbour();
 
@@ -744,11 +733,15 @@ void Foam::solidSubMeshes::makeInterfaceBaseFaces() const
              == processorFvPatch::typeName
             )
             {
-                const scalarField ownMat =
-                    materials.boundaryField()[patchI].patchInternalField();
+                const scalarField ownMat
+                (
+                    materials.boundaryField()[patchI].patchInternalField()
+                );
 
-                const scalarField ngbMat =
-                    materials.boundaryField()[patchI].patchNeighbourField();
+                const scalarField ngbMat
+                (
+                    materials.boundaryField()[patchI].patchNeighbourField()
+                );
 
                 forAll(ownMat, faceI)
                 {
@@ -802,22 +795,7 @@ void Foam::solidSubMeshes::makePointNumOfMaterials() const
 
     forAll(cellZoneNames_, matI)
     {
-        const ZoneID<cellZone> cellZoneID =
-            ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
-
-        if (!cellZoneID.active())
-        {
-            FatalErrorIn
-            (
-                "void Foam::solidSubMeshes::"
-                "makeIsolatedInterfacePoints() const"
-            )   << "cellZone " << cellZoneNames_[matI]
-                << " not found for material " << cellZoneNames_[matI]
-                << abort(FatalError);
-        }
-
-        const labelList& curCellZone =
-            baseMesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone = this->curCellZone(matI);
 
         forAll(curCellZone, cI)
         {
@@ -875,22 +853,7 @@ void Foam::solidSubMeshes::makeIsolatedInterfacePoints() const
 
     forAll(cellZoneNames_, matI)
     {
-        const ZoneID<cellZone> cellZoneID =
-            ZoneID<cellZone>(cellZoneNames_[matI], baseMesh().cellZones());
-
-        if (!cellZoneID.active())
-        {
-            FatalErrorIn
-            (
-                "void Foam::solidSubMeshes::"
-                "makeIsolatedInterfacePoints() const"
-            )   << "cellZone " << cellZoneNames_[matI]
-                << " not found for material " << cellZoneNames_[matI]
-                << abort(FatalError);
-        }
-
-        const labelList& curCellZone =
-            baseMesh().cellZones()[cellZoneID.index()];
+        const labelList& curCellZone = this->curCellZone(matI);
 
         forAll(curCellZone, cI)
         {
@@ -914,7 +877,11 @@ void Foam::solidSubMeshes::makeIsolatedInterfacePoints() const
         pMesh,
         dimensionedScalar("0", dimless, 0)
     );
+#ifdef OPENFOAMESIORFOUNDATION
+    scalarField& pointMaterialsI = pointMaterials.ref();
+#else
     scalarField& pointMaterialsI = pointMaterials.internalField();
+#endif
 
     const labelListList& pointCells = baseMesh().pointCells();
 
@@ -1132,7 +1099,7 @@ void Foam::solidSubMeshes::updateInterfaceShadowSigma
 
         if (patchID == -1)
         {
-            // This sub mesh has not faces on a bi-material interface
+            // This sub mesh has no faces on a bi-material interface
             continue;
         }
 
@@ -1207,7 +1174,11 @@ void Foam::solidSubMeshes::updateInterfaceShadowSigma
                 // internal field
                 if (useVolFieldSigma)
                 {
+#ifdef OPENFOAMESIORFOUNDATION
+                    baseSigmaForSyncing.ref()
+#else
                     baseSigmaForSyncing.internalField()
+#endif
                         [
                             faceCells[baseLocalFaceID]
                         ]
@@ -1218,7 +1189,11 @@ void Foam::solidSubMeshes::updateInterfaceShadowSigma
                 }
                 else
                 {
+#ifdef OPENFOAMESIORFOUNDATION
+                    baseSigmaForSyncing.ref()
+#else
                     baseSigmaForSyncing.internalField()
+#endif
                         [
                             faceCells[baseLocalFaceID]
                         ] = subMeshSigmaf()
@@ -1397,7 +1372,8 @@ Foam::solidSubMeshes::solidSubMeshes
             Info<< "Writing subMeshes "
                 << subMeshes[matI].subMesh().name() << endl;
             subMeshes[matI].subMesh().setInstance("constant");
-            subMeshes[matI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
+            subMeshes[matI].subMesh().polyMesh::writeOpt() =
+                IOobject::AUTO_WRITE;
             subMeshes[matI].subMesh().write();
         }
     }
@@ -1405,7 +1381,7 @@ Foam::solidSubMeshes::solidSubMeshes
     {
         forAll(subMeshes, matI)
         {
-            subMeshes[matI].subMesh().writeOpt() = IOobject::NO_WRITE;
+            subMeshes[matI].subMesh().polyMesh::writeOpt() = IOobject::NO_WRITE;
         }
     }
 }
@@ -1448,8 +1424,11 @@ Foam::PtrList<Foam::newFvMeshSubset>& Foam::solidSubMeshes::subMeshes()
     return subMeshes_;
 }
 
-
-const Foam::PtrList<Foam::newLeastSquaresVolPointInterpolation>&
+#ifdef OPENFOAMESIORFOUNDATION
+    const Foam::PtrList<Foam::volPointInterpolation>&
+#else
+    const Foam::PtrList<Foam::newLeastSquaresVolPointInterpolation>&
+#endif
 Foam::solidSubMeshes::subMeshVolToPoint() const
 {
     if (subMeshVolToPoint_.empty())
@@ -1687,7 +1666,11 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
             if (patchMap[patchI] == -1)
             {
                 // Interface displacement
+#ifdef OPENFOAMESIORFOUNDATION
+                vectorField& Dinterface = subMeshD.boundaryFieldRef()[patchI];
+#else
                 vectorField& Dinterface = subMeshD.boundaryField()[patchI];
+#endif
 
                 // Patch start face index
                 const label start = subMesh.boundaryMesh()[patchI].start();
@@ -1718,6 +1701,13 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                 const volScalarField& K =
                     mesh.lookupObject<volScalarField>("impK");
                 const scalarField& KI = K.internalField();
+
+                // Base mesh displacement field
+                const vectorField& DI = D.internalField();
+
+                // Base mesh displacement field previous iteration
+                const volVectorField& DPrev = D.prevIter();
+                const vectorField& DPrevI = DPrev.internalField();
 
                 // Interface face centres
                 const vectorField& patchCf = subMesh.boundary()[patchI].Cf();
@@ -1805,22 +1795,37 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                         scalar Ka = KI[baseOwnID];
                         scalar Kb = KI[baseNeiID];
 
+                        // Lookup own and nei displacements (current and
+                        // previous iterations)
+                        vector Da = DI[baseOwnID];
+                        vector Db = DI[baseNeiID];
+                        vector DPreva = DPrevI[baseOwnID];
+                        vector DPrevb = DPrevI[baseNeiID];
+
                         // The base own cell should be side-a
                         if (baseOwnID != cellMap[faceCells[faceI]])
                         {
                             n = -n;
                             Swap(Ka, Kb);
                             Swap(da, db);
+                            Swap(Da, Db);
+                            Swap(DPreva, DPrevb);
                         }
 
                         // Calculate the traction at side-a and side-b
                         const vector tractiona = n & sigmaPatch[faceI];
                         const vector tractionb = n & interfaceShadSigma[faceI];
 
+                        // Weights
+                        const scalar wab = (da*db/(db*Ka + da*Kb));
+                        const scalar wa = db*Ka/(db*Ka + da*Kb);
+                        const scalar wb = 1 - wa;
+
                         // Calculate the displacement at the interface
                         Dinterface[faceI] =
                             DinterfacePrev[faceI]
-                          + (da*db/(db*Ka + da*Kb))*(tractionb - tractiona);
+                            + wab*(tractionb - tractiona)
+                            + wa*(Da - DPreva) + wb*(Db - DPrevb);
                     }
                     else
                     {
@@ -1935,14 +1940,32 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
                         const scalar Kb =
                             K.boundaryField()[basePatchID][baseLocalFaceID];
 
+                        // Lookup own and nei displacements (current and
+                        // previous iterations)
+                        const vector Da = DI[baseOwnID];
+                        const vector Db =
+                            D.boundaryField()[basePatchID][baseLocalFaceID];
+                        const vector DPreva = DPrevI[baseOwnID];
+                        const vector DPrevb =
+                            DPrev.boundaryField()
+                            [
+                                basePatchID
+                            ][baseLocalFaceID];
+
                         // Calculate the traction at side-a and side-b
                         const vector tractiona = n & sigmaPatch[faceI];
                         const vector tractionb = n & interfaceShadSigma[faceI];
 
+                        // Weights
+                        const scalar wab = (da*db/(db*Ka + da*Kb));
+                        const scalar wa = db*Ka/(db*Ka + da*Kb);
+                        const scalar wb = 1 - wa;
+
                         // Calculate the displacement at the interface
                         Dinterface[faceI] =
                             DinterfacePrev[faceI]
-                          + (da*db/(db*Ka + da*Kb))*(tractionb - tractiona);
+                            + wab*(tractionb - tractiona)
+                            + wa*(Da - DPreva) + wb*(Db - DPrevb);
                     }
                 }
             }
@@ -1975,13 +1998,23 @@ void Foam::solidSubMeshes::correctBoundarySnGrad
         forAll(subMeshGradD.boundaryField(), patchI)
         {
             const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
-            const vectorField n = subMesh.boundary()[patchI].nf();
+            const vectorField n(subMesh.boundary()[patchI].nf());
+#ifdef OPENFOAMESIORFOUNDATION
+            tensorField& patchGradD = subMeshGradD.boundaryFieldRef()[patchI];
+#else
             tensorField& patchGradD = subMeshGradD.boundaryField()[patchI];
-            const tensorField patchGradDif =
-                subMeshGradD.boundaryField()[patchI].patchInternalField();
+#endif
+
+            const tensorField patchGradDif
+            (
+                subMeshGradD.boundaryField()[patchI].patchInternalField()
+            );
+
             const vectorField& patchD = subMeshD.boundaryField()[patchI];
-            const vectorField patchDif =
-                subMeshD.boundaryField()[patchI].patchInternalField();
+            const vectorField patchDif
+            (
+                subMeshD.boundaryField()[patchI].patchInternalField()
+            );
 
             // Calculate the corrected snGrad
             vectorField correctedSnGrad;
@@ -1994,20 +2027,22 @@ void Foam::solidSubMeshes::correctBoundarySnGrad
 
                 const vectorField& patchC = ppatch.faceCentres();
                 const vector& centreN = wedgePatch.centreNormal();
-                const vectorField Cn = subMesh.boundary()[patchI].Cn();
-                const scalarField d = ((Cn - patchC) & centreN)/(n & centreN);
-                const vectorField projC = d*n + patchC;
+                const vectorField Cn(subMesh.boundary()[patchI].Cn());
+                const scalarField d(((Cn - patchC) & centreN)/(n & centreN));
+                const vectorField projC(d*n + patchC);
 
                 // Calculate correction vector which connects actual cell
                 // centre to the transformed cell centre
-                const vectorField k = projC - Cn;
+                const vectorField k(projC - Cn);
 
-                const Field<vector> projD = patchDif + (k & patchGradDif);
+                const Field<vector> projD(patchDif + (k & patchGradDif));
 
                 // Calculate delta coeffs from proj position on centre plane to
                 // transformed projected position
-                const scalarField projDeltaCoeff =
-                    1.0/mag(transform(wedgePatch.cellT(), projC) - projC);
+                const scalarField projDeltaCoeff
+                (
+                    1.0/mag(transform(wedgePatch.cellT(), projC) - projC)
+                );
 
                 // Calculate the patch snGrad
                 correctedSnGrad =
@@ -2017,8 +2052,8 @@ void Foam::solidSubMeshes::correctBoundarySnGrad
             }
             else
             {
-                const vectorField delta = subMesh.boundary()[patchI].delta();
-                const vectorField k = delta - (sqr(n) & delta);
+                const vectorField delta(subMesh.boundary()[patchI].delta());
+                const vectorField k(delta - (sqr(n) & delta));
                 const scalarField& deltaCoeffs =
                     subMesh.boundary()[patchI].deltaCoeffs();
 
@@ -2052,14 +2087,24 @@ void Foam::solidSubMeshes::correctBoundarySnGradf
         forAll(subMeshGradDf.boundaryField(), patchI)
         {
             const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
-            const vectorField n = subMesh.boundary()[patchI].nf();
+            const vectorField n(subMesh.boundary()[patchI].nf());
+#ifdef OPENFOAMESIORFOUNDATION
+            tensorField& patchGradDf =
+                subMeshGradDf.boundaryFieldRef()[patchI];
+#else
             tensorField& patchGradDf =
                 subMeshGradDf.boundaryField()[patchI];
-            const tensorField patchGradDif =
-                subMeshGradD.boundaryField()[patchI].patchInternalField();
+#endif
+
+            const tensorField patchGradDif
+            (
+                subMeshGradD.boundaryField()[patchI].patchInternalField()
+            );
             const vectorField& patchD = subMeshD.boundaryField()[patchI];
-            const vectorField patchDif =
-                subMeshD.boundaryField()[patchI].patchInternalField();
+            const vectorField patchDif
+            (
+                subMeshD.boundaryField()[patchI].patchInternalField()
+            );
 
             // Calculate the corrected snGrad
             vectorField correctedSnGrad;
@@ -2072,20 +2117,22 @@ void Foam::solidSubMeshes::correctBoundarySnGradf
 
                 const vectorField& patchC = ppatch.faceCentres();
                 const vector& centreN = wedgePatch.centreNormal();
-                const vectorField Cn = subMesh.boundary()[patchI].Cn();
-                const scalarField d = ((Cn - patchC) & centreN)/(n & centreN);
-                const vectorField projC = d*n + patchC;
+                const vectorField Cn(subMesh.boundary()[patchI].Cn());
+                const scalarField d(((Cn - patchC) & centreN)/(n & centreN));
+                const vectorField projC(d*n + patchC);
 
                 // Calculate correction vector which connects actual cell
                 // centre to the transformed cell centre
-                const vectorField k = projC - Cn;
+                const vectorField k(projC - Cn);
 
-                const Field<vector> projD = patchDif + (k & patchGradDif);
+                const Field<vector> projD(patchDif + (k & patchGradDif));
 
                 // Calculate delta coeffs from proj position on centre plane to
                 // transformed projected position
-                const scalarField projDeltaCoeff =
-                    1.0/mag(transform(wedgePatch.cellT(), projC) - projC);
+                const scalarField projDeltaCoeff
+                (
+                    1.0/mag(transform(wedgePatch.cellT(), projC) - projC)
+                );
 
                 // Calculate the patch snGrad
                 correctedSnGrad =
@@ -2095,8 +2142,8 @@ void Foam::solidSubMeshes::correctBoundarySnGradf
             }
             else
             {
-                const vectorField delta = subMesh.boundary()[patchI].delta();
-                const vectorField k = delta - (sqr(n) & delta);
+                const vectorField delta(subMesh.boundary()[patchI].delta());
+                const vectorField k(delta - (sqr(n) & delta));
                 const scalarField& deltaCoeffs =
                     subMesh.boundary()[patchI].deltaCoeffs();
 
@@ -2122,14 +2169,20 @@ void Foam::solidSubMeshes::moveSubMeshes()
                 << endl;
 
             twoDPointCorrector twoDCorrector(subMeshes()[matI].subMesh());
-            pointField newPoints =
-                subMeshes()[matI].subMesh().points() + subMeshPointD()[matI];
+            pointField newPoints
+            (
+                subMeshes()[matI].subMesh().points() + subMeshPointD()[matI]
+            );
             twoDCorrector.correctPoints(newPoints);
 
             subMeshes()[matI].subMesh().movePoints(newPoints);
             subMeshes()[matI].subMesh().V00();
             subMeshes()[matI].subMesh().moving(false);
+#ifdef OPENFOAMESIORFOUNDATION
+            subMeshes()[matI].subMesh().topoChanging(false);
+#else
             subMeshes()[matI].subMesh().changing(false);
+#endif
             subMeshes()[matI].subMesh().setPhi().writeOpt() =
                 IOobject::NO_WRITE;
 
@@ -2137,7 +2190,8 @@ void Foam::solidSubMeshes::moveSubMeshes()
             {
                 Info<< "    Writing subMesh "
                     << subMeshes()[matI].subMesh().name() << endl;
-                subMeshes()[matI].subMesh().writeOpt() = IOobject::AUTO_WRITE;
+                subMeshes()[matI].subMesh().polyMesh::writeOpt() =
+                    IOobject::AUTO_WRITE;
                 subMeshes()[matI].subMesh().setInstance
                 (
                     baseMesh().time().timeName()

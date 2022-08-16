@@ -27,10 +27,10 @@ License
 #include "solidForces.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
+#include "surfaceFields.H"
 #include "pointFields.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "surfaceFields.H"
-#endif
+#include "lookupSolidModel.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -70,7 +70,7 @@ bool Foam::solidForces::writeData()
             mesh.Sf().boundaryField()[historyPatchID_];
 
         // Patch unit area vectors
-        const vectorField patchNf = mesh.boundary()[historyPatchID_].nf();
+        const vectorField patchNf(mesh.boundary()[historyPatchID_].nf());
 
         // Calculate the force as the intergal of the traction over the area
         vector force = vector::zero;
@@ -83,12 +83,19 @@ bool Foam::solidForces::writeData()
                 "sigma"
             ).boundaryField()[historyPatchID_];
 
+        // Lookup solid model
+        const solidModel& solMod = lookupSolidModel(mesh);
+
         // Check if it is a linear or nonlinear geometry case
-        if
-        (
-            !mesh.foundObject<volVectorField>("DD")
-         && mesh.foundObject<volTensorField>("F")
-        )
+        if (solMod.nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY)
+        {
+            // Linear geometry
+
+            force = gSum(patchSf & sigma);
+
+            normalForce = gSum(patchNf & (patchSf & sigma));
+        }
+        else if (solMod.nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
         {
             // Total Lagrangian
 
@@ -107,21 +114,17 @@ bool Foam::solidForces::writeData()
                 ).boundaryField()[historyPatchID_];
 
             // Calculate area vectors in the deformed configuration
-            const vectorField patchDeformSf = (J*Finv.T() & patchSf);
+            const vectorField patchDeformSf(J*Finv.T() & patchSf);
 
             // Calculate unit area vectors in the deformed configuration
-            const vectorField patchDeformNf = patchDeformSf/mag(patchDeformSf);
+            const vectorField patchDeformNf(patchDeformSf/mag(patchDeformSf));
 
             // It is assumed that sigma is the true (Cauchy) stress
             force = gSum(patchDeformSf & sigma);
 
             normalForce = gSum(patchDeformNf & (patchDeformSf & sigma));
         }
-        else if
-        (
-            mesh.foundObject<volVectorField>("DD")
-         && mesh.foundObject<volTensorField>("F")
-        )
+        else if (solMod.nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
         {
             // Updated Lagrangian
 
@@ -135,11 +138,9 @@ bool Foam::solidForces::writeData()
         }
         else
         {
-            // Linear geometry
-
-            force = gSum(patchSf & sigma);
-
-            normalForce = gSum(patchNf & (patchSf & sigma));
+            FatalErrorIn("bool Foam::solidForces::writeData()")
+                << "Unknown solidModel nonLinGeom type = "
+                << solMod.nonLinGeom() << abort(FatalError);
         }
 
         if (Pstream::master())
@@ -229,11 +230,11 @@ Foam::solidForces::solidForces
             {
                 // Put in undecomposed case (Note: gives problems for
                 // distributed data running)
-                historyDir = time_.path()/".."/"history"/startTimeName;
+                historyDir = time_.path()/".."/"postProcessing"/startTimeName;
             }
             else
             {
-                historyDir = time_.path()/"history"/startTimeName;
+                historyDir = time_.path()/"postProcessing"/startTimeName;
             }
 
             // Create directory if does not exist.
@@ -267,7 +268,7 @@ bool Foam::solidForces::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::solidForces::execute(const bool forceWrite)
 #else
 bool Foam::solidForces::execute()

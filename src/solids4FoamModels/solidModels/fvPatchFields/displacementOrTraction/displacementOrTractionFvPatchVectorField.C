@@ -186,20 +186,26 @@ displacementOrTractionFvPatchVectorField
     }
     else
     {
-        const Field<vector> normalValue =
-            transform(valueFraction(), refValue());
+        const Field<vector> normalValue
+        (
+            transform(valueFraction(), refValue())
+        );
 
-        const Field<vector> gradValue =
-            patchInternalField() + refGrad()/patch().deltaCoeffs();
+        const Field<vector> gradValue
+        (
+            patchInternalField() + refGrad()/patch().deltaCoeffs()
+        );
 
-        const Field<vector> transformGradValue =
-            transform(I - valueFraction(), gradValue);
+        const Field<vector> transformGradValue
+        (
+            transform(I - valueFraction(), gradValue)
+        );
 
         Field<vector>::operator=(normalValue + transformGradValue);
     }
 
     // Unit normals
-    const vectorField nf = patch().nf();
+    const vectorField nf(patch().nf());
 
     // Set fixed displacement directions based on specifyNormalDirection and
     // valueFraction

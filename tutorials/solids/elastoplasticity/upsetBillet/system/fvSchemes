@@ -36,12 +36,12 @@ divSchemes
 
 laplacianSchemes
 {
-    default            Gauss linear skewCorrected 1;
+    default            Gauss linear corrected;
 }
 
 snGradSchemes
 {
-    default            skewCorrected 1;
+    default            corrected;
 }
 
 interpolationSchemes

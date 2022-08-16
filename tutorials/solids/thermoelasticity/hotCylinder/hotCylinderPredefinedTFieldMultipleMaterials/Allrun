@@ -9,14 +9,12 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-solids4Foam::caseOnlyRunsWithFoamExtend
-
 # Create the mesh
-runApplication blockMesh
+solids4Foam::runApplication blockMesh
 
 # Create cellZones for materials
-runApplication setSet -batch batch.setSet
-runApplication setsToZones
+solids4Foam::runApplication setSet -batch batch.setSet
+solids4Foam::runApplication setsToZones
 
 # Run the solver
-runApplication solids4Foam
+solids4Foam::runApplication solids4Foam

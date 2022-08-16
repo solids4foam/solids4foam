@@ -1,0 +1,70 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       areaScalarField;
+    location    "0";
+    object      w;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    right
+    {
+        //type            fixedValue;
+        //value           uniform 0.014555;
+
+        //type            fixedGradient;
+        //gradient        uniform 0.0108787;
+
+        // Free
+        type            freeEdgeDisplacement;
+        relaxationFactor 1.0;
+    }
+
+    top
+    {
+        //type            fixedValue;
+        //value           uniform 0;
+
+        type            zeroGradient;
+    }
+
+    bottom
+    {
+        type            zeroGradient;
+
+        //type            fixedValue;
+        //value           uniform 0;
+    }
+
+    left
+    {
+        type            fixedValue;
+        value           uniform 0;
+    }
+
+    back
+    {
+         type            empty;
+    }
+
+    front
+    {
+         type            empty;
+    }
+}
+
+// ************************************************************************* //

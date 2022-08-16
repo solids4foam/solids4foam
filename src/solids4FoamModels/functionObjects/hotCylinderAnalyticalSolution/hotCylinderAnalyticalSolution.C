@@ -213,7 +213,7 @@ bool Foam::hotCylinderAnalyticalSolution::start()
 }
 
 
-#if FOAMEXTEND > 40
+#if FOAMEXTEND
 bool Foam::hotCylinderAnalyticalSolution::execute(const bool forceWrite)
 #else
 bool Foam::hotCylinderAnalyticalSolution::execute()

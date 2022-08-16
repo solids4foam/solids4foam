@@ -88,6 +88,7 @@ outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 }
 
 
+#ifndef OPENFOAMFOUNDATION
 outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 (
     const outflowPressureFvPatchScalarField& pivpvf
@@ -95,6 +96,7 @@ outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 :
     fixedValueFvPatchScalarField(pivpvf)
 {}
+#endif
 
 
 outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
@@ -141,7 +143,7 @@ void outflowPressureFvPatchScalarField::updateCoeffs()
     const fvPatchField<vector>& pU =
         patch().lookupPatchField<volVectorField, vector>("U");
 
-    vectorField n = this->patch().nf();
+    vectorField n(patch().nf());
 
     pp = nu.value()*(n & pU.snGrad());
 

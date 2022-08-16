@@ -38,8 +38,8 @@ void Foam::newMapNearestAMI<SourcePatch, TargetPatch>::findNearestFace
     label& tgtFacei
 ) const
 {
-    const vectorField& srcCf = srcPatch.faceCentres();
-    const vectorField& tgtCf = tgtPatch.faceCentres();
+    const vectorField srcCf(srcPatch.faceCentres());
+    const vectorField tgtCf(tgtPatch.faceCentres());
 
     const vector srcP = srcCf[srcFacei];
 
@@ -108,7 +108,7 @@ void Foam::newMapNearestAMI<SourcePatch, TargetPatch>::setNextNearestFaces
 
             if (tgtFacei == -1)
             {
-                const vectorField& srcCf = this->srcPatch_.faceCentres();
+                const vectorField srcCf(this->srcPatch_.faceCentres());
 
                 FatalErrorInFunction
                     << "Unable to find target face for source face "
@@ -268,8 +268,8 @@ void Foam::newMapNearestAMI<SourcePatch, TargetPatch>::calculate
 
     // for the case of multiple source faces per target face, select the
     // nearest source face only and discard the others
-    const vectorField& srcCf = this->srcPatch_.faceCentres();
-    const vectorField& tgtCf = this->tgtPatch_.faceCentres();
+    const vectorField srcCf(this->srcPatch_.faceCentres());
+    const vectorField tgtCf(this->tgtPatch_.faceCentres());
 
     forAll(tgtAddr, targetFacei)
     {

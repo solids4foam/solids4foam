@@ -27,7 +27,7 @@ Class
 
 Description
     Transient solver for trans-sonic/supersonic, laminar flow of a
-    compressible liquid. Assumes a linear equation of state between 
+    compressible liquid. Assumes a linear equation of state between
 	density and pressure related by the bulk modulus.
 
 Author
@@ -45,11 +45,14 @@ SourceFiles
 #include "fluidModel.H"
 #include "pimpleControl.H"
 #include "uniformDimensionedFields.H"
-#ifdef OPENFOAMESIORFOUNDATION
-	#include "pressureControl.H"
-	#include "fvOptions.H"
-	#include "fvcSmooth.H"
+#ifdef OPENFOAMFOUNDATION
+    #include "pressureReference.H"
+    #include "fvcSmooth.H"
+#elif OPENFOAMESI
+    #include "pressureControl.H"
+    #include "fvcSmooth.H"
 #endif
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -94,12 +97,8 @@ class sonicLiquidFluid
         volScalarField rho_;
 
 #ifdef OPENFOAMESIORFOUNDATION
-		//- Creates and initialises the momentum field rhoUf
-		autoPtr<surfaceVectorField> rhoUf_;
-
-		//- Finite volume options: source terms, constrains and corrections
-		fv::options& fvOptions_;
-
+        //- Creates and initialises the momentum field rhoUf
+        autoPtr<surfaceVectorField> rhoUf_;
 #endif
         //- rAU field
         volScalarField rAU_;

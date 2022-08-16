@@ -71,7 +71,7 @@ extrapolatedPressureValueFvPatchScalarField::extrapolatedPressureValueFvPatchSca
     relaxFac_(readScalar(dict.lookup("relaxFactor")))
 {}
 
-
+#ifndef OPENFOAMFOUNDATION
 extrapolatedPressureValueFvPatchScalarField::extrapolatedPressureValueFvPatchScalarField
 (
     const extrapolatedPressureValueFvPatchScalarField& pivpvf
@@ -80,7 +80,7 @@ extrapolatedPressureValueFvPatchScalarField::extrapolatedPressureValueFvPatchSca
     fixedValueFvPatchScalarField(pivpvf),
     relaxFac_(pivpvf.relaxFac_)
 {}
-
+#endif
 
 extrapolatedPressureValueFvPatchScalarField::extrapolatedPressureValueFvPatchScalarField
 (
@@ -113,10 +113,10 @@ void extrapolatedPressureValueFvPatchScalarField::updateCoeffs()
             patch().lookupPatchField<volVectorField, vector>(gradFieldName);
 
         // Unit normals
-        const vectorField n = patch().nf();
+        const vectorField n(patch().nf());
 
         // Delta vectors
-        const vectorField delta = patch().delta();
+        const vectorField delta(patch().delta());
 
         // Linearly extrapolate from the internal field and apply
         // under-relaxation
@@ -155,10 +155,10 @@ tmp<Foam::Field<scalar> > extrapolatedPressureValueFvPatchScalarField::snGrad() 
             patch().lookupPatchField<volVectorField, vector>(gradFieldName);
 
         // Unit normals
-        const vectorField n = patch().nf();
+        const vectorField n(patch().nf());
 
         // Delta vectors
-        const vectorField delta = patch().delta();
+        const vectorField delta(patch().delta());
 
         // Correction vectors
         const vectorField k = (I - sqr(n)) & delta;
@@ -193,10 +193,10 @@ gradientBoundaryCoeffs() const
             patch().lookupPatchField<volVectorField, vector>(gradFieldName);
 
         // Unit normals
-        const vectorField n = patch().nf();
+        const vectorField n(patch().nf());
 
         // Delta vectors
-        const vectorField delta = patch().delta();
+        const vectorField delta(patch().delta());
 
         // Correction vectors
         const vectorField k = (I - sqr(n)) & delta;

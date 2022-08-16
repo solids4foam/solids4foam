@@ -49,7 +49,6 @@ Foam::neoHookeanElastic::neoHookeanElastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
-    rho_(dict.lookup("rho")),
     mu_("mu", dimPressure, 0.0),
     K_("K", dimPressure, 0.0)
 {
@@ -89,6 +88,10 @@ Foam::neoHookeanElastic::neoHookeanElastic
             << "Either E and nu or mu and K should be specified"
             << abort(FatalError);
     }
+
+    // Store old F
+    F().storeOldTime();
+    Ff().storeOldTime();
 }
 
 
@@ -99,28 +102,6 @@ Foam::neoHookeanElastic::~neoHookeanElastic()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::rho() const
-{
-    return tmp<volScalarField>
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "rhoLaw",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            rho_,
-            calculatedFvPatchScalarField::typeName
-        )
-    );
-}
-
 
 Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 {
@@ -154,13 +135,13 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
     }
 
     // Calculate the Jacobian of the deformation gradient
-    const volScalarField J = det(F());
+    const volScalarField J(det(F()));
 
     // Calculate the volume preserving left Cauchy Green strain
-    const volSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(F() & F().T());
+    const volSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F() & F().T()));
 
     // Calculate the deviatoric stress
-    const volSymmTensorField s = mu_*dev(bEbar);
+    const volSymmTensorField s(mu_*dev(bEbar));
 
     // Calculate the Cauchy stress
     sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
@@ -178,17 +159,23 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     }
 
     // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J = det(Ff());
+    const surfaceScalarField J(det(Ff()));
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
-    const surfaceSymmTensorField bEbar = pow(J, -2.0/3.0)*symm(Ff() & Ff().T());
+    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(Ff() & Ff().T()));
 
     // Calculate deviatoric stress
-    const surfaceSymmTensorField s = mu_*dev(bEbar);
+    const surfaceSymmTensorField s(mu_*dev(bEbar));
 
     // Calculate the Cauchy stress
     sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
 }
 
+
+void Foam::neoHookeanElastic::setRestart()
+{
+    F().writeOpt() = IOobject::AUTO_WRITE;
+    Ff().writeOpt() = IOobject::AUTO_WRITE;
+}
 
 // ************************************************************************* //
