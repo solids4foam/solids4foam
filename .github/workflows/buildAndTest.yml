@@ -51,7 +51,7 @@ jobs:
           cd tutorials
           ./Alltest
 
-  build-and-test-on-foam-extend-4.1:
+  build-and-test-on-foamextend41:
     name: Build on foam-extend-4.1
     runs-on: ubuntu-latest
     container:
