@@ -1,0 +1,46 @@
+Dockerfile
+.dockerignore
+
+.git
+
+tutorialsTest
+
+**/log.Allwmake
+
+**/*~
+**/.*~
+**/*.bak
+**/*.bak[0-9][0-9]
+**/*.orig
+**/*.orig[0-9][0-9]
+**/\#*\#
+
+**/*.[oa]
+**/*.la
+**/*.so
+**/*.jar
+**/*.dylib
+
+# Corefiles
+**/core
+
+# dependency files - anywhere
+**/*.dep
+
+# lnInclude (symlink) folders - anywhere
+**/lnInclude
+
+# A hidden file created by the Mac OS X Finder.
+**/.DS_Store
+
+# build folders - anywhere
+**/linux*Gcc*/
+**/linux*Icc*/
+**/darwin*Gcc*/
+**/darwin*Intel*/
+**/darwin*Arm*/
+**/darwin*Clang*/
+**/linuxming*/
+**/SiCortex*Gcc*/
+**/solaris*Gcc*/
+**/SunOS*Gcc*/
