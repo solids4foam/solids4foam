@@ -1,5 +1,4 @@
 # Build and push solids4foam docker images to docker hub
-# This is only run if the "Build and test" workflow successfuly completes
 name: Build and push docker images
 
 on:
