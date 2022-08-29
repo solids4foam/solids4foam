@@ -16,4 +16,3 @@ solids4Foam::runApplication blockMesh
 
 # Run solver
 solids4Foam::runApplication solids4Foam
-#solids4Foam | grep -v 'Both matrices are symmetric: inserting only upper triangle' 2>&1 | tee log.solids4Foam

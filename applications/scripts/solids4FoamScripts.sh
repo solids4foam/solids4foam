@@ -147,6 +147,15 @@ function solids4Foam::convertCaseFormat()
         mv "${CASE_DIR}/system/changeDictionaryDict.openfoam" "system/changeDictionaryDict"
     fi
 
+    # 8. Check for createPatchDict.openfoam
+    if [[ -f "${CASE_DIR}/system/createPatchDict.openfoam" ]]
+    then
+        echo "Moving ${CASE_DIR}/system/createPatchDict to system/createPatchDict.foamextend"
+        mv "${CASE_DIR}/system/createPatchDict" "system/createPatchDict.foamextend"
+        echo "Moving ${CASE_DIR}/system/createPatchDict.openfoam to system/createPatchDict"
+        mv "${CASE_DIR}/system/createPatchDict.openfoam" "system/createPatchDict"
+    fi
+
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -279,6 +288,15 @@ function solids4Foam::convertCaseFormatFoamExtend()
         mv "${CASE_DIR}/system/changeDictionaryDict" "system/changeDictionaryDict.openfoam"
         echo "Moving ${CASE_DIR}/system/changeDictionaryDict.foamextend to system/changeDictionaryDict"
         mv "${CASE_DIR}/system/changeDictionaryDict.foamextend" "system/changeDictionaryDict"
+    fi
+
+    # 8. Check for createPatchDict.openfoam
+    if [[ -f "${CASE_DIR}/system/createPatchDict.foamextend" ]]
+    then
+        echo "Moving ${CASE_DIR}/system/createPatchDict to system/createPatchDict.openfoam"
+        mv "${CASE_DIR}/system/createPatchDict" "system/createPatchDict.openfoam"
+        echo "Moving ${CASE_DIR}/system/createPatchDict.foamextend to system/createPatchDict"
+        mv "${CASE_DIR}/system/createPatchDict.foamextend" "system/createPatchDict"
     fi
 
     echo

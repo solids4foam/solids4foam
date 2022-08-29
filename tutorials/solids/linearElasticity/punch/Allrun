@@ -9,8 +9,6 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-solids4Foam::caseOnlyRunsWithFoamExtend
-
 if ! command -v cartesianMesh &> /dev/null
 then
     echo
@@ -30,8 +28,14 @@ cp system/punch_bottom/meshDict system/meshDict
 solids4Foam::runApplication -s punch_bottom cartesianMesh
 
 # Merge the punch_top into the main mesh (punch_bottom)
-solids4Foam::runApplication mergeMeshes . . . . \
+if [[ $WM_PROJECT = "foam" ]]
+then
+    solids4Foam::runApplication mergeMeshes . . . . \
                             -addRegion punch_top -noFunctionObjects
+else
+    solids4Foam::runApplication mergeMeshes . . \
+                            -addRegion punch_top -noFunctionObjects
+fi
 rm -rf constant/polyMesh
 mv 1/polyMesh constant/
 

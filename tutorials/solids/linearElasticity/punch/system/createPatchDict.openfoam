@@ -1,0 +1,88 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      createPatchDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+matchTolerance 1e-3;
+
+pointSync false;
+
+patches
+(
+    {
+        name cylinderTractionFree;
+        patchInfo
+        {
+            type patch;
+        }
+        constructFrom patches;
+        patches ("auto0");
+    }
+    {
+        name punchContact;
+        patchInfo
+        {
+            type patch;
+        }
+        constructFrom patches;
+        patches ("auto1");
+    }
+    {
+        name symmx;
+        patchInfo
+        {
+            type symmetryPlane;
+        }
+        constructFrom patches;
+        patches ("auto8" "auto3");
+    }
+    {
+        name cylinderContact;
+        patchInfo
+        {
+            type patch;
+        }
+        constructFrom patches;
+        patches ("auto2");
+    }
+    {
+        name punchLoading;
+        patchInfo
+        {
+            type patch;
+        }
+        constructFrom patches;
+        patches ("auto5");
+    }
+    {
+        name cylinderFixed;
+        patchInfo
+        {
+            type patch;
+        }
+        constructFrom patches;
+        patches ("auto4");
+    }
+    {
+        name symmy;
+        patchInfo
+        {
+            type symmetryPlane;
+        }
+        constructFrom patches;
+        patches ("auto6" "auto7");
+    }
+);
+
+// ************************************************************************* //
