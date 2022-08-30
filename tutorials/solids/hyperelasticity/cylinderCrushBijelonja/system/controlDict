@@ -25,11 +25,11 @@ stopAt          endTime;
 
 endTime         30;
 
-deltaT          1; //0.001;
+deltaT          1;
 
 writeControl    timeStep;
 
-writeInterval   1; //250;
+writeInterval   1;
 
 cycleWrite      0;
 
@@ -44,14 +44,5 @@ timeFormat      general;
 timePrecision   6;
 
 runTimeModifiable no;
-
-/*functions*/
-/*{*/
-/*    forceDisp*/
-/*    {*/
-/*        type          solidForcesDisplacements;*/
-/*        historyPatch  topContact;*/
-/*    }*/
-/*}*/
 
 // ************************************************************************* //

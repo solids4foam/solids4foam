@@ -9,12 +9,16 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-solids4Foam::caseOnlyRunsWithFoamExtend
-
 # Create mesh
 mkdir -p constant/polyMesh
 m4 system/blockMeshDict.cylinder.m4 > constant/polyMesh/blockMeshDict
 solids4Foam::runApplication blockMesh
+
+if [[ $WM_PROJECT != "foam" ]]
+then
+    # Axis edges must be manually removed
+    solids4Foam::runApplication collapseEdges -overwrite
+fi
 
 # Run solver
 solids4Foam::runApplication solids4Foam
