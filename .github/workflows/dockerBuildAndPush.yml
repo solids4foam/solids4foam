@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  docker-openfoam-v2012:
+  docker-openfoamv2012:
     runs-on: ubuntu-latest
     steps:
       - name: Login to DockerHub
@@ -25,7 +25,7 @@ jobs:
           tags: solids4foam/solids4foam-v2.0-openfoam-v2012:v2.0
           file: Dockerfile.openfoamv2012
 
-  docker-openfoam-9:
+  docker-openfoam9:
     runs-on: ubuntu-latest
     steps:
       - name: Login to DockerHub
@@ -41,7 +41,7 @@ jobs:
           tags: solids4foam/solids4foam-v2.0-openfoam-9:v2.0
           file: Dockerfile.openfoam9
 
-  docker-foam-extend-4.1:
+  docker-foamextend41:
     runs-on: ubuntu-latest
     steps:
       - name: Login to DockerHub
