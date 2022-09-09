@@ -23,6 +23,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifndef S4F_NO_USE_EIGEN
+
 #include "blockLduSolvers.H"
 #include "BlockEigenSolver.H"
 #include "OFstream.H"
@@ -361,5 +363,6 @@ Foam::BlockEigenSolver::BlockEigenSolver
     Info<< type() << " : writeMatlabFiles is " << writeMatlabFiles_ << endl;
 }
 
+#endif // end of #ifndef S4F_NO_USE_EIGEN
 
 // ************************************************************************* //

@@ -23,10 +23,11 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifndef S4F_NO_USE_EIGEN
+
 #include "blockLduSolvers.H"
 #include "BlockEigenSparseLUSolver.H"
 #include "addToRunTimeSelectionTable.H"
-#include <Eigen/Sparse>
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -220,5 +221,6 @@ Foam::BlockEigenSparseLUSolver::solve
     );
 }
 
+#endif // end of #ifndef S4F_NO_USE_EIGEN
 
 // ************************************************************************* //

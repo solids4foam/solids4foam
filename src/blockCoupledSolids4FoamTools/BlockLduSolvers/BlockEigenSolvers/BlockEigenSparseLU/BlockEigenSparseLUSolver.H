@@ -57,7 +57,6 @@ SourceFiles
 #include "BlockLduSolver.H"
 #include "blockLduSolvers.H"
 #include "BlockSolverPerformance.H"
-#include <Eigen/Sparse>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

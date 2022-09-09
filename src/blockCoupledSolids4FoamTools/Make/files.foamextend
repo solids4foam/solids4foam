@@ -16,12 +16,6 @@ blockFvPatchVectorFields/blockFixedGradient/blockFixedGradientFvPatchVectorField
 
 BlockLduSolvers/BlockEigenSolvers/BlockEigenSolver/BlockEigenSolver.C
 BlockLduSolvers/BlockEigenSolvers/BlockEigenSparseLU/BlockEigenSparseLUSolver.C
-BlockLduSolvers/BlockEigenSolvers/BlockEigenBiCGStab/BlockEigenBiCGStabSolver.C
-BlockLduSolvers/BlockEigenSolvers/BlockEigenGMRes/BlockEigenGMResSolver.C
-BlockLduSolvers/BlockEigenFoamBiCGStab/BlockEigenFoamBiCGStabSolver.C
-BlockLduSolvers/BlockEigenILUTPrecon/BlockEigenILUTPrecon.C
-/*BlockLduSolvers/BlockMUMPS/BlockMUMPS.C*/
-/*BlockLduSolvers/BlockPETSc/BlockPETScSolver.C*/
 
 solidPolyMesh/solidPolyBoundaryMesh.C
 solidPolyMesh/solidPolyMeshLduAddressing.C
