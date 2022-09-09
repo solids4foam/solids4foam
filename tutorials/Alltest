@@ -252,7 +252,7 @@ echo
 
 if [[ $N_FAILED_SOLVER -gt 0 ]]
 then
-    echo "The solids4Foam solver failed on the following cases:"
+    echo "The solids4Foam solver failed in the following cases:"
     grep "ERROR" testLoopReport | grep "solids4Foam"
 elif [[ $N_FAILED_OTHER -gt 0 ]]
 then
