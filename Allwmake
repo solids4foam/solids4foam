@@ -11,14 +11,6 @@ then
     exit 1
 fi
 
-# Replace files in the main foam libraries
-#(cd filesToReplaceInOF && ./Allcheck)
-#if [ $? -ne 0 ]
-#then
-#    echo "Please fix the filesToReplaceInOF above!"
-#    exit 1
-#fi
-
 # Download ThirdParty software
 (cd ThirdParty && ./Allwmake 2>&1 | tee log.Allwmake)
 if [ $? -ne 0 ]
