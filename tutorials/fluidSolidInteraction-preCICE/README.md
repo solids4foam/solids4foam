@@ -8,7 +8,5 @@ Both preCICE and the preCICE OpenFOAM adapter need to be installed:
 
 You can then try out the preCICE tutorials (https://precice.org/tutorials.html)
 that demonstrate solids4foam. For example, see:
-- https://precice.org/tutorials-perpendicular-flap.html [pending pull request https://github.com/precice/tutorials/pull/286]
+- https://precice.org/tutorials-perpendicular-flap.html
 These tutorials can be downloaded using the included `installTutorials` script, i.e. `./installTutorials`.
-
-Note: the OpenFOAM adapter needs to have the solids4foam update [https://github.com/precice/openfoam-adapter/pull/236].
