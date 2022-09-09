@@ -44,11 +44,14 @@ ifdef PETSC_DIR
     VERSION_SPECIFIC_LIBS += -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lpetsc
 endif
 
+ifndef S4F_NO_USE_EIGEN
+    VERSION_SPECIFIC_INC += -I../../ThirdParty/eigen3 -DS4F_NO_USE_EIGEN
+endif
+
 EXE_INC = \
     -std=c++14 \
     -Wno-old-style-cast -Wno-deprecated-declarations \
     $(VERSION_SPECIFIC_INC) \
-    -I../../ThirdParty/eigen3 \
     -I../blockCoupledSolids4FoamTools/lnInclude \
     -I../RBFMeshMotionSolver/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \

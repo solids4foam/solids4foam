@@ -25,8 +25,10 @@ License
 
 #include "sparseMatrixTools.H"
 #include "OFstream.H"
-#include <Eigen/Sparse>
-#include <unsupported/Eigen/SparseExtra>
+#ifndef S4F_NO_USE_EIGEN
+    #include <Eigen/Sparse>
+    #include <unsupported/Eigen/SparseExtra>
+#endif
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif
@@ -79,6 +81,13 @@ void Foam::sparseMatrixTools::solveLinearSystemEigen
     const bool debug
 )
 {
+#ifdef S4F_NO_USE_EIGEN
+    FatalErrorIn("void Foam::sparseMatrixTools::solveLinearSystemEigen(...)")
+        << "This function cannot be called as the S4F_NO_USE_EIGEN variable "
+        << " is set.  If you would like to use this option then unset the "
+        << "S4F_NO_USE_EIGEN variable and re-run the top-level Allwmake script"
+        << abort(FatalError);
+#else
     // For now, we can directly use the Eigen direct solver to solve the
     // linear system
 
@@ -218,6 +227,7 @@ void Foam::sparseMatrixTools::solveLinearSystemEigen
             }
         }
     }
+#endif
 }
 
 
