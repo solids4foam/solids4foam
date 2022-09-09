@@ -1,37 +1,62 @@
 #!/bin/bash
 cd ${0%/*} || exit 1    # run from this directory
 
-# To use system version of a ThirdParty code, set the corresponding
-# environmental variable: for example, for the Eigen library add the following
-# line to your ~.bashrc:
-#     export EIGEN_DIR="/opt/local/include/eigen3"
+echo; echo "Checking ThirdParty"
 
-# Eigen library: http://eigen.tuxfamily.org/index.php?title=Main_Page
-# Check if eigen3 directory is found
-if [ -d $(pwd)/eigen3 ]
+# Eigen library: http://eigen.tuxfamily.org
+# Optionally, you can set the Eigen installation location, e.g.
+#     export EIGEN_DIR="/opt/local/include/eigen3"
+# If you would not like eigen to be used, set the S4F_NO_USE_EIGEN variable, i.e.
+#    export S4F_NO_USE_EIGEN=1
+
+echo "Checking eigen"
+if [ -n "$S4F_NO_USE_EIGEN" ]
 then
-    echo "eigen3 found."
+    echo "The S4F_NO_USE_EIGEN variable is set so eigen will not be used"
+elif [ -d $(pwd)/eigen3 ]
+then
+    echo "eigen3 found"
 else
     if [ -z $EIGEN_DIR ]
     then
-        # Download eigen using wget
-        echo "Downloading eigen3"
-        wget --no-check-certificate \
-            https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz
-        if [ $? -ne 0 ]
+        # Check standard locations for a system installation of eigen
+        # If found, then create a symbolic link; otherwise download a copy
+        if [[ -n $(find /usr/include -name signature_of_eigen3_matrix_library -type f 2>/dev/null) ]]
         then
-            echo "Download failed!"
-            echo "Check your internet connection and check the following link "
-            echo "is valid: https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz"
-            echo
-            exit 1
+            # Typical linux installation
+            EIGEN_FILES=$(find /usr/include -name signature_of_eigen3_matrix_library -type f 2>/dev/null)
+            EIGEN_DIR=$(dirname ${EIGEN_FILES})
+            echo "Linking ${EIGEN_DIR} to eigen"
+            ln -s ${EIGEN_DIR} eigen3
+        elif [[ -n $(find /opt -name signature_of_eigen3_matrix_library -type f 2>/dev/null) ]]
+        then
+            # Typical macOS (homebrew or MacPorts) installation
+            EIGEN_FILES=$(find /opt -name signature_of_eigen3_matrix_library -type f 2>/dev/null)
+            EIGEN_DIR=$(dirname ${EIGEN_FILES})
+            echo "Linking ${EIGEN_DIR} to eigen"
+            ln -s ${EIGEN_DIR} eigen3
+        else
+            # Download eigen using wget
+            echo "Downloading eigen"
+            wget --no-check-certificate \
+                https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz
+            if [ $? -ne 0 ]
+            then
+                echo "Download failed!"
+                echo "Check your internet connection and check the following link "
+                echo "is valid: https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz"
+                echo
+                exit 1
+            fi
+            tar xvf eigen-3.3.7.tar.gz &> /dev/null
+            rm -f eigen-3.3.7.tar.gz
+            mv eigen-3.3.7 eigen3
         fi
-        tar xvf eigen-3.3.7.tar.gz &> /dev/null
-        rm -f eigen-3.3.7.tar.gz
-        mv eigen-3.3.7 eigen3
     else
         #  If EIGEN_DIR is set then then we will create a symbolic link to it
         echo "EIGEN_DIR is set: creating symbolic link"
-        \ln -s $EIGEN_DIR eigen3
+        ln -s $EIGEN_DIR eigen3
     fi
 fi
+
+echo "ThirdParty done"; echo
