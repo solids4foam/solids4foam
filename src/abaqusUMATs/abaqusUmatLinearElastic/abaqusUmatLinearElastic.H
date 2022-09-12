@@ -113,27 +113,12 @@ public:
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const;
 
-        //- Return density scale
-        virtual const dimensionedScalar& rhoScalar() const;
+        //- Return density as a scalar
+        virtual dimensionedScalar rhoScalar() const;
 
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
-
-        //- Provide access to mu for the coupledUnsNonLinLinearElasticSolid
-        virtual const dimensionedScalar& mu() const;
-
-        //- Bulk modulus
-        virtual const dimensionedScalar& K() const;
-
-        //- Young's modulus
-        virtual const dimensionedScalar& E() const;
-
-        //- Poisson's ratio
-        virtual const dimensionedScalar& nu() const;
-
-        //- Lambda
-        virtual const dimensionedScalar& lambda() const;
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);

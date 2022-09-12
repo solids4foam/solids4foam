@@ -196,16 +196,7 @@ Foam::tmp<Foam::volScalarField> Foam::abaqusUmatLinearElastic::rho() const
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::abaqusUmatLinearElastic::bulkModulus() const
-{
-    notImplemented("Foam::abaqusUmatLinearElastic::bulkModulus()");
-
-    // Kepp the compiler happy
-    return rho();
-}
-
-
-const Foam::dimensionedScalar& Foam::abaqusUmatLinearElastic::rhoScalar() const
+Foam::dimensionedScalar Foam::abaqusUmatLinearElastic::rhoScalar() const
 {
     return rho_;
 }
@@ -229,51 +220,6 @@ Foam::tmp<Foam::volScalarField> Foam::abaqusUmatLinearElastic::impK() const
             impK_
         )
     );
-}
-
-
-const Foam::dimensionedScalar& Foam::abaqusUmatLinearElastic::mu() const
-{
-    notImplemented("Foam::abaqusUmatLinearElastic::mu()");
-
-    // Kepp the compiler happy
-    return rhoScalar();
-}
-
-
-const Foam::dimensionedScalar& Foam::abaqusUmatLinearElastic::K() const
-{
-    notImplemented("Foam::abaqusUmatLinearElastic::K()");
-
-    // Kepp the compiler happy
-    return rhoScalar();
-}
-
-
-const Foam::dimensionedScalar& Foam::abaqusUmatLinearElastic::E() const
-{
-    notImplemented("Foam::abaqusUmatLinearElastic::E()");
-
-    // Kepp the compiler happy
-    return rhoScalar();
-}
-
-
-const Foam::dimensionedScalar& Foam::abaqusUmatLinearElastic::nu() const
-{
-    notImplemented("Foam::abaqusUmatLinearElastic::nu()");
-
-    // Kepp the compiler happy
-    return rhoScalar();
-}
-
-
-const Foam::dimensionedScalar& Foam::abaqusUmatLinearElastic::lambda() const
-{
-    notImplemented("Foam::abaqusUmatLinearElastic::lambda()");
-
-    // Kepp the compiler happy
-    return rhoScalar();
 }
 
 
