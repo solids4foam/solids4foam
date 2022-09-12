@@ -9,16 +9,7 @@ source solids4FoamScripts.sh
 cleanCase
 cleanCase fluid
 cleanCase solid
-if [[ "${WM_PROJECT}" == "foam" ]]
-then
-    foamClearPolyMesh -region fluid
-    foamClearPolyMesh -region solid
-else
-    foamCleanPolyMesh -region fluid
-    foamCleanPolyMesh -region solid
-fi
-rm -rf constant/solid/polyMesh/boundary case.foam
-rm -rf constant/solid/polyMesh/[c-z]* postProcessing
+rm -rf case.foam postProcessing
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
