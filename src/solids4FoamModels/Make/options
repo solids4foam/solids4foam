@@ -104,7 +104,7 @@ EXE_INC = \
 
 LIB_LIBS = \
     $(VERSION_SPECIFIC_LIBS) \
-    -L$(FOAM_USER_LIBBIN) -lblockCoupledSolids4FoamTools \
+    -L$(FOAM_USER_LIBBIN) -lblockCoupledSolids4FoamTools -lRBFMeshMotionSolver \
     -lfiniteVolume \
     -ldynamicFvMesh \
     -ldynamicMesh \
