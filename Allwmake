@@ -13,9 +13,15 @@ fi
 
 # Download ThirdParty software
 (cd ThirdParty && ./Allwmake 2>&1 | tee log.Allwmake)
-if [ $? -ne 0 ]
+
+# Some files in foam-extend may need to be fixed
+(cd optionalFixes && ./Allcheck 2>&1 | tee log.Allcheck)
+N_FIXES=$(grep "PLEASE FIX THIS" optionalFixes/log.Allcheck | wc -l)
+if [[ $N_FIXES -gt 0 ]]
 then
-    echo "Please fix the ThirdParty errors above!"
+    echo "** ERROR with optionalFixes **"
+    echo "Please make the file replacements described above, or skip these "
+    echo "checks by setting 'export S4F_NO_FILE_FIXES=1'"; echo
     exit 1
 fi
 
@@ -33,7 +39,8 @@ then
     echo "** BUILD ERROR **"
     echo "There were build errors in the following logs:"
     find . -name log.Allwmake | xargs grep "\ Error\ "
-    echo; echo "Please examine these logs for additional details"
+    echo; echo "Please examine these logs for additional details"; echo
+    exit 1
 else
     echo "There were no build errors: enjoy solids4foam!"; echo
     echo "To test the installation, run:"
