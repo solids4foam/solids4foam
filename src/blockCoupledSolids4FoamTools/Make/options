@@ -9,8 +9,10 @@ else
     endif
 endif
 
-ifndef S4F_NO_USE_EIGEN
-    VERSION_SPECIFIC_INC += -I../../ThirdParty/eigen3 -DS4F_NO_USE_EIGEN
+ifdef S4F_NO_USE_EIGEN
+    VERSION_SPECIFIC_INC += -DS4F_NO_USE_EIGEN
+else
+    VERSION_SPECIFIC_INC += -I../../ThirdParty/eigen3
 endif
 
 EXE_INC = \
