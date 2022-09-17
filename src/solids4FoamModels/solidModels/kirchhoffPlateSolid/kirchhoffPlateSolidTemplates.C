@@ -46,9 +46,17 @@ mapAreaFieldToSingleLayerVolumeField
     const Field<Type> afI = af.internalField();
     FieldField<fvPatchField, Type>& bf = vf.boundaryField();
 
+    // Check that bf area patch is not of type empty
+    if (bf[areaPatchID].type() == "empty")
+    {
+        FatalErrorIn("mapAreaFieldToSingleLayerVolumeField(...)")
+            << "Patch " << bf[areaPatchID].patch().name()
+            << " must not be of type 'empty'"
+            << abort(FatalError);
+    }
 
     // 1. Map af to vf areaPatch
-
+    Field<Type>& bfAreaPatch = bf[areaPatchID];
     forAll(faceLabels, aFaceI)
     {
         const label faceID = faceLabels[aFaceI];
@@ -57,7 +65,7 @@ mapAreaFieldToSingleLayerVolumeField
         if (faceID < pMeshNFaces)
         {
             const label localFaceID = bm[areaPatchID].whichFace(faceID);
-            bf[areaPatchID][localFaceID] = afI[aFaceI];
+            bfAreaPatch[localFaceID] = afI[aFaceI];
         }
     }
 
