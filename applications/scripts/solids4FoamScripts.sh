@@ -440,9 +440,9 @@ function solids4Foam::runApplication()
         echo "Running $appRun on $PWD"
         if [ "$logMode" = append ]
         then
-            $appRun $appArgs "$@" >> $logFile 2>&1
+            $appRun $appArgs "$@" >> $logFile 2>&1 || echo "ERROR" >> $logFile
         else
-            $appRun $appArgs "$@" > $logFile 2>&1
+            $appRun $appArgs "$@" > $logFile 2>&1 || echo "ERROR" >> $logFile
         fi
     fi
 }
