@@ -24,8 +24,7 @@ solvers
         //solver              EigenSparseLU;
 
         // Iterative solver
-        solver            EigenFoamBiCGStab;
-        //solver            BiCGStab;
+        solver            BiCGStab;
         preconditioner    myCholesky;
         tolerance         1e-10;
         relTol            0;
