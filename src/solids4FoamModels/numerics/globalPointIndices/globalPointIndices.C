@@ -43,7 +43,6 @@ namespace Foam
 Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
 :
     mesh_(mesh),
-    globalPoints_(mesh),
     ownedByThisProc_(mesh.nPoints(), true),
     localToGlobalPointMap_(mesh.nPoints(), 0),
     stencilSizeOwned_(mesh.nPoints(), 0),
@@ -62,8 +61,8 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
     //   then set all patch points to false
     // - for all global points, set to true for lowest procID
 
-    const DynamicList<procPointList>& procPoints = globalPoints_.procPoints();
     const labelList& sharedPointLabels = mesh_.globalData().sharedPointLabels();
+    const pointMesh& pMesh(pointMesh::New(mesh_));
 
     // Correct points on processor patches
     forAll(mesh_.boundaryMesh(), patchI)
@@ -92,29 +91,41 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
     }
 
     // Correct global points
-    forAll(sharedPointLabels, globalPointI)
+
+    // Construct a list of all global points with the lowest processor index
+    // which owns each point
+    labelList globalPointOwner
+    (
+        mesh_.globalData().nGlobalPoints(), Pstream::nProcs()
+    );
+    const labelList& sharedPointAddr = mesh_.globalData().sharedPointAddr();
+    forAll(sharedPointAddr, gpI)
     {
-        const label pointID = sharedPointLabels[globalPointI];
+        const label globalPointID = sharedPointAddr[gpI];
+        globalPointOwner[globalPointID] = Pstream::myProcNo();
+    }
+    reduce(globalPointOwner, minOp<labelList>());
 
-        // Get list of processors which share this point
-        const procPointList& curProcPointList = procPoints[globalPointI];
+    // Correct ownedByThisProc for global points
 
-        // Find lowest ID of proc that shares this point
-        label lowestProcID = Pstream::nProcs();
-        forAll(curProcPointList, procI)
+    forAll(sharedPointLabels, gpI)
+    {
+        const label globaPointID = sharedPointAddr[gpI];
+        const label pointID = sharedPointLabels[gpI];
+
+        if (globalPointOwner[globaPointID] == Pstream::myProcNo())
         {
-            lowestProcID = min(lowestProcID, curProcPointList[procI][0]);
-        }
+            if (debug)
+            {
+                Pout<< "Proc " << Pstream::myProcNo() << " owns global point "
+                    << mesh_.points()[pointID] << endl;
+            }
 
-        // Check if the lowest procID is equal to the current procID
-        if (lowestProcID < Pstream::myProcNo())
+            ownedByThisProc_[pointID] = true; 
+        }
+        else
         {
             ownedByThisProc_[pointID] = false;
-        }
-        else if (debug)
-        {
-            Pout<< "Proc " << Pstream::myProcNo() << " owns global point "
-                << mesh_.points()[pointID] << endl;
         }
     }
 
@@ -222,6 +233,8 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
         {
             const processorPolyPatch& procPatch =
                 refCast<const processorPolyPatch>(mesh_.boundaryMesh()[patchI]);
+            const processorPointPatch& procPointPatch =
+                refCast<const processorPointPatch>(pMesh.boundary()[patchI]);
 
             const label neiProcNo = procPatch.neighbProcNo();
 
@@ -245,7 +258,14 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
                 );
 
                 // Insert indices into local map
-                const labelList& meshPoints = procPatch.meshPoints();
+                // Take care as the point ordering is reversed on the receiving
+                // side
+                #ifdef FOAMEXTEND
+                    const labelList& meshPoints = procPatch.meshPoints();
+                #else
+                    const labelList& meshPoints =
+                        procPointPatch.reverseMeshPoints();
+                #endif
                 forAll(meshPoints, pI)
                 {
                     const label pointID = meshPoints[pI];
@@ -259,7 +279,13 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
     // Sync global points
 
     // Correct global points
-    const labelList& sharedPointAddr = globalPoints_.sharedPointAddr();
+
+    if (debug)
+    {
+        Pout<< "sharedPointAddr = " << sharedPointAddr << nl
+            << "sharedPointLabels = " << sharedPointLabels << endl;
+    }
+
     {
         // Prepare a list of all global points, i.e. once synced, this list will
         // be the same on all procs
@@ -282,6 +308,11 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
         // Take the maximum across all procs, i.e. the point global index
         reduce(gpf, ListMaxOp<label>());
 
+        if (debug)
+        {
+            Pout<< "global point indices = " << gpf << endl;
+        }
+
         // Extract local data
         forAll(sharedPointAddr, globalPointI)
         {
@@ -293,6 +324,16 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
             {
                 localToGlobalPointMap_[pointID] =
                     gpf[sharedPointAddr[globalPointI]];
+
+                if (debug)
+                {
+                    Pout<< "Updating localToGlobalPointMap[" << pointID << "]:"
+                        << nl << "    globalPointI = " << globalPointI << nl
+                        << "    sharedPointAddr = "
+                        << sharedPointAddr[globalPointI] << nl
+                        << "    gpf = " << gpf[sharedPointAddr[globalPointI]]
+                        << endl;
+                }
             }
         }
     }
@@ -300,8 +341,28 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
 
     if (debug)
     {
+        // Write ownedByThisProc field
+        pointScalarField ownedByThisProc
+        (
+            IOobject
+            (
+                "ownedByThisProc",
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            pMesh,
+            dimensionedScalar("0", dimless, -1)
+        );
+
+        forAll(ownedByThisProc, i)
+        {
+            ownedByThisProc[i] = scalar(int(ownedByThisProc_[i]));
+        }
+        ownedByThisProc.write();
+
         // Write global point index field
-        const pointMesh& pMesh(pointMesh::New(mesh_));
         pointScalarField t
         (
             IOobject

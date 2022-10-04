@@ -41,7 +41,6 @@ SourceFiles
 #define globalPointIndices_H
 
 #include "polyMesh.H"
-#include "globalPoints.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -61,9 +60,6 @@ class globalPointIndices
 
         //- Const reference to the polyMesh
         const polyMesh& mesh_;
-
-        //- Global points object
-        globalPoints globalPoints_;
 
         //- List indicating which points are owned by the current processor
         boolList ownedByThisProc_;
