@@ -512,24 +512,29 @@ bool vertexCentredLinGeomSolid::vertexCentredLinGeomSolid::converged
 
 scalar vertexCentredLinGeomSolid::calculateLineSearchSlope
 (
-    const scalar eta, const vectorField& pointDcorr, const scalar zeta
+    const scalar eta,
+    const vectorField& pointDcorr,
+    pointVectorField& pointD,
+    surfaceTensorField& dualGradDf,
+    surfaceSymmTensorField& dualSigmaf,
+    const scalar zeta
 )
 {
     // Store pointD as we will reset it after changing it
-    pointD().storePrevIter();
+    pointD.storePrevIter();
 
     // Update pointD
 #ifdef OPENFOAMESIORFOUNDATION
-    pointD().primitiveFieldRef() += eta*pointDcorr;
+    pointD.primitiveFieldRef() += eta*pointDcorr;
 #else
-    pointD().internalField() += eta*pointDcorr;
+    pointD.internalField() += eta*pointDcorr;
 #endif
-    pointD().correctBoundaryConditions();
+    pointD.correctBoundaryConditions();
 
     // Calculate gradD at dual faces
-    dualGradDf_ = vfvc::fGrad
+    dualGradDf = vfvc::fGrad
     (
-        pointD(),
+        pointD,
         mesh(),
         dualMesh(),
         dualMeshMap().dualFaceToCell(),
@@ -538,18 +543,89 @@ scalar vertexCentredLinGeomSolid::calculateLineSearchSlope
     );
 
     // Calculate stress at dual faces
-    dualMechanicalPtr_().correct(dualSigmaf_);
+    dualMechanicalPtr_().correct(dualSigmaf);
 
     // Update the source vector
     vectorField source(mesh().nPoints(), vector::zero);
-    pointD().correctBoundaryConditions();
+    pointD.correctBoundaryConditions();
     updateSource(source, dualMeshMap().dualCellToPoint());
 
     // Reset pointD
-    pointD() = pointD().prevIter();
+    pointD = pointD.prevIter();
 
     // Return the slope
     return gSum(pointDcorr & source);
+}
+
+
+scalar vertexCentredLinGeomSolid::calculateLineSearchFactor
+(
+    const scalar rTol, // Slope reduction tolerance
+    const int maxIter, // Maximum number of line search iterations
+    const vectorField& pointDcorr, // Point displacement correction
+    const vectorField& source, // Linear system source
+    const scalar zeta // Discretisation parameter
+)
+{
+    // Calculate initial slope
+    const scalar s0 = gSum(pointDcorr & source);
+
+    // Set initial line search parameter
+    scalar eta = 1.0;
+    int lineSearchIter = 0;
+
+    // Perform backtracking to find suitable eta
+    do
+    {
+        lineSearchIter++;
+
+        // Calculate slope at eta
+        const scalar s1 = calculateLineSearchSlope
+        (
+            eta, pointDcorr, pointD(), dualGradDf_, dualSigmaf_, zeta
+        );
+
+        // Calculate ratio of s1 to s0
+        const scalar r = s1/s0;
+
+        if (mag(r) < rTol)
+        {
+            break;
+        }
+        else
+        {
+            // Interpolate/extrapolate to find new eta
+            // Limit it to be less than 10
+            //eta = min(-1/(r - 1), 10);
+
+            if (r < 0)
+            {
+                // Simple back tracking
+                eta *= 0.5;
+            }
+            else
+            {
+                // Extrapolate
+                eta = min(-1/(r - 1), 10);
+            }
+        }
+
+        if (lineSearchIter == maxIter)
+        {
+            Warning
+                << "Max line search iterations reached!" << endl;
+        }
+    }
+    while (lineSearchIter < maxIter);
+
+    // Update pointD and re-calculate source, then calculate s
+    if (mag(eta - 1) > SMALL)
+    {
+        Info<< "        line search parameter = " << eta
+            << ", iter = " << lineSearchIter << endl;
+    }
+
+    return eta;
 }
 
 
@@ -936,11 +1012,13 @@ bool vertexCentredLinGeomSolid::evolve()
         // Update point displacement field
         if (Switch(solidModelDict().lookup("lineSearch")))
         {
-            // Set target tolerance for slope reduction
+            // Lookup target tolerance for slope reduction
             const scalar rTol
             (
                 solidModelDict().lookupOrDefault<scalar>("lineSearchRTol", 0.8)
             );
+
+            // Lookup the maximum number of line search iterations
             const int maxIter
             (
                 solidModelDict().lookupOrDefault<scalar>
@@ -949,64 +1027,16 @@ bool vertexCentredLinGeomSolid::evolve()
                 )
             );
 
-            // Calculate initial slope
-            const scalar s0 = gSum(pointDcorr & source);
-            //Info<< "s0 = " << s0 << endl;
-
-            // Set initial line search parameter
-            scalar eta = 1.0;
-            int lineSearchIter = 0;
-
-            // Perform backtracking to find suitable eta
-            do
-            {
-                lineSearchIter++;
-
-                // Calculate slope at eta
-                const scalar s1 = calculateLineSearchSlope
+            // Calculate line search factor
+            const scalar eta
+            (
+                calculateLineSearchFactor
                 (
-                    eta, pointDcorr, zeta
-                );
+                    rTol, maxIter, pointDcorr, source, zeta
+                )
+            );
 
-                // Calculate ratio of s1 to s0
-                const scalar r = s1/s0;
-
-                if (mag(r) < rTol)
-                {
-                    break;
-                }
-                else
-                {
-                    // Interpolate/extrapolate to find new eta
-                    // Limit it to be less than 10
-                    //eta = min(-1/(r - 1), 10);
-
-                    if (r < 0)
-                    {
-                        // Simple back tracking
-                        eta *= 0.5;
-                    }
-                    else
-                    {
-                        // Extrapolate
-                        eta = min(-1/(r - 1), 10);
-                    }
-                }
-
-                if (lineSearchIter == maxIter)
-                {
-                    Warning
-                        << "Max line search iterations reached!" << endl;
-                }
-            }
-            while (lineSearchIter < maxIter);
-
-            // Update pointD and re-calculate source, then calculate s
-            if (mag(eta - 1) > SMALL)
-            {
-                Info<< "        line search parameter = " << eta
-                    << ", iter = " << lineSearchIter << endl;
-            }
+            // Update displacement field
 #ifdef OPENFOAMESIORFOUNDATION
             pointD().primitiveFieldRef() += eta*pointDcorr;
 #else

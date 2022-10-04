@@ -172,7 +172,21 @@ class vertexCentredLinGeomSolid
         //- Calculate line search slope for the given eta parameter
         scalar calculateLineSearchSlope
         (
-            const scalar eta, const vectorField& pointDcorr, const scalar alpha
+            const scalar eta,
+            const vectorField& pointDcorr,
+            pointVectorField& pointD,
+            surfaceTensorField& dualGradDf,
+            surfaceSymmTensorField& dualSigmaf,
+            const scalar zeta
+        );
+
+        scalar calculateLineSearchFactor
+        (
+            const scalar rTol, // Slope reduction tolerance
+            const int maxIter, // Maximum number of line search iterations
+            const vectorField& pointDcorr, // Point displacement correction
+            const vectorField& source, // Linear system source
+            const scalar zeta // Discretisation parameter
         );
 
         //- Disallow default bitwise copy construct
