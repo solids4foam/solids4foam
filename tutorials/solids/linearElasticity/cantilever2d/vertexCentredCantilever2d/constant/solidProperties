@@ -45,7 +45,7 @@ solidModel     vertexCentredLinearGeometry;
     lineSearchRTol 0.5;
 
     // Use PETSc, else use Eigen SparseLU
-    usePETSc no;
+    usePETSc yes;
     optionsFile "$FOAM_CASE/petscOptions";
 }
 

@@ -93,6 +93,19 @@ class cantileverAnalyticalSolution
         //- Second moment of area
         const scalar I_;
 
+        //- Calculate cell displacement fields
+        const Switch cellDisplacement_;
+
+        //- Calculate point displacement fields
+        const Switch pointDisplacement_;
+
+        //- Calculate cell stress fields
+        const Switch cellStress_;
+
+        //- Calculate point stress fields
+        const Switch pointStress_;
+
+
     // Private Member Functions
 
         //- Write data

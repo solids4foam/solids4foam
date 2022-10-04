@@ -72,6 +72,7 @@ bool Foam::cantileverAnalyticalSolution::writeData()
     const pointField& points = mesh.points();
 
     // Cell analytical fields
+    if (cellDisplacement_ || cellStress_)
     {
         // Analytical stress field
         volSymmTensorField analyticalStress
@@ -110,9 +111,17 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
         forAll(sI, cellI)
         {
-            sI[cellI] = cantileverStress(CI[cellI], P_, E_, nu_, L_, D_, I_);
-            aDI[cellI] =
-                cantileverDisplacement(CI[cellI], P_, E_, nu_, L_, D_, I_);
+            if (cellStress_)
+            {
+                sI[cellI] =
+                    cantileverStress(CI[cellI], P_, E_, nu_, L_, D_, I_);
+            }
+
+            if (cellDisplacement_)
+            {
+                aDI[cellI] =
+                    cantileverDisplacement(CI[cellI], P_, E_, nu_, L_, D_, I_);
+            }
         }
 
         forAll(analyticalStress.boundaryField(), patchI)
@@ -130,24 +139,44 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
                 forAll(sP, faceI)
                 {
-                    sP[faceI] =
-                        cantileverStress(CP[faceI], P_, E_, nu_, L_, D_, I_);
-                    aDP[faceI] =
-                        cantileverDisplacement(CP[faceI], P_, E_, nu_, L_, D_, I_);
+                    if (cellStress_)
+                    {
+                        sP[faceI] =
+                            cantileverStress
+                            (
+                                CP[faceI], P_, E_, nu_, L_, D_, I_
+                            );
+                    }
+
+                    if (cellDisplacement_)
+                    {
+                        aDP[faceI] =
+                            cantileverDisplacement
+                            (
+                                CP[faceI], P_, E_, nu_, L_, D_, I_
+                            );
+                    }
                 }
             }
         }
 
-        // Write out the cell analytical field
-        Info<< "Writing analytical stress field (analyticalCellStress)"
-            << endl;
-        analyticalStress.write();
-        Info<< "Writing analytical stress field (analyticalCellStress)"
-            << endl;
-        analyticalD.write();
+        // Write out the cell analytical fields
+        if (cellStress_)
+        {
+            Info<< "Writing analyticalCellStress field"
+                << nl << endl;
+            analyticalStress.write();
+        }
+
+        if (cellDisplacement_)
+        {
+            Info<< "Writing analyticalCellStress field"
+                << nl << endl;
+            analyticalD.write();
+        }
 
 
-        if (mesh.foundObject<volSymmTensorField>("sigma"))
+        if (cellStress_ && mesh.foundObject<volSymmTensorField>("sigma"))
         {
             const volSymmTensorField& sigma =
                 mesh.lookupObject<volSymmTensorField>("sigma");
@@ -174,11 +203,11 @@ bool Foam::cantileverAnalyticalSolution::writeData()
                     << "    " << gAverage(mag(diffI))
                     << " " << Foam::sqrt(gAverage(magSqr(diffI)))
                     << " " << gMax(mag(diffI))
-                    << endl;
+                    << nl << endl;
             }
         }
 
-        if (mesh.foundObject<volVectorField>("D"))
+        if (cellDisplacement_ && mesh.foundObject<volVectorField>("D"))
         {
             const volVectorField& D =
                 mesh.lookupObject<volVectorField>("D");
@@ -195,11 +224,12 @@ bool Foam::cantileverAnalyticalSolution::writeData()
                 << "    " << gAverage(mag(diffI))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI)))
                 << " " << gMax(mag(diffI))
-                << endl;
+                << nl << endl;
         }
     }
 
     // Point analytical fields
+    if (pointDisplacement_ || pointStress_)
     {
         pointSymmTensorField analyticalStress
         (
@@ -234,21 +264,42 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
         forAll(sI, pointI)
         {
-            sI[pointI] =
-                cantileverStress(points[pointI], P_, E_, nu_, L_, D_, I_);
-            aDI[pointI] =
-                cantileverDisplacement(points[pointI], P_, E_, nu_, L_, D_, I_);
+            if (pointStress_)
+            {
+                sI[pointI] =
+                    cantileverStress(points[pointI], P_, E_, nu_, L_, D_, I_);
+            }
+
+            if (pointDisplacement_)
+            {
+                aDI[pointI] =
+                    cantileverDisplacement
+                    (
+                        points[pointI], P_, E_, nu_, L_, D_, I_
+                    );
+            }
         }
 
         // Write point analytical fields
-        Info<< "Writing analyticalPointStress"
-            << endl;
-        analyticalStress.write();
-        Info<< "Writing analyticalPointDisplacement"
-            << endl;
-        analyticalD.write();
+        if (pointStress_)
+        {
+            Info<< "Writing analyticalPointStress field"
+                << nl << endl;
+            analyticalStress.write();
+        }
 
-        if (mesh.foundObject<pointVectorField>("pointD"))
+        if (pointDisplacement_)
+        {
+            Info<< "Writing analyticalPointDisplacement field"
+                << nl << endl;
+            analyticalD.write();
+        }
+
+        if
+        (
+            pointDisplacement_
+         && mesh.foundObject<pointVectorField>("pointD")
+        )
         {
             const pointVectorField& pointD =
                 mesh.lookupObject<pointVectorField>("pointD");
@@ -265,7 +316,7 @@ bool Foam::cantileverAnalyticalSolution::writeData()
                 << "    " << gAverage(mag(diffI))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI)))
                 << " " << gMax(mag(diffI))
-                << endl;
+                << nl << endl;
         }
     }
 
@@ -289,7 +340,23 @@ Foam::cantileverAnalyticalSolution::cantileverAnalyticalSolution
     nu_(readScalar(dict.lookup("nu"))),
     L_(readScalar(dict.lookup("L"))),
     D_(readScalar(dict.lookup("D"))),
-    I_(Foam::pow(D_, 3.0)/12.0)
+    I_(Foam::pow(D_, 3.0)/12.0),
+    cellDisplacement_
+    (
+        dict.lookupOrDefault<Switch>("cellDisplacement", true)
+    ),
+    pointDisplacement_
+    (
+        dict.lookupOrDefault<Switch>("pointDisplacement", true)
+    ),
+    cellStress_
+    (
+        dict.lookupOrDefault<Switch>("cellStress", true)
+    ),
+    pointStress_
+    (
+        dict.lookupOrDefault<Switch>("pointStress", true)
+    )
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 
@@ -336,7 +403,7 @@ bool Foam::cantileverAnalyticalSolution::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::cantileverAnalyticalSolution::write()
 {
-    return writeData();
+    return true;
 }
 #endif
 

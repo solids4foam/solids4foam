@@ -4,7 +4,7 @@
 
 # Iterative solver settings
 # Preconditioner and settings
--pc_type bjacobi
+#-pc_type bjacobi
 -sub_pc_type ilu
 -sub_pc_factor_levels 1
 #-pc_type gamg

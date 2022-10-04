@@ -60,6 +60,10 @@ functions
         nu 0.3;
         L 2;
         D 0.1;
+        cellDisplacement no;
+        pointDisplacement yes;
+        cellStress yes;
+        pointStress no;
     }
 }
 // ************************************************************************* //
