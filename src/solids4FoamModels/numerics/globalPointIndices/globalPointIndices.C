@@ -233,8 +233,10 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
         {
             const processorPolyPatch& procPatch =
                 refCast<const processorPolyPatch>(mesh_.boundaryMesh()[patchI]);
+            #ifndef FOAMEXTEND
             const processorPointPatch& procPointPatch =
                 refCast<const processorPointPatch>(pMesh.boundary()[patchI]);
+            #endif
 
             const label neiProcNo = procPatch.neighbProcNo();
 
