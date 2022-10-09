@@ -87,6 +87,19 @@ class plateHoleAnalyticalSolution
         //- Poisson's ratio
         const scalar nu_;
 
+        //- Calculate cell displacement fields
+        const Switch cellDisplacement_;
+
+        //- Calculate point displacement fields
+        const Switch pointDisplacement_;
+
+        //- Calculate cell stress fields
+        const Switch cellStress_;
+
+        //- Calculate point stress fields
+        const Switch pointStress_;
+
+
     // Private Member Functions
 
         //- Analytical stress solution

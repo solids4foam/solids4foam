@@ -170,7 +170,7 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
         if (cellDisplacement_)
         {
-            Info<< "Writing analyticalCellStress field"
+            Info<< "Writing analyticalD field"
                 << nl << endl;
             analyticalD.write();
         }

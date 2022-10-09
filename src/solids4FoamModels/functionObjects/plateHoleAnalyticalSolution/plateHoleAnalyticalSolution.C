@@ -160,6 +160,7 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
     }
 
     // Cell analytical fields
+    if (cellDisplacement_ || cellStress_)
     {
         // Analytical stress field
         volSymmTensorField analyticalStress
@@ -198,8 +199,15 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
 
         forAll(sI, cellI)
         {
-            sI[cellI] = plateHoleStress(CI[cellI]);
-            aDI[cellI] = plateHoleDisplacement(CI[cellI], sI[cellI]);
+            if (cellStress_)
+            {
+                sI[cellI] = plateHoleStress(CI[cellI]);
+            }
+
+            if (cellDisplacement_)
+            {
+                aDI[cellI] = plateHoleDisplacement(CI[cellI], sI[cellI]);
+            }
         }
 
         forAll(analyticalStress.boundaryField(), patchI)
@@ -217,22 +225,37 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
 
                 forAll(sP, faceI)
                 {
-                    sP[faceI] = plateHoleStress(CP[faceI]);
-                    aDP[faceI] = plateHoleDisplacement(CP[faceI], sP[faceI]);
+                    if (cellStress_)
+                    {
+                        sP[faceI] = plateHoleStress(CP[faceI]);
+                    }
+
+                    if (cellDisplacement_)
+                    {
+                        aDP[faceI] =
+                            plateHoleDisplacement(CP[faceI], sP[faceI]);
+                    }
                 }
             }
         }
 
         // Write out the cell analytical field
-        Info<< "Writing analytical stress field (analyticalCellStress)"
-            << endl;
-        analyticalStress.write();
-        Info<< "Writing analytical stress field (analyticalCellStress)"
-            << endl;
-        analyticalD.write();
+        if (cellStress_)
+        {
+            Info<< "Writing analyticalCellStress field"
+                << nl << endl;
+            analyticalStress.write();
+        }
+
+        if (cellDisplacement_)
+        {
+            Info<< "Writing analyticalD field"
+                << nl << endl;
+            analyticalD.write();
+        }
 
 
-        if (mesh.foundObject<volSymmTensorField>("sigma"))
+        if (cellStress_ && mesh.foundObject<volSymmTensorField>("sigma"))
         {
             const volSymmTensorField& sigma =
                 mesh.lookupObject<volSymmTensorField>("sigma");
@@ -260,11 +283,11 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
                     << "    " << gAverage(mag(diffIcmptI))
                     << " " << Foam::sqrt(gAverage(magSqr(diffIcmptI)))
                     << " " << gMax(mag(diffIcmptI))
-                    << endl;
+                    << nl << endl;
             }
         }
 
-        if (mesh.foundObject<volVectorField>("D"))
+        if (cellDisplacement_ && mesh.foundObject<volVectorField>("D"))
         {
             const volVectorField& D =
                 mesh.lookupObject<volVectorField>("D");
@@ -281,11 +304,12 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
                 << "    " << gAverage(mag(diffI))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI)))
                 << " " << gMax(mag(diffI))
-                << endl;
+                << nl << endl;
         }
     }
 
     // Point analytical fields
+    if (pointDisplacement_ || pointStress_)
     {
         pointSymmTensorField analyticalStress
         (
@@ -320,19 +344,37 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
 
         forAll(sI, pointI)
         {
-            sI[pointI] = plateHoleStress(points[pointI]);
-            aDI[pointI] = plateHoleDisplacement(points[pointI], sI[pointI]);
+            if (pointStress_)
+            {
+                sI[pointI] = plateHoleStress(points[pointI]);
+            }
+
+            if (pointDisplacement_)
+            {
+                aDI[pointI] = plateHoleDisplacement(points[pointI], sI[pointI]);
+            }
         }
 
         // Write point analytical fields
-        Info<< "Writing analyticalPointStress"
-            << endl;
-        analyticalStress.write();
-        Info<< "Writing analyticalPointDisplacement"
-            << endl;
-        analyticalD.write();
+        if (pointStress_)
+        {
+            Info<< "Writing analyticalPointStress"
+                << nl << endl;
+            analyticalStress.write();
+        }
 
-        if (mesh.foundObject<pointVectorField>("pointD"))
+        if (pointDisplacement_)
+        {
+            Info<< "Writing analyticalPointDisplacement"
+                << nl << endl;
+            analyticalD.write();
+        }
+
+        if
+        (
+            pointDisplacement_
+         && mesh.foundObject<pointVectorField>("pointD")
+        )
         {
             const pointVectorField& pointD =
                 mesh.lookupObject<pointVectorField>("pointD");
@@ -349,7 +391,7 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
                 << "    " << gAverage(mag(diffI))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI)))
                 << " " << gMax(mag(diffI))
-                << endl;
+                << nl << endl;
         }
     }
 
@@ -371,7 +413,23 @@ Foam::plateHoleAnalyticalSolution::plateHoleAnalyticalSolution
     T_(readScalar(dict.lookup("farFieldTractionX"))),
     holeR_(readScalar(dict.lookup("holeRadius"))),
     E_(readScalar(dict.lookup("E"))),
-    nu_(readScalar(dict.lookup("nu")))
+    nu_(readScalar(dict.lookup("nu"))),
+    cellDisplacement_
+    (
+        dict.lookupOrDefault<Switch>("cellDisplacement", true)
+    ),
+    pointDisplacement_
+    (
+        dict.lookupOrDefault<Switch>("pointDisplacement", true)
+    ),
+    cellStress_
+    (
+        dict.lookupOrDefault<Switch>("cellStress", true)
+    ),
+    pointStress_
+    (
+        dict.lookupOrDefault<Switch>("pointStress", true)
+    )
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 
@@ -418,7 +476,7 @@ bool Foam::plateHoleAnalyticalSolution::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::plateHoleAnalyticalSolution::write()
 {
-    return writeData();
+    return true;
 }
 #endif
 

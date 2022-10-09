@@ -41,7 +41,6 @@ SourceFiles
 #ifndef analyticalPlateHoleTractionFvPatchVectorField_H
 #define analyticalPlateHoleTractionFvPatchVectorField_H
 
-#include "foamTime.H"
 #include "fvPatchFields.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "Switch.H"
