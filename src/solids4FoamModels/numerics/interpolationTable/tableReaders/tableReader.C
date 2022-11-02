@@ -39,6 +39,17 @@ Foam::autoPtr<Foam::tableReader<Type>> Foam::tableReader<Type>::New
         "openFoam"
     );
 
+    
+ #if OPENFOAM > 2205    
+    auto* cstrIter =  dictionaryConstructorTable(readerType);
+     if(!cstrIter)  {
+        FatalErrorIn( "solidModel::New(Time&, const word&)")   << "Unknown reader type " << readerType
+            << endl << endl   << "Valid reader are :" << endl
+            << dictionaryConstructorTablePtr_->toc()    << exit(FatalError);
+    }
+    return autoPtr<tableReader>(cstrIter(spec));
+#else    
+    
     typename dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_
             ->find(readerType);
@@ -54,6 +65,7 @@ Foam::autoPtr<Foam::tableReader<Type>> Foam::tableReader<Type>::New
     }
 
     return autoPtr<tableReader<Type>>(cstrIter()(spec));
+#endif
 }
 
 
