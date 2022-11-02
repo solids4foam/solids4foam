@@ -50,6 +50,9 @@ SourceFiles
 #include "Tuple2.H"
 #include "labelPair.H"
 
+#if OPENFOAM > 2205
+#include "Switch.H"
+#endif
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
