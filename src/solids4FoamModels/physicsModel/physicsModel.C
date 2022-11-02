@@ -104,37 +104,30 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New
 
     // For backwards compatibility, update names
     // This means the user can equivalently select "solid" or "solidModel", etc.
-    if (physicsModelTypeName == "solid")
-    {
-        physicsModelTypeName = "solidModel";
-    }
-    else if (physicsModelTypeName == "fluid")
-    {
-        physicsModelTypeName = "fluidModel";
-    }
-    else if (physicsModelTypeName == "fluidSolidInteraction")
-    {
-        physicsModelTypeName = "fluidSolidInterface";
-    }
+    if (physicsModelTypeName == "solid")   {  physicsModelTypeName = "solidModel";   }
+    else if (physicsModelTypeName == "fluid") { physicsModelTypeName = "fluidModel";  }
+    else if (physicsModelTypeName == "fluidSolidInteraction")  { physicsModelTypeName = "fluidSolidInterface";  }
 
     Info<< "Selecting physicsModel " << physicsModelTypeName << endl;
-
+#if OPENFOAM > 2005    
+    auto* cstrIter = physicsModelConstructorTable(physicsModelTypeName);
+    if (!cstrIter) {
+            FatalErrorIn ( "physicsModel::New(Time&)")   << "Unknown physicsModel type " << physicsModelTypeName
+                << endl << endl  << "Valid physicsModel types are :" << endl   << physicsModelConstructorTablePtr_->toc()
+                << exit(FatalError);
+        }
+     return autoPtr<physicsModel>(cstrIter(runTime, region));   
+#else    
     physicsModelConstructorTable::iterator cstrIter =
         physicsModelConstructorTablePtr_->find(physicsModelTypeName);
 
-    if (cstrIter == physicsModelConstructorTablePtr_->end())
-    {
-        FatalErrorIn
-        (
-            "physicsModel::New(Time&)"
-        )   << "Unknown physicsModel type " << physicsModelTypeName
-            << endl << endl
-            << "Valid physicsModel types are :" << endl
-            << physicsModelConstructorTablePtr_->toc()
+    if (cstrIter == physicsModelConstructorTablePtr_->end()) {
+        FatalErrorIn( "physicsModel::New(Time&)" )   << "Unknown physicsModel type " << physicsModelTypeName
+            << endl << endl   << "Valid physicsModel types are :" << endl   << physicsModelConstructorTablePtr_->toc()
             << exit(FatalError);
     }
-
     return autoPtr<physicsModel>(cstrIter()(runTime, region));
+#endif    
 }
 
 
