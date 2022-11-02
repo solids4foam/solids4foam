@@ -39,6 +39,9 @@ Description
 #include "demandDrivenData.H"
 #include "cyclicPolyPatch.H"
 #include "dynamicFvMesh.H"
+#if OPENFOAM> 2205
+#include "processorPolyPatch.H"
+#endif
 #if FOAMEXTEND
     #include "oversetPolyPatch.H"
 #endif

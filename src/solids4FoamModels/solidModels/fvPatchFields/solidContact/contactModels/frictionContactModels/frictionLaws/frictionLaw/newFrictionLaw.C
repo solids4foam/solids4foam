@@ -46,14 +46,25 @@ autoPtr<frictionLaw> frictionLaw::New
 )
 {
     Info<< "        Friction law: " << name << endl;
-
-    dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(name);
-
-    if (cstrIter == dictionaryConstructorTablePtr_->end())
-    {
-        FatalIOErrorIn
-        (
+#if OPENFOAM> 2205
+   auto* cstrIter =  dictionaryConstructorTable(name);
+    if (!cstrIter) {   FatalIOErrorIn(
+            "frictionLaw::New(\n"
+            "    const word& name,\n"
+            "    const frictionContactModel& fricModel,\n"
+            "    const dictionary& dict\n"
+            ")",
+            dict
+        )   << "Unknown frictionLaw type "
+            << name << endl << endl
+            << "Valid  frictionLaws are : " << endl
+            << dictionaryConstructorTablePtr_->toc()
+            << exit(FatalIOError);
+    }
+    return autoPtr<frictionLaw>(cstrIter(name, fricModel, dict));
+#else      
+    dictionaryConstructorTable::iterator cstrIter =  dictionaryConstructorTablePtr_->find(name);
+    if (cstrIter == dictionaryConstructorTablePtr_->end())  {    FatalIOErrorIn   (
             "frictionLaw::New(\n"
             "    const word& name,\n"
             "    const frictionContactModel& fricModel,\n"
@@ -68,6 +79,7 @@ autoPtr<frictionLaw> frictionLaw::New
     }
 
     return autoPtr<frictionLaw>(cstrIter()(name, fricModel, dict));
+#endif
 }
 
 

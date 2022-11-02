@@ -909,23 +909,25 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
     }
 
     Info<< nl << "Selecting fluidModel " << fluidModelTypeName << endl;
-
+#if OPENFOAM >2205    
+   auto* cstrIter = dictionaryConstructorTable(fluidModelTypeName);
+    if (!cstrIter)    {
+        FatalErrorIn("fluidModel::New(Time&, const word&)")   << "Unknown fluidModel type " << fluidModelTypeName
+            << endl << endl << "Valid fluidModel types are :" << endl
+            << dictionaryConstructorTablePtr_->toc()   << exit(FatalError);
+    }
+return autoPtr<fluidModel>(cstrIter(runTime, region));
+#else
     dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_->find(fluidModelTypeName);
 
-    if (cstrIter == dictionaryConstructorTablePtr_->end())
-    {
-        FatalErrorIn
-        (
-            "fluidModel::New(Time&, const word&)"
-        )   << "Unknown fluidModel type " << fluidModelTypeName
-            << endl << endl
-            << "Valid fluidModel types are :" << endl
-            << dictionaryConstructorTablePtr_->toc()
-            << exit(FatalError);
+    if (cstrIter == dictionaryConstructorTablePtr_->end())  {
+        FatalErrorIn       (            "fluidModel::New(Time&, const word&)" )   << "Unknown fluidModel type " << fluidModelTypeName
+            << endl << endl            << "Valid fluidModel types are :" << endl
+            << dictionaryConstructorTablePtr_->toc()        << exit(FatalError);
     }
-
     return autoPtr<fluidModel>(cstrIter()(runTime, region));
+#endif
 }
 
 

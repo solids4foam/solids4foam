@@ -41,7 +41,7 @@ ifdef PETSC_DIR
     VERSION_SPECIFIC_INC += \
         $(PINC) -I$(PETSC_DIR)/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include \
         -DUSE_PETSC
-    VERSION_SPECIFIC_LIBS += -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lpetsc
+    VERSION_SPECIFIC_LIBS += -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lpetscFoam
 endif
 
 ifdef S4F_NO_USE_EIGEN
@@ -111,4 +111,5 @@ LIB_LIBS = \
     -ldynamicFvMesh \
     -ldynamicMesh \
     -lmeshTools \
-    -ltopoChangerFvMesh
+    -ltopoChangerFvMesh \
+    -lpetscFoam

@@ -75,26 +75,22 @@ Foam::interfaceToInterfaceMapping::New
 )
 {
     Info<< "Selecting interfaceToInterfaceMapping " << type << endl;
-
-    dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(type);
-
-    if (cstrIter == dictionaryConstructorTablePtr_->end())
-    {
-        FatalErrorIn
-        (
-            "interfaceToInterfaceMapping::New(Time&, const word&)"
-        )   << "Unknown interfaceToInterfaceMapping type " << type
-            << endl << endl
-            << "Valid interfaceToInterfaceMapping types are :" << endl
-            << dictionaryConstructorTablePtr_->toc()
-            << exit(FatalError);
+#if OPENFOAM >2205   
+  auto* cstrIter = dictionaryConstructorTable(type);
+    if (!cstrIter){FatalErrorIn("interfaceToInterfaceMapping::New(Time&, const word&)")   << "Unknown interfaceToInterfaceMapping type " << type
+            << endl << endl  << "Valid interfaceToInterfaceMapping types are :" << endl
+            << dictionaryConstructorTablePtr_->toc()  << exit(FatalError);
     }
-
-    return autoPtr<interfaceToInterfaceMapping>
-    (
-        cstrIter()(type, dict, patchA, patchB, zoneA, zoneB)
-    );
+return autoPtr<interfaceToInterfaceMapping> (cstrIter(type, dict, patchA, patchB, zoneA, zoneB));
+#else
+    dictionaryConstructorTable::iterator cstrIter =  dictionaryConstructorTablePtr_->find(type);
+    if (cstrIter == dictionaryConstructorTablePtr_->end()){
+        FatalErrorIn( "interfaceToInterfaceMapping::New(Time&, const word&)")   << "Unknown interfaceToInterfaceMapping type " << type
+            << endl << endl       << "Valid interfaceToInterfaceMapping types are :" << endl
+            << dictionaryConstructorTablePtr_->toc()      << exit(FatalError);
+    }
+    return autoPtr<interfaceToInterfaceMapping>( cstrIter()(type, dict, patchA, patchB, zoneA, zoneB));
+    #endif
 }
 
 

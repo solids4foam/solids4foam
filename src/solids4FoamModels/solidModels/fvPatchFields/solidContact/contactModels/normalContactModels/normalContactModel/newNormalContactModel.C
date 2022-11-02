@@ -50,7 +50,40 @@ autoPtr<normalContactModel> normalContactModel::New
 )
 {
     Info<< "    Normal contact model: " << name << endl;
+#if OPENFOAM> 2205
+   auto* cstrIter =  dictionaryConstructorTable(name);
+    if (!cstrIter) {
+        FatalIOErrorIn(
+            "normalContactModel::New(\n"
+            "    const word& name,\n"
+            "    const fvPatch& patch,\n"
+            "    const dictionary& dict,\n"
+            "    const label masterPatchID,\n"
+            "    const label slavePatchID,\n"
+            "    const standAlonePatch& masterFaceZonePatch,\n"
+            "    const standAlonePatch& slaveFaceZonePatch\n"
+            ")",
+            dict
+        )   << "Unknown normalContactModel type "
+            << name << endl << endl
+            << "Valid  normalContactModels are : " << endl
+            << dictionaryConstructorTablePtr_->toc()
+            << exit(FatalIOError);
+    }
 
+    return autoPtr<normalContactModel>(cstrIter (
+            name,
+            patch,
+            dict,
+            masterPatchID,
+            slavePatchID,
+            masterFaceZonePatch,
+            slaveFaceZonePatch
+        )
+    );
+    
+ 
+#else
     dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_->find(name);
 
@@ -88,6 +121,7 @@ autoPtr<normalContactModel> normalContactModel::New
             slaveFaceZonePatch
         )
     );
+#endif
 }
 
 

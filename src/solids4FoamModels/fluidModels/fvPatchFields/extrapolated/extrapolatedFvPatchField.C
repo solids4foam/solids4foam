@@ -31,7 +31,9 @@ License
 #include "scalarMatrices.H"
 #include "volFields.H"
 #include "skewCorrectionVectors.H"
-
+#if OPENFOAM> 2205
+#include "processorPolyPatch.H"
+#endif
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam

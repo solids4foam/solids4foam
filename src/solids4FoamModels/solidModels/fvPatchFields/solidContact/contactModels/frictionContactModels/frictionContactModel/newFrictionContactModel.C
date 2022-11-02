@@ -48,14 +48,36 @@ autoPtr<frictionContactModel> frictionContactModel::New
 )
 {
     Info<< "    Friction contact model: " << name << endl;
-
-    dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(name);
-
-    if (cstrIter == dictionaryConstructorTablePtr_->end())
-    {
-        FatalIOErrorIn
-        (
+#if OPENFOAM> 2205
+   auto* cstrIter =  dictionaryConstructorTable(name);
+    if (!cstrIter) {     FatalIOErrorIn(
+            "frictionContactModel::New(\n"
+            "    const word& name,\n"
+            "    const fvPatch& patch,\n"
+            "    const dictionary& dict,\n"
+            "    const label masterPatchID,\n"
+            "    const label slavePatchID\n"
+            ")",
+            dict
+        )   << "Unknown frictionContactModel type "
+            << name << endl << endl
+            << "Valid  frictionContactModels are : " << endl
+            << dictionaryConstructorTablePtr_->toc()
+            << exit(FatalIOError);
+    }
+    return autoPtr<frictionContactModel> (  cstrIter(
+            name,
+            patch,
+            dict,
+            masterPatchID,
+            slavePatchID
+        )
+    );
+#else
+    
+    dictionaryConstructorTable::iterator cstrIter =    dictionaryConstructorTablePtr_->find(name);
+    if (cstrIter == dictionaryConstructorTablePtr_->end())  {
+        FatalIOErrorIn    (
             "frictionContactModel::New(\n"
             "    const word& name,\n"
             "    const fvPatch& patch,\n"
@@ -71,10 +93,8 @@ autoPtr<frictionContactModel> frictionContactModel::New
             << exit(FatalIOError);
     }
 
-    return autoPtr<frictionContactModel>
-    (
-        cstrIter()
-        (
+    return autoPtr<frictionContactModel> (
+        cstrIter()  (
             name,
             patch,
             dict,
@@ -82,6 +102,7 @@ autoPtr<frictionContactModel> frictionContactModel::New
             slavePatchID
         )
     );
+#endif
 }
 
 
