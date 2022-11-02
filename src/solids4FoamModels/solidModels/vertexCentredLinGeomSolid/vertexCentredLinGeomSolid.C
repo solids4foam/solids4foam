@@ -1180,9 +1180,12 @@ void vertexCentredLinGeomSolid::setTraction
     // Get point field on patch
     const vectorField traction
     (
-        globalPatches()[interfaceI].interpolator().faceToPointInterpolate
+        globalPatches()[interfaceI].globalPointToPatch
         (
-            globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction)
+            globalPatches()[interfaceI].interpolator().faceToPointInterpolate
+            (
+                faceZoneTraction
+            )()
         )
     );
 
@@ -1212,55 +1215,6 @@ void vertexCentredLinGeomSolid::setTraction
         )   << "Boundary condition "
             << ptPatch.type()
             << " for point patch " << ptPatch.patch().name()
-            << " should instead be type "
-            << solidTractionPointPatchVectorField::typeName
-            << abort(FatalError);
-    }
-}
-
-
-void vertexCentredLinGeomSolid::setPressure
-(
-    const label interfaceI,
-    const label patchID,
-    const scalarField& faceZonePressure
-)
-{
-    // Get patch field
-    const scalarField pressure
-    (
-        globalPatches()[interfaceI].interpolator().faceToPointInterpolate
-        (
-            globalPatches()[interfaceI].globalFaceToPatch(faceZonePressure)
-        )
-    );
-
-    // Lookup point patch field
-#ifdef OPENFOAMESIORFOUNDATION
-    pointPatchVectorField& ptPatch = pointD().boundaryFieldRef()[patchID];
-#else
-    pointPatchVectorField& ptPatch = pointD().boundaryField()[patchID];
-#endif
-
-    if (ptPatch.type() == solidTractionPointPatchVectorField::typeName)
-    {
-        solidTractionPointPatchVectorField& patchD =
-            refCast<solidTractionPointPatchVectorField>(ptPatch);
-
-        patchD.pressure() = pressure;
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            "void Foam::vertexCentredLinGeomSolid::setPressure\n"
-            "(\n"
-            "    fvPatchVectorField& pressurePatch,\n"
-            "    const vectorField& pressure\n"
-            ")"
-        )   << "Boundary condition "
-            << ptPatch.type()
-            << "for patch" << ptPatch.patch().name()
             << " should instead be type "
             << solidTractionPointPatchVectorField::typeName
             << abort(FatalError);
