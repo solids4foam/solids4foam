@@ -523,7 +523,7 @@ bool sonicLiquidFluid::evolve()
 #ifdef OPENFOAMFOUNDATION
         if (!pimple().simpleRho())
         {
-                solveRhoEqn();
+            solveRhoEqn();
         }
 #else
         solveRhoEqn();
@@ -576,7 +576,7 @@ bool sonicLiquidFluid::evolve()
         while (pimple().correct())
         {
 #ifdef OPENFOAMESIORFOUNDATION
-            solvePEqn(tUEqn.ref());
+            solvePEqn(tUEqn.cref());
 #else
             solvePEqn(UEqn);
 #endif
