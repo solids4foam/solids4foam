@@ -88,6 +88,15 @@ unsLinGeomSolid::unsLinGeomSolid
 {
     DisRequired();
 
+    // Force all required old-time fields to be created
+    fvm::d2dt2(D());
+
+    // For consistent restarts, we will calculate the gradient field
+    D().correctBoundaryConditions();
+    D().storePrevIter();
+    mechanical().interpolate(D(), pointD(), false);
+    mechanical().grad(D(), pointD(), gradD(), gradDf_);
+
     // Store old times
     gradDf_.oldTime();
     sigmaf_.oldTime();
