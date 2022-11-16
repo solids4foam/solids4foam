@@ -40,7 +40,8 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
+fixedDisplacementZeroShearPointPatchVectorField::
+fixedDisplacementZeroShearPointPatchVectorField
 (
     const pointPatch& p,
     const DimensionedField<vector, pointMesh>& iF
@@ -52,7 +53,8 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
 {}
 
 
-fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
+fixedDisplacementZeroShearPointPatchVectorField::
+fixedDisplacementZeroShearPointPatchVectorField
 (
     const pointPatch& p,
     const DimensionedField<vector, pointMesh>& iF,
@@ -88,7 +90,7 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
     }
     else
     {
-        refValue = vectorField("value", dict, p.size());
+        refValue = vectorField("refValue", dict, p.size());
     }
 
     //this->updateBoundaryField();
@@ -118,7 +120,8 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
 }
 
 
-fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
+fixedDisplacementZeroShearPointPatchVectorField::
+fixedDisplacementZeroShearPointPatchVectorField
 (
     const fixedDisplacementZeroShearPointPatchVectorField& ptf,
     const pointPatch& p,
@@ -138,7 +141,8 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
 
 
 #ifndef OPENFOAMFOUNDATION
-fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
+fixedDisplacementZeroShearPointPatchVectorField::
+fixedDisplacementZeroShearPointPatchVectorField
 (
     const fixedDisplacementZeroShearPointPatchVectorField& ptf
 )
@@ -150,7 +154,8 @@ fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPoint
 #endif
 
 
-fixedDisplacementZeroShearPointPatchVectorField::fixedDisplacementZeroShearPointPatchVectorField
+fixedDisplacementZeroShearPointPatchVectorField::
+fixedDisplacementZeroShearPointPatchVectorField
 (
     const fixedDisplacementZeroShearPointPatchVectorField& ptf,
     const DimensionedField<vector, pointMesh>& iF
@@ -182,9 +187,6 @@ void fixedDisplacementZeroShearPointPatchVectorField::rmap
 )
 {
     componentMixedPointPatchVectorField::rmap(ptf, addr);
-
-    // const fixedDisplacementZeroShearPointPatchVectorField& tiptf =
-    //   refCast<const fixedDisplacementZeroShearPointPatchVectorField>(ptf);
 }
 
 
@@ -221,12 +223,6 @@ void fixedDisplacementZeroShearPointPatchVectorField::write(Ostream& os) const
         dispSeries_.write(os);
         os << token::END_BLOCK << nl;
     }
-#ifdef FOAMEXTEND
-    else
-    {
-        refValue().writeEntry("value", os);
-    }
-#endif
 }
 
 
