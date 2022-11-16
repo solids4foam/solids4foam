@@ -266,14 +266,6 @@ public:
                 const label patchID,
                 const vectorField& faceZoneTraction
             );
-
-            //- Set traction at specified patch
-            virtual void setPressure
-            (
-                const label interfaceI,
-                const label patchID,
-                const scalarField& faceZonePressure
-            );
 };
 
 

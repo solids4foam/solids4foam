@@ -1856,54 +1856,6 @@ void Foam::solidModel::setTraction
 }
 
 
-void Foam::solidModel::setPressure
-(
-    fvPatchVectorField& pressurePatch,
-    const scalarField& pressure
-)
-{
-    if (pressurePatch.type() == solidTractionFvPatchVectorField::typeName)
-    {
-        solidTractionFvPatchVectorField& patchD =
-            refCast<solidTractionFvPatchVectorField>(pressurePatch);
-
-        patchD.pressure() = pressure;
-    }
-#ifndef OPENFOAMESIORFOUNDATION
-    else if
-    (
-        pressurePatch.type() == blockSolidTractionFvPatchVectorField::typeName
-    )
-    {
-        blockSolidTractionFvPatchVectorField& patchD =
-            refCast<blockSolidTractionFvPatchVectorField>(pressurePatch);
-
-        patchD.pressure() = pressure;
-    }
-#endif
-    else
-    {
-        FatalErrorIn
-        (
-            "void Foam::solidModel::setPressure\n"
-            "(\n"
-            "    fvPatchVectorField& pressurePatch,\n"
-            "    const vectorField& pressure\n"
-            ")"
-        )   << "Boundary condition "
-            << pressurePatch.type()
-            << "for patch" << pressurePatch.patch().name()
-            << " should instead be type "
-            << solidTractionFvPatchVectorField::typeName
-#ifndef OPENFOAMESIORFOUNDATION
-            << " or "
-            << blockSolidTractionFvPatchVectorField::typeName
-#endif
-            << abort(FatalError);
-    }
-}
-
-
 void Foam::solidModel::setTraction
 (
     const label interfaceI,
@@ -1920,26 +1872,6 @@ void Foam::solidModel::setTraction
     setTraction(solutionD().boundaryFieldRef()[patchID], patchTraction);
 #else
     setTraction(solutionD().boundaryField()[patchID], patchTraction);
-#endif
-}
-
-
-void Foam::solidModel::setPressure
-(
-    const label interfaceI,
-    const label patchID,
-    const scalarField& faceZonePressure
-)
-{
-    const scalarField patchPressure
-    (
-        globalPatches()[interfaceI].globalFaceToPatch(faceZonePressure)
-    );
-
-#ifdef OPENFOAMESIORFOUNDATION
-    setPressure(solutionD().boundaryFieldRef()[patchID], patchPressure);
-#else
-    setPressure(solutionD().boundaryField()[patchID], patchPressure);
 #endif
 }
 

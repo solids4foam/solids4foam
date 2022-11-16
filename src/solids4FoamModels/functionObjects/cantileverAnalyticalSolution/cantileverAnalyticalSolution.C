@@ -190,8 +190,8 @@ bool Foam::cantileverAnalyticalSolution::writeData()
 
             for (int cmpt = 0; cmpt < pTraits<symmTensor>::nComponents; cmpt++)
             {
-                // Only calculate for XX and XY
-                if (cmpt != 0 && cmpt != 1)
+                // Only calculate for XX, XY and YY
+                if (cmpt != 0 && cmpt != 1 && cmpt != 3)
                 {
                     continue;
                 }

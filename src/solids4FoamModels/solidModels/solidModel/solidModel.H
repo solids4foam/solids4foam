@@ -648,27 +648,12 @@ public:
                 const vectorField& traction
             );
 
-            //- Set pressure at specified patch
-            virtual void setPressure
-            (
-                fvPatchVectorField& pressurePatch,
-                const scalarField& pressure
-            );
-
             //- Set traction at specified patch
             virtual void setTraction
             (
                 const label interfaceI,
                 const label patchID,
                 const vectorField& faceZoneTraction
-            );
-
-            //- Set traction at specified patch
-            virtual void setPressure
-            (
-                const label interfaceI,
-                const label patchID,
-                const scalarField& faceZonePressure
             );
 
             //- Check if solid model is diverging using the Jacobian field

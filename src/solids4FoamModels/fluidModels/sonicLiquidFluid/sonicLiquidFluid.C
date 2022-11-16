@@ -30,7 +30,7 @@ License
 #include "fvc.H"
 #include "fvm.H"
 #ifdef OPENFOAMESIORFOUNDATION
-        #include "CorrectPhi.H"
+    #include "CorrectPhi.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -75,10 +75,10 @@ void sonicLiquidFluid::solveRhoEqn()
         fvm::ddt(rho_)
       + fvc::div(phi())
 #ifdef OPENFOAMFOUNDATION
-      ==
+     ==
         models().source(rho_)
 #elif OEPNFOAMESI
-      ==
+     ==
         options()(rho_)
 #endif
     );
@@ -523,7 +523,7 @@ bool sonicLiquidFluid::evolve()
 #ifdef OPENFOAMFOUNDATION
         if (!pimple().simpleRho())
         {
-                solveRhoEqn();
+            solveRhoEqn();
         }
 #else
         solveRhoEqn();
@@ -575,15 +575,17 @@ bool sonicLiquidFluid::evolve()
         // --- Pressure corrector loop
         while (pimple().correct())
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMFOUNDATION
             solvePEqn(tUEqn.ref());
+#elif OPENFOAMESI
+            solvePEqn(tUEqn.cref());
 #else
             solvePEqn(UEqn);
 #endif
         }
 
 #ifdef OPENFOAMESIORFOUNDATION
-                tUEqn.clear();
+        tUEqn.clear();
 #endif
 
         gradU() = fvc::grad(U());

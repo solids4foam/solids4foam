@@ -110,9 +110,6 @@ public:
         //- Return density
         virtual tmp<volScalarField> rho() const;
 
-        //- Return bulk modulus
-        virtual tmp<volScalarField> bulkModulus() const;
-
         //- Return density as a scalar
         virtual dimensionedScalar rhoScalar() const;
 
