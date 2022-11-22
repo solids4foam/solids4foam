@@ -26,10 +26,17 @@ Class
     pimpleFluid
 
 Description
-    pimpleDyMFoam fluid model from foam-extend-4.1.
+    pimpleDyMFoam fluid model from foam-extend-4.1 with support for the
+    "elastic" Robin boundary conditions for partitioned FSI as described in:
+
+        Tuković et al. Added Mass Partitioned Fluid–Structure Interaction
+        Solver Based on a Robin Boundary Condition for Pressure. OpenFOAM.
+        2019;1–22.
 
 Author
-    Ported by Philip Cardiff, UCD.
+    Hrvoje Jasak, Wikki Ltd. All rights reserved.
+    Zeljko Tukovic, FSB Zagreb. All rights reserved.
+    Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
     pimpleFluid.foamextend.C
@@ -70,8 +77,17 @@ class pimpleFluid
         //- Fluid density [kg/m3]
         dimensionedScalar rho_;
 
+        //- Acceleration field
+        volVectorField ddtU_;
+
+        //- Velocity field
+        surfaceVectorField Uf_;
+
         //- rAU field
         volScalarField rAU_;
+
+        //- rAUf field
+        surfaceScalarField rAUf_;
 
         //- Reference pressure cell
         label pRefCell_;
@@ -93,16 +109,14 @@ class pimpleFluid
 
     // Private Member Functions
 
-        //- Correct phi function
-        void correctPhi();
+        //- Reset flux if mesh changed
+        void updateRobinFsiInterfaceFlux();
 
-        //- Solve pressure equation
-        void solvePEqn
-        (
-            const scalar& UUrf,
-            const fvVectorMatrix& ddtUEqn,
-            const fvVectorMatrix& HUEqn
-        );
+        //- Update phi for Robin FSI boundary conditions
+        void updateRobinFsiInterface();
+
+        //- Correct phi after solving pressure equation
+        void correctRobinFsiInterfaceFlux();
 
         //- Disallow default bitwise copy construct
         pimpleFluid(const pimpleFluid&);
@@ -115,6 +129,7 @@ public:
 
     //- Runtime type information
     TypeName("pimpleFluid");
+
 
     // Constructors
 
