@@ -499,9 +499,13 @@ bool vertexCentredLinGeomSolid::vertexCentredLinGeomSolid::converged
     }
     else if (iCorr >= nCorr() - 1)
     {
-        Warning
-            << "Max iterations reached within the momentum Newton-Raphson loop"
-            << endl;
+        if (nCorr() > 1)
+        {
+            Warning
+                << "Max iterations reached within the momentum Newton-Raphson "
+                "loop" << endl;
+        }
+
         return true;
     }
 
@@ -1196,7 +1200,7 @@ void vertexCentredLinGeomSolid::setTraction
     pointPatchVectorField& ptPatch = pointD().boundaryField()[patchID];
 #endif
 
-    if (ptPatch.type() == solidTractionPointPatchVectorField::typeName)
+    if (isA<solidTractionPointPatchVectorField>(ptPatch))
     {
         solidTractionPointPatchVectorField& patchD =
             refCast<solidTractionPointPatchVectorField>(ptPatch);

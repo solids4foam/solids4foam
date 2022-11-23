@@ -156,9 +156,9 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     }
 
     // For consistent restarts, we will update the relative kinematic fields
+    D().correctBoundaryConditions();
     if (restart())
     {
-        D().correctBoundaryConditions();
         DD() = D() - D().oldTime();
         mechanical().grad(D(), gradD());
         gradDD() = gradD() - gradD().oldTime();

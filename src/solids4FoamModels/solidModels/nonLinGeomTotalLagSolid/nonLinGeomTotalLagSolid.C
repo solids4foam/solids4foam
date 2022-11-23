@@ -109,9 +109,9 @@ nonLinGeomTotalLagSolid::nonLinGeomTotalLagSolid
     fvm::d2dt2(DD());
 
     // For consistent restarts, we will update the relative kinematic fields
+    DD().correctBoundaryConditions();
     if (restart())
     {
-        DD().correctBoundaryConditions();
         mechanical().grad(DD(), gradDD());
         gradD() = gradD().oldTime() + gradDD();
         F_ = I + gradD().T();

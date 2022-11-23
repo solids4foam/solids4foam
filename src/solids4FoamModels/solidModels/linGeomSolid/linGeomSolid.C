@@ -63,6 +63,11 @@ linGeomSolid::linGeomSolid
 
     // Force all required old-time fields to be created
     fvm::d2dt2(DD());
+
+    // For consistent restarts, we will calculate the gradient field
+    DD().correctBoundaryConditions();
+    DD().storePrevIter();
+    mechanical().grad(DD(), gradDD());
 }
 
 

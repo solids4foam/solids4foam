@@ -218,9 +218,9 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
     DisRequired();
 
     // For consistent restarts, we will update the relative kinematic fields
+    D().correctBoundaryConditions();
     if (restart())
     {
-        D().correctBoundaryConditions();
         mechanical().interpolate(D(), pointD(), false);
         mechanical().grad(D(), pointD(), gradD());
         mechanical().grad(D(), pointD(), gradDf_);

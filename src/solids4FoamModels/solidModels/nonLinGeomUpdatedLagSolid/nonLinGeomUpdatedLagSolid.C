@@ -143,9 +143,9 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     fvc::d2dt2(rho_, D().oldTime());
 
     // For consistent restarts, we will update the relative kinematic fields
+    DD().correctBoundaryConditions();
     if (restart())
     {
-        DD().correctBoundaryConditions();
         mechanical().grad(DD(), gradDD());
         relF_ = I + gradDD().T();
         relFinv_ = inv(relF_);

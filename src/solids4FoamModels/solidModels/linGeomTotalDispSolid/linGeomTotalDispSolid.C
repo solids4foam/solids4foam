@@ -87,6 +87,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     fvm::d2dt2(D());
 
     // For consistent restarts, we will calculate the gradient field
+    D().correctBoundaryConditions();
     D().storePrevIter();
     mechanical().grad(D(), gradD());
 
