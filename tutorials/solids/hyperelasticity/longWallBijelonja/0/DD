@@ -22,8 +22,8 @@ boundaryField
 {
     left
     {
-        type            	fixedDisplacementZeroShear;
-		value           	uniform (0 0 0);
+        type            fixedDisplacementZeroShear;
+        value           uniform (0 0 0);
     }
     right
     {
@@ -38,8 +38,8 @@ boundaryField
     }
     bottom
     {
-        type            	fixedDisplacementZeroShear;
-		value           	uniform (0 0 0);
+        type            fixedDisplacementZeroShear;
+        value           uniform (0 0 0);
     }
     top
     {
