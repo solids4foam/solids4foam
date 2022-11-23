@@ -13,3 +13,9 @@ rm -rf case.foam postProcessing
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
+
+# Link files back to default with pimpleFluid
+for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
+do 
+    ln -vnsf ${file##*/} ${file%.*}
+done
