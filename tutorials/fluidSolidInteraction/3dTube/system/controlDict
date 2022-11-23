@@ -22,13 +22,14 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         0.005;
+endTime         0.02;
 
-deltaT          1e-4;
+deltaT          1e-4; // For comparisons
+//deltaT          2.5e-5; // Original value used for RNF
 
 writeControl    runTime;
 
-writeInterval   2e-4; //1e-3;
+writeInterval   1e-3; //1e-3;
 
 purgeWrite      0;
 
@@ -67,7 +68,7 @@ functions
         outputInterval      1;
         patches             (wall);
         "pName|p"           p;
-	"UName|U"           U;
+        "UName|U"           U;
         "rhoName|rho"       rhoInf;
         log                 false;
         rhoInf              1000;
