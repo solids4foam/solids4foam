@@ -31,6 +31,10 @@ SourceFiles
     mechanicalLaw.C
     newMechanicalLaw.C
 
+Author
+    Philip Cardiff, UCD.
+    Iago Oliveira
+
 \*---------------------------------------------------------------------------*/
 
 #ifndef mechanicalLaw_H
@@ -72,6 +76,21 @@ class mechanicalLaw
 
         //- Nonlinear geometry enumerator
         const nonLinearGeometry::nonLinearType nonLinGeom_;
+
+        // Linearised shear modulus
+        mutable autoPtr<volScalarField> muPtr_;
+
+        // Linearised shear modulus surface field
+        mutable autoPtr<surfaceScalarField> mufPtr_;
+
+        // Linearised bulk modulus
+        mutable autoPtr<volScalarField> KPtr_;
+
+        // Linearised bulk modulus surface field
+        mutable autoPtr<surfaceScalarField> KfPtr_;
+
+        // Linearised implicit modulus field
+        mutable autoPtr<volScalarField> impKPtr_;
 
         // Small strain tensor
         mutable autoPtr<volSymmTensorField> epsilonPtr_;
@@ -184,6 +203,21 @@ protected:
             );
         }
 
+        //- Assign a constant mu field and return a reference to it
+        const volScalarField& mu(const dimensionedScalar& mu);
+
+        //- Assign a constant Ku field and return a reference to it
+        const volScalarField& K(const dimensionedScalar& K);
+
+        //- Assign a constant muf field and return a reference to it
+        const surfaceScalarField& muf(const dimensionedScalar& mu);
+
+        //- Assign a constant Kuf field and return a reference to it
+        const surfaceScalarField& Kf(const dimensionedScalar& K);
+
+        //- Assign a constant impK field and return a reference to it
+        const volScalarField& impK(const dimensionedScalar& impK);
+
         //- Return a const reference to the epsilon field
         const volSymmTensorField& epsilon() const;
 
@@ -224,7 +258,7 @@ protected:
         void updateEpsilonf();
 
         //- Update the deformation gradient
-        //  The lienarised shear and bulk modulii are used to enforce linear
+        //  The linearised shear and bulk modulii are used to enforce linear
         //  elasticity in the case that the enforceLinear flag is tripped by the
         //  solid model
         //  true is returned if enforceLinear is true (linear elasticity is
@@ -236,6 +270,14 @@ protected:
             const dimensionedScalar& K
         );
 
+        //- Update the deformation gradient
+        bool updateF
+        (
+            volSymmTensorField& sigma,
+            const volScalarField& mu,
+            const volScalarField& K
+        );
+
         //- Equivalent to the updateF function, except instead for the Ff
         //  surface field
         bool updateFf
@@ -243,6 +285,15 @@ protected:
             surfaceSymmTensorField& sigma,
             const dimensionedScalar& mu,
             const dimensionedScalar& K
+        );
+
+        //- Equivalent to the updateF function, except instead for the Ff
+        //  surface field
+        bool updateFf
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceScalarField& mu,
+            const surfaceScalarField& K
         );
 
         //- Update the hydrostatic stress field by solving a diffusion equation.
@@ -254,6 +305,13 @@ protected:
         (
             const volScalarField& sigmaHydExplicit,
             const dimensionedScalar& impK
+        );
+
+        //- Update the hydrostatic stress field by solving a diffusion equation.
+        void updateSigmaHyd
+        (
+            const volScalarField& sigmaHydExplicit,
+            const volScalarField& impK
         );
 
         //- Lookup the enforceLinear Switch in the solidModel
