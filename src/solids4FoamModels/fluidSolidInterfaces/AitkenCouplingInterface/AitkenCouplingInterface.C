@@ -79,7 +79,7 @@ bool AitkenCouplingInterface::evolve()
 
     scalar residualNorm = 0;
 
-    if (predictSolid_)
+    if (predictSolid_ && coupled())
     {
         updateForce();
 
@@ -106,7 +106,10 @@ bool AitkenCouplingInterface::evolve()
         updateForce();
 
         // Solve solid
-        solid().evolve();
+        if (coupled())
+        {
+            solid().evolve();
+        }
 
         // Calculate the FSI residual
         residualNorm = updateResidual();
