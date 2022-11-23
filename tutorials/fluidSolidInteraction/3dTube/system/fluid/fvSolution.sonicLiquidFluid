@@ -16,7 +16,7 @@ FoamFile
 
 solvers
 {
-    "p|pcorr"
+    "p|pFinal|pcorr|pcorrFinal"
     {
         solver          GAMG;
         tolerance       1e-06;
@@ -71,9 +71,16 @@ solvers
         relTol          0;
     }
 
-    rho
-    {}
-
+    // the continuity equation is solved explicitly and corrected in each
+    // time-step, so the choice of solver here is actually irrelevant, it is
+    // only needed so OpenFOAM-v2012 does not complain 
+    "rho|rhoFinal"
+    {
+        solver          PBiCG;
+        preconditioner  DILU;
+        tolerance       1e-09;
+        relTol          0;
+    }
 }
 
 PIMPLE

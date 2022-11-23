@@ -38,6 +38,7 @@ laplacianSchemes
     laplacian(rhorAUf,p) 	 Gauss linear corrected;
     laplacian(rhorAUf,pcorr) Gauss linear corrected;
 	laplacian(diffusivity,cellMotionU) Gauss linear corrected;
+    laplacian(rAUf,pcorr) 	 Gauss linear corrected;
 }
 
 interpolationSchemes

@@ -35,7 +35,12 @@ boundaryField
     }
     inlet
     {
-        type       	timeVaryingUniformFixedValue;
+        // openfoam
+        //type          uniformFixedValue;
+        uniformValue  tableFile;
+
+        // foam extend
+        type        timeVaryingUniformFixedValue;
         file   	    "$FOAM_CASE/0/fluid/time-series";
         outOfBounds	clamp;
     }
@@ -44,6 +49,8 @@ boundaryField
 		type        zeroGradient;
         value      	uniform 0;
     }
+
+}
 
 
 // ************************************************************************* //

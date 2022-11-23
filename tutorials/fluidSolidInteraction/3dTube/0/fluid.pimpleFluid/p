@@ -40,7 +40,7 @@ boundaryField
         uniformValue  tableFile;
 
         // foam extend
-        type                timeVaryingUniformFixedValue;
+        type        timeVaryingUniformFixedValue;
         "file|fileName"     "$FOAM_CASE/0/fluid/time-series";
         outOfBounds         clamp;
     }
