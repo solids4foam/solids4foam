@@ -22,25 +22,45 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    linearElastic
+    isotropicFungElastic
 
 Description
-    Hookean linear elastic mechanical law.
+    Isotropic Fung-like model with two parameters, c1 and c2, with
+    strain energy function for the isochoric part given by:
+
+        Psi = (c1/c2)*(exp(0.5*c2*(isoI1 - 3) - 1)
+
+    The Cauchy stress tensor for the compressible case is then given by:
+
+        J*sigma =   0.5*K*(J^2 - 1)*I
+                  + c1*exp(c2*(isoI1 - 3))*dev(isoB)
+
+    where:
+
+    J        Jacobian of the deformation gradient
+    F        deformation gradient
+    isoB     isochoric left Cauchy-Green deformation tensor = J^(-2/3)*(F & F.T)
+    isoI1    first principal invariant of isoB
+
+    Includes support for pre-stress (S0) field and heterogeneous c1.
+
+    Reference
+
 
 SourceFiles
-    linearElastic.C
+    isotropicFungElastic.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved
+    Iago Oliveira, based on code by Philip Cardiff, UCD.
+    Minor modifications by Philip Cardiff, UCD.
+    All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef linearElastic_H
-#define linearElastic_H
+#ifndef isotropicFungElastic_H
+#define isotropicFungElastic_H
 
 #include "mechanicalLaw.H"
-#include "surfaceMesh.H"
-#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -48,54 +68,36 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class linearElastic Declaration
+                 Class isotropicFungElastic Declaration
 \*---------------------------------------------------------------------------*/
 
-class linearElastic
+class isotropicFungElastic
 :
     public mechanicalLaw
 {
     // Private data
 
-        //- Shear modulus (second Lame parameter)
-        dimensionedScalar mu_;
+        // Shear modulus parameter
+        volScalarField c1_;
 
-        //- Bulk modulus
-        dimensionedScalar K_;
+        // Shear modulus parameter surface field
+        surfaceScalarField c1f_;
 
-        //- Young's modulus
-        dimensionedScalar E_;
-
-        //- Poisson's ratio
-        dimensionedScalar nu_;
-
-        //- First Lame parameter
-        dimensionedScalar lambda_;
-
-        //- Initial (residual) stress surface field
-        mutable autoPtr<surfaceSymmTensorField> sigma0fPtr_;
+        // First material parameter associated with I2
+        const dimensionedScalar c2_;
 
     // Private Member Functions
 
-        //- Make the initial stress surface field
-        void makeSigma0f() const;
-
-        //- Return a const reference to the initial stress surface field
-        const surfaceSymmTensorField& sigma0f() const;
-
-        //- Return a non-const reference to the initial stress surface field
-        surfaceSymmTensorField& sigma0f();
-
         //- Disallow default bitwise copy construct
-        linearElastic(const linearElastic&);
+        isotropicFungElastic(const isotropicFungElastic&);
 
         //- Disallow default bitwise assignment
-        void operator=(const linearElastic&);
+        void operator=(const isotropicFungElastic&);
 
 public:
 
     //- Runtime type information
-    TypeName("linearElastic");
+    TypeName("isotropicFungElastic");
 
     // Static data members
 
@@ -103,7 +105,7 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        linearElastic
+        isotropicFungElastic
         (
             const word& name,
             const fvMesh& mesh,
@@ -114,36 +116,14 @@ public:
 
     // Destructor
 
-        virtual ~linearElastic()
+        virtual ~isotropicFungElastic()
         {}
 
 
     // Member Functions
 
-        //- Return bulk modulus
-        virtual tmp<volScalarField> bulkModulus() const;
-
         //- Return the implicit stiffness
-        //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
-
-        //- Material tangent for Newton Raphson loop
-        virtual symmTensor4thOrder materialTangent() const;
-
-        //- Provide access to mu for the coupledUnsNonLinLinearElasticSolid
-        virtual const dimensionedScalar& mu() const;
-
-        //- Bulk modulus
-        virtual const dimensionedScalar& K() const;
-
-        //- Young's modulus
-        virtual const dimensionedScalar& E() const;
-
-        //- Poisson's ratio
-        virtual const dimensionedScalar& nu() const;
-
-        //- Lambda
-        virtual const dimensionedScalar& lambda() const;
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);

@@ -44,6 +44,7 @@ Author
 #include "typeInfo.H"
 #include "runTimeSelectionTables.H"
 #include "volFields.H"
+#include "surfaceFields.H"
 #include "tmp.H"
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
@@ -77,20 +78,26 @@ class mechanicalLaw
         //- Nonlinear geometry enumerator
         const nonLinearGeometry::nonLinearType nonLinGeom_;
 
-        // Linearised shear modulus
+        //- Linearised shear modulus
         mutable autoPtr<volScalarField> muPtr_;
 
-        // Linearised shear modulus surface field
+        //- Linearised shear modulus surface field
         mutable autoPtr<surfaceScalarField> mufPtr_;
 
-        // Linearised bulk modulus
+        //- Linearised bulk modulus
         mutable autoPtr<volScalarField> KPtr_;
 
-        // Linearised bulk modulus surface field
+        //- Linearised bulk modulus surface field
         mutable autoPtr<surfaceScalarField> KfPtr_;
 
-        // Linearised implicit modulus field
+        //- Linearised implicit modulus field
         mutable autoPtr<volScalarField> impKPtr_;
+
+        //- Initial (residual) stress field
+        //  Note: for nonlinear geometry laws, it is law specific whether this
+        //  is the Cauchy stress or 2nd Piola-Kirchhoff or some other stress
+        //  measure
+        mutable autoPtr<volSymmTensorField> sigma0Ptr_;
 
         // Small strain tensor
         mutable autoPtr<volSymmTensorField> epsilonPtr_;
@@ -139,6 +146,21 @@ class mechanicalLaw
 
 
     // Private Member Functions
+
+        //- Make the mu field
+        void makeMu() const;
+
+        //- Make the muf field
+        void makeMuf() const;
+
+        //- Make the K field
+        void makeK() const;
+
+        //- Make the Kf field
+        void makeKf() const;
+
+        //- Make the sigma0 field
+        void makeSigma0() const;
 
         //- Make the epsilon field
         void makeEpsilon() const;
@@ -203,20 +225,50 @@ protected:
             );
         }
 
+        //- Return a const reference to the mu field
+        const volScalarField& mu() const;
+
+        //- Return a non-const reference to the mu field
+        volScalarField& mu();
+
+        //- Return a const reference to the muf field
+        const surfaceScalarField& muf() const;
+
+        //- Return a non-const reference to the muf field
+        surfaceScalarField& muf();
+
         //- Assign a constant mu field and return a reference to it
         const volScalarField& mu(const dimensionedScalar& mu);
 
-        //- Assign a constant Ku field and return a reference to it
-        const volScalarField& K(const dimensionedScalar& K);
-
         //- Assign a constant muf field and return a reference to it
         const surfaceScalarField& muf(const dimensionedScalar& mu);
+
+        //- Return a const reference to the K field
+        const volScalarField& K() const;
+
+        //- Return a non-const reference to the K field
+        volScalarField& K();
+
+        //- Return a const reference to the Kf field
+        const surfaceScalarField& Kf() const;
+
+        //- Return a non-const reference to the Kf field
+        surfaceScalarField& Kf();
+
+        //- Assign a constant Ku field and return a reference to it
+        const volScalarField& K(const dimensionedScalar& K);
 
         //- Assign a constant Kuf field and return a reference to it
         const surfaceScalarField& Kf(const dimensionedScalar& K);
 
         //- Assign a constant impK field and return a reference to it
         const volScalarField& impK(const dimensionedScalar& impK);
+
+        //- Return a const reference to the sigma0 field
+        const volSymmTensorField& sigma0() const;
+
+        //- Return a non-const reference to the sigma0 field
+        volSymmTensorField& sigma0();
 
         //- Return a const reference to the epsilon field
         const volSymmTensorField& epsilon() const;
@@ -280,7 +332,7 @@ protected:
 
         //- Equivalent to the updateF function, except instead for the Ff
         //  surface field
-        bool updateFf
+        bool updateF
         (
             surfaceSymmTensorField& sigma,
             const dimensionedScalar& mu,
@@ -289,7 +341,7 @@ protected:
 
         //- Equivalent to the updateF function, except instead for the Ff
         //  surface field
-        bool updateFf
+        bool updateF
         (
             surfaceSymmTensorField& sigma,
             const surfaceScalarField& mu,

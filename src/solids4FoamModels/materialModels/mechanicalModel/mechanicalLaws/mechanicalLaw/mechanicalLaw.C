@@ -50,6 +50,141 @@ namespace Foam
 
 // * * * * * * * * * * *  Private Member Funtcions * * * * * * * * * * * * * //
 
+void Foam::mechanicalLaw::makeMu() const
+{
+    if (muPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeMu()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    muPtr_.set
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "mu_" + name_,
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("0", dimPressure, 0.0)
+        )
+    );
+}
+
+
+void Foam::mechanicalLaw::makeMuf() const
+{
+    if (mufPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeMuf()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    mufPtr_.set
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "muf_" + name_,
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("0", dimPressure, 0.0)
+        )
+    );
+}
+
+
+void Foam::mechanicalLaw::makeK() const
+{
+    if (KPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeK()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    KPtr_.set
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "K_" + name_,
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("0", dimPressure, 0.0)
+        )
+    );
+}
+
+
+void Foam::mechanicalLaw::makeKf() const
+{
+    if (KfPtr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeKf()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    KfPtr_.set
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "Kf_" + name_,
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("0", dimPressure, 0.0)
+        )
+    );
+}
+
+
+void Foam::mechanicalLaw::makeSigma0() const
+{
+    if (sigma0Ptr_.valid())
+    {
+        FatalErrorIn("void " + type() + "::makeSigma0()")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    sigma0Ptr_.set
+    (
+        new volSymmTensorField
+        (
+            IOobject
+            (
+                "sigma0_",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+        )
+    );
+}
+
+
 void Foam::mechanicalLaw::makeEpsilon() const
 {
     if (epsilonPtr_.valid())
@@ -330,27 +465,55 @@ bool Foam::mechanicalLaw::planeStress() const
 }
 
 
+const Foam::volScalarField& Foam::mechanicalLaw::mu() const
+{
+    if (muPtr_.empty())
+    {
+        makeMu();
+    }
+
+    return muPtr_();
+}
+
+
+Foam::volScalarField& Foam::mechanicalLaw::mu()
+{
+    if (muPtr_.empty())
+    {
+        makeMu();
+    }
+
+    return muPtr_();
+}
+
+
+const Foam::surfaceScalarField& Foam::mechanicalLaw::muf() const
+{
+    if (mufPtr_.empty())
+    {
+        makeMuf();
+    }
+
+    return mufPtr_();
+}
+
+
+Foam::surfaceScalarField& Foam::mechanicalLaw::muf()
+{
+    if (mufPtr_.empty())
+    {
+        makeMuf();
+    }
+
+    return mufPtr_();
+}
+
+
 const Foam::volScalarField& Foam::mechanicalLaw::mu(const dimensionedScalar& mu)
 {
     if (muPtr_.empty())
     {
-        // Construct the field
-        muPtr_.set
-        (
-            new volScalarField
-            (
-                IOobject
-                (
-                    "mu_"  + name_,
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::READ_IF_PRESENT,
-                    IOobject::NO_WRITE
-                ),
-                mesh(),
-                mu
-            )
-        );
+        makeMu();
     }
 
     // Set constant field, overwriting any existing values
@@ -368,23 +531,7 @@ const Foam::surfaceScalarField& Foam::mechanicalLaw::muf
 {
     if (mufPtr_.empty())
     {
-        // Construct the field
-        mufPtr_.set
-        (
-            new surfaceScalarField
-            (
-                IOobject
-                (
-                    "muf_"  + name_,
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::READ_IF_PRESENT,
-                    IOobject::NO_WRITE
-                ),
-                mesh(),
-                mu
-            )
-        );
+        makeMuf();
     }
 
     // Set constant field, overwriting any existing values
@@ -395,27 +542,55 @@ const Foam::surfaceScalarField& Foam::mechanicalLaw::muf
 }
 
 
+const Foam::volScalarField& Foam::mechanicalLaw::K() const
+{
+    if (KPtr_.empty())
+    {
+        makeK();
+    }
+
+    return KPtr_();
+}
+
+
+Foam::volScalarField& Foam::mechanicalLaw::K()
+{
+    if (KPtr_.empty())
+    {
+        makeK();
+    }
+
+    return KPtr_();
+}
+
+
+const Foam::surfaceScalarField& Foam::mechanicalLaw::Kf() const
+{
+    if (KfPtr_.empty())
+    {
+        makeKf();
+    }
+
+    return KfPtr_();
+}
+
+
+Foam::surfaceScalarField& Foam::mechanicalLaw::Kf()
+{
+    if (KfPtr_.empty())
+    {
+        makeKf();
+    }
+
+    return KfPtr_();
+}
+
+
 const Foam::volScalarField& Foam::mechanicalLaw::K(const dimensionedScalar& K)
 {
     if (KPtr_.empty())
     {
-        // Construct the field
-        KPtr_.set
-        (
-            new volScalarField
-            (
-                IOobject
-                (
-                    "K_"  + name_,
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::READ_IF_PRESENT,
-                    IOobject::NO_WRITE
-                ),
-                mesh(),
-                K
-            )
-        );
+        makeK();
     }
 
     // Set constant field, overwriting any existing values
@@ -433,23 +608,7 @@ const Foam::surfaceScalarField& Foam::mechanicalLaw::Kf
 {
     if (KfPtr_.empty())
     {
-        // Construct the field
-        KfPtr_.set
-        (
-            new surfaceScalarField
-            (
-                IOobject
-                (
-                    "Kf_"  + name_,
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::READ_IF_PRESENT,
-                    IOobject::NO_WRITE
-                ),
-                mesh(),
-                K
-            )
-        );
+        makeKf();
     }
 
     // Set constant field, overwriting any existing values
@@ -493,6 +652,27 @@ const Foam::volScalarField& Foam::mechanicalLaw::impK
     return impKPtr_();
 }
 
+
+const Foam::volSymmTensorField& Foam::mechanicalLaw::sigma0() const
+{
+    if (sigma0Ptr_.empty())
+    {
+        makeSigma0();
+    }
+
+    return sigma0Ptr_();
+}
+
+
+Foam::volSymmTensorField& Foam::mechanicalLaw::sigma0()
+{
+    if (sigma0Ptr_.empty())
+    {
+        makeSigma0();
+    }
+
+    return sigma0Ptr_();
+}
 
 Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon()
 {
@@ -793,14 +973,14 @@ bool Foam::mechanicalLaw::updateF
 }
 
 
-bool Foam::mechanicalLaw::updateFf
+bool Foam::mechanicalLaw::updateF
 (
     surfaceSymmTensorField& sigma,
     const dimensionedScalar& mu,
     const dimensionedScalar& K
 )
 {
-    return updateFf
+    return updateF
     (
         sigma,
         mechanicalLaw::muf(mu),
@@ -809,7 +989,7 @@ bool Foam::mechanicalLaw::updateFf
 }
 
 
-bool Foam::mechanicalLaw::updateFf
+bool Foam::mechanicalLaw::updateF
 (
     surfaceSymmTensorField& sigma,
     const surfaceScalarField& mu,

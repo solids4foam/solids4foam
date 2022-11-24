@@ -44,29 +44,42 @@ namespace Foam
 
 void Foam::linearElastic::makeSigma0f() const
 {
-    if (sigma0fPtr_)
+    if (sigma0fPtr_.valid())
     {
         FatalErrorIn("void Foam::linearElastic::makeSigma0f() const")
             << "pointer already set" << abort(FatalError);
     }
 
-    sigma0fPtr_ =
+    sigma0fPtr_.set
+    (
         new surfaceSymmTensorField
         (
             "sigma0f",
-            fvc::interpolate(sigma0_)
-        );
+            fvc::interpolate(sigma0())
+        )
+    );
 }
 
 
 const Foam::surfaceSymmTensorField& Foam::linearElastic::sigma0f() const
 {
-    if (!sigma0fPtr_)
+    if (sigma0fPtr_.empty())
     {
         makeSigma0f();
     }
 
-    return *sigma0fPtr_;
+    return sigma0fPtr_();
+}
+
+
+Foam::surfaceSymmTensorField& Foam::linearElastic::sigma0f()
+{
+    if (sigma0fPtr_.empty())
+    {
+        makeSigma0f();
+    }
+
+    return sigma0fPtr_();
 }
 
 
@@ -87,24 +100,7 @@ Foam::linearElastic::linearElastic
     E_("E", dimPressure, 0.0),
     nu_("nu", dimless, 0.0),
     lambda_("lambda", dimPressure, 0.0),
-    sigma0_
-    (
-        IOobject
-        (
-            "sigma0",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dict.lookupOrDefault<dimensionedSymmTensor>
-        (
-            "sigma0",
-            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
-        )
-    ),
-    sigma0fPtr_(NULL)
+    sigma0fPtr_()
 {
     // Store old times
     epsilon().storeOldTime();
@@ -205,23 +201,18 @@ Foam::linearElastic::linearElastic
             << "consider setting 'solvePressureEqn' to 'yes'!" << endl;
     }
 
-    if (gMax(mag(sigma0_)()) > SMALL)
+    // Read the initial stress
+    if (dict.found("sigma0"))
     {
-        Info<< "Reading sigma0 initial/residual stress field" << endl;
+        Info<< "Reading sigma0 from the dict" << endl;
+        sigma0() = dimensionedSymmTensor(dict.lookup("sigma0"));
+    }
+    else if (gMax(mag(sigma0())()) > SMALL)
+    {
+        Info<< "Reading sigma0 stress field" << endl;
     }
 
-    if (gMax(mag(sigma0_)()) > SMALL)
-    {
-        Info<< "Reading sigma0 initial/residual stress field" << endl;
-    }
-}
-
-
-// * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
-
-Foam::linearElastic::~linearElastic()
-{
-    deleteDemandDrivenData(sigma0fPtr_);
+    sigma0f() = fvc::interpolate(sigma0());
 }
 
 
@@ -357,12 +348,12 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
         updateSigmaHyd(K_*tr(epsilon()), 2*mu_ + lambda_);
 
         // Hooke's law: partitioned deviatoric and dilation form
-        sigma = 2.0*mu_*dev(epsilon()) + sigmaHyd()*I + sigma0_;
+        sigma = 2.0*mu_*dev(epsilon()) + sigmaHyd()*I + sigma0();
     }
     else
     {
         // Hooke's law: standard form
-        sigma = 2.0*mu_*epsilon() + lambda_*tr(epsilon())*I + sigma0_;
+        sigma = 2.0*mu_*epsilon() + lambda_*tr(epsilon())*I + sigma0();
 
         // Update sigmaHyd variable
         sigmaHyd() = -K_*tr(epsilon());

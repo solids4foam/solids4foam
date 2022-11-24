@@ -457,7 +457,7 @@ void Foam::StVenantKirchhoffOrthotropicElastic::correct
     // Update the deformation gradient field
     // Note: if true is returned, it means that linearised elasticity was
     // enforced by the solver via the enforceLinear switch
-    if (updateFf(sigma, mu_, K_))
+    if (updateF(sigma, mu_, K_))
     {
         return;
     }
