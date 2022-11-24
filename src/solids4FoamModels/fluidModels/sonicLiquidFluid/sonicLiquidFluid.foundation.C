@@ -1,5 +1,4 @@
-/*---------------------------------------------------------------------------*\
-  =========                 |
+/*---------------------------------------------------------------------------*\ =========                 |
   \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
    \\    /   O peration     |
     \\  /    A nd           | Copyright held by original author
@@ -162,61 +161,6 @@ void sonicLiquidFluid::compressibleCourantNo()
     Info<< "Region: " << mesh().name()
         << " Courant Number mean: " << meanCoNum
         << " max: " << CoNum << endl;
-}
-
-
-void sonicLiquidFluid::solvePEqn(const fvVectorMatrix& UEqn)
-{
-    rAU_ = 1.0/UEqn.A();
-
-    const surfaceScalarField rhorAUf
-    (
-        "rhorAUf",
-        fvc::interpolate(rho_*rAU_)
-    );
-
-    U() = rAU_*UEqn.H();
-
-    // Compute advective transport coeff. to pressure
-    surfaceScalarField phid
-    (
-        "phid",
-        psi_
-       *(
-            fvc::flux(U())
-          + rhorAUf*fvc::ddtCorr(rho_, U(), phi())/fvc::interpolate(rho_)
-        )
-    );
-
-    // Make flux relative to mesh motion
-    fvc::makeRelative(phid, psi_, U());
-
-    // Recompute flux for pressure equation
-    phi() = fvc::interpolate(rhoO_)*phid/psi_;
-
-    // Pressure equation
-    // essential to account for ddt(rho0) term for mesh motion)
-    fvScalarMatrix pEqn
-    (
-        fvm::ddt(psi_, p())
-      + fvc::div(phi())
-      + fvm::div(phid, p())
-      - fvm::laplacian(rhorAUf, p())
-      + fvc::ddt(rhoO_)
-    );
-
-    pEqn.solve();
-
-    phi() += pEqn.flux();
-
-    solveRhoEqn();
-
-    // State equation errors
-    compressibleContinuityErrs();
-
-    // Correct velocity
-    U() -= rAU_*fvc::grad(p());
-    U().correctBoundaryConditions();
 }
 
 
@@ -446,7 +390,6 @@ bool sonicLiquidFluid::evolve()
 
         UEqn.relax();
 
-        tmp<fvVectorMatrix> tUEqn(UEqn);
         constraints().constrain(UEqn);
 
         if (pimple().momentumPredictor())
@@ -465,10 +408,57 @@ bool sonicLiquidFluid::evolve()
         // --- Pressure corrector loop
         while (pimple().correct())
         {
-            solvePEqn(tUEqn.ref());
-        }
+            rAU_ = 1.0/UEqn.A();
 
-        tUEqn.clear();
+            const surfaceScalarField rhorAUf
+            (
+                "rhorAUf",
+                fvc::interpolate(rho_*rAU_)
+            );
+
+            U() = rAU_*UEqn.H();
+
+            // Compute advective transport coeff. to pressure
+            surfaceScalarField phid
+            (
+                "phid",
+                psi_
+               *(
+                    fvc::flux(U())
+                  + rhorAUf*fvc::ddtCorr(rho_, U(), phi())/fvc::interpolate(rho_)
+                )
+            );
+
+            // Make flux relative to mesh motion
+            fvc::makeRelative(phid, psi_, U());
+
+            // Recompute flux for pressure equation
+            phi() = fvc::interpolate(rhoO_)*phid/psi_;
+
+            // Pressure equation
+            // essential to account for ddt(rho0) term for mesh motion)
+            fvScalarMatrix pEqn
+            (
+                fvm::ddt(psi_, p())
+              + fvc::div(phi())
+              + fvm::div(phid, p())
+              - fvm::laplacian(rhorAUf, p())
+              + fvc::ddt(rhoO_)
+            );
+
+            pEqn.solve();
+
+            phi() += pEqn.flux();
+
+            solveRhoEqn();
+
+            // State equation errors
+            compressibleContinuityErrs();
+
+            // Correct velocity
+            U() -= rAU_*fvc::grad(p());
+            U().correctBoundaryConditions();
+        }
 
         gradU() = fvc::grad(U());
     }
