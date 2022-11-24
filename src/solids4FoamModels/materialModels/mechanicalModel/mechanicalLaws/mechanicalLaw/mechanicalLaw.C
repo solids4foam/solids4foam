@@ -674,6 +674,18 @@ Foam::volSymmTensorField& Foam::mechanicalLaw::sigma0()
     return sigma0Ptr_();
 }
 
+
+const Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon() const
+{
+    if (epsilonPtr_.empty())
+    {
+        makeEpsilon();
+    }
+
+    return epsilonPtr_();
+}
+
+
 Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon()
 {
     if (epsilonPtr_.empty())
@@ -684,7 +696,8 @@ Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon()
     return epsilonPtr_();
 }
 
-Foam::surfaceSymmTensorField& Foam::mechanicalLaw::epsilonf()
+
+const Foam::surfaceSymmTensorField& Foam::mechanicalLaw::epsilonf() const
 {
     if (epsilonfPtr_.empty())
     {
@@ -694,7 +707,8 @@ Foam::surfaceSymmTensorField& Foam::mechanicalLaw::epsilonf()
     return epsilonfPtr_();
 }
 
-const Foam::surfaceSymmTensorField& Foam::mechanicalLaw::epsilonf() const
+
+Foam::surfaceSymmTensorField& Foam::mechanicalLaw::epsilonf()
 {
     if (epsilonfPtr_.empty())
     {
