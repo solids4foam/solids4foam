@@ -42,9 +42,9 @@ boundaryField
         type         newMovingWallVelocity;
         value        uniform (0 0 0);
 
-        // Robin condition approach
-        // type         elasticWallVelocity;
-        // value        uniform (0 0 0);
+        // Robin-Neumann condition approach
+        //type         elasticWallVelocity;
+        //value        uniform (0 0 0);
     }
 }
 

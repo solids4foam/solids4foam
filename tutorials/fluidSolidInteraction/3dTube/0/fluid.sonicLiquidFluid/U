@@ -9,50 +9,40 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    object      p;
+    class       volVectorField;
+    object      U;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 2 -2 0 0 0 0];
+dimensions      [0 1 -1 0 0 0 0];
 
-internalField   uniform 0;
+internalField   uniform (0 0 0);
 
 boundaryField
 {
     symmetry-x
     {
-        type        symmetryPlane;
+        type         symmetryPlane;
     }
     symmetry-y
     {
-        type        symmetryPlane;
+        type         symmetryPlane;
     }
     outlet
     {
-        type        fixedValue;
-        value       uniform 0;
+        type         fluxCorrectedVelocity;
     }
     inlet
     {
-        // openfoam
-        //type          uniformFixedValue;
-        uniformValue  tableFile;
-
-        // foam extend
-        type        timeVaryingUniformFixedValue;
-        "fileName|file" "$FOAM_CASE/constant/fluid/time-series";
-        outOfBounds clamp;
+        type         fluxCorrectedVelocity;
     }
     wall
     {
         // Default Dirichlet-Neumann approach
-        // type       zeroGradient;
-
-        // Robin condition approach
-        type        elasticWallPressure;
-        value       uniform 0;
+        type         newMovingWallVelocity;
+        value        uniform (0 0 0);
     }
 }
+
 
 // ************************************************************************* //
