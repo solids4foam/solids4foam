@@ -23,32 +23,28 @@ License
     Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 Class
-    pimpleFluid
+    sonicLiquidFluid
 
 Description
-    pimpleDyMFoam fluid model from foam-extend-4.1 with support for the
-    "elastic" Robin boundary conditions for partitioned FSI as described in:
-
-        Tuković et al. Added Mass Partitioned Fluid–Structure Interaction
-        Solver Based on a Robin Boundary Condition for Pressure. OpenFOAM.
-        2019;1–22.
+    Transient solver for trans-sonic/supersonic, laminar flow of a
+    compressible liquid. Assumes a linear equation of state between
+	density and pressure related by the bulk modulus.
 
 Author
-    Hrvoje Jasak, Wikki Ltd. All rights reserved.
-    Zeljko Tukovic, FSB Zagreb. All rights reserved.
+    Iago Lessa de Oliveira, FEIS/UNESP/UCD.
     Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
-    pimpleFluid.foamextend.C
+    sonicLiquidFluid.foamextend.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef pimpleFluid_H
-#define pimpleFluid_H
+#ifndef sonicLiquidFluid_H
+#define sonicLiquidFluid_H
 
 #include "fluidModel.H"
-#include "singlePhaseTransportModel.H"
-#include "turbulenceModel.H"
+#include "pimpleControl.H"
+#include "uniformDimensionedFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -59,82 +55,81 @@ namespace fluidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class pimpleFluid Declaration
+                        Class sonicLiquidFluid Declaration
 \*---------------------------------------------------------------------------*/
 
-class pimpleFluid
+class sonicLiquidFluid
 :
     public fluidModel
 {
     // Private data
 
-        //- Transport model
-        singlePhaseTransportModel laminarTransport_;
+        // Transport properties dictionary
+        IOdictionary transportProperties_;
 
-        //- Turbulence model
-        autoPtr<incompressible::turbulenceModel> turbulence_;
+        //- Dynamic viscosity
+        dimensionedScalar mu_;
 
-        //- Fluid density [kg/m3]
-        dimensionedScalar rho_;
+		//- Thermodynamic properties
+		IOdictionary thermodynamicProperties_;
 
-        //- Acceleration field
-        volVectorField ddtU_;
+		//- Ref. fluid density
+		const dimensionedScalar rho0_;
 
-        //- Velocity field
-        surfaceVectorField Uf_;
+		//- Ref. pressure
+		const dimensionedScalar p0_;
+
+        //- const Ref. of psi field
+        const dimensionedScalar psi_;
+
+		//- Density offset
+        const volScalarField rhoO_;
+
+        //- Fluid density
+        volScalarField rho_;
 
         //- rAU field
         volScalarField rAU_;
 
-        //- rAUf field
-        surfaceScalarField rAUf_;
-
-        //- Reference pressure cell
-        label pRefCell_;
-
-        //- Reference pressure value
-        scalar pRefValue_;
-
-        //- Correct phi flag
-        const bool correctPhi_;
-
-        //- Check Courant number flag
-        const bool checkMeshCourantNo_;
-
-        //- Cumulative continuity errors
-        scalar sumLocalContErr_;
-        scalar globalContErr_;
+        //- Cumulative continuity error
         scalar cumulativeContErr_;
-
 
     // Private Member Functions
 
-        //- Reset flux if mesh changed
-        void updateRobinFsiInterfaceFlux();
+        //- Calculates and prints the continuity errors
+        void compressibleContinuityErrs();
 
-        //- Update phi for Robin FSI boundary conditions
-        void updateRobinFsiInterface();
+        //- Solve density equation
+        void solveRhoEqn();
 
-        //- Correct phi after solving pressure equation
-        void correctRobinFsiInterfaceFlux();
+        //- Phi correction for mesh motion
+        void CorrectFlux();
+
+        //- Print compressible Courant number
+		void compressibleCourantNo();
+
+        //- Solve pressure equation
+		void solvePEqn
+		(
+			const fvVectorMatrix& UEqn
+		);
 
         //- Disallow default bitwise copy construct
-        pimpleFluid(const pimpleFluid&);
+        sonicLiquidFluid(const sonicLiquidFluid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const pimpleFluid&);
+        void operator=(const sonicLiquidFluid&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("pimpleFluid");
-
+    TypeName("sonicLiquidFluid");
 
     // Constructors
 
         //- Construct from components
-        pimpleFluid
+        sonicLiquidFluid
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -143,7 +138,7 @@ public:
 
     // Destructor
 
-        virtual ~pimpleFluid()
+        virtual ~sonicLiquidFluid()
         {}
 
 
@@ -162,6 +157,7 @@ public:
             (
                 const label patchID
             ) const;
+
 
         // Edit
 
