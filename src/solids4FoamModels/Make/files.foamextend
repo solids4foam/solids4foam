@@ -177,6 +177,7 @@ functionObjects/solidStresses/solidStresses.C
 functionObjects/solidTorque/solidTorque.C
 functionObjects/solidTractions/solidTractions.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
+functionObjects/volumetricStrain/volumetricStrain.C
 
 dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
 dynamicFvMesh/crackerFvMesh/crackerFvMesh.C

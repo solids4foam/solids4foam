@@ -159,6 +159,7 @@ functionObjects/solidStresses/solidStresses.C
 functionObjects/solidTorque/solidTorque.C
 functionObjects/solidTractions/solidTractions.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
+functionObjects/volumetricStrain/volumetricStrain.C
 
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
