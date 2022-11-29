@@ -48,6 +48,9 @@ Description
         // Optional: specifiy mesh region for multi-region solvers, defaults to
         // region0
         region    region0;
+
+        // Optional: specifiy if compression is considered positive
+        compressionPositive   true;
     );
     @endverbatim
 
