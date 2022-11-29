@@ -51,34 +51,23 @@ bool Foam::volumetricStrain::writeData()
 {
     if (runTime_.outputTime())
     {
-        // Lookup D field
-        const volVectorField* DPtr = NULL;
-        DPtr = &(mesh_.lookupObject<volVectorField>("D"));
+        if (mesh_.foundObject<volTensorField>("grad(D)"))
+        {
+            // Lookup D field
+            const volTensorField& gradD =  mesh_.lookupObject<volTensorField>("grad(D)");
 
-        const volVectorField& D = *DPtr;;
+            const volScalarField volEpsilon("volEpsilon", tr(gradD));
 
-        const fvMesh& mesh = D.mesh();
-        const Time& runTime = mesh.time();
+            // Write fields
+            Info<< "    Writing volEpsilon" << endl;
 
-        volScalarField volEpsilon = tr(fvc::grad(D));
+            volEpsilon.write();
+        }
+        else 
+        {
+            Info<< name_ << ": grad(D) not found!" << endl;
+        }
 
-        // Write fields
-        Info<< "    Writing volEpsilon" << endl;
-
-        volScalarField volEpsilon_write
-        (
-            IOobject
-            (
-                "volEpsilon",
-                runTime.timeName(),
-                mesh,
-                IOobject::NO_READ,
-                IOobject::AUTO_WRITE
-            ),
-            volEpsilon
-        );
-
-        volEpsilon_write.write();
     }
 
     return true;
