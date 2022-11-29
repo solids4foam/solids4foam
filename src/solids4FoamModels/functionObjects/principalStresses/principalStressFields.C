@@ -30,7 +30,8 @@ License
 
 void Foam::calculateEigenValues
 (
-    const symmTensor& sigma,
+    symmTensor sigma,
+    const bool& compressionPositive,
     scalar& sigmaMax,
     scalar& sigmaMid,
     scalar& sigmaMin,
@@ -39,6 +40,15 @@ void Foam::calculateEigenValues
     vector& sigmaMinDir
 )
 {
+    // Multiply stress tensor by -1 if compression is positive
+    if (compressionPositive)
+    {
+        forAll(sigma, cellI)
+        {
+            sigma[cellI] = sigma[cellI]*(-1);
+        }
+    };
+
     const vector eValues = eigenValues(sigma);
     const tensor eVectors = eigenVectors(sigma);
 
@@ -129,7 +139,7 @@ void Foam::calculateEigenValues
 }
 
 
-void Foam::writePrincipalStressFields(const volSymmTensorField& sigma)
+void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const bool& compressionPositive)
 {
     const fvMesh& mesh = sigma.mesh();
     const Time& runTime = mesh.time();
@@ -244,6 +254,7 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma)
         calculateEigenValues
         (
             sigmaI[cellI],
+            compressionPositive,
             sigmaMaxI[cellI],
             sigmaMidI[cellI],
             sigmaMinI[cellI],
@@ -283,6 +294,7 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma)
                 calculateEigenValues
                 (
                     pSigma[faceI],
+                    compressionPositive,
                     pSigmaMax[faceI],
                     pSigmaMid[faceI],
                     pSigmaMin[faceI],

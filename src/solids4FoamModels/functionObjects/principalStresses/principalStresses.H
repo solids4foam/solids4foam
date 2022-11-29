@@ -95,6 +95,9 @@ class principalStresses
         //- Reference to mesh region
         const fvMesh& mesh_;
 
+        //- Reference to compressionPositive flag
+        const bool compressionPositive_;
+
 
     // Private Member Functions
 

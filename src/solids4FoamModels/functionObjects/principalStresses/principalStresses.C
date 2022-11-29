@@ -61,10 +61,10 @@ bool Foam::principalStresses::writeData()
         {
             sigmaPtr = &(mesh_.lookupObject<volSymmTensorField>("sigmaCauchy"));
         }
-        const volSymmTensorField& sigma = *sigmaPtr;;
+        const volSymmTensorField& sigma = *sigmaPtr;
 
         // Calculate and write principal stress fields
-        writePrincipalStressFields(sigma);
+        writePrincipalStressFields(sigma, compressionPositive_);
     }
 
     return true;
@@ -88,6 +88,10 @@ Foam::principalStresses::principalStresses
         (
             dict.lookupOrDefault<word>("region", "region0")
         )
+    ),
+    compressionPositive_
+    (
+        dict.lookupOrDefault("compressionPositive", false)
     )
 {
     Info<< "Creating " << this->name() << " function object" << endl;
