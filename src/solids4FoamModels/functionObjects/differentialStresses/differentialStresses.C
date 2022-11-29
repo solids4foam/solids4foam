@@ -64,7 +64,7 @@ bool Foam::differentialStresses::writeData()
         const volSymmTensorField& sigma = *sigmaPtr;;
 
         // Calculate and write the differential stress field
-        writedifferentialStressFields(sigma);
+        writedifferentialStressFields(sigma, compressionPositive_);
     }
 
     return true;
@@ -88,6 +88,10 @@ Foam::differentialStresses::differentialStresses
         (
             dict.lookupOrDefault<word>("region", "region0")
         )
+    ),
+    compressionPositive_
+    (
+        dict.lookupOrDefault("compressionPositive", false)
     )
 {
     Info<< "Creating " << this->name() << " function object" << endl;

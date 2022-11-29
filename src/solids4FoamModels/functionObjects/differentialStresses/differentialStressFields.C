@@ -25,93 +25,41 @@ License
 \*----------------------------------------------------------------------------*/
 
 #include "differentialStressFields.H"
+#include "principalStressFields.H"
 
 // * * * * * * * * * * * * * * * * * * Functions * * * * * * * * * * * * * * //
 
-void Foam::calculateEigenValues
+void Foam::calculateDifferentialStress
 (
     const symmTensor& sigma,
+    const bool& compressionPositive,
     scalar& sigmaDiff
 )
 {
-    const vector eValues = eigenValues(sigma);
+    scalar sigmaMax = 0;
+    scalar sigmaMid = 0;
+    scalar sigmaMin = 0;
+    vector sigmaMaxDir = vector::zero;
+    vector sigmaMidDir = vector::zero;
+    vector sigmaMinDir = vector::zero;
 
-    label iMax = -1;
-    label iMin = -1;
-    const scalar a = eValues[0];
-    const scalar b = eValues[1];
-    const scalar c = eValues[2];
+    calculateEigenValues
+    (
+        sigma,
+        compressionPositive,
+        sigmaMax,
+        sigmaMid,
+        sigmaMin,
+        sigmaMaxDir,
+        sigmaMidDir,
+        sigmaMinDir
+    );
 
-    if (a < b)
-    {
-        if (a < c)
-        {
-            if (b < c)
-            {
-                // a < b
-                // a < c
-                // b < c
-                // a < b < c
-                iMin = 0;
-                iMax = 2;
-            }
-            else
-            {
-                // a < b
-                // a < c
-                // b > c
-                // a < c < b
-                iMin = 0;
-                iMax = 1;
-            }
-        }
-        else
-        {
-            // a < b
-            // a > c
-            // c < a < b
-            iMin = 2;
-            iMax = 1;
-        }
-    }
-    else
-    {
-        if (b < c)
-        {
-            if (a < c)
-            {
-                // a > b
-                // b < c
-                // a < c
-                // b < a < c
-                iMin = 1;
-                iMax = 2;
-            }
-            else
-            {
-                // a > b
-                // b < c
-                // a > c
-                // b < c < a
-                iMin = 1;
-                iMax = 0;
-            }
-        }
-        else
-        {
-            // a > b
-            // b > c
-            // c < b < a
-            iMin = 2;
-            iMax = 0;
-        }
-    }
-
-    sigmaDiff = eValues[iMax] - eValues[iMin];
+    sigmaDiff = sigmaMax - sigmaMin;
 }
 
 
-void Foam::writedifferentialStressFields(const volSymmTensorField& sigma)
+void Foam::writedifferentialStressFields(const volSymmTensorField& sigma, const bool& compressionPositive)
 {
     const fvMesh& mesh = sigma.mesh();
     const Time& runTime = mesh.time();
@@ -141,9 +89,10 @@ void Foam::writedifferentialStressFields(const volSymmTensorField& sigma)
 
     forAll (sigmaI, cellI)
     {
-        calculateEigenValues
+        calculateDifferentialStress
         (
             sigmaI[cellI],
+            compressionPositive,
             sigmaDiffI[cellI]
         );
     }
@@ -165,9 +114,10 @@ void Foam::writedifferentialStressFields(const volSymmTensorField& sigma)
 
             forAll(pSigmaDiff, faceI)
             {
-                calculateEigenValues
+                calculateDifferentialStress
                 (
                     pSigma[faceI],
+                    compressionPositive,
                     pSigmaDiff[faceI]
                 );
             }
@@ -177,7 +127,7 @@ void Foam::writedifferentialStressFields(const volSymmTensorField& sigma)
     sigmaDiff.correctBoundaryConditions();
 
     // Write fields
-    Info<< "    Writing sigmaDiff" << endl;
+    // Info<< "    Writing sigmaDiff" << endl;
 
     sigmaDiff.write();
 

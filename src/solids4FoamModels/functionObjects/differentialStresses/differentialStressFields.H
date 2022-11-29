@@ -45,12 +45,13 @@ Author
 namespace Foam
 {
     // Set differential stress
-    void calculateEigenValues(
+    void calculateDifferentialStress(
         const symmTensor &sigma,
+        const bool& compressionPositive,
         scalar &sigmaDiff);
 
     // Calculate and write differential stress values
-    void writedifferentialStressFields(const volSymmTensorField &sigma);
+    void writedifferentialStressFields(const volSymmTensorField &sigma, const bool& compressionPositive);
 
 } // End namespace Foam
 
