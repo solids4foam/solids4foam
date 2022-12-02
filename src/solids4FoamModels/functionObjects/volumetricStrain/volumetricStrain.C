@@ -99,7 +99,8 @@ Foam::volumetricStrain::volumetricStrain
         dict.lookupOrDefault("compressionPositive", false)
     )
 {
-    Info<< "Creating " << this->name() << " function object" << endl;
+    Info<< "Creating " << this->name() << " function object" << nl
+        << "    compressionPositive: " << compressionPositive_ << endl;
 }
 
 
