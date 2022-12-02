@@ -63,82 +63,41 @@ namespace fluidModels
                         Class pimpleOversetFluid Declaration
 \*---------------------------------------------------------------------------*/
 
-class pimpleOversetFluid
-:
-    public fluidModel
-{
+class pimpleOversetFluid:    public fluidModel{
     // Private data
-
-        //- Transport model
-        singlePhaseTransportModel laminarTransport_;
-
-        //- Turbulence model
-        autoPtr<incompressible::turbulenceModel> turbulence_;
-
-        //- Density
-        dimensionedScalar rho_;
-
-        //- Reference pressure cell
-        label pRefCell_;
-
-        //- Reference pressure value
-        scalar pRefValue_;
+        singlePhaseTransportModel laminarTransport_;  //- Transport model
+        autoPtr<incompressible::turbulenceModel> turbulence_;      //- Turbulence model
+       
+        dimensionedScalar rho_; //- Density
+        label pRefCell_;  //- Reference pressure cell
+        scalar pRefValue_;  //- Reference pressure value
 
     // Private Member Functions
-
-        //- Disallow default bitwise copy construct
-        pimpleOversetFluid(const pimpleOversetFluid&);
-
-        //- Disallow default bitwise assignment
-        void operator=(const pimpleOversetFluid&);
-
+        pimpleOversetFluid(const pimpleOversetFluid&);  //- Disallow default bitwise copy construct
+        void operator=(const pimpleOversetFluid&);//- Disallow default bitwise assignment
 
 public:
 
-    //- Runtime type information
-    TypeName("pimpleOversetFluid");
-
+    TypeName("pimpleOversetFluid");  //- Runtime type information
     // Constructors
-
         //- Construct from components
-        pimpleOversetFluid
-        (
+        pimpleOversetFluid (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
         );
-
-
     // Destructor
-
-        virtual ~pimpleOversetFluid()
-        {}
-
+        virtual ~pimpleOversetFluid(){}
 
     // Member Functions
-
         // Access
-
             //- Patch viscous force (N/m2)
-            virtual tmp<vectorField> patchViscousForce
-            (
-                const label patchID
-            ) const;
-
+            virtual tmp<vectorField> patchViscousForce  (const label patchID ) const;
             //- Patch pressure force (N/m2)
-            virtual tmp<scalarField> patchPressureForce
-            (
-                const label patchID
-            ) const;
-
-            //- Face zone effective dynamic viscosity
-            virtual tmp<scalarField> faceZoneMuEff
-            (
-                const label zoneID,
-                const label patchID
-            ) const;
+            virtual tmp<scalarField> patchPressureForce  (const label patchID) const;
+            //-Face zone effective dynamic viscosity
+            virtual tmp<scalarField> faceZoneMuEff(const label zoneID,const label patchID) const;
 
         // Edit
-
             //- Evolve the fluid model
             virtual bool evolve();
 };

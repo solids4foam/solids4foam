@@ -64,10 +64,12 @@ autoPtr<thermalLaw> thermalLaw::New
     const word thermalTypeName(dict.lookup("type"));
 
     Info<< "Selecting thermal model " << thermalTypeName << endl;
-#if OPENFOAM> 2205    
-    auto* cstrIter=dictionaryConstructorTable(thermalTypeName);
+
+#if OPENFOAM > 2205
+    auto* cstrIter = dictionaryConstructorTable(thermalTypeName);
+    
     if (!cstrIter){
-        FatalIOErrorIn (
+        FatalIOErrorIn(
             "thermalLaw::New(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
@@ -80,11 +82,16 @@ autoPtr<thermalLaw> thermalLaw::New
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
-return autoPtr<thermalLaw>(cstrIter(name, mesh, dict));
-#else
-    dictionaryConstructorTable::iterator cstrIter =  dictionaryConstructorTablePtr_->find(thermalTypeName);
-    if (cstrIter == dictionaryConstructorTablePtr_->end())  {
-        FatalIOErrorIn  (
+    return autoPtr<thermalLaw>(cstrIter(name, mesh, dict));
+#else    
+    
+     dictionaryConstructorTable::iterator cstrIter =
+        dictionaryConstructorTablePtr_->find(thermalTypeName);
+
+    if (cstrIter == dictionaryConstructorTablePtr_->end())
+    {
+        FatalIOErrorIn
+        (
             "thermalLaw::New(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
@@ -97,8 +104,10 @@ return autoPtr<thermalLaw>(cstrIter(name, mesh, dict));
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
+
     return autoPtr<thermalLaw>(cstrIter()(name, mesh, dict));
 #endif
+    
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

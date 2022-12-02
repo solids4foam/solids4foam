@@ -41,7 +41,7 @@ SourceFiles
 #ifndef nonLinearGeometry_H
 #define nonLinearGeometry_H
 
-#include "NamedEnum.H"
+#include "Enum.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -51,20 +51,35 @@ namespace Foam
 /*---------------------------------------------------------------------------*\
                        Class nonLinearGeometry Declaration
 \*---------------------------------------------------------------------------*/
-
+// class volumeType
+// {
+// public:
+// 
+//     //- Volume classification types
+//     enum type : char
+//     {
+//         UNKNOWN = 0,    //!< Unknown state
+//         INSIDE  = 0x1,  //!< A location inside the volume
+//         OUTSIDE = 0x2,  //!< A location outside the volume
+//         MIXED   = 0x3   //!< A location that is partly inside and outside
+//     };
+//    //- Names for the classification enumeration
+//     static const Enum<volumeType::type> names;
+    
+    
 class nonLinearGeometry
 {
 public:
 
         //- Non-linear solver options
-        enum nonLinearType
+        enum nonLinearType: char
         {
             LINEAR_GEOMETRY,
             UPDATED_LAGRANGIAN,
             TOTAL_LAGRANGIAN
         };
 
-        static const NamedEnum<nonLinearType, 3> nonLinearNames_;
+        static const Enum<nonLinearGeometry::nonLinearType> nonLinearNames_;
 };
 
 

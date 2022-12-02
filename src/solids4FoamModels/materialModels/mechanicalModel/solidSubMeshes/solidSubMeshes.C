@@ -2183,17 +2183,18 @@ void Foam::solidSubMeshes::moveSubMeshes()
 #else
             subMeshes()[matI].subMesh().changing(false);
 #endif
-#if OPENFOAM >2205
+#if OPENFOAM > 2205
             subMeshes()[matI].subMesh().setPhi()->writeOpt(IOobject::NO_WRITE);
-#else                
-            subMeshes()[matI].subMesh().setPhi().writeOpt() = IOobject::NO_WRITE;  
+#else
+             subMeshes()[matI].subMesh().setPhi().writeOpt() = IOobject::NO_WRITE;
 #endif
+
             if (baseMesh().time().outputTime() && writeSubMeshes_)
             {
                 Info<< "    Writing subMesh "
                     << subMeshes()[matI].subMesh().name() << endl;
-                subMeshes()[matI].subMesh().polyMesh::writeOpt() =
-                    IOobject::AUTO_WRITE;
+                    
+                subMeshes()[matI].subMesh().polyMesh::writeOpt() = IOobject::AUTO_WRITE;
                 subMeshes()[matI].subMesh().setInstance
                 (
                     baseMesh().time().timeName()
