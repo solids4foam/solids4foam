@@ -52,6 +52,9 @@ Description
         // Optional: specifiy mesh region for multi-region solvers, defaults to
         // region0
         region    region0;
+
+        // Optional: specifiy if compression is considered positive
+        compressionPositive   true;
     );
     @endverbatim
 
@@ -94,6 +97,9 @@ class principalStresses
 
         //- Reference to mesh region
         const fvMesh& mesh_;
+
+        //- Flag to signify if compression is considered positive
+        const Switch compressionPositive_;
 
 
     // Private Member Functions
