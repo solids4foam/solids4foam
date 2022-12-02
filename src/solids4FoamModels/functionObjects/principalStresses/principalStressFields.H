@@ -49,7 +49,7 @@ namespace Foam
     // Set principal stress values and directions
     void calculateEigenValues
     (
-        symmTensor sigma,
+        const symmTensor sigma,
         const bool& compressionPositive,
         scalar& sigmaMax,
         scalar& sigmaMid,
@@ -60,7 +60,10 @@ namespace Foam
     );
 
     // Calculate and write principal stress value and direction fields
-    void writePrincipalStressFields(const volSymmTensorField& sigma, const bool& compressionPositive);
+    void writePrincipalStressFields
+    (
+        const volSymmTensorField& sigma, const bool& compressionPositive
+    );
 
 } // End namespace Foam
 

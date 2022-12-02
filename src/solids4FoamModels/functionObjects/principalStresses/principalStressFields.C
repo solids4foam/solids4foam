@@ -30,7 +30,7 @@ License
 
 void Foam::calculateEigenValues
 (
-    symmTensor sigma,
+    const symmTensor sigma,
     const bool& compressionPositive,
     scalar& sigmaMax,
     scalar& sigmaMid,
@@ -139,7 +139,10 @@ void Foam::calculateEigenValues
 }
 
 
-void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const bool& compressionPositive)
+void Foam::writePrincipalStressFields
+(
+    const volSymmTensorField& sigma, const bool& compressionPositive
+)
 {
     const fvMesh& mesh = sigma.mesh();
     const Time& runTime = mesh.time();
@@ -231,6 +234,21 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const boo
         dimensionedVector("sigmaMinDir", dimPressure, vector::zero)
     );
 
+    // Differential stress: difference between the max and min
+    volScalarField sigmaDiff
+    (
+        IOobject
+        (
+            "sigmaDiff",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedScalar("sigmaDiff", dimPressure, 0.0)
+    );
+
     // References to internalFields for efficiency
     const symmTensorField& sigmaI = sigma.internalField();
 #ifdef OPENFOAMESIORFOUNDATION
@@ -240,6 +258,7 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const boo
     vectorField& sigmaMaxDirI = sigmaMaxDir.primitiveFieldRef();
     vectorField& sigmaMidDirI = sigmaMidDir.primitiveFieldRef();
     vectorField& sigmaMinDirI = sigmaMinDir.primitiveFieldRef();
+    scalarField& sigmaDiffI = sigmaDiff.primitiveFieldRef();
 #else
     scalarField& sigmaMaxI = sigmaMax.internalField();
     scalarField& sigmaMidI = sigmaMid.internalField();
@@ -247,6 +266,7 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const boo
     vectorField& sigmaMaxDirI = sigmaMaxDir.internalField();
     vectorField& sigmaMidDirI = sigmaMidDir.internalField();
     vectorField& sigmaMinDirI = sigmaMinDir.internalField();
+    scalarField& sigmaDiffI = sigmaDiff.internalField();
 #endif
 
     forAll (sigmaI, cellI)
@@ -262,6 +282,8 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const boo
             sigmaMidDirI[cellI],
             sigmaMinDirI[cellI]
         );
+
+        sigmaDiffI[cellI] = sigmaMaxI[cellI] - sigmaMinI[cellI];
     }
 
     forAll(sigma.boundaryField(), patchI)
@@ -280,6 +302,7 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const boo
             vectorField& pSigmaMaxDir = sigmaMaxDir.boundaryFieldRef()[patchI];
             vectorField& pSigmaMidDir = sigmaMidDir.boundaryFieldRef()[patchI];
             vectorField& pSigmaMinDir = sigmaMinDir.boundaryFieldRef()[patchI];
+            scalarField& pSigmaDiff = sigmaDiff.boundaryFieldRef()[patchI];
 #else
             scalarField& pSigmaMax = sigmaMax.boundaryField()[patchI];
             scalarField& pSigmaMid = sigmaMid.boundaryField()[patchI];
@@ -287,6 +310,7 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const boo
             vectorField& pSigmaMaxDir = sigmaMaxDir.boundaryField()[patchI];
             vectorField& pSigmaMidDir = sigmaMidDir.boundaryField()[patchI];
             vectorField& pSigmaMinDir = sigmaMinDir.boundaryField()[patchI];
+            scalarField& pSigmaDiff = sigmaDiff.boundaryField()[patchI];
 #endif
 
             forAll(pSigmaMax, faceI)
@@ -302,6 +326,8 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const boo
                     pSigmaMidDir[faceI],
                     pSigmaMinDir[faceI]
                 );
+
+                pSigmaDiff[faceI] = pSigmaMax[faceI] - pSigmaMin[faceI];
             }
         }
     }
@@ -312,6 +338,7 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const boo
     sigmaMaxDir.correctBoundaryConditions();
     sigmaMidDir.correctBoundaryConditions();
     sigmaMinDir.correctBoundaryConditions();
+    sigmaDiff.correctBoundaryConditions();
 
     // Write fields
     Info<< "    Writing sigmaMax" << nl
@@ -319,7 +346,8 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const boo
         << "    Writing sigmaMin" << nl
         << "    Writing sigmaMaxDir" << nl
         << "    Writing sigmaMidDir" << nl
-        << "    Writing sigmaMinDir" << endl;
+        << "    Writing sigmaMinDir" << nl
+        << "    Writing sigmaDiff" << endl;
 
     sigmaMax.write();
     sigmaMid.write();
@@ -327,6 +355,7 @@ void Foam::writePrincipalStressFields(const volSymmTensorField& sigma, const boo
     sigmaMaxDir.write();
     sigmaMidDir.write();
     sigmaMinDir.write();
+    sigmaDiff.write();
 
     Info<< "Principal stresses: max = " << gMax(mag(sigmaMax)()) << endl;
 }

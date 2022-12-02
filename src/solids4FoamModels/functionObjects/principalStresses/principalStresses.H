@@ -98,8 +98,8 @@ class principalStresses
         //- Reference to mesh region
         const fvMesh& mesh_;
 
-        //- Reference to compressionPositive flag
-        const bool compressionPositive_;
+        //- Flag to signify if compression is considered positive
+        const Switch compressionPositive_;
 
 
     // Private Member Functions
