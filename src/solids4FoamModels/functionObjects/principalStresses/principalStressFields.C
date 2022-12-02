@@ -40,17 +40,13 @@ void Foam::calculateEigenValues
     vector& sigmaMinDir
 )
 {
-    // Multiply stress tensor by -1 if compression is positive
+    vector eValues = eigenValues(sigma);
+    const tensor eVectors = eigenVectors(sigma);
+
     if (compressionPositive)
     {
-        forAll(sigma, cellI)
-        {
-            sigma[cellI] = sigma[cellI]*(-1);
-        }
-    };
-
-    const vector eValues = eigenValues(sigma);
-    const tensor eVectors = eigenVectors(sigma);
+        eValues = -eValues;
+    }
 
     label iMax = -1;
     label iMid = -1;
