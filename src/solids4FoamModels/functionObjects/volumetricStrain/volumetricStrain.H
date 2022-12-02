@@ -67,49 +67,58 @@ SourceFiles
 namespace Foam
 {
 
-    /*---------------------------------------------------------------------------*\
-                            Class volumetricStrain Declaration
-    \*---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*\
+                        Class volumetricStrain Declaration
+\*---------------------------------------------------------------------------*/
 
-    class volumetricStrain
-        : public functionObject
-    {
-        // Private data
+class volumetricStrain
+:
+    public functionObject
+{
+    // Private data
 
         //- Name
         const word name_;
 
         //- Reference to main object registry
-        const Time &runTime_;
+        const Time& runTime_;
 
         //- Reference to mesh region
-        const fvMesh &mesh_;
+        const fvMesh& mesh_;
 
-        // Private Member Functions
+        //- Flag to signify if compression is considered positive
+        const Switch compressionPositive_;
+
+    // Private Member Functions
 
         //- Write data
         bool writeData();
 
         //- Disallow default bitwise copy construct
-        volumetricStrain(
-            const volumetricStrain &);
+        volumetricStrain(const volumetricStrain &);
 
         //- Disallow default bitwise assignment
         void operator=(const volumetricStrain &);
 
-    public:
-        //- Runtime type information
-        TypeName("volumetricStrain");
 
-        // Constructors
+public:
+
+    //- Runtime type information
+    TypeName("volumetricStrain");
+
+
+    // Constructors
 
         //- Construct from components
-        volumetricStrain(
+        volumetricStrain
+        (
             const word &name,
             const Time &,
-            const dictionary &);
+            const dictionary &
+        );
 
-        // Member Functions
+
+    // Member Functions
 
         //- start is called at the start of the time-loop
         virtual bool start();
@@ -127,26 +136,18 @@ namespace Foam
 #ifdef OPENFOAMESIORFOUNDATION
         //- Write
         virtual bool write();
-#endif
-
-#ifndef OPENFOAMESIORFOUNDATION
+#else
         //- Update for changes of mesh
         virtual void updateMesh(const mapPolyMesh &)
-        {
-        }
+        {}
 
         //- Update for changes of mesh
         virtual void movePoints(const pointField &)
-        {
-        }
+        {}
 #endif
+};
 
-        // // Write Volumetric Strain
-        // virtual bool writeVolumetricStrain(const volVectorField&)
-        // {}
-    };
-
-    // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
 

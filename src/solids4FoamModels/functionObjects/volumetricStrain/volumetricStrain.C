@@ -49,25 +49,27 @@ namespace Foam
 
 bool Foam::volumetricStrain::writeData()
 {
-    if (runTime_.outputTime())
+    if (runTime_.outputTime() && mesh_.foundObject<volTensorField>("grad(D)"))
     {
-        if (mesh_.foundObject<volTensorField>("grad(D)"))
+        // Lookup the displacement gradient field
+        const volTensorField& gradD =
+            mesh_.lookupObject<volTensorField>("grad(D)");
+
+        // Calculate volumetric strain
+        volScalarField volEpsilon("volEpsilon", tr(gradD));
+
+        if (compressionPositive_)
         {
-            // Lookup D field
-            const volTensorField& gradD =  mesh_.lookupObject<volTensorField>("grad(D)");
-
-            const volScalarField volEpsilon("volEpsilon", tr(gradD));
-
-            // Write fields
-            Info<< "    Writing volEpsilon" << endl;
-
-            volEpsilon.write();
-        }
-        else 
-        {
-            Info<< name_ << ": grad(D) not found!" << endl;
+            volEpsilon = -volEpsilon;
         }
 
+        // Write the field
+        Info<< name_ << ": writing volEpsilon" << endl;
+        volEpsilon.write();
+    }
+    else
+    {
+        Info<< name_ << ": grad(D) not found!" << endl;
     }
 
     return true;
@@ -91,6 +93,10 @@ Foam::volumetricStrain::volumetricStrain
         (
             dict.lookupOrDefault<word>("region", "region0")
         )
+    ),
+    compressionPositive_
+    (
+        dict.lookupOrDefault("compressionPositive", false)
     )
 {
     Info<< "Creating " << this->name() << " function object" << endl;
