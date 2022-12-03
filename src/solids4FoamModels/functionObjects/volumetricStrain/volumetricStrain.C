@@ -24,22 +24,22 @@ License
 
 \*----------------------------------------------------------------------------*/
 
-#include "principalStresses.H"
+#include "volumetricStrain.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "pointFields.H"
-#include "principalStressFields.H"
+#include "fvc.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(principalStresses, 0);
+    defineTypeNameAndDebug(volumetricStrain, 0);
 
     addToRunTimeSelectionTable
     (
         functionObject,
-        principalStresses,
+        volumetricStrain,
         dictionary
     );
 }
@@ -47,24 +47,29 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-bool Foam::principalStresses::writeData()
+bool Foam::volumetricStrain::writeData()
 {
-    if (runTime_.outputTime())
+    if (runTime_.outputTime() && mesh_.foundObject<volTensorField>("grad(D)"))
     {
-        // Lookup stress tensor
-        const volSymmTensorField* sigmaPtr = NULL;
-        if (mesh_.foundObject<volSymmTensorField>("sigma"))
-        {
-            sigmaPtr = &(mesh_.lookupObject<volSymmTensorField>("sigma"));
-        }
-        else if (mesh_.foundObject<volSymmTensorField>("sigmaCauchy"))
-        {
-            sigmaPtr = &(mesh_.lookupObject<volSymmTensorField>("sigmaCauchy"));
-        }
-        const volSymmTensorField& sigma = *sigmaPtr;
+        // Lookup the displacement gradient field
+        const volTensorField& gradD =
+            mesh_.lookupObject<volTensorField>("grad(D)");
 
-        // Calculate and write principal stress fields
-        writePrincipalStressFields(sigma, compressionPositive_);
+        // Calculate volumetric strain
+        volScalarField volEpsilon("volEpsilon", tr(gradD));
+
+        if (compressionPositive_)
+        {
+            volEpsilon = -volEpsilon;
+        }
+
+        // Write the field
+        Info<< name_ << ": writing volEpsilon" << endl;
+        volEpsilon.write();
+    }
+    else
+    {
+        Info<< name_ << ": grad(D) not found!" << endl;
     }
 
     return true;
@@ -72,7 +77,7 @@ bool Foam::principalStresses::writeData()
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::principalStresses::principalStresses
+Foam::volumetricStrain::volumetricStrain
 (
     const word& name,
     const Time& t,
@@ -101,7 +106,7 @@ Foam::principalStresses::principalStresses
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-bool Foam::principalStresses::start()
+bool Foam::volumetricStrain::start()
 {
     if (runTime_.outputTime())
     {
@@ -113,9 +118,9 @@ bool Foam::principalStresses::start()
 
 
 #if FOAMEXTEND
-bool Foam::principalStresses::execute(const bool forceWrite)
+bool Foam::volumetricStrain::execute(const bool forceWrite)
 #else
-bool Foam::principalStresses::execute()
+bool Foam::volumetricStrain::execute()
 #endif
 {
     if (runTime_.outputTime())
@@ -127,13 +132,13 @@ bool Foam::principalStresses::execute()
 }
 
 
-bool Foam::principalStresses::read(const dictionary& dict)
+bool Foam::volumetricStrain::read(const dictionary& dict)
 {
     return true;
 }
 
 #ifdef OPENFOAMESIORFOUNDATION
-bool Foam::principalStresses::write()
+bool Foam::volumetricStrain::write()
 {
     return writeData();
 }
