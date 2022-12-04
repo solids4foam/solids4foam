@@ -172,7 +172,7 @@ void Foam::mechanicalLaw::makeSigma0() const
         (
             IOobject
             (
-                "sigma0_",
+                "sigma0",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::READ_IF_PRESENT,
