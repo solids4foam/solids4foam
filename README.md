@@ -14,4 +14,9 @@ Please visit the [solids4foam website](https://solids4foam.github.io).
 
 ### Disclaimer
 
-OPENFOAM® is a registered trademark of ESI Group. solids4foam is not approved or endorsed by ESI Group, the producer of the OpenFOAM software and owner of the OPENFOAM® and OpenCFD® trademarks.
+This offering is not approved or endorsed by OpenCFD Limited, producer and distributor of the OpenFOAM software via [www.openfoam.com](https://www.openfoam.com), and owner of the OPENFOAM® and OpenCFD® trade marks.
+
+
+### Acknowledgement
+
+OPENFOAM® is a registered trademark of OpenCFD Limited, producer and distributor of the OpenFOAM software via [www.openfoam.com](https://www.openfoam.com).
