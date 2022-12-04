@@ -5,6 +5,7 @@ notes.txt
 
 # Build log files
 log.Allwmake
+log.Allcheck
 
 # Library files which are replaced by links
 src/blockCoupledSolids4FoamTools/Make/files
