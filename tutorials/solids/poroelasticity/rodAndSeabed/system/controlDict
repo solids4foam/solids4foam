@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  1.7.1                                 |
-|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com](https://www.openfoam.com), and owner of the  |
+|              OPENFOAM® and OpenCFD® trade marks.                            |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -52,6 +54,5 @@ nonlinearity nonLinear;
 wave standingWave;
 
 libs ( /*"libSoilFvPatchFields.so"*/ "libOpenFOAM.so" "libgroovyBC.so");
-
 
 // ************************************************************************* //

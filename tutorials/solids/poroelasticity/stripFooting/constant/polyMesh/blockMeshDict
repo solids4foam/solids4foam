@@ -1,10 +1,11 @@
-
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  1.7.1                                 |
-|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com](https://www.openfoam.com), and owner of the  |
+|              OPENFOAM® and OpenCFD® trade marks.                            |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -17,7 +18,7 @@ FoamFile
 
 convertToMeters 1;
 
-vertices        
+vertices
 (
     (0 0 0)
     (1 0 0)
@@ -25,7 +26,7 @@ vertices
     (0 1 0)
     (1 1 0)
     (5 1 0)
-     
+
     (0 0 4)
     (1 0 4)
     (5 0 4)
@@ -42,13 +43,13 @@ blocks
     hex (1 2 5 4 7 8 11 10) (40 1 40) simpleGrading (1 1 1)
 );
 
-edges           
+edges
 (
 );
 
-patches         
+patches
 (
-    patch ground 
+    patch ground
     (
         (7 8 11 10)
     )
@@ -56,7 +57,7 @@ patches
     (
 	  (6 7 10 9)
     )
-    patch left 
+    patch left
     (
 	(2 5 11 8)	
     )
@@ -65,7 +66,7 @@ patches
         (5 4 10 11)
 	(4 3 9 10)
     )
-    empty front 
+    empty front
     (
 	(0 1 7 6)
 	(1 2 8 7)	
@@ -81,7 +82,7 @@ patches
     )
 );
 
-mergePatchPairs 
+mergePatchPairs
 (
 );
 

@@ -1,3 +1,12 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com](https://www.openfoam.com), and owner of the  |
+|              OPENFOAM® and OpenCFD® trade marks.                            |
+\*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
@@ -5,7 +14,6 @@ FoamFile
     class       volVectorField;
     object      U;
 }
-
 dimensions      [0 1 -1 0 0 0 0];
 
 internalField   uniform (10 0 0);
@@ -31,7 +39,7 @@ boundaryField
         // Can be used in openfoam but not available in foam extend
         //type            noSlip;
 
-        // Can be used in all versions 
+        // Can be used in all versions
         type              fixedValue;
         value             uniform (0 0 0);
     }
@@ -40,7 +48,7 @@ boundaryField
         // Can be used in openfoam but not available in foam extend
         //type            noSlip;
 
-        // Can be used in all versions 
+        // Can be used in all versions
         type              fixedValue;
         value             uniform (0 0 0);
     }

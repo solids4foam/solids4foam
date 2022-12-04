@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com](https://www.openfoam.com), and owner of the  |
+|              OPENFOAM® and OpenCFD® trade marks.                            |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -38,7 +40,7 @@ mechanical
             nuzx            0.4;
 
             // Shear modulii (in Pa)
-            Gxy             0.5e7;  
+            Gxy             0.5e7;
             Gyz             1.2e7;
             Gzx             1.2e7;
         }
@@ -58,15 +60,13 @@ mechanical
 //   nuyz           0.24;
 //   nuzx           0.4;
 
-//   Gxy           0.5e7;  
+//   Gxy           0.5e7;
 //   Gyz           1.2e7;
 //   Gzx           1.2e7; // para1
 
 // kx               kx [ 0 1 -1 0 0 0 0 ] 0.001;
 // ky               ky [ 0 1 -1 0 0 0 0 ] 0.001;
 // kz               kz [ 0 1 -1 0 0 0 0 ] 0.001;
-
-
 
 // K               K [ 1 -1 -2 0 0 0 0 ] 2e9;
 

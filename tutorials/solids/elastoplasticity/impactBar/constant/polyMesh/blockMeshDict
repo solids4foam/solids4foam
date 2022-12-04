@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
-|  \\    /   O peration     | Version:  1.6-ext                               |
-|   \\  /    A nd           | Web:      www.extend-project.de                 |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com](https://www.openfoam.com), and owner of the  |
+|              OPENFOAM® and OpenCFD® trade marks.                            |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -20,8 +22,6 @@ FoamFile
 
 // Setup m4 stuff
 
-
-
 // define geometry in mm
 
  // full cylinder height/length
@@ -31,9 +31,6 @@ FoamFile
  // wall radius
 
 // calculated quantities
-
-
-
 
 // define mesh density
  // number of cells in axial direction

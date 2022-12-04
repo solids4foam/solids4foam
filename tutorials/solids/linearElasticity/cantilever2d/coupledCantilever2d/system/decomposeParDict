@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM Extend Project: Open source CFD        |
-|  \\    /   O peration     | Version:  1.6-ext                               |
-|   \\  /    A nd           | Web:      www.extend-project.de                 |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com](https://www.openfoam.com), and owner of the  |
+|              OPENFOAM® and OpenCFD® trade marks.                            |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -14,7 +16,6 @@ FoamFile
     location    "system";
     object      decomposeParDict;
 }
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 numberOfSubdomains  2;
@@ -28,7 +29,6 @@ numberOfSubdomains  2;
 //- Keep owner and neighbour on same processor for faces in patches:
 //  (makes sense only for cyclic patches)
 //preservePatches (cyclic_left_right);
-
 
 //method          scotch;
 // method          hierarchical;
@@ -80,15 +80,13 @@ manualCoeffs
     dataFile    "cellDecomposition";
 }
 
-
 //// Is the case distributed
 //distributed     yes;
 //// Per slave (so nProcs-1 entries) the directory above the case.
-//roots           
+//roots
 //(
 //    "/tmp"
 //    "/tmp"
 //);
-
 
 // ************************************************************************* //

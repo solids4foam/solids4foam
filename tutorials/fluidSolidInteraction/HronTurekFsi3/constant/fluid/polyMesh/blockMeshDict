@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com](https://www.openfoam.com), and owner of the  |
+|              OPENFOAM® and OpenCFD® trade marks.                            |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -131,16 +133,16 @@ blocks
 edges
 (
     arc 23 24 (200 300 0)
-    arc 55 56 (200 300 15) 
+    arc 55 56 (200 300 15)
 
     arc 16 17 (200 250 0)
-    arc 48 49 (200 250 15) 
+    arc 48 49 (200 250 15)
 
     arc 6 7 (200 100 0)
-    arc 38 39 (200 100 15) 
+    arc 38 39 (200 100 15)
 
     arc 10 11 (200 150 0)
-    arc 42 43 (200 150 15) 
+    arc 42 43 (200 150 15)
 
     arc 6 23 (100 200 0)
     arc 38 55 (100 200 15)
@@ -149,16 +151,16 @@ edges
     arc 42 48 (150 200 15)
 
     arc 17 18 (243.301 225 0)
-    arc 49 50 (243.301 225 15) 
+    arc 49 50 (243.301 225 15)
 
     arc 24 19 (288.2725 258.6957 0)
-    arc 56 51 (288.2725 258.6957 15) 
+    arc 56 51 (288.2725 258.6957 15)
 
     arc 11 12 (243.301 175 0)
-    arc 43 44 (243.301 175 15) 
+    arc 43 44 (243.301 175 15)
 
     arc 13 7  (288.2725 141.3043 0)
-    arc 45 39 (288.2725 141.3043 15) 
+    arc 45 39 (288.2725 141.3043 15)
 
 );
 

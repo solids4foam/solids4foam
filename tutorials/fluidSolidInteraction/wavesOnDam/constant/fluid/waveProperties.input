@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  1.5                                   |
-|   \\  /    A nd           | Web:      http://www.OpenFOAM.org               |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com](https://www.openfoam.com), and owner of the  |
+|              OPENFOAM® and OpenCFD® trade marks.                            |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -27,8 +29,8 @@ initializationName inlet; //outlet;
 inletCoeffs
 {
     // Wave type to be used at boundary "inlet" and in relaxation zone "inlet"
-    waveType    stokesFirst;  
-    
+    waveType    stokesFirst;
+
     // Ramp time of 2 s
     Tsoft       0.2; //2;
 
@@ -41,19 +43,19 @@ inletCoeffs
     // Phase shift in the wave
     phi         0.000000;
 
-    // Wave number vector, k. 
+    // Wave number vector, k.
     direction  (1.0 0.0 0.0);
 
     // Wave height
     height      0.02;
-    
+
     // Specifications on the relaxation zone shape and relaxation scheme
     relaxationZone
     {
         relaxationScheme Spatial;
         relaxationShape  Rectangular;
         beachType        Empty;
-    
+
         relaxType   INLET;
         startX      (0 0.0 -1);
         //endX        (5 0.0  1);
@@ -72,7 +74,7 @@ inletCoeffs
 //     {
 //         relaxationScheme Spatial;
 //         relaxationShape  Rectangular;
-//         beachType        Empty;    
+//         beachType        Empty;
 
 //         relaxType   OUTLET;
 //         // startX      (13 0.0 -1);
@@ -82,7 +84,5 @@ inletCoeffs
 //         orientation      (1.0 0.0 0.0);
 //     }
 // };
-
-
 
 // ************************************************************************* //

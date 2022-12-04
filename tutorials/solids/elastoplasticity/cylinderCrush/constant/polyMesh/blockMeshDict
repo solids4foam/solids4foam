@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com](https://www.openfoam.com), and owner of the  |
+|              OPENFOAM® and OpenCFD® trade marks.                            |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -20,7 +22,7 @@ vertices
 (
     (0 0 0)                  // 0
     (0.003414 0 0)           // 1
-    (0.002828 0.002828 0)    // 2 
+    (0.002828 0.002828 0)    // 2
     (0 0.003414 0)           // 3
 
     (0.005 0 0)              // 4
@@ -28,7 +30,7 @@ vertices
     (0 0.005 0)              // 6
 
     (0 0 0.0025)               // 7
-    (0.003414 0 0.0025)        // 8 
+    (0.003414 0 0.0025)        // 8
     (0.002828 0.002828 0.0025) // 9
     (0 0.003414 0.0025)        // 10
 
