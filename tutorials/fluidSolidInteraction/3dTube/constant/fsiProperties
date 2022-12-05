@@ -4,8 +4,8 @@
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
-|              www.openfoam.com](https://www.openfoam.com), and owner of the  |
-|              OPENFOAM® and OpenCFD® trade marks.                            |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
