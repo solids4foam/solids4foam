@@ -6,21 +6,20 @@
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
 License
-    This file is part of OpenFOAM.
+    This file is part of solids4foam.
 
-    OpenFOAM is free software; you can redistribute it and/or modify it
+    solids4foam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the
-    Free Software Foundation; either version 2 of the License, or (at your
+    Free Software Foundation, either version 3 of the License, or (at your
     option) any later version.
 
-    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-    for more details.
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with OpenFOAM; if not, write to the Free Software Foundation,
-    Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -178,7 +177,7 @@ bool pimpleOversetFluid::evolve()
         const Time& runTime = fluidModel::runTime();
 #       include "volContinuity.H"
     }
-    
+
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), U());
 
@@ -213,7 +212,7 @@ bool pimpleOversetFluid::evolve()
         while (pimple().correct())
         {
             p().boundaryField().updateCoeffs();
-            
+
             volScalarField rAU = 1.0/UEqn.A();
             oversetFvPatchScalarField::oversetInterpolate(rAU);
             surfaceScalarField rAUf = fvc::interpolate(rAU);
@@ -222,7 +221,7 @@ bool pimpleOversetFluid::evolve()
             oversetFvPatchVectorField::oversetInterpolate(U());
 
             phi() = fvc::interpolate(U()) & mesh.Sf();
-            
+
             // Adjust overset fluxes
             oversetAdjustPhi(phi(), U()); // Fringe flux adjustment
             globalOversetAdjustPhi(phi(), U(), p()); // Global flux adjustment

@@ -6,20 +6,20 @@
      \\/     M anipulation  | For copyright notice see file Copyright
 -------------------------------------------------------------------------------
 License
-    This file is part of foam-extend.
+    This file is part of solids4foam.
 
-    foam-extend is free software: you can redistribute it and/or modify it
+    solids4foam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the
     Free Software Foundation, either version 3 of the License, or (at your
     option) any later version.
 
-    foam-extend is distributed in the hope that it will be useful, but
+    solids4foam is distributed in the hope that it will be useful, but
     WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
     General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -121,7 +121,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
                     << mesh_.points()[pointID] << endl;
             }
 
-            ownedByThisProc_[pointID] = true; 
+            ownedByThisProc_[pointID] = true;
         }
         else
         {
@@ -134,7 +134,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
     // - count the number of point owned by each proc
     // - scatter this list to all procs
     // - determine the starting global point ID for each proc
-    // - create the map on each proc using this starting global ID 
+    // - create the map on each proc using this starting global ID
 
     // Count the number of point owned by each proc
     label nPointsOwnByThisProc = 0;
@@ -248,7 +248,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
 
                 // Receive
                 IPstream::read
-                ( 
+                (
 #ifdef OPENFOAMESIORFOUNDATION
                     Pstream::commsTypes::blocking,
 #else
@@ -299,7 +299,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
             // Local point ID
             const label pointID = sharedPointLabels[globalPointI];
 
-            // Insert global point ID, if this proc owns the point 
+            // Insert global point ID, if this proc owns the point
             if (ownedByThisProc_[pointID])
             {
                 gpf[sharedPointAddr[globalPointI]] =
@@ -425,7 +425,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
                     {
                         stencilNotOwned.insert(neiPointID);
                     }
-                }                        
+                }
             }
         }
 
