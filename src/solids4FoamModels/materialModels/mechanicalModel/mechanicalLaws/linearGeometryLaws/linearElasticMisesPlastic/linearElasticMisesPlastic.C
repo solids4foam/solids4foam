@@ -6,20 +6,20 @@
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
 License
-    This file is part of foam-extend.
+    This file is part of solids4foam.
 
-    foam-extend is free software: you can redistribute it and/or modify it
+    solids4foam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the
     Free Software Foundation, either version 3 of the License, or (at your
     option) any later version.
 
-    foam-extend is distributed in the hope that it will be useful, but
+    solids4foam is distributed in the hope that it will be useful, but
     WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
     General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -245,26 +245,26 @@ void Foam::linearElasticMisesPlastic::calculateStress
 {
     // Calculate deviatoric strain
     const surfaceSymmTensorField e(dev(epsilon));
-    
+
     // Calculate deviatoric trial stress
     const surfaceSymmTensorField sTrial
     (
      2.0*mu_*(e - dev(epsilonPf_.oldTime()))
      );
-    
+
     // Calculate the yield function
     const surfaceScalarField fTrial(mag(sTrial) - sqrtTwoOverThree_*sigmaYf_);
-    
+
     // Make a copy of history fields that are updated
     surfaceSymmTensorField plasticN("plasticNtmp", 1.0*plasticNf_);
     surfaceScalarField DSigmaY("DSigmaYtmp", 1.0*DSigmaYf_);
     surfaceScalarField DLambda("DLambdatmp", 1.0*DLambdaf_);
     surfaceScalarField sigmaY("sigmaYtmp", 1.0*sigmaYf_);
-    
+
 #ifdef OPENFOAMESIORFOUNDATION
     // Normalise residual in Newton method with respect to mag(bE)
     const scalar maxMagBE = max(gMax(mag(epsilon.primitiveField())), SMALL);
-    
+
     // Take references to the internal fields for efficiency
     const scalarField& fTrialI = fTrial.primitiveField();
     const symmTensorField& sTrialI = sTrial.primitiveField();
@@ -277,7 +277,7 @@ void Foam::linearElasticMisesPlastic::calculateStress
 #else
     // Normalise residual in Newton method with respect to mag(bE)
     const scalar maxMagBE = max(gMax(mag(epsilon.internalField())), SMALL);
-    
+
     // Take references to the internal fields for efficiency
     const scalarField& fTrialI = fTrial.internalField();
     const symmTensorField& sTrialI = sTrial.internalField();
@@ -288,7 +288,7 @@ void Foam::linearElasticMisesPlastic::calculateStress
     const scalarField& sigmaYOldI = sigmaYf_.oldTime().internalField();
     const scalarField& epsilonPEqOldI = epsilonPEqf_.oldTime().internalField();
 #endif
-    
+
     // Calculate DLambdaf_ and plasticNf_
     // int numYield = 0;
     forAll(fTrialI, faceI)
@@ -307,14 +307,14 @@ void Foam::linearElasticMisesPlastic::calculateStress
          mu_.value(),
          maxMagBE
          );
-        
+
         // if (fTrialI[faceI] > 0)
         // {
         //     numYield++;
         // }
     }
     // Info<< "        tang: numYield = " <<  numYield << endl;
-    
+
     forAll(fTrial.boundaryField(), patchI)
     {
         // Take references to the boundary patch fields for efficiency
@@ -335,7 +335,7 @@ void Foam::linearElasticMisesPlastic::calculateStress
         sigmaYf_.oldTime().boundaryField()[patchI];
         const scalarField& epsilonPEqOldP =
         epsilonPEqf_.oldTime().boundaryField()[patchI];
-        
+
         forAll(fTrialP, faceI)
         {
             // Update plasticN, DLambda, DSigmaY and sigmaY for this face
@@ -354,30 +354,30 @@ void Foam::linearElasticMisesPlastic::calculateStress
              );
         }
     }
-    
+
     // Update DEpsilonPEq
     // DEpsilonPEqf_ = sqrtTwoOverThree_*DLambdaf_;
-    
+
     // Store previous iteration for residual calculation
     // DEpsilonPf_.storePrevIter();
-    
+
     // Update DEpsilonP
     const surfaceSymmTensorField DEpsilonP(DLambda*plasticN);
-    
+
     // Update total plastic strain
     // epsilonPf_ = epsilonPf_.oldTime() + DEpsilonPf_;
-    
+
     // Update equivalent total plastic strain
     // epsilonPEqf_ = epsilonPEqf_.oldTime() + DEpsilonPEqf_;
-    
+
     // Calculate deviatoric stress
     const surfaceSymmTensorField s(sTrial - 2*mu_*DEpsilonP);
-    
+
     // Calculate the hydrostatic pressure directly from the displacement
     // field
     // const surfaceScalarField trEpsilon(tr(epsilon));
     // calculateHydrostaticStress(sigmaHydf_, trEpsilon);
-    
+
     // Update the stress
     sigma = K_*tr(epsilon)*I + s;
 }
@@ -878,7 +878,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
     (
         max(mag(sTrial), dimensionedScalar("SMALL", dimPressure, SMALL))
     );
- 
+
     // Calculate the yield function
     const surfaceScalarField fTrial
     (
@@ -895,7 +895,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
     if (numericalTangent)
     {
         // Lookup current stress and store it as the reference
-        const surfaceSymmTensorField& sigmaRef = 
+        const surfaceSymmTensorField& sigmaRef =
             mesh().lookupObject<surfaceSymmTensorField>("sigmaf");
         const surfaceSymmTensorField& epsilonRef = epsilonf();
 

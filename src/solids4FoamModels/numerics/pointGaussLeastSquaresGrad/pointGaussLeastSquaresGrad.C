@@ -6,20 +6,20 @@
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
 License
-    This file is part of foam-extend.
+    This file is part of solids4foam.
 
-    foam-extend is free software: you can redistribute it and/or modify it
+    solids4foam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the
     Free Software Foundation, either version 3 of the License, or (at your
     option) any later version.
 
-    foam-extend is distributed in the hope that it will be useful, but
+    solids4foam is distributed in the hope that it will be useful, but
     WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
     General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -279,7 +279,7 @@ pointGaussLeastSquaresGrad<Type>::calcGrad
         {
             // Info << mesh.boundary()[patchI].name() << ", "
             //      << mesh.boundary()[patchI].type() << endl;
-          
+
             Field<Type> ppf = pf.boundaryField()[patchI].patchInternalField();
 
             tGrad().boundaryField()[patchI] =
@@ -309,20 +309,20 @@ pointGaussLeastSquaresGrad<Type>::calcGrad
                *vf.boundaryField()[patchI].snGrad();
         }
     }
-    
+
     forAll(mesh.boundary(), patchI)
     {
         if (mesh.boundary()[patchI].type() == ggiFvPatch::typeName)
         {
-            const ggiFvPatch& ggiPatch = 
+            const ggiFvPatch& ggiPatch =
                 refCast<const ggiFvPatch>(mesh.boundary()[patchI]);
 
             if (!ggiPatch.master())
             {
-                Field<GradType>& slaveGrad = 
+                Field<GradType>& slaveGrad =
                     tGrad().boundaryField()[patchI];
 
-                const Field<GradType>& masterGrad = 
+                const Field<GradType>& masterGrad =
                     tGrad().boundaryField()[ggiPatch.shadowIndex()];
 
                 slaveGrad = ggiPatch.interpolate(masterGrad);

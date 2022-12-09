@@ -6,20 +6,20 @@
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
 License
-    This file is part of foam-extend.
+    This file is part of solids4foam.
 
-    foam-extend is free software: you can redistribute it and/or modify it
+    solids4foam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the
     Free Software Foundation, either version 3 of the License, or (at your
     option) any later version.
 
-    foam-extend is distributed in the hope that it will be useful, but
+    solids4foam is distributed in the hope that it will be useful, but
     WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
     General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -121,7 +121,7 @@ void Foam::isotropicFungElastic::correct(volSymmTensorField& sigma)
     // Compute first derivative of strain-energy function
     const volScalarField psi1(c1_*exp(0.5*c2_*(I1 - 3)));
 
-    // Update the hydrostatic stress 
+    // Update the hydrostatic stress
     updateSigmaHyd
     (
         0.5*K()*(pow(J, 2.0) - 1.0),
