@@ -44,12 +44,9 @@ Foam::physicsModel::physicsModel
     const word& type,
     Time& runTime,
     const word& region
-)
-:
-    dict_
-    (
-        IOobject
-        (
+):
+    dict_ (
+        IOobject   (
             "physicsProperties",
             bool(region == dynamicFvMesh::defaultRegion)
           ? fileName(runTime.caseConstant())
