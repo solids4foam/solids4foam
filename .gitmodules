@@ -1,0 +1,3 @@
+[submodule "solids4foam-tutorials-benchmark-data"]
+	path = solids4foam-tutorials-benchmark-data
+	url = git@github.com:solids4foam/solids4foam-tutorials-benchmark-data.git

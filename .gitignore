@@ -2,6 +2,8 @@
 # Lines that start with '#' are comments.
 
 notes.txt
+todo*
+tutorialsTest
 
 # Build log files
 log.Allwmake
@@ -13,6 +15,9 @@ src/solids4FoamModels/Make/files
 
 # ignore eigen and ltensor libraries
 ThirdParty/eigen3
+
+# preCICE tutorial repo
+tutorials/fluidSolidInteraction-preCICE/tutorials
 
 # editor and misc backup files - anywhere
 *~
