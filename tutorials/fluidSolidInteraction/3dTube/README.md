@@ -48,6 +48,8 @@ In this tutorial, we will compare six variants of the approaches above:
 
 In all approaches, the solid domain setup is exactly the same, where an incremental small strain formulation is used (the `linearGeometry` solid model). One-quarter of the tube's cross-section is considered, although the case could actually be modelled as 2-D axisymmetric. The test is run for 0.02 s. A relatively tight FSI loop tolerance of 1e-6 is used for all approaches based on the interface motion. For approach 6 (preCICE), the relative displacement tolerance was set to 1e-6, and the relative force tolerance was set to 1e-3.
 
+The first-order Euler time scheme is used for the solid and fluid in all cases.
+
 ---
 
 ## Running the Case
@@ -103,3 +105,8 @@ To observe the effect of the time step size, the cases were re-run with a smalle
 **Figure 7: Number of FSI iterations per time-step with deltaT = 2.5e-5 s**
 
 Unlike the larger time step, the Robin-Neumann approach now requires the least number of iterations per time step (exactly 4 for every time step). The weakly compressible approaches are the next best, where the IQNILS-accelerated compressible model outperforms the Aitken's-accelerated compressible model. The incompressible IQNILS approaches are the next best (both solids4foam and preCICE). Finally, in this case, the Aitken's-accelerated incompressible model shows the poorest performance, requiring an order of magnitude greater number of iterations than the best approach. The impressive performance of the Robin-Neumann approach can also be observed for smaller time steps; in general, for cases like this, if the time step is sufficiently small, the Robin-Neumann approach requires minimal iterations; however, once the time step is large, then the Robin approach diverges or becomes uncompetitive.
+
+
+## Data Availability
+
+The results and gnuplot scripts used to generate the figures above are available in the [solids4foam tutorials benchmark data](https://github.com/solids4foam/solids4foam-tutorials-benchmark-data) repository.
