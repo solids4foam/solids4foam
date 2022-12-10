@@ -6,6 +6,12 @@ sort: 3
 
 ---
 
+## Tutorial Aims
+
+- Demonstrate the solution of an external flow fluid-solid interaction problem;
+- Explain how to run a fluid-solid interaction simulation in solids4foam.
+
+
 ## Case overview
 
 ![](images/fs_over_1.PNG)

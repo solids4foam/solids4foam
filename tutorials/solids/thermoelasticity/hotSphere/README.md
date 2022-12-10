@@ -6,6 +6,13 @@ sort: 1
 
 ---
 
+## Tutorial Aims
+
+- Demonstrate how to perform a solid-only analysis in solids4foam;
+- Describe the structure of a solids4foam solid-only case;
+- Demonstrate how to perform a thermo-elastic analysis;
+
+
 ## Case overview
 ![](images/sol_overview_1.PNG)
 

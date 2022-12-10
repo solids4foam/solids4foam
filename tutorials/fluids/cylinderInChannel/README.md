@@ -6,6 +6,11 @@ sort: 2
 
 ---
 
+## Tutorial Aims
+
+- Demonstrate how to perform a fluid-only analysis in solids4foam;
+- Explain how a solids4foam fluid case is different from a standard OpenFOAM fluid case.
+
 ## Case overview
 
 ![](images/flu_over_1.PNG)
