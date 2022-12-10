@@ -1,0 +1,50 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      solidForce;
+}
+
+dimensions      [1 2 2 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    outlet
+    {
+        type            calculated;
+        value           uniform (0 0 0);
+    }
+    inlet
+    {
+        type            calculated;
+        value           uniform (0 0 0);
+    }
+    inner-wall
+    {
+        type            calculated;
+        value           uniform (0 0 0);
+    }
+    outer-wall
+    {
+        type            calculated;
+        value           uniform (0 0 0);
+    }
+    symmetry-x
+    {
+        type            symmetryPlane;
+    }
+    symmetry-y
+    {
+        type            symmetryPlane;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+
