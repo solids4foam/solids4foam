@@ -29,14 +29,18 @@ The tube wall is assumed an isotropic elastic body under the small-strain regime
 The case demonstrates a strong coupling between the fluid and the solid due to the high fluid-to-solid density ratio. When using a partitioned solution approach (as in solids4foam), the so-called 'added-mass operator' makes the problem difficult to solve due to numerical instabilities.
 
 Currently, in solids4foam, there are two classes of approaches for partitioned FSI coupling:
-    - **Dirichlet-Neumann coupling**, where a Dirichlet condition is applied to the fluid velocity and Neumann conditions to the fluid pressure and solid displacement. This approach **does not** require modification of the underlying fluid solver; see [Tuković Ž, Karač A, Cardiff P, Jasak H, Ivanković A, 2018, OpenFOAM finite volume solver for fluid–solid interaction. Trans FAMENA, 42(3):1–31.10.21278/TOF.42301](https://hrcak.srce.hr/206941);
-        - **Robin-Neumann coupling**, where a Dirichlet condition is applied to the fluid velocity, a Robin condition to the fluid pressure, and a Neumann condition to the solid displacement. This approach **does** require modification of the underlying fluid solver, and hence it cannot be considered a *black-box* coupling approach; see [Tuković Ž, Bukač M, Cardiff P, Jasak H, Ivanković A, 2018, Added mass partitioned fluid–structure interaction solver based on a robin boundary condition for pressure. In: OpenFOAM selected papers of the 11th workshop. Springer, Berlin, pp 1–23](https://www.springerprofessional.de/en/added-mass-partitioned-fluid-structure-interaction-solver-based-/16418780).
+
+- **Dirichlet-Neumann coupling**, where a Dirichlet condition is applied to the fluid velocity and Neumann conditions to the fluid pressure and solid displacement. This approach **does not** require modification of the underlying fluid solver; see [Tuković Ž, Karač A, Cardiff P, Jasak H, Ivanković A, 2018, OpenFOAM finite volume solver for fluid–solid interaction. Trans FAMENA, 42(3):1–31.10.21278/TOF.42301](https://hrcak.srce.hr/206941);
+
+- **Robin-Neumann coupling**, where a Dirichlet condition is applied to the fluid velocity, a Robin condition to the fluid pressure, and a Neumann condition to the solid displacement. This approach **does** require modification of the underlying fluid solver, and hence it cannot be considered a *black-box* coupling approach; see [Tuković Ž, Bukač M, Cardiff P, Jasak H, Ivanković A, 2018, Added mass partitioned fluid–structure interaction solver based on a robin boundary condition for pressure. In: OpenFOAM selected papers of the 11th workshop. Springer, Berlin, pp 1–23](https://www.springerprofessional.de/en/added-mass-partitioned-fluid-structure-interaction-solver-based-/16418780).
 
 For each of these two classes of approach, we can employ different methods to accelerate the FSI iteration loop convergence; within solids4foam, we can use:
-    - Aitken's dynamic relaxation;
-    - the IQN-ILS algorithm of [Joris Degroote, Robby Haelterman, Sebastiaan Annerel, Peter Bruggeman, Jan Vierendeels, Performance of partitioned procedures in fluid–structure interaction, Computers & Structures, 88, 7–8, 2010, 10.1016/j.compstruc.2009.12.006](https://www.sciencedirect.com/science/article/abs/pii/S0045794909003022).
 
-As well as using these acceleration algorithms, we can also use a weakly compressible fluid model rather than the standard fully incompressible model; for FSI, weakly compressible fluid models how been shown to improve convergence, for example, see [E. Tandis and A. Ashrafizadeh, “A numerical study on the fluid compressibility effects in strongly coupled fluid–solid interaction problems,” Engineering with Computers, 2019, doi: 10.1007/s00366-019-00880-4.](https://doi.org/10.1007/s00366-019-00880-4).
+- Aitken's dynamic relaxation;
+
+- the IQN-ILS algorithm of [Joris Degroote, Robby Haelterman, Sebastiaan Annerel, Peter Bruggeman, Jan Vierendeels, Performance of partitioned procedures in fluid–structure interaction, Computers & Structures, 88, 7–8, 2010, 10.1016/j.compstruc.2009.12.006](https://www.sciencedirect.com/science/article/abs/pii/S0045794909003022).
+
+As well as using these acceleration algorithms, we can also use a **weakly compressible** fluid model rather than the standard **fully incompressible** model; for FSI, weakly compressible fluid models how been shown to improve convergence, for example, see [E. Tandis and A. Ashrafizadeh, “A numerical study on the fluid compressibility effects in strongly coupled fluid–solid interaction problems,” Engineering with Computers, 2019, doi: 10.1007/s00366-019-00880-4.](https://doi.org/10.1007/s00366-019-00880-4).
 
 In this tutorial, we will compare six variants of the approaches above:
 
@@ -49,7 +53,7 @@ In this tutorial, we will compare six variants of the approaches above:
 
 In all approaches, the solid domain setup is exactly the same, where an incremental small strain formulation is used (the `linearGeometry` solid model). One-quarter of the tube's cross-section is considered, although the case could actually be modelled as 2-D axisymmetric. The test is run for 0.02 s. A relatively tight FSI loop tolerance of 1e-6 is used for all approaches based on the interface motion. For approach 6 (preCICE), the relative displacement tolerance was set to 1e-6, and the relative force tolerance was set to 1e-3.
 
-The first-order Euler time scheme is used for the solid and fluid in all cases.
+In all cases, the first-order Euler time scheme is used for the solid and fluid.
 
 ---
 
