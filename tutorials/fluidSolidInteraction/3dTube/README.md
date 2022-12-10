@@ -19,6 +19,7 @@ sort: 4
 This case consists of a pressure pulse applied in a thick-walled elastic tube (Figure 1).
 
 ![](images/3dTube.png)
+
 **Figure 1: Wave propagation in an elastic pipe**
 
 The fluid is assumed incompressible, Newtonian and isothermal, with a density of 1000.0 kg/m3 and kinematic viscosity of 3e-6 m2/s. A pressure wave, with a peak of 1333.3 Pa, is applied at the tube inlet for a duration of 3e-3 s. The outlet pressure is held at 0 Pa throughout.
@@ -82,12 +83,15 @@ Initially, we compare the solutions using a relatively large time step size of 1
 - preCICE-DN-IQNILS: Dirichlet-Neumann formulation with Aitken's acceleration and an incompressible fluid model using preCICE.
 
 ![](./images/axial-displacement-deltaT1e-4.png)
+
 **Figure 2: Axial displacement at point A vs time with deltaT = 1e-4 s**
 
 ![](./images/radial-displacement-deltaT1e-4.png)
+
 **Figure 3: Radial displacement at point A vs time with deltaT = 1e-4 s**
 
 ![](./images/coupling-iterations-deltaT1e-4.png)
+
 **Figure 4: Number of FSI iterations per time-step with deltaT = 1e-4 s**
 
 The predictions from all approaches agree closely. Examining the number of FSI iterations per time step, both implementations (solids4foam and preCICE) of Dirichlet-Neumann coupling with IQN-ILS acceleration are seen to require the least number of iterations. The weakly compressible approach is the next best performing approach, while the incompressible Aitken's-accelerated Dirichlet-Neumann and Robin-Neumann approaches are seen to perform the poorest.
@@ -96,12 +100,15 @@ The predictions from all approaches agree closely. Examining the number of FSI i
 
 To observe the effect of the time step size, the cases were re-run with a smaller time step of 2.5e-5 s, where Figures 5, 6 and 7 show the radial displacement, axial displacement and the number of iterations.
 ![](./images/axial-displacement-deltaT2.5e-5.png)
+
 **Figure 5: Axial displacement at point A vs time with deltaT = 2.5e-5 s**
 
 ![](./images/radial-displacement-deltaT2.5e-5.png)
+
 **Figure 6: Radial displacement at point A vs time with deltaT = 2.5e-5 s**
 
 ![](./images/coupling-iterations-deltaT2.5e-5.png)
+
 **Figure 7: Number of FSI iterations per time-step with deltaT = 2.5e-5 s**
 
 Unlike the larger time step, the Robin-Neumann approach now requires the least number of iterations per time step (exactly 4 for every time step). The weakly compressible approaches are the next best, where the IQNILS-accelerated compressible model outperforms the Aitken's-accelerated compressible model. The incompressible IQNILS approaches are the next best (both solids4foam and preCICE). Finally, in this case, the Aitken's-accelerated incompressible model shows the poorest performance, requiring an order of magnitude greater number of iterations than the best approach. The impressive performance of the Robin-Neumann approach can also be observed for smaller time steps; in general, for cases like this, if the time step is sufficiently small, the Robin-Neumann approach requires minimal iterations; however, once the time step is large, then the Robin approach diverges or becomes uncompetitive.
