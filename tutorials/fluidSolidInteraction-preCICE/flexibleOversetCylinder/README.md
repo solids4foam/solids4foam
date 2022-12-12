@@ -70,7 +70,7 @@ To run the tutorial, we suggest using two terminal tabs: one for the solid; and 
 
 The time-varying velocity field in the fluid and hydrostatic stress in the solid are shown in Video 1. A bouncing type behaviour can be seen in the solid in the early stages of the simulation, where the acceleration on the solid is greatest (Figure 2).
 
-<iframe width="560" height="315" src="https://youtu.be/fWx9aCKs6uA" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+{% include youtube.html id="fWx9aCKs6uA" %}
 
 **Video 1: Velocity field within the fluid domain and hydrostatic stress field within the solid domain in the `flexibleOversetCylinder` tutorial**
 
