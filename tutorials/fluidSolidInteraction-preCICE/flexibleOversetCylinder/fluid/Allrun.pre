@@ -1,0 +1,12 @@
+#!/bin/sh
+cd "${0%/*}" || exit                                # Run from this directory
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions        # Tutorial run functions
+#------------------------------------------------------------------------------
+
+# Extrude mesh around cylinder
+(cd cylinderMesh && ./Allrun.pre)
+
+# Add background mesh
+(cd cylinderAndBackground && ./Allrun.pre)
+
+#------------------------------------------------------------------------------

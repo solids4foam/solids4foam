@@ -1,0 +1,10 @@
+#!/bin/sh
+cd "${0%/*}" || exit    # Run from this directory
+
+# An extruded mesh around cylinder
+(cd cylinderAndBackground && ./Allclean)
+
+# The background mesh
+(cd cylinderMesh && foamCleanTutorials)
+
+#------------------------------------------------------------------------------

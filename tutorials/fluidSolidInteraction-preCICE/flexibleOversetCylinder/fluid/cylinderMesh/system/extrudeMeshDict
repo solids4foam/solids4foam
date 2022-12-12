@@ -1,0 +1,135 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      extrudeMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// What to extrude:
+//      patch   : from patch of another case ('sourceCase')
+//      mesh    : as above but with original case included
+//      surface : from externally read surface
+
+//constructFrom mesh;
+//constructFrom patch;
+constructFrom surface;
+
+// If construct from patch/mesh:
+sourceCase "../cavity";
+sourcePatches (movingWall);
+
+// If construct from patch: patch to use for back (can be same as sourcePatch)
+exposedPatchName movingWall;
+
+// If construct from surface:
+surface "<constant>/triSurface/cylinder.vtk";
+
+// Flip surface normals before usage. Valid only for extrude from surface or
+// patch.
+flipNormals false;
+
+//- Linear extrusion in point-normal direction
+extrudeModel        linearNormal;
+
+//- Single layer linear extrusion in point-normal direction
+//  with empty patches on front and back
+//extrudeModel        plane;
+
+//- Linear extrusion in specified direction
+//extrudeModel        linearDirection;
+
+//- Sector extrusion
+//extrudeModel        sector;
+
+//- Wedge extrusion of a single layer
+//  with wedge patches on front and back
+//extrudeModel        wedge;
+
+//- Extrudes into sphere around (0 0 0)
+//extrudeModel        linearRadial;
+
+//- Extrudes into sphere around (0 0 0) with specified radii
+//extrudeModel        radial;
+
+//- Extrudes into sphere with grading according to pressure (atmospherics)
+//extrudeModel        sigmaRadial;
+
+//- Extrudes by interpolating along path inbetween two (topologically identical)
+//  surfaces (e.g. one is an offsetted version of the other)
+//extrudeModel        offsetSurface;
+
+nLayers             10;
+
+expansionRatio      1.02;
+
+sectorCoeffs    //<- Also used for wedge
+{
+    point       (0 0.1 -0.05);
+    axis        (-1 0 0);
+    angle       360;  // For nLayers=1 assume symmetry so angle/2 on each side
+}
+
+linearNormalCoeffs
+{
+    thickness       0.7;
+}
+
+planeCoeffs
+{
+//    thickness       0.1;
+  nLayers 4;
+}
+
+linearDirectionCoeffs
+{
+    direction       (0 1 0);
+    thickness       0.5;
+}
+
+linearRadialCoeffs
+{
+    R               0.1;
+    Rsurface        0.01;  // Optional inner radius
+}
+
+radialCoeffs
+{
+    // Radii specified through interpolation table
+    R               table ((0 0.01)(3 0.03)(10 0.1));
+}
+
+sigmaRadialCoeffs
+{
+    RTbyg           1;
+    pRef            1;
+    pStrat          1;
+}
+
+offsetSurfaceCoeffs
+{
+    // Surface that mesh has been meshed to
+    baseSurface "<constant>/triSurface/DTC-scaled-inflated.obj";
+
+    // Surface to fill in to
+    offsetSurface "<constant>/triSurface/DTC-scaled.obj";
+}
+
+
+// Do front and back need to be merged? Usually only makes sense for 360
+// degree wedges.
+mergeFaces false;
+
+// Merge small edges. Fraction of bounding box.
+mergeTol 0;
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

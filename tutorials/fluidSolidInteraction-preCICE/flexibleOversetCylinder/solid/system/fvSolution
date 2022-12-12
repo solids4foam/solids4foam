@@ -1,0 +1,49 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "D|DD"
+    {
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-09;
+        relTol          0.1;
+    }
+    "blockDD|blockD"
+    {
+        // Direct solver
+        solver              EigenSparseLU;
+    }
+}
+
+relaxationFactors
+{
+    // Under-relaxating the DD equation by 0.99-0.9999 can improve convergence in
+    // some cases, in particular when there are solidContact boundaries
+    //DEqn   0.999;
+    //DDEqn   0.999;
+
+    // Under-relaxating the DD field by 0.1-0.9 can improve convergence in some
+    // cases
+    D      0.9;
+    DD      0.9;
+}
+
+// ************************************************************************* //

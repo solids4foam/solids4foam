@@ -1,0 +1,13 @@
+#!/bin/bash
+
+cd "${0%/*}" || exit                                # Run from this directory
+
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions        # Tutorial run functions
+
+./Allrun.pre
+
+# Run it for a bit
+runApplication $(getApplication)
+
+# Remove empty time directories created by preCICE
+source solids4FoamScripts.sh && solids4Foam::removeEmptyDirs

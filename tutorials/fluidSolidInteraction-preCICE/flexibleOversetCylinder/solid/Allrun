@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Create the mesh
+runApplication blockMesh
+
+# preCICE needs 2-D geometry to be in the XY plane 
+transformPoints -rotate-angle "((1 0 0) 90)"
+
+# Run the solver
+runApplication solids4Foam
+
+# Remove empty time directories created by preCICE
+source solids4FoamScripts.sh && solids4Foam::removeEmptyDirs
