@@ -46,4 +46,19 @@ timePrecision   6;
 
 runTimeModifiable no;
 
+functions
+(
+    topStress
+    {
+       type         solidStresses;
+       historyPatch top;
+    }
+
+    topDisplacement
+    {
+       type         solidDisplacements;
+       historyPatch top;
+    }
+);
+
 // ************************************************************************* //
