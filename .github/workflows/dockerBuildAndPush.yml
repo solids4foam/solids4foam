@@ -12,10 +12,6 @@ jobs:
   docker-openfoamv2012:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout without submodules
-        uses: actions/checkout@v3
-        with:
-          submodules: false
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
