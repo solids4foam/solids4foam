@@ -42,6 +42,7 @@ To run a fluid-solid interaction case using OpenFOAM and preCICE, the solid and 
         type preciceAdapterFunctionObject;
         libs ("libpreciceAdapterFunctionObject.so");
     }
+    ```
   - Add the `preciceDict` to the `system` directory; for example, see the preCICE [perpendicular-flap tutorial OpenFOAM fluid case](https://github.com/precice/tutorials/blob/master/perpendicular-flap/fluid-openfoam/system/preciceDict).
   - Use the `displacementLaplacian` mesh motion solver; this means that the `pointDisplacement` field needs to be specified in the 0 directory, where the interface condition is set to `fixedValue`;
   - Optionally, add the `solids4Foam::removeEmptyDirs` bash call to the end of the Allrun script; the purpose of this function is to remove empty time directories which are inadvertently created by preCICE.
