@@ -118,7 +118,7 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
     const tensorField& eigenVecI = eigenVec.internalField();
     symmTensor logEigenVal = symmTensor::zero;
 
-        #ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESIORFOUNDATION
     symmTensorField& resultI = result.primitiveFieldRef();
 #else
     symmTensorField& resultI = result.internalField();
