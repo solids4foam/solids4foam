@@ -169,7 +169,13 @@ void Foam::OgdenElastic::correct
     // Calculate the deviatoric stress
     const vectorField& lambdaI = lambda.internalField();
     const tensorField& eigVecI = eigVec.internalField();
+
+#ifdef FOAMEXTEND
+    symmTensorField& sI = s.internalField();
+#else
     symmTensorField& sI = s.primitiveFieldRef();
+#endif
+
     forAll(sI, cellI)
     {
         // Calculate principal stresses individually for each cell
