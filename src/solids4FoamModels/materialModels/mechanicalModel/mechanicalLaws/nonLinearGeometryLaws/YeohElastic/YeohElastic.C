@@ -143,7 +143,18 @@ Foam::tmp<Foam::volScalarField> Foam::YeohElastic::impK() const
 {
     return tmp<volScalarField>
     (
-        new volScalarField((4.0/3.0)*mu() + K())
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            ((4.0/3.0)*mu() + K())
+        )
     );
 }
 
