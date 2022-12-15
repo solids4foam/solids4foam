@@ -14,5 +14,3 @@ solids4Foam::runApplication blockMesh
 
 # Run the solver
 solids4Foam::runApplication solids4Foam
-
-

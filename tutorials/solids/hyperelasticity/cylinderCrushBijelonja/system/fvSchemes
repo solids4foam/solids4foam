@@ -18,12 +18,12 @@ FoamFile
 
 d2dt2Schemes
 {
-    default            steadyState;
+    default            Euler;
 }
 
 ddtSchemes
 {
-    default            steadyState;
+    default            Euler;
 }
 
 gradSchemes
