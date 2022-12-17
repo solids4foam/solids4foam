@@ -151,8 +151,8 @@ bool nonLinGeomTotalLagSolid::evolve()
         // Momentum equation incremental displacement total Lagrangian form
         fvVectorMatrix DDEqn
         (
-            fvm::d2dt2(rho(), DD())
-          + fvc::d2dt2(rho().oldTime(), D().oldTime())
+            rho()*fvm::d2dt2(DD())
+          + rho()*fvc::d2dt2(D().oldTime())
          == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           + fvc::div(J_*Finv_ & sigma(), "div(sigma)")

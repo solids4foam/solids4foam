@@ -288,8 +288,14 @@ bool explicitUnsLinGeomTotalDispSolid::evolve()
                     ),
                     "laplacian(DU,U)"
                 )().internalField()
-            )/rho().internalField()
-          + g().value();
+            )/rho().internalField();
+
+#ifdef OPENFOAMESIORFOUNDATION
+        a_.primitiveFieldRef() += g().value();
+#else
+        a_.internalField() += g().value();
+#endif
+
         a_.correctBoundaryConditions();
 
         // Check energies

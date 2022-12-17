@@ -21,11 +21,7 @@ License
     You should have received a copy of the GNU General Public License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
-Description
-
 \*---------------------------------------------------------------------------*/
-
-#ifdef OPENFOAMESIORFOUNDATION
 
 #include "backwardD2dt2Scheme.H"
 #include "fvMesh.H"
@@ -33,7 +29,5 @@ Description
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 makeFvD2dt2Scheme(backwardD2dt2Scheme)
-
-#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
 // ************************************************************************* //

@@ -25,15 +25,17 @@ Class
     Foam::fv::backwardD2dt2Scheme
 
 Description
-    First-order backward implicit d2dt2 using the current and two previous
+    Second-order backward implicit d2dt2 using the current and four previous
     time-step values.
 
 SourceFiles
     backwardD2dt2Scheme.C
 
-\*---------------------------------------------------------------------------*/
+Author
+    Zeljko Tukovic
+    Some additions by Philip Cardiff
 
-#ifdef OPENFOAMESIORFOUNDATION
+\*---------------------------------------------------------------------------*/
 
 #ifndef backwardD2dt2Scheme_H
 #define backwardD2dt2Scheme_H
@@ -157,7 +159,5 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
-
-#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
 // ************************************************************************* //

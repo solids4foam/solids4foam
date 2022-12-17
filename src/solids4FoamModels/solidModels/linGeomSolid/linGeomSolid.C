@@ -50,12 +50,26 @@ linGeomSolid::linGeomSolid
     solidModel(typeName, runTime, region),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_)
+    rImpK_(1.0/impK_),
+    rhoDdtD_0_
+    (
+        IOobject
+        (
+            "rhoDdtD_0",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedVector("zero", dimForce/dimVolume, vector::zero)
+    )
 {
     DDisRequired();
 
     // Force all required old-time fields to be created
     fvm::d2dt2(DD());
+    fvc::d2dt2(D().oldTime());
 
     // For consistent restarts, we will calculate the gradient field
     DD().correctBoundaryConditions();
@@ -95,7 +109,7 @@ bool linGeomSolid::evolve()
             fvVectorMatrix DDEqn
             (
                 rho()*fvm::d2dt2(DD())
-              + rho()*fvc::d2dt2(D().oldTime())
+              + rhoDdtD_0_
              == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
               - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
               + fvc::div(sigma(), "div(sigma)")
@@ -159,6 +173,9 @@ bool linGeomSolid::evolve()
         U() = fvc::ddt(D());
     }
     while (mesh().update());
+
+    // Store ddt old term
+    rhoDdtD_0_ = rho()*fvc::d2dt2(D());
 
 #ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector>::debug = 1;

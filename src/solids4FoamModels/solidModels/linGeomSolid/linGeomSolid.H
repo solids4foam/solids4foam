@@ -71,6 +71,10 @@ class linGeomSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Store rho*ddt(D_old) for efficiency
+        volVectorField rhoDdtD_0_;
+
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct

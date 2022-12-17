@@ -7,7 +7,6 @@ solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
 solidModels/solidModel/dualMeshToMeshMap.C
 
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
-solidModels/coupledUnsLinGeomSolid/coupledUnsLinGeomSolid.C
 solidModels/explicitLinGeomTotalDispSolid/explicitLinGeomTotalDispSolid.C
 solidModels/explicitUnsLinGeomTotalDispSolid/explicitUnsLinGeomTotalDispSolid.C
 solidModels/linGeomSolid/linGeomSolid.C

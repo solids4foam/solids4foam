@@ -271,7 +271,7 @@ bool unsNonLinGeomUpdatedLagSolid::evolve()
         fvVectorMatrix DDEqn
         (
             fvm::d2dt2(rho_, DD())
-          + fvc::d2dt2(rho_.oldTime(), D().oldTime())
+          + fvc::d2dt2(rho_, D().oldTime())
          == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
           + fvc::div((relJf_*relFinvf_.T() & mesh().Sf()) & sigmaf_)
