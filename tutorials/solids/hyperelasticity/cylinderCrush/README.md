@@ -12,6 +12,9 @@ sort: 3
   and a solid contact boundary condition.
 - Compare the convergence behavior of updated and total Lagrangian formulations.
 
+```warning
+This tutorial currently only works with foam-extend-4.1.
+```
 
 ## Case overview
 

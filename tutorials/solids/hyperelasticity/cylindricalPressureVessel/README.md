@@ -12,6 +12,10 @@ sort: 2
 - Assess the effect of the bulk modulus on the residual convergence of
   segregated algorithms for solids.
 
+```warning
+This tutorial currently only works with foam-extend-4.1.
+```
+
 ## Case Overview
 
 <img src="images/cylindrical-pressure-vessel.png" width="400" />
