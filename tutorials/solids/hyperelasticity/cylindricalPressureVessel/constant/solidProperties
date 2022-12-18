@@ -36,7 +36,7 @@ solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
     materialTolerance       1e-05;
 
     // Write frequency for the residuals
-    infoFrequency           1;
+    infoFrequency           100;
 
     stabilisation
     {

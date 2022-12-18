@@ -6,6 +6,9 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+# Case only run with foam-extend
+solids4Foam::caseOnlyRunsWithFoamExtend
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
