@@ -28,6 +28,12 @@ License
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-makeFvD2dt2Scheme(backwardD2dt2Scheme)
+namespace Foam
+{
+namespace fv
+{
+    makeFvD2dt2Scheme(backwardD2dt2Scheme)
+}
+}
 
 // ************************************************************************* //
