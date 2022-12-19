@@ -28,6 +28,7 @@ License
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+#ifdef FOAMEXTEND
 namespace Foam
 {
 namespace fv
@@ -35,5 +36,8 @@ namespace fv
     makeFvD2dt2Scheme(backwardD2dt2Scheme)
 }
 }
+#else
+makeFvD2dt2Scheme(backwardD2dt2Scheme)
+#endif
 
 // ************************************************************************* //
