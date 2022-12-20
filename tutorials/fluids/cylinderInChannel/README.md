@@ -9,13 +9,13 @@ sort: 2
 ## Tutorial Aims
 
 - Demonstrate how to perform a fluid-only analysis in solids4foam;
-- Explain how a solids4foam fluid case is different from a standard OpenFOAM fluid case.
+- Explain how a solids4foam fluid case differs from a standard OpenFOAM fluid case.
 
-## Case overview
+## Case Overview
 
 ![](images/flu_over_1.PNG)
 
-This is the classic “flow over a cylinder in a channel” test case, as analysed by, for example, Ferziger and Peric (2002). The problem is modelled as 2-D. The inlet flow velocity profile is specified (coming in from the left) and the outlet (right) gauge pressure is zero. The upper wall, lower wall and cylinder are no slip walls.
+This is the classic “flow over a cylinder in a channel” test case, as analysed by, for example, Ferziger and Peric (2002). The problem is modelled as 2-D. The inlet flow velocity profile is specified (coming in from the left), and the outlet (right) gauge pressure is zero. The upper wall, lower wall and cylinder are no-slip walls.
 
 We assume an incompressible Newtonian isothermal laminar fluid, where the Navier-Stokes governing equations take the form:
 
@@ -32,15 +32,15 @@ end
 ```
 ---
 
-## Expected results
+## Expected Results
 
-For Re = 100, the flow is expected to be unsteady with vortices shedding from the cylinder.
+For Re = 100, the flow is expected to be unsteady, with vortices shedding from the cylinder.
 
 ![](images/flu_over_3.PNG)
 
 ---
 
-## Running the case
+## Running the Case
 
 The tutorial case can be run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the `Allrun` script is
 ```bash
@@ -85,7 +85,7 @@ Remmber that a tutorial case can be cleaned and reset using the included `Allrun
 
 ---
 
-## Analysing the results
+## Analysing the Results
 
 In the ParaView, a [von Kármán vortex street](https://en.wikipedia.org/wiki/Kármán_vortex_street) is clearly visible by viewing the pressure field `p`:
 ![](images/flu_run_1.PNG)
@@ -93,15 +93,15 @@ In the ParaView, a [von Kármán vortex street](https://en.wikipedia.org/wiki/K�
 
 ---
 
-# Delving deeper
+# Delving Deeper
 
 ---
 
-If you would like to learn more about the case, then please continue; if not, how about you check out *my third tutorial: beaminCrossFlow*.
+If you would like to learn more about the case, then please continue; if not, how about you check out [my third tutorial: 'beaminCrossFlow'](./tutorial3.md).
 
 ---
 
-## Case structure
+## Case Structure
 
 The case follows the typical `pimpleFoam` (or `pimpleDyMFoam`) case structure:
 
@@ -154,7 +154,7 @@ Apart from specifying the `physicsProperties` and `fluidProperties` dictionaries
 
 ## Code
 
-### `fluidModel` code
+### `fluidModel`
 
 For the `cylinderInChannel` test case, we have selected a “fluid” analysis in the `physicsProperties` dictionary: this means a `fluidModel` class will be selected; then, we specify the actual `solidModel` class to be the `pimpleFluid` class.
 

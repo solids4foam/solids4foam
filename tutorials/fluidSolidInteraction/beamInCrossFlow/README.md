@@ -12,13 +12,13 @@ sort: 3
 - Explain how to run a fluid-solid interaction simulation in solids4foam.
 
 
-## Case overview
+## Case Overview
 
 ![](images/fs_over_1.PNG)
 
-This case consists of an elastic thick plate attached to the bottom surface of a rectangular channel. Due to symmetry, only half of the spatial domain is considered. An incompressible viscous fluid with density 1000 kg/m3 and kinematic viscosity 0.001 m2/s enters the channel from the left-hand side with a parabolic velocity profile.
+This case consists of a thick elastic plate attached to the bottom surface of a rectangular channel. Due to symmetry, only half of the spatial domain is considered. An incompressible viscous fluid with a density 1000 kg/m3 and kinematic viscosity 0.001 m2/s enters the channel from the left-hand side with a parabolic velocity profile.
 
-The peak inlet velocity is 0.2 m/s, corresponding to Re = 40 with respect to the plate height (h = 0.2 m). The peak inlet velocity is gradually increased from zero at t = 0 s to its maximum value at t = 4 s using the following transition function 0.2 [1 − cos(πt/4)]/2. A constant pressure is imposed at the outlet of the channel and a no-slip boundary condition is applied on the channel walls. The elastic plate has a density of 1000 kg/m3, a Young’s modulus of 1.4 MPa (shear modulus of 0.5 MPa), a Poisson’s ratio of 0.4.
+The peak inlet velocity is 0.2 m/s, corresponding to Re = 40 with respect to the plate height (h = 0.2 m). The peak inlet velocity gradually increases from zero at t = 0 s to its maximum value at t = 4 s using the following transition function 0.2 [1 − cos(πt/4)]/2. A constant pressure is imposed at the outlet of the channel, and a no-slip boundary condition is applied on the channel walls. The elastic plate has a density of 1000 kg/m3, Young’s modulus of 1.4 MPa (shear modulus of 0.5 MPa), and a Poisson’s ratio of 0.4.
 
 We assume incompressible Newtonian isothermal laminar flow, where the Navier-Stokes governing equations take the form:
 
@@ -50,9 +50,9 @@ end
 
 ---
 
-## Expected results
+## Expected Results
 
-The incoming flow imparts pressure and viscous forces on the plate, causing it to bend. Following some initial transient effects, the flow and beam reach steady-state.
+The incoming flow imparts pressure and viscous forces on the plate, causing it to bend. Following some initial transient effects, the flow and beam reach a steady-state.
 
 ![](images/fs_over_2.PNG)
 
@@ -60,7 +60,7 @@ Further details of the case can be found in [Ž. Tuković, A. Karač, P. Cardi
 
 ---
 
-## Running the case
+## Running the Case
 
 The tutorial case can be run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the `Allrun` script is
 ```bash
@@ -103,7 +103,7 @@ else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
 ```
-where the `solids4Foam::convertCaseFormat .` script makes minor changes to the case to make it compatible with your version of OpenFOAM/foam-extend. As can be seen, if the argument "parallel" is passed to the `Allrun` script (i.e. `> ./Allrun parallel`) it will run the case in parallel. After the solver has finished, `force.pdf` and `deflection.pdf` plots ared generated if the `gnuplot` program is installed. 
+where the `solids4Foam::convertCaseFormat .` script makes minor changes to the case to make it compatible with your version of OpenFOAM/foam-extend. As can be seen, if the argument "parallel" is passed to the `Allrun` script (i.e. `> ./Allrun parallel`) it will run the case in parallel. After the solver has finished, `force.pdf` and `deflection.pdf` plots are generated if the `gnuplot` program is installed. 
 
 ```tip
 Remmber that a tutorial case can be cleaned and reset using the included `Allrun` script, i.e. `> ./Allclean`.
@@ -111,9 +111,9 @@ Remmber that a tutorial case can be cleaned and reset using the included `Allrun
 
 ---
 
-## Analysing the results
+## Analysing the Results
 
-In the ParaView, both the solid and fluid regions are loaded by default. The *Extract Block* filter in ParaView can be used to extract the solid region, and a second instance of the *Extract Block* filter for the fluid region. In that way, a the fluid region can be coloured by a fluid field (e.g. `p` or `U`) and the solid region by a solid field (e.g. `D` or `sigmaEq`). As an alternative to using the *Extract Block* filter, two instances of the case can be opened (File -> Open -> case.foam), where one opens the “fluid/internalMesh” and the other opens the “solid/internalMesh”.
+In the ParaView, both the solid and fluid regions are loaded by default. The *Extract Block* filter in ParaView can be used to extract the solid region, and a second instance of the *Extract Block* filter for the fluid region. In that way, the fluid region can be coloured by a fluid field (e.g. `p` or `U`) and the solid region by a solid field (e.g. `D` or `sigmaEq`). As an alternative to using the *Extract Block* filter, two instances of the case can be opened (File -> Open -> case.foam), where one opens the “fluid/internalMesh” and the other opens the “solid/internalMesh”.
 
 ![](images/fs_run_1.PNG)
 
@@ -121,15 +121,15 @@ In the ParaView, both the solid and fluid regions are loaded by default. The *Ex
 
 ---
 
-# Delving deeper
+# Delving Deeper
 
 ---
 
-If you would like to learn more about the case, then please continue; if not, how about you check out the other tutorials guides **(LINK TO BE ADDED)**.
+If you would like to learn more about the case, please continue; if not, how about you check out the [other tutorial guides](./more-tutorials/README.md).
 
 ---
 
-## Case structure
+## Case Structure
 
 The case follows the typical multi-region (e.g. as used by `chtMultiRegionSimpleFoam`) case structure:
 
@@ -177,7 +177,7 @@ Coupling algorithm parameters are given here, e.g. solid interface patch(es), fl
 
 ---
 
-## Solver output
+## Solver Output
 
 During a partitioned fluid-solid interaction analysis, the `solids4Foam` solver will perform multiple outer FSI iterations per time-step, where both the fluid and solid and solved within each FSI iteration. Several types of information will be printed to the log, including
 - Fluid model residual information, e.g. `U` and `p` residuals and iteractions
@@ -211,7 +211,7 @@ Alternative fsi residual: 5.70555e-07
 
 ---
 
-## Tips for fluid-solid analyses
+## Tips for Fluid-Solid Analyses
 
 ### Problem: when I view the fluid and solid in ParaView, there is a gap between the fluid and solid interface: the solid domain does not align with the fluid domain.
 
@@ -245,7 +245,7 @@ Alternative fsi residual: 5.70555e-07
 **Solution 2**: try a different (more robust) solid model e.g. linear geometry solid models, such as linGeomTotalDispSolid and coupledUnsLinGeomLinearElasticSolid, tend to converge better than the non-linear geometry models.
 ```
 
-### General tips
+### General Tips
 
 ```tip
 Perform independent analyses on the solid and fluid domains separately, before enabling FSI coupling, to ensure all fluid and solid properties, meshes, schemes, etc. are reasonable.
@@ -267,7 +267,7 @@ If you are having convergence issues, try use a conformal mesh at the fluid-to-s
 
 ## Code
 
-### `fluidSolidInterface` code
+### `fluidSolidInterface`
 
 For the `cylinderInChannel` test case, we have selected a “fluidSolidInterface” analysis in the `physicsProperties` dictionary: this means a `fluidSolidInterface` class will be selected; then, we specify the actual `fluidSolidInterface` class to be the `AitkenCouplingInterface` class.
 
@@ -276,7 +276,7 @@ The code for the `AitkenCouplingInterface` class is located at:
 solids4foam/src/solids4FoamModels/fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
 ```
 
-Let us examine the code, in particular the “evolve” function of this class, to see how the FSI procedure is implemented.
+Let us examine the code, in particular, the “evolve” function of this class, to see how the FSI procedure is implemented.
 
 ```
 bool AitkenCouplingInterface::evolve()

@@ -13,7 +13,7 @@ sort: 1
 - Demonstrate how to perform a thermo-elastic analysis;
 
 
-## Case overview
+## Case Overview
 ![](images/sol_overview_1.PNG)
 
 This case analyses the stresses and displacements generated in a spherical pressure vessel subjected to an increasing internal pressure and temperature. The problem is 1-D axisymmetric in nature, but for demonstration purposes one eighth of the vessel is modelled here and symmetry planes are used. The outer surface of the vessel is stress/traction free and the heat flux is given by Newton’s law of cooling (a simplified convection boundary condition). The internal pressure and temperature are a function of time $t$:
@@ -40,14 +40,14 @@ end
 
 ---
 
-## Expected results
+## Expected Results
 
 At 5 s, the expected temperature distribution across the wall thickness is expected to be close to linear, where, the von Mises stress distribution is quite nonlinear with a minimum 4 mm from the inner wall.
 ![](images/sol_expres_1.PNG)
 
 ---
 
-## Running the case
+## Running the Case
 
 As in all solids4foam tutorials, the tutorial case can be run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the `Allrun` script is
 ```bash
@@ -76,7 +76,7 @@ A tutorial case can be cleaned and reset using the included `Allrun` script, i.e
 
 ---
 
-## Analysing the results
+## Analysing the Results
 
 When viewing the results in ParaView, it can be insightful to warp the geometry by a scaled displacement field. This can be achieved using the *Warp By Vector* filter, where the `D` displacement field is selected as the *Vector* and a *Scale Factor* of 1 shows the true deformation. In this case, using a *Scale Factor* of 100 allows the deformation to be seen. 
 ![](images/sol_runcase_1.PNG)
@@ -85,15 +85,15 @@ When viewing the results in ParaView, it can be insightful to warp the geometry 
 
 ---
 
-# Delving deeper
+# Delving Deeper
 
 ---
 
-If you would like to learn more about the case, then please continue; if not, how about you check out **my second tutorial (LINK TO BE ADDED)**.
+If you would like to learn more about the case, then please continue; if not, how about you check out [my second tutorial](./tutorial2.md).
 
 ---
 
-## Case structure
+## Case Structure
 
 The case structure follows the typical OpenFOAM case structure:
 ```
@@ -124,7 +124,7 @@ hotSphere
 
 ---
 
-## Initial conditions and boundary conditions
+## Initial Conditions and Boundary Conditions
 
 In this case, there are two primitive variables:
 
@@ -139,7 +139,7 @@ In this case, there are two primitive variables:
 This initial displacement field is assumed to be zero, and the initial temperature field is assumed to be 300 K.
 
 
-### Displacement field `D` boundary conditions
+### Displacement Field `D` Boundary Conditions
 
 A zero-traction condition is specified on the outer wall:
 ```
@@ -178,7 +178,7 @@ where `timeVsPressure` specifies time vs pressure as a XY piecewise linear serie
 )
 ```
 
-### Temperature field `T` boundary conditions
+### Temperature Field `T` Boundary Conditions
 
 For the temperature field, a convection condition (Newton’s law of cooling) is specified on the outer wall:
 ```
@@ -214,7 +214,7 @@ where `timeVsTemperature` specifies time vs temperature:
 
 ---
 
-## Specifying the type of solid analysis
+## Specifying the Type of Solid Analysis
 
 The type of solid analysis, which is called by the `solids4Foam` solver, is specified in the `constant/solidProperties` dictionary:
 ```
@@ -239,12 +239,12 @@ A **linear geometry** approach is also known as a “small strain” or “small
 
 - `nCorrectors`: this is the maximum number of outer correctors per time-step. If `nCorrectors` is reached, this means the equations have not converged to the required tolerance.
 - `solutionTolerance` and `alternativeTolerance`: these are solution tolerances for the outer corrector loop. Further details are given below.
-- Iterations will continue until either the D (and T) have converged to the specific **tolerances**, or the maximum number of correctors has been reached. 
+- Iterations will continue until either the D (and T) have converged to the specific **tolerances** or the maximum number of correctors has been reached. 
 - `infoFrequency`: this is the frequency that the outer loop residuals are printed to the standard output.
 
 ---
 
-## The mechanical law
+## The Mechanical Law
 
 A “solid” analysis requires the definition of the mechanical properties via the `mechanicalProperties` dictionary; in this case the `thermoLinearElastic` law is specified (Duhamel-Nuemann form of Hooke’s law):
 ![](images/sol_runcase_8.PNG)
@@ -279,7 +279,7 @@ thermal
 
 ---
 
-## Examining the solver output
+## Examining the Solver Output
 
 Let us examine the output from the `solids4Foam` solver for this case:
 ```
@@ -339,7 +339,7 @@ Equation relaxation values of 0.99-0.9999 are typical, while field relaxation fa
 
 ## Code
 
-### `solidModel` code
+### `solidModel`
 
 For the `hotSphere` test case, we have selected a “solid” analysis in the `physicsProperties` dictionary: this means a `solidModel` class will be selected; then, we specify the actual `solidModel` class to be the `thermoLinGeomSolidModel` class.
 
@@ -493,7 +493,7 @@ Also, we add an additional diffusion term to quell numerical oscillations (e.g. 
 
 The values of impK can affect convergence, but not the answer, assuming convergence is achieved.
 
-### `mechanicalLaw` code
+### `mechanicalLaw`
 
 For the `hotSphere` test case, we have selected the `thermoLinearElastic` mechanical law in the `mechanicalProperties` dictionary: this class will perform the calculation of stress for the solid.
 
