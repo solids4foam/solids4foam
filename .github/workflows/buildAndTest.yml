@@ -3,9 +3,9 @@ name: Build and test
 
 on:
   push:
-    branches: [ "nextRelease" ]
+    branches: [ "master" "development" "nextRelease" ]
   pull_request:
-    branches: [ "nextRelease" ]
+    branches: [ "master" "development" "nextRelease" ]
   workflow_dispatch:
 
 jobs:

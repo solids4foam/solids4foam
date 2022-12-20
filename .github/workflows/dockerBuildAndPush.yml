@@ -5,7 +5,7 @@ on:
   workflow_run:
     workflows: ["Build and test"]
     types: [completed]
-    branches: [ "nextRelease" ]
+    branches: [ "master" ]
   workflow_dispatch:
 
 jobs:
