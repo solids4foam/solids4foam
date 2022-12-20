@@ -250,14 +250,21 @@ echo "    Number of cases where the solver failed: ${N_FAILED_SOLVER}"
 echo "    Number of cases where another command failed: ${N_FAILED_OTHER}"
 echo
 
-if [[ $N_FAILED_SOLVER -gt 0 ]]
+if [[ $N_FAILED_SOLVER -gt 0 || $N_FAILED_OTHER -gt 0 ]]
 then
-    echo "The solids4Foam solver failed in the following cases:"
-    grep "ERROR" testLoopReport | grep "solids4Foam"
-elif [[ $N_FAILED_OTHER -gt 0 ]]
-then
-    echo "The following commands failed:"
-    grep "ERROR" testLoopReport
+    if [[ $N_FAILED_SOLVER -gt 0 ]]
+    then
+        echo "The solids4Foam solver failed in the following cases:"
+        grep "ERROR" testLoopReport | grep "solids4Foam"
+        echo
+    fi
+    if [[ $N_FAILED_OTHER -gt 0 ]]
+    then
+        echo "The following commands failed:"
+        grep "ERROR" testLoopReport
+        echo
+    fi
+    exit 1
 else
     echo "All tests passed: enjoy solids4foam."
 fi
