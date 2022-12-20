@@ -82,7 +82,7 @@ Foam::isotropicFungElastic::isotropicFungElastic
         const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
         
         // Young's modulus
-        const volScalarField E = 3.0*c1_;
+        const volScalarField E(3.0*c1_);
 
         // Compute K based on linear elasticity
         K() = E/(3.0*(1.0 - 2.0*nu));

@@ -109,7 +109,7 @@ Foam::MooneyRivlinElastic::MooneyRivlinElastic
         const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
         
         // Young's modulus
-        const volScalarField E = 6.0*(c10_ + c01_);
+        const volScalarField E(6.0*(c10_ + c01_));
 
         // Compute K based on linear elasticity
         K() = E/(3.0*(1.0 - 2.0*nu));
