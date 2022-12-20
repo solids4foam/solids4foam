@@ -1,0 +1,8 @@
+#!/bin/bash
+
+./Allrun.solid &
+./Allrun.fluid &
+
+echo "Waiting for the solid and fluid to finish"; echo
+wait
+echo "Done."; echo
