@@ -125,7 +125,7 @@ In the ParaView, both the solid and fluid regions are loaded by default. The *Ex
 
 ---
 
-If you would like to learn more about the case, please continue; if not, how about you check out the [other tutorial guides](./more-tutorials/README.md).
+If you would like to learn more about the case, please continue; if not, how about you check out another tutorial.
 
 ---
 
