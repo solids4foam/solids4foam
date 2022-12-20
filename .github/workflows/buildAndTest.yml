@@ -3,9 +3,7 @@ name: Build and test
 
 on:
   push:
-    branches: [ "master" "development" "nextRelease" ]
   pull_request:
-    branches: [ "master" "development" "nextRelease" ]
   workflow_dispatch:
 
 jobs:
