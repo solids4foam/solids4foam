@@ -72,7 +72,29 @@ Foam::isotropicFungElastic::isotropicFungElastic
     mu() = c1_;
 
     // Bulk modulus
-    K() = dimensionedScalar(dict.lookup("K"));
+    // The user can specify K directly or the Poisson's ratio, nu
+    if (dict.found("K"))
+    {
+        K() = dimensionedScalar(dict.lookup("K"));
+    }
+    else if (dict.found("nu") && !dict.found("K"))
+    {
+        const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
+        
+        // Young's modulus
+        const volScalarField E = 3.0*c1_;
+
+        // Compute K based on linear elasticity
+        K() = E/(3.0*(1.0 - 2.0*nu));
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "isotropicFungElastic::isotropicFungElastic::()"
+        )   << "Either K or nu elastic parameters should be "
+            << "specified" << abort(FatalError);
+    }
 
     Info<< "Material properties "               << nl
         << "    max(c1) = " << gMax(mag(c1_)()) << nl
@@ -96,7 +118,18 @@ Foam::tmp<Foam::volScalarField> Foam::isotropicFungElastic::impK() const
 {
     return tmp<volScalarField>
     (
-        new volScalarField((4.0/3.0)*mu() + K())
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            ((4.0/3.0)*mu() + K())
+        )
     );
 }
 
