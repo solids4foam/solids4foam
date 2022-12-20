@@ -55,7 +55,7 @@ void Foam::linearElastic::makeSigma0f() const
         new surfaceSymmTensorField
         (
             "sigma0f",
-            fvc::interpolate(sigma0())
+            linearInterpolate(sigma0())
         )
     );
 }
@@ -211,8 +211,6 @@ Foam::linearElastic::linearElastic
     {
         Info<< "Reading sigma0 stress field" << endl;
     }
-
-    sigma0f() = fvc::interpolate(sigma0());
 }
 
 
