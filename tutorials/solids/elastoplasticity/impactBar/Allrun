@@ -11,6 +11,7 @@ solids4Foam::convertCaseFormat .
 
 # Create the mesh
 m4 system/blockMeshDict.cylinder.m4 > constant/polyMesh/blockMeshDict
+m4 system/blockMeshDict.cylinder.m4 > system/blockMeshDict
 solids4Foam::runApplication blockMesh
 
 if [[ $WM_PROJECT != "foam" ]]
