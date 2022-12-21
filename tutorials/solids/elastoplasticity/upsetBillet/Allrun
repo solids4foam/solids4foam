@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# This case currently gives errors with OpenFOAM.org
+if [[ "${WM_PROJECT}" != "foam"* ]]
+then
+    if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
+    then
+        echo; echo "Skipping this case as it does not currently working with OpenFOAM.org"
+        echo
+        exit 0
+    fi
+fi
+
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
