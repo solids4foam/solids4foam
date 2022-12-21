@@ -27,6 +27,7 @@ License
 #include "fvcDiv.H"
 #include "fvMatrices.H"
 #include "backwardDdtScheme.H"
+#include "EulerD2dt2Scheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -95,6 +96,12 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
+    // Default to 1st order Euler on the first timne step
+    if (mesh().time().timeIndex() == 1)
+    {
+        return EulerD2dt2Scheme<Type>(mesh()).fvcD2dt2(vf);
+    }
+
     IOobject d2dt2IOobject
     (
         "d2dt2(" + vf.name() + ')',
@@ -156,6 +163,12 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
+    // Default to 1st order Euler on the first timne step
+    if (mesh().time().timeIndex() == 1)
+    {
+        return EulerD2dt2Scheme<Type>(mesh()).fvcD2dt2(rho, vf);
+    }
+
     IOobject d2dt2IOobject
     (
         "d2dt2(" + vf.name() + ')',
@@ -214,6 +227,12 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
     if (mesh().moving())
     {
         notImplemented(type() + ": not implemented for a moving mesh");
+    }
+
+    // Default to 1st order Euler on the first timne step
+    if (mesh().time().timeIndex() == 1)
+    {
+        return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(vf);
     }
 
     tmp<fvMatrix<Type> > tfvm
@@ -293,6 +312,12 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
+    // Default to 1st order Euler on the first timne step
+    if (mesh().time().timeIndex() == 1)
+    {
+        return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(rho, vf);
+    }
+
     tmp<fvMatrix<Type> > tfvm
     (
         new fvMatrix<Type>
@@ -368,6 +393,12 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
     if (mesh().moving())
     {
         notImplemented(type() + ": not implemented for a moving mesh");
+    }
+
+    // Default to 1st order Euler on the first timne step
+    if (mesh().time().timeIndex() == 1)
+    {
+        return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(rho, vf);
     }
 
     tmp<fvMatrix<Type> > tfvm
