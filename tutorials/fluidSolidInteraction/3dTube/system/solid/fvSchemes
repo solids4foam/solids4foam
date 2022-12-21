@@ -18,12 +18,12 @@ FoamFile
 
 d2dt2Schemes
 {
-    default            Euler;
+    default            backward;
 }
 
 ddtSchemes
 {
-    default            Euler;
+    default            backward;
 }
 
 gradSchemes
@@ -56,6 +56,7 @@ interpolationSchemes
     interpolate(impK)       linear;
     interpolate(sigma0)     linear;
     interpolate(grad(DD))   linear;
+    interpolate(grad(D))   linear;
 }
 
 // ************************************************************************* //

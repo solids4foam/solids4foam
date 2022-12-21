@@ -26,12 +26,11 @@ stopAt          endTime;
 
 endTime         0.02;
 
-deltaT          1e-4; // For comparisons
-//deltaT          2.5e-5; // Original value used for RNF
+deltaT          5e-5;
 
 writeControl    runTime;
 
-writeInterval   1e-3; //1e-3;
+writeInterval   1e-3;
 
 purgeWrite      0;
 

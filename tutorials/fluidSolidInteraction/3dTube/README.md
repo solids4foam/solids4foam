@@ -118,6 +118,23 @@ To observe the effect of the time step size, the cases were re-run with a smalle
 Unlike the larger time step, the Robin-Neumann approach now requires the least number of iterations per time step (exactly 4 for every time step). The weakly compressible approaches are the next best, where the IQNILS-accelerated compressible model outperforms the Aitken's-accelerated compressible model. The incompressible IQNILS approaches are the next best (both solids4foam and preCICE). Finally, in this case, the Aitken's-accelerated incompressible model shows the poorest performance, requiring an order of magnitude greater number of iterations than the best approach. The impressive performance of the Robin-Neumann approach can also be observed for smaller time steps; in general, for cases like this, if the time step is sufficiently small, the Robin-Neumann approach requires minimal iterations; however, once the time step is large, then the Robin approach diverges or becomes uncompetitive.
 
 
+### First-Order Euler vs Second-Order Backward Time Schemes
+
+Finally, we demonstrate the effect of the time scheme by comparing the first-order `Euler` and second-order `backward` time schemes, where both the solid and fluid use the same time schemes. For this, we re-run the case with five time step sizes: 8e-4, 4e-4, 2e-4, 1e-4 and 5e-5 s. Figure 8 shows the first-order Euler radial displacements results, Figure 9 shows the second-order backward results, and Figure 10 compares both. The second-order scheme shows small time discretisation errors for each time step and is seen to converge more quickly as the time step size is reduced, as expected. The results were generated using the weakly compressible fluid model and Aitken's coupling; however, the same behaviour is expected with the other modelling and coupling approaches.
+
+![](./images/radial-displacement-euler.png)
+
+**Figure 8: The effect of the time step size when using the first-order `Euler` time scheme**
+
+![](./images/radial-displacement-backward.png)
+
+**Figure 9: The effect of the time step size when using the second-order `backward` time scheme**
+
+![](./images/radial-displacement-time-schemes.png)
+
+**Figure 10: Comparing the first-order `Euler` and second-order `backward` schemes as the time step size is reduced**
+
+
 ## Data Availability
 
 The results and gnuplot scripts used to generate the figures above are available in the [solids4foam tutorials benchmark data](https://github.com/solids4foam/solids4foam-tutorials-benchmark-data) repository.

@@ -16,10 +16,11 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel linearGeometry;
+//solidModel linearGeometry;
+solidModel linearGeometryTotalDisplacement;
 //solidModel nonLinearGeometryUpdatedLagrangian;
 
-"linearGeometryCoeffs|nonLinearGeometryUpdatedLagrangianCoeffs"
+"linearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs|nonLinearGeometryUpdatedLagrangianCoeffs"
 {
     // Maximum number of momentum correctors
     nCorrectors             20000;
@@ -35,6 +36,9 @@ solidModel linearGeometry;
 
     // Write frequency for the residuals
     infoFrequency           100;
+
+    // Predict displacement field at the start of a time step using the velocity
+    predictor               on;
 }
 
 // ************************************************************************* //
