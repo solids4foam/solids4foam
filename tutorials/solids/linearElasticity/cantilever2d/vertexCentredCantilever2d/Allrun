@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# This case requires PETSc to be installed
+if [ -z "${PETSC_DIR}" ];
+then
+    echo; echo "Skipping this case as PETSc is not installed"
+    echo "Please set the PETSC_DIR variable"; echo
+    exit 0
+fi
+
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 

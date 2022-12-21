@@ -40,7 +40,7 @@ solidModel     vertexCentredLinearGeometry;
     //fixedDofScale 1;
 
     // Fraction of compact edge direction gradient used
-    zeta 2.0;
+    zeta 1.0;
 
     // Line search settings
     lineSearch no;
