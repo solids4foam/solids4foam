@@ -47,20 +47,20 @@ fixedDisplacementZeroShearFvPatchVectorField
 fixedDisplacementZeroShearFvPatchVectorField::
 fixedDisplacementZeroShearFvPatchVectorField
 (
-    const fixedDisplacementZeroShearFvPatchVectorField& ptf,
+    const fixedDisplacementZeroShearFvPatchVectorField& pvf,
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
     const fvPatchFieldMapper& mapper
 )
 :
-    solidDirectionMixedFvPatchVectorField(ptf, p, iF, mapper),
+    solidDirectionMixedFvPatchVectorField(pvf, p, iF, mapper),
 #ifdef OPENFOAMFOUNDATION
-    totalDisp_(mapper(ptf.totalDisp_)),
+    totalDisp_(mapper(pvf.totalDisp_)),
 #else
-    totalDisp_(ptf.totalDisp_, mapper),
+    totalDisp_(pvf.totalDisp_, mapper),
 #endif
-    dispSeries_(ptf.dispSeries_),
-    forceZeroShearGrad_(ptf.forceZeroShearGrad_)
+    dispSeries_(pvf.dispSeries_),
+    forceZeroShearGrad_(pvf.forceZeroShearGrad_)
 {}
 
 
@@ -129,14 +129,14 @@ fixedDisplacementZeroShearFvPatchVectorField
 fixedDisplacementZeroShearFvPatchVectorField::
 fixedDisplacementZeroShearFvPatchVectorField
 (
-    const fixedDisplacementZeroShearFvPatchVectorField& ptf,
+    const fixedDisplacementZeroShearFvPatchVectorField& pvf,
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    solidDirectionMixedFvPatchVectorField(ptf, iF),
-    totalDisp_(ptf.totalDisp_),
-    dispSeries_(ptf.dispSeries_),
-    forceZeroShearGrad_(ptf.forceZeroShearGrad_)
+    solidDirectionMixedFvPatchVectorField(pvf, iF),
+    totalDisp_(pvf.totalDisp_),
+    dispSeries_(pvf.dispSeries_),
+    forceZeroShearGrad_(pvf.forceZeroShearGrad_)
 {}
 
 
@@ -161,16 +161,16 @@ void fixedDisplacementZeroShearFvPatchVectorField::autoMap
 // Reverse-map the given fvPatchField onto this fvPatchField
 void fixedDisplacementZeroShearFvPatchVectorField::rmap
 (
-    const fvPatchField<vector>& ptf,
+    const fvPatchField<vector>& pvf,
     const labelList& addr
 )
 {
-    solidDirectionMixedFvPatchVectorField::rmap(ptf, addr);
+    solidDirectionMixedFvPatchVectorField::rmap(pvf, addr);
 
-    const fixedDisplacementZeroShearFvPatchVectorField& dmptf =
-        refCast<const fixedDisplacementZeroShearFvPatchVectorField>(ptf);
+    const fixedDisplacementZeroShearFvPatchVectorField& rpvf =
+        refCast<const fixedDisplacementZeroShearFvPatchVectorField>(pvf);
 
-    totalDisp_.rmap(dmptf.totalDisp_, addr);
+    totalDisp_.rmap(rpvf.totalDisp_, addr);
 }
 
 

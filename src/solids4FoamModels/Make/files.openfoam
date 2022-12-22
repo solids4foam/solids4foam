@@ -173,6 +173,7 @@ numerics/logExpVolFields/logVolFields.C
 numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
+numerics/patchCorrectionVectors/patchCorrectionVectors.C
 numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C

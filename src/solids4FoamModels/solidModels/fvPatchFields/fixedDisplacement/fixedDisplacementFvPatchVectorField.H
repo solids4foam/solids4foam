@@ -55,6 +55,9 @@ class fixedDisplacementFvPatchVectorField
 {
     // Private Data
 
+        //- Enable non-orthogonal corrections
+        const Switch nonOrthogonalCorrections_;
+
         //- Constant total displacement field
         vectorField totalDisp_;
 

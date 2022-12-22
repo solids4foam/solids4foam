@@ -51,6 +51,12 @@ class solidDirectionMixedFvPatchVectorField
 {
     // Private data
 
+        //- Enable non-orthogonal corrections
+        const Switch nonOrthogonalCorrections_;
+
+        //- Second order accuracy correction
+        const Switch secondOrder_;
+
         //- Limiter coefficient for snGrad correction
         scalar limitCoeff_;
 

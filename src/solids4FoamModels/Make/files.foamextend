@@ -235,6 +235,7 @@ numerics/mechanicalEnergies/mechanicalEnergies.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
+numerics/patchCorrectionVectors/patchCorrectionVectors.C
 
 numerics/meshDualiser/meshDualiser.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
