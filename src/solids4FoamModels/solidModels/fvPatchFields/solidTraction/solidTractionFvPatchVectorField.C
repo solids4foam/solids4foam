@@ -411,11 +411,11 @@ void solidTractionFvPatchVectorField::evaluate
         const fvPatchField<tensor>& gradField =
             patch().lookupPatchField<volTensorField, tensor>
             (
-    #ifdef OPENFOAMESIORFOUNDATION
+            #ifdef OPENFOAMESIORFOUNDATION
                 "grad(" + internalField().name() + ")"
-    #else
+            #else
                 "grad(" + dimensionedInternalField().name() + ")"
-    #endif
+            #endif
             );
 
         // Non-orthogonal correction vectors
