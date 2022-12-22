@@ -24,8 +24,7 @@ The case geometry (Figure 1) consists of an irregular quadrilateral, which is me
 Uniform, linear elastic material properties are assumed; in this case, Young's modulus of 200 GPa and Poisson's ratio of 0.3. Body forces are set to zero. In this case, where we are examining spatially second-order solid solvers, a linearly-varying displacement field is prescribed for the four boundary patches:
 
 $$
-d_x = \alpha_{x0} +  \alpha_{x1}x +  \alpha_{x2}y \\
-d_y = \alpha_{y0} +  \alpha_{y1}x +  \alpha_{y2}y
+d_x = \alpha_{x0} +  \alpha_{x1}x +  \alpha_{x2}y, \quad d_y = \alpha_{y0} +  \alpha_{y1}x +  \alpha_{y2}y
 $$
 
 Where $$d_x$$ is the x-component of displacement, $$d_y$$ is the y-component, $$x$$ is the x-coordinate, $$y$$ is the y-coordinate, and the constant $$\alpha$$ are set by the user. In this case,  $$\alpha_{x0} = 1e-6$$, $$\alpha_{x1} = 2e-6$$, $$\alpha_{x2} = 3e-6$$, $$\alpha_{y0} = 4e-6$$, $$\alpha_{y1} = 5e-6$$, and $$\alpha_{y2} = 6e-6$$.
@@ -33,8 +32,8 @@ Where $$d_x$$ is the x-component of displacement, $$d_y$$ is the y-component, $$
 For the discretisation to pass the patch test, the strains (`epsilon`) should be constant in the domain and given by
 
 $$
-\epsilon_{xx} = \frac{\partial d_x}{\partial x} = \alpha_{x1} \\
-\epsilon_{yy} = \frac{\partial d_y}{\partial y} = \alpha_{y2} \\
+\epsilon_{xx} = \frac{\partial d_x}{\partial x} = \alpha_{x1}, \quad
+\epsilon_{yy} = \frac{\partial d_y}{\partial y} = \alpha_{y2}, \quad
 \epsilon_{xy} = \epsilon_{yx}= \frac{1}{2} \left(\frac{\partial d_x}{\partial y} + \frac{\partial d_y}{\partial x} \right) = \frac{1}{2} \left( \alpha_{x2} + \alpha_{y1}\right)
 $$
 
@@ -64,8 +63,8 @@ For OpenFOAM.com and OpenFOAM.org, the `pointCellsLeastSquares` or `edgeCellsLea
 As noted above, the strain tensor should be constant in the domain and, for the chosen $$\alpha$$ paramters, equal to:
 
 $$
-\epsilon_{xx} = \alpha_{x1} = 2e-6 \\
-\epsilon_{yy} = \alpha_{y2} = 6e-6 \\
+\epsilon_{xx} = \alpha_{x1} = 2e-6, \quad
+\epsilon_{yy} = \alpha_{y2} = 6e-6, \quad
 \epsilon_{xy} = \frac{1}{2} \left( \alpha_{x2} + \alpha_{y1}\right) = 4e-6
 $$
 
