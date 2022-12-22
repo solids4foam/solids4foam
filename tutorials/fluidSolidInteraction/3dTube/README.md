@@ -135,6 +135,19 @@ Finally, we demonstrate the effect of the time scheme by comparing the first-ord
 **Figure 10: Comparing the first-order `Euler` and second-order `backward` schemes as the time step size is reduced**
 
 
+Table 1 gives the total clock time for each model when running these models in serial. Surprisingly, the fastest model is the backward method with the smallest time step (5e-5 s). Similarly, the fastest Euler model uses the second smallest time step (1e-4 s). The explanation for this is that when using larger time steps, a much greater number of outer fluid-solid interaction iterations are required; whereas for smaller time steps, much fewer iterations are required, resulting in a lower overall clock time. If the time step sizes were reduced further, it would be expected that at some point, the models would start to become slower (e.g., as shown by the Euler method when going from 1e-4 to 5e-5 s); however, these results highlight the importance of selecting a sufficiently small time step size for fluid-solid interaction simulations.  
+
+| Time Step Size (in s) | Euler (in s) | backward (in s)
+| ------- | -------- | -------- |
+| 8e-4 | 1568 | 2233 |
+| 4e-4 | 2618 | 2710 |
+| 2e-4 | 3009 | 2451 |
+| 1e-4 | 2021 | 1999 |
+| 5e-5 | 2718 | 1648 |
+
+**Table 1: Clock times for the Euler and backward with different time step sizes**
+
+
 ## Data Availability
 
 The results and gnuplot scripts used to generate the figures above are available in the [solids4foam tutorials benchmark data](https://github.com/solids4foam/solids4foam-tutorials-benchmark-data) repository.
