@@ -1010,6 +1010,12 @@ bool Foam::mechanicalLaw::updateF
     const surfaceScalarField& K
 )
 {
+    if (curTimeIndex_ != mesh().time().timeIndex())
+    {
+        curTimeIndex_ = mesh().time().timeIndex();
+        warnAboutEnforceLinear_ = true;
+    }
+
     // Check if the mathematical model is in total or updated Lagrangian form
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
@@ -1032,10 +1038,16 @@ bool Foam::mechanicalLaw::updateF
 
         if (enforceLinear())
         {
-            WarningIn
-            (
-                "void " + type() + "::correct(surfaceSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
+            if (warnAboutEnforceLinear_)
+            {
+                warnAboutEnforceLinear_ = false;
+
+                WarningIn
+                (
+                    "void " + type()
+                    + "::correct(surfaceSymmTensorField& sigma)"
+                )   << "Material linearity enforced for stability!" << endl;
+            }
 
             // Calculate stress using Hooke's law
             sigma =
@@ -1061,11 +1073,16 @@ bool Foam::mechanicalLaw::updateF
 
             if (enforceLinear())
             {
-                WarningIn
-                (
-                    "void " + type()
-                  + "::correct(surfaceSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
+                if (warnAboutEnforceLinear_)
+                {
+                    warnAboutEnforceLinear_ = false;
+
+                    WarningIn
+                    (
+                        "void " + type()
+                      + "::correct(surfaceSymmTensorField& sigma)"
+                    )   << "Material linearity enforced for stability!" << endl;
+                }
 
                 // Calculate stress using Hooke's law
                 sigma =
@@ -1089,11 +1106,16 @@ bool Foam::mechanicalLaw::updateF
 
             if (enforceLinear())
             {
-                WarningIn
-                (
-                    "void " + type()
-                  + "::correct(surfaceSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
+                if (warnAboutEnforceLinear_)
+                {
+                    warnAboutEnforceLinear_ = false;
+
+                    WarningIn
+                    (
+                        "void " + type()
+                      + "::correct(surfaceSymmTensorField& sigma)"
+                    )   << "Material linearity enforced for stability!" << endl;
+                }
 
                 // Calculate stress using Hooke's law
                 sigma = 2.0*mu*dev(symm(gradD)) + K*tr(gradD)*I;
