@@ -71,8 +71,15 @@ class linGeomSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
-        //- Store rho*ddt(D_old) for efficiency
-        volVectorField rhoDdtD_0_;
+        //- Predict new time-step fields using the velocity field
+        const Switch predictor_;
+
+
+    // Private Member Functions
+
+        //- Predict the fields for the next time-step based on the
+        //  previous time-steps
+        void predict();
 
 
     // Private Member Functions

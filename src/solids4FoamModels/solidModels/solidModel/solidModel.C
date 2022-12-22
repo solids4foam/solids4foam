@@ -1093,6 +1093,43 @@ Foam::dictionary& Foam::solidModel::solidModelDict()
 }
 
 
+void Foam::solidModel::makeRhoD2dt2D() const
+{
+    if (rhoD2dt2DPtr_.valid())
+    {
+        FatalErrorIn("void Foam::solidModel::makeRhoD2dt2D() const")
+            << "Pointer already set" << abort(FatalError);
+    }
+
+    rhoD2dt2DPtr_.set
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "rhoD2dt2D",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedVector("zero", dimForce/dimVolume, vector::zero)
+        )
+    );
+}
+
+
+Foam::volVectorField& Foam::solidModel::rhoD2dt2D() const
+{
+    if (rhoD2dt2DPtr_.empty())
+    {
+        makeRhoD2dt2D();
+    }
+
+    return rhoD2dt2DPtr_();
+}
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::solidModel::solidModel
@@ -1364,7 +1401,8 @@ Foam::solidModel::solidModel
     restart_
     (
         solidModelDict().lookupOrDefault<Switch>("restart", false)
-    )
+    ),
+    rhoD2dt2DPtr_()
 {
     // Force old time fields to be stored
     D_.oldTime().oldTime();
