@@ -200,6 +200,15 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
                 gammafP = interfaceScaleFactor*0.5*(pif + pnf);
             }
         }
+        else
+        {
+            // Set stabilisation to zero on non-coupled boundaries
+#ifdef OPENFOAMESIORFOUNDATION
+            gammaf.boundaryFieldRef()[patchI] = 0.0;
+#else
+            gammaf.boundaryField()[patchI] = 0.0;
+#endif
+        }
     }
 
     // Calculate stabilisation term
