@@ -11,51 +11,35 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      fvSchemes;
+    class       volVectorField;
+    location    "0";
+    object      DD;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default            steadyState;
-}
+dimensions      [0 1 0 0 0 0 0];
 
-ddtSchemes
-{
-    default            steadyState;
-}
+internalField   uniform (0 0 0);
 
-gradSchemes
+boundaryField
 {
-    default            leastSquares;
-}
+    cylinder
+    {
+        type            fixedRotation;
+        rotationAngleSeries
+        {
+            "fileName|file"        "$FOAM_CASE/constant/timeVsAngle";
+            outOfBounds     clamp;
+        }
+        rotationAxis     ( 0 0 1 );
+        rotationOrigin   ( 0 0 0 );
+        value            uniform   ( 0 0 0 );
+    }
 
-divSchemes
-{
-    default            Gauss linear;
-}
-
-laplacianSchemes
-{
-    default            none;
-    laplacian(DD,D)    Gauss linear corrected;
-    laplacian(DDD,DD)  Gauss linear corrected;
-}
-
-snGradSchemes
-{
-    default            none;
-    snGrad(D)          corrected;
-    snGrad(DD)         corrected;
-}
-
-interpolationSchemes
-{
-    default            none;
-    interpolate(impK)  linear;
-    interpolate(grad(D)) linear;
-    interpolate(grad(DD)) linear;
+    frontAndBackPlanes
+    {
+        type empty;
+    }
 }
 
 // ************************************************************************* //
