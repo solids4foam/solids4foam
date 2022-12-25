@@ -34,7 +34,6 @@ boundaryField
     inlet
     {
         type            transitionalParabolicVelocity;
-//         type            parabolicVelocity;
         maxValue        3;
         n               ( 1 0 0 );
         y               ( 0 1 0 );
