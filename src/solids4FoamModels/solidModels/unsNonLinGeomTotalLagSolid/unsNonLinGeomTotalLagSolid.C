@@ -380,6 +380,12 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         {
             maxIterReached()++;
         }
+
+        // Force at least one iteration
+	if (iCorr == 0)
+        {
+            res = 1.0;
+        }
     }
     while (res > curConvergenceTolerance && ++iCorr < nCorr());
 
