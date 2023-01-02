@@ -5,6 +5,7 @@
     // without contribution from under-relaxation
     // HJ, 26/Oct/2015
     aU = HUEqn.A();
+    rAUf = fvc::interpolate(1.0/aU);
 
     // Store velocity under-relaxation point before using U for the flux
     // precursor
@@ -14,7 +15,7 @@
     phi = (fvc::interpolate(U) & mesh.Sf());
 
     // Update flux on the FSI interface for Robin BCs
-    robin_.updateInterface(phi, rAU);
+    robin_.updateInterface(phi, rAUf);
 
     // Global flux balance
     adjustPhi(phi, U, p);
@@ -32,6 +33,8 @@
             mesh.solutionDict().solver(p.select(pimple.finalInnerIter()))
         );
 
+        gradp() = fvc::grad(p);
+
         if (pimple.finalNonOrthogonalIter())
         {
             phi -= pEqn.flux();
@@ -39,7 +42,7 @@
     }
 
     // Correct flux due for Robin BCs according to temporal discretisation
-    robin_.correctInterface(p, phi, rAU);
+    robin_.correctInterface(p, phi, rAUf);
 
     // Explicitly relax pressure for momentum corrector except for last corrector
     if (!pimple.finalIter())
@@ -61,4 +64,7 @@
         )
       + (1 - UUrf)*U.prevIter();
     U.correctBoundaryConditions();
+
+    gradU() = fvc::grad(U);
+    ddtU_ = fvc::ddt(U);
 }

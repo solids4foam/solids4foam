@@ -94,6 +94,15 @@ public:
 
     // Member Functions
 
+        // Access
+
+            //- Const access to patchIDs
+            const labelList& patchIDs() const
+            {
+                return patchIDs_;
+            }
+
+
         // Evaluation
 
             //- Reset flux if mesh changed
@@ -106,7 +115,7 @@ public:
             void updateInterface
             (
                 surfaceScalarField& phi,
-                volScalarField& rAU
+                surfaceScalarField& rAU
             ) const;
 
             //- Correct phi after solving pressure equation
@@ -114,7 +123,7 @@ public:
             (
                 const volScalarField& p,
                 surfaceScalarField& phi,
-                volScalarField& rAU
+                surfaceScalarField& rAU
             ) const;
 };
 

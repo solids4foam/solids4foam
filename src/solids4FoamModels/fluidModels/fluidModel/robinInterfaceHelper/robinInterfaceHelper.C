@@ -113,7 +113,7 @@ void Foam::robinInterfaceHelper::setInterfaceFluxToZero
 void Foam::robinInterfaceHelper::updateInterface
 (
     surfaceScalarField& phi,
-    volScalarField& rAU
+    surfaceScalarField& rAU
 ) const
 {
     forAll(patchIDs_, pI)
@@ -171,7 +171,7 @@ void Foam::robinInterfaceHelper::correctInterface
 (
     const volScalarField& p,
     surfaceScalarField& phi,
-    volScalarField& rAU
+    surfaceScalarField& rAU
 ) const
 {
     forAll(patchIDs_, pI)

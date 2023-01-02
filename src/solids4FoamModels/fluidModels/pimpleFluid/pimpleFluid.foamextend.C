@@ -121,7 +121,7 @@ pimpleFluid::pimpleFluid
     ),
     useFoamExtend40formulation_
     (
-        pimple().dict().lookupOrDefault("useFoamExtend40formulation", true)
+        fluidProperties().lookupOrDefault("useFoamExtend40formulation", true)
     ),
     robin_(U(), p()),
     sumLocalContErr_(0),
@@ -138,6 +138,13 @@ pimpleFluid::pimpleFluid
 
     setRefCell(p(), pimple().dict(), pRefCell_, pRefValue_);
     mesh().schemesDict().setFluxRequired(p().name());
+
+    if (useFoamExtend40formulation_ && robin_.patchIDs().size() > 0)
+    {
+        FatalErrorIn(type())
+            << "Currently, the Robin coupling approach only works with "
+            << "useFoamExtend40formulation turned off" << abort(FatalError);
+    }
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -186,6 +193,7 @@ bool pimpleFluid::evolve()
     surfaceScalarField& phi = this->phi();
     volScalarField& aU = aU_;
     volScalarField& rAU = rAU_;
+    surfaceScalarField& rAUf = rAUf_;
     const label pRefCell = pRefCell_;
     const scalar& pRefValue = pRefValue_;
     scalar& sumLocalContErr = sumLocalContErr_;
@@ -230,6 +238,13 @@ bool pimpleFluid::evolve()
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi, U);
 
+    if (meshChanged)
+    {
+        // Update flux in FSI interface with Robin BC
+        robin_.setInterfaceFluxToZero(phi);
+    }
+
+    // CourantNo
     if (mesh.moving() && checkMeshCourantNo)
     {
 #       include "meshCourantNo.H"
@@ -237,15 +252,13 @@ bool pimpleFluid::evolve()
 
     if (meshChanged)
     {
-        robin_.setInterfaceFluxToZero(phi);
-
 #       include "CourantNo.H"
     }
 
-    if (useFoamExtend40formulation)
+    // --- PIMPLE loop
+    while (pimple.loop())
     {
-        // --- PIMPLE loop
-        while (pimple.loop())
+        if (useFoamExtend40formulation)
         {
 #           include "UEqn.pimpleFoam.foamextend40.H"
 
@@ -254,14 +267,8 @@ bool pimpleFluid::evolve()
             {
 #               include "pEqn.pimpleFoam.foamextend40.H"
             }
-
-            turbulence->correct();
         }
-    }
-    else
-    {
-        // --- PIMPLE loop
-        while (pimple.loop())
+        else
         {
 #           include "UEqn.pimpleFoam.foamextend41.H"
 
@@ -270,9 +277,9 @@ bool pimpleFluid::evolve()
             {
 #               include "pEqn.pimpleFoam.foamextend41.H"
             }
-
-            turbulence->correct();
         }
+
+        turbulence_->correct();
     }
 
     // Make the fluxes absolute to the mesh motion
