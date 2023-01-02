@@ -19,12 +19,7 @@ Class
     pimpleFluid
 
 Description
-    pimpleDyMFoam fluid model from foam-extend-4.1 with support for the
-    "elastic" Robin boundary conditions for partitioned FSI as described in:
-
-        Tuković et al. Added Mass Partitioned Fluid–Structure Interaction
-        Solver Based on a Robin Boundary Condition for Pressure. OpenFOAM.
-        2019;1–22.
+    Direct port of pimpleDyMFoam fluid model from foam-extend-4.1.
 
 Author
     Hrvoje Jasak, Wikki Ltd. All rights reserved.
@@ -42,6 +37,7 @@ SourceFiles
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
 #include "turbulenceModel.H"
+#include "robinInterfaceHelper.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -76,6 +72,9 @@ class pimpleFluid
         //- Velocity field
         surfaceVectorField Uf_;
 
+        //- aU field
+        volScalarField aU_;
+
         //- rAU field
         volScalarField rAU_;
 
@@ -89,10 +88,16 @@ class pimpleFluid
         scalar pRefValue_;
 
         //- Correct phi flag
-        const bool correctPhi_;
+        const Switch correctPhi_;
 
         //- Check Courant number flag
-        const bool checkMeshCourantNo_;
+        const Switch checkMeshCourantNo_;
+
+        //- Use foam-extend-4.0 formulation of PIMPLE flag
+        const Switch useFoamExtend40formulation_;
+
+        //- Helper object for applying Robin boundary conditions
+        robinInterfaceHelper robin_;
 
         //- Cumulative continuity errors
         scalar sumLocalContErr_;
@@ -101,15 +106,6 @@ class pimpleFluid
 
 
     // Private Member Functions
-
-        //- Reset flux if mesh changed
-        void updateRobinFsiInterfaceFlux();
-
-        //- Update phi for Robin FSI boundary conditions
-        void updateRobinFsiInterface();
-
-        //- Correct phi after solving pressure equation
-        void correctRobinFsiInterfaceFlux();
 
         //- Disallow default bitwise copy construct
         pimpleFluid(const pimpleFluid&);
