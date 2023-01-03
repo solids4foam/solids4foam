@@ -200,9 +200,14 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
         return;
     }
 
-    Info << "elasticSlipWallVelocityFvPatchVectorField::updateCoeffs" << endl;
-
 #ifdef OPENFOAMESIORFOUNDATION
+    notImplemented
+    (
+        "Not currently implemented for this version of OpenFOAM/foam"
+        "Feel free to monitor or contribute to "
+        "https://github.com/solids4foam/solids4foam/issues"
+    );
+
     const fvMesh& mesh = internalField().mesh();
     const pointField& points = mesh.points();
 #else
