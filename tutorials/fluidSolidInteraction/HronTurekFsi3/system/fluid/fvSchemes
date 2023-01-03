@@ -39,9 +39,9 @@ laplacianSchemes
     default none;
     laplacian(nuEff,U) Gauss linear corrected;
     laplacian((1|A(U)),p) Gauss linear corrected;
-    laplacian(diffusivity,cellMotionU) Gauss linear corrected;
-
+    laplacian((1|aU),p) Gauss linear corrected;
     laplacian(rAU,p) Gauss linear corrected;
+    laplacian(diffusivity,cellMotionU) Gauss linear corrected;
 }
 
 interpolationSchemes

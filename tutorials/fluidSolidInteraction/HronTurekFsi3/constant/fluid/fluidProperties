@@ -19,6 +19,10 @@ FoamFile
 fluidModel    pimpleFluid;
 
 pimpleFluidCoeffs
-{}
+{
+    // Use the PIMPLE formulation from foam-extend-4.0, which seems to be more
+    // stable
+    useFoamExtend40formulation yes;
+}
 
 // ************************************************************************* //

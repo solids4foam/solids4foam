@@ -121,7 +121,7 @@ pimpleFluid::pimpleFluid
     ),
     useFoamExtend40formulation_
     (
-        fluidProperties().lookupOrDefault("useFoamExtend40formulation", true)
+        fluidProperties().lookupOrDefault("useFoamExtend40formulation", false)
     ),
     robin_(U(), p()),
     sumLocalContErr_(0),
@@ -139,11 +139,23 @@ pimpleFluid::pimpleFluid
     setRefCell(p(), pimple().dict(), pRefCell_, pRefValue_);
     mesh().schemesDict().setFluxRequired(p().name());
 
-    if (useFoamExtend40formulation_ && robin_.patchIDs().size() > 0)
+    if (useFoamExtend40formulation_)
     {
-        FatalErrorIn(type())
-            << "Currently, the Robin coupling approach only works with "
-            << "useFoamExtend40formulation turned off" << abort(FatalError);
+        if (robin_.patchIDs().size() > 0)
+        {
+            FatalErrorIn(type())
+                << "Currently, the Robin coupling approach only works with "
+                << "useFoamExtend40formulation turned off" << abort(FatalError);
+        }
+
+        // Add default UFinal equation relaxation factor
+        if (!mesh().solutionDict().relaxEquation("UFinal"))
+        {
+            mesh().solutionDict().equationRelaxationFactors().add
+            (
+                "UFinal", 1.0
+            );
+        }
     }
 }
 
