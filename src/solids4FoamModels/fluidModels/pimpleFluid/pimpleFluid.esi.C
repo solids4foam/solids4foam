@@ -61,6 +61,7 @@ pimpleFluid::pimpleFluid
     ),
     rho_(laminarTransport_.lookup("rho")),
     correctPhi_(pimple().dict().lookupOrDefault("correctPhi", false)),
+    robin_(U(), p()),
     checkMeshCourantNo_
     (
         pimple().dict().lookupOrDefault("checkMeshCourantNo", false)
@@ -192,6 +193,9 @@ bool pimpleFluid::evolve()
                 {
                     #include "meshCourantNo.H"
                 }
+
+                // Update flux in FSI interface with Robin BC
+                robin_.setInterfaceFluxToZero(phi);
             }
         }
 

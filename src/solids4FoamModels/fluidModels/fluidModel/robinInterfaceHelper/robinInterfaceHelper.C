@@ -89,7 +89,11 @@ Foam::robinInterfaceHelper::robinInterfaceHelper
     // Lookup U ddt scheme
     ddtScheme_ = word
     (
+#ifdef FOAMEXTEND
         U.mesh().schemesDict().ddtScheme("ddt(" + U.name() +')')
+#else
+        U.mesh().ddtScheme("ddt(" + U.name() +')')
+#endif
     );
 }
 
@@ -103,7 +107,11 @@ void Foam::robinInterfaceHelper::setInterfaceFluxToZero
     forAll(patchIDs_, pI)
     {
         const label patchID = patchIDs_[pI];
+#ifdef FOAMEXTEND
         phi.boundaryField()[patchID] = 0;
+#else
+        phi.boundaryFieldRef()[patchID] = 0;
+#endif
 
         Info<< type() << ": setting phi to 0 on patch " << patchID << endl;
     }
@@ -123,9 +131,16 @@ void Foam::robinInterfaceHelper::updateInterface
 
         if (ddtScheme_ == fv::EulerDdtScheme<vector>::typeName)
         {
+#ifdef FOAMEXTEND
             phi.boundaryField()[patchID] = phi.oldTime().boundaryField()[patchID];
 
             rAU.boundaryField()[patchID] = mesh.time().deltaT().value();
+#else
+            phi.boundaryFieldRef()[patchID] =
+                phi.oldTime().boundaryField()[patchID];
+
+            rAU.boundaryFieldRef()[patchID] = mesh.time().deltaT().value();
+#endif
         }
         else if
         (
@@ -134,10 +149,17 @@ void Foam::robinInterfaceHelper::updateInterface
         {
             if (mesh.time().timeIndex() == 1)
             {
+#ifdef FOAMEXTEND
                 phi.boundaryField()[patchID] =
                     phi.oldTime().boundaryField()[patchID];
 
                 rAU.boundaryField()[patchID] = mesh.time().deltaT().value();
+#else
+                phi.boundaryFieldRef()[patchID] =
+                    phi.oldTime().boundaryField()[patchID];
+
+                rAU.boundaryFieldRef()[patchID] = mesh.time().deltaT().value();
+#endif
 
                 phi.oldTime().oldTime();
             }
@@ -151,6 +173,7 @@ void Foam::robinInterfaceHelper::updateInterface
                     deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
                 const scalar Co = Cn + Coo;
 
+#ifdef FOAMEXTEND
                 phi.boundaryField()[patchID] =
                     (Co/Cn)*phi.oldTime().boundaryField()
                     [
@@ -162,6 +185,19 @@ void Foam::robinInterfaceHelper::updateInterface
                     ];
 
                 rAU.boundaryField()[patchID] = deltaT/Cn;
+#else
+                phi.boundaryFieldRef()[patchID] =
+                    (Co/Cn)*phi.oldTime().boundaryField()
+                    [
+                        patchID
+                    ]
+                  - (Coo/Cn)*phi.oldTime().oldTime().boundaryField()
+                    [
+                        patchID
+                    ];
+
+                rAU.boundaryFieldRef()[patchID] = deltaT/Cn;
+#endif
             }
         }
     }
@@ -181,7 +217,11 @@ void Foam::robinInterfaceHelper::correctInterface
 
         if (ddtScheme_ == fv::EulerDdtScheme<vector>::typeName)
         {
+#ifdef FOAMEXTEND
             phi.boundaryField()[patchID] =
+#else
+            phi.boundaryFieldRef()[patchID] =
+#endif
                 phi.oldTime().boundaryField()[patchID]
               - p.boundaryField()
                 [
@@ -199,10 +239,17 @@ void Foam::robinInterfaceHelper::correctInterface
         {
             if (mesh.time().timeIndex() == 1)
             {
+#ifdef FOAMEXTEND
                 phi.boundaryField()[patchID] =
                     phi.oldTime().boundaryField()[patchID];
 
                 rAU.boundaryField()[patchID] = mesh.time().deltaT().value();
+#else
+                phi.boundaryFieldRef()[patchID] =
+                    phi.oldTime().boundaryField()[patchID];
+
+                rAU.boundaryFieldRef()[patchID] = mesh.time().deltaT().value();
+#endif
 
                 phi.oldTime().oldTime();
             }
@@ -215,6 +262,7 @@ void Foam::robinInterfaceHelper::correctInterface
                 const scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
                 const scalar Co = Cn + Coo;
 
+#ifdef FOAMEXTEND
                 phi.boundaryField()[patchID] =
                     (Co/Cn)*phi.oldTime().boundaryField()
                     [
@@ -226,6 +274,19 @@ void Foam::robinInterfaceHelper::correctInterface
                     ];
 
                 rAU.boundaryField()[patchID] = deltaT/Cn;
+#else
+                phi.boundaryFieldRef()[patchID] =
+                    (Co/Cn)*phi.oldTime().boundaryField()
+                    [
+                        patchID
+                    ]
+                  - (Coo/Cn)*phi.oldTime().oldTime().boundaryField()
+                    [
+                        patchID
+                    ];
+
+                rAU.boundaryFieldRef()[patchID] = deltaT/Cn;
+#endif
             }
         }
     }
