@@ -229,6 +229,81 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
             "JSTouter"
         );
     }
+    else if (method == "alpha")
+    {
+        // This alpha scheme is adapted from: H Nishikawa, Y Nakashima, N
+        // Watanabe, Effects of high-frequency damping on iterative convergence
+        // of implicit viscous solver, Journal of Computational Physics, 2017,
+        // 10.1016/j.jcp.2017.07.021.
+
+        // Note that the scale factor `alpha` has already been rolled into the
+        // gammaf field above
+
+        const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+        const vectorField& nI = n.internalField();
+        const vectorField deltaI(mesh.delta());
+        const scalarField& magSfI = mesh.magSf().internalField();
+        const vectorField& vfI = vf.internalField();
+        const tensorField& gradVfI = gradVf.internalField();
+
+        vectorField& resultI = result;
+
+        forAll(gammafI, faceI)
+        {
+            const label ownCellID = own[faceI];
+            const label neiCellID = nei[faceI];
+
+            const vector& ownVf = vfI[ownCellID];
+            const vector& neiVf = vfI[neiCellID];
+
+            const tensor& ownGradVf = gradVfI[ownCellID];
+            const tensor& neiGradVf = gradVfI[neiCellID];
+
+            const vector& n = nI[faceI];
+            const vector& d = deltaI[faceI];
+
+            const vector extrapOwnVf = ownVf + 0.5*(d & ownGradVf);
+            const vector extrapNeiVf = neiVf - 0.5*(d & neiGradVf);
+
+            const scalar curMagSf = magSfI[faceI];
+            const scalar curGamma = gammafI[faceI];
+
+            // Note: gamma already contains the scale factor alpha
+            const vector faceDamping =
+                curMagSf*curGamma*(extrapNeiVf - extrapOwnVf)/mag(n & d);
+
+            // The alpha scheme is essentially equivalent to Rhie-Chow; the
+            // differences may lie in how the weights are calculated, which may
+            // have consequences for distorted meshes: the gradVf terms are
+            // scaled by mag(n & d) in the alpha scheme but not in the Rhie-Chow
+            // scheme; for a highly non-orthogonal face, mag(n & d) will be
+            // small, which increases the entire damping term for the alpha
+            // scheme; whereas only the compact term is increased in the
+            // Rhie-Chow approach.
+
+            // Rhie-Chow (mid-point interpolation of gradients)
+            // const vector faceDamping =
+            //     curMagSf*curGamma
+            //    *(
+            //        (neiVf - ownVf)/(n & d)
+            //      - 0.5*(n & (ownGradVf + neiGradVf))
+            //    );
+
+            resultI[ownCellID] += faceDamping;
+            resultI[neiCellID] -= faceDamping;
+        }
+
+        if (Pstream::parRun())
+        {
+            notImplemented
+            (
+                "Parallel boundaries for alpha scheme have to be implemented"
+            );
+        }
+
+        // Divide by the volume
+        resultI /= mesh.V();
+    }
     else if (method == "Laplacian")
     {
         result = fvc::laplacian(gammaf, vf);
@@ -237,8 +312,8 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     {
         FatalErrorIn(type() + "::stabilisation() const")
             << "Unknown method = " << method << nl
-            << "Methods are: none, RhieChow, JamesonSchmidtTurkel and Laplacian"
-            <<  abort(FatalError);
+            << "Methods are: none, RhieChow, JamesonSchmidtTurkel, alpha and "
+            << "Laplacian" <<  abort(FatalError);
     }
 
     return tresult;
