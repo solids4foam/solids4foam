@@ -29,9 +29,9 @@ endTime         6;
 
 deltaT          1e-3;
 
-writeControl    timeStep;
+writeControl    runTime;
 
-writeInterval   20;
+writeInterval   0.1;
 
 purgeWrite      0;
 
@@ -45,11 +45,7 @@ timeFormat      general;
 
 timePrecision   6;
 
-runTimeModifiable yes;
-
-adjustTimeStep  no;
-
-maxCo           0.2;
+runTimeModifiable no;
 
 #include "./system/functions"
 

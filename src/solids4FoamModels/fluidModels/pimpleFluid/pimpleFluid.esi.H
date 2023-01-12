@@ -36,6 +36,7 @@ SourceFiles
 #include "singlePhaseTransportModel.H"
 #include "turbulentTransportModel.H"
 #include "CorrectPhi.H"
+#include "robinInterfaceHelper.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -75,6 +76,9 @@ class pimpleFluid
 
         //- Correct phi flag
         const bool correctPhi_;
+
+        //- Helper object for applying Robin boundary conditions
+        robinInterfaceHelper robin_;
 
         //- Check Courant number flag
         const bool checkMeshCourantNo_;
