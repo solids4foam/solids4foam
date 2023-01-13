@@ -1047,8 +1047,6 @@ bool vertexCentredLinGeomSolid::evolve()
 #endif
         {
             // Relaxing the correction can help convergence
-            // This is like a simple line search
-            // Of course, an actual line search would be better: to-do!
 
 #ifdef OPENFOAMESIORFOUNDATION
             const scalar rf
@@ -1148,6 +1146,7 @@ bool vertexCentredLinGeomSolid::evolve()
 
     // Calculate cell gradient
     // This assumes a constant gradient within each primary mesh cell
+    // This is a first-order approximation
     gradD() = vfvc::grad(pointD(), mesh());
 
     // Map primary cell gradD field to sub-meshes for multi-material cases
@@ -1161,6 +1160,7 @@ bool vertexCentredLinGeomSolid::evolve()
 
     // Update primary mesh cell stress field, assuming it is constant per
     // primary mesh cell
+    // This stress will be first-order accurate
     mechanical().correct(sigma());
 
     return true;
@@ -1216,6 +1216,67 @@ void vertexCentredLinGeomSolid::setTraction
             << solidTractionPointPatchVectorField::typeName
             << abort(FatalError);
     }
+}
+
+
+void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
+{
+    // Calculate gradD at the primary points using least squares: this should
+    // be second-order accurate (... I think).
+    const pointTensorField pGradD(vfvc::pGrad(pointD(), mesh()));
+
+    // Calculate strain at the primary points based on pGradD
+    // Note: the symm operator is not defined for pointTensorFields so we will
+    // do it manually
+    // const pointSymmTensorField pEpsilon("pEpsilon", symm(pGradD));
+    pointSymmTensorField pEpsilon
+    (
+        IOobject
+        (
+            "pEpsilon",
+            runTime.timeName(),
+            runTime,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedSymmTensor("0", dimless, symmTensor::zero)
+    );
+
+#ifdef FOAMEXTEND
+    pEpsilon.internalField() = symm(pGradD.internalField());
+#else
+    pEpsilon.primitiveFieldRef() = symm(pGradD.internalField());
+#endif
+    pEpsilon.write();
+
+    // Equivalent strain at the points
+    pointScalarField pEpsilonEq
+    (
+        IOobject
+        (
+            "pEpsilonEq",
+            runTime.timeName(),
+            runTime,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedScalar("0", dimless, 0.0)
+    );
+
+#ifdef FOAMEXTEND
+    pEpsilonEq.internalField() =
+        sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
+#else
+    pEpsilonEq.primitiveFieldRef() =
+        sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
+#endif
+    pEpsilonEq.write();
+
+    Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;
+
+    solidModel::writeFields(runTime);
 }
 
 

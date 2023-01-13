@@ -259,6 +259,11 @@ public:
                 const label patchID,
                 const vectorField& faceZoneTraction
             );
+
+        // Write
+
+            //- Write fields
+            virtual void writeFields(const Time& runTime);
 };
 
 
