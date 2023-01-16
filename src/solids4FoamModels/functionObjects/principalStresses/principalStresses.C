@@ -128,7 +128,7 @@ bool Foam::principalStresses::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::principalStresses::write()
 {
-    return writeData();
+    return true;
 }
 #endif
 
