@@ -330,13 +330,13 @@ void Foam::writePrincipalStressFields
     sigmaDiff.correctBoundaryConditions();
 
     // Write fields
-    Info<< "    Writing sigmaMax" << nl
-        << "    Writing sigmaMid" << nl
-        << "    Writing sigmaMin" << nl
-        << "    Writing sigmaMaxDir" << nl
-        << "    Writing sigmaMidDir" << nl
-        << "    Writing sigmaMinDir" << nl
-        << "    Writing sigmaDiff" << endl;
+    Info<< "Writing sigmaMax" << nl
+        << "Writing sigmaMid" << nl
+        << "Writing sigmaMin" << nl
+        << "Writing sigmaMaxDir" << nl
+        << "Writing sigmaMidDir" << nl
+        << "Writing sigmaMinDir" << nl
+        << "Writing sigmaDiff" << endl;
 
     sigmaMax.write();
     sigmaMid.write();
