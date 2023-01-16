@@ -272,7 +272,7 @@ void Foam::writePrincipalStressFields
             sigmaMinDirI[cellI]
         );
 
-        sigmaDiffI[cellI] = sigmaMaxI[cellI] - sigmaMinI[cellI];
+        sigmaDiffI[cellI] = sigmaMinI[cellI] - sigmaMaxI[cellI];
     }
 
     forAll(sigma.boundaryField(), patchI)
@@ -316,7 +316,7 @@ void Foam::writePrincipalStressFields
                     pSigmaMinDir[faceI]
                 );
 
-                pSigmaDiff[faceI] = pSigmaMax[faceI] - pSigmaMin[faceI];
+                pSigmaDiff[faceI] = pSigmaMin[faceI] - pSigmaMax[faceI];
             }
         }
     }
