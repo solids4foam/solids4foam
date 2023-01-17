@@ -133,9 +133,15 @@ int main(int argc, char *argv[])
                 newPoints[pointI] +=
                     vector
                     (
+#ifdef FOAMEXTEND
+                        scaleFactor.x()*(2.0*rnd.scalar01() - 1.0),
+                        scaleFactor.y()*(2.0*rnd.scalar01() - 1.0),
+                        scaleFactor.z()*(2.0*rnd.scalar01() - 1.0)
+#else
                         scaleFactor.x()*(2.0*rnd.sample01<scalar>() - 1.0),
                         scaleFactor.y()*(2.0*rnd.sample01<scalar>() - 1.0),
                         scaleFactor.z()*(2.0*rnd.sample01<scalar>() - 1.0)
+#endif
                     );
             }
         }
