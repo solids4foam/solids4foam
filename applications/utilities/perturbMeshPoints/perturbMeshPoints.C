@@ -78,7 +78,9 @@ int main(int argc, char *argv[])
     // Read inputs
     const scalar seed(readScalar(perturbDict.lookup("seed")));
     const vector scaleFactor(perturbDict.lookup("scaleFactor"));
+#ifdef OPENFOAMESI
     const Switch Gaussian(perturbDict.lookup("Gaussian"));
+#endif
 
     // Create random number generator
     Random rnd(seed);
@@ -112,6 +114,7 @@ int main(int argc, char *argv[])
     {
         if (!boundaryPoint[pointI])
         {
+#ifdef OPENFOAMESI
             if (Gaussian)
             {
                 // Gaussian distribution
@@ -124,6 +127,7 @@ int main(int argc, char *argv[])
                     );
             }
             else
+#endif
             {
                 // Uniform distribution
                 newPoints[pointI] +=
