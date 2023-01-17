@@ -119,9 +119,9 @@ namespace vfvc
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#ifdef NoRepository
-#   include "vfvcCellPoint.C"
-#endif
+// #ifdef NoRepository
+// #   include "vfvcCellPoint.C"
+// #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

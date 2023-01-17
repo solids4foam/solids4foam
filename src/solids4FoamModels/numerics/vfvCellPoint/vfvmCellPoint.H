@@ -47,6 +47,7 @@ Author
 #include "volFields.H"
 #include "pointFields.H"
 #include "sparseMatrix.H"
+#include "symmTensor4thOrder.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -94,9 +95,9 @@ namespace vfvm
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#ifdef NoRepository
-#   include "vfvmCellPoint.C"
-#endif
+// #ifdef NoRepository
+// #   include "vfvmCellPoint.C"
+// #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

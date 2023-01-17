@@ -242,5 +242,7 @@ numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/multiplyCoeff/multiplyCoeff.C
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/sparseMatrixTools.C
+numerics/vfvCellPoint/vfvcCellPoint.C
+numerics/vfvCellPoint/vfvmCellPoint.C
 
 LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels

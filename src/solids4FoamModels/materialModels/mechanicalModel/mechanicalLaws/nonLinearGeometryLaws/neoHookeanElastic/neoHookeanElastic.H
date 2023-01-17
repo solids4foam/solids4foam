@@ -123,6 +123,10 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+        //- Material tangent field for Newton Raphson loop
+        //  The size of this field should be mesh.nFaces()
+        virtual tmp<Field<symmTensor4thOrder>> materialTangentField() const;
+
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
 

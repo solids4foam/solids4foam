@@ -124,6 +124,46 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 }
 
 
+Foam::tmp<Foam::Field<Foam::symmTensor4thOrder>>
+Foam::neoHookeanElastic::materialTangentField() const
+{
+    tmp<Field<symmTensor4thOrder>> tresult
+    (
+        new Field<symmTensor4thOrder>(mesh().nFaces(), symmTensor4thOrder::zero)
+    );
+
+#ifdef FOAMEXTEND
+    Field<symmTensor4thOrder>& result = tresult();
+#else
+    Field<symmTensor4thOrder>& result = tresult.ref();
+#endif
+
+    // Calculate the Jacobian of the deformation gradient
+    const surfaceScalarField J(det(const_cast<neoHookeanElastic&>(*this).Ff()));
+    const scalarField& JI = J;
+
+    const scalar lambda = K_.value() - (2.0/3.0)*mu_.value();
+    const scalarField muPrime(mu_.value() - lambda*Foam::log(JI));
+    //const scalarField muPrime(JI.size(), mu_.value());
+
+    forAll(result, faceI)
+    {
+        result[faceI] =
+            symmTensor4thOrder
+            (
+                2*muPrime[faceI] + lambda, lambda, lambda,
+                        2*muPrime[faceI] + lambda, lambda,
+                                2*muPrime[faceI] + lambda,
+                muPrime[faceI], // xyxy == yxyx == xyyx == yxxy
+                muPrime[faceI], // yzyz == zyzy == yzzy == zyyz
+                muPrime[faceI]  // zxzx == xzxz == xzzx == zxxz
+            );
+    }
+
+    return tresult;
+}
+
+
 void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 {
     // Update the deformation gradient field

@@ -16,11 +16,11 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    vertexCentredLinGeomSolid
+    vertexCentredNonLinGeomTotalLagSolid
 
 Description
-    Mathematical model where linear geometry is assumed i.e. small strains and
-    small rotations are assumed, and the total displacement is the primary
+    Mathematical model where nonlinear geometry is assumed i.e. finite strains
+    and finite rotations are allowed, and the total displacement is the primary
     unknown.
 
     Discretisation is performed using a vertex-centred finite volume approach
@@ -31,12 +31,12 @@ Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
-    vertexCentredLinGeomSolid.C
+    vertexCentredNonLinGeomTotalLagSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef vertexCentredLinGeomSolid_H
-#define vertexCentredLinGeomSolid_H
+#ifndef vertexCentredNonLinGeomTotalLagSolid_H
+#define vertexCentredNonLinGeomTotalLagSolid_H
 
 #include "solidModel.H"
 #include "volFields.H"
@@ -59,10 +59,10 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class vertexCentredLinGeomSolid Declaration
+                        Class vertexCentredNonLinGeomTotalLagSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class vertexCentredLinGeomSolid
+class vertexCentredNonLinGeomTotalLagSolid
 :
     public solidModel
 {
@@ -116,8 +116,17 @@ class vertexCentredLinGeomSolid
         //- Displacement gradient field at the dual mesh faces
         surfaceTensorField dualGradDf_;
 
-        //- Stress field at the dual mesh faces
+        //- Cauchy stress field at the dual mesh faces
         surfaceSymmTensorField dualSigmaf_;
+
+        //- Deformation gradient field at the dual mesh faces
+        surfaceTensorField dualFf_;
+
+        //- Inverse of the deformation gradient field at the dual mesh faces
+        surfaceTensorField dualFinvf_;
+
+        //- Jacobian of the deformation gradient field at the dual mesh faces
+        surfaceScalarField dualJf_;
 
         //- Local-to-global point map and owner list
         globalPointIndices globalPointIndices_;
@@ -182,10 +191,10 @@ class vertexCentredLinGeomSolid
         );
 
         //- Disallow default bitwise copy construct
-        vertexCentredLinGeomSolid(const vertexCentredLinGeomSolid&);
+        vertexCentredNonLinGeomTotalLagSolid(const vertexCentredNonLinGeomTotalLagSolid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const vertexCentredLinGeomSolid&);
+        void operator=(const vertexCentredNonLinGeomTotalLagSolid&);
 
 
 protected:
@@ -195,19 +204,19 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            return nonLinearGeometry::LINEAR_GEOMETRY;
+            return nonLinearGeometry::TOTAL_LAGRANGIAN;
         }
 
 
 public:
 
     //- Runtime type information
-    TypeName("vertexCentredLinearGeometry");
+    TypeName("vertexCentredNonLinearGeometry");
 
     // Constructors
 
         //- Construct from components
-        vertexCentredLinGeomSolid
+        vertexCentredNonLinGeomTotalLagSolid
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -215,7 +224,7 @@ public:
 
     // Destructor
 
-        virtual ~vertexCentredLinGeomSolid();
+        virtual ~vertexCentredNonLinGeomTotalLagSolid();
 
 
     // Member Functions

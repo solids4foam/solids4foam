@@ -667,6 +667,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     }
 
     ierr = KSPSolve(ksp, b, x); checkErr(ierr);
+    Info<< "ierr = " << ierr << endl;
 
     if (debug)
     {

@@ -26,6 +26,9 @@ License
 #include "vfvmCellPoint.H"
 #include "multiplyCoeff.H"
 #include "sparseMatrixTools.H"
+#include "vectorList.H"
+#include "surfaceMesh.H"
+#include "cellPointLeastSquaresVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
