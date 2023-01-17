@@ -237,6 +237,7 @@ numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
 numerics/patchCorrectionVectors/patchCorrectionVectors.C
 
+numerics/deltaVectors/deltaVectors.C
 numerics/meshDualiser/meshDualiser.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/multiplyCoeff/multiplyCoeff.C

@@ -25,6 +25,7 @@ License
 
 #include "momentumStabilisation.H"
 #include "fvc.H"
+#include "deltaVectors.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -241,7 +242,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
 
         const surfaceVectorField n(mesh.Sf()/mesh.magSf());
         const vectorField& nI = n.internalField();
-        const vectorField deltaI(mesh.delta());
+        const vectorField deltaI(deltaVectors(mesh));
         const scalarField& magSfI = mesh.magSf().internalField();
         const vectorField& vfI = vf.internalField();
         const tensorField& gradVfI = gradVf.internalField();
