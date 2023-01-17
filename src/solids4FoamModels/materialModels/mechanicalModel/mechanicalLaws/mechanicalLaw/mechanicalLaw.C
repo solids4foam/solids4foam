@@ -185,6 +185,25 @@ void Foam::mechanicalLaw::makeSigma0() const
 }
 
 
+void Foam::mechanicalLaw::makeSigma0f() const
+{
+    if (sigma0fPtr_.valid())
+    {
+        FatalErrorIn("void Foam::mechanicalLaw::makeSigma0f() const")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    sigma0fPtr_.set
+    (
+        new surfaceSymmTensorField
+        (
+            "sigma0f",
+            linearInterpolate(sigma0())
+        )
+    );
+}
+
+
 void Foam::mechanicalLaw::makeEpsilon() const
 {
     if (epsilonPtr_.valid())
@@ -672,6 +691,28 @@ Foam::volSymmTensorField& Foam::mechanicalLaw::sigma0()
     }
 
     return sigma0Ptr_();
+}
+
+
+const Foam::surfaceSymmTensorField& Foam::mechanicalLaw::sigma0f() const
+{
+    if (sigma0fPtr_.empty())
+    {
+        makeSigma0f();
+    }
+
+    return sigma0fPtr_();
+}
+
+
+Foam::surfaceSymmTensorField& Foam::mechanicalLaw::sigma0f()
+{
+    if (sigma0fPtr_.empty())
+    {
+        makeSigma0f();
+    }
+
+    return sigma0fPtr_();
 }
 
 
@@ -1295,6 +1336,9 @@ Foam::mechanicalLaw::mechanicalLaw
     mufPtr_(),
     KPtr_(),
     KfPtr_(),
+    impKPtr_(),
+    sigma0Ptr_(),
+    sigma0fPtr_(),
     epsilonPtr_(),
     epsilonfPtr_(),
     FPtr_(),

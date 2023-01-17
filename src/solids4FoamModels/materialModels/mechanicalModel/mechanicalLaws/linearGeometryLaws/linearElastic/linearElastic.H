@@ -72,19 +72,8 @@ class linearElastic
         //- First Lame parameter
         dimensionedScalar lambda_;
 
-        //- Initial (residual) stress surface field
-        mutable autoPtr<surfaceSymmTensorField> sigma0fPtr_;
 
     // Private Member Functions
-
-        //- Make the initial stress surface field
-        void makeSigma0f() const;
-
-        //- Return a const reference to the initial stress surface field
-        const surfaceSymmTensorField& sigma0f() const;
-
-        //- Return a non-const reference to the initial stress surface field
-        surfaceSymmTensorField& sigma0f();
 
         //- Disallow default bitwise copy construct
         linearElastic(const linearElastic&);

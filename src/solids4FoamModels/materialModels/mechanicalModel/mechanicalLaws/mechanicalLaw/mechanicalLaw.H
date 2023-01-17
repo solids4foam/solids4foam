@@ -99,6 +99,9 @@ class mechanicalLaw
         //  measure
         mutable autoPtr<volSymmTensorField> sigma0Ptr_;
 
+        //- Initial (residual) stress surface field
+        mutable autoPtr<surfaceSymmTensorField> sigma0fPtr_;
+
         // Small strain tensor
         mutable autoPtr<volSymmTensorField> epsilonPtr_;
 
@@ -161,6 +164,9 @@ class mechanicalLaw
 
         //- Make the sigma0 field
         void makeSigma0() const;
+
+        //- Make the sigma0f field
+        void makeSigma0f() const;
 
         //- Make the epsilon field
         void makeEpsilon() const;
@@ -269,6 +275,12 @@ protected:
 
         //- Return a non-const reference to the sigma0 field
         volSymmTensorField& sigma0();
+
+        //- Return a const reference to the sigma0 surface field
+        const surfaceSymmTensorField& sigma0f() const;
+
+        //- Return a non-const reference to the sigma0 surface field
+        surfaceSymmTensorField& sigma0f();
 
         //- Return a const reference to the epsilon field
         const volSymmTensorField& epsilon() const;
