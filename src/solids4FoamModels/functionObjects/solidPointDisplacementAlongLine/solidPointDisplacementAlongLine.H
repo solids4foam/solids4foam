@@ -82,15 +82,6 @@ class solidPointDisplacementAlongLine
         //- Point coordinates
         DynamicList<vector> pointCoord_;
 
-        //- Point ID sorted
-        DynamicList<label> pointIDSorted_;
-
-        //- Point coordinates sorted
-        DynamicList<vector> pointCoordSorted_;
-
-	//- Number of mesh points on the line
-        scalar no_points_;	
-
         //- History file ptr
         autoPtr<OFstream> historyFilePtr_;
 
@@ -129,9 +120,12 @@ public:
     // Member Functions
     
         //- Sort array by component
-        auto sortByCompX(DynamicList<vector> pointCoord_, DynamicList<label> pointID_);
-	auto sortByCompY(DynamicList<vector> pointCoord_, DynamicList<label> pointID_);
-	auto sortByCompZ(DynamicList<vector> pointCoord_, DynamicList<label> pointID_);
+        void sortByComp
+        (
+            DynamicList<vector>& pointCoord_,
+            DynamicList<label>& pointID_,
+            const label cmptI
+        );
 	
         //- start is called at the start of the time-loop
         virtual bool start();

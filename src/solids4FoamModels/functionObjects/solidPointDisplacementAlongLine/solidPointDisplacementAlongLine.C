@@ -34,9 +34,7 @@ License
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
-#ifdef OPENFOAMFOUNDATION
-    #include "OSspecific.H"
-#endif
+#include "boundBox.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -57,7 +55,7 @@ namespace Foam
 
 bool Foam::solidPointDisplacementAlongLine::writeData()
 {
-    
+
     // Lookup the solid mesh
     const fvMesh& mesh = time_.lookupObject<fvMesh>(region_);
 
@@ -67,28 +65,20 @@ bool Foam::solidPointDisplacementAlongLine::writeData()
         const pointVectorField& pointD =
             mesh.lookupObject<pointVectorField>("pointD");
 
-        vector pointDValue = vector::zero;
-        
         //Obtain pointD for all values on the specified line
-        for (scalar i = 0; i < no_points_; i++)
+        forAll(pointID_, pI)
         {
-			if (pointIDSorted_[i] > -1)
-			{
-				pointDValue = pointD[pointIDSorted_[i]];
-			}
-			reduce(pointDValue, sumOp<vector>());
+            const vector pointDValue = pointD[pointID_[pI]];
 
-			if (Pstream::master())
-			{
-				historyFilePtr_()
-				<< pointIDSorted_[i] << " " << pointCoordSorted_[i]
-				<< " " << pointDValue.x()
-				<< " " << pointDValue.y()
-				<< " " << pointDValue.z()
-				<< " " << mag(pointDValue)
-				<< endl;
-			}
-	    }
+            historyFilePtr_()
+                << pointID_[pI]
+                << " " << pointCoord_[pI]
+                << " " << pointDValue.x()
+                << " " << pointDValue.y()
+                << " " << pointDValue.z()
+                << " " << mag(pointDValue)
+                << endl;
+        }
     }
     else
     {
@@ -99,72 +89,37 @@ bool Foam::solidPointDisplacementAlongLine::writeData()
     return true;
 }
 
-auto Foam::solidPointDisplacementAlongLine::sortByCompX(DynamicList<vector> pointCoord_, DynamicList<label> pointID_)
+
+void Foam::solidPointDisplacementAlongLine::sortByComp
+(
+    DynamicList<vector>& pointCoord,
+    DynamicList<label>& pointID,
+    const label cmptI
+)
 {
-	for (scalar i = 0; i < pointCoord_.size(); i++)
-	{
-		for (scalar k = i + 1; k < pointCoord_.size(); k++)
-		{
-			if (mag(pointCoord_[i].component(vector::X)) > mag(pointCoord_[k].component(vector::X)))
-			{
-				vector tempCoord(pointCoord_[i]);
-				pointCoord_[i] = pointCoord_[k];
-				pointCoord_[k] = tempCoord;
-				
-				label tempID(pointID_[i]);
-				pointID_[i] = pointID_[k];
-				pointID_[k] = tempID;
-			} 
-		}
-	}
-	
-	return Tuple2<DynamicList<vector>, DynamicList<label>>(pointCoord_, pointID_);
+    for (scalar i = 0; i < pointCoord.size(); i++)
+    {
+        for (scalar k = i + 1; k < pointCoord.size(); k++)
+        {
+            // I think there should be no mag here?
+            if
+            (
+                mag(pointCoord[i].component(cmptI))
+              > mag(pointCoord[k].component(cmptI))
+            )
+            {
+                vector tempCoord(pointCoord[i]);
+                pointCoord[i] = pointCoord[k];
+                pointCoord[k] = tempCoord;
+
+                label tempID(pointID[i]);
+                pointID[i] = pointID[k];
+                pointID[k] = tempID;
+            }
+        }
+    }
 }
 
-auto Foam::solidPointDisplacementAlongLine::sortByCompY(DynamicList<vector> pointCoord_, DynamicList<label> pointID_)
-{
-	for (scalar i = 0; i < pointCoord_.size(); i++)
-	{
-		for (scalar k = i + 1; k < pointCoord_.size(); k++)
-		{
-			if (mag(pointCoord_[i].component(vector::Y)) > mag(pointCoord_[k].component(vector::Y)))
-			{
-				vector tempCoord(pointCoord_[i]);
-				pointCoord_[i] = pointCoord_[k];
-				pointCoord_[k] = tempCoord;
-				
-				label tempID(pointID_[i]);
-				pointID_[i] = pointID_[k];
-				pointID_[k] = tempID;
-			} 
-		}
-	}
-	
-	return Tuple2<DynamicList<vector>, DynamicList<label>>(pointCoord_, pointID_);
-}
-
-auto Foam::solidPointDisplacementAlongLine::sortByCompZ(DynamicList<vector> pointCoord_, DynamicList<label> pointID_)
-{
-	for (scalar i = 0; i < pointCoord_.size(); i++)
-	{
-		for (scalar k = i + 1; k < pointCoord_.size(); k++)
-		{
-			if (mag(pointCoord_[i].component(vector::Z)) > mag(pointCoord_[k].component(vector::Z)))
-			{
-				vector tempCoord(pointCoord_[i]);
-				pointCoord_[i] = pointCoord_[k];
-				pointCoord_[k] = tempCoord;
-				
-				label tempID(pointID_[i]);
-				pointID_[i] = pointID_[k];
-				pointID_[k] = tempID;
-			
-			} 
-		}
-	}
-	
-	return Tuple2<DynamicList<vector>, DynamicList<label>>(pointCoord_, pointID_);
-}
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -179,10 +134,18 @@ Foam::solidPointDisplacementAlongLine::solidPointDisplacementAlongLine
     name_(name),
     time_(t),
     region_(dict.lookupOrDefault<word>("region", "UNDEFINED")),
-    pointID_(-1),
-    no_points_(0),
+    pointID_(0),
+    pointCoord_(0),
     historyFilePtr_()
 {
+    if (Pstream::parRun())
+    {
+        notImplemented
+        (
+            "This function object is currently only implemented for serial runs"
+        );
+    }
+
     Info<< "Creating " << this->name() << " function object" << endl;
 
     // Set region if it is undefined
@@ -200,8 +163,8 @@ Foam::solidPointDisplacementAlongLine::solidPointDisplacementAlongLine
     Info<< "    region = " << region_ << endl;
 
     // Lookup the start and end point of the line
-    const vector pointA(dict.lookup("StartPoint"));
-    const vector pointB(dict.lookup("EndPoint"));
+    const vector pointA(dict.lookup("startPoint"));
+    const vector pointB(dict.lookup("endPoint"));
 
     const fvMesh* meshPtr = NULL;
     if (time_.foundObject<fvMesh>("solid"))
@@ -214,153 +177,126 @@ Foam::solidPointDisplacementAlongLine::solidPointDisplacementAlongLine
     }
     const fvMesh& mesh = *meshPtr;
 
+    // Set capacity of point lists to be a fraction of the total number of points
+    pointID_.setCapacity(0.001*mesh.nPoints());
+    pointCoord_.setCapacity(0.001*mesh.nPoints());
+
     // Create history file if not already created
     if (historyFilePtr_.empty())
     {
         // Find the closest point on the line
-        scalar minDist = 1e-6;
+        const scalar minDist(dict.lookupOrDefault<scalar>("minDist", 1e-6));
+        Info<< "    minDist: " << minDist << endl;
+
         //Define vector between points A and B
-        const vector line_vector(pointB.x() - pointA.x(), pointB.y() - pointA.y(), pointB.z() - pointA.z());
-        
+        const vector line_vector = pointB - pointA;
+
         forAll(mesh.points(), pI)
         {
-			//Define vector between point A and mesh point P
-			vector point_vector(mesh.points()[pI].component(vector::X) - pointA.x(), mesh.points()[pI].component(vector::Y) - pointA.y(), mesh.points()
-			[pI].component(vector::Z) - pointA.z());
-    	    
-    	    //Check whether point is within the region defined by the segment
-	        if ( mag(mesh.points()[pI].component(vector::X)) <= mag(pointB.x()) && mag(mesh.points()[pI].component(vector::X)) >= mag(pointA.x()) && 
-                 mag(mesh.points()[pI].component(vector::Y)) <= mag(pointB.y()) && mag(mesh.points()[pI].component(vector::Y)) >= mag(pointA.y()) &&
-                 mag(mesh.points()[pI].component(vector::Z)) <= mag(pointB.z()) && mag(mesh.points()[pI].component(vector::Z)) >= mag(pointA.z()) )
-            {   
-			   //Calculate coordinates of projection point on line
-			   vector proj_pt(((point_vector & line_vector)/mag(line_vector))*(line_vector/mag(line_vector)) + pointA);
-               
-               //Calculate distance between mesh point and projection point
-               scalar dist = mag(mesh.points()[pI] - proj_pt);
-               
-               //Check if mesh point is on the line
-               if (dist < minDist)
-               {
-                   pointID_.append(pI);
-                   pointCoord_.append(mesh.points()[pI]); 
-                   no_points_++;
-               }
+            //Define vector between point A and mesh point P
+            const vector point_vector = mesh.points()[pI] - pointA;
+
+            // Create bounding box for the line from A to B
+            boundBox bb(pointA, pointB);
+
+            // Inflate the box in case it has zero volume
+            bb.inflate(0.01);
+
+            //Check whether point is within the region defined by the segment
+            if (bb.contains(mesh.points()[pI]))
+            {
+                // Calculate coordinates of projection point on line
+                const vector proj_pt
+                (
+                    (
+                        (point_vector & line_vector)/mag(line_vector)
+                    )*(line_vector/mag(line_vector))
+                  + pointA
+                );
+
+                // Calculate distance between mesh point and projection point
+                const scalar dist = mag(mesh.points()[pI] - proj_pt);
+
+                // Check if mesh point is on the line
+                if (dist < minDist)
+                {
+                    pointID_.append(pI);
+                    pointCoord_.append(mesh.points()[pI]);
+                }
+            }
+        }
+
+        //Sort point coordinates by x, y or z-coordinates
+        if (mag(pointCoord_[0].component(vector::Y)) == mag(pointCoord_[1].component(vector::Y)) && mag(pointCoord_[0].component(vector::Z)) ==
+        mag(pointCoord_[1].component(vector::Z)))
+        {
+            //Sort point coordinates by x-coordinates
+            sortByComp(pointCoord_, pointID_, vector::X);
+
+            Info<< "SortByCompX called" << pointID_.size() << pointCoord_.size() << endl;
+        }
+        else if (mag(pointCoord_[0].component(vector::X)) == mag(pointCoord_[1].component(vector::X)) && mag(pointCoord_[0].component(vector::Z)) ==
+        mag(pointCoord_[1].component(vector::Z)))
+        {
+            //Sort point coordinates by y-coordinates
+            sortByComp(pointCoord_, pointID_, vector::Y);
+
+            Info<< "SortByCompY called" << pointID_.size() << pointCoord_.size() << endl;
+        }
+        else if (mag(pointCoord_[0].component(vector::X)) == mag(pointCoord_[1].component(vector::X)) && mag(pointCoord_[0].component(vector::Y)) ==
+        mag(pointCoord_[1].component(vector::Y)))
+        {
+            //Sort point coordinates by z-coordinates
+            sortByComp(pointCoord_, pointID_, vector::Z);
+
+            Info<< "SortByCompZ called" << pointID_.size() << pointCoord_.size() << endl;
+        }
+        else
+        {
+            //Sort point coordinates by x-coordinates
+            sortByComp(pointCoord_, pointID_, vector::X);
+            Info << "SortByCompX since two or three coordinates are different" << endl;
+        }
+
+        // File update
+        if (Pstream::master())
+        {
+            fileName historyDir;
+
+            const word startTimeName =
+                time_.timeName(mesh.time().startTime().value());
+
+            if (Pstream::parRun())
+            {
+                // Put in undecomposed case (Note: gives problems for
+                // distributed data running)
+                historyDir = time_.path()/".."/"postProcessing"/startTimeName;
+            }
+            else
+            {
+                historyDir = time_.path()/"postProcessing"/startTimeName;
             }
 
-		    // Find global closest point
-		    const scalar globalMinDist = returnReduce(minDist, minOp<scalar>());
-		    int procNo = -1;
-		    if (mag(globalMinDist - minDist) < SMALL)
-		    {
-		        procNo = Pstream::myProcNo();
-		    }
-		    else
-		    {
-		        pI = -1;
-		    }
+            // Create directory if does not exist.
+            mkDir(historyDir);
 
-		    // More than one processor can have the point so we will take the proc
-		    // with the highest processor number
-		    const int globalMaxProc = returnReduce(procNo, maxOp<int>());
-		    if (mag(globalMaxProc - procNo) > SMALL)
-		    {
-		        pI = -1;
-		    }
+            // Open new file at start up
+            historyFilePtr_.reset
+            (
+                new OFstream
+                (
+                    historyDir/"solidPointDisplacementAlongLine_" + name + ".dat"
+                )
+            );
 
-		    if (pI > -1)
-		    {
-		        Pout<< "    distance from specified point is " << minDist
-		            << endl;
-		    }
-
-		    if (returnReduce(pI, maxOp<int>()) == -1)
-		    {
-		        FatalErrorIn("solidPointDisplacementAlongLine::solidPointDisplacementAlongLine")
-		            << "Something went wrong: no proc found a point!"
-		            << abort(FatalError);
-		    }
-	    
-	    }
-	    
-	    //Sort point coordinates by x, y or z-coordinates
-	    DynamicList<vector> pointCoordSorted();
-	    DynamicList<label> pointIDSorted();
-	    
-	    if (mag(pointCoord_[0].component(vector::Y)) == mag(pointCoord_[1].component(vector::Y)) && mag(pointCoord_[0].component(vector::Z)) ==
-	    mag(pointCoord_[1].component(vector::Z))) 
-	    {
-			//Sort point coordinates by x-coordinates
-			pointCoordSorted_=sortByCompX(pointCoord_, pointID_).first();
-			pointIDSorted_=sortByCompX(pointCoord_, pointID_).second();
-			
-			Info << "SortByCompX called" << pointIDSorted_.size() << pointCoordSorted_.size() << endl;
-	    }
-	    else if (mag(pointCoord_[0].component(vector::X)) == mag(pointCoord_[1].component(vector::X)) && mag(pointCoord_[0].component(vector::Z)) ==
-	    mag(pointCoord_[1].component(vector::Z)))
-	    {
-	    	//Sort point coordinates by y-coordinates
-			pointCoordSorted_=sortByCompY(pointCoord_, pointID_).first();
-			pointIDSorted_=sortByCompY(pointCoord_, pointID_).second();
-			
-			Info << "SortByCompY called" << endl;
-	    }
-	    else if (mag(pointCoord_[0].component(vector::X)) == mag(pointCoord_[1].component(vector::X)) && mag(pointCoord_[0].component(vector::Y)) ==
-	    mag(pointCoord_[1].component(vector::Y)))
-	    {
-	    	//Sort point coordinates by z-coordinates
-			pointCoordSorted_=sortByCompZ(pointCoord_, pointID_).first();
-			pointIDSorted_=sortByCompZ(pointCoord_, pointID_).second();
-			
-			Info << "SortByCompZ called" << endl;
-	    }
-	    else 
-	    {
-	    	//Sort point coordinates by x-coordinates
-			pointCoordSorted_=sortByCompX(pointCoord_, pointID_).first();
-			pointIDSorted_=sortByCompX(pointCoord_, pointID_).second();
-			Info << "SortByCompX since two or three coordinates are different" << endl;
-	    }
-	    
-	    // File update
-	    if (Pstream::master())
-	    {
-	        fileName historyDir;
-
-	        const word startTimeName =
-	            time_.timeName(mesh.time().startTime().value());
-
-	        if (Pstream::parRun())
-	        {
-	            // Put in undecomposed case (Note: gives problems for
-	            // distributed data running)
-	            historyDir = time_.path()/".."/"postProcessing"/startTimeName;
-	        }
-	        else
-	        {
-	            historyDir = time_.path()/"postProcessing"/startTimeName;
-	        }
-
-	        // Create directory if does not exist.
-	        mkDir(historyDir);
-
-	        // Open new file at start up
-	        historyFilePtr_.reset
-	        (
-	            new OFstream
-	            (
-	                historyDir/"solidPointDisplacementAlongLine_" + name + ".dat"
-	            )
-	        );
-
-	        // Add headers to output data
-	        if (historyFilePtr_.valid())
-	        {
-	            historyFilePtr_()
-	                << "# PointID PointCoord Dx Dy Dz magD" << endl;
-	        }
-	    }
-    }    
+            // Add headers to output data
+            if (historyFilePtr_.valid())
+            {
+                historyFilePtr_()
+                    << "# PointID PointCoord Dx Dy Dz magD" << endl;
+            }
+        }
+    }
 }
 
 
