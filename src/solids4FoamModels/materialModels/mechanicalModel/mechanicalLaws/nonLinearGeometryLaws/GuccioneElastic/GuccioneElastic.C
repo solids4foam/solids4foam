@@ -67,7 +67,7 @@ Foam::GuccioneElastic::GuccioneElastic
         ),
         mesh
     ),
-    f0f0_(sqr(f0_)),
+    f0f0_("f0f0", sqr(f0_)),
     s0_
     (
         IOobject
@@ -194,7 +194,7 @@ void Foam::GuccioneElastic::correct(volSymmTensorField& sigma)
     const volSymmTensorField S(dQdE*0.5*k_*exp(Q));
 
     // Convert the second Piola-Kirchhoff stress to the Cauchy stress
-    sigma = J*symm(F & S & F.T());;
+    sigma = J*symm(F & S & F.T());
 }
 
 
