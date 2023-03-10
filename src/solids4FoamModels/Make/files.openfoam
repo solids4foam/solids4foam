@@ -64,6 +64,7 @@ $(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
 
 nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
 $(nonLinGeomLaws)/isotropicFungElastic/isotropicFungElastic.C
+$(nonLinGeomLaws)/electroMechanicalLaw/electroMechanicalLaw.C
 $(nonLinGeomLaws)/GentElastic/GentElastic.C
 $(nonLinGeomLaws)/GuccioneElastic/GuccioneElastic.C
 $(nonLinGeomLaws)/OgdenElastic/OgdenElastic.C

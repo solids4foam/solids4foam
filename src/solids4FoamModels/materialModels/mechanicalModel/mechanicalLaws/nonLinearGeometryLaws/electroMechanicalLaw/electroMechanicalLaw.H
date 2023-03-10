@@ -22,27 +22,27 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    GuccioneElastic
+    electroMechanicalLaw
 
 Description
-    Guccione hyper-elasticity law suitable for myocardium. This implementation
-    is based on the approach described in E Garcia-Blanco, R Ortigosa, AJ Gil,
-    CH Lee, J Bonet, A new computational framework for electro-activation in
-    cardiac mechanics, Comput. Methods Appl. Mech. Engrg. 348 (2019) 796–845.
+    Generalised electro-coupled mechanical law, where the stress is composed of
+    two components: an active component, stemming from electro-mechanical
+    coupling; and a passive component coming from a hyperelastic law.
+
+    The passive hyperelastic law is run-time selectable.
 
 SourceFiles
-    GuccioneElastic.C
+    electroMechanicalLaw.C
 
 Author
     Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef GuccioneElastic_H
-#define GuccioneElastic_H
+#ifndef electroMechanicalLaw_H
+#define electroMechanicalLaw_H
 
 #include "mechanicalLaw.H"
-#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -50,51 +50,42 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                         Class linearElastic Declaration
+                         Class electroMechanicalLaw Declaration
 \*---------------------------------------------------------------------------*/
 
-class GuccioneElastic
+class electroMechanicalLaw
 :
     public mechanicalLaw
 {
-    // Private data
+    // Private Data
 
-        //- Bulk modulus
-        dimensionedScalar bulkModulus_;
+        //- Run-time selectable passive mechanical law
+        autoPtr<mechanicalLaw> passiveMechLawPtr_;
 
-        //- Guccione modulus parameter
-        dimensionedScalar k_;
-
-        //- Material parameters
-        const scalar cf_;
-        const scalar ct_;
-        const scalar cfs_;
-
-        //- Shear modulus in the limited of small strains
-        dimensionedScalar mu_;
-
-        //- Fibre directions in the reference configuration 
-        volVectorField f0_;
-
-        //- Outer product of the fibre directions with themselves
-        volSymmTensorField f0f0_;
-
-        //- Sheet directions in the reference configuration 
-        volVectorField s0_;
-
+        //- Constant active tension
+        const dimensionedScalar Ta_;
 
     // Private Member Functions
 
+        // //- Make the initial pore-pressure surface field
+        // void makeP0f() const;
+
+        // //- Return a reference to the initial pore-pressure surface field
+        // const surfaceScalarField& p0f() const;
+
+        // //- Lookup and return a reference to the pressure field
+        // const volScalarField& lookupPressureField() const;
+
         //- Disallow default bitwise copy construct
-        GuccioneElastic(const GuccioneElastic&);
+        electroMechanicalLaw(const electroMechanicalLaw&);
 
         //- Disallow default bitwise assignment
-        void operator=(const GuccioneElastic&);
+        void operator=(const electroMechanicalLaw&);
 
 public:
 
     //- Runtime type information
-    TypeName("GuccioneElastic");
+    TypeName("electroMechanicalLaw");
 
     // Static data members
 
@@ -102,7 +93,7 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        GuccioneElastic
+        electroMechanicalLaw
         (
             const word& name,
             const fvMesh& mesh,
@@ -113,7 +104,7 @@ public:
 
     // Destructor
 
-        virtual ~GuccioneElastic();
+        virtual ~electroMechanicalLaw();
 
 
     // Member Functions
@@ -127,10 +118,6 @@ public:
 
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
-
-        //- Set restart: some mechanical laws may change the writeOpt of fields
-        //  accordingly
-        virtual void setRestart();
 };
 
 
