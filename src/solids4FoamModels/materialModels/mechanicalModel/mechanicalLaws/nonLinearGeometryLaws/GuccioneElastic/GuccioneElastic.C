@@ -193,8 +193,20 @@ void Foam::GuccioneElastic::correct(volSymmTensorField& sigma)
     // Calculate the 2nd Piola-Kirchhoff stress
     const volSymmTensorField S(dQdE*0.5*k_*exp(Q));
 
-    // Convert the second Piola-Kirchhoff stress to the Cauchy stress
-    sigma = J*symm(F & S & F.T());
+    // Convert the second Piola-Kirchhoff stress to the Cauchy stress and take
+    // the deviatoric component
+    const volSymmTensorField s(dev(J*symm(F & S & F.T())));
+
+    // Calculate the hydrostatic stress
+    updateSigmaHyd
+    (
+        0.5*bulkModulus_*(pow(J, 2.0) - 1.0)/J,
+        (4.0/3.0)*mu_ + bulkModulus_
+    );
+
+    // Convert the second Piola-Kirchhoff stress to the Cauchy stress and add
+    // hydrostatic stress term
+    sigma = s + sigmaHyd()*I;
 }
 
 

@@ -65,16 +65,10 @@ class electroMechanicalLaw
         //- Constant active tension
         const dimensionedScalar Ta_;
 
+        //- Ramp time over which Ta is increased from zero to its maximum value
+        const scalar rampTime_;
+
     // Private Member Functions
-
-        // //- Make the initial pore-pressure surface field
-        // void makeP0f() const;
-
-        // //- Return a reference to the initial pore-pressure surface field
-        // const surfaceScalarField& p0f() const;
-
-        // //- Lookup and return a reference to the pressure field
-        // const volScalarField& lookupPressureField() const;
 
         //- Disallow default bitwise copy construct
         electroMechanicalLaw(const electroMechanicalLaw&);
