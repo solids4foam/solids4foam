@@ -7,3 +7,4 @@ echo
 
 wclean lib blockCoupledSolids4FoamTools
 wclean lib solids4FoamModels
+wclean lib RBFMeshMotionSolver
