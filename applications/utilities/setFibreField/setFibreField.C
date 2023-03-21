@@ -96,7 +96,6 @@ int main(int argc, char *argv[])
     const volScalarField x("x", mesh.C().component(vector::X));
     const volScalarField y("y", mesh.C().component(vector::Y));
     const volScalarField z("z", mesh.C().component(vector::Z));
-    z.write();
 
     //const volScalarField posX(pos(x));
     const volScalarField posY(pos(y));
@@ -117,8 +116,8 @@ int main(int argc, char *argv[])
         ),
         -acos(z/rl)
     );
-    Info<< "Writing u" << endl;
-    u.write();
+    // Info<< "Writing u" << endl;
+    // u.write();
 
     const volScalarField v
     (
@@ -133,8 +132,8 @@ int main(int argc, char *argv[])
         (negY - posY)*acos(x/(rs*sin(u)))
         //asin(y/(rs*sin(u)))
     );
-    Info<< "Writing v" << endl;
-    v.write();
+    // Info<< "Writing v" << endl;
+    // v.write();
 
     const volVectorField dxdu
     (
@@ -154,8 +153,8 @@ int main(int argc, char *argv[])
       + rs*cos(u)*sin(v)*jHat
       - rl*sin(u)*kHat
     );
-    Info<< "Writing dxdu" << endl;
-    dxdu.write();
+    // Info<< "Writing dxdu" << endl;
+    // dxdu.write();
 
     const volVectorField dxduHat
     (
@@ -169,8 +168,8 @@ int main(int argc, char *argv[])
         ),
         dxdu/mag(dxdu)
     );
-    Info<< "Writing dxduHat" << endl;
-    dxduHat.write();
+    // Info<< "Writing dxduHat" << endl;
+    // dxduHat.write();
 
     const volVectorField dxdv
     (
@@ -191,8 +190,8 @@ int main(int argc, char *argv[])
        // + (1.0 - posY)*rs*sin(u)*cos(v)*jHat
        // - posY*rs*sin(u)*cos(v)*jHat
     );
-    Info<< "Writing dxdv" << endl;
-    dxdv.write();
+    // Info<< "Writing dxdv" << endl;
+    // dxdv.write();
 
     const volVectorField dxdvHat
     (
@@ -206,8 +205,8 @@ int main(int argc, char *argv[])
         ),
         dxdv/mag(dxdv)
     );
-    Info<< "Writing dxdvHat" << endl;
-    dxdvHat.write();
+    // Info<< "Writing dxdvHat" << endl;
+    // dxdvHat.write();
 
     // Initialise the fibre field
     const word fibreFieldName("f0");
