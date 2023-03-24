@@ -227,36 +227,6 @@ int main(int argc, char *argv[])
     Info<< "Writing " << fibres.name() << endl;
     fibres.write();
 
-    // Create sheet direction field
-    // This is not defined for Lund et al. because the Guccione model is
-    // transversly isotropic, so it does not matter what direction it points
-    // as long as it is normal to the fibres
-    volVectorField sheet
-    (
-        IOobject
-        (
-            "s0",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedVector("0", dimless, vector::zero)
-    );
-
-    // Arbitrarily select z direction and remove the component the thre fibre
-    // direction
-    sheet = (I - sqr(fibres)) & kHat;
-    sheet /= mag(sheet);
-
-    // Remove component
-
-    sheet /= mag(sheet);
-
-    Info<< "Writing " << sheet.name() << endl;
-    sheet.write();
-
     Info<< "\nEnd\n" << endl;
 
     return 0;
