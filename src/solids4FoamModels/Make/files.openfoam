@@ -186,6 +186,7 @@ numerics/interpolationTable/tableReaders/csv/csvTableReaders.C
 numerics/meshDualiser/meshDualiser.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/multiplyCoeff/multiplyCoeff.C
+numerics/multiplyCoeff/multiplyCoeffRectMat.C
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/sparseMatrixTools.C
 

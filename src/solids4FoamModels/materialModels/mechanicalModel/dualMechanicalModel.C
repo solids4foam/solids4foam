@@ -335,20 +335,20 @@ const Foam::fvMesh& Foam::dualMechanicalModel::mesh() const
 }
 
 
-Foam::tmp<Foam::Field<Foam::symmTensor4thOrder>>
+Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 Foam::dualMechanicalModel::materialTangentFaceField() const
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
     // Prepare the field
-    tmp< Field<symmTensor4thOrder> > tresult
+    tmp< Field<RectangularMatrix<scalar>> > tresult
     (
-        new Field<symmTensor4thOrder>(mesh().nFaces(), symmTensor4thOrder::zero)
+        new Field<RectangularMatrix<scalar>>(mesh().nFaces(), RectangularMatrix<scalar>(6))
     );
 #ifdef OPENFOAMESIORFOUNDATION
-    Field<symmTensor4thOrder>& result = tresult.ref();
+    Field<RectangularMatrix<scalar>>& result = tresult.ref();
 #else
-    Field<symmTensor4thOrder>& result = tresult();
+    Field<RectangularMatrix<scalar>>& result = tresult();
 #endif
 
     if (laws.size() == 1)
@@ -364,11 +364,11 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
     }
     else
     {
-        // Accumulate data for all materials
+/*        // Accumulate data for all materials
         // Note: the value on each dual face is uniquely set by one material law
         forAll(laws, lawI)
         {
-            const Field<symmTensor4thOrder> matTanI
+            const Field<RectangularMatrix<scalar>> matTanI
             (
                 laws[lawI].materialTangentField()
             );
@@ -382,7 +382,9 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
 
             // Insert values from actual material region into main sigma field
             result += dualFaceInThisMaterialList()[lawI]*matTanI;
-        }
+        }  */
+        
+        notImplemented("Not implemented for more than one material");
     }
 
     return tresult;

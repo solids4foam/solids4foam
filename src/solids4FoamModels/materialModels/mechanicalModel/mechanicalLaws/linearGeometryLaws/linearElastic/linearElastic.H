@@ -128,7 +128,7 @@ public:
         virtual tmp<volScalarField> impK() const;
 
         //- Material tangent for Newton Raphson loop
-        virtual symmTensor4thOrder materialTangent() const;
+        virtual RectangularMatrix<scalar> materialTangent() const;
 
         //- Provide access to mu for the coupledUnsNonLinLinearElasticSolid
         virtual const dimensionedScalar& mu() const;

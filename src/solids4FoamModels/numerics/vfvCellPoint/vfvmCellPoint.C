@@ -24,8 +24,9 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "vfvmCellPoint.H"
-#include "multiplyCoeff.H"
+#include "multiplyCoeffRectMat.H"
 #include "sparseMatrixTools.H"
+#include "RectangularMatrix.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -36,7 +37,7 @@ void Foam::vfvm::divSigma
     const fvMesh& dualMesh,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const Field<symmTensor4thOrder>& materialTangentField,
+    const Field<RectangularMatrix<scalar>>& materialTangentField,
     const boolList& fixedDofs,
     const symmTensorField& fixedDofDirections,
     const scalar fixedDofScale,
@@ -67,7 +68,7 @@ void Foam::vfvm::divSigma
         const label cellID = dualFaceToCell[dualFaceI];
 
         // Material tangent at the dual mesh face
-        const symmTensor4thOrder& materialTangent =
+        const RectangularMatrix<scalar>& materialTangent =
             materialTangentField[dualFaceI];
 
         // Points in cellID
@@ -118,7 +119,7 @@ void Foam::vfvm::divSigma
 
             // Calculate the coefficient for this point coming from dualFaceI
             tensor coeff;
-            multiplyCoeff(coeff, curDualSf, materialTangent, lsVec);
+            multiplyCoeffRectMat(coeff, curDualSf, materialTangent, lsVec);
 
             // Add the coefficient to the ownPointID equation coming from
             // pointID
@@ -138,7 +139,7 @@ void Foam::vfvm::divSigma
 
         // Compact edge direction coefficient
         tensor edgeDirCoeff;
-        multiplyCoeff
+        multiplyCoeffRectMat
         (
             edgeDirCoeff, curDualSf, materialTangent, eOverLength
         );
