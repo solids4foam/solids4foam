@@ -67,21 +67,9 @@ Foam::GuccioneElastic::GuccioneElastic
         ),
         mesh
     ),
-    f0f0_("f0f0", sqr(f0_)),
-    s0_
-    (
-        IOobject
-        (
-            "s0",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh
-    )
+    f0f0_("f0f0", sqr(f0_))
 {
-    // Check that f0 and s0 are unit vectors
+    // Check f0 are unit vectors
 
     if (min(mag(mag(f0_.primitiveField()))) < SMALL)
     {
@@ -90,18 +78,8 @@ Foam::GuccioneElastic::GuccioneElastic
             << abort(FatalError);
     }
 
-    if (min(mag(mag(s0_.primitiveField()))) < SMALL)
-    {
-        FatalErrorIn("GuccioneElastic::GuccioneElastic()")
-            << "At least one s0 vector has a length of zero!"
-            << abort(FatalError);
-    }
-
     // Normalise f0
     f0_ /= mag(f0_);
-
-    // Normalise s0
-    s0_ /= mag(s0_);
 
     // Re-calculate f0f0
     f0f0_ = sqr(f0_);

@@ -79,9 +79,6 @@ class GuccioneElastic
         //- Outer product of the fibre directions with themselves
         volSymmTensorField f0f0_;
 
-        //- Sheet directions in the reference configuration 
-        volVectorField s0_;
-
 
     // Private Member Functions
 
