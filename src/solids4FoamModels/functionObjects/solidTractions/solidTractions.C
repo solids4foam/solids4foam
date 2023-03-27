@@ -233,7 +233,7 @@ bool Foam::solidTractions::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::solidTractions::write()
 {
-    return writeData();
+    return true;
 }
 #endif
 
