@@ -73,11 +73,26 @@ class GuccioneElastic
         //- Shear modulus in the limited of small strains
         dimensionedScalar mu_;
 
-        //- Fibre directions in the reference configuration 
+        //- Fibre directions in the reference configuration
         volVectorField f0_;
+
+        //- Sheet directions in the reference configuration
+        //  f0 & s0 == 0
+        volVectorField s0_;
+
+        //- Sheet normal directions in the reference configuration
+        //  n0 & f0 == n0 & s0 == 0
+        volVectorField n0_;
+
+        //- Rotation matrix from local fibre coordinate system to the global
+        //  coordinate system
+        volTensorField R_;
 
         //- Outer product of the fibre directions with themselves
         volSymmTensorField f0f0_;
+
+        //- 2nd Piola-Kirchhoff stress (without the hydrostatic term)
+        volSymmTensorField S_;
 
 
     // Private Member Functions

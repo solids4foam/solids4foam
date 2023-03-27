@@ -67,7 +67,59 @@ Foam::GuccioneElastic::GuccioneElastic
         ),
         mesh
     ),
-    f0f0_("f0f0", sqr(f0_))
+    s0_
+    (
+        IOobject
+        (
+            "s0",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector("i", dimless, vector(1, 0, 0))
+    ),
+    n0_
+    (
+        IOobject
+        (
+            "n0",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector("0", dimless, vector::zero)
+    ),
+    R_
+    (
+        IOobject
+        (
+            "R",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedTensor("0", dimless, tensor::zero)
+    ),
+    f0f0_("f0f0", sqr(f0_)),
+    S_
+    (
+        IOobject
+        (
+            "S2PK",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+    )
 {
     // Check f0 are unit vectors
 
@@ -87,6 +139,44 @@ Foam::GuccioneElastic::GuccioneElastic
     // Store old F
     F().storeOldTime();
     //Ff().storeOldTime();
+
+    // Calculate sheet direction (s0) which is orthogonal to f0. There are
+    // infinite vectors which are orthogonal to f0 so we will start with i
+    // and remove any component in the f0 direction
+    // Remove component in f0 direction
+    s0_ = ((I - f0f0_) & s0_);
+
+    // Check for any vectors with zero magnitude; if found, then use the j
+    // direction
+    const volScalarField magS0(mag(s0_));
+    const volScalarField posMagS0(pos(magS0));
+    s0_ = posMagS0*s0_ + (1.0 - posMagS0)*((I - f0f0_) & vector(0, 1, 0));
+
+    // Make s0 unit vectors
+    s0_ /= mag(s0_);
+
+    // Calculate n0 as orthogonal to f0 and s0
+    n0_ = f0_ ^ s0_;
+    n0_ /= mag(n0_);
+
+    // Assign the components of R
+    R_.replace(tensor::XX, f0_.component(vector::X));
+    R_.replace(tensor::YX, f0_.component(vector::Y));
+    R_.replace(tensor::ZX, f0_.component(vector::Z));
+    R_.replace(tensor::YY, s0_.component(vector::X));
+    R_.replace(tensor::YY, s0_.component(vector::Y));
+    R_.replace(tensor::ZY, s0_.component(vector::Z));
+    R_.replace(tensor::YZ, n0_.component(vector::X));
+    R_.replace(tensor::YZ, n0_.component(vector::Y));
+    R_.replace(tensor::ZZ, n0_.component(vector::Z));
+
+    if (dict.lookupOrDefault<Switch>("writeS0N0R", Switch(false)))
+    {
+        Info<< "Writing s0, n0 and R" << endl;
+        s0_.write();
+        n0_.write();
+        R_.write();
+    }
 }
 
 
@@ -142,38 +232,103 @@ void Foam::GuccioneElastic::correct(volSymmTensorField& sigma)
     // Calculate the Green-Lagrange strain
     const volSymmTensorField E(0.5*(C - I));
 
-    // Calculate E . E
-    const volSymmTensorField sqrE(symm(E & E));
-
-    // Calculate the invariants of E
-    const volScalarField I1(tr(E));
-    const volScalarField I2(0.5*(sqr(tr(E)) - tr(sqrE)));
-    const volScalarField I4(E && f0f0_);
-    const volScalarField I5(sqrE && f0f0_);
-
-    // Calculate Q
-    const volScalarField Q
+    const Switch useLocalCoordSys
     (
-        ct_*sqr(I1)
-      - 2.0*ct_*I2
-     + (cf_ - 2.0*cfs_ + ct_)*sqr(I4)
-     + 2.0*(cfs_ - ct_)*I5
+        dict().lookupOrDefault<Switch>
+        (
+            "calculateStressInLocalCoordinateSystem",
+            Switch(false)
+        )
     );
 
-    // Calculate the derivative of Q wrt to E
-    const volSymmTensorField dQdE
-    (
-        2.0*ct_*E
-      + 2.0*(cf_ - 2.0*cfs_ + ct_)*I4*f0f0_
-      + 2.0*(cfs_ - ct_)*symm((E & f0f0_) + (f0f0_ & E))
-    );
+    if (useLocalCoordSys)
+    {
+        // Calculate the Green strain in the local coordinate system
+        const volSymmTensorField EStar("EStar", symm(R_.T() & E & R_));
 
-    // Calculate the 2nd Piola-Kirchhoff stress
-    const volSymmTensorField S(dQdE*0.5*k_*exp(Q));
+        // Extract the components of EStar
+        // Note: EStar is symmetric
+        const volScalarField E11("E11", EStar.component(symmTensor::XX));
+        const volScalarField E12("E12", EStar.component(symmTensor::XY));
+        const volScalarField E13("E13", EStar.component(symmTensor::XZ));
+        const volScalarField E22("E22", EStar.component(symmTensor::YY));
+        const volScalarField E23("E23", EStar.component(symmTensor::YZ));
+        const volScalarField E33("E33", EStar.component(symmTensor::ZZ));
+
+        // Calculate Q
+        const volScalarField Q
+        (
+            "Q",
+            cf_*sqr(E11)
+          + ct_*(sqr(E22) + sqr(E33) + 2*sqr(E23))
+          + cfs_*(2*sqr(E12) + 2*sqr(E13))
+        );
+
+        // Calculate the derivative of Q wrt to EStar
+        volSymmTensorField dQdEStar
+        (
+            IOobject
+            (
+                "dQdEStar",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedSymmTensor("0", dimless, symmTensor::zero)
+        );
+
+        dQdEStar.replace(symmTensor::XX, 2*cf_*E11);
+        dQdEStar.replace(symmTensor::XY, 2*cfs_*E12);
+        dQdEStar.replace(symmTensor::XZ, 2*cfs_*E13);
+        dQdEStar.replace(symmTensor::YY, 2*ct_*E22);
+        dQdEStar.replace(symmTensor::YZ, 2*ct_*E23);
+        dQdEStar.replace(symmTensor::ZZ, 2*ct_*E33);
+
+        // Calculate the local 2nd Piola-Kirchhoff stress (without the
+        // hydrostatic term)
+        S_ = dQdEStar*0.5*k_*exp(Q);
+
+        // Rotate S from the local fibre coordinate system to the global
+        // coordinate system
+        S_ = symm(R_ & S_ & R_.T());
+    }
+    else
+    {
+        // Calculate E . E
+        const volSymmTensorField sqrE(symm(E & E));
+
+        // Calculate the invariants of E
+        const volScalarField I1(tr(E));
+        const volScalarField I2(0.5*(sqr(tr(E)) - tr(sqrE)));
+        const volScalarField I4(E && f0f0_);
+        const volScalarField I5(sqrE && f0f0_);
+
+        // Calculate Q
+        const volScalarField Q
+        (
+            ct_*sqr(I1)
+          - 2.0*ct_*I2
+         + (cf_ - 2.0*cfs_ + ct_)*sqr(I4)
+         + 2.0*(cfs_ - ct_)*I5
+        );
+
+        // Calculate the derivative of Q wrt to E
+        const volSymmTensorField dQdE
+        (
+            2.0*ct_*E
+          + 2.0*(cf_ - 2.0*cfs_ + ct_)*I4*f0f0_
+          + 2.0*(cfs_ - ct_)*symm((E & f0f0_) + (f0f0_ & E))
+        );
+
+        // Update the 2nd Piola-Kirchhoff stress (without the hydrostatic term)
+        S_ = dQdE*0.5*k_*exp(Q);
+    }
 
     // Convert the second Piola-Kirchhoff stress to the Cauchy stress and take
     // the deviatoric component
-    const volSymmTensorField s(dev(J*symm(F & S & F.T())));
+    const volSymmTensorField s(dev(J*symm(F & S_ & F.T())));
 
     // Calculate the hydrostatic stress
     updateSigmaHyd
@@ -182,8 +337,8 @@ void Foam::GuccioneElastic::correct(volSymmTensorField& sigma)
         (4.0/3.0)*mu_ + bulkModulus_
     );
 
-    // Convert the second Piola-Kirchhoff stress to the Cauchy stress and add
-    // hydrostatic stress term
+    // Convert the second Piola-Kirchhoff deviatoric stress to the Cauchy stress
+    // and add hydrostatic stress term
     sigma = s + sigmaHyd()*I;
 }
 
