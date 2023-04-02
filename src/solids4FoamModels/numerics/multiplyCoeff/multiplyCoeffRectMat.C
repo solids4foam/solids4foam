@@ -29,6 +29,14 @@ void Foam::multiplyCoeffRectMat
     const vector& g
 )
 {
+    //Define indexes for readability.
+    scalar XX = 0;
+    scalar YY = 1;
+    scalar ZZ = 2;
+    scalar XY = 3;
+    scalar YZ = 4;
+    scalar ZX = 5;
+
     // Index notation
     // coeff_ij = Sf_m C_mikl g_k delta_lj
     // where delta is kronecker delta
@@ -58,20 +66,26 @@ void Foam::multiplyCoeffRectMat
 
     // Note: C_2121 == C_1212
     coeff[tensor::XX] = 
-        Sf[vector::X]*C(0,0)*g[vector::X]
-      + Sf[vector::Y]*C(0,3)*g[vector::Y]
-      + Sf[vector::Z]*C(0,5)*g[vector::Z]
+        Sf[vector::X]*C(XX,XX)*g[vector::X]
+      + Sf[vector::X]*C(XX,XY)*g[vector::Y]
+      + Sf[vector::X]*C(XX,ZX)*g[vector::Z]
       
-      + Sf[vector::X]*C(3,0)*g[vector::X]
-      + Sf[vector::Y]*C(3,3)*g[vector::Y]
-      + Sf[vector::Z]*C(3,5)*g[vector::Z]
+      + Sf[vector::Y]*C(XY,XX)*g[vector::X]
+      + Sf[vector::Y]*C(XY,XY)*g[vector::Y]
+      + Sf[vector::Y]*C(XY,ZX)*g[vector::Z]
       
-      + Sf[vector::X]*C(5,0)*g[vector::X]
-      + Sf[vector::Y]*C(5,3)*g[vector::Y]
-      + Sf[vector::Z]*C(5,5)*g[vector::Z];
+      + Sf[vector::Z]*C(ZX,XX)*g[vector::X]
+      + Sf[vector::Z]*C(ZX,XY)*g[vector::Y]
+      + Sf[vector::Z]*C(ZX,ZX)*g[vector::Z];
 
     // Similarly the other components can be calculated as
-    // coeff_21 = Sf_1 C_1211 g_1
+    // coeff_21 = Sf_m C_m2k1 g_k
+    //
+    //          = Sf_1 C_12k1 g_k
+    //            + Sf_2 C_22k1 g_k
+    //            + Sf_3 C_32k1 g_k
+ 
+    //          = Sf_1 C_1211 g_1
     //            + Sf_1 C_1221 g_2
     //            + Sf_1 C_1231 g_3
 
@@ -86,19 +100,25 @@ void Foam::multiplyCoeffRectMat
     // Note: C_2211 == C_1122 and C_1221 == C_2112 == C_1212 == C_2121
     
     coeff[tensor::YX] = 
-        Sf[vector::X]*C(3,0)*g[vector::X]
-      + Sf[vector::Y]*C(3,3)*g[vector::Y]
-      + Sf[vector::Z]*C(3,5)*g[vector::Z]
+        Sf[vector::X]*C(XY,XX)*g[vector::X]
+      + Sf[vector::X]*C(XY,XY)*g[vector::Y]
+      + Sf[vector::X]*C(XY,ZX)*g[vector::Z]
       
-      + Sf[vector::X]*C(1,0)*g[vector::X]
-      + Sf[vector::Y]*C(1,3)*g[vector::Y]
-      + Sf[vector::Z]*C(1,5)*g[vector::Z]
+      + Sf[vector::Y]*C(YY,XX)*g[vector::X]
+      + Sf[vector::Y]*C(YY,XY)*g[vector::Y]
+      + Sf[vector::Y]*C(YY,ZX)*g[vector::Z]
       
-      + Sf[vector::X]*C(4,0)*g[vector::X]
-      + Sf[vector::Y]*C(4,3)*g[vector::Y]
-      + Sf[vector::Z]*C(4,5)*g[vector::Z];    
+      + Sf[vector::Z]*C(YZ,XX)*g[vector::X]
+      + Sf[vector::Z]*C(YZ,XY)*g[vector::Y]
+      + Sf[vector::Z]*C(YZ,ZX)*g[vector::Z];    
 
-    // coeff_31 = Sf_1 C_1311 g_1
+    // coeff_31 = Sf_m C_m3k1 g_k
+    //
+    //          = Sf_1 C_13k1 g_k
+    //            + Sf_2 C_23k1 g_k
+    //            + Sf_3 C_33k1 g_k
+    
+    //          = Sf_1 C_1311 g_1
     //            + Sf_1 C_1321 g_2
     //            + Sf_1 C_1331 g_3
 
@@ -113,17 +133,17 @@ void Foam::multiplyCoeffRectMat
     // Note: C_1331 == C_1313 and C_3311 == C_1133
     
     coeff[tensor::ZX] = 
-        Sf[vector::X]*C(5,0)*g[vector::X]
-      + Sf[vector::Y]*C(5,3)*g[vector::Y]
-      + Sf[vector::Z]*C(5,5)*g[vector::Z]
+        Sf[vector::X]*C(ZX,XX)*g[vector::X]
+      + Sf[vector::X]*C(ZX,XY)*g[vector::Y]
+      + Sf[vector::X]*C(ZX,ZX)*g[vector::Z]
       
-      + Sf[vector::X]*C(4,0)*g[vector::X]
-      + Sf[vector::Y]*C(4,3)*g[vector::Y]
-      + Sf[vector::Z]*C(4,5)*g[vector::Z]
+      + Sf[vector::Y]*C(YZ,XX)*g[vector::X]
+      + Sf[vector::Y]*C(YZ,XY)*g[vector::Y]
+      + Sf[vector::Y]*C(YZ,ZX)*g[vector::Z]
       
-      + Sf[vector::X]*C(2,0)*g[vector::X]
-      + Sf[vector::Y]*C(2,3)*g[vector::Y]
-      + Sf[vector::Z]*C(2,5)*g[vector::Z];
+      + Sf[vector::Z]*C(ZZ,XX)*g[vector::X]
+      + Sf[vector::Z]*C(ZZ,XY)*g[vector::Y]
+      + Sf[vector::Z]*C(ZZ,ZX)*g[vector::Z];
 
     // coeff_i2 = Sf_m C_mik2 g_k delta_22
     //
@@ -143,14 +163,20 @@ void Foam::multiplyCoeffRectMat
     //            + Sf_3 C_3i22 g_2
     //            + Sf_3 C_3i32 g_3
 
-    // coeff_12 = Sf_1 C_1112 g_1
+    // coeff_12 = Sf_m C_m1k2 g_k
+    //
+    //          = Sf_1 C_11k2 g_k
+    //            + Sf_2 C_21k2 g_k
+    //            + Sf_3 C_31k2 g_k
+              
+    //          = Sf_1 C_1112 g_1
     //            + Sf_1 C_1122 g_2
     //            + Sf_1 C_1132 g_3
-    //
+    
     //            + Sf_2 C_2112 g_1
     //            + Sf_2 C_2122 g_2
     //            + Sf_2 C_2132 g_3
-    //
+    
     //            + Sf_3 C_3112 g_1
     //            + Sf_3 C_3122 g_2
     //            + Sf_3 C_3132 g_3
@@ -158,19 +184,25 @@ void Foam::multiplyCoeffRectMat
     // coeff_12 = Sf_2 C_2112 g_1 + Sf_1 C_1122 g_2
     
     coeff[tensor::XY] = 
-        Sf[vector::X]*C(0,3)*g[vector::X]
-      + Sf[vector::Y]*C(0,1)*g[vector::Y]
-      + Sf[vector::Z]*C(0,4)*g[vector::Z]
+        Sf[vector::X]*C(XX,XY)*g[vector::X]
+      + Sf[vector::X]*C(XX,YY)*g[vector::Y]
+      + Sf[vector::X]*C(XX,YZ)*g[vector::Z]
       
-      + Sf[vector::X]*C(3,3)*g[vector::X]
-      + Sf[vector::Y]*C(3,1)*g[vector::Y]
-      + Sf[vector::Z]*C(3,4)*g[vector::Z]
+      + Sf[vector::Y]*C(XY,XY)*g[vector::X]
+      + Sf[vector::Y]*C(XY,YY)*g[vector::Y]
+      + Sf[vector::Y]*C(XY,YZ)*g[vector::Z]
       
-      + Sf[vector::X]*C(5,3)*g[vector::X]
-      + Sf[vector::Y]*C(5,1)*g[vector::Y]
-      + Sf[vector::Z]*C(5,4)*g[vector::Z];
-      
-    // coeff_22 = Sf_1 C_1212 g_1
+      + Sf[vector::Z]*C(ZX,XY)*g[vector::X]
+      + Sf[vector::Z]*C(ZX,YY)*g[vector::Y]
+      + Sf[vector::Z]*C(ZX,YZ)*g[vector::Z];
+     
+    // coeff_22 = Sf_m C_m2k2 g_k
+    //
+    //          = Sf_1 C_12k2 g_k
+    //            + Sf_2 C_22k2 g_k
+    //            + Sf_3 C_32k2 g_k 
+    
+    //          = Sf_1 C_1212 g_1
     //            + Sf_1 C_1222 g_2
     //            + Sf_1 C_1232 g_3
     //
@@ -184,19 +216,25 @@ void Foam::multiplyCoeffRectMat
     // Note: C_3232 == C_2323
     
     coeff[tensor::YY] = 
-        Sf[vector::X]*C(3,3)*g[vector::X]
-      + Sf[vector::Y]*C(3,1)*g[vector::Y]
-      + Sf[vector::Z]*C(3,4)*g[vector::Z]
+        Sf[vector::X]*C(XY,XY)*g[vector::X]
+      + Sf[vector::X]*C(XY,YY)*g[vector::Y]
+      + Sf[vector::X]*C(XY,YZ)*g[vector::Z]
       
-      + Sf[vector::X]*C(1,3)*g[vector::X]
-      + Sf[vector::Y]*C(1,1)*g[vector::Y]
-      + Sf[vector::Z]*C(1,4)*g[vector::Z]
+      + Sf[vector::Y]*C(YY,XY)*g[vector::X]
+      + Sf[vector::Y]*C(YY,YY)*g[vector::Y]
+      + Sf[vector::Y]*C(YY,YZ)*g[vector::Z]
       
-      + Sf[vector::X]*C(4,3)*g[vector::X]
-      + Sf[vector::Y]*C(4,1)*g[vector::Y]
-      + Sf[vector::Z]*C(4,4)*g[vector::Z];
+      + Sf[vector::Z]*C(YZ,XY)*g[vector::X]
+      + Sf[vector::Z]*C(YZ,YY)*g[vector::Y]
+      + Sf[vector::Z]*C(YZ,YZ)*g[vector::Z];
 
-    // coeff_32 = Sf_1 C_1312 g_1
+    // coeff_32 = Sf_m C_m3k2 g_k
+    //
+    //          = Sf_1 C_13k2 g_k
+    //            + Sf_2 C_23k2 g_k
+    //            + Sf_3 C_33k2 g_k 
+    
+    //          = Sf_1 C_1312 g_1
     //            + Sf_1 C_1322 g_2
     //            + Sf_1 C_1332 g_3
     //
@@ -210,100 +248,118 @@ void Foam::multiplyCoeffRectMat
     //
     // Note: C_2332 == C_2323 and C_3322 == C_2233
     
-    coeff[tensor::YZ] = 
-        Sf[vector::X]*C(5,3)*g[vector::X]
-      + Sf[vector::Y]*C(5,1)*g[vector::Y]
-      + Sf[vector::Z]*C(5,4)*g[vector::Z]
+    coeff[tensor::ZY] = 
+        Sf[vector::X]*C(ZX,XY)*g[vector::X]
+      + Sf[vector::X]*C(ZX,YY)*g[vector::Y]
+      + Sf[vector::X]*C(ZX,YZ)*g[vector::Z]
       
-      + Sf[vector::X]*C(3,3)*g[vector::X]
-      + Sf[vector::Y]*C(3,1)*g[vector::Y]
-      + Sf[vector::Z]*C(3,4)*g[vector::Z]
+      + Sf[vector::Y]*C(YZ,XY)*g[vector::X]
+      + Sf[vector::Y]*C(YZ,YY)*g[vector::Y]
+      + Sf[vector::Y]*C(YZ,YZ)*g[vector::Z]
       
-      + Sf[vector::X]*C(2,3)*g[vector::X]
-      + Sf[vector::Y]*C(2,1)*g[vector::Y]
-      + Sf[vector::Z]*C(2,4)*g[vector::Z];
+      + Sf[vector::Z]*C(ZZ,XY)*g[vector::X]
+      + Sf[vector::Z]*C(ZZ,YY)*g[vector::Y]
+      + Sf[vector::Z]*C(ZZ,YZ)*g[vector::Z];
 
     // coeff_i3 = Sf_m C_mik3 g_k delta_33
     //
     //          = Sf_1 C_1ik3 g_k
-    //          + Sf_2 C_2ik3 g_k
-    //          + Sf_3 C_3ik3 g_k
+    //            + Sf_2 C_2ik3 g_k
+    //            + Sf_3 C_3ik3 g_k
+
+    // coeff_13 = Sf_m C_m1k3 g_k
     //
+    //          = Sf_1 C_11k3 g_k
+    //            + Sf_2 C_21k3 g_k
+    //            + Sf_3 C_31k3 g_k 
+    
     // coeff_13 = Sf_1 C_1113 g_1
-    //          + Sf_1 C_1123 g_2
-    //          + Sf_1 C_1133 g_3
+    //            + Sf_1 C_1123 g_2
+    //            + Sf_1 C_1133 g_3
     //
-    //          + Sf_2 C_2113 g_1
-    //          + Sf_2 C_2123 g_2
-    //          + Sf_2 C_2133 g_3
+    //            + Sf_2 C_2113 g_1
+    //            + Sf_2 C_2123 g_2
+    //            + Sf_2 C_2133 g_3
     //
-    //          + Sf_3 C_3113 g_1
-    //          + Sf_3 C_3123 g_2
-    //          + Sf_3 C_3133 g_3
+    //            + Sf_3 C_3113 g_1
+    //            + Sf_3 C_3123 g_2
+    //            + Sf_3 C_3133 g_3
        
     coeff[tensor::XZ] = 
-        Sf[vector::X]*C(0,5)*g[vector::X]
-      + Sf[vector::Y]*C(0,4)*g[vector::Y]
-      + Sf[vector::Z]*C(0,2)*g[vector::Z]
+        Sf[vector::X]*C(XX,ZX)*g[vector::X]
+      + Sf[vector::X]*C(XX,YZ)*g[vector::Y]
+      + Sf[vector::X]*C(XX,ZZ)*g[vector::Z]
       
-      + Sf[vector::X]*C(3,5)*g[vector::X]
-      + Sf[vector::Y]*C(3,4)*g[vector::Y]
-      + Sf[vector::Z]*C(3,2)*g[vector::Z]
+      + Sf[vector::Y]*C(XY,ZX)*g[vector::X]
+      + Sf[vector::Y]*C(XY,YZ)*g[vector::Y]
+      + Sf[vector::Y]*C(XY,ZZ)*g[vector::Z]
       
-      + Sf[vector::X]*C(5,5)*g[vector::X]
-      + Sf[vector::Y]*C(5,4)*g[vector::Y]
-      + Sf[vector::Z]*C(5,2)*g[vector::Z];
-      
-    // coeff_23 = Sf_1 C_1213 g_1
-    //          + Sf_1 C_1223 g_2
-    //          + Sf_1 C_1233 g_3
-    //
-    //          + Sf_2 C_2213 g_1
-    //          + Sf_2 C_2223 g_2
-    //          + Sf_2 C_2233 g_3
-    //
-    //          + Sf_3 C_3213 g_1
-    //          + Sf_3 C_3223 g_2
-    //          + Sf_3 C_3233 g_3
+      + Sf[vector::Z]*C(ZX,ZX)*g[vector::X]
+      + Sf[vector::Z]*C(ZX,YZ)*g[vector::Y]
+      + Sf[vector::Z]*C(ZX,ZZ)*g[vector::Z];
 
-    coeff[tensor::XZ] = 
-        Sf[vector::X]*C(3,5)*g[vector::X]
-      + Sf[vector::Y]*C(3,4)*g[vector::Y]
-      + Sf[vector::Z]*C(3,2)*g[vector::Z]
-      
-      + Sf[vector::X]*C(1,5)*g[vector::X]
-      + Sf[vector::Y]*C(1,4)*g[vector::Y]
-      + Sf[vector::Z]*C(1,2)*g[vector::Z]
-      
-      + Sf[vector::X]*C(4,5)*g[vector::X]
-      + Sf[vector::Y]*C(4,4)*g[vector::Y]
-      + Sf[vector::Z]*C(4,2)*g[vector::Z];
+    // coeff_23 = Sf_m C_m2k3 g_k
+    //
+    //          = Sf_1 C_12k3 g_k
+    //            + Sf_2 C_22k3 g_k
+    //            + Sf_3 C_32k3 g_k 
+     
+    //          = Sf_1 C_1213 g_1
+    //            + Sf_1 C_1223 g_2
+    //            + Sf_1 C_1233 g_3
+    //
+    //            + Sf_2 C_2213 g_1
+    //            + Sf_2 C_2223 g_2
+    //            + Sf_2 C_2233 g_3
+    //
+    //            + Sf_3 C_3213 g_1
+    //            + Sf_3 C_3223 g_2
+    //            + Sf_3 C_3233 g_3
 
-    // coeff_33 = Sf_1 C_1313 g_1
-    //          + Sf_1 C_1323 g_2
-    //          + Sf_1 C_1333 g_3
+    coeff[tensor::YZ] = 
+        Sf[vector::X]*C(XY,ZX)*g[vector::X]
+      + Sf[vector::X]*C(XY,YZ)*g[vector::Y]
+      + Sf[vector::X]*C(XY,ZZ)*g[vector::Z]
+      
+      + Sf[vector::Y]*C(YY,ZX)*g[vector::X]
+      + Sf[vector::Y]*C(YY,YZ)*g[vector::Y]
+      + Sf[vector::Y]*C(YY,ZZ)*g[vector::Z]
+      
+      + Sf[vector::Z]*C(YZ,ZX)*g[vector::X]
+      + Sf[vector::Z]*C(YZ,YZ)*g[vector::Y]
+      + Sf[vector::Z]*C(YZ,ZZ)*g[vector::Z];
+
+    // coeff_33 = Sf_m C_m3k3 g_k
     //
-    //          + Sf_2 C_2313 g_1
-    //          + Sf_2 C_2323 g_2
-    //          + Sf_2 C_2333 g_3
+    //          = Sf_1 C_13k3 g_k
+    //            + Sf_2 C_23k3 g_k
+    //            + Sf_3 C_33k3 g_k 
+    
+    //          = Sf_1 C_1313 g_1
+    //            + Sf_1 C_1323 g_2
+    //            + Sf_1 C_1333 g_3
     //
-    //          + Sf_3 C_3313 g_1
-    //          + Sf_3 C_3323 g_2
-    //          + Sf_3 C_3333 g_3
+    //            + Sf_2 C_2313 g_1
+    //            + Sf_2 C_2323 g_2
+    //            + Sf_2 C_2333 g_3
+    //
+    //            + Sf_3 C_3313 g_1
+    //            + Sf_3 C_3323 g_2
+    //            + Sf_3 C_3333 g_3
     // Note: C_1313 == C_3131
     
     coeff[tensor::ZZ] = 
-        Sf[vector::X]*C(5,5)*g[vector::X]
-      + Sf[vector::Y]*C(5,4)*g[vector::Y]
-      + Sf[vector::Z]*C(5,2)*g[vector::Z]
+        Sf[vector::X]*C(ZX,ZX)*g[vector::X]
+      + Sf[vector::X]*C(ZX,YZ)*g[vector::Y]
+      + Sf[vector::X]*C(ZX,ZZ)*g[vector::Z]
       
-      + Sf[vector::X]*C(4,5)*g[vector::X]
-      + Sf[vector::Y]*C(4,4)*g[vector::Y]
-      + Sf[vector::Z]*C(4,2)*g[vector::Z]
+      + Sf[vector::Y]*C(YZ,ZX)*g[vector::X]
+      + Sf[vector::Y]*C(YZ,YZ)*g[vector::Y]
+      + Sf[vector::Y]*C(YZ,ZZ)*g[vector::Z]
       
-      + Sf[vector::X]*C(2,5)*g[vector::X]
-      + Sf[vector::Y]*C(2,4)*g[vector::Y]
-      + Sf[vector::Z]*C(2,2)*g[vector::Z];
+      + Sf[vector::Z]*C(ZZ,ZX)*g[vector::X]
+      + Sf[vector::Z]*C(ZZ,YZ)*g[vector::Y]
+      + Sf[vector::Z]*C(ZZ,ZZ)*g[vector::Z];
       
 }
 

@@ -836,7 +836,7 @@ bool vertexCentredLinGeomSolid::evolve()
     const labelList& localToGlobalPointMap =
         globalPointIndices_.localToGlobalPointMap();
 
-    if (!fullNewton_) //if not using Newton-Raphson approach
+    if (!fullNewton_) //if not using full Newton-Raphson approach
     {
         // Assemble matrix once per time-step
         Info<< "    Assembling the matrix" << endl;
@@ -970,95 +970,6 @@ bool vertexCentredLinGeomSolid::evolve()
         {
             Info<< "    Solving" << endl;
         }
-        
-        Info<< "The size of the material tangent with ID = 0 is: " << materialTangent[0].size() << endl
-            
-            << "The xxxx component of the material tangent with ID = 0 is: " << materialTangent[0](0,0) << endl
-            << "The xxyy component of the material tangent with ID = 0 is: " << materialTangent[0](0,1) << endl
-            << "The xxzz component of the material tangent with ID = 0 is: " << materialTangent[0](0,2) << endl
-            << "The xxxy component of the material tangent with ID = 0 is: " << materialTangent[0](0,3) << endl
-            << "The xxyz component of the material tangent with ID = 0 is: " << materialTangent[0](0,4) << endl
-            << "The xxzx component of the material tangent with ID = 0 is: " << materialTangent[0](0,5) << endl
-            
-            << "The yyxx component of the material tangent with ID = 0 is: " << materialTangent[0](1,0) << endl
-            << "The yyyy component of the material tangent with ID = 0 is: " << materialTangent[0](1,1) << endl
-            << "The yyzz component of the material tangent with ID = 0 is: " << materialTangent[0](1,2) << endl
-            << "The yyxy component of the material tangent with ID = 0 is: " << materialTangent[0](1,3) << endl
-            << "The yyyz component of the material tangent with ID = 0 is: " << materialTangent[0](1,4) << endl
-            << "The yyzx component of the material tangent with ID = 0 is: " << materialTangent[0](1,5) << endl
-            
-            << "The zzxx component of the material tangent with ID = 0 is: " << materialTangent[0](2,0) << endl
-            << "The zzyy component of the material tangent with ID = 0 is: " << materialTangent[0](2,1) << endl
-            << "The zzzz component of the material tangent with ID = 0 is: " << materialTangent[0](2,2) << endl
-            << "The zzxy component of the material tangent with ID = 0 is: " << materialTangent[0](2,3) << endl
-            << "The zzyz component of the material tangent with ID = 0 is: " << materialTangent[0](2,4) << endl
-            << "The zzzx component of the material tangent with ID = 0 is: " << materialTangent[0](2,5) << endl
-            
-            << "The xyxx component of the material tangent with ID = 0 is: " << materialTangent[0](3,0) << endl
-            << "The xyyy component of the material tangent with ID = 0 is: " << materialTangent[0](3,1) << endl
-            << "The xyzz component of the material tangent with ID = 0 is: " << materialTangent[0](3,2) << endl
-            << "The xyxy component of the material tangent with ID = 0 is: " << materialTangent[0](3,3) << endl
-            << "The xyyz component of the material tangent with ID = 0 is: " << materialTangent[0](3,4) << endl
-            << "The xyzx component of the material tangent with ID = 0 is: " << materialTangent[0](3,5) << endl
-            
-            << "The yzxx component of the material tangent with ID = 0 is: " << materialTangent[0](4,0) << endl
-            << "The yzyy component of the material tangent with ID = 0 is: " << materialTangent[0](4,1) << endl
-            << "The yzzz component of the material tangent with ID = 0 is: " << materialTangent[0](4,2) << endl
-            << "The yzxy component of the material tangent with ID = 0 is: " << materialTangent[0](4,3) << endl
-            << "The yzyz component of the material tangent with ID = 0 is: " << materialTangent[0](4,4) << endl
-            << "The yzzx component of the material tangent with ID = 0 is: " << materialTangent[0](4,5) << endl
-            
-            << "The zxxx component of the material tangent with ID = 0 is: " << materialTangent[0](5,0) << endl
-            << "The zxyy component of the material tangent with ID = 0 is: " << materialTangent[0](5,1) << endl
-            << "The zxzz component of the material tangent with ID = 0 is: " << materialTangent[0](5,2) << endl
-            << "The zxxy component of the material tangent with ID = 0 is: " << materialTangent[0](5,3) << endl
-            << "The zxyz component of the material tangent with ID = 0 is: " << materialTangent[0](5,4) << endl
-            << "The zxzx component of the material tangent with ID = 0 is: " << materialTangent[0](5,5) << endl << endl
-            
-            << "The size of the material tangent with ID = 1000 is: " << materialTangent[1000].size() << endl
-            
-            << "The xxxx component of the material tangent with ID = 1000 is: " << materialTangent[1000](0,0) << endl
-            << "The xxyy component of the material tangent with ID = 1000 is: " << materialTangent[1000](0,1) << endl
-            << "The xxzz component of the material tangent with ID = 1000 is: " << materialTangent[1000](0,2) << endl
-            << "The xxxy component of the material tangent with ID = 1000 is: " << materialTangent[1000](0,3) << endl
-            << "The xxyz component of the material tangent with ID = 1000 is: " << materialTangent[1000](0,4) << endl
-            << "The xxzx component of the material tangent with ID = 1000 is: " << materialTangent[1000](0,5) << endl
-            
-            << "The yyxx component of the material tangent with ID = 1000 is: " << materialTangent[1000](1,0) << endl
-            << "The yyyy component of the material tangent with ID = 1000 is: " << materialTangent[1000](1,1) << endl
-            << "The yyzz component of the material tangent with ID = 1000 is: " << materialTangent[1000](1,2) << endl
-            << "The yyxy component of the material tangent with ID = 1000 is: " << materialTangent[1000](1,3) << endl
-            << "The yyyz component of the material tangent with ID = 1000 is: " << materialTangent[1000](1,4) << endl
-            << "The yyzx component of the material tangent with ID = 1000 is: " << materialTangent[1000](1,5) << endl
-            
-            << "The zzxx component of the material tangent with ID = 1000 is: " << materialTangent[1000](2,0) << endl
-            << "The zzyy component of the material tangent with ID = 1000 is: " << materialTangent[1000](2,1) << endl
-            << "The zzzz component of the material tangent with ID = 1000 is: " << materialTangent[1000](2,2) << endl
-            << "The zzxy component of the material tangent with ID = 1000 is: " << materialTangent[1000](2,3) << endl
-            << "The zzyz component of the material tangent with ID = 1000 is: " << materialTangent[1000](2,4) << endl
-            << "The zzzx component of the material tangent with ID = 1000 is: " << materialTangent[1000](2,5) << endl
-            
-            << "The xyxx component of the material tangent with ID = 1000 is: " << materialTangent[1000](3,0) << endl
-            << "The xyyy component of the material tangent with ID = 1000 is: " << materialTangent[1000](3,1) << endl
-            << "The xyzz component of the material tangent with ID = 1000 is: " << materialTangent[1000](3,2) << endl
-            << "The xyxy component of the material tangent with ID = 1000 is: " << materialTangent[1000](3,3) << endl
-            << "The xyyz component of the material tangent with ID = 1000 is: " << materialTangent[1000](3,4) << endl
-            << "The xyzx component of the material tangent with ID = 1000 is: " << materialTangent[1000](3,5) << endl
-            
-            << "The yzxx component of the material tangent with ID = 1000 is: " << materialTangent[1000](4,0) << endl
-            << "The yzyy component of the material tangent with ID = 1000 is: " << materialTangent[1000](4,1) << endl
-            << "The yzzz component of the material tangent with ID = 1000 is: " << materialTangent[1000](4,2) << endl
-            << "The yzxy component of the material tangent with ID = 1000 is: " << materialTangent[1000](4,3) << endl
-            << "The yzyz component of the material tangent with ID = 1000 is: " << materialTangent[1000](4,4) << endl
-            << "The yzzx component of the material tangent with ID = 1000 is: " << materialTangent[1000](4,5) << endl
-            
-            << "The zxxx component of the material tangent with ID = 1000 is: " << materialTangent[1000](5,0) << endl
-            << "The zxyy component of the material tangent with ID = 1000 is: " << materialTangent[1000](5,1) << endl
-            << "The zxzz component of the material tangent with ID = 1000 is: " << materialTangent[1000](5,2) << endl
-            << "The zxxy component of the material tangent with ID = 1000 is: " << materialTangent[1000](5,3) << endl
-            << "The zxyz component of the material tangent with ID = 1000 is: " << materialTangent[1000](5,4) << endl
-            << "The zxzx component of the material tangent with ID = 1000 is: " << materialTangent[1000](5,5) << endl << endl;
-            
 
         if (Switch(solidModelDict().lookup("usePETSc"))) //Check if PETSCs is defined
         {
