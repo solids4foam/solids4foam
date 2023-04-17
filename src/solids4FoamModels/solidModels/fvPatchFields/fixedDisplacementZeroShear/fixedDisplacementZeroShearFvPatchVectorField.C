@@ -89,19 +89,6 @@ fixedDisplacementZeroShearFvPatchVectorField
 
         refValue() = dispSeries_(this->db().time().timeOutputValue());
     }
-    else if (dict.found("value"))
-    {
-        refValue() = vectorField("value", dict, p.size());
-    }
-    else
-    {
-        FatalErrorIn
-        (
-            "fixedDisplacementZeroShearFvPatchVectorField::"
-            "fixedDisplacementZeroShearFvPatchVectorField"
-        )   << "value entry not found for patch " << patch().name()
-            << abort(FatalError);
-    }
 
     this->refGrad() = vector::zero;
 
