@@ -105,6 +105,7 @@ $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
 
 pointPatchFields = solidModels/pointPatchFields
 $(pointPatchFields)/pointAnalyticalPlateHoleTraction/analyticalPlateHoleTractionPointPatchVectorField.C
+$(pointPatchFields)/pointSolidForce/solidForcePointPatchVectorField.C
 $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
 
