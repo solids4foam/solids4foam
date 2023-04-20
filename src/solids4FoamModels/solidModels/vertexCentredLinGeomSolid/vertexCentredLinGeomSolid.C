@@ -744,6 +744,10 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         "calculated"
     ),
     globalPointIndices_(mesh())
+#ifdef OPENFOAMESI
+    ,
+    pointVolInterp_(pMesh(), mesh())
+#endif
 {
     // Create dual mesh and set write option
     dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
@@ -1162,6 +1166,12 @@ bool vertexCentredLinGeomSolid::evolve()
     // primary mesh cell
     // This stress will be first-order accurate
     mechanical().correct(sigma());
+
+#ifdef OPENFOAMESI
+    // Interpolate pointD to D
+    // This is useful for visualisation but it is also needed when using preCICE
+    pointVolInterp_.interpolate(pointD(), D());
+#endif
 
     return true;
 }
