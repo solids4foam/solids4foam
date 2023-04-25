@@ -265,6 +265,9 @@ public:
 
     // Member Functions
 
+        //- Return bulk modulus
+        virtual tmp<volScalarField> bulkModulus() const;
+
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;

@@ -515,7 +515,7 @@ public:
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const
         {
-            notImplemented("Not yet implemented for this mechanical law");
+            notImplemented("bulkModulus() const");
 
             // Keep compiler happy
             return rho();
