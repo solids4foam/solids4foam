@@ -1054,10 +1054,16 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
 
         // Include 0.5 factor for shear components
         forAll(result, faceI)
-        {
-            result[faceI](3,3) *= 0.5;
-            result[faceI](4,4) *= 0.5;
-            result[faceI](5,5) *= 0.5;
+        {                     
+            
+            for (int i = 3; i < 6; i++)
+            {
+                for (int j = 3; j < 6; j++)
+                {
+                    result[faceI](i,j) *= 0.5;
+                }
+            }
+            
         }
     }
     else // Analytical tangent

@@ -281,7 +281,7 @@ void vertexCentredLinGeomSolid::setFixedDofs
                             << abort(FatalError);
                     }
 
-                    // If the point is not fully fuxed then make sure the normal
+                    // If the point is not fully fixed then make sure the normal
                     // direction is fixed
                     if (mag(fixedDofDirections[pointID] - symmTensor(I)) > 0)
                     {
@@ -821,7 +821,7 @@ bool vertexCentredLinGeomSolid::evolve()
     (
         dualMechanicalPtr_().materialTangentFaceField()
     );
-
+    
     // Lookup compact edge gradient factor
     const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
     if (debug) //Meaning?? Maybe if zeta is not declared print the value of default zeta?
@@ -948,6 +948,9 @@ bool vertexCentredLinGeomSolid::evolve()
                 int(bool(debug))
             );
         }
+        
+        Info << "Before enforcing DOFs: " << endl << endl;
+        //matrix.print();
 
         // Enforce fixed DOF on the linear system
         sparseMatrixTools::enforceFixedDof //Loop through the matrix and overwrite coefficients for fixed DOFs
@@ -959,6 +962,9 @@ bool vertexCentredLinGeomSolid::evolve()
             fixedDofValues_,
             fixedDofScale_
         );
+
+        Info << "After enforcing DOFs " << endl << endl;
+        //matrix.print();
 
         // Solve linear system for displacement correction
         if (debug)
@@ -1170,7 +1176,6 @@ bool vertexCentredLinGeomSolid::evolve()
 
     return true;
 }
-
 
 void vertexCentredLinGeomSolid::setTraction
 (
