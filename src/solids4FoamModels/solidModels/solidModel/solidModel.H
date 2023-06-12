@@ -136,6 +136,9 @@ class solidModel
         //- Gravitational acceleration
         const uniformDimensionedVectorField g_;
 
+        //- Damping coefficient
+        const dimensionedScalar dampingCoeff_;
+
         //- Stabilisation term for momentum equation
         autoPtr<momentumStabilisation> stabilisationPtr_;
 
@@ -563,6 +566,12 @@ public:
             const uniformDimensionedVectorField& g() const
             {
                 return g_;
+            }
+
+            //- Return const access to the damping coefficient
+            const dimensionedScalar& dampingCoeff() const
+            {
+                return dampingCoeff_;
             }
 
             //- Each solidModel must indicate whether D or DD is the primary

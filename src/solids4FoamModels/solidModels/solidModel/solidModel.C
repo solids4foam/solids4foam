@@ -1307,6 +1307,14 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
+    dampingCoeff_
+    (
+        solidModelDict().lookupOrDefault<dimensionedScalar>
+        (
+            "dampingCoeff",
+            dimensionedScalar("K", dimless/dimTime, 0)
+        )
+    ),
     stabilisationPtr_(),
     solutionTol_
     (
