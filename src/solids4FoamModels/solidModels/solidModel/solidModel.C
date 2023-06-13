@@ -1312,7 +1312,7 @@ Foam::solidModel::solidModel
         solidModelDict().lookupOrDefault<dimensionedScalar>
         (
             "dampingCoeff",
-            dimensionedScalar("K", dimless/dimTime, 0)
+            dimensionedScalar("dampingCoeff", dimless/dimTime, 0)
         )
     ),
     stabilisationPtr_(),
