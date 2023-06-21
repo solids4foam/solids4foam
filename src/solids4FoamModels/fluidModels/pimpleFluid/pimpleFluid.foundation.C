@@ -561,6 +561,10 @@ bool pimpleFluid::evolve()
 
             #include "continuityErrs.H"
 
+            // Correct flux due for Robin BCs according to temporal
+            // discretization
+            correctRobinFsiInterfaceFlux();
+
             // Explicitly relax pressure for momentum corrector
             p.relax();
 
