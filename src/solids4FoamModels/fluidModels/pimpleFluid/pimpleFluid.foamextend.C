@@ -23,7 +23,6 @@ License
 #include "adjustPhi.H"
 #include "fvc.H"
 #include "fvm.H"
-
 #include "EulerDdtScheme.H"
 #include "backwardDdtScheme.H"
 #include "elasticSlipWallVelocityFvPatchVectorField.H"

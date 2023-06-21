@@ -62,8 +62,18 @@ class pimpleFluid
         //- Reciprocal of the local time-step field
         tmp<volScalarField> trDeltaT_;
 
+        //- Acceleration field
+        volVectorField ddtU_;
+
         //- Pointer to the velocity surface field
         autoPtr<surfaceVectorField> Uf_;
+
+        //- Reciprocal of the momentum equation diagonal coefficient field
+        volScalarField rAU_;
+
+        //- Reciprocal of the momentum equation diagonal coefficient field at
+        //  the mesh faces
+        surfaceScalarField rAUf_;
 
         //- Pressure reference object
         pressureReference pressureReference_;
@@ -91,6 +101,15 @@ class pimpleFluid
 
 
     // Private Member Functions
+
+        //- Reset flux if mesh changed
+        void updateRobinFsiInterfaceFlux();
+
+        //- Update phi for Robin FSI boundary conditions
+        void updateRobinFsiInterface();
+
+        //- Correct phi after solving pressure equation
+        void correctRobinFsiInterfaceFlux();
 
         //- Correct phi function
         void correctPhi();

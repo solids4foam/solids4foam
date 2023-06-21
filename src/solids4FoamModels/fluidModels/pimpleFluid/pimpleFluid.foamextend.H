@@ -76,10 +76,11 @@ class pimpleFluid
         //- Velocity field
         surfaceVectorField Uf_;
 
-        //- rAU field
+        //- Reciprocal of the momentum equation diagonal coefficient field
         volScalarField rAU_;
 
-        //- rAUf field
+        //- Reciprocal of the momentum equation diagonal coefficient field at
+        //  the mesh faces
         surfaceScalarField rAUf_;
 
         //- Reference pressure cell
