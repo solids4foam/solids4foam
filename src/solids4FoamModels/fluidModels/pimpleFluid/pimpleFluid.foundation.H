@@ -24,7 +24,10 @@ Description
 Author
     Ported by Philip Cardiff, UCD.
 
-SourceFiles
+    Robin FSI condition ported by Simona Moretti and Andrea Luigi Facci,
+    University of Tuscia.
+
+    SourceFiles
     pimpleFluid.foamextend.C
 
 \*---------------------------------------------------------------------------*/
