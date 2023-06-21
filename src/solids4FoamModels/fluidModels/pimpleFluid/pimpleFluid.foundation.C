@@ -268,7 +268,21 @@ pimpleFluid::pimpleFluid
     LTS_(fv::localEulerDdt::enabled(mesh())),
     trDeltaT_(),
     ddtU_(fvc::ddt(U())),
-    Uf_(),
+    Uf_
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "Uf",
+                runTime.timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            fvc::interpolate(U())
+        )
+    ),
     rAU_
     (
         IOobject
@@ -320,24 +334,6 @@ pimpleFluid::pimpleFluid
 {
     mesh().setFluxRequired(p().name());
     turbulence_->validate();
-
-    if (mesh().dynamic())
-    {
-        Info<< "Constructing face velocity Uf\n" << endl;
-
-        Uf_ = new surfaceVectorField
-        (
-            IOobject
-            (
-                "Uf",
-                runTime.timeName(),
-                mesh(),
-                IOobject::READ_IF_PRESENT,
-                IOobject::AUTO_WRITE
-            ),
-            fvc::interpolate(U())
-        );
-    }
 
     if (LTS_)
     {
@@ -594,13 +590,13 @@ bool pimpleFluid::evolve()
 
     // Update velocity on faces to account for modifications in the flux
     // when using the Robin BCs
-    Uf_() = fvc::interpolate(U, "interpolate(U)");
+    Uf() = fvc::interpolate(U, "interpolate(U)");
 
     // Get tangential velocity
-    Uf_() -= (mesh.Sf() & Uf_())*mesh.Sf()/magSqr(mesh.Sf());
+    Uf() -= (mesh.Sf() & Uf())*mesh.Sf()/magSqr(mesh.Sf());
 
     // Update with normal from flux
-    Uf_() += phi*mesh.Sf()/magSqr(mesh.Sf());
+    Uf() += phi*mesh.Sf()/magSqr(mesh.Sf());
 
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi, U);
