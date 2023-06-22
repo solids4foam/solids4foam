@@ -36,8 +36,7 @@ Cook's membrane is well-known bending-dominated benchmark case. The tapered pane
 
 Table 1 summarises FEM results for the values of the vertical displacement of the top right corner [[1]](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html). For the mesh consisting of 20x20 control volumes, the vertical displacement of the top right corner in `solids4foam` is **32.12**. By refining the mesh, the solution from `solids4Foam` is converging to values reported using quadratic elements on fine mesh. 
 
-
-**Table 1: Comparison of vertical displacement in the top right corner**
+**Table 1: FEM results for the vertical displacement in the top right corner, reported in [[1]](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html)**
 
 |     Solver      | Very Fine Mesh <br>  quadratic (Hexahedral mesh) | Very Fine Mesh <br>  quadratic (Tetrahedral mesh) |
 | :-------------: | :----------------------------------------------: | :-----------------------------------------------: |
