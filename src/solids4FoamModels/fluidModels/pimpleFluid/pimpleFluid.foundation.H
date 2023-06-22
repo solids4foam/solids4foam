@@ -27,7 +27,7 @@ Author
     Robin FSI condition ported by Simona Moretti and Andrea Luigi Facci,
     University of Tuscia.
 
-    SourceFiles
+SourceFiles
     pimpleFluid.foamextend.C
 
 \*---------------------------------------------------------------------------*/
@@ -65,17 +65,16 @@ class pimpleFluid
         //- Reciprocal of the local time-step field
         tmp<volScalarField> trDeltaT_;
 
-        //- Acceleration field
-        volVectorField ddtU_;
-
         //- Pointer to the velocity surface field
         autoPtr<surfaceVectorField> Uf_;
 
-        //- Reciprocal of the momentum equation diagonal coefficient field
+        //- Acceleration field
+        volVectorField ddtU_;
+
+        //- rAU field
         volScalarField rAU_;
 
-        //- Reciprocal of the momentum equation diagonal coefficient field at
-        //  the mesh faces
+        //- rAUf field
         surfaceScalarField rAUf_;
 
         //- Pressure reference object
