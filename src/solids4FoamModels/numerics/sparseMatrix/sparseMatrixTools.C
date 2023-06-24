@@ -946,6 +946,8 @@ void Foam::sparseMatrixTools::enforceFixedDof
     const scalar fixedDofScale
 )
 {
+    const bool debug = 0;
+
     // Loop though the matrix and overwrite the coefficients for fixed DOFs
     // To enforce the value we will set the diagonal to the identity and set
     // the source to zero. The reason the source is zero is that we are solving
@@ -966,18 +968,39 @@ void Foam::sparseMatrixTools::enforceFixedDof
         {
             tensor& coeff = iter();
 
+            if (debug)
+            {
+                Info<< "blockRow fixed: " << blockRowI << nl
+                    << "    row,col: " << blockRowI << "," << blockColI << nl
+                    << "    fixedDir: " << fixedDofDirections[blockRowI] << nl
+                    << "    coeff before: " << coeff << endl;
+            }
+
+            // Free direction
+            const tensor freeDir(I - fixedDofDirections[blockRowI]);
+
             // Set the source to zero as the correction to the displacement
             // is zero
-            source[blockRowI] =
-                ((I - fixedDofDirections[blockRowI]) & source[blockRowI]);
+            source[blockRowI] = (freeDir & source[blockRowI]);
 
             // Eliminate the fixed directions from the coeff
-            coeff = ((I - fixedDofDirections[blockRowI]) & coeff);
+            coeff = (freeDir & coeff);
 
             if (blockRowI == blockColI)
             {
-                // Scale the fixed directions to the 1 with scaling
-                coeff -= tensor(fixedDofScale*fixedDofDirections[blockRowI]);
+                // Remove the fixed component from the free component equation
+                coeff = (freeDir & coeff & freeDir);
+
+                // Fixed direction
+                const tensor& fixedDir = fixedDofDirections[blockRowI];
+
+                // Set the fixed direction diagonal to enforce a zero correction
+                coeff -= tensor(fixedDofScale*fixedDir);
+            }
+
+            if (debug)
+            {
+                Info<< "    coeff after: " << coeff << nl << endl;
             }
         }
         else if (fixedDofs[blockColI])
@@ -987,12 +1010,24 @@ void Foam::sparseMatrixTools::enforceFixedDof
             // source
             tensor& coeff = iter();
 
-            // // Add contribution to the source: this is not correct!
-            // source[blockRowI] -=
-            //     ((fixedDofDirections[blockColI] & coeff) & fixedDofValues[blockColI]);
+            if (debug)
+            {
+                Info<< "blockCol fixed: " << blockColI << nl
+                    << "    row,col: " << blockRowI << "," << blockColI << nl
+                    << "    fixedDir: " << fixedDofDirections[blockColI] << nl
+                    << "    coeff before: " << coeff << endl;
+            }
+
+            // Directions where the DOFs are unknown
+            const tensor freeDir(I - fixedDofDirections[blockColI]);
 
             // Eliminate the fixed directions
-            coeff = ((I - fixedDofDirections[blockColI]) & coeff);
+            coeff = (coeff & freeDir);
+
+            if (debug)
+            {
+                Info<< "    coeff after: " << coeff << nl << endl;
+            }
         }
     }
 }
