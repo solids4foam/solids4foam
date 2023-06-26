@@ -57,10 +57,7 @@ namespace Foam
 
 #ifdef OPENFOAMESIORFOUNDATION
     typedef slipPointPatchField<vector> componentMixedPointPatchVectorField;
-
-    #ifdef OPENFOAMESIORFOUNDATION
-        typedef pointPatchFieldMapper PointPatchFieldMapper;
-    #endif
+    typedef pointPatchFieldMapper PointPatchFieldMapper;
 #endif
 
 /*---------------------------------------------------------------------------* \
