@@ -9,6 +9,10 @@ solidModels/solidModel/dualMeshToMeshMap.C
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/explicitLinGeomTotalDispSolid/explicitLinGeomTotalDispSolid.C
 solidModels/explicitUnsLinGeomTotalDispSolid/explicitUnsLinGeomTotalDispSolid.C
+/*
+solidModels/explicitVertexCentredLinGeomSolid/explicitVertexCentredLinGeomSolid.C
+solidModels/explicitVertexCentredNonLinGeomTotalLagSolid/explicitVertexCentredNonLinGeomTotalLagSolid.C
+*/
 solidModels/linGeomSolid/linGeomSolid.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
 solidModels/linGeomPressureDisplacementSolid/linGeomPressureDisplacementSolid.C
@@ -20,10 +24,11 @@ solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
-solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
+/*solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C*/
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
+fluidModels/compressibleInterFluid/compressibleInterFluid.C
 fluidModels/interFluid/interFluid.C
 fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pimpleFluid/pimpleFluid.C
@@ -189,6 +194,7 @@ numerics/interpolationTable/tableReaders/csv/csvTableReaders.C
 
 numerics/deltaVectors/deltaVectors.C
 numerics/meshDualiser/meshDualiser.C
+numerics/minEdgeLength/minEdgeLength.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/multiplyCoeff/multiplyCoeff.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C

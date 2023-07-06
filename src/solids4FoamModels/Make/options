@@ -16,7 +16,8 @@ else
             -lcompressibleTurbulenceModels -lsampling \
             -lincompressibleTransportModels -linterfaceProperties -lwaveModels \
             -lVoFphaseTurbulentTransportModels \
-            -lincompressibleInterPhaseTransportModels -ladjointOptimisation
+            -lincompressibleInterPhaseTransportModels -ladjointOptimisation \
+            -lVoFphaseCompressibleTurbulenceModels -ltwoPhaseMixtureThermo
     else
         VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
         VERSION_SPECIFIC_LIBS = \
@@ -103,7 +104,12 @@ EXE_INC = \
     -I$(LIB_SRC)/overset/oversetMesh/lnInclude \
     -I$(LIB_SRC)/phaseSystemModels/twoPhaseInter/incompressibleInterPhaseTransportModel/lnInclude \
     -I$(LIB_SRC)/phaseSystemModels/twoPhaseInter/VoFphaseIncompressibleTurbulenceModels/lnInclude \
-    -I$(LIB_SRC)/optimisation/adjointOptimisation/adjoint/lnInclude
+    -I$(LIB_SRC)/TurbulenceModels/phaseCompressible/lnInclude \
+    -I$(LIB_SRC)/optimisation/adjointOptimisation/adjoint/lnInclude \
+    -I$(FOAM_SOLVERS)/multiphase/compressibleInterFoam/VoFphaseCompressibleTurbulenceModels/lnInclude \
+    -I$(FOAM_SOLVERS)/multiphase/compressibleInterFoam/twoPhaseMixtureThermo/lnInclude \
+    -I$(FOAM_SOLVERS)/multiphase/VoF \
+    -I$(FOAM_SOLVERS)/multiphase/compressibleInterFoam
 
 LIB_LIBS = \
     $(VERSION_SPECIFIC_LIBS) \
