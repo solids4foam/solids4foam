@@ -2,9 +2,9 @@
 sort: 3
 ---
 
-# `narrowTmember`
+# Tutorial: `narrowTmember`
 
-#### Prepared by Philip Cardiff
+Prepared by Philip Cardiff
 
 ---
 
