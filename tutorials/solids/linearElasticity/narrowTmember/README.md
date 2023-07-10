@@ -19,11 +19,11 @@ sort: 3
 
 This case comprises a narrow engineering component with a T cross-section (Figure 1). This case was proposed as a benchmark by [Demirdzic et al., 1997, Benchmark solutions of some structural analysis problems using the finite-volume method and multigrid acceleration. Int J Numer Methods Eng.](http://refhub.elsevier.com/S0045-7949(16)30604-6/h0015) Due to symmetry, the solution domain consists of one-quarter of the component. A constant negative pressure of 1 MPa is applied to the lower surface, and the upper left surface is fully clamped (Figure 1). The Young’s modulus is 210 GPa, and Poisson’s ratio is 0.3. A radius $$R = 5$$ mm hole is located at the expected stress concentration. Four separate systematically refined hexahedral meshes (624, 4992, 39 936, and 319 488 cells) are examined here, mimicking the meshes employed by Demirdzic et al.; the coarsest mesh is shown in Figure 2.
 
-![](images/geometry.png)
+![](images/narrowTmember-geometry.png)
 
 **Figure 1: Geometry and loading with dimensions in mm.
 
-![](images/mesh.png)
+![](images/narrowTmember-mesh.png)
 
 **Figure 2: Coarest hexahedral mesh (624 cells)
 
@@ -60,7 +60,7 @@ The case can the be run as before, i.e. `> blockMesh && solids4Foam`.
 
 Figure 3 shows the $$\sigma_{xx}$$ and $$\sigma_yy$$ stress distributions on the plane z = 0 m (symmetry plane) for the finest mesh. The predictions agree closely with the results of Demirdzic et al. Further comparisons can be found in [Cardiff et al., 2016, A block-coupled Finite Volume methodology for linear elasticity and unstructured meshes, Comp. and Struct.](https://www.sciencedirect.com/science/article/pii/S0045794916306046)
 
-![](images/stress-results.png)
+![](images/narrowTmember-stress-results.png)
 
 **Figure 3: Predicted stress component distributions on the plane z = 0:0 m (right) compared with results from Demirdzic et al. (left).
 
