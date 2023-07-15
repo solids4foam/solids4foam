@@ -138,7 +138,7 @@ public:
             const fvMesh& mesh() const;
 
             //- Material tangent field defined at dual mesh faces
-            tmp< Field<symmTensor4thOrder> > materialTangentFaceField() const;
+            tmp< Field< RectangularMatrix<scalar>>> materialTangentFaceField() const;
 
             //- Bulk modulus field at the faces
             tmp<surfaceScalarField> bulkModulus() const;

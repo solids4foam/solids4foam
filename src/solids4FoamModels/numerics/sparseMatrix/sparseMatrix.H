@@ -126,6 +126,9 @@ public:
             //- Count and return the number of block rows in the matrix
             label nBlockRows() const;
 
+            //- Print out the matrix coefficients
+            void print() const;
+
         // Modifiers
 
             //- Clear the matrix but do not change its capacity

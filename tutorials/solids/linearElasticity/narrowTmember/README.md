@@ -1,10 +1,10 @@
 ---
-sort: 3
+sort: 2
 ---
 
-# `narrowTmember`
+# Tutorial: `narrowTmember`
 
-#### Prepared by Philip Cardiff
+Prepared by Philip Cardiff
 
 ---
 
@@ -21,11 +21,11 @@ This case comprises a narrow engineering component with a T cross-section (Figur
 
 ![](images/narrowTmember-geometry.png)
 
-**Figure 1: Geometry and loading with dimensions in mm.
+**Figure 1: Geometry and loading with dimensions in mm.**
 
 ![](images/narrowTmember-mesh.png)
 
-**Figure 2: Coarest hexahedral mesh (624 cells)
+**Figure 2: Coarest hexahedral mesh (624 cells)**
 
 
 ---
@@ -62,7 +62,7 @@ Figure 3 shows the $$\sigma_{xx}$$ and $$\sigma_yy$$ stress distributions on the
 
 ![](images/narrowTmember-stress-results.png)
 
-**Figure 3: Predicted stress component distributions on the plane z = 0:0 m (right) compared with results from Demirdzic et al. (left).
+**Figure 3: Predicted stress component distributions on the plane z = 0:0 m (right) compared with results from Demirdzic et al. (left).**
 
 The wall-clock times and memory requirements for each run are given in Table 1, where the results for the coupled and segregated solid models are compared. The coupled solver used a bi-conjugate gradient stabilised linear solver with ILU(0) preconditioner, while the segregated solver used a conjugate gradient linear solver with ILU(0) preconditioner. Both approaches used a solution tolerance of $$1 \times 10^{-6}$$. In this case, the coupled solver is approximately four times faster than the segregated solver but requires about four times more memory.
 
@@ -70,7 +70,7 @@ The wall-clock times and memory requirements for each run are given in Table 1, 
 The wall-clock times given in Table 1 were recorded in 2015 using one core of a 2.4 GHz Intel Ivy Bridge CPU. Better performance can be expected using a new machine.
 ```
 
-**Table 1: Wall-clock time (in s) and maximum memory usage (in MB).
+**Table 1: Wall-clock time (in s) and maximum memory usage (in MB).**
 
 | Mesh        | Coupled  |            | Segregated |            |
 | ----------- | -------- | ---------- | ---------- | ---------- |

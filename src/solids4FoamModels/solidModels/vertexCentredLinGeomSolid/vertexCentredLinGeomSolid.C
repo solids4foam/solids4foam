@@ -48,7 +48,6 @@ namespace solidModels
 defineTypeNameAndDebug(vertexCentredLinGeomSolid, 0);
 addToRunTimeSelectionTable(solidModel, vertexCentredLinGeomSolid, dictionary);
 
-
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 void vertexCentredLinGeomSolid::updateSource
@@ -280,7 +279,7 @@ void vertexCentredLinGeomSolid::setFixedDofs
                             << abort(FatalError);
                     }
 
-                    // If the point is not fully fuxed then make sure the normal
+                    // If the point is not fully fixed then make sure the normal
                     // direction is fixed
                     if (mag(fixedDofDirections[pointID] - symmTensor(I)) > 0)
                     {
@@ -819,7 +818,7 @@ bool vertexCentredLinGeomSolid::evolve()
     sparseMatrix matrix(sum(globalPointIndices_.stencilSize()));
 
     // Store material tangent field for dual mesh faces
-    Field<symmTensor4thOrder> materialTangent
+    Field<RectangularMatrix<scalar>> materialTangent
     (
         dualMechanicalPtr_().materialTangentFaceField()
     );
@@ -832,7 +831,9 @@ bool vertexCentredLinGeomSolid::evolve()
     }
 
     // Global point index lists
+    //List showing which points are on a specific processor?
     const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
+    //Mapping local points to global?
     const labelList& localToGlobalPointMap =
         globalPointIndices_.localToGlobalPointMap();
 
@@ -909,8 +910,6 @@ bool vertexCentredLinGeomSolid::evolve()
 
         if (fullNewton_)
         {
-            // Info<< "    Assembling the matrix" << endl;
-
             // Assemble the matrix once per outer iteration
             matrix.clear();
 
@@ -949,6 +948,12 @@ bool vertexCentredLinGeomSolid::evolve()
             );
         }
 
+        if (debug > 1)
+        {
+            // Print the matrix
+            matrix.print();
+        }
+
         // Enforce fixed DOF on the linear system
         sparseMatrixTools::enforceFixedDof
         (
@@ -959,6 +964,12 @@ bool vertexCentredLinGeomSolid::evolve()
             fixedDofValues_,
             fixedDofScale_
         );
+
+        if (debug > 1)
+        {
+            // Print the matrix
+            matrix.print();
+        }
 
         // Solve linear system for displacement correction
         if (debug)
@@ -1175,7 +1186,6 @@ bool vertexCentredLinGeomSolid::evolve()
 
     return true;
 }
-
 
 void vertexCentredLinGeomSolid::setTraction
 (
