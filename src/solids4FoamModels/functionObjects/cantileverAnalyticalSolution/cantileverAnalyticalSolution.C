@@ -396,7 +396,7 @@ bool Foam::cantileverAnalyticalSolution::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::cantileverAnalyticalSolution::write()
 {
-    return true;
+    return false;
 }
 #endif
 

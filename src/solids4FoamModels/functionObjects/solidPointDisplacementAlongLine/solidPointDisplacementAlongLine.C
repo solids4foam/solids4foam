@@ -326,7 +326,7 @@ bool Foam::solidPointDisplacementAlongLine::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::solidPointDisplacementAlongLine::write()
 {
-    return writeData();
+    return false;
 }
 #endif
 

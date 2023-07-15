@@ -469,7 +469,7 @@ bool Foam::plateHoleAnalyticalSolution::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::plateHoleAnalyticalSolution::write()
 {
-    return true;
+    return false;
 }
 #endif
 
