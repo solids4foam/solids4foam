@@ -173,6 +173,12 @@ Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::impK() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::bulkModulus() const
+{
+    return passiveMechLawPtr_->bulkModulus();
+}
+
+
 void Foam::electroMechanicalLaw::correct(volSymmTensorField& sigma)
 {
     // Calculate passive stress
@@ -204,10 +210,30 @@ void Foam::electroMechanicalLaw::correct(volSymmTensorField& sigma)
 
 void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
 {
-    notImplemented
-    (
-        "void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)"
-    );
+    // Calculate passive stress
+    passiveMechLawPtr_->correct(sigma);
+
+    // Lookup the fibre directions
+    // How best should we do this to avoid duplicating the fibre field?
+    // For now, let's hard-code in the field name
+    const surfaceSymmTensorField f0f0 =
+        mesh().lookupObject<surfaceSymmTensorField>("f0f0f");
+
+    // Take a reference to the deformation gradient to make the code easier to
+    // read
+    const surfaceTensorField& F = this->Ff();
+
+    // Calculate the Jacobian of the deformation gradient
+    const surfaceScalarField J(det(F));
+
+    // For now, we will assume a constant active stress
+    // The next step will be to include an active-stress model to convert
+    // muscle activation to fibre tension
+
+    // Add active stress to the passive stress
+    // Note that the active stress is converted from a 2nd Piola-Kirchhoff
+    // stress to a Cauchy stress
+    sigma += J*symm(F & (Ta_*f0f0) & F.T());
 }
 
 
