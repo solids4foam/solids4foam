@@ -89,6 +89,10 @@ fixedDisplacementZeroShearFvPatchVectorField
 
         refValue() = dispSeries_(this->db().time().timeOutputValue());
     }
+    else
+    {
+        refValue() = vector::zero;
+    }
 
     this->refGrad() = vector::zero;
 

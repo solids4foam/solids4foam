@@ -27,12 +27,13 @@ Description
     where the governing equations are integrated over a dual mesh. The dual mesh
     is automatically constructed from the primary mesh using the meshDualiser.
 
+    An implicit Newton-Raphson algorithm is employed.
+
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
     vertexCentredLinGeomSolid.C
-    vertexCentredLinGeomSolidTemplates.C
 
 \*---------------------------------------------------------------------------*/
 
