@@ -57,6 +57,21 @@ Foam::label Foam::sparseMatrix::nBlockRows() const
 }
 
 
+void Foam::sparseMatrix::print() const
+{
+    Info<< "void Foam::sparseMatrix::print() const" << endl;
+
+    for (auto iter = data_.begin(); iter != data_.end(); ++iter)
+    {
+        const label rowI = iter.key()[0];
+        const label colI = iter.key()[1];
+        const tensor& val = *iter;
+
+        Info<< "(" << rowI << ", " << colI << "): " << val << endl;
+    }
+}
+
+
 Foam::tensor& Foam::sparseMatrix::operator()
 (
     const label rowI,
