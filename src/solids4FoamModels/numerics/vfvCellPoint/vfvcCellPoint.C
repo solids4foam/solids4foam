@@ -27,6 +27,7 @@ License
 #include "cellPointLeastSquaresVectors.H"
 #include "pointPointLeastSquaresVectors.H"
 #include "patchToPatchInterpolation.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

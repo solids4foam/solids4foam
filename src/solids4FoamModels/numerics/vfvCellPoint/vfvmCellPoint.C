@@ -27,6 +27,7 @@ License
 #include "multiplyCoeff.H"
 #include "sparseMatrixTools.H"
 #include "RectangularMatrix.H"
+#include "cellPointLeastSquaresVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
