@@ -62,7 +62,20 @@ Foam::tmp<Foam::surfaceVectorField> Foam::deltaVectors
 
     forAll(deltabf, patchi)
     {
-        deltabf[patchi] = mesh.boundary()[patchi].delta();
+        const labelList faceCells(mesh.boundary()[patchi].faceCells());
+
+        if (deltabf[patchi].coupled())
+        {
+            deltabf[patchi] =
+                C.boundaryField()[patchI].patchNeighbourField()
+              - C.boundaryField()[patchI].patchInternalField();
+        }
+        else
+        {
+            deltabf[patchi] =
+                C.boundaryField()[patchI]
+              - C.boundaryField()[patchI].patchInternalField();
+        }
     }
 
     return tdelta;
