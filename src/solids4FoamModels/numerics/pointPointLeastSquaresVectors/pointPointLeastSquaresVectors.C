@@ -72,7 +72,8 @@ void Foam::pointPointLeastSquaresVectors::makeLeastSquaresVectors() const
 
     if (Pstream::parRun())
     {
-        notImplemented
+        WarningIn
+        //notImplemented
         (
             "Not yet implemented for parallel runs:"
             " actually it will work, but the results at parallel boundary "
