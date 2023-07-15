@@ -47,6 +47,7 @@ Author
 #include "volFields.H"
 #include "pointFields.H"
 #include "sparseMatrix.H"
+#include "RectangularMatrix.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -65,7 +66,7 @@ namespace vfvm
         const fvMesh& dualMesh,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const Field<symmTensor4thOrder>& materialTangentField,
+        const Field<RectangularMatrix<scalar>>& materialTangentField,
         const boolList& fixedDofs,
         const symmTensorField& fixedDofDirections,
         const scalar fixedDofScale,

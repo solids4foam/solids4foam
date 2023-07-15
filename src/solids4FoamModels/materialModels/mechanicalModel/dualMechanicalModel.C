@@ -335,20 +335,20 @@ const Foam::fvMesh& Foam::dualMechanicalModel::mesh() const
 }
 
 
-Foam::tmp<Foam::Field<Foam::symmTensor4thOrder>>
+Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 Foam::dualMechanicalModel::materialTangentFaceField() const
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
     // Prepare the field
-    tmp< Field<symmTensor4thOrder> > tresult
+    tmp< Field<RectangularMatrix<scalar>> > tresult
     (
-        new Field<symmTensor4thOrder>(mesh().nFaces(), symmTensor4thOrder::zero)
+        new Field<RectangularMatrix<scalar>>(mesh().nFaces(), RectangularMatrix<scalar>(6))
     );
 #ifdef OPENFOAMESIORFOUNDATION
-    Field<symmTensor4thOrder>& result = tresult.ref();
+    Field<RectangularMatrix<scalar>>& result = tresult.ref();
 #else
-    Field<symmTensor4thOrder>& result = tresult();
+    Field<RectangularMatrix<scalar>>& result = tresult();
 #endif
 
     if (laws.size() == 1)
@@ -366,23 +366,29 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
     {
         // Accumulate data for all materials
         // Note: the value on each dual face is uniquely set by one material law
-        forAll(laws, lawI)
-        {
-            const Field<symmTensor4thOrder> matTanI
-            (
-                laws[lawI].materialTangentField()
-            );
+        // forAll(laws, lawI)
+        // {
+        //     const Field<RectangularMatrix<scalar>> matTanI
+        //     (
+        //         laws[lawI].materialTangentField()
+        //     );
 
-            if (matTanI.size() != mesh().nFaces())
-            {
-                FatalErrorIn("dualMechanicalModel::materialTangentField()")
-                    << "The materialTangentField field for law " << lawI
-                    << " is the wrong size!" << abort(FatalError);
-            }
+        //     if (matTanI.size() != mesh().nFaces())
+        //     {
+        //         FatalErrorIn("dualMechanicalModel::materialTangentField()")
+        //             << "The materialTangentField field for law " << lawI
+        //             << " is the wrong size!" << abort(FatalError);
+        //     }
 
-            // Insert values from actual material region into main sigma field
-            result += dualFaceInThisMaterialList()[lawI]*matTanI;
-        }
+        //     // Insert values from actual material region into main sigma field
+        //     result += dualFaceInThisMaterialList()[lawI]*matTanI;
+        // }
+
+        // This does work but the problem can be that the maps for the boundary
+        // faces sometimes struggle to be defined when creating the
+        // dualFaceInThisMaterialList function. It should be possible to make
+        // this robust
+        notImplemented("Not implemented for more than one material");
     }
 
     return tresult;

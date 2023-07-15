@@ -108,6 +108,7 @@ $(pointPatchFields)/pointAnalyticalPlateHoleTraction/analyticalPlateHoleTraction
 $(pointPatchFields)/pointSolidForce/solidForcePointPatchVectorField.C
 $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
+$(pointPatchFields)/pointNormalDisplacement/normalDisplacementPointPatchVectorField.C
 
 contactModels = $(solidFvPatchFields)/solidContact/contactModels
 normalContactModels = $(contactModels)/normalContactModels
