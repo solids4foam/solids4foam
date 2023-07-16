@@ -818,7 +818,7 @@ bool vertexCentredLinGeomSolid::evolve()
     sparseMatrix matrix(sum(globalPointIndices_.stencilSize()));
 
     // Store material tangent field for dual mesh faces
-    Field<RectangularMatrix<scalar>> materialTangent
+    Field<scalarSquareMatrix> materialTangent
     (
         dualMechanicalPtr_().materialTangentFaceField()
     );

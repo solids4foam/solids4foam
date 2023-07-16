@@ -26,7 +26,7 @@ License
 #include "vfvmCellPoint.H"
 #include "multiplyCoeff.H"
 #include "sparseMatrixTools.H"
-#include "RectangularMatrix.H"
+#include "scalarSquareMatrix.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -37,7 +37,7 @@ void Foam::vfvm::divSigma
     const fvMesh& dualMesh,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const Field<RectangularMatrix<scalar>>& materialTangentField,
+    const Field<scalarSquareMatrix>& materialTangentField,
     const boolList& fixedDofs,
     const symmTensorField& fixedDofDirections,
     const scalar fixedDofScale,
@@ -68,7 +68,7 @@ void Foam::vfvm::divSigma
         const label cellID = dualFaceToCell[dualFaceI];
 
         // Material tangent at the dual mesh face
-        const RectangularMatrix<scalar>& materialTangent =
+        const scalarSquareMatrix& materialTangent =
             materialTangentField[dualFaceI];
 
         // Points in cellID

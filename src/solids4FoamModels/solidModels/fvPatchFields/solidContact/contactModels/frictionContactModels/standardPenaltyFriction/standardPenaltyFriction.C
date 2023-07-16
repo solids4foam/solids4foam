@@ -270,8 +270,8 @@ void Foam::standardPenaltyFriction::correct
 
     // Calculate slave shear traction increments
     const scalarField magSlavePressure(mag(slavePressure));
-    label numSlipFaces = 0;
-    label numStickFaces = 0;
+    // label numSlipFaces = 0;
+    // label numStickFaces = 0;
     scalarField& stickSlip = stickSlipFaces();
     const scalarField oldStickSlip = stickSlip;
     const scalar frictionPenaltyFac = frictionPenaltyFactor();
@@ -327,12 +327,12 @@ void Foam::standardPenaltyFriction::correct
                 newSlaveTraction[faceI] =
                     slipTraction[faceI]*(-slip_[faceI]/magSlip);
 
-                numSlipFaces++;
+                // numSlipFaces++;
                 stickSlip[faceI] = 1;
             }
             else
             {
-                numStickFaces++;
+                // numStickFaces++;
                 stickSlip[faceI] = 2;
             }
         }

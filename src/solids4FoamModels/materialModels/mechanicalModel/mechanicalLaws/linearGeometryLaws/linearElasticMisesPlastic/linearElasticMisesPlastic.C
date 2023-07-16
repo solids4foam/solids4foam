@@ -877,22 +877,19 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
 #endif
 
 
-Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
+#ifdef OPENFOAMESIORFOUNDATION
+Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::linearElasticMisesPlastic::materialTangentField() const
 {
     // Prepare tmp field
-    tmp<Field<Foam::RectangularMatrix<Foam::scalar>>> tresult
+    tmp<Field<Foam::scalarSquareMatrix>> tresult
     (
-        new Field<Foam::RectangularMatrix<Foam::scalar>>
+        new Field<Foam::scalarSquareMatrix>
         (
-            mesh().nFaces(), Foam::RectangularMatrix<scalar>(6, 6, 0.0)
+            mesh().nFaces(), Foam::scalarSquareMatrix(6, 0.0)
         )
     );
-#ifdef OPENFOAMESIORFOUNDATION
-    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult.ref();
-#else
-    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult();
-#endif
+    Field<Foam::scalarSquareMatrix>& result = tresult.ref();
 
     // Update total strain
     const_cast<linearElasticMisesPlastic&>(*this).updateEpsilonf();
@@ -1103,6 +1100,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
 
     return tresult;
 }
+#endif
 
 
 void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
