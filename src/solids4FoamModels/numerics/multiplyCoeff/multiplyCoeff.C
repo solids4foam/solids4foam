@@ -25,7 +25,7 @@ void Foam::multiplyCoeff
 (
     tensor& coeff,
     const vector& Sf,
-    const RectangularMatrix<scalar>& C,
+    const scalarSquareMatrix& C,
     const vector& g
 )
 {

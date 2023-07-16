@@ -336,22 +336,18 @@ const Foam::fvMesh& Foam::dualMechanicalModel::mesh() const
     return mesh_;
 }
 
-
-Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
+#ifdef OPENFOAMESIORFOUNDATION
+Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::dualMechanicalModel::materialTangentFaceField() const
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
     // Prepare the field
-    tmp< Field<RectangularMatrix<scalar>> > tresult
+    tmp< Field<scalarSquareMatrix> > tresult
     (
-        new Field<RectangularMatrix<scalar>>(mesh().nFaces(), RectangularMatrix<scalar>(6))
+        new Field<scalarSquareMatrix>(mesh().nFaces(), scalarSquareMatrix(6))
     );
-#ifdef OPENFOAMESIORFOUNDATION
-    Field<RectangularMatrix<scalar>>& result = tresult.ref();
-#else
-    Field<RectangularMatrix<scalar>>& result = tresult();
-#endif
+    Field<scalarSquareMatrix>& result = tresult.ref();
 
     if (laws.size() == 1)
     {
@@ -370,7 +366,7 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
         // Note: the value on each dual face is uniquely set by one material law
         // forAll(laws, lawI)
         // {
-        //     const Field<RectangularMatrix<scalar>> matTanI
+        //     const Field<scalarSquareMatrix> matTanI
         //     (
         //         laws[lawI].materialTangentField()
         //     );
@@ -395,7 +391,7 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
 
     return tresult;
 }
-
+#endif
 
 Foam::tmp<Foam::surfaceScalarField>
 Foam::dualMechanicalModel::bulkModulus() const

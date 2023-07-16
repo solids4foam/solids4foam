@@ -48,7 +48,11 @@ Author
 #include "tmp.H"
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
-#include "symmTensor4thOrder.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "scalarMatrices.H"
+#else
+    #include "scalarSquareMatrix.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -499,18 +503,20 @@ public:
         virtual tmp<surfaceScalarField> impKf() const;
 
         //- Material tangent for Newton Raphson loop
-        virtual RectangularMatrix<scalar> materialTangent() const
+        virtual scalarSquareMatrix materialTangent() const
         {
             // We could use numerical differentiation for this if needed
             notImplemented("Not yet implemented for this mechanical law");
 
             // Keep compiler happy
-            return RectangularMatrix<scalar>(0);
+            return scalarSquareMatrix(0);
         }
 
+#ifdef OPENFOAMESIORFOUNDATION
         //- Material tangent field for Newton Raphson loop
         //  The size of this field should be mesh.nFaces()
-        virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
+        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
+#endif
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const

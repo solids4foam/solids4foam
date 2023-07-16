@@ -26,7 +26,6 @@ solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
-solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
@@ -241,7 +240,6 @@ numerics/patchCorrectionVectors/patchCorrectionVectors.C
 numerics/deltaVectors/deltaVectors.C
 numerics/meshDualiser/meshDualiser.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
-numerics/multiplyCoeff/multiplyCoeff.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/sparseMatrixTools.C
