@@ -26,7 +26,6 @@ License
 #include "vfvmCellPoint.H"
 #include "multiplyCoeff.H"
 #include "sparseMatrixTools.H"
-#include "scalarSquareMatrix.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

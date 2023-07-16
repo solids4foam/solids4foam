@@ -47,7 +47,11 @@ Author
 #include "volFields.H"
 #include "pointFields.H"
 #include "sparseMatrix.H"
-#include "scalarSquareMatrix.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "scalarMatrices.H"
+#else
+    #include "scalarSquareMatrix.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

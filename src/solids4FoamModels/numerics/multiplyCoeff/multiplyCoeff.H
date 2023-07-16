@@ -35,7 +35,11 @@ Author
 #define multiplyCoeff_H
 
 #include "fieldTypes.H"
-#include "scalarSquareMatrix.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "scalarMatrices.H"
+#else
+    #include "scalarSquareMatrix.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
