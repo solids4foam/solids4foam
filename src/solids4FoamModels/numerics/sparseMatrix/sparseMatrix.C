@@ -83,6 +83,52 @@ Foam::tensor& Foam::sparseMatrix::operator()
     }
 }
 
+void Foam::sparseMatrix::print() const
+{
+    Info << "Print out sparseMatrix coefficients: " << endl;
+    
+    //Create a vector to store the matrix indices
+    std::vector<FixedList<label, 2>> keys(data_.size());
+    
+    //Insert the matrix indices into the vector for all data
+    int i = 0;
+    for (auto iter = data_.begin(); iter != data_.end(); ++iter)
+    {
+    	keys[i] = iter.key();
+    	i++;
+    }
+    
+    //Define custom sorting criteria
+    auto cmp = [](const FixedList<label, 2>& a, const FixedList<label, 2>& b) 
+    {
+		if (a[0] < b[0]) 
+		{
+			return true;
+		} 
+		else if (a[0] == b[0]) 
+		{
+			return a[1] < b[1];
+		} 
+		else 
+		{
+			return false;
+		}
+    };
+
+    //Sort keys by row and column
+	std::sort(keys.begin(), keys.end(), cmp);
+    
+    //Print out sorted values
+    forAll (keys, k)
+    {
+        const label rowI = keys[k][0];
+        const label colI = keys[k][1];
+        const tensor& coeff = data_[keys[k]];
+
+        Info << "(" << rowI << ", " << colI << ") : " << coeff << endl;
+    }      
+}
+
 
 
 // ************************************************************************* //
