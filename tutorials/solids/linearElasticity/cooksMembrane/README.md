@@ -1,23 +1,23 @@
-
-# Tutorial: `Cook's membrane`
-
+---
+sort: 2
 ---
 
-Author: Ivan Batistić, 05/2023
+# Tutorial: `cooksMembrane`
+
+Prepared by Ivan Batistić
 
 ---
 
 ## Tutorial Aims
 
 - Demonstrate how to perform a solid-only analysis in solids4foam.
-- To demonstrate solver performance under both shear and bending conditions in 
-combination with a skew numerical mesh.
+- To demonstrate solver performance under both shear and bending conditions in combination with a skew numerical mesh.
 
 ---
 
 ## Case Overview
 
-Cook's membrane is well-known bending-dominated benchmark case. The tapered panel (trapezoid) is fixed on one side and subjected to uniform shear traction on the opposite side. The prescribed shear traction is 6250 Pa. The vertices of the trapezoid (in mm) are (0, 0), (48, 44), (48, 60),  and (0, 44). Membrane geometry is shown in the figure below. Young's modulus is set to 70 Pa and Poisson's ratio to 1/3. Gravitation effects are neglected, and there are no body forces. The problem is solved as static, using one loading increment.
+Cook's membrane is a well-known bending-dominated benchmark case. The tapered panel (trapezoid) is fixed on one side and subjected to uniform shear traction on the opposite side. The prescribed shear traction is 6250 Pa. The vertices of the trapezoid (in mm) are (0, 0), (48, 44), (48, 60), and (0, 44), as shown in Figure 1. The Young's modulus is 70 Pa, and the Poisson's ratio is 1/3. Gravitation effects are neglected, and there are no body forces. The problem is solved as static, using one loading increment.
 
 <div style="text-align: center;">
   <img src="./images/membrane_geometry.PNG" alt="Image" width="400">
@@ -30,51 +30,45 @@ Cook's membrane is well-known bending-dominated benchmark case. The tapered pane
 
 ## Expected Results
 
-* Around the top-left corner, the elastic body is squeezed the most
-* The body is stretched the most near the bottom side
-* There is no known analytical solution for this problem.
+* Around the top-left corner, the elastic body is squeezed the most (positive hydrostatic compression).
+* The body is most stretched near the bottom side (negative hydrostatic compression).
+* There is no known analytical solution for this problem, but results from various codes and procedures are available in the literature.
 
-Table 1 summarises FEM results for the values of the vertical displacement of the top right corner [[1]](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html). For the mesh consisting of 20x20 control volumes, the vertical displacement of the top right corner in `solids4foam` is **32.12**. By refining the mesh, the solution from `solids4Foam` is converging to values reported using quadratic elements on fine mesh. 
+Table 1 summarises predictions from various finite element codes for the top-right corner vertical displacement [[1](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html)]. For the mesh consisting of $$20 \otimes 20$$ cells, the `solids4foam` prediction is 32.12 mm (using `foam-extend-4.1`). As the mesh is refined, the `solids4foam` prediction converges to the values reported in Table 1.
 
-**Table 1: FEM results for the vertical displacement in the top right corner, reported in [[1]](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html)**
+**Table 1: Finite element predictions for the top-right corner vertical displacement, reported at [CoFEA [1]](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html)**
 
-|     Solver      | Very Fine Mesh <br>  quadratic (Hexahedral mesh) | Very Fine Mesh <br>  quadratic (Tetrahedral mesh) |
-| :-------------: | :----------------------------------------------: | :-----------------------------------------------: |
-|    Calculix     |                      32.27                       |                       32.27                       |
-|   Code_Aster    |                      32.20                       |                       32.20                       |
-|      Elmer      |                      32.28                       |                       32.27                       |
+|   Solver   | Very Fine Mesh <br>  quadratic (Hexahedral mesh) [in mm] | Very Fine Mesh <br>  quadratic (Tetrahedral mesh) [in mm] |
+| :--------: | :------------------------------------------------------: | :-------------------------------------------------------: |
+|  Calculix  |                          32.27                           |                           32.27                           |
+| Code_Aster |                          32.20                           |                           32.20                           |
+|   Elmer    |                          32.28                           |                           32.27                           |
 
-Vertical displacement of the top right corner is reported using
-`solidPointDisplacement` function placed in `controlDict`:
+In the `solids4foam` case, the vertical displacement at the top right corner is extracted using the `solidPointDisplacement` function object placed in the `controlDict`:
 
 ```
 functions
 {
-   pointDisp
-   {
-       type    solidPointDisplacement;
-       point   (0.048 0.060 0);
-   }
+    pointDisp
+    {
+        type    solidPointDisplacement;
+        point   (0.048 0.060 0);
+    }
 }
 
 ```
-`solidPointDisplacement` function writes point displacement in the following file:  
+The `solidPointDisplacement` function finds the mesh vertex nearest to the specified `point` and writes the displacement of this vertex to the following file in the case:  
 
 `postProcessing/0/solidPointDisplacement_pointDisp.dat`
 
 ---
 
-## Running the case
-The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/cooksMembrane`. The case can be run using the included `Allrun` script, i.e. `./Allrun`.  In this case, the Allrun simply consists of creating the mesh using `blockMesh` (`./blockMesh`) followed by running the solids4foam solver (`./solids4Foam`).
-
-```warning
-The case is set using foam-extend 4.1. 
-Other versions of the OpenFOAM may require some small tweaks.
-```
+## Running the Case
+The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/cooksMembrane`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the Allrun consists of creating the mesh using `blockMesh` (`> ./blockMesh`) followed by running the `solids4foam` solver (`> ./solids4Foam`).
 
 ---
 
-### Literature 
+## References 
 
 [1] [https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html)
 

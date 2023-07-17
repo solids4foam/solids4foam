@@ -6,11 +6,8 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
-
-# Check OpenFOAM version (tested only with fe41)
-solids4Foam::caseOnlyRunsWithFoamExtend
+# Check case version is correct
+solids4Foam::convertCaseFormat .
 
 # Create mesh
 solids4Foam::runApplication blockMesh
