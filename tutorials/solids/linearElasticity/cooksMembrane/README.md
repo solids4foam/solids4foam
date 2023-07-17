@@ -32,9 +32,9 @@ Cook's membrane is a well-known bending-dominated benchmark case. The tapered pa
 
 * Around the top-left corner, the elastic body is squeezed the most (positive hydrostatic compression).
 * The body is most stretched near the bottom side (negative hydrostatic compression).
-* There is no known analytical solution for this problem, but results from various codes and procedures are available in the literature.
+* There is no known analytical solution for this problem, but results from various codes and procedures are available in the literature [[1](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html), [2](https://www.sciencedirect.com/science/article/abs/pii/S0045794999001340), [3](https://www.tandfonline.com/doi/abs/10.1080/10407782.2017.1372665?journalCode=unht20), [4](https://www.sciencedirect.com/science/article/abs/pii/S0045782506000387)].
 
-Table 1 summarises predictions from various finite element codes for the top-right corner vertical displacement [[1](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html)]. For the mesh consisting of $$20 \otimes 20$$ cells, the `solids4foam` prediction is 32.12 mm (using `foam-extend-4.1`). As the mesh is refined, the `solids4foam` prediction converges to the values reported in Table 1.
+Table 1 summarises predictions from various finite element codes for the top-right corner vertical displacement [[1](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html)]. For the mesh consisting of $$20 \times 20$$ cells, the `solids4foam` prediction is 32.12 mm (using `foam-extend-4.1`). As the mesh is refined, the `solids4foam` prediction converges to the values reported in Table 1.
 
 **Table 1: Finite element predictions for the top-right corner vertical displacement, reported at [CoFEA [1]](https://cofea.readthedocs.io/en/latest/benchmarks/002-cook-membrane/results.html)**
 
@@ -57,9 +57,7 @@ functions
 }
 
 ```
-The `solidPointDisplacement` function finds the mesh vertex nearest to the specified `point` and writes the displacement of this vertex to the following file in the case:  
-
-`postProcessing/0/solidPointDisplacement_pointDisp.dat`
+The `solidPointDisplacement` function finds the mesh vertex nearest to the specified `point` and writes the displacement of this vertex to `postProcessing/0/solidPointDisplacement_pointDisp.dat`.
 
 ---
 
