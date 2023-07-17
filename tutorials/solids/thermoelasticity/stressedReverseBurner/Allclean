@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Source tutorial clean functions
+. $WM_PROJECT_DIR/bin/tools/CleanFunctions
+
+# Source solids4Foam scripts
+#source solids4FoamScripts.sh
+
+cleanCase
+rm -rf constant/polyMesh VTK case.foam postProcessing system/*Subset
+rm -rf reverseBurner.solid
+cd reverseBurner
+./Allclean
+cd ..
+
+# Convert case version to FOAM EXTEND
+#solids4Foam::convertCaseFormatFoamExtend .

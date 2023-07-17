@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Case has not been checked with foam-extend
+if [[ $WM_PROJECT == "foam" ]]
+then
+    echo; echo "This case currently does not run with foam-extend"; echo
+    exit 0
+fi
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Run the temperature case
+echo "Running reverseBurner/Allrun"
+cd reverseBurner
+./Allrun &> log.reverseBurner.Allrun
+rm -rf processor*
+cd ..
+
+# Create reverseBurner solid-only case with solid temperature field
+mkdir reverseBurner.solid
+cd reverseBurner.solid
+cp -r ../reverseBurner/0/solid 0
+cp -r ../reverseBurner/system .
+cp -r ../reverseBurner/constant/solid constant
+for i in $(\ls ../reverseBurner | egrep -i "[1-9]"); do echo $i; cp -r ../reverseBurner/$i/solid $i; done
+cd ..
+
+# Copy the solid region mesh from the temperature case
+cp -r reverseBurner.solid/constant/polyMesh constant/
+
+# Run the solver
+solids4Foam::runApplication solids4Foam
