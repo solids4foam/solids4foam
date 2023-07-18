@@ -1,45 +1,44 @@
 /*---------------------------------------------------------------------------*\
   =========                 |
   \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
+   \\    /   O peration     | Version:     4.1
     \\  /    A nd           | Web:         http://www.foam-extend.org
      \\/     M anipulation  | For copyright notice see file Copyright
 -------------------------------------------------------------------------------
 License
-    This file is part of solids4foam.
+    This file is part of foam-extend.
 
-    solids4foam is free software: you can redistribute it and/or modify it
+    foam-extend is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the
     Free Software Foundation, either version 3 of the License, or (at your
     option) any later version.
 
-    solids4foam is distributed in the hope that it will be useful, but
+    foam-extend is distributed in the hope that it will be useful, but
     WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
     General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::outflowPressureFvPatchScalarField
+    Foam::flowRateOutletPressureFvPatchScalarField
 
 Description
-    Foam::outflowPressureFvPatchScalarField
-
-Author
-    Zeljko Tukovic, FSB Zagreb.  All rights reserved.
+    Foam::flowRateOutletPressureFvPatchScalarField
 
 SourceFiles
-    outflowPressureFvPatchScalarField.C
+    flowRateOutletPressureFvPatchScalarField.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef outflowPressureFvPatchScalarField_H
-#define outflowPressureFvPatchScalarField_H
+#ifndef flowRateOutletPressureFvPatchScalarFields_H
+#define flowRateOutletPressureFvPatchScalarFields_H
 
 #include "fvPatchFields.H"
-#include "fixedValueFvPatchFields.H"
+#include "zeroGradientFvPatchFields.H"
+#include "Switch.H"
+#include "fvMatrix.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -47,63 +46,78 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                 Class outflowPressureFvPatch Declaration
+                   Class flowRateOutletPressureFvPatch Declaration
 \*---------------------------------------------------------------------------*/
 
-class outflowPressureFvPatchScalarField
+class flowRateOutletPressureFvPatchScalarField
 :
-    public fixedValueFvPatchScalarField
+    public zeroGradientFvPatchScalarField
 {
+    // Private data
 
-//     //To keep track when to copy patch face centres
-//     label myTimeIndex_;
+        //- Name of the velocity field
+        word UName_;
 
-//     //Old face centres of patch. Needed for (second order) time integration
-//     scalarField Fc_;
-//     scalarField oldFc_;
-//     scalarField oldoldFc_;
+        //- Name of the flux transporting the field
+        word phiName_;
 
+        //- Name of the density field used to
+        //  normalise the mass flux if neccessary
+        word rhoName_;
+
+        //- Flow rate fraction of the total inlet flow rate
+        scalar flowRateFraction_;
+
+        //- Flow rate fraction is not specified and
+        //  will be calculated based on patch area
+        bool calculatedFlowRateFraction_;
+    
+        //- Flow rate fractions is checked?
+        bool checkedFlowRateFractions_;
+
+        //- Inlet flow rate patch index
+        labelList inletPatchIndices_;
+
+        //- Current phi correction
+        scalarField phiCorr_;
 
 public:
 
     //- Runtime type information
-    TypeName("outflowPressure");
+    TypeName("flowRateOutletPressure");
 
 
     // Constructors
 
         //- Construct from patch and internal field
-        outflowPressureFvPatchScalarField
+        flowRateOutletPressureFvPatchScalarField
         (
             const fvPatch&,
             const DimensionedField<scalar, volMesh>&
         );
 
         //- Construct from patch, internal field and dictionary
-        outflowPressureFvPatchScalarField
+        flowRateOutletPressureFvPatchScalarField
         (
             const fvPatch&,
             const DimensionedField<scalar, volMesh>&,
             const dictionary&
         );
 
-        //- Construct by mapping given outflowPressureFvPatchScalarField
-        //  onto a new patch
-        outflowPressureFvPatchScalarField
+        //- Construct by mapping given
+        //  flowRateOutletPressureFvPatchScalarField onto a new patch
+        flowRateOutletPressureFvPatchScalarField
         (
-            const outflowPressureFvPatchScalarField&,
+            const flowRateOutletPressureFvPatchScalarField&,
             const fvPatch&,
             const DimensionedField<scalar, volMesh>&,
             const fvPatchFieldMapper&
         );
 
         //- Construct as copy
-        outflowPressureFvPatchScalarField
+        flowRateOutletPressureFvPatchScalarField
         (
-            const outflowPressureFvPatchScalarField&
-#ifdef OPENFOAMFOUNDATION
-        ) = delete;
-#else
+            const flowRateOutletPressureFvPatchScalarField&
         );
 
         //- Construct and return a clone
@@ -111,15 +125,14 @@ public:
         {
             return tmp<fvPatchScalarField>
             (
-                new outflowPressureFvPatchScalarField(*this)
+                new flowRateOutletPressureFvPatchScalarField(*this)
             );
         }
-#endif
 
         //- Construct as copy setting internal field reference
-        outflowPressureFvPatchScalarField
+        flowRateOutletPressureFvPatchScalarField
         (
-            const outflowPressureFvPatchScalarField&,
+            const flowRateOutletPressureFvPatchScalarField&,
             const DimensionedField<scalar, volMesh>&
         );
 
@@ -131,26 +144,31 @@ public:
         {
             return tmp<fvPatchScalarField>
             (
-                new outflowPressureFvPatchScalarField(*this, iF)
+                new flowRateOutletPressureFvPatchScalarField(*this, iF)
             );
         }
 
 
-
     // Member functions
 
+        //- Return constant reference to flow rate fraction
+        const scalar& flowRateFraction() const
+        {
+            return flowRateFraction_;
+        }
+    
+        //- Return constant reference to flow rate fraction
+        bool calculatedFlowRateFraction() const
+        {
+            return calculatedFlowRateFraction_;
+        }
+    
         //- Update the coefficients associated with the patch field
         virtual void updateCoeffs();
-
-    // Evaluation functions
-
-//         //- Return patch-normal gradient
-//         virtual tmp<Field<scalar> > snGrad() const;
-
-//         //- Return the matrix source coefficients corresponding to the
-//         //  evaluation of the gradient of this patchField
-//         virtual tmp<Field<scalar> > gradientBoundaryCoeffs() const;
-
+    
+        //- Manipulate matrix
+        virtual void manipulateMatrix(fvMatrix<scalar>& matrix);
+    
         //- Write
         virtual void write(Ostream&) const;
 };

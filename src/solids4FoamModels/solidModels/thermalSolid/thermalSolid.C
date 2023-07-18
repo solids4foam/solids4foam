@@ -17,11 +17,14 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "thermalLinGeomSolid.H"
+#include "thermalSolid.H"
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
+
+#include "fixedGradientFvPatchFields.H"
+#include "thermalRobinFvPatchScalarField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -35,30 +38,27 @@ namespace solidModels
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(thermalLinGeomSolid, 0);
-addToRunTimeSelectionTable(solidModel, thermalLinGeomSolid, dictionary);
+defineTypeNameAndDebug(thermalSolid, 0);
+addToRunTimeSelectionTable(solidModel, thermalSolid, dictionary);
 
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
-bool thermalLinGeomSolid::converged
+bool thermalSolid::converged
 (
     const int iCorr,
 #ifdef OPENFOAMESIORFOUNDATION
-    const SolverPerformance<vector>& solverPerfD,
     const SolverPerformance<scalar>& solverPerfT,
 #else
-    const lduSolverPerformance& solverPerfD,
     const lduSolverPerformance& solverPerfT,
 #endif
-    const volVectorField& D,
     const volScalarField& T
 )
 {
     // We will check a number of different residuals for convergence
     bool converged = false;
 
-    // Calculate relative residuals
+     // Calculate relative residuals
     const scalar absResidualT =
         gMax
         (
@@ -89,53 +89,12 @@ bool thermalLinGeomSolid::converged
             SMALL
         );
 
-    const scalar residualD =
-        gMax
-        (
-#ifdef OPENFOAMESIORFOUNDATION
-            DimensionedField<double, volMesh>
-#endif
-            (
-                mag(D.internalField() - D.prevIter().internalField())
-               /max
-                (
-                    gMax
-                    (
-#ifdef OPENFOAMESIORFOUNDATION
-                        DimensionedField<double, volMesh>
-#endif
-                        (
-                            mag(D.internalField() - D.oldTime().internalField())
-                        )
-                    ),
-                    SMALL
-                )
-            )
-        );
-
-    // Calculate material residual
-    const scalar materialResidual = mechanical().residual();
-
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
     // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol())
+    if (iCorr > 1)
     {
-        bool convergedD = false;
         bool convergedT = false;
-
-        if
-        (
-            (
-                mag(solverPerfD.initialResidual()) < solutionTol()
-             && residualD < solutionTol()
-            )
-         || mag(solverPerfD.initialResidual()) < alternativeTol()
-         || residualD < alternativeTol()
-        )
-        {
-            convergedD = true;
-        }
 
         if
         (
@@ -152,7 +111,7 @@ bool thermalLinGeomSolid::converged
         }
 
 
-        if (convergedD && convergedT)
+        if (convergedT)
         {
             Info<< "    The residuals have converged" << endl;
             converged = true;
@@ -162,19 +121,15 @@ bool thermalLinGeomSolid::converged
     // Print residual information
     if (iCorr == 0)
     {
-        Info<< "    Corr, res (T & D), relRes (T & D), matRes, iters (T & D)"
+        Info<< "    Corr, res (T), relRes (T), iters (T)"
             << endl;
     }
     else if (iCorr % infoFrequency() == 0 || converged)
     {
         Info<< "    " << iCorr
             << ", " << solverPerfT.initialResidual()
-            << ", " << mag(solverPerfD.initialResidual())
             << ", " << residualT
-            << ", " << residualD
-            << ", " << materialResidual
-            << ", " << solverPerfT.nIterations()
-            << ", " << solverPerfD.nIterations() << endl;
+            << ", " << solverPerfT.nIterations() << endl;
 
         if (converged)
         {
@@ -185,7 +140,7 @@ bool thermalLinGeomSolid::converged
     {
         maxIterReached()++;
         Warning
-            << "Max iterations reached within the enery-momentum loop" << endl;
+            << "Max iterations reached within the enery loop" << endl;
     }
 
     return converged;
@@ -194,7 +149,7 @@ bool thermalLinGeomSolid::converged
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-thermalLinGeomSolid::thermalLinGeomSolid
+thermalSolid::thermalSolid
 (
     Time& runTime,
     const word& region
@@ -247,13 +202,8 @@ thermalLinGeomSolid::thermalLinGeomSolid
             "absoluteTemperatureTolerance",
             1e-06
         )
-    ),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_)
+    )
 {
-    DisRequired();
-
     // Store T old time
     T_.oldTime();
 }
@@ -262,26 +212,23 @@ thermalLinGeomSolid::thermalLinGeomSolid
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-bool thermalLinGeomSolid::evolve()
+bool thermalSolid::evolve()
 {
     Info<< "Evolving thermal solid solver" << endl;
 
     int iCorr = 0;
 #ifdef OPENFOAMESIORFOUNDATION
-    SolverPerformance<vector> solverPerfD;
     SolverPerformance<scalar> solverPerfT;
     SolverPerformance<scalar>::debug = 0;
-    SolverPerformance<vector>::debug = 0;
 #else
-    lduSolverPerformance solverPerfD;
     lduSolverPerformance solverPerfT;
     blockLduMatrix::debug = 0;
 #endif
 
-    Info<< "Solving coupled energy and displacements equation for T and D"
+    Info<< "Solving energy equation for T"
         << endl;
 
-    // Momentum-energy coupling outer loop
+    // Energy eq loop
     do
     {
         // Store fields for under-relaxation and residual calculation
@@ -291,8 +238,7 @@ bool thermalLinGeomSolid::evolve()
         fvScalarMatrix TEqn
         (
             rhoC_*fvm::ddt(T_)
-         == fvm::laplacian(k_, T_, "laplacian(k,T)")
-          + (sigma() && fvc::grad(U()))
+          - fvm::laplacian(k_, T_, "laplacian(k,T)")
         );
 
         // Under-relaxation the linear system
@@ -307,78 +253,19 @@ bool thermalLinGeomSolid::evolve()
         // Update gradient of temperature
         gradT_ = fvc::grad(T_);
 
-        // Store fields for under-relaxation and residual calculation
-        D().storePrevIter();
-
-        // Linear momentum equation total displacement form
-        fvVectorMatrix DEqn
-        (
-            rho()*fvm::d2dt2(D())
-         == fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
-          - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-          + fvc::div(sigma(), "div(sigma)")
-          + rho()*g()
-          + mechanical().RhieChowCorrection(D(), gradD())
-        );
-
-        // Under-relaxation the linear system
-        DEqn.relax();
-
-        // Enforce any cell displacements
-        solidModel::setCellDisps(DEqn);
-
         // Hack to avoid expensive copy of residuals
 #ifdef OPENFOAMESI
         const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
 #endif
-
-        // Solve the linear system
-        solverPerfD = DEqn.solve();
-
-        // Under-relax the field
-        relaxField(D(), iCorr);
-
-        // Update increment of displacement
-        DD() = D() - D().oldTime();
-
-        // Update velocity
-        U() = fvc::ddt(D());
-
-        // Update gradient of displacement
-        mechanical().grad(D(), gradD());
-
-        // Update gradient of displacement increment
-        gradDD() = gradD() - gradD().oldTime();
-
-        // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
-
-        // Update impKf to improve convergence
-        // Note: impK and rImpK are not updated as they are used for traction
-        // boundaries
-        if (iCorr % 10 == 0)
-        {
-            impKf_ = mechanical().impKf();
-        }
     }
     while
     (
-        !converged(iCorr, solverPerfD, solverPerfT, D(), T_)
+        !converged(iCorr, solverPerfT, T_)
      && ++iCorr < nCorr()
     );
 
-    // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
-
-    // Increment of displacement
-    DD() = D() - D().oldTime();
-
-    // Increment of point displacement
-    pointDD() = pointD() - pointD().oldTime();
-
 #ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<scalar>::debug = 1;
-    SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;
 #endif
@@ -387,46 +274,22 @@ bool thermalLinGeomSolid::evolve()
 }
 
 
-tmp<vectorField> thermalLinGeomSolid::tractionBoundarySnGrad
+tmp<vectorField> thermalSolid::tractionBoundarySnGrad
 (
     const vectorField& traction,
     const scalarField& pressure,
     const fvPatch& patch
 ) const
 {
-    // Patch index
-    const label patchID = patch.index();
-
-    // Patch mechanical property
-    const scalarField& impK = impK_.boundaryField()[patchID];
-
-    // Patch reciprocal implicit stiffness field
-    const scalarField& rImpK = rImpK_.boundaryField()[patchID];
-
-    // Patch gradient
-    const tensorField& pGradD = gradD().boundaryField()[patchID];
-
-    // Patch stress
-    const symmTensorField& pSigma = sigma().boundaryField()[patchID];
-
-    // Patch unit normals
-    const vectorField n(patch.nf());
-
     // Return patch snGrad
     return tmp<vectorField>
     (
-        new vectorField
-        (
-            (
-                (traction - n*pressure)
-              - (n & (pSigma - impK*pGradD))
-            )*rImpK
-        )
+        new vectorField(patch.size(), vector::zero)
     );
 }
 
 
-void thermalLinGeomSolid::writeFields(const Time& runTime)
+void thermalSolid::writeFields(const Time& runTime)
 {
     Info<< "Max T = " << max(T_).value() << nl
         << "Min T = " << min(T_).value() << endl;
@@ -449,6 +312,183 @@ void thermalLinGeomSolid::writeFields(const Time& runTime)
         << endl;
 
     solidModel::writeFields(runTime);
+}
+
+
+void thermalSolid::setTemperatureAndHeatFlux
+(
+    fvPatchScalarField& temperaturePatch,
+    const scalarField& temperature,
+    const scalarField& heatFlux
+)
+{
+    if (temperaturePatch.type() == thermalRobinFvPatchScalarField::typeName)
+    {
+        thermalRobinFvPatchScalarField& patchT =
+            refCast<thermalRobinFvPatchScalarField>(temperaturePatch);
+
+        patchT.temperature() = temperature;
+        patchT.heatFlux() = heatFlux;
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void thermalSolid::setTemperatureAndHeatFlux\n"
+            "(\n"
+            "    fvPatchScalarField& temperaturePatch,\n"
+            "    const scalarField& temperature,\n"
+            "    const scalarField& heatFlux\n"
+            ")"
+        )   << "Boundary condition "
+            << temperaturePatch.type()
+            << " for patch " << temperaturePatch.patch().name()
+            << " should instead be type "
+            << thermalRobinFvPatchScalarField::typeName
+            << abort(FatalError);
+    }
+}
+
+
+void thermalSolid::setTemperatureAndHeatFlux
+(
+    const label interfaceI,
+    const label patchID,
+    const scalarField& faceZoneTemperature,
+    const scalarField& faceZoneHeatFlux
+)
+{
+    const scalarField patchTemperature
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneTemperature)
+    );
+
+    const scalarField patchHeatFlux
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneHeatFlux)
+    );
+    
+#ifdef OPENFOAMESIORFOUNDATION
+    setTemperatureAndHeatFlux
+    (
+        T_.boundaryFieldRef()[patchID],
+        patchTemperature,
+        patchHeatFlux
+    );
+#else
+    setTemperatureAndHeatFlux
+    (
+        T_.boundaryField()[patchID],
+        patchTemperature,
+        patchHeatFlux
+    );
+#endif
+}
+
+
+void thermalSolid::setEqInterHeatTransferCoeff
+(
+    fvPatchScalarField& temperaturePatch,
+    const scalarField& HTC
+)
+{
+    if (temperaturePatch.type() == thermalRobinFvPatchScalarField::typeName)
+    {
+        thermalRobinFvPatchScalarField& patchT =
+            refCast<thermalRobinFvPatchScalarField>(temperaturePatch);
+
+        patchT.eqInterHeatTransferCoeff() = HTC;
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void thermalSolid::setEqInterHeatTransferCoeff\n"
+            "(\n"
+            "    fvPatchScalarField& temperaturePatch,\n"
+            "    const scalarField& HTc\n"
+            ")"
+        )   << "Boundary condition "
+            << temperaturePatch.type()
+            << " for patch " << temperaturePatch.patch().name()
+            << " should instead be type "
+            << thermalRobinFvPatchScalarField::typeName
+            << abort(FatalError);
+    }
+}
+
+
+void thermalSolid::setEqInterHeatTransferCoeff
+(
+    const label interfaceI,
+    const label patchID,
+    const scalarField& faceZoneHTC
+)
+{
+    const scalarField patchHTC
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneHTC)
+    );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    setEqInterHeatTransferCoeff
+    (
+        T_.boundaryFieldRef()[patchID],
+        patchHTC
+    );
+#else
+    setEqInterHeatTransferCoeff
+    (
+        T_.boundaryField()[patchID],
+        patchHTC
+    );
+#endif
+}
+
+
+tmp<scalarField> thermalSolid::faceZoneTemperature
+(
+    const label interfaceI
+) const
+{
+    return globalPatches()[interfaceI].patchFaceToGlobal
+    (
+        T_.boundaryField()[globalPatches()[interfaceI].patch().index()]
+    );
+}
+
+    
+tmp<scalarField> thermalSolid::faceZoneHeatFlux
+(
+    const label interfaceI
+) const
+{
+    scalarField patchHeatFlux =
+        k_.boundaryField()[globalPatches()[interfaceI].patch().index()]*
+        T_.boundaryField()[globalPatches()[interfaceI].patch().index()]
+       .snGrad();
+        
+    return globalPatches()[interfaceI].patchFaceToGlobal(patchHeatFlux);
+}
+
+
+tmp<scalarField> thermalSolid::faceZoneHeatTransferCoeff
+(
+    const label interfaceI
+) const
+{
+    const scalarField& patchDeltaCoeff =
+        mesh().deltaCoeffs().boundaryField()
+        [globalPatches()[interfaceI].patch().index()];
+    
+    scalarField patchHeatTransferCoeff =
+        (1.0/patchDeltaCoeff)/
+        k_.boundaryField()[globalPatches()[interfaceI].patch().index()];
+        
+    return globalPatches()[interfaceI].patchFaceToGlobal
+    (
+        patchHeatTransferCoeff
+    );
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

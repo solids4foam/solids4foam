@@ -762,6 +762,48 @@ Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZonePressureForce
 }
 
 
+Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZoneTemperature
+(
+    const label interfaceI
+) const
+{
+    const scalarField patchT
+    (
+        patchTemperature(globalPatches()[interfaceI].patch().index())
+    );
+
+    return globalPatches()[interfaceI].patchFaceToGlobal(patchT);
+}
+
+
+Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZoneHeatFlux
+(
+    const label interfaceI
+) const
+{
+    const scalarField patchHF
+    (
+        patchHeatFlux(globalPatches()[interfaceI].patch().index())
+    );
+
+    return globalPatches()[interfaceI].patchFaceToGlobal(patchHF);
+}
+
+
+Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZoneHeatTransferCoeff
+(
+    const label interfaceI
+) const
+{
+    const scalarField patchHTC
+    (
+        patchHeatTransferCoeff(globalPatches()[interfaceI].patch().index())
+    );
+
+    return globalPatches()[interfaceI].patchFaceToGlobal(patchHTC);
+}
+
+
 void Foam::fluidModel::UisRequired()
 {
 #ifdef OPENFOAMESIORFOUNDATION
@@ -790,7 +832,6 @@ void Foam::fluidModel::pisRequired()
             << abort(FatalError);
     }
 }
-
 
 void Foam::fluidModel::makeGlobalPatches(const wordList& patchNames) const
 {

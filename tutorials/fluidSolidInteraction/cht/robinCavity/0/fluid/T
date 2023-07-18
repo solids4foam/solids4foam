@@ -12,48 +12,51 @@ FoamFile
     version     2.0;
     format      ascii;
     class       volScalarField;
-    object      p;
+    location    "0";
+    object      T;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 2 -2 0 0 0 0];
+dimensions      [0 0 0 1 0 0 0];
 
-internalField   uniform 0;
+internalField uniform 283;
 
 boundaryField
 {
-    symmetry-x
+    left
     {
-        type        symmetryPlane;
+        type            fixedValue;
+        value           uniform 283;        
     }
-    symmetry-y
-    {
-        type        symmetryPlane;
-    }
-    outlet
-    {
-        type        fixedValue;
-        value       uniform 0;
-    }
-    inlet
-    {
-        // openfoam
-        //type          uniformFixedValue;
-        uniformValue  tableFile;
 
-        // foam extend
-        type        timeVaryingUniformFixedValue;
-        "file|fileName"     "$FOAM_CASE/0/time-series";
-        outOfBounds         clamp;
-    }
-    wall
+    right
     {
-        // Default Dirichlet-Neumann approach
-        type       zeroGradient;
+        type            thermalRobin;
 
-        // Robin-Neumann condition approach
-        //type        elasticWallPressure;
-        //value       uniform 0;
+        // neiTemperature  uniform 283;
+        // neiHeatFlux     uniform 0;
+        // deltaByLambda   uniform 0.02;
+
+        lambda lambdaEff;
+        
+        value           uniform 283;        
+    }
+
+    bottom
+    {
+        type            zeroGradient;
+        value           $internalField;
+    }
+
+    top
+    {
+        type            zeroGradient;
+        value           $internalField;
+    }
+
+    frontAndBack
+    {
+        type            empty;
     }
 }
 

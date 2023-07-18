@@ -64,7 +64,8 @@ bool fixedRelaxationCouplingInterface::evolve()
 
     scalar residualNorm = 0;
 
-    if (predictSolid_)
+    if (predictSolid_ && (runTime().timeIndex() > 1))
+    // if (predictSolid_)
     {
         updateForce();
 
@@ -89,7 +90,7 @@ bool fixedRelaxationCouplingInterface::evolve()
 
         // Transfer the force from the fluid to the solid
         updateForce();
-
+        
         // Solve solid
         solid().evolve();
 
