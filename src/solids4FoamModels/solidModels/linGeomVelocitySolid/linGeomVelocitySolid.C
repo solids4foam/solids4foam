@@ -159,7 +159,7 @@ bool linGeomVelocitySolid::evolve()
             mechanical().grad(D(), gradD());
 
             // Calculate the stress using run-time selectable mechanical law
-            const volScalarField DDEqnA("DEqnA", DDEqn.A());
+            const volScalarField UEqnA("DEqnA", UEqn.A());
             mechanical().correct(sigma());
         }
         while
