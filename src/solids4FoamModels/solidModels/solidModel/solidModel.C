@@ -978,6 +978,7 @@ Foam::solidModel::solidModel
     mechanicalPtr_(),
     Dheader_("D", runTime.timeName(), mesh(), IOobject::MUST_READ),
     DDheader_("DD", runTime.timeName(), mesh(), IOobject::MUST_READ),
+    Uheader_("U", runTime.timeName(), mesh(), IOobject::MUST_READ),
     pointDheader_("pointD", runTime.timeName(), mesh(), IOobject::MUST_READ),
     D_
     (
@@ -1070,6 +1071,19 @@ Foam::solidModel::solidModel
         ),
         mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
+    ),
+    gradU_
+    (
+        IOobject
+        (
+            "grad(" + U_.name() + ")",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedTensor("0", dimless/dimTime, tensor::zero)
     ),
     sigma_
     (
@@ -1208,6 +1222,7 @@ Foam::solidModel::solidModel
     pointDD_.oldTime();
     gradD_.oldTime();
     gradDD_.oldTime();
+    gradU_.oldTime();
     sigma_.oldTime();
 
     if (restart_)
@@ -1218,12 +1233,15 @@ Foam::solidModel::solidModel
         DD_.writeOpt() = IOobject::AUTO_WRITE;
         DD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
         DD_.oldTime().oldTime().writeOpt() = IOobject::AUTO_WRITE;
+        U_.writeOpt() = IOobject::AUTO_WRITE;
+        U_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
         pointD_.writeOpt() = IOobject::AUTO_WRITE;
         pointD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
         pointDD_.writeOpt() = IOobject::AUTO_WRITE;
         gradD_.writeOpt() = IOobject::AUTO_WRITE;
         gradD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
         gradDD_.writeOpt() = IOobject::AUTO_WRITE;
+        gradU_.writeOpt() = IOobject::AUTO_WRITE;
     }
     else
     {
@@ -1232,12 +1250,15 @@ Foam::solidModel::solidModel
         DD_.writeOpt() = IOobject::NO_WRITE;
         DD_.oldTime().writeOpt() = IOobject::NO_WRITE;
         DD_.oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
+        U_.oldTime().writeOpt() = IOobject::NO_WRITE;
+        U_.oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
         pointD_.writeOpt() = IOobject::AUTO_WRITE;
         pointD_.oldTime().writeOpt() = IOobject::NO_WRITE;
         pointDD_.writeOpt() = IOobject::NO_WRITE;
         gradD_.writeOpt() = IOobject::NO_WRITE;
         gradD_.oldTime().writeOpt() = IOobject::NO_WRITE;
         gradDD_.writeOpt() = IOobject::NO_WRITE;
+        gradU_.writeOpt() = IOobject::NO_WRITE;
     }
 
     // Print out the relaxation factor
@@ -1360,6 +1381,19 @@ void Foam::solidModel::DDisRequired()
     }
 }
 
+void Foam::solidModel::UisRequired()
+{
+#ifdef OPENFOAMESIORFOUNDATION
+    if (!Uheader_.typeHeaderOk<volVectorField>(true))
+#else
+    if (!Uheader_.headerOk())
+#endif
+    {
+        FatalErrorIn(type() + "::UisRequired()")
+            << "This solidModel requires the 'U' field to be specified!"
+            << abort(FatalError);
+    }
+}
 
 void Foam::solidModel::pointDisRequired()
 {

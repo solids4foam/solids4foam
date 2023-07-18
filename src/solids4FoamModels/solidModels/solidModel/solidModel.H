@@ -95,6 +95,9 @@ class solidModel
         //- Increment of displacement field header
         IOobject DDheader_;
 
+        //- Velocity field header
+        IOobject Uheader_;
+
         //- Point total displacement field header
         IOobject pointDheader_;
 
@@ -123,6 +126,9 @@ class solidModel
 
         //- Gradient of the displacement increment
         volTensorField gradDD_;
+
+        //- Gradient of the displacement increment
+        volTensorField gradU_;
 
         //- Stress field
         //  This is the engineering stress for linear geometry approaches, and
@@ -547,6 +553,18 @@ public:
                 return gradDD_;
             }
 
+            //- Return non-const reference to gradU
+            virtual volTensorField& gradU()
+            {
+                return gradU_;
+            }
+
+            //- Return const reference to gradU
+            virtual const volTensorField& gradU() const
+            {
+                return gradU_;
+            }
+
             //- Return non-const reference to sigma
             virtual volSymmTensorField& sigma()
             {
@@ -633,6 +651,9 @@ public:
 
             //- This function will check that the DD field was read from disk
             virtual void DDisRequired();
+
+            //- This function will check that the U field was read from disk
+            virtual void UisRequired();
 
             //- This function will check that the pointD field was read from disk
             virtual void pointDisRequired();
