@@ -89,7 +89,7 @@ When viewing the results in ParaView, it can be insightful to warp the geometry 
 
 ---
 
-If you would like to learn more about the case, then please continue; if not, how about you check out [my second tutorial](./tutorial2.md).
+If you would like to learn more about the case, then please continue; if not, how about you check out another tutorial.
 
 ---
 

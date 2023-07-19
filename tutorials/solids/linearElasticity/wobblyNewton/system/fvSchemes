@@ -63,7 +63,7 @@ gradSchemes
     snGradCorr(laplacian(((0.5*(deltaT+deltaT0))*interpolate(impK)),U)) cellLimited leastSquares 1.0;
 
     // For segregated solids
-    grad(DD)          extendedLeastSquares 0;
+    grad(DD)          leastSquares;
 }
 
 divSchemes

@@ -257,7 +257,7 @@ void Foam::MooneyRivlinElastic::correct
         (1.0/J)
        *(
            dev(s) + sigmaHydf*I
-         + symm(Ff() & fvc::interpolate(sigma0()) & Ff().T())
+         + symm(Ff() & linearInterpolate(sigma0()) & Ff().T())
         );
 }
 

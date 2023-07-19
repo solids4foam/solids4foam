@@ -16,20 +16,24 @@ sort: 3
 
 ![](images/fs_over_1.PNG)
 
-This case consists of a thick elastic plate attached to the bottom surface of a rectangular channel. Due to symmetry, only half of the spatial domain is considered. An incompressible viscous fluid with a density 1000 kg/m3 and kinematic viscosity 0.001 m2/s enters the channel from the left-hand side with a parabolic velocity profile.
+This case consists of a thick elastic plate attached to the bottom surface of a rectangular channel (see the figure above). Due to symmetry, only half of the spatial domain is considered. An incompressible viscous fluid with a density of 1000 kg/m3 and kinematic viscosity of 0.001 m2/s enters the channel from the left-hand side with a parabolic velocity profile.
 
-The peak inlet velocity is 0.2 m/s, corresponding to Re = 40 with respect to the plate height (h = 0.2 m). The peak inlet velocity gradually increases from zero at t = 0 s to its maximum value at t = 4 s using the following transition function 0.2 [1 − cos(πt/4)]/2. A constant pressure is imposed at the outlet of the channel, and a no-slip boundary condition is applied on the channel walls. The elastic plate has a density of 1000 kg/m3, Young’s modulus of 1.4 MPa (shear modulus of 0.5 MPa), and a Poisson’s ratio of 0.4.
+This case can be analysed in two forms:
 
-We assume incompressible Newtonian isothermal laminar flow, where the Navier-Stokes governing equations take the form:
+- The original form, proposed by [Richter](https://onlinelibrary.wiley.com/doi/10.1002/nme.4943): The peak inlet velocity is 0.2 m/s, corresponding to Re = 40 with respect to the plate height (h = 0.2 m). The peak inlet velocity gradually increases from zero at t = 0 s to its maximum value at t = 4 s using the following transition function $$0.2 [1 − \cos(\pi t/4)]/2$$. A constant pressure is imposed at the channel outlet, and a no-slip boundary condition is applied on the channel walls. The elastic plate has a density of 1000 kg/m3, Young’s modulus of 1.4 MPa (shear modulus of 0.5 MPa), and a Poisson’s ratio of 0.4.
+- A modified form, analysed by [Gillebaart et al.](https://doi.org/10.1016/j.cma.2015.09.025) and [Tuković et al.](https://hrcak.srce.hr/206941): The peak inlet velocity is increased to 0.3 m/s, and the Young’s modulus of the solid beam is reduced to 10 kPa. In addition, the velocity reaches its maximum value at 1 s, and the simulation continues until the beam reaches steady-state. The purpose of these changes is to demonstrate large solid displacements and fluid mesh motion.
+
+
+The fluid is described by incompressible Newtonian isothermal laminar flow, where the Navier-Stokes governing equations take the form:
 
 ![](images/fs_theo_1.PNG)
 
 
-For the solid, we assume finite strains (though a small strain assumption would be OK in this case) with the material behaviour described by the neo-Hookean hyperelastic law:
+For the solid, we assume finite strains (though a small strain assumption would be OK in the the original form of the case) with the material behaviour described by the neo-Hookean hyperelastic law:
 
 ![](images/fs_theo_2.PNG)
 
-At the interface between the fluid and solid regions, kinematic and dynamic conditions hold. The kinematic conditions state that the velocity and displacement must be continuous across the interface:
+Kinematic and dynamic conditions hold at the interface between the fluid and solid regions. The kinematic conditions state that the velocity and displacement must be continuous across the interface:
 ![](images/fs_theo_3.PNG)
 The dynamic conditions follow from linear momentum conservation and state that the forces are in equilibrium:
 ![](images/fs_theo_4.PNG)
@@ -52,11 +56,10 @@ end
 
 ## Expected Results
 
-The incoming flow imparts pressure and viscous forces on the plate, causing it to bend. Following some initial transient effects, the flow and beam reach a steady-state.
+The incoming flow imparts pressure and viscous forces on the plate, causing it to bend. Following some initial transient effects, the flow and beam reach a steady-state. In the modified form of the case, with an increased peak inlet velocity of 0.3 m/s and reduced Young’s modulus of 10 kPa, displacement of point A is pexected to be (0.01463, 0.005, −0.000447) m at steady state. Further details of the case can be found in [Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković (2018) OpenFOAM Finite Volume Solver for Fluid-Solid Interaction](https://hrcak.srce.hr/206941); in particular, see Fig. 28 therein. The figure below shows the displacement field in the beam, the fluid velocity streamlines, and the fluid pressure on the channel ground, wall and outlet. 
+
 
 ![](images/fs_over_2.PNG)
-
-Further details of the case can be found in [Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković (2018) OpenFOAM Finite Volume Solver for Fluid-Solid Interaction](https://hrcak.srce.hr/206941).
 
 ---
 
@@ -106,7 +109,7 @@ fi
 where the `solids4Foam::convertCaseFormat .` script makes minor changes to the case to make it compatible with your version of OpenFOAM/foam-extend. As can be seen, if the argument "parallel" is passed to the `Allrun` script (i.e. `> ./Allrun parallel`) it will run the case in parallel. After the solver has finished, `force.pdf` and `deflection.pdf` plots are generated if the `gnuplot` program is installed. 
 
 ```tip
-Remmber that a tutorial case can be cleaned and reset using the included `Allrun` script, i.e. `> ./Allclean`.
+Remember that a tutorial case can be cleaned and reset using the included `Allrun` script, i.e. `> ./Allclean`.
 ```
 
 ---
@@ -125,7 +128,7 @@ In the ParaView, both the solid and fluid regions are loaded by default. The *Ex
 
 ---
 
-If you would like to learn more about the case, please continue; if not, how about you check out the [other tutorial guides](./more-tutorials/README.md).
+If you would like to learn more about the case, please continue; if not, how about you check out another tutorial.
 
 ---
 
@@ -133,7 +136,7 @@ If you would like to learn more about the case, please continue; if not, how abo
 
 The case follows the typical multi-region (e.g. as used by `chtMultiRegionSimpleFoam`) case structure:
 
-```
+```bash
 beamInCrossFlow
 ├── 0
 │   ├── fluid
@@ -158,13 +161,13 @@ beamInCrossFlow
 where `fluid` and `solid' sub-directories are present in the `0`, `constant` and `system` directories.
 
 As in all solids4foam cases, the `constant/physicsProperties` dictionary must be present, where, in this case, a fluid-solid interaction analysis is specified:
-```
+```c++
 type   fluidSolidInteraction;
 ```
 
 As a fluid-solid interaction, a `constant/fsiProperties` dictionary must also be present, where, in this case, the Aitken's accelerated coupling algorithm is specified:
 
-```
+```c++
 fluidSolidInterface Aitken;
 
 AitkenCoeffs
@@ -187,7 +190,7 @@ During a partitioned fluid-solid interaction analysis, the `solids4Foam` solver 
 - Force(s) on the FSI interface(s)
 
 For example:
-```
+```bash
 Time = 0.1, iteration: 15
 Current fsi under-relaxation factor (Aitken): 0.980175
 Maximal accumulated displacement of interface points: 8.51423e-07
@@ -278,7 +281,7 @@ solids4foam/src/solids4FoamModels/fluidSolidInterfaces/AitkenCouplingInterface/A
 
 Let us examine the code, in particular, the “evolve” function of this class, to see how the FSI procedure is implemented.
 
-```
+```c++
 bool AitkenCouplingInterface::evolve()
 {
     initializeFields();

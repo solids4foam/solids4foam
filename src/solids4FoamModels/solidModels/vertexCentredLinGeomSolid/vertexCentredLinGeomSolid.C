@@ -48,7 +48,6 @@ namespace solidModels
 defineTypeNameAndDebug(vertexCentredLinGeomSolid, 0);
 addToRunTimeSelectionTable(solidModel, vertexCentredLinGeomSolid, dictionary);
 
-
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 void vertexCentredLinGeomSolid::updateSource
@@ -280,7 +279,7 @@ void vertexCentredLinGeomSolid::setFixedDofs
                             << abort(FatalError);
                     }
 
-                    // If the point is not fully fuxed then make sure the normal
+                    // If the point is not fully fixed then make sure the normal
                     // direction is fixed
                     if (mag(fixedDofDirections[pointID] - symmTensor(I)) > 0)
                     {
@@ -744,6 +743,10 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         "calculated"
     ),
     globalPointIndices_(mesh())
+#ifdef OPENFOAMESI
+    ,
+    pointVolInterp_(pMesh(), mesh())
+#endif
 {
     // Create dual mesh and set write option
     dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
@@ -815,7 +818,7 @@ bool vertexCentredLinGeomSolid::evolve()
     sparseMatrix matrix(sum(globalPointIndices_.stencilSize()));
 
     // Store material tangent field for dual mesh faces
-    Field<symmTensor4thOrder> materialTangent
+    Field<scalarSquareMatrix> materialTangent
     (
         dualMechanicalPtr_().materialTangentFaceField()
     );
@@ -828,7 +831,9 @@ bool vertexCentredLinGeomSolid::evolve()
     }
 
     // Global point index lists
+    //List showing which points are on a specific processor?
     const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
+    //Mapping local points to global?
     const labelList& localToGlobalPointMap =
         globalPointIndices_.localToGlobalPointMap();
 
@@ -905,8 +910,6 @@ bool vertexCentredLinGeomSolid::evolve()
 
         if (fullNewton_)
         {
-            // Info<< "    Assembling the matrix" << endl;
-
             // Assemble the matrix once per outer iteration
             matrix.clear();
 
@@ -945,6 +948,12 @@ bool vertexCentredLinGeomSolid::evolve()
             );
         }
 
+        if (debug > 1)
+        {
+            // Print the matrix
+            matrix.print();
+        }
+
         // Enforce fixed DOF on the linear system
         sparseMatrixTools::enforceFixedDof
         (
@@ -955,6 +964,12 @@ bool vertexCentredLinGeomSolid::evolve()
             fixedDofValues_,
             fixedDofScale_
         );
+
+        if (debug > 1)
+        {
+            // Print the matrix
+            matrix.print();
+        }
 
         // Solve linear system for displacement correction
         if (debug)
@@ -1047,8 +1062,6 @@ bool vertexCentredLinGeomSolid::evolve()
 #endif
         {
             // Relaxing the correction can help convergence
-            // This is like a simple line search
-            // Of course, an actual line search would be better: to-do!
 
 #ifdef OPENFOAMESIORFOUNDATION
             const scalar rf
@@ -1148,6 +1161,7 @@ bool vertexCentredLinGeomSolid::evolve()
 
     // Calculate cell gradient
     // This assumes a constant gradient within each primary mesh cell
+    // This is a first-order approximation
     gradD() = vfvc::grad(pointD(), mesh());
 
     // Map primary cell gradD field to sub-meshes for multi-material cases
@@ -1161,11 +1175,17 @@ bool vertexCentredLinGeomSolid::evolve()
 
     // Update primary mesh cell stress field, assuming it is constant per
     // primary mesh cell
+    // This stress will be first-order accurate
     mechanical().correct(sigma());
+
+#ifdef OPENFOAMESI
+    // Interpolate pointD to D
+    // This is useful for visualisation but it is also needed when using preCICE
+    pointVolInterp_.interpolate(pointD(), D());
+#endif
 
     return true;
 }
-
 
 void vertexCentredLinGeomSolid::setTraction
 (
@@ -1216,6 +1236,67 @@ void vertexCentredLinGeomSolid::setTraction
             << solidTractionPointPatchVectorField::typeName
             << abort(FatalError);
     }
+}
+
+
+void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
+{
+    // Calculate gradD at the primary points using least squares: this should
+    // be second-order accurate (... I think).
+    const pointTensorField pGradD(vfvc::pGrad(pointD(), mesh()));
+
+    // Calculate strain at the primary points based on pGradD
+    // Note: the symm operator is not defined for pointTensorFields so we will
+    // do it manually
+    // const pointSymmTensorField pEpsilon("pEpsilon", symm(pGradD));
+    pointSymmTensorField pEpsilon
+    (
+        IOobject
+        (
+            "pEpsilon",
+            runTime.timeName(),
+            runTime,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedSymmTensor("0", dimless, symmTensor::zero)
+    );
+
+#ifdef FOAMEXTEND
+    pEpsilon.internalField() = symm(pGradD.internalField());
+#else
+    pEpsilon.primitiveFieldRef() = symm(pGradD.internalField());
+#endif
+    pEpsilon.write();
+
+    // Equivalent strain at the points
+    pointScalarField pEpsilonEq
+    (
+        IOobject
+        (
+            "pEpsilonEq",
+            runTime.timeName(),
+            runTime,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedScalar("0", dimless, 0.0)
+    );
+
+#ifdef FOAMEXTEND
+    pEpsilonEq.internalField() =
+        sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
+#else
+    pEpsilonEq.primitiveFieldRef() =
+        sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
+#endif
+    pEpsilonEq.write();
+
+    Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;
+
+    solidModel::writeFields(runTime);
 }
 
 

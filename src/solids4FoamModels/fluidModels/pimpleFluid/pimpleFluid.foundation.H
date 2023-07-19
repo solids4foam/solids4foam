@@ -24,6 +24,9 @@ Description
 Author
     Ported by Philip Cardiff, UCD.
 
+    Robin FSI condition ported by Simona Moretti and Andrea Luigi Facci,
+    University of Tuscia.
+
 SourceFiles
     pimpleFluid.foamextend.C
 
@@ -65,6 +68,15 @@ class pimpleFluid
         //- Pointer to the velocity surface field
         autoPtr<surfaceVectorField> Uf_;
 
+        //- Acceleration field
+        volVectorField ddtU_;
+
+        //- rAU field
+        volScalarField rAU_;
+
+        //- rAUf field
+        surfaceScalarField rAUf_;
+
         //- Pressure reference object
         pressureReference pressureReference_;
 
@@ -91,6 +103,15 @@ class pimpleFluid
 
 
     // Private Member Functions
+
+        //- Reset flux if mesh changed
+        void updateRobinFsiInterfaceFlux();
+
+        //- Update phi for Robin FSI boundary conditions
+        void updateRobinFsiInterface();
+
+        //- Correct phi after solving pressure equation
+        void correctRobinFsiInterfaceFlux();
 
         //- Correct phi function
         void correctPhi();

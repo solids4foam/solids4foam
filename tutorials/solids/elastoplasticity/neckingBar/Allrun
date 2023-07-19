@@ -9,6 +9,7 @@ source solids4FoamScripts.sh
 # Create the blockMeshDict
 mkdir -p constant/polyMesh
 m4 system/blockMeshDict.neckingBar.m4 > constant/polyMesh/blockMeshDict
+m4 system/blockMeshDict.neckingBar.m4 > system/blockMeshDict
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .

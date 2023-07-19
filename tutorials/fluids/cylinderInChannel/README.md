@@ -97,7 +97,7 @@ In the ParaView, a [von Kármán vortex street](https://en.wikipedia.org/wiki/K�
 
 ---
 
-If you would like to learn more about the case, then please continue; if not, how about you check out [my third tutorial: 'beaminCrossFlow'](./tutorial3.md).
+If you would like to learn more about the case, then please continue; if not, how about you check out another tutorial.
 
 ---
 

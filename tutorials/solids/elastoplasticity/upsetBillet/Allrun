@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# This case currently gives errors with OpenFOAM.org
+if [[ "${WM_PROJECT}" != "foam"* ]]
+then
+    if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
+    then
+        echo; echo "Skipping this case as it does not currently working with OpenFOAM.org"
+        echo
+        exit 0
+    fi
+fi
+
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
@@ -12,6 +23,7 @@ solids4Foam::convertCaseFormat .
 # Create mesh
 mkdir -p constant/polyMesh
 m4 system/blockMeshDict.cylinder.m4 > constant/polyMesh/blockMeshDict
+m4 system/blockMeshDict.cylinder.m4 > system/blockMeshDict
 solids4Foam::runApplication blockMesh
 
 if [[ $WM_PROJECT != "foam" ]]

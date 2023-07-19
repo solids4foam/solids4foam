@@ -136,6 +136,9 @@ class solidModel
         //- Gravitational acceleration
         const uniformDimensionedVectorField g_;
 
+        //- Damping coefficient
+        const dimensionedScalar dampingCoeff_;
+
         //- Stabilisation term for momentum equation
         autoPtr<momentumStabilisation> stabilisationPtr_;
 
@@ -211,6 +214,9 @@ class solidModel
         //- Optional: restart flag
         //  Write out all fields required for a consistent restart
         const Switch restart_;
+
+        //- Store rho*d2d2t(D) for efficiency
+        mutable autoPtr<volVectorField> rhoD2dt2DPtr_;
 
 
     // Private Member Functions
@@ -348,6 +354,12 @@ protected:
         {
             return stabilisationPtr_();
         }
+
+        //- Make rhoD2dt2D
+        void makeRhoD2dt2D() const;
+
+        //- Return non-const access to rhoD2dt2D
+        volVectorField& rhoD2dt2D() const;
 
 
 public:
@@ -554,6 +566,12 @@ public:
             const uniformDimensionedVectorField& g() const
             {
                 return g_;
+            }
+
+            //- Return const access to the damping coefficient
+            const dimensionedScalar& dampingCoeff() const
+            {
+                return dampingCoeff_;
             }
 
             //- Each solidModel must indicate whether D or DD is the primary

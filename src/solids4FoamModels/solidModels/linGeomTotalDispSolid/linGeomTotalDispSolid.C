@@ -46,10 +46,9 @@ addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 
 void linGeomTotalDispSolid::predict()
 {
-    Info<< "Linear predictor using DD" << endl;
+    Info<< "Applying linear predictor to D" << endl;
 
-    // Predict D using the increment of displacement field from the previous
-    // time-step
+    // Predict D using previous time steps
     D() = D().oldTime() + U()*runTime().deltaT();
 
     // Update gradient of displacement
@@ -148,6 +147,12 @@ bool linGeomTotalDispSolid::evolve()
               + rho()*g()
               + stabilisation().stabilisation(D(), gradD(), impK_)
             );
+
+            // Add damping
+            if (dampingCoeff().value() > SMALL)
+            {
+                DEqn += dampingCoeff()*rho()*fvm::ddt(D());
+            }
 
             // Under-relaxation the linear system
             DEqn.relax();

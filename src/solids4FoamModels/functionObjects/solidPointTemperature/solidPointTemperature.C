@@ -264,7 +264,7 @@ bool Foam::solidPointTemperature::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::solidPointTemperature::write()
 {
-    return writeData();
+    return false;
 }
 #endif
 

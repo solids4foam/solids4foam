@@ -24,31 +24,31 @@ boundaryField
 {
     symmetry-x
     {
-        type        symmetryPlane;
+        type            symmetryPlane;
     }
     symmetry-y
     {
-        type        symmetryPlane;
+        type            symmetryPlane;
     }
     outlet
     {
-        type        fixedValue;
-        value       uniform 0;
+        type            fixedValue;
+        value           uniform 0;
     }
     inlet
     {
         // openfoam
-        //type          uniformFixedValue;
-        uniformValue  tableFile;
+        //type           uniformFixedValue;
+        uniformValue     tableFile;
 
         // foam extend
-        type        timeVaryingUniformFixedValue;
-        file   	    "$FOAM_CASE/0/fluid/time-series";
+        type            timeVaryingUniformFixedValue;
+        file   	        "$FOAM_CASE/0/fluid/time-series";
         outOfBounds	clamp;
     }
     wall
     {
-		type        zeroGradient;
+        type            zeroGradient;
         value      	uniform 0;
     }
 

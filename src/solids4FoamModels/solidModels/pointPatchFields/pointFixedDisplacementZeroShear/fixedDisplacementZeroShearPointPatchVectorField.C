@@ -66,6 +66,7 @@ fixedDisplacementZeroShearPointPatchVectorField
     curTimeIndex_(-1)
 {
 #ifdef OPENFOAMESIORFOUNDATION
+    // refValue is only used by foam-extend
     vectorField refValue(patch().size(), vector::zero);
 #else
     // Set value fraction to fixed normal direction
@@ -90,7 +91,8 @@ fixedDisplacementZeroShearPointPatchVectorField
     }
     else
     {
-        refValue = vectorField("refValue", dict, p.size());
+        // Use the "value" on the patch
+        refValue = this->patchInternalField();
     }
 
     //this->updateBoundaryField();

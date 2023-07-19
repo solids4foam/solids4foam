@@ -1294,7 +1294,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
             labelListList patchPointCells(patchPoints.size());
 
-            label nCells = 0;
+            //label nCells = 0;
 
             forAll(patchPointCells, pointI)
             {
@@ -1320,7 +1320,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
                 patchPointCells[pointI] = cellSet.toc();
 
-                nCells += patchPointCells[pointI].size();
+                //nCells += patchPointCells[pointI].size();
             }
 
             // Parallel data exchange

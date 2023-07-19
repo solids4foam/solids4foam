@@ -48,7 +48,11 @@ Author
 #include "tmp.H"
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
-#include "symmTensor4thOrder.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "scalarMatrices.H"
+#else
+    #include "scalarSquareMatrix.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -98,6 +102,9 @@ class mechanicalLaw
         //  is the Cauchy stress or 2nd Piola-Kirchhoff or some other stress
         //  measure
         mutable autoPtr<volSymmTensorField> sigma0Ptr_;
+
+        //- Initial (residual) stress surface field
+        mutable autoPtr<surfaceSymmTensorField> sigma0fPtr_;
 
         // Small strain tensor
         mutable autoPtr<volSymmTensorField> epsilonPtr_;
@@ -161,6 +168,9 @@ class mechanicalLaw
 
         //- Make the sigma0 field
         void makeSigma0() const;
+
+        //- Make the sigma0f field
+        void makeSigma0f() const;
 
         //- Make the epsilon field
         void makeEpsilon() const;
@@ -269,6 +279,12 @@ protected:
 
         //- Return a non-const reference to the sigma0 field
         volSymmTensorField& sigma0();
+
+        //- Return a const reference to the sigma0 surface field
+        const surfaceSymmTensorField& sigma0f() const;
+
+        //- Return a non-const reference to the sigma0 surface field
+        surfaceSymmTensorField& sigma0f();
 
         //- Return a const reference to the epsilon field
         const volSymmTensorField& epsilon() const;
@@ -487,23 +503,25 @@ public:
         virtual tmp<surfaceScalarField> impKf() const;
 
         //- Material tangent for Newton Raphson loop
-        virtual symmTensor4thOrder materialTangent() const
+        virtual scalarSquareMatrix materialTangent() const
         {
             // We could use numerical differentiation for this if needed
             notImplemented("Not yet implemented for this mechanical law");
 
             // Keep compiler happy
-            return symmTensor4thOrder::zero;
+            return scalarSquareMatrix(0);
         }
 
+#ifdef OPENFOAMESIORFOUNDATION
         //- Material tangent field for Newton Raphson loop
         //  The size of this field should be mesh.nFaces()
-        virtual tmp<Field<symmTensor4thOrder>> materialTangentField() const;
+        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
+#endif
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const
         {
-            notImplemented("Not yet implemented for this mechanical law");
+            notImplemented("bulkModulus() const");
 
             // Keep compiler happy
             return rho();

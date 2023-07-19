@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# This case requires the preCICE OpenFOAM adapter to be installed
+if [[ ! -f "${FOAM_USER_LIBBIN}/libpreciceAdapterFunctionObject.dylib" && ! -f "${FOAM_USER_LIBBIN}/libpreciceAdapterFunctionObject.so" ]]
+then
+    echo; echo "Skipping this case as preCICE is not installed"; echo
+    exit 0
+fi
+
+./Allrun.solid &
+./Allrun.fluid &
+
+echo "Waiting for the solid and fluid to finish"; echo
+wait
+echo "Done."; echo

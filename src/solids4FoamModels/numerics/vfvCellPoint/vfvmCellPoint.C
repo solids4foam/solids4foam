@@ -36,7 +36,7 @@ void Foam::vfvm::divSigma
     const fvMesh& dualMesh,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const Field<symmTensor4thOrder>& materialTangentField,
+    const Field<scalarSquareMatrix>& materialTangentField,
     const boolList& fixedDofs,
     const symmTensorField& fixedDofDirections,
     const scalar fixedDofScale,
@@ -67,7 +67,7 @@ void Foam::vfvm::divSigma
         const label cellID = dualFaceToCell[dualFaceI];
 
         // Material tangent at the dual mesh face
-        const symmTensor4thOrder& materialTangent =
+        const scalarSquareMatrix& materialTangent =
             materialTangentField[dualFaceI];
 
         // Points in cellID
@@ -152,15 +152,6 @@ void Foam::vfvm::divSigma
         matrix(neiPointID, neiPointID) -= edgeDirCoeff;
         matrix(neiPointID, ownPointID) += edgeDirCoeff;
     }
-
-    // Enforce fixed degrees of freedom
-    // This should probably be in its own function but it is ok here for now
-    // Note: traction boundary conditions do not contribute to matrix
-    // coefficients and instead contribute to just the source
-    // sparseMatrixTools::addFixedDofToMatrix
-    // (
-    //     matrix, fixedDofs, fixedDofDirections, fixedDofScale
-    // );
 
     if (debug)
     {

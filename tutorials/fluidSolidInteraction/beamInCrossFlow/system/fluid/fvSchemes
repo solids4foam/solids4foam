@@ -18,18 +18,18 @@ FoamFile
 
 ddtSchemes
 {
-    default backward;
+    default            Euler;
 }
 
 gradSchemes
 {
-    default leastSquares;
+    default            leastSquares;
 }
 
 divSchemes
 {
-    default none;
-    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
+    default            none;
+    div(phi,U)         Gauss linearUpwind cellLimited leastSquares 1;
     div((nuEff*dev2(T(grad(U))))) Gauss linear;
     div((nuEff*dev(T(grad(U))))) Gauss linear;
 }
@@ -40,24 +40,23 @@ laplacianSchemes
     laplacian(nuEff,U) Gauss linear corrected;
     laplacian((1|A(U)),p) Gauss linear corrected;
     laplacian(diffusivity,cellMotionU) Gauss linear corrected;
-
-    laplacian(rAU,p) Gauss linear corrected;
+    laplacian(rAU,p)   Gauss linear corrected;
 }
 
 interpolationSchemes
 {
-    default linear;
-    interpolate(U) skewCorrected linear;
+    default            linear;
+    interpolate(U)     skewCorrected linear;
 }
 
 snGradSchemes
 {
-    default corrected;
+    default            corrected;
 }
 
 fluxRequired
 {
-    default no;
+    default            no;
     p;
 }
 

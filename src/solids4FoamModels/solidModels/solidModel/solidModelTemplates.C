@@ -153,7 +153,8 @@ bool Foam::solidModel::converged
             Info<< endl;
         }
     }
-    else if (iCorr == nCorr_ - 1)
+
+    if (iCorr == nCorr_ - 1 && !converged)
     {
         maxIterReached_++;
         Warning

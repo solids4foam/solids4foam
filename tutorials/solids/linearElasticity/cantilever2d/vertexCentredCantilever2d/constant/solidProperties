@@ -40,7 +40,7 @@ solidModel     vertexCentredLinearGeometry;
     //fixedDofScale 1;
 
     // Fraction of compact edge direction gradient used
-    zeta 2.0;
+    zeta 1.0;
 
     // Line search settings
     lineSearch no;
@@ -49,6 +49,8 @@ solidModel     vertexCentredLinearGeometry;
     // Use PETSc, else use Eigen SparseLU
     usePETSc yes;
     optionsFile "$FOAM_CASE/petscOptions";
+    //optionsFile "$FOAM_CASE/petscOptions.mumps";
+    //optionsFile "$FOAM_CASE/petscOptions.superlu_dist";
 }
 
 // ************************************************************************* //

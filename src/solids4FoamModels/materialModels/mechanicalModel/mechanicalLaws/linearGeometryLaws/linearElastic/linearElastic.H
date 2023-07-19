@@ -72,19 +72,8 @@ class linearElastic
         //- First Lame parameter
         dimensionedScalar lambda_;
 
-        //- Initial (residual) stress surface field
-        mutable autoPtr<surfaceSymmTensorField> sigma0fPtr_;
 
     // Private Member Functions
-
-        //- Make the initial stress surface field
-        void makeSigma0f() const;
-
-        //- Return a const reference to the initial stress surface field
-        const surfaceSymmTensorField& sigma0f() const;
-
-        //- Return a non-const reference to the initial stress surface field
-        surfaceSymmTensorField& sigma0f();
 
         //- Disallow default bitwise copy construct
         linearElastic(const linearElastic&);
@@ -127,8 +116,10 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+#ifdef OPENFOAMESIORFOUNDATION
         //- Material tangent for Newton Raphson loop
-        virtual symmTensor4thOrder materialTangent() const;
+        virtual scalarSquareMatrix materialTangent() const;
+#endif
 
         //- Provide access to mu for the coupledUnsNonLinLinearElasticSolid
         virtual const dimensionedScalar& mu() const;

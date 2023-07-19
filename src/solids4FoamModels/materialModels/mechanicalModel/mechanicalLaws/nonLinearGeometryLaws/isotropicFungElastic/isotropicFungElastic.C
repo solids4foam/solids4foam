@@ -198,7 +198,7 @@ void Foam::isotropicFungElastic::correct(surfaceSymmTensorField& sigma)
         (1.0/J)
        *(
            psi1*dev(isoB) + sigmaHydf*I
-         + symm(Ff() & fvc::interpolate(sigma0()) & Ff().T())
+         + symm(Ff() & linearInterpolate(sigma0()) & Ff().T())
        );
 }
 
