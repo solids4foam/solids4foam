@@ -109,7 +109,7 @@ class thermalSolid
 protected:
 
     // Protected member functions
-    
+
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
@@ -148,7 +148,7 @@ public:
                 // This model solves for D
                 return D();
             }
-    
+
             //- Return const access to the cell temperature field
             const volScalarField& T() const
             {
@@ -173,7 +173,7 @@ public:
                 const scalarField& pressure,
                 const fvPatch& patch
             ) const;
-    
+
             //- Set temperature and heat flux at specified patch
             void setTemperatureAndHeatFlux
             (
@@ -190,7 +190,7 @@ public:
                 const scalarField& faceZoneTemperature,
                 const scalarField& faceZoneHeatFlux
             );
-    
+
             //- Set equivalent interface heat transfer coeff
             void setEqInterHeatTransferCoeff
             (
@@ -217,13 +217,13 @@ public:
             (
                 const label interfaceI
             ) const;
-    
+
             //- Face zone heat transfer coefficient
             virtual tmp<scalarField> faceZoneHeatTransferCoeff
             (
                 const label interfaceI
             ) const;
-    
+
             //- Write fields
             virtual void writeFields(const Time& runTime);
 };

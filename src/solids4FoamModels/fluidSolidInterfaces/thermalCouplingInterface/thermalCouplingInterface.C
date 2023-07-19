@@ -103,7 +103,7 @@ bool thermalCouplingInterface::evolve()
 
         // Transfer temperature and heat flux from the fluid to the solid
         updateHeatFluxAndTemperatureOnSolidInterface();
- 
+
         // Solve solid
         solid().evolve();
 
@@ -160,7 +160,7 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnFluidInterface()
         // Initialise the fluid zone heat flux field
         // that is to be interpolated from the solid zone
         scalarField fluidZoneHeatFlux(fluidZone.size(), 0);
-        
+
         // Transfer the field from the solid interface to the fluid interface
         interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
         (
@@ -169,7 +169,7 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnFluidInterface()
             solidZoneTemperature,      // from field
             fluidZoneTemperature       // to field
         );
-        
+
         interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
         (
             solidZone,                 // from zone
@@ -190,7 +190,7 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnFluidInterface()
                 fluidZoneHeatFlux
             );
         }
-        
+
         // Print total heat flux on solid and fluid interfaces
         Info<< "Heat flow rate on solid interface " << interfaceI << ": "
             << heatFlowRateOnInterface(solidZone, solidZoneHeatFlux)
@@ -199,7 +199,7 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnFluidInterface()
 }
 
 
-    
+
 void thermalCouplingInterface::updateHeatFluxAndTemperatureOnSolidInterface()
 {
     Info<< "Setting heat flux and temperature on solid interfaces" << endl;
@@ -260,7 +260,7 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnSolidInterface()
                 solidZoneHeatFlux
             );
         }
-        
+
         // Print total heat flux on solid and fluid interfaces
         Info<< "Heat flow rate on fluid interface " << interfaceI << ": "
             << heatFlowRateOnInterface(fluidZone, fluidZoneHeatFlux)
@@ -268,7 +268,7 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnSolidInterface()
     }
 }
 
-    
+
 scalar thermalCouplingInterface::calcThermalResidual()
 {
     // Maximum residual for all interfaces
@@ -291,7 +291,7 @@ scalar thermalCouplingInterface::calcThermalResidual()
         // Initialise the solid zone temperature field
         // interpolated to the fluid zone
         scalarField solidZoneTemperature(solidZone.size(), 0);
-        
+
         // Transfer displacement field from the solid to the fluid
         interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
         (
@@ -306,13 +306,13 @@ scalar thermalCouplingInterface::calcThermalResidual()
         (
             fluid().faceZoneTemperature(interfaceI)
         );
-        
+
         // Calculate thermal residual
         scalarField residual =
             solidZoneTemperature
           - fluidZoneTemperature;
 
-        
+
         // Calculate thermal resudal norm
         scalar residualNorm =
             Foam::sqrt(gSum(magSqr(residual)));
@@ -391,7 +391,7 @@ scalar thermalCouplingInterface::heatFlowRateOnInterface
 void thermalCouplingInterface::setEqInterHeatTransferCoeff()
 {
     Info<< "Setting equivalent interface heat transfeor coefficient" << endl;
-    
+
     for (label interfaceI = 0; interfaceI < nGlobalPatches(); interfaceI++)
     {
         // Take references to zones
@@ -422,7 +422,7 @@ void thermalCouplingInterface::setEqInterHeatTransferCoeff()
         // Add HTC from solid side and get equivalent HTC
         solidZoneHTC +=
             solid().faceZoneHeatTransferCoeff(interfaceI);
-        
+
         // Set eq interface HTC on solid
         if (coupledInterfaces_[interfaceI])
         {
@@ -462,7 +462,7 @@ void thermalCouplingInterface::setEqInterHeatTransferCoeff()
     }
 }
 
-    
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace fluidSolidInterfaces

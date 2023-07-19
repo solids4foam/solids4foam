@@ -422,7 +422,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
         (
             runTime()
 #if OPENFOAM < 1912
-	    ,
+            ,
             IOobject
             (
                 "g",
@@ -460,7 +460,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
         (
             runTime()
 #if OPENFOAM < 1912
-	    ,
+            ,
             IOobject
             (
                 "g",

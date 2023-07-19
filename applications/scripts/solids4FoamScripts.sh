@@ -156,6 +156,22 @@ function solids4Foam::convertCaseFormat()
         mv "${CASE_DIR}/system/createPatchDict.openfoam" "system/createPatchDict"
     fi
 
+    # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
+    #    the gradScheme for the solid in OpenFOAM.com, as these are the only
+    #    schemes consistent with boundary non-orthogonal correction
+    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    then
+        if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/fvSchemes"
+            sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/fvSchemes
+        elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/solid/fvSchemes"
+            sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
+        fi
+    fi
+
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -297,6 +313,22 @@ function solids4Foam::convertCaseFormatFoamExtend()
         mv "${CASE_DIR}/system/createPatchDict" "system/createPatchDict.openfoam"
         echo "Moving ${CASE_DIR}/system/createPatchDict.foamextend to system/createPatchDict"
         mv "${CASE_DIR}/system/createPatchDict.foamextend" "system/createPatchDict"
+    fi
+
+    # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
+    #    the gradScheme for the solid in OpenFOAM.com, as these are the only
+    #    schemes consistent with boundary non-orthogonal correction
+    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    then
+        if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/fvSchemes"
+            sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/fvSchemes
+        elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/solid/fvSchemes"
+            sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
+        fi
     fi
 
     echo

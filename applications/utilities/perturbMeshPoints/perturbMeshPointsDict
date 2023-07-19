@@ -11,50 +11,15 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    object      p;
+    class       dictionary;
+    object      perturbMeshPointsDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 2 -2 0 0 0 0];
+seed        1;
 
-internalField   uniform 0;
+scaleFactor (5e-3 5e-3 0);
 
-boundaryField
-{
-    symmetry-x
-    {
-        type        symmetryPlane;
-    }
-    symmetry-y
-    {
-        type        symmetryPlane;
-    }
-    outlet
-    {
-        type        fixedValue;
-        value       uniform 0;
-    }
-    inlet
-    {
-        // openfoam
-        type          uniformFixedValue;
-        uniformValue  tableFile;
-
-        // foam extend
-        //type        timeVaryingUniformFixedValue;
-        "file|fileName"     "$FOAM_CASE/0/time-series";
-        outOfBounds         clamp;
-    }
-    wall
-    {
-        // Default Dirichlet-Neumann approach
-        type       zeroGradient;
-
-        // Robin-Neumann condition approach
-        //type        elasticWallPressure;
-        //value       uniform 0;
-    }
-}
+Gaussian    no;
 
 // ************************************************************************* //

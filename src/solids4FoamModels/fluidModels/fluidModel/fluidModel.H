@@ -462,14 +462,14 @@ public:
                 NotImplemented;
                 return tmp<scalarField>(new scalarField());
             }
-    
+
             //- Patch heat flux (W/m2)
             virtual tmp<scalarField> patchHeatFlux(const label patchID) const
             {
                 NotImplemented;
                 return tmp<scalarField>(new scalarField());
             }
-    
+
             //- Patch heat transfer coefficient
             virtual tmp<scalarField> patchHeatTransferCoeff
             (
@@ -479,7 +479,7 @@ public:
                 NotImplemented;
                 return tmp<scalarField>(new scalarField());
             }
-    
+
             //- Face zone viscous force (N/m2)
             virtual tmp<vectorField> faceZoneViscousForce
             (
@@ -497,19 +497,19 @@ public:
             (
                 const label interfaceI
             ) const;
-    
+
             //- Face zone heat flux (W/m2)
             virtual tmp<scalarField> faceZoneHeatFlux
             (
                 const label interfaceI
             ) const;
-    
+
             //- Face zone heat transfer coefficient
             virtual tmp<scalarField> faceZoneHeatTransferCoeff
             (
                 const label interfaceI
             ) const;
-    
+
             //- This function will check that the U field was read from disk
             virtual void UisRequired();
 

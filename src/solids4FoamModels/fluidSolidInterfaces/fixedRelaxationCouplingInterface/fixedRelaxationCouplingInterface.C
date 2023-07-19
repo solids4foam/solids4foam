@@ -90,7 +90,7 @@ bool fixedRelaxationCouplingInterface::evolve()
 
         // Transfer the force from the fluid to the solid
         updateForce();
-        
+
         // Solve solid
         solid().evolve();
 

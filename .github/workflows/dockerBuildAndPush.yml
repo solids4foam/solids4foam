@@ -5,7 +5,7 @@ on:
   workflow_run:
     workflows: ["Build and test"]
     types: [completed]
-    branches: [ "nextRelease" ]
+    branches: [ "master" ]
   workflow_dispatch:
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: solids4foam/solids4foam-v2.0-openfoam-v2012:v2.0
+          tags: solids4foam/solids4foam-v2.0-openfoam-v2012:latest
           file: Dockerfile.openfoamv2012
 
   docker-openfoam9:
@@ -38,7 +38,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: solids4foam/solids4foam-v2.0-openfoam-9:v2.0
+          tags: solids4foam/solids4foam-v2.0-openfoam-9:latest
           file: Dockerfile.openfoam9
 
   docker-foamextend41:
@@ -54,5 +54,5 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: solids4foam/solids4foam-v2.0-foam-extend-4.1:v2.0
+          tags: solids4foam/solids4foam-v2.0-foam-extend-4.1:latest
           file: Dockerfile.foamextend41

@@ -64,10 +64,10 @@ class thermalCouplingInterface
 
         //- Residual file pointer
         autoPtr<OFstream> thermalResidualFilePtr_;
-    
+
         //- List of maximal thermal residuals norm
         List<scalar> maxThermalResidualsNorm_;
-    
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -111,16 +111,16 @@ public:
 
             //- Update temperature and heat flux on fluid side
             void updateHeatFluxAndTemperatureOnFluidInterface();
-    
+
             //- Update temperature and heat flux on solid side
             void updateHeatFluxAndTemperatureOnSolidInterface();
-                
+
             //- Return reference to the residualFile
             OFstream& thermalResidualFile();
 
             //- Calculate thermal residual
             scalar calcThermalResidual();
-    
+
             //- Return the current rate heat flow on the interface
             //  given the zone and zone traction field
             scalar heatFlowRateOnInterface

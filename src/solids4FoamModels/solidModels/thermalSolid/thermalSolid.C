@@ -367,7 +367,7 @@ void thermalSolid::setTemperatureAndHeatFlux
     (
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneHeatFlux)
     );
-    
+
 #ifdef OPENFOAMESIORFOUNDATION
     setTemperatureAndHeatFlux
     (
@@ -457,7 +457,7 @@ tmp<scalarField> thermalSolid::faceZoneTemperature
     );
 }
 
-    
+
 tmp<scalarField> thermalSolid::faceZoneHeatFlux
 (
     const label interfaceI
@@ -467,7 +467,7 @@ tmp<scalarField> thermalSolid::faceZoneHeatFlux
         k_.boundaryField()[globalPatches()[interfaceI].patch().index()]*
         T_.boundaryField()[globalPatches()[interfaceI].patch().index()]
        .snGrad();
-        
+
     return globalPatches()[interfaceI].patchFaceToGlobal(patchHeatFlux);
 }
 
@@ -480,11 +480,11 @@ tmp<scalarField> thermalSolid::faceZoneHeatTransferCoeff
     const scalarField& patchDeltaCoeff =
         mesh().deltaCoeffs().boundaryField()
         [globalPatches()[interfaceI].patch().index()];
-    
+
     scalarField patchHeatTransferCoeff =
         (1.0/patchDeltaCoeff)/
         k_.boundaryField()[globalPatches()[interfaceI].patch().index()];
-        
+
     return globalPatches()[interfaceI].patchFaceToGlobal
     (
         patchHeatTransferCoeff
