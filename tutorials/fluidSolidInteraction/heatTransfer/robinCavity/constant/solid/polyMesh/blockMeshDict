@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
-|  \\    /   O peration     | Version:  1.6-ext                               |
-|   \\  /    A nd           | Web:      www.extend-project.de                 |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -22,7 +24,7 @@ FoamFile
 
 
 
-// GEOMETRY 
+// GEOMETRY
 // visina
 //m4_define(H, 0.010)
 // duljina
@@ -40,7 +42,7 @@ FoamFile
 
 
 // MESH
-// Abaqus mesh 
+// Abaqus mesh
 //m4_define(BLOCKSIZE, 40 54 1)
 //m4_define(BLOCKSIZE, 20 51 1) // from paper
 //m4_define(BLOCKSIZE1,  calc(H*1000) calc((L-l)*2000) 1)
@@ -79,7 +81,7 @@ blocks
 );
 
 edges
-(   
+(
 );
 
 boundary
@@ -98,10 +100,10 @@ boundary
         type patch;
         faces
         (
-            (4 7 3 0)  
+            (4 7 3 0)
         );
     }
-    
+
     right
     {
         type patch;
@@ -116,21 +118,21 @@ boundary
         type patch;
         faces
         (
-            (0 1 5 4)   
+            (0 1 5 4)
         );
     }
-       
+
     frontAndBack
     {
         type empty;
         faces
         (
             (0 3 2 1)
-            (4 5 6 7)	    
+            (4 5 6 7)
         );
     }
 );
- 
+
 //mergePatchPairs
 //(
 //);
