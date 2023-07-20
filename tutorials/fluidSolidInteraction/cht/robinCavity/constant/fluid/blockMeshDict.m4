@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
-|  \\    /   O peration     | Version:  1.6-ext                               |
-|   \\  /    A nd           | Web:      www.extend-project.de                 |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -22,7 +24,7 @@ m4_define(rad, [calc($1*pi/180.0)])
 m4_define(VCOUNT, 0)
 m4_define(vlabel, [[// ]Vertex $1 = VCOUNT m4_define($1, VCOUNT)m4_define([VCOUNT], m4_incr(VCOUNT))])
 
-// GEOMETRY 
+// GEOMETRY
 // visina
 //m4_define(H, 0.010)
 // duljina
@@ -40,7 +42,7 @@ m4_define(zA, -0.001)
 m4_define(zB, 0.001)
 
 // MESH
-// Abaqus mesh 
+// Abaqus mesh
 //m4_define(BLOCKSIZE, 40 54 1)
 //m4_define(BLOCKSIZE, 20 51 1) // from paper
 //m4_define(BLOCKSIZE1,  calc(H*1000) calc((L-l)*2000) 1)
@@ -78,7 +80,7 @@ blocks
 
 edges
 (
-   
+
 );
 
 boundary
@@ -97,10 +99,10 @@ boundary
         type patch;
         faces
         (
-            (B0 B3 A3 A0)  
+            (B0 B3 A3 A0)
         );
     }
-    
+
     right
     {
         type patch;
@@ -115,21 +117,21 @@ boundary
         type patch;
         faces
         (
-            (A0 A1 B1 B0)   
+            (A0 A1 B1 B0)
         );
     }
-       
+
     frontAndBack
     {
         type empty;
         faces
         (
             (A0 A3 A2 A1)
-            (B0 B1 B2 B3)	    
+            (B0 B1 B2 B3)
         );
     }
 );
- 
+
 //mergePatchPairs
 //(
 //);

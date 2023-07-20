@@ -1,9 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
-|  \\    /   O peration     | Version:  1.6-ext                               |
-|   \\  /    A nd           | Web:      www.extend-project.de                 |
-|    \\/     M anipulation  |                                                 |
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -21,7 +23,7 @@ solvers
     {
         solver			BiCGStab;
         preconditioner	Cholesky;
-        
+
         minIter			1;
         maxIter			5000;
 
@@ -57,7 +59,7 @@ relaxationFactors
     //     D               0.99; //0.98;
     //     DFinal          0.99; //0.98;
     // }
-    
+
     // Under-relaxating the DD equation by 0.99-0.9999 can improve convergence in
     // some cases, in particular when there are solidContact boundaries
     //DEqn   0.999;
