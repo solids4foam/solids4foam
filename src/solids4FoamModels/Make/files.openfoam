@@ -21,6 +21,7 @@ solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
+/* solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C */
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
@@ -105,6 +106,7 @@ $(pointPatchFields)/pointAnalyticalPlateHoleTraction/analyticalPlateHoleTraction
 $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
 $(pointPatchFields)/pointNormalDisplacement/normalDisplacementPointPatchVectorField.C
+$(pointPatchFields)/pointLinearSpatialDisplacement/linearSpatialDisplacementPointPatchVectorField.C
 
 contactModels = $(solidFvPatchFields)/solidContact/contactModels
 normalContactModels = $(contactModels)/normalContactModels
@@ -179,6 +181,7 @@ numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
+numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 
 numerics/interpolationTable/tableReaders/tableReaders.C
 numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C
