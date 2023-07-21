@@ -107,7 +107,7 @@ void Foam::vfvm::divSigma
             const label pointID = curCellPoints[cpI];
 
             // Take a copy of the least squares vector from the centre of
-            // cellID to pointI
+            // cellID to pointID
             vector lsVec = curLeastSquaresVecs[cpI];
 
             // Replace the component in the primary mesh edge direction with
@@ -120,14 +120,22 @@ void Foam::vfvm::divSigma
             // Calculate the coefficient for this point coming from dualFaceI
             tensor coeff;
             multiplyCoeffRectMat(coeff, curDualSf, materialTangent, lsVec);
-
+            
+//            if (pointID == 5 && ownPointID == 13)
+//            {
+//            	Info << "Dual face " << dualFaceI << " with Sf " << curDualSf << ": " << coeff << endl;
+//            }	
+//            else if (pointID == 5 && neiPointID == 13)
+//            {
+//            	Info << "Dual face " << dualFaceI << " with Sf " << -curDualSf << ": " << -coeff << endl;
+//            }
             // Add the coefficient to the ownPointID equation coming from
             // pointID
             matrix(ownPointID, pointID) += coeff;
 
             // Add the coefficient to the neiPointID equation coming from
             // pointID
-            matrix(neiPointID, pointID) -= coeff;
+            matrix(neiPointID, pointID) -= coeff;            
         }
 
         // Add compact central-differencing component in the edge direction
@@ -144,6 +152,21 @@ void Foam::vfvm::divSigma
             edgeDirCoeff, curDualSf, materialTangent, eOverLength
         );
         edgeDirCoeff *= zeta;
+        
+                    
+//        if (ownPointID == 13 || neiPointID == 13)
+//        {
+//        	Info << "Dual face " << dualFaceI << " with Sf " << curDualSf << ": " << -edgeDirCoeff << endl;
+//        }            
+                    
+//        if (ownPointID == 13 && neiPointID == 5)
+//        {
+//        	Info << "Dual face " << dualFaceI << " with Sf " << curDualSf << ": " << edgeDirCoeff << endl;
+//        }
+//        else if (neiPointID == 13 && ownPointID == 5)
+//        {
+//        	Info << "Dual face " << dualFaceI << " with Sf " << curDualSf << ": " << edgeDirCoeff << endl;
+//        }	
 
         // Insert coefficients for the ownPoint
         matrix(ownPointID, ownPointID) -= edgeDirCoeff;
@@ -151,7 +174,8 @@ void Foam::vfvm::divSigma
 
         // Insert coefficients for the neiPoint
         matrix(neiPointID, neiPointID) -= edgeDirCoeff;
-        matrix(neiPointID, ownPointID) += edgeDirCoeff;
+        matrix(neiPointID, ownPointID) += edgeDirCoeff;       
+        
     }
 
     // Enforce fixed degrees of freedom

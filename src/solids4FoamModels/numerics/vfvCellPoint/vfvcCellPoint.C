@@ -26,6 +26,8 @@ License
 #include "vfvcCellPoint.H"
 #include "cellPointLeastSquaresVectors.H"
 #include "patchToPatchInterpolation.H"
+#include "surfaceFields.H"
+#include "pointPointLeastSquaresVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -56,6 +58,7 @@ Foam::tmp<Foam::volTensorField> Foam::vfvc::grad
             "zeroGradient"
         )
     );
+
 #ifdef OPENFOAMESIORFOUNDATION
     volTensorField& result = tresult.ref();
 #else
@@ -93,6 +96,88 @@ Foam::tmp<Foam::volTensorField> Foam::vfvc::grad
 
             // Add least squares contribution to the cell gradient
             cellGrad += lsVec*pointDI[pointID];
+            
+            //Info << "GradD for cell " << cellI << " and point " << pointID << ": " << cellGrad << endl; 
+        }
+    }
+
+    result.correctBoundaryConditions();
+
+    return tresult;
+}
+
+Foam::tmp<Foam::pointTensorField> Foam::vfvc::pGrad
+(
+    const pointVectorField& pointD,
+    const fvMesh& mesh
+)
+{
+    // Get a reference to the pointMesh
+    const pointMesh& pMesh = pointD.mesh();
+
+    // Prepare the result field
+    tmp<pointTensorField> tresult
+    (
+        new pointTensorField
+        (
+            IOobject
+            (
+                "pGrad("+ pointD.name() +")",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            pMesh,
+            dimensionedTensor
+            (
+                "zero", pointD.dimensions()/dimLength, tensor::zero
+            ),
+            "calculated"
+        )
+    );
+#ifdef OPENFOAMESIORFOUNDATION
+    pointTensorField& result = tresult.ref();
+#else
+    pointTensorField& result = tresult();
+#endif
+
+    // Take references for clarity and efficiency
+
+    tensorField& resultI = result;
+    const labelListList& pointPoints = mesh.pointPoints();
+    const vectorField& pointDI = pointD.internalField();
+    const pointPointLeastSquaresVectors& pointPointLeastSquaresVecs =
+        pointPointLeastSquaresVectors::New(mesh);
+    const List<vectorList>& leastSquaresVecs =
+        pointPointLeastSquaresVecs.vectors();
+
+    // Calculate the gradient for each point
+    forAll(resultI, pointI)
+    {
+        // Point-point neighbours
+        const labelList& curPointPoints = pointPoints[pointI];
+
+        // Least squares vectors for pointI
+        const vectorList& curLeastSquaresVecs = leastSquaresVecs[pointI];
+
+        // Accumulate contribution to the point gradient from each point
+        // neighbour
+        tensor& pointGrad = resultI[pointI];
+        forAll(curPointPoints, ppI)
+        {
+            // Least squares vector from the average point to this neighbour
+            // point
+            const vector& lsVec = curLeastSquaresVecs[ppI];
+
+            // Point index
+            const label pointPointID = curPointPoints[ppI];
+
+            // Delta pointD
+            const vector deltaPointD = pointDI[pointPointID] - pointDI[pointI];
+
+            // Add least squares contribution to the gradient
+            pointGrad += lsVec*deltaPointD;
         }
     }
 

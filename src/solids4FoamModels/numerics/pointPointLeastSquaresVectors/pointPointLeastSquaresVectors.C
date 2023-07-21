@@ -23,7 +23,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "cellPointLeastSquaresVectors.H"
+#include "pointPointLeastSquaresVectors.H"
 #include "volFields.H"
 #include "mapPolyMesh.H"
 
@@ -31,18 +31,21 @@ License
 
 namespace Foam
 {
-    defineTypeNameAndDebug(cellPointLeastSquaresVectors, 0);
+    defineTypeNameAndDebug(pointPointLeastSquaresVectors, 0);
 }
 
 
 // * * * * * * * * * * * * * * * * Constructors * * * * * * * * * * * * * * //
 
-Foam::cellPointLeastSquaresVectors::cellPointLeastSquaresVectors(const fvMesh& mesh)
+Foam::pointPointLeastSquaresVectors::pointPointLeastSquaresVectors
+(
+    const fvMesh& mesh
+)
 :
 #ifdef OPENFOAMESIORFOUNDATION
-    MeshObject<fvMesh, MoveableMeshObject, cellPointLeastSquaresVectors>(mesh),
+    MeshObject<fvMesh, MoveableMeshObject, pointPointLeastSquaresVectors>(mesh),
 #else
-    MeshObject<fvMesh, cellPointLeastSquaresVectors>(mesh),
+    MeshObject<fvMesh, pointPointLeastSquaresVectors>(mesh),
 #endif
     vectorsPtr_()
 {}
@@ -50,7 +53,7 @@ Foam::cellPointLeastSquaresVectors::cellPointLeastSquaresVectors(const fvMesh& m
 
 // * * * * * * * * * * * * * * * * Destructor * * * * * * * * * * * * * * * //
 
-Foam::cellPointLeastSquaresVectors::~cellPointLeastSquaresVectors()
+Foam::pointPointLeastSquaresVectors::~pointPointLeastSquaresVectors()
 {
     vectorsPtr_.clear();
 }
@@ -58,13 +61,23 @@ Foam::cellPointLeastSquaresVectors::~cellPointLeastSquaresVectors()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
+void Foam::pointPointLeastSquaresVectors::makeLeastSquaresVectors() const
 {
     if (debug)
     {
-        Info<< "cellPointLeastSquaresVectors::makeLeastSquaresVectors() :"
+        Info<< "pointPointLeastSquaresVectors::makeLeastSquaresVectors() :"
             << "Constructing least square gradient vectors"
             << endl;
+    }
+
+    if (Pstream::parRun())
+    {
+        notImplemented
+        (
+            "Not yet implemented for parallel runs:"
+            " actually it will work, but the results at parallel boundary "
+            " will not be consistent with serial runs"
+        );
     }
 
 #ifdef OPENFOAMESIORFOUNDATION
@@ -73,44 +86,27 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
     const fvMesh& mesh = this->mesh();
 #endif
 
-    vectorsPtr_.set(new List<vectorList>(mesh.nCells()));
+    vectorsPtr_.set(new List<vectorList>(mesh.nPoints()));
     List<vectorList>& ls = vectorsPtr_();
 
     // Set local references to mesh data
-    const labelListList& cellPoints = mesh.cellPoints();
+    const labelListList& pointPoints = mesh.pointPoints();
     const vectorField& points = mesh.points();
 
-    // Calculate average position in each cell
-    vectorField cellAvPoint(mesh.nCells(), vector::zero);
-    forAll(cellAvPoint, cellI)
-    {
-        const labelList& curCellPoints = cellPoints[cellI];
-
-        forAll(curCellPoints, cpI)
-        {
-            const label pointID = curCellPoints[cpI];
-
-            cellAvPoint[cellI] += points[pointID];
-        }
-
-        cellAvPoint[cellI] /= curCellPoints.size();
-        
-    }
-
     // Set up temporary storage for the dd tensor (before inversion)
-    symmTensorField dd(mesh.nCells(), symmTensor::zero);
+    symmTensorField dd(mesh.nPoints(), symmTensor::zero);
 
-    forAll(dd, cellI)
+    forAll(dd, pointI)
     {
-        const labelList& curCellPoints = cellPoints[cellI];
-        const vector& avPoint = cellAvPoint[cellI];
+        const vector& curPoint = points[pointI];
+        const labelList& curPointPoints = pointPoints[pointI];
 
-        forAll(curCellPoints, cpI)
+        forAll(curPointPoints, ppI)
         {
-            const label pointID = curCellPoints[cpI];
+            const label pointPointID = curPointPoints[ppI];
 
-            // Vector from the avPoint to the point
-            const vector d = points[pointID] - avPoint;
+            // Vector from curPoint to the point-point
+            const vector d = points[pointPointID] - curPoint;
 
             // Weighted contribution
             // There are many ways to choose weights
@@ -119,9 +115,8 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
             const scalar w = 1.0/magSqr(d);
             //const scalar w = 1.0/Foam::pow(mag(d), 3);
 
-            dd[cellI] += w*sqr(d);
-		}
- 
+            dd[pointI] += w*sqr(d);
+        }
     }
 
     // Invert least squares matrix using Householder transformations to avoid
@@ -132,64 +127,41 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
     const symmTensorField invDd(hinv(dd));
 #endif
 
-    // Revisit all cells and calculate the ls vectors
-    forAll(ls, cellI)
+    // Revisit all points and calculate the ls vectors
+    forAll(ls, pointI)
     {
-        const labelList& curCellPoints = cellPoints[cellI];
-        const vector& avPoint = cellAvPoint[cellI];
-        vectorList& curLs = ls[cellI];
-        curLs.resize(curCellPoints.size(), vector::zero);
+        const labelList& curPointPoints = pointPoints[pointI];
+        const vector& curPoint = points[pointI];
+        vectorList& curLs = ls[pointI];
+        curLs.resize(curPointPoints.size(), vector::zero);
 
-        forAll(curCellPoints, cpI)
+        forAll(curPointPoints, ppI)
         {
-            const label pointID = curCellPoints[cpI];
+            const label pointPointID = curPointPoints[ppI];
 
-            // Vector from the avPoint to the point
-            const vector d = points[pointID] - avPoint;
+            // Vector from the curPoint to the point-point
+            const vector d = points[pointPointID] - curPoint;
 
             // Weighted contribution
             //const scalar w = 1.0;
             const scalar w = 1.0/magSqr(d);
             //const scalar w = 1.0/Foam::pow(mag(d), 3);
 
-            curLs[cpI] = w*(invDd[cellI] & d);
+            curLs[ppI] = w*(invDd[pointI] & d);
         }
-    }
-
-    // Revisit all cells (again) and subtract the cell-averaged ls vectors from
-    // each ls vector
-    forAll(ls, cellI)
-    {
-        const labelList& curCellPoints = cellPoints[cellI];
-        vectorList& curLs = ls[cellI];
-
-        // Calculate cell-averaged ls vector
-        vector cellAvLsVec = vector::zero;
-        forAll(curCellPoints, cpI)
-        {
-            cellAvLsVec += curLs[cpI];
-        }
-        cellAvLsVec /= curCellPoints.size();
-
-        // Subtract cell-averaged ls vector from each ls vector
-        forAll(curCellPoints, cpI)
-        {
-            curLs[cpI] -= cellAvLsVec;
-        }
-        
     }
 
     if (debug)
     {
-        Info<< "cellPointLeastSquaresVectors::makeLeastSquaresVectors() :"
-            << "Finished constructing least square gradient vectors" 
+        Info<< "pointPointLeastSquaresVectors::makeLeastSquaresVectors() :"
+            << "Finished constructing least square gradient vectors"
             << endl;
     }
 }
 
 
 const Foam::List<Foam::vectorList>&
-Foam::cellPointLeastSquaresVectors::vectors() const
+Foam::pointPointLeastSquaresVectors::vectors() const
 {
     if (vectorsPtr_.empty())
     {
@@ -201,14 +173,14 @@ Foam::cellPointLeastSquaresVectors::vectors() const
 
 
 #ifdef OPENFOAMESIORFOUNDATION
-    bool Foam::cellPointLeastSquaresVectors::movePoints()
+    bool Foam::pointPointLeastSquaresVectors::movePoints()
 #else
-    bool Foam::cellPointLeastSquaresVectors::movePoints() const
+    bool Foam::pointPointLeastSquaresVectors::movePoints() const
 #endif
 {
     if (debug)
     {
-        InfoIn("bool cellPointLeastSquaresVectors::movePoints() const")
+        InfoIn("bool pointPointLeastSquaresVectors::movePoints() const")
             << "Clearing least square data" << endl;
     }
 
@@ -218,13 +190,13 @@ Foam::cellPointLeastSquaresVectors::vectors() const
 }
 
 
-bool Foam::cellPointLeastSquaresVectors::updateMesh(const mapPolyMesh& mpm) const
+bool Foam::pointPointLeastSquaresVectors::updateMesh(const mapPolyMesh& mpm) const
 {
     if (debug)
     {
         InfoIn
         (
-            "bool cellPointLeastSquaresVectors::updateMesh(const mapPolyMesh&) const"
+            "bool pointPointLeastSquaresVectors::updateMesh(const mapPolyMesh&) const"
         )   << "Clearing least square data" << endl;
     }
 

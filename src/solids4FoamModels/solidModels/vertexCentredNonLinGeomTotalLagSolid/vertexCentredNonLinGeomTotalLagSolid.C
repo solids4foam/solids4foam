@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "vertexCentredLinGeomSolid.H"
+#include "vertexCentredNonLinGeomTotalLagSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "sparseMatrix.H"
 #include "symmTensor4thOrder.H"
@@ -45,14 +45,13 @@ namespace solidModels
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(vertexCentredLinGeomSolid, 0);
-addToRunTimeSelectionTable(solidModel, vertexCentredLinGeomSolid, dictionary); //adds derived contructor to hash table held by base
-//addToRunTimeSelectionTable(baseType, thisType, argNames)
+defineTypeNameAndDebug(vertexCentredNonLinGeomTotalLagSolid, 0);
+addToRunTimeSelectionTable(solidModel, vertexCentredNonLinGeomTotalLagSolid, dictionary); 
 
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
-void vertexCentredLinGeomSolid::updateSource
+void vertexCentredNonLinGeomTotalLagSolid::updateSource
 (
     vectorField& source,
     const labelList& dualCellToPoint
@@ -60,7 +59,7 @@ void vertexCentredLinGeomSolid::updateSource
 {
     if (debug)
     {
-        Info<< "void vertexCentredLinGeomSolid::updateSource(...): start"
+        Info<< "void vertexCentredNonLinGeomTotalLagSolid::updateSource(...): start"
             << endl;
     }
 
@@ -68,7 +67,7 @@ void vertexCentredLinGeomSolid::updateSource
     source = vector::zero;
 
     // The source vector is -F, where:
-    // F = div(sigma) + rho*g - rho*d2dt2(D)
+    // F = div(JF^-T * sigma) + rho*g - rho*d2dt2(D)
 
     // Point volume field
     const scalarField& pointVolI = pointVol_.internalField();
@@ -76,22 +75,26 @@ void vertexCentredLinGeomSolid::updateSource
     // Point density field
     const scalarField& pointRhoI = pointRho_.internalField();
 
-    // Calculate the tractions on the dual faces
-    surfaceVectorField dualTraction
+    // Dual face area vectors at deformed configuration
+    const surfaceVectorField deformedDualSf
     (
-        (dualMesh().Sf()/dualMesh().magSf()) & dualSigmaf_
+        dualJf_*dualFinvf_.T() & dualMesh().Sf()
     );
+    
+    // Magnitude of deformedDualSf
+    const surfaceScalarField deformedDualMagSf(mag(deformedDualSf));
+
+    // Dual face unit normals at deformed configuration
+    const surfaceVectorField deformedDualN(deformedDualSf/deformedDualMagSf);
+
+    // Calculate the Cauchy tractions on the dual faces
+    surfaceVectorField dualTraction(deformedDualN & dualSigmaf_);
 
     // Enforce extract tractions on traction boundaries
-    
-    //Info << "dualTraction before: " << dualTraction.boundaryField()[2] << endl;
-    
     enforceTractionBoundaries
     (
         pointD(), dualTraction, mesh(), dualMeshMap().pointToDualFaces()
     );
-    
-    //Info << "dualTraction after: " << dualTraction.boundaryField()[2]  << endl;
 
     // Set coupled boundary (e.g. processor) traction fields to zero: this
     // ensures their global contribution is zero
@@ -108,23 +111,23 @@ void vertexCentredLinGeomSolid::updateSource
     }
 
     // Calculate divergence of stress for the dual cells
-    // const vectorField dualDivSigma = fvc::div(dualMesh().Sf() & dualSigmaf_);
-    
-    const vectorField dualDivSigma = fvc::div(dualTraction*dualMesh().magSf());
-    
-    // Map dual cell field to primary mesh point field
-    vectorField pointDivSigma(mesh().nPoints(), vector::zero);
+    const vectorField dualDivSigma = fvc::div(dualTraction*deformedDualMagSf);
+
+    // Map dual cell fields to primary mesh point fields
+    vectorField pointDivSigmaI(mesh().nPoints(), vector::zero);
+    scalarField pointJI(mesh().nPoints(), 0.0);
     forAll(dualDivSigma, dualCellI)
     {
         const label pointID = dualCellToPoint[dualCellI];
-        pointDivSigma[pointID] = dualDivSigma[dualCellI];
+        pointDivSigmaI[pointID] = dualDivSigma[dualCellI];
+        pointJI[pointID] = dualJf_[dualCellI];
     }
 
     // Add surface forces to source
-    source -= pointDivSigma*pointVolI;
+    source -= pointDivSigmaI*pointVolI*pointJI;
 
     // Add gravity body forces
-    source -= pointRhoI*g().value()*pointVolI;
+    source -= pointRhoI*g().value()*pointVolI*pointJI;
 
     // Add transient term
     source += vfvc::d2dt2
@@ -140,17 +143,17 @@ void vertexCentredLinGeomSolid::updateSource
         pointRho_,
         pointVol_,
         int(bool(debug))
-    );
+    )*pointJI;
 
     if (debug)
     {
-        Info<< "void vertexCentredLinGeomSolid::updateSource(...): end"
+        Info<< "void vertexCentredNonLinGeomTotalLagSolid::updateSource(...): end"
             << endl;
     }
 }
 
 
-void vertexCentredLinGeomSolid::setFixedDofs
+void vertexCentredNonLinGeomTotalLagSolid::setFixedDofs
 (
     const pointVectorField& pointD,
     boolList& fixedDofs,
@@ -161,7 +164,7 @@ void vertexCentredLinGeomSolid::setFixedDofs
     // Flag all fixed DOFs
 
     forAll(pointD.boundaryField(), patchI)
-    {        
+    {
         if
         (
             // isA<uniformFixedValuePointPatchVectorField>
@@ -205,7 +208,7 @@ void vertexCentredLinGeomSolid::setFixedDofs
                     {
                         FatalErrorIn
                         (
-                            "void vertexCentredLinGeomSolid::setFixedDofs(...)"
+                            "void vertexCentredNonLinGeomTotalLagSolid::setFixedDofs(...)"
                         )   << "Inconsistent displacements prescribed at point "
                             << "= " << pointD.mesh().mesh().points()[pointID]
                             << abort(FatalError);
@@ -219,9 +222,8 @@ void vertexCentredLinGeomSolid::setFixedDofs
                 {
                     fixedDofs[pointID] = true;
                     fixedDofValues[pointID] = disp;
-                    fixedDofDirections[pointID] = symmTensor(I);  
-                          
-                }     
+                    fixedDofDirections[pointID] = symmTensor(I);
+                }
             }
         }
         else if
@@ -249,13 +251,13 @@ void vertexCentredLinGeomSolid::setFixedDofs
                     pointD.boundaryField()[patchI]
                 )
             )
-            {          
+            {
                 normalDisp =
                 (
                     pointNormals
                   & pointD.boundaryField()[patchI].patchInternalField()
                 );
-                
+
                 if (debug)
                 {
                     Info<< "normalDisp = " << normalDisp << endl;
@@ -282,7 +284,7 @@ void vertexCentredLinGeomSolid::setFixedDofs
                     {
                         FatalErrorIn
                         (
-                            "void vertexCentredLinGeomSolid::setFixedDofs(...)"
+                            "void vertexCentredNonLinGeomTotalLagSolid::setFixedDofs(...)"
                         )   << "Inconsistent displacements prescribed at point "
                             << "= " << pointD.mesh().mesh().points()[pointID]
                             << abort(FatalError);
@@ -317,7 +319,7 @@ void vertexCentredLinGeomSolid::setFixedDofs
 }
 
 
-void vertexCentredLinGeomSolid::enforceTractionBoundaries
+void vertexCentredNonLinGeomTotalLagSolid::enforceTractionBoundaries
 (
     const pointVectorField& pointD,
     surfaceVectorField& dualTraction,
@@ -350,6 +352,8 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
             // Primary mesh point normals
             const vectorField& n =
                 pMesh.boundary()[patchI].pointNormals();
+                
+            // Todo: use deformedN
 
             // Primary mesh point tractions
             const vectorField totalTraction
@@ -407,7 +411,7 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
             {
                 FatalErrorIn
                 (
-                    "void vertexCentredLinGeomSolid::"
+                    "void vertexCentredNonLinGeomTotalLagSolid::"
                     "enforceTractionBoundaries(...)"
                 )   << "Problem setting tractions: gMin(nPointsPerDualFace) < 1"
                     << nl << "nPointsPerDualFace = " << nPointsPerDualFace
@@ -416,6 +420,7 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
 
             // Take the average
             dualFaceTraction /= nPointsPerDualFace;
+
             // Overwrite the dual patch face traction
 #ifdef OPENFOAMESIORFOUNDATION
             dualTraction.boundaryFieldRef()[patchI] = dualFaceTraction;
@@ -433,9 +438,11 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
         )
         {
             // Set the dual patch face shear traction to zero
-            const vectorField n(dualMesh.boundary()[patchI].nf()); 
             
-#ifdef OPENFOAMESIORFOUNDATION            
+            // Todo: use deformedN
+            
+            const vectorField n(dualMesh.boundary()[patchI].nf());
+#ifdef OPENFOAMESIORFOUNDATION
             dualTraction.boundaryFieldRef()[patchI] =
                 (sqr(n) & dualTraction.boundaryField()[patchI]);
 #else
@@ -446,7 +453,7 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
     }
 }
 
-bool vertexCentredLinGeomSolid::vertexCentredLinGeomSolid::converged
+bool vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid::converged
 (
     const label iCorr,
     scalar& initResidual,
@@ -515,7 +522,7 @@ bool vertexCentredLinGeomSolid::vertexCentredLinGeomSolid::converged
 }
 
 
-scalar vertexCentredLinGeomSolid::calculateLineSearchSlope
+scalar vertexCentredNonLinGeomTotalLagSolid::calculateLineSearchSlope
 (
     const scalar eta,
     const vectorField& pointDcorr,
@@ -546,6 +553,15 @@ scalar vertexCentredLinGeomSolid::calculateLineSearchSlope
         dualMeshMap().dualCellToPoint(),
         zeta
     );
+    
+    // Update F
+    dualFf_ = I + dualGradDf.T();
+
+    // Update Finv
+    dualFinvf_ = inv(dualFf_);
+
+    // Update J
+    dualJf_ = det(dualFf_);
 
     // Calculate stress at dual faces
     dualMechanicalPtr_().correct(dualSigmaf);
@@ -563,7 +579,7 @@ scalar vertexCentredLinGeomSolid::calculateLineSearchSlope
 }
 
 
-scalar vertexCentredLinGeomSolid::calculateLineSearchFactor
+scalar vertexCentredNonLinGeomTotalLagSolid::calculateLineSearchFactor
 (
     const scalar rTol, // Slope reduction tolerance
     const int maxIter, // Maximum number of line search iterations
@@ -636,7 +652,7 @@ scalar vertexCentredLinGeomSolid::calculateLineSearchFactor
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
+vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
 (
     Time& runTime,
     const word& region
@@ -751,6 +767,46 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         dimensionedSymmTensor("zero", dimPressure, symmTensor::zero),
         "calculated"
     ),
+    dualFf_
+    (
+        IOobject
+        (
+            "Ff",
+            runTime.timeName(),
+            dualMesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        dualMesh(),
+        dimensionedTensor("zero", dimless, tensor::zero),
+        "calculated"
+    ),
+    dualFinvf_
+    (
+        IOobject
+        (
+            "Finvf",
+            runTime.timeName(),
+            dualMesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        inv(dualFf_)
+    ),
+    dualJf_
+    (
+        IOobject
+        (
+            "Jf",
+            runTime.timeName(),
+            dualMesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        dualMesh(),
+        dimensionedScalar("zero", dimless, 0.0),
+        "calculated"
+    ),
     globalPointIndices_(mesh())
 {
     // Create dual mesh and set write option
@@ -768,7 +824,8 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
     // Set the pointVol field
     // Map dualMesh cell volumes to the primary mesh points
 #ifdef OPENFOAMESIORFOUNDATION
-    scalarField& pointVolI = pointVol_.primitiveFieldRef();
+    scalarField& pointVolI = pointVol_;
+    // scalarField& pointVolI = pointVol_.primitiveFieldRef();
 #else
     scalarField& pointVolI = pointVol_.internalField();
 #endif
@@ -803,7 +860,7 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
 
 // * * * * * * * * * * * * * * * *  Destructors  * * * * * * * * * * * * * * //
 
-vertexCentredLinGeomSolid::~vertexCentredLinGeomSolid()
+vertexCentredNonLinGeomTotalLagSolid::~vertexCentredNonLinGeomTotalLagSolid()
 {
 #ifdef USE_PETSC
     if (Switch(solidModelDict().lookup("usePETSc")))
@@ -815,16 +872,12 @@ vertexCentredLinGeomSolid::~vertexCentredLinGeomSolid()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-bool vertexCentredLinGeomSolid::evolve()
+bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
-    
-    //Update boundary conditions
-    pointD().correctBoundaryConditions();
 
     // Initialise matrix
     sparseMatrix matrix(sum(globalPointIndices_.stencilSize())); 
-    //sparseMatrix is created given the size sum(globalPointIndices_.stencilSize())
 
     // Store material tangent field for dual mesh faces
     Field<RectangularMatrix<scalar>> materialTangent
@@ -840,13 +893,11 @@ bool vertexCentredLinGeomSolid::evolve()
     }
 
     // Global point index lists
-    //List showing which points are on a specific processor?
     const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
-    //Mapping local points to global?
     const labelList& localToGlobalPointMap =
         globalPointIndices_.localToGlobalPointMap();
 
-    if (!fullNewton_) //if not using full Newton-Raphson approach
+    if (!fullNewton_)
     {
         // Assemble matrix once per time-step
         Info<< "    Assembling the matrix" << endl;
@@ -893,7 +944,7 @@ bool vertexCentredLinGeomSolid::evolve()
 #ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector> solverPerf;
 #else
-    BlockSolverPerformance<vector> solverPerf; //Class containing performance statistics
+    BlockSolverPerformance<vector> solverPerf;
 #endif
     do
     {
@@ -908,6 +959,15 @@ bool vertexCentredLinGeomSolid::evolve()
             zeta,
             debug
         );
+        
+        // Update F
+        dualFf_ = I + dualGradDf_.T();
+
+        // Update Finv
+        dualFinvf_ = inv(dualFf_);
+
+        // Update J
+        dualJf_ = det(dualFf_);
 
         // Calculate stress at dual faces
         dualMechanicalPtr_().correct(dualSigmaf_);
@@ -959,19 +1019,19 @@ bool vertexCentredLinGeomSolid::evolve()
             );
         }
         
-//        Info << endl << "Before enforcing DOFs: " << endl << endl;
-//        matrix.print();
-//        Info << endl << "Print out the source: " << endl << endl;
-//        
-//        for (int i = 0; i < source.size(); i++)
-//        {
-//            Info << "(" << i << ", 0) : " << source[i] << endl;
-//            
-//        } 
-//        Info << endl;
+        Info << endl << "Before enforcing DOFs: " << endl << endl;
+        matrix.print();
+        Info << endl << "Print out the source: " << endl << endl;
+        
+        for (int i = 0; i < source.size(); i++)
+        {
+            Info << "(" << i << ", 0) : " << source[i] << endl;
+            
+        } 
+        Info << endl;
 
         // Enforce fixed DOF on the linear system
-        sparseMatrixTools::enforceFixedDof //Loop through the matrix and overwrite coefficients for fixed DOFs
+        sparseMatrixTools::enforceFixedDof
         (
             matrix,
             source,
@@ -981,20 +1041,20 @@ bool vertexCentredLinGeomSolid::evolve()
             fixedDofScale_
         );
 
-//        Info << endl << "After enforcing DOFs " << endl << endl;
-//        matrix.print();
-//        Info << endl << "Print out the source: " << endl << endl;
-//        
-//        for (int i = 0; i < source.size(); i++)
-//        {
-//            Info << "(" << i << ", 0) : " << source[i] << endl;
-//            
-//        } 
+        Info << endl << "After enforcing DOFs " << endl << endl;
+        matrix.print();
+        Info << endl << "Print out the source: " << endl << endl;
+        
+        for (int i = 0; i < source.size(); i++)
+        {
+            Info << "(" << i << ", 0) : " << source[i] << endl;
+            
+        } 
 
         // Solve linear system for displacement correction
         if (debug)
         {
-            Info<< "bool vertexCentredLinGeomSolid::evolve(): "
+            Info<< "bool vertexCentredNonLinGeomTotalLagSolid::evolve(): "
                 << " solving linear system: start" << endl;
         }
         else
@@ -1002,10 +1062,9 @@ bool vertexCentredLinGeomSolid::evolve()
             Info<< "    Solving" << endl;
         }
 
-        if (Switch(solidModelDict().lookup("usePETSc"))) //Check if PETSCs is defined
+        if (Switch(solidModelDict().lookup("usePETSc"))) 
         {
 #ifdef USE_PETSC
-            //If defined solve linear system using PETSc
             fileName optionsFile(solidModelDict().lookup("optionsFile"));
             solverPerf = sparseMatrixTools::solveLinearSystemPETSc
             (
@@ -1022,14 +1081,14 @@ bool vertexCentredLinGeomSolid::evolve()
                 solidModelDict().lookupOrDefault<bool>("debugPETSc", false)
             );
 #else
-            FatalErrorIn("vertexCentredLinGeomSolid::evolve()")
+            FatalErrorIn("vertexCentredNonLinGeomTotalLagSolid::evolve()")
                 << "PETSc not available. Please set the PETSC_DIR environment "
                 << "variable and re-compile solids4foam" << abort(FatalError);
 #endif
         }
         else
         {
-            // Otherwise, use Eigen SparseLU direct solver
+            // Use Eigen SparseLU direct solver
             sparseMatrixTools::solveLinearSystemEigen
             (
                 matrix, source, pointDcorr, twoD_, false, debug
@@ -1038,7 +1097,7 @@ bool vertexCentredLinGeomSolid::evolve()
 
         if (debug)
         {
-            Info<< "bool vertexCentredLinGeomSolid::evolve(): "
+            Info<< "bool vertexCentredNonLinGeomTotalLagSolid::evolve(): "
                 << " solving linear system: end" << endl;
         }
 
@@ -1083,8 +1142,6 @@ bool vertexCentredLinGeomSolid::evolve()
 #endif
         {
             // Relaxing the correction can help convergence
-            // This is like a simple line search
-            // Of course, an actual line search would be better: to-do!
 
 #ifdef OPENFOAMESIORFOUNDATION
             const scalar rf
@@ -1178,18 +1235,26 @@ bool vertexCentredLinGeomSolid::evolve()
         zeta,
         debug
     );
+    
+    // Update F
+    dualFf_ = I + dualGradDf_.T();
+
+    // Update Finv
+    dualFinvf_ = inv(dualFf_);
+
+    // Update J
+    dualJf_ = det(dualFf_);
 
     // Update the increment of displacement
     pointDD() = pointD() - pointD().oldTime();
-    
-    //Info << pointD().internalField() << endl;
 
     // Calculate cell gradient
     // This assumes a constant gradient within each primary mesh cell
+    // This is a first-order approximation
     gradD() = vfvc::grad(pointD(), mesh());
 
     // Map primary cell gradD field to sub-meshes for multi-material cases
-    if (mechanical().PtrList<mechanicalLaw>::size() > 1) //Meaning??
+    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
     {
         mechanical().mapGradToSubMeshes(gradD()); 
     }
@@ -1199,12 +1264,13 @@ bool vertexCentredLinGeomSolid::evolve()
 
     // Update primary mesh cell stress field, assuming it is constant per
     // primary mesh cell
+    // This stress will be first-order accurate
     mechanical().correct(sigma());
 
     return true;
 }
 
-void vertexCentredLinGeomSolid::setTraction
+void vertexCentredNonLinGeomTotalLagSolid::setTraction
 (
     const label interfaceI,
     const label patchID,
@@ -1241,7 +1307,7 @@ void vertexCentredLinGeomSolid::setTraction
     {
         FatalErrorIn
         (
-            "void Foam::vertexCentredLinGeomSolid::setTraction\n"
+            "void Foam::vertexCentredNonLinGeomTotalLagSolid::setTraction\n"
             "(\n"
             "    fvPatchVectorField& tractionPatch,\n"
             "    const vectorField& traction\n"
@@ -1255,7 +1321,7 @@ void vertexCentredLinGeomSolid::setTraction
     }
 }
 
-void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
+void vertexCentredNonLinGeomTotalLagSolid::writeFields(const Time& runTime)
 {
     // Calculate gradD at the primary points using least squares: this should
     // be second-order accurate (... I think).
@@ -1315,7 +1381,6 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
     solidModel::writeFields(runTime);
 }
 
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace solidModels
@@ -1324,4 +1389,4 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 
 } // End namespace Foam
 
-// ************************************************************************* //Traction
+// ************************************************************************* //

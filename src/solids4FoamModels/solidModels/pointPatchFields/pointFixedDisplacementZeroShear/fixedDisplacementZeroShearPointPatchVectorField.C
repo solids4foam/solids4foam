@@ -90,7 +90,8 @@ fixedDisplacementZeroShearPointPatchVectorField
     }
     else
     {
-        refValue = vectorField("refValue", dict, p.size());
+        //refValue = vectorField("refValue", dict, p.size());
+        refValue = vector::zero;
     }
 
     //this->updateBoundaryField();
