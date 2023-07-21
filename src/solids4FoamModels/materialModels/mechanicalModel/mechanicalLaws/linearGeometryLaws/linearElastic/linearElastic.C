@@ -247,10 +247,11 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 }
 
 
-Foam::RectangularMatrix<Foam::scalar>
+#ifdef OPENFOAMESIORFOUNDATION
+Foam::scalarSquareMatrix
 Foam::linearElastic::materialTangent() const
 {
-    RectangularMatrix<scalar> matTang(6,6,0);
+    scalarSquareMatrix matTang(6, 0.0);
 
     matTang(0,0) = 2*mu_.value() + lambda().value();
     matTang(0,1) = lambda().value();
@@ -270,6 +271,7 @@ Foam::linearElastic::materialTangent() const
 
     return matTang;
 }
+#endif
 
 
 const Foam::dimensionedScalar& Foam::linearElastic::mu() const

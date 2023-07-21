@@ -313,8 +313,13 @@ tmp<surfaceTensorField> fGrad
                 // Use the gradient in the adjacent primary cell-centre
                 // This will result in inconsistent values at processor patches
                 // Is this an issue?
+#ifdef OPENFOAMESIORFOUNDATION
                 result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
                     gradDI[cellID];
+#else
+                result.boundaryField()[dualPatchID][localDualFaceID] =
+                    gradDI[cellID];
+#endif
             }
         }
     }

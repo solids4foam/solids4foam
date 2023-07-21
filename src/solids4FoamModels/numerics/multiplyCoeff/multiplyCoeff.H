@@ -35,7 +35,11 @@ Author
 #define multiplyCoeff_H
 
 #include "fieldTypes.H"
-#include "RectangularMatrix.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "scalarMatrices.H"
+#else
+    #include "scalarSquareMatrix.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -54,7 +58,7 @@ namespace Foam
     (
         tensor& coeff,
         const vector& Sf,
-        const RectangularMatrix<scalar>& C,
+        const scalarSquareMatrix& C,
         const vector& g
     );
 

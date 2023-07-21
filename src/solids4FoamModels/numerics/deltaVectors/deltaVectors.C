@@ -53,26 +53,26 @@ Foam::tmp<Foam::surfaceVectorField> Foam::deltaVectors
     const unallocLabelList& owner = mesh.owner();
     const unallocLabelList& neighbour = mesh.neighbour();
 
-    forAll(owner, facei)
+    forAll(owner, faceI)
     {
-        delta[facei] = C[neighbour[facei]] - C[owner[facei]];
+        delta[faceI] = C[neighbour[faceI]] - C[owner[faceI]];
     }
 
     auto& deltabf =  delta.boundaryField();
 
-    forAll(deltabf, patchi)
+    forAll(deltabf, patchI)
     {
-        const labelList faceCells(mesh.boundary()[patchi].faceCells());
+        const labelList faceCells(mesh.boundary()[patchI].faceCells());
 
-        if (deltabf[patchi].coupled())
+        if (deltabf[patchI].coupled())
         {
-            deltabf[patchi] =
+            deltabf[patchI] =
                 C.boundaryField()[patchI].patchNeighbourField()
               - C.boundaryField()[patchI].patchInternalField();
         }
         else
         {
-            deltabf[patchi] =
+            deltabf[patchI] =
                 C.boundaryField()[patchI]
               - C.boundaryField()[patchI].patchInternalField();
         }
