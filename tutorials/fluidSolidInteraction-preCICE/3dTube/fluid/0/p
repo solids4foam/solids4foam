@@ -38,11 +38,11 @@ boundaryField
     inlet
     {
         // openfoam
-        type          uniformFixedValue;
+        //type          uniformFixedValue;
         uniformValue  tableFile;
 
         // foam extend
-        //type        timeVaryingUniformFixedValue;
+        type        timeVaryingUniformFixedValue;
         "file|fileName"     "$FOAM_CASE/0/time-series";
         outOfBounds         clamp;
     }
