@@ -657,7 +657,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
     );
 
     // Set sigma to sigma effective trial, including the initial stress
-    sigma = deltaSigma().oldTime() + DSigmaTrial + sigma0();
+    sigma = sigma.oldTime() + DSigmaTrial + sigma0();
 
     // Take a reference to internal fields for efficiency
     symmTensorField& sigmaI = sigma;
