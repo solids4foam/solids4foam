@@ -133,7 +133,7 @@ class linearElasticMohrCoulombPlastic
         const vector sigma_a_;
 
         //- Effective stress surface field
-        surfaceSymmTensorField sigmaEfff_;
+        surfaceSymmTensorField deltaSigmaf_;
 
         //- Incremental of strain
         volSymmTensorField DEpsilon_;

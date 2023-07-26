@@ -411,25 +411,25 @@ void Foam::mechanicalLaw::makeSigmaHyd()
 }
 
 
-void Foam::mechanicalLaw::makeSigmaEff()
+void Foam::mechanicalLaw::makedeltaSigma()
 {
-    if (sigmaEffPtr_.valid())
+    if (deltaSigmaPtr_.valid())
     {
-        FatalErrorIn("void " + type() + "::makeSigmaEff()")
+        FatalErrorIn("void " + type() + "::makedeltaSigma()")
             << "pointer already set" << abort(FatalError);
     }
 
-    sigmaEffPtr_.set
+    deltaSigmaPtr_.set
     (
         new volSymmTensorField
         (
             IOobject
             (
-                "sigmaEff_",
+                "deltaSigma_",
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::READ_IF_PRESENT,
-                IOobject::AUTO_WRITE
+                IOobject::NO_WRITE
             ),
             mesh(),
             dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
@@ -826,14 +826,14 @@ Foam::volVectorField& Foam::mechanicalLaw::gradSigmaHyd()
 }
 
 
-Foam::volSymmTensorField& Foam::mechanicalLaw::sigmaEff()
+Foam::volSymmTensorField& Foam::mechanicalLaw::deltaSigma()
 {
-    if (sigmaEffPtr_.empty())
+    if (deltaSigmaPtr_.empty())
     {
-        makeSigmaEff();
+        makedeltaSigma();
     }
 
-    return sigmaEffPtr_();
+    return deltaSigmaPtr_();
 }
 
 
@@ -1355,7 +1355,7 @@ Foam::mechanicalLaw::mechanicalLaw
     ),
     sigmaHydPtr_(),
     gradSigmaHydPtr_(),
-    sigmaEffPtr_(),
+    deltaSigmaPtr_(),
     curTimeIndex_(-1),
     warnAboutEnforceLinear_(true)
 {

@@ -138,12 +138,8 @@ class mechanicalLaw
         // Gradient of the hydrostatic stress field
         autoPtr<volVectorField> gradSigmaHydPtr_;
 
-        //- Effective stress (sigmaEff = sigma + p*I)
-        //  Where:
-        //      sigmaEff is the effective stress
-        //      sigma is the total stress
-        //      p is the pore pressure
-        autoPtr<volSymmTensorField> sigmaEffPtr_;
+        //- stress variation from initial (sigma = deltaSigma + sigma0), used in some stress-state-dependent mechLaws for residual calculation
+        autoPtr<volSymmTensorField> deltaSigmaPtr_;
 
         //- Current time index
         label curTimeIndex_;
@@ -193,8 +189,8 @@ class mechanicalLaw
         //- Make the sigmaHyd field
         void makeSigmaHyd();
 
-        //- Make the sigmaEff field
-        void makeSigmaEff();
+        //- Make the deltaSigma field
+        void makedeltaSigma();
 
         //- Disallow copy construct
         mechanicalLaw(const mechanicalLaw&);
@@ -316,8 +312,8 @@ protected:
         //- Return a reference to the gradSigmaHyd field
         volVectorField& gradSigmaHyd();
 
-        //- Return a reference to the sigmaEff field
-        volSymmTensorField& sigmaEff();
+        //- Return a reference to the deltaSigma field
+        volSymmTensorField& deltaSigma();
 
         //- Update epsilon
         void updateEpsilon();
