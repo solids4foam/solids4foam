@@ -186,14 +186,6 @@ public:
             //- Evolve the fluid model
             virtual bool evolve();
 
-            // //- Set temperature at specified patch
-            // virtual void setTemperature
-            // (
-            //     const label interfaceI,
-            //     const label patchID,
-            //     const scalarField& faceZoneTemperature
-            // );
-
             //- Set temperature and heat flux at specified patch
             virtual void setTemperatureAndHeatFlux
             (

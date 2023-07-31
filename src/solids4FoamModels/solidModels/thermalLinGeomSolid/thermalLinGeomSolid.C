@@ -22,6 +22,7 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
+#include "thermalRobinFvPatchScalarField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -451,6 +452,184 @@ void thermalLinGeomSolid::writeFields(const Time& runTime)
     solidModel::writeFields(runTime);
 }
 
+
+void thermalLinGeomSolid::setTemperatureAndHeatFlux
+(
+    fvPatchScalarField& temperaturePatch,
+    const scalarField& temperature,
+    const scalarField& heatFlux
+)
+{
+    if (temperaturePatch.type() == thermalRobinFvPatchScalarField::typeName)
+    {
+        thermalRobinFvPatchScalarField& patchT =
+            refCast<thermalRobinFvPatchScalarField>(temperaturePatch);
+
+        patchT.temperature() = temperature;
+        patchT.heatFlux() = heatFlux;
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void thermalSolid::setTemperatureAndHeatFlux\n"
+            "(\n"
+            "    fvPatchScalarField& temperaturePatch,\n"
+            "    const scalarField& temperature,\n"
+            "    const scalarField& heatFlux\n"
+            ")"
+        )   << "Boundary condition "
+            << temperaturePatch.type()
+            << " for patch " << temperaturePatch.patch().name()
+            << " should instead be type "
+            << thermalRobinFvPatchScalarField::typeName
+            << abort(FatalError);
+    }
+}
+
+
+void thermalLinGeomSolid::setTemperatureAndHeatFlux
+(
+    const label interfaceI,
+    const label patchID,
+    const scalarField& faceZoneTemperature,
+    const scalarField& faceZoneHeatFlux
+)
+{
+    const scalarField patchTemperature
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneTemperature)
+    );
+
+    const scalarField patchHeatFlux
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneHeatFlux)
+    );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    setTemperatureAndHeatFlux
+    (
+        T_.boundaryFieldRef()[patchID],
+        patchTemperature,
+        patchHeatFlux
+    );
+#else
+    setTemperatureAndHeatFlux
+    (
+        T_.boundaryField()[patchID],
+        patchTemperature,
+        patchHeatFlux
+    );
+#endif
+}
+
+
+void thermalLinGeomSolid::setEqInterHeatTransferCoeff
+(
+    fvPatchScalarField& temperaturePatch,
+    const scalarField& HTC
+)
+{
+    if (temperaturePatch.type() == thermalRobinFvPatchScalarField::typeName)
+    {
+        thermalRobinFvPatchScalarField& patchT =
+            refCast<thermalRobinFvPatchScalarField>(temperaturePatch);
+
+        patchT.eqInterHeatTransferCoeff() = HTC;
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void thermalSolid::setEqInterHeatTransferCoeff\n"
+            "(\n"
+            "    fvPatchScalarField& temperaturePatch,\n"
+            "    const scalarField& HTc\n"
+            ")"
+        )   << "Boundary condition "
+            << temperaturePatch.type()
+            << " for patch " << temperaturePatch.patch().name()
+            << " should instead be type "
+            << thermalRobinFvPatchScalarField::typeName
+            << abort(FatalError);
+    }
+}
+
+
+void thermalLinGeomSolid::setEqInterHeatTransferCoeff
+(
+    const label interfaceI,
+    const label patchID,
+    const scalarField& faceZoneHTC
+)
+{
+    const scalarField patchHTC
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneHTC)
+    );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    setEqInterHeatTransferCoeff
+    (
+        T_.boundaryFieldRef()[patchID],
+        patchHTC
+    );
+#else
+    setEqInterHeatTransferCoeff
+    (
+        T_.boundaryField()[patchID],
+        patchHTC
+    );
+#endif
+}
+
+
+tmp<scalarField> thermalLinGeomSolid::faceZoneTemperature
+(
+    const label interfaceI
+) const
+{
+    return globalPatches()[interfaceI].patchFaceToGlobal
+    (
+        T_.boundaryField()[globalPatches()[interfaceI].patch().index()]
+    );
+}
+
+
+tmp<scalarField> thermalLinGeomSolid::faceZoneHeatFlux
+(
+    const label interfaceI
+) const
+{
+    scalarField patchHeatFlux =
+        k_.boundaryField()[globalPatches()[interfaceI].patch().index()]*
+        T_.boundaryField()[globalPatches()[interfaceI].patch().index()]
+       .snGrad();
+
+    return globalPatches()[interfaceI].patchFaceToGlobal(patchHeatFlux);
+}
+
+
+tmp<scalarField> thermalLinGeomSolid::faceZoneHeatTransferCoeff
+(
+    const label interfaceI
+) const
+{
+    const scalarField& patchDeltaCoeff =
+        mesh().deltaCoeffs().boundaryField()
+        [globalPatches()[interfaceI].patch().index()];
+
+    scalarField patchHeatTransferCoeff =
+        (1.0/patchDeltaCoeff)/
+        k_.boundaryField()[globalPatches()[interfaceI].patch().index()];
+
+    return globalPatches()[interfaceI].patchFaceToGlobal
+    (
+        patchHeatTransferCoeff
+    );
+}
+
+    
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace solidModels

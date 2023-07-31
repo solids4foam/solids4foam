@@ -56,11 +56,8 @@ class thermalCouplingInterface
         //- Fixed under-relaxation factor
         const scalar relaxationFactor_;
 
-        //- Predict solid
-        const bool predictSolid_;
-
-        //- Coupling status for each fsi interface
-        boolList coupledInterfaces_;
+        //- Predict temperature and heat-flux at fluid and solid interface
+        const bool predictTemperatureAndHeatFlux_;
 
         //- Residual file pointer
         autoPtr<OFstream> thermalResidualFilePtr_;
@@ -68,6 +65,21 @@ class thermalCouplingInterface
         //- List of maximal thermal residuals norm
         List<scalar> maxThermalResidualsNorm_;
 
+        //- Old-time solid face-zone temperature
+        mutable PtrList<scalarField> oldSolidFaceZoneTemperature_;
+    
+        //- Old-time solid face-zone heat flux
+        mutable PtrList<scalarField> oldSolidFaceZoneHeatFlux_;
+    
+        //- Old-old-time solid face-zone temperature
+        mutable PtrList<scalarField> oldOldSolidFaceZoneTemperature_;
+    
+        //- Old-old-time solid face-zone heat flux
+        mutable PtrList<scalarField> oldOldSolidFaceZoneHeatFlux_;
+    
+        //- Time index
+        label timeIndex_;
+    
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -94,7 +106,6 @@ public:
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
         );
-
 
     // Destructor
 

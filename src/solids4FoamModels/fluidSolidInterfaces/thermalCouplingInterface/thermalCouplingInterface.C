@@ -53,32 +53,64 @@ thermalCouplingInterface::thermalCouplingInterface
     (
         fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
     ),
-    predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
-    coupledInterfaces_(fluidPatchIndices().size(), coupled()),
+    predictTemperatureAndHeatFlux_
+    (
+        fsiProperties().lookupOrDefault<bool>
+        (
+            "predictTemperatureAndHeatFlux",
+            false
+        )
+    ),
     thermalResidualFilePtr_(),
-    maxThermalResidualsNorm_()
+    maxThermalResidualsNorm_(),
+    oldSolidFaceZoneTemperature_(),
+    oldSolidFaceZoneHeatFlux_(),
+    oldOldSolidFaceZoneTemperature_(),
+    oldOldSolidFaceZoneHeatFlux_(),
+    timeIndex_(-1)
 {
-    if (fsiProperties().found("coupledInterfaces"))
-    {
-        coupledInterfaces_ =
-            boolList(fsiProperties().lookup("coupledInterfaces"));
-
-        if (coupledInterfaces_.size() != fluidPatchIndices().size())
-        {
-            FatalErrorIn("")
-                << "Size of coupling status list is not equal to the specified "
-                << "number of interfaces"
-                << nl
-                << "Currently, there are " << solidPatchIndices().size()
-                << " solid interface patches and " << fluidPatchIndices().size()
-                << " patches!" << abort(FatalError);
-        }
-    }
-
     maxThermalResidualsNorm_.setSize(nGlobalPatches());
 
     // Set equivalent interface heat transfer coefficient
     setEqInterHeatTransferCoeff();
+
+    // Initialize old-times face-zone temperatures and heat-fluxes
+    {
+        oldSolidFaceZoneTemperature_.setSize(nGlobalPatches());
+        oldSolidFaceZoneHeatFlux_.setSize(nGlobalPatches());
+        oldOldSolidFaceZoneTemperature_.setSize(nGlobalPatches());
+        oldOldSolidFaceZoneHeatFlux_.setSize(nGlobalPatches());
+    
+        forAll(oldSolidFaceZoneTemperature_, interI)
+        {
+            const standAlonePatch& solidZone =
+                solid().globalPatches()[interI].globalPatch();
+        
+            oldSolidFaceZoneTemperature_.set
+            (
+                interI,
+                scalarField(solidZone.size(), 0)
+            );
+            
+            oldSolidFaceZoneHeatFlux_.set
+            (
+                interI,
+                scalarField(solidZone.size(), 0)
+            );
+            
+            oldOldSolidFaceZoneTemperature_.set
+            (
+                interI,
+                scalarField(solidZone.size(), 0)
+            );
+            
+            oldOldSolidFaceZoneHeatFlux_.set
+            (
+                interI,
+                scalarField(solidZone.size(), 0)
+            );
+        }
+    }
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -95,7 +127,10 @@ bool thermalCouplingInterface::evolve()
     {
         outerCorr()++;
 
-        // // Transfer temperature and heat flux from the solid to the fluid
+        Info<< nl << "Time = " << fluid().runTime().timeName()
+            << ", iteration: " << outerCorr() << endl;
+
+        // Transfer temperature and heat flux from the solid to the fluid
         updateHeatFluxAndTemperatureOnFluidInterface();
 
         // Solve fluid
@@ -128,9 +163,6 @@ bool thermalCouplingInterface::evolve()
 
 void thermalCouplingInterface::updateHeatFluxAndTemperatureOnFluidInterface()
 {
-    Info<< nl << "Time = " << fluid().runTime().timeName()
-        << ", iteration: " << outerCorr() << endl;
-
     Info<< "Setting heat flux and temperature on fluid interfaces" << endl;
 
     for (label interfaceI = 0; interfaceI < nGlobalPatches(); interfaceI++)
@@ -153,6 +185,38 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnFluidInterface()
             solid().faceZoneHeatFlux(interfaceI)
         );
 
+        if (timeIndex_ < runTime().timeIndex())
+        {
+            oldOldSolidFaceZoneTemperature_[interfaceI] =
+                oldSolidFaceZoneTemperature_[interfaceI];
+            oldOldSolidFaceZoneHeatFlux_[interfaceI] =
+                oldSolidFaceZoneHeatFlux_[interfaceI];
+
+            oldSolidFaceZoneTemperature_[interfaceI] =
+                solidZoneTemperature;
+            oldSolidFaceZoneHeatFlux_[interfaceI] =
+                solidZoneHeatFlux;
+
+            if
+            (
+                predictTemperatureAndHeatFlux_
+             && (runTime().timeIndex() > 2)
+            )
+            {
+                Info << "Predicting temperature and heat-flux" << endl;
+
+                // Linear extrapolation of temp. and heat-flux in time
+                solidZoneTemperature =
+                    2*oldSolidFaceZoneTemperature_[interfaceI]
+                  - oldOldSolidFaceZoneTemperature_[interfaceI];
+                solidZoneHeatFlux =
+                    2*oldSolidFaceZoneHeatFlux_[interfaceI]
+                  - oldOldSolidFaceZoneHeatFlux_[interfaceI];
+            }
+            
+            timeIndex_ = runTime().timeIndex();
+        }
+        
         // Initialise the fluid zone temperature field
         // that is to be interpolated from the solid zone
         scalarField fluidZoneTemperature(fluidZone.size(), 0);
@@ -180,7 +244,7 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnFluidInterface()
         fluidZoneHeatFlux *= -1;
 
         // Set temperature on fluid interface
-        if (coupledInterfaces_[interfaceI])
+        if (coupled())
         {
             fluid().setTemperatureAndHeatFlux
             (
@@ -232,7 +296,8 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnSolidInterface()
         // that is to be interpolated from the solid zone
         scalarField solidZoneHeatFlux(solidZone.size(), 0);
 
-        // Transfer the field from the solid interface to the fluid interface
+        // Transfer the field from the fluid interface
+        // to the solid interface
         interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
         (
             fluidZone,                 // from zone
@@ -247,10 +312,11 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnSolidInterface()
             fluidZoneHeatFlux,         // from field
             solidZoneHeatFlux          // to field
         );
+        
         solidZoneHeatFlux *= -1;
 
         // Set temperature on fluid interface
-        if (coupledInterfaces_[interfaceI])
+        if (coupled())
         {
             solid().setTemperatureAndHeatFlux
             (
@@ -424,7 +490,7 @@ void thermalCouplingInterface::setEqInterHeatTransferCoeff()
             solid().faceZoneHeatTransferCoeff(interfaceI);
 
         // Set eq interface HTC on solid
-        if (coupledInterfaces_[interfaceI])
+        if (coupled())
         {
             solid().setEqInterHeatTransferCoeff
             (
@@ -444,7 +510,7 @@ void thermalCouplingInterface::setEqInterHeatTransferCoeff()
         );
 
         // Set eq interface HTC on fluid
-        if (coupledInterfaces_[interfaceI])
+        if (coupled())
         {
             fluid().setEqInterHeatTransferCoeff
             (

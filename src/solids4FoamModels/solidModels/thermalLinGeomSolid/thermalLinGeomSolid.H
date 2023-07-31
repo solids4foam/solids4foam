@@ -188,6 +188,56 @@ public:
                 const fvPatch& patch
             ) const;
 
+            //- Set temperature and heat flux at specified patch
+            void setTemperatureAndHeatFlux
+            (
+                fvPatchScalarField& patch,
+                const scalarField& temperature,
+                const scalarField& heatFlux
+            );
+
+            //- Set temperature and heat flux at specified patch
+            virtual void setTemperatureAndHeatFlux
+            (
+                const label interfaceI,
+                const label patchID,
+                const scalarField& faceZoneTemperature,
+                const scalarField& faceZoneHeatFlux
+            );
+
+            //- Set equivalent interface heat transfer coeff
+            void setEqInterHeatTransferCoeff
+            (
+                fvPatchScalarField& temperaturePatch,
+                const scalarField& HTC
+            );
+
+            //- Set equivalent interface heat transfer coeff
+            virtual void setEqInterHeatTransferCoeff
+            (
+                const label interfaceI,
+                const label patchID,
+                const scalarField& faceZoneHTC
+            );
+
+            //- Face zone temperature
+            virtual tmp<scalarField> faceZoneTemperature
+            (
+                const label interfaceI
+            ) const;
+
+            //- Face zone heat flux
+            virtual tmp<scalarField> faceZoneHeatFlux
+            (
+                const label interfaceI
+            ) const;
+
+            //- Face zone heat transfer coefficient
+            virtual tmp<scalarField> faceZoneHeatTransferCoeff
+            (
+                const label interfaceI
+            ) const;
+    
             //- Write fields
             virtual void writeFields(const Time& runTime);
 };
