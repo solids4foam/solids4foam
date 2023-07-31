@@ -44,7 +44,7 @@ namespace Foam
 
 bool Foam::poroMechanicalLaw::checkSigmaEffReady(const volSymmTensorField& sigma, const volScalarField& p)
 {
-    if (sigmaEff_)
+    if (sigmaEff_.valid())
     {
         return true;
     }
@@ -67,7 +67,7 @@ bool Foam::poroMechanicalLaw::checkSigmaEffReady(const volSymmTensorField& sigma
 
 bool Foam::poroMechanicalLaw::checkSigmaEffReady(const surfaceSymmTensorField& sigma, const surfaceScalarField& p)
 {
-    if (sigmaEfff_)
+    if (sigmaEfff_.valid())
     {
         return true;
     }
