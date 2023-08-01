@@ -463,10 +463,14 @@ tmp<scalarField> thermalSolid::faceZoneHeatFlux
     const label interfaceI
 ) const
 {
-    scalarField patchHeatFlux =
-        k_.boundaryField()[globalPatches()[interfaceI].patch().index()]*
-        T_.boundaryField()[globalPatches()[interfaceI].patch().index()]
-       .snGrad();
+    const scalarField patchHeatFlux
+    (
+        k_.boundaryField()[globalPatches()[interfaceI].patch().index()]
+       *T_.boundaryField()
+        [
+            globalPatches()[interfaceI].patch().index()
+        ].snGrad()
+    );
 
     return globalPatches()[interfaceI].patchFaceToGlobal(patchHeatFlux);
 }
@@ -479,11 +483,15 @@ tmp<scalarField> thermalSolid::faceZoneHeatTransferCoeff
 {
     const scalarField& patchDeltaCoeff =
         mesh().deltaCoeffs().boundaryField()
-        [globalPatches()[interfaceI].patch().index()];
+        [
+            globalPatches()[interfaceI].patch().index()
+        ];
 
-    scalarField patchHeatTransferCoeff =
-        (1.0/patchDeltaCoeff)/
-        k_.boundaryField()[globalPatches()[interfaceI].patch().index()];
+    const scalarField patchHeatTransferCoeff
+    (
+        (1.0/patchDeltaCoeff)
+       /k_.boundaryField()[globalPatches()[interfaceI].patch().index()]
+    );
 
     return globalPatches()[interfaceI].patchFaceToGlobal
     (
