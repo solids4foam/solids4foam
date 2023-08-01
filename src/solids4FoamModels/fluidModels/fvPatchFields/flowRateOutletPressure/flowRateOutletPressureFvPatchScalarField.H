@@ -118,6 +118,9 @@ public:
         flowRateOutletPressureFvPatchScalarField
         (
             const flowRateOutletPressureFvPatchScalarField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -128,6 +131,7 @@ public:
                 new flowRateOutletPressureFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         flowRateOutletPressureFvPatchScalarField

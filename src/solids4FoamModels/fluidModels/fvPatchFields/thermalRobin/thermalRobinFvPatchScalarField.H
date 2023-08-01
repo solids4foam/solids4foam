@@ -105,6 +105,9 @@ public:
         thermalRobinFvPatchScalarField
         (
             const thermalRobinFvPatchScalarField&
+#ifdef OPENFOAMFOUNDATION
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
@@ -115,6 +118,7 @@ public:
                 new thermalRobinFvPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         thermalRobinFvPatchScalarField
