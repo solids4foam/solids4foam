@@ -576,6 +576,19 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
         mesh,
         dimensionedScalar("zero", dimless, 0.0)
     ),
+    deltaSigma_
+    (
+        IOobject
+        (
+            "deltaSigma_",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+    ),
     activeYield_
     (
         IOobject
@@ -689,10 +702,10 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
 
     // Store previous iteration of deltaSigma as it is used to calculate the
     // residual
-    deltaSigma().storePrevIter();
+    deltaSigma_.storePrevIter();
 
     // Update the stress variation tensor
-    deltaSigma() = sigma-sigma0();
+    deltaSigma_ = sigma-sigma0();
     // Note: if a poro-elasto-plastic law is used then the pore-pressure term
     // will be added to the effective stress after this
 }
@@ -811,19 +824,19 @@ Foam::scalar Foam::linearElasticMohrCoulombPlastic::residual()
             (
                 mag
                 (
-                    deltaSigma().primitiveField()
-                  - deltaSigma().prevIter().primitiveField()
+                    deltaSigma_.primitiveField()
+                  - deltaSigma_.prevIter().primitiveField()
                 )
-            )/gMax(SMALL + mag(deltaSigma().primitiveField()));
+            )/gMax(SMALL + mag(deltaSigma_.primitiveField()));
 #else
             gMax
             (
                 mag
                 (
-                    deltaSigma().internalField()
-                  - deltaSigma().prevIter().internalField()
+                    deltaSigma_.internalField()
+                  - deltaSigma_.prevIter().internalField()
                 )
-            )/gMax(SMALL + mag(deltaSigma().internalField()));
+            )/gMax(SMALL + mag(deltaSigma_.internalField()));
 #endif
     }
 }
@@ -848,7 +861,7 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
 #endif
 
     const symmTensorField& DEpsilonI = DEpsilon_;
-    const symmTensorField& deltaSigmaI = deltaSigma();
+    const symmTensorField& deltaSigmaI = deltaSigma_;
     const scalarField& activeYieldI = activeYield_;
     const scalar mu = mu_.value();
     const scalar lambda = lambda_.value();

@@ -153,6 +153,10 @@ class linearElasticMohrCoulombPlastic
         //- Equivalent plastic strain
         volScalarField epsilonPEq_;
 
+        //- stress variation from initial (sigma = deltaSigma + sigma0), used in
+        //  some stress-state-dependent mechLaws for residual calculation
+        volSymmTensorField deltaSigma_;
+
         //- Active yielding flag
         //     1.0 for active yielding
         //     0.0 otherwise
