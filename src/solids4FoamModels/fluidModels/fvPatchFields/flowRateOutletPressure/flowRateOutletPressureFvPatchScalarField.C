@@ -105,6 +105,7 @@ flowRateOutletPressureFvPatchScalarField
 {}
 
 
+#ifndef OPENFOAMFOUNDATION
 Foam::flowRateOutletPressureFvPatchScalarField::
 flowRateOutletPressureFvPatchScalarField
 (
@@ -121,6 +122,7 @@ flowRateOutletPressureFvPatchScalarField
     inletPatchIndices_(ptf.inletPatchIndices_),
     phiCorr_(ptf.phiCorr_)
 {}
+#endif
 
 
 Foam::flowRateOutletPressureFvPatchScalarField::
@@ -365,7 +367,7 @@ void Foam::flowRateOutletPressureFvPatchScalarField::write(Ostream& os) const
 {
     fvPatchScalarField::write(os);
     
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESI
     os.writeEntryIfDifferent<word>("U", "U", UName_);
     os.writeEntryIfDifferent<word>("phi", "phi", phiName_);
     os.writeEntryIfDifferent<word>("rho", "rho", rhoName_);
