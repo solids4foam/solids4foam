@@ -286,6 +286,7 @@ explicitVertexCentredLinGeomSolid::explicitVertexCentredLinGeomSolid
 )
 :
     solidModel(typeName, runTime, region),
+    impK_(mechanical().impK()),
     zeta_(solidModelDict().lookupOrDefault<scalar>("zeta", 1.0)),
     dampingCoeff_(solidModelDict().lookup("dampingCoeff")),
     dualMechanicalPtr_

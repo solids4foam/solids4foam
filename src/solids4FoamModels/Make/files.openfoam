@@ -107,6 +107,9 @@ $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
 
 pointPatchFields = solidModels/pointPatchFields
 $(pointPatchFields)/pointAnalyticalPlateHoleTraction/analyticalPlateHoleTractionPointPatchVectorField.C
+$(pointPatchFields)/pointLinearSpatialDisplacement/linearSpatialDisplacementPointPatchVectorField.C
+$(pointPatchFields)/pointSolidContact/solidContactPointPatchVectorField.C
+$(pointPatchFields)/pointSolidContact/solidContactPointPatchVectorFieldCalcContact.C
 $(pointPatchFields)/pointSolidForce/solidForcePointPatchVectorField.C
 $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
@@ -125,6 +128,12 @@ $(frictionContactModels)/standardPenaltyFriction/standardPenaltyFriction.C
 $(frictionContactModels)/frictionLaws/frictionLaw/frictionLaw.C
 $(frictionContactModels)/frictionLaws/frictionLaw/newFrictionLaw.C
 $(frictionContactModels)/frictionLaws/coulombFriction/coulombFriction.C
+
+pointContactModels = $(pointPatchFields)/pointSolidContact/pointContactModels
+pointNormalContactModels = $(pointContactModels)/pointNormalContactModels
+$(pointNormalContactModels)/pointNormalContactModel/pointNormalContactModel.C
+$(pointNormalContactModels)/pointNormalContactModel/newPointNormalContactModel.C
+$(pointNormalContactModels)/pointStandardPenalty/pointStandardPenalty.C
 
 fluidFvPatchFields = fluidModels/fvPatchFields
 $(fluidFvPatchFields)/elasticSlipWallVelocity/elasticSlipWallVelocityFvPatchVectorField.C

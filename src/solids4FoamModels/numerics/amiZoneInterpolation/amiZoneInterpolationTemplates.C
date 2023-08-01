@@ -138,7 +138,7 @@ Foam::amiZoneInterpolation::interpolateToSourcePoints
 
     const List< List<scalar> >& weights = sourcePointWeights();
 
-    forAll (result, pointI)
+    forAll(result, pointI)
     {
         if (addr[pointI].first() > -1)
         {
@@ -153,15 +153,6 @@ Foam::amiZoneInterpolation::interpolateToSourcePoints
                 weights[pointI][0]*pf[hitFace[pI]]
               + weights[pointI][1]*pf[hitFace.nextLabel(pI)]
               + weights[pointI][2]*ctrF;
-        }
-        else
-        {
-            FatalErrorIn
-            (
-                "ExtendedAMIInterpolation::interpolateToSourcePoints"
-                "(const Field<Type> pf)"
-            )   << "Source point addressing is not correct"
-                << abort(FatalError);
         }
     }
 

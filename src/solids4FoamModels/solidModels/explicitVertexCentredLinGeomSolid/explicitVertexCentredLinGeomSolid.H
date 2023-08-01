@@ -73,6 +73,10 @@ class explicitVertexCentredLinGeomSolid
 {
     // Private Data
 
+        //- Store stiffness field: only used by pointSolidContact boundaries for
+        //  calculating the penalty factor
+        const volScalarField impK_;
+
         //- Compact edge gradient factor
         const scalar zeta_;
 

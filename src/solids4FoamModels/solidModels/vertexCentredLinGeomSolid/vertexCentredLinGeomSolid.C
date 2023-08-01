@@ -830,6 +830,9 @@ bool vertexCentredLinGeomSolid::evolve()
         Info<< "zeta: " << zeta << endl;
     }
 
+    // Update the displacement boundary conditions
+    pointD().correctBoundaryConditions();
+
     // Global point index lists
     //List showing which points are on a specific processor?
     const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();

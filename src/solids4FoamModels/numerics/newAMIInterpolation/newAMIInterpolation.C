@@ -279,10 +279,13 @@ void Foam::newAMIInterpolation<SourcePatch, TargetPatch>::reportSumWeights
     }
     reduce(nLowWeight, sumOp<label>());
 
-    Info<< indent << "AMI: Patch " << patchName
-        << " sum(weights) min/max/average = " << gMin(wghtSum) << ", "
-        << gMax(wghtSum) << ", "
-        << gSum(wghtSum*patchAreas)/gSum(patchAreas) << endl;
+    if (debug)
+    {
+        Info<< indent << "AMI: Patch " << patchName
+            << " sum(weights) min/max/average = " << gMin(wghtSum) << ", "
+            << gMax(wghtSum) << ", "
+            << gSum(wghtSum*patchAreas)/gSum(patchAreas) << endl;
+    }
 
     if (nLowWeight)
     {
@@ -962,8 +965,11 @@ void Foam::newAMIInterpolation<SourcePatch, TargetPatch>::update
 
     if (useGlobalPolyPatch_)
     {
-        Info<< indent
-            << "AMI: using globalPolyPatch" << endl;
+        if (debug)
+        {
+            Info<< indent
+                << "AMI: using globalPolyPatch" << endl;
+        }
         singlePatchProc_ = Pstream::myProcNo();
     }
 

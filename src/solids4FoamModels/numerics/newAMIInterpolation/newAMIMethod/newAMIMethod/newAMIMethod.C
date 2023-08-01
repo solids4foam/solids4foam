@@ -50,14 +50,17 @@ void Foam::newAMIMethod<SourcePatch, TargetPatch>::checkPatches() const
 
         if (!bbTgtInf.contains(bbSrc))
         {
-            WarningInFunction
-                << "Source and target patch bounding boxes are not similar"
-                << nl
-                << "    source box span     : " << bbSrc.span() << nl
-                << "    target box span     : " << bbTgt.span() << nl
-                << "    source box          : " << bbSrc << nl
-                << "    target box          : " << bbTgt << nl
-                << "    inflated target box : " << bbTgtInf << endl;
+            if (debug)
+            {
+                WarningInFunction
+                    << "Source and target patch bounding boxes are not similar"
+                    << nl
+                    << "    source box span     : " << bbSrc.span() << nl
+                    << "    target box span     : " << bbTgt.span() << nl
+                    << "    source box          : " << bbSrc << nl
+                    << "    target box          : " << bbTgt << nl
+                    << "    inflated target box : " << bbTgtInf << endl;
+            }
         }
     }
 }
