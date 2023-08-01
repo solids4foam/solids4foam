@@ -49,7 +49,7 @@ linearSpatialDisplacementPointPatchVectorField
 :
     fixedValuePointPatchVectorField(p, iF),
     a_(vector::zero),
-    b_(vector::zero)
+    b_(tensor::zero)
 {}
 
 
@@ -78,7 +78,9 @@ linearSpatialDisplacementPointPatchVectorField
     const PointPatchFieldMapper&
 )
 :
-    fixedValuePointPatchVectorField(p, iF)
+    fixedValuePointPatchVectorField(p, iF),
+    a_(vector::zero),
+    b_(tensor::zero) 
 {}
 
 
@@ -138,7 +140,8 @@ void linearSpatialDisplacementPointPatchVectorField::updateCoeffs()
         return;
     }
 
-    this->operator==(a_ + cmptMultiply(b_, patch().localPoints()));
+    this->operator==(a_ + (b_ & patch().localPoints()));
+    
     fixedValuePointPatchField<vector>::updateCoeffs();
 }
 
