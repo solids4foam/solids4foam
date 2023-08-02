@@ -2,9 +2,7 @@
 sort: 1
 ---
 
-# Elastoplastic Cook's membrane: `cooksMembrane`
-
----
+# Elastoplastic Cook's Membrane: `cooksMembrane`
 
 Prepared by Ivan Batistić
 
@@ -21,9 +19,9 @@ A small-strain elastic version of this tutorial is also available in solids4foam
 
 ## Case Overview
 
-Cook's membrane is a well-known bending-dominated benchmark case used in linear and non-linear analysis. The tapered panel (trapezoid) is fixed on one side and subjected to uniform shear traction on the opposite side. The prescribed shear traction is $\tau =$ 312500 Pa. The vertices of the trapezoid (in mm) are (0, 0), (48, 44), (48, 60),  and (0, 44), as shown in Figure 1. Gravitation effects are neglected, there are no body forces, and the problem is solved as 2D using plane strain assumption. The problem is solved as static, using 30 equally-sized loading increments. 
+Cook's membrane is a well-known bending-dominated benchmark case used in linear and non-linear analysis. The tapered panel (trapezoid) is fixed on one side and subjected to uniform shear traction on the opposite side. The prescribed shear traction is $$\tau = 0.3125$$ MPa. The vertices of the trapezoid (in mm) are (0, 0), (48, 44), (48, 60),  and (0, 44), as shown in Figure 1. Gravitation effects are neglected, there are no body forces, and the problem is solved as 2D using plane strain assumption. The problem is solved as static, using 30 equally-sized loading increments. 
 
-The material is considered elastoplastic, with the following property values: Young's modulus $E = 206.9$ MPa, Poisson's ratio $\nu=0.29$, initial yield stress $\sigma_Y = 0.45$ MPa and the hardening parameters $\sigma_{\infty} = 0.715$ MPa, $\delta = 16.93$, $H = 0.12924$ MPa. The strain hardening function is the one presented in [[1]]((https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705)):
+The material is considered elastoplastic, with the following property values: Young's modulus $$E = 206.9$$ MPa, Poisson's ratio $$\nu=0.29$$, initial yield stress $$\sigma_Y = 0.45$$ MPa and the hardening parameters $$\sigma_{\infty} = 0.715$$ MPa, $$\delta = 16.93$$, $$H = 0.12924$$ MPa. The strain hardening function is the one presented in [[1]]((https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705)):
 $$
 \sigma_y = \sigma_Y + (\sigma_{\infty} - \sigma_Y)(1-\text{exp}(-\delta\varepsilon_p)) + H\varepsilon_p.
 $$

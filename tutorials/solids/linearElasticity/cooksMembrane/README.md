@@ -2,7 +2,7 @@
 sort: 3
 ---
 
-# Tutorial: `cooksMembrane`
+# Linear Elastic Cook's Membrane: `cooksMembrane`
 
 Prepared by Ivan Batistić
 
@@ -13,7 +13,9 @@ Prepared by Ivan Batistić
 - Demonstrate how to perform a solid-only analysis in solids4foam.
 - To demonstrate solver performance under both shear and bending conditions in combination with a skew numerical mesh.
 
----
+```note
+A finite-strain elastoplastic version of this tutorial is also available in solids4foam at tutorials/elastoplasticity/cooksMembrane
+```
 
 ## Case Overview
 
