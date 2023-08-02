@@ -11,53 +11,56 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "system";
-    object      controlDict;
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     solids4Foam;
+ddtSchemes
+{
+    default         backward;
+}
 
-startFrom       startTime;
+gradSchemes
+{
+    default         Gauss linear;
+    
+}
 
-startTime       0;
+divSchemes
+{
+    default none;
+    
+    div(phi,U) Gauss linearUpwind cellLimited grad(U) 1;
+    
+    div(phi,T) Gauss linearUpwind cellLimited grad(T) 1;
+}
 
-stopAt          endTime;
+laplacianSchemes
+{
+    default none;
+    laplacian(nuEff,U) Gauss linear corrected;
+    laplacian(rAU,p) Gauss linear corrected;
+    laplacian((1|A(U)),p) Gauss linear corrected;
+    laplacian(diffusivity,cellMotionU) Gauss linear corrected;
 
-endTime         10;
+    laplacian(lambdaEff,T) Gauss linear corrected;
+}
 
-deltaT          0.01;
 
-writeControl    timeStep;
+snGradSchemes
+{
+    default         corrected;
+}
+fluxRequired
+{
+    default         no;
+    p;
+}
 
-writeInterval   10;
+interpolationSchemes
+{
+    default         linear;
+}
 
-purgeWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression uncompressed;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable yes;
-
-adjustTimeStep  no;
-
-maxCo           0.5;
-
-maxDeltaT       1;
-
-functions
-(
-    fsiConvData
-    {
-        type fsiConvergenceData;        
-        region fluid;
-    }
-);
 
 // ************************************************************************* //

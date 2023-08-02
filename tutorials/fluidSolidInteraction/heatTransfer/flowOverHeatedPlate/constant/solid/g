@@ -1,40 +1,21 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      fsiProperties;
+    class       uniformDimensionedVectorField;
+    location    "constant";
+    object      g;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface thermal;
-
-thermalCoeffs
-{
-    solidPatch left;
-    fluidPatch right;
-
-    predictTemperatureAndHeatFlux false;
-    
-    relaxationFactor 1;
-
-    interfaceDeformationLimit 0;
-
-    outerCorrTolerance 1e-6;
-    nOuterCorr 100;
-
-    interpolatorUpdateFrequency 0;
-
-    coupled yes;
-
-    writeResidualsToFile yes;
-}
+dimensions      [0 1 -2 0 0 0 0];
+value           ( 0 0 0 );
 
 // ************************************************************************* //

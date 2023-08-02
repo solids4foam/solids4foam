@@ -1,8 +1,8 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
@@ -10,31 +10,26 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fsiProperties;
+    location    "constant";
+    object      transportProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface thermal;
+nu              nu [0 2 -1 0 0 0 0] 2e-4;
+rho             rho [1 -3 0 0 0 0 0] 1;
 
-thermalCoeffs
-{
-    solidPatch left;
-    fluidPatch right;
+// For piso/transientSimple
+transportModel  Newtonian;
 
-    predictTemperatureAndHeatFlux false;
-    
-    relaxationFactor 1;
+// Thermal properties
+TRef            TRef [0 0 0 1 0 0 0] 303.0;
 
-    interfaceDeformationLimit 0;
+Cp              Cp [0 2 -2 -1 0 0 0] 250;
 
-    outerCorrTolerance 1e-6;
-    nOuterCorr 100;
+beta            beta [0 0 0 -1 0 0 0] 0; // forced convection
 
-    interpolatorUpdateFrequency 0;
+Prt             Prt [0 0 0 0 0 0 0] 0.85;
 
-    coupled yes;
-
-    writeResidualsToFile yes;
-}
+lambda          lambda [1 1 -3 -1 0 0 0] 5;
 
 // ************************************************************************* //

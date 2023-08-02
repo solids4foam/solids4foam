@@ -11,53 +11,15 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    location    "0";
-    object      T;
+    class       dictionary;
+    object      decomposeParDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 0 0 1 0 0 0];
+// Note: this decomposeParDict is not used but it must be present to keep
+// argList happy. Use instead the decomposeParDicts in system/fluid and
+// system/solid
 
-internalField uniform 283;
-
-boundaryField
-{
-    left
-    {
-        type            fixedValue;
-        value           uniform 283;        
-    }
-
-    right
-    {
-        type            thermalRobin;
-
-        // Apply dirichlet bc
-        // dirichlet true;
-        // neumann false;
- 
-        lambda lambdaEff;
-        
-        value           uniform 283;        
-    }
-
-    bottom
-    {
-        type            zeroGradient;
-        value           $internalField;
-    }
-
-    top
-    {
-        type            zeroGradient;
-        value           $internalField;
-    }
-
-    frontAndBack
-    {
-        type            empty;
-    }
-}
+numberOfSubdomains 4;
 
 // ************************************************************************* //

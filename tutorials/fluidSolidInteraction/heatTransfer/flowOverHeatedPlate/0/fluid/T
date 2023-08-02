@@ -15,46 +15,47 @@ FoamFile
     location    "0";
     object      T;
 }
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 dimensions      [0 0 0 1 0 0 0];
 
-internalField uniform 283;
+internalField   uniform 300;
 
 boundaryField
 {
-    left
-    {
-        type            fixedValue;
-        value           uniform 283;        
-    }
-
-    right
+    interface
     {
         type            thermalRobin;
-
-        // Apply dirichlet bc
-        // dirichlet true;
-        // neumann false;
- 
-        lambda lambdaEff;
-        
-        value           uniform 283;        
+        lambda          lambdaEff;
+        value           $internalField;     
     }
-
-    bottom
+    inlet
     {
-        type            zeroGradient;
+        type            fixedValue;
         value           $internalField;
     }
-
+    outlet
+    {
+        type            zeroGradient;
+    }
     top
     {
         type            zeroGradient;
-        value           $internalField;
     }
-
-    frontAndBack
+    bottom
+    {
+        type            zeroGradient;
+    }
+    slip-bottom
+    {
+        type            zeroGradient;
+    }
+    outerWall
+    {
+        type            zeroGradient;
+    }
+    defaultFaces
     {
         type            empty;
     }

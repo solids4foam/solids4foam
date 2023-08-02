@@ -10,31 +10,26 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fsiProperties;
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+solidModel thermalSolid;
 
-fluidSolidInterface thermal;
-
-thermalCoeffs
+thermalSolidCoeffs
 {
-    solidPatch left;
-    fluidPatch right;
+    // Maximum number of correctors
+    nCorrectors             1000;
 
-    predictTemperatureAndHeatFlux false;
-    
-    relaxationFactor 1;
+    // Solution tolerance
+    solutionTolerance       1e-8;
 
-    interfaceDeformationLimit 0;
+    // Alternative solution tolerance
+    alternativeTolerance    1e-07;
 
-    outerCorrTolerance 1e-6;
-    nOuterCorr 100;
-
-    interpolatorUpdateFrequency 0;
-
-    coupled yes;
-
-    writeResidualsToFile yes;
+    // Write frequency for the residuals
+    infoFrequency           1;
 }
+
+
 
 // ************************************************************************* //

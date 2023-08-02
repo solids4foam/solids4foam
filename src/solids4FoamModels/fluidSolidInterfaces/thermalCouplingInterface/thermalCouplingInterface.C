@@ -148,7 +148,7 @@ bool thermalCouplingInterface::evolve()
         // Optional: write residuals to file
         if (writeResidualsToFile() && Pstream::master())
         {
-            residualFile()
+            thermalResidualFile()
                 << runTime().value() << " "
                 << outerCorr() << " "
                 << residualNorm << endl;
@@ -356,7 +356,7 @@ scalar thermalCouplingInterface::calcThermalResidual()
 
         // Initialise the solid zone temperature field
         // interpolated to the fluid zone
-        scalarField solidZoneTemperature(solidZone.size(), 0);
+        scalarField solidZoneTemperature(fluidZone.size(), 0);
 
         // Transfer displacement field from the solid to the fluid
         interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone

@@ -18,10 +18,10 @@ fluidSolidInterface thermal;
 
 thermalCoeffs
 {
-    solidPatch left;
-    fluidPatch right;
+    solidPatch top;
+    fluidPatch interface;
 
-    predictTemperatureAndHeatFlux false;
+    predictTemperatureAndHeatFlux true;
     
     relaxationFactor 1;
 
@@ -31,6 +31,8 @@ thermalCoeffs
     nOuterCorr 100;
 
     interpolatorUpdateFrequency 0;
+
+    // couplingReuse 0;
 
     coupled yes;
 

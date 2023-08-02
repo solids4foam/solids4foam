@@ -11,53 +11,16 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    location    "0";
-    object      T;
+    class       dictionary;
+    object      thermalProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 0 0 1 0 0 0];
-
-internalField uniform 283;
-
-boundaryField
+thermal
 {
-    left
-    {
-        type            fixedValue;
-        value           uniform 283;        
-    }
-
-    right
-    {
-        type            thermalRobin;
-
-        // Apply dirichlet bc
-        // dirichlet true;
-        // neumann false;
- 
-        lambda lambdaEff;
-        
-        value           uniform 283;        
-    }
-
-    bottom
-    {
-        type            zeroGradient;
-        value           $internalField;
-    }
-
-    top
-    {
-        type            zeroGradient;
-        value           $internalField;
-    }
-
-    frontAndBack
-    {
-        type            empty;
-    }
+    type            constant;
+    C               C [0 2 -2 -1 0 0 0] 100;
+    k               k [1 1 -3 -1 0 0 0] 100;
 }
 
 // ************************************************************************* //

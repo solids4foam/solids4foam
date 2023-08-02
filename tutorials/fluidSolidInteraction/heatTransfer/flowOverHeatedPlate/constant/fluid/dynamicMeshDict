@@ -10,31 +10,16 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      fsiProperties;
+    object      dynamicMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluidSolidInterface thermal;
+dynamicFvMesh staticFvMesh;
 
-thermalCoeffs
-{
-    solidPatch left;
-    fluidPatch right;
+// dynamicFvMesh dynamicMotionSolverFvMesh;
 
-    predictTemperatureAndHeatFlux false;
-    
-    relaxationFactor 1;
+// solver velocityLaplacian;
 
-    interfaceDeformationLimit 0;
-
-    outerCorrTolerance 1e-6;
-    nOuterCorr 100;
-
-    interpolatorUpdateFrequency 0;
-
-    coupled yes;
-
-    writeResidualsToFile yes;
-}
+// diffusivity quadratic inverseDistance (interface);
 
 // ************************************************************************* //

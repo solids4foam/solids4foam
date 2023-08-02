@@ -19,42 +19,30 @@ FoamFile
 
 dimensions      [0 0 0 1 0 0 0];
 
-internalField uniform 283;
+internalField   uniform 350;
 
 boundaryField
 {
-    left
-    {
-        type            fixedValue;
-        value           uniform 283;        
-    }
-
-    right
-    {
-        type            thermalRobin;
-
-        // Apply dirichlet bc
-        // dirichlet true;
-        // neumann false;
- 
-        lambda lambdaEff;
-        
-        value           uniform 283;        
-    }
-
-    bottom
-    {
-        type            zeroGradient;
-        value           $internalField;
-    }
-
     top
     {
-        type            zeroGradient;
+        type            thermalRobin;
+        lambda          k;
         value           $internalField;
     }
-
-    frontAndBack
+    left
+    {
+        type            zeroGradient;
+    }
+    right
+    {
+        type            zeroGradient;
+    }
+    bottom
+    {
+        type            fixedValue;
+        value           $internalField;
+    }
+    defaultFaces
     {
         type            empty;
     }

@@ -26,11 +26,11 @@ boundaryField
     left
     {
         type            thermalRobin;
-        
-        // neiTemperature  uniform 323;
-        // neiHeatFlux     uniform 0;
-        // deltaByLambda   uniform 0.02;
 
+        // Apply neumann bc
+        // dirichlet false;
+        // neumann true;
+        
         lambda k;
         
         value           $internalField;

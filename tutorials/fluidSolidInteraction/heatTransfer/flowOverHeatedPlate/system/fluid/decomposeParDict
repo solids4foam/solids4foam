@@ -11,53 +11,25 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volScalarField;
-    location    "0";
-    object      T;
+    class       dictionary;
+    object      decomposeParDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 0 0 1 0 0 0];
+numberOfSubdomains 4;
 
-internalField uniform 283;
+method          simple;
 
-boundaryField
+simpleCoeffs
 {
-    left
-    {
-        type            fixedValue;
-        value           uniform 283;        
-    }
-
-    right
-    {
-        type            thermalRobin;
-
-        // Apply dirichlet bc
-        // dirichlet true;
-        // neumann false;
- 
-        lambda lambdaEff;
-        
-        value           uniform 283;        
-    }
-
-    bottom
-    {
-        type            zeroGradient;
-        value           $internalField;
-    }
-
-    top
-    {
-        type            zeroGradient;
-        value           $internalField;
-    }
-
-    frontAndBack
-    {
-        type            empty;
-    }
+    n               (2 2 1);
+    delta           0.001;
 }
+
+distributed     no;
+
+roots
+(
+);
 
 // ************************************************************************* //
