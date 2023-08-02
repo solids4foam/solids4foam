@@ -610,9 +610,9 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     sigma0();
 
     // Check and warn for zero inital stress
-    if (gsum(mag(sigma0())).value()==0.0)
+    if (gSum(mag(sigma0())).value()==0.0)
     {
-        FoamWarningIn("linearElasticMohrCoulombPlastic") 
+        WarningIn("linearElasticMohrCoulombPlastic") 
         << "Initial stress is zero everywhere, "
         << "since Mohr-Coulomb material law is stress-state dependent, "
         << "this may lead to problems. Proceed with caution." << endl;
