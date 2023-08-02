@@ -413,7 +413,6 @@ void Foam::linearElasticMohrCoulombPlastic::calculateEigens
     }
 }
 
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -609,6 +608,15 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
 
     // Create the initial stress field
     sigma0();
+
+    // Check and warn for zero inital stress
+    if (gsum(mag(sigma0())).value()==0.0)
+    {
+        FoamWarningIn("linearElasticMohrCoulombPlastic") 
+        << "Initial stress is zero everywhere, "
+        << "since Mohr-Coulomb material law is stress-state dependent, "
+        << "this may lead to problems. Proceed with caution." << endl;
+    }
 }
 
 
@@ -670,7 +678,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
     );
 
     // Set sigma to sigma effective trial, including the initial stress
-    sigma = sigma.oldTime() + DSigmaTrial + sigma0();
+    sigma = deltaSigma_.oldTime() + DSigmaTrial + sigma0();
 
     // Take a reference to internal fields for efficiency
     symmTensorField& sigmaI = sigma;
@@ -705,7 +713,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
     deltaSigma_.storePrevIter();
 
     // Update the stress variation tensor
-    deltaSigma_ = sigma-sigma0();
+    deltaSigma_ = sigma - sigma0();
     // Note: if a poro-elasto-plastic law is used then the pore-pressure term
     // will be added to the effective stress after this
 }
@@ -779,10 +787,10 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     // residual
     deltaSigmaf_.storePrevIter();
 
-    // Update the effective stress tensor
+    // Update the stress variation tensor
+    deltaSigmaf_ = sigma-sigma0f();
     // Note: if a poro-elasto-plastic law is used then the pore-pressure term
     // will be added after this
-    deltaSigmaf_ = sigma-sigma0f();
 }
 
 
