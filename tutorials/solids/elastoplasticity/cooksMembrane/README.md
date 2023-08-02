@@ -77,7 +77,7 @@ The `solidPointDisplacement` function finds the mesh vertex nearest to the speci
 
 ## Running the Case
 
-The tutorial case is located at `solids4foam/tutorials/solids/elastoplasticity/cooksMembrane`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the Allrun consists of creating the mesh using `blockMesh` (`> ./blockMesh`) followed by running the `solids4foam` solver (`> ./solids4Foam`).
+The tutorial case is located at `solids4foam/tutorials/solids/elastoplasticity/cooksMembrane`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the Allrun consists of creating the mesh using `blockMesh` (`> blockMesh`) followed by running the `solids4foam` solver (`> solids4Foam`).
 
 
 ---
