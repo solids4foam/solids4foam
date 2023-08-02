@@ -40,11 +40,7 @@ ifdef PETSC_DIR
         endif
     endif
     VERSION_SPECIFIC_INC += \
-        $(PINC) $(PETSC_CC_INCLUDES) \
-        -DUSE_PETSC
-    VERSION_SPECIFIC_INC += \
-        $(PETSC_CC_INCLUDES) \
-        -DUSE_PETSC
+        $(PINC) $(PETSC_CC_INCLUDES) -DUSE_PETSC
     VERSION_SPECIFIC_LIBS += $(PETSC_LIB)
 endif
 
