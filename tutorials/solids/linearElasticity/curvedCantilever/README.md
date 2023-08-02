@@ -1,4 +1,8 @@
-# `Curved cantilever beam`
+---
+sort: 4
+---
+
+# Curved Cantilever Beam: `curvedCantilever`
 
 ---
 
@@ -9,13 +13,13 @@ Prepared by Ivan Batistić
 ## Tutorial Aims
 
 - Demonstrate how to perform a solid-only analysis in solids4foam.
-- To demonstrate solver performance under conditions in which shear-locking phenomena can occur.
+- To demonstrate solver performance under conditions in which the shear-locking phenomena can occur.
 
 ---
 
-## Case overview
+## Case Overview
 
-The curved cantilever beam is fixed on the left side and the right side has prescribed horizontal traction, as shown in Fig 1. The prescribed horizontal traction is 200 Pa. The beam inner radius is set to $a=$ 0.31 m and the beam outer radius to $b = $ 0.33 m. The Young's modulus is $E=$ 100 Pa, and the Poisson's ratio is $\nu=$ 0.3. Gravitation effects are neglected, and there are no body forces. The problem is solved as static, using one loading increment.
+The curved cantilever beam is fixed on the left side, and the right side has prescribed horizontal traction, as shown in Fig 1. The prescribed horizontal traction is 200 Pa. The beam's inner radius is set to $a=$ 0.31 m and the beam's outer radius to $b = $ 0.33 m. The Young's modulus is $E=$ 100 Pa and the Poisson's ratio is $\nu=$ 0.3. Gravitation effects are neglected, and there are no body forces. The problem is solved as static, using one loading increment.
 
 <div style="text-align: center;">
   <img src="./images/curvedCantilever-geometry.png" alt="Image" width="400">
@@ -62,21 +66,22 @@ The curved cantilever beam is fixed on the left side and the right side has pres
   }
   ```
 
-  Figures 2 and 3 are showing $\sigma_{xx}$, $\sigma_{xy}$ and $\sigma_{yy}$ stress distributions along the line $\theta$=45$^{\circ}$ for computational meshes consisting of 100×100 and 200×50 control volumes. One can see that with mesh refinement, numerical results are converging to analytical ones. The data for plots presented in Fig 2 and 3 is extracted using the `sampleDict` located in `system` directory.
+  Figures 2 and 3 show $\sigma_{xx}$, $\sigma_{xy}$ and $\sigma_{yy}$ stress distributions along the line $\theta=45^{\circ}$ for computational meshes consisting of $100\times100$ and $200\times50$ cells. One can see that with mesh refinement, numerical results converge to analytical ones. The data for plots presented in Figures 2 and 3 is extracted using the `sampleDict` located in the `system` directory.
 
 <div style="text-align: center;">
   <img src="./images/sigmaAtTheta45deg-mesh100x10.png" alt="Image" width="800">
     <figcaption>
-     <strong>Figure 2: Stress distribution for mesh consisting of 100x10 CVs</strong>
+     <strong>Figure 2: Stress distribution for mesh consisting of 100x10 cells</strong>
     </figcaption>
 </div>
 
 <div style="text-align: center;">
   <img src="./images/sigmaAtTheta45deg-mesh200x50.png" alt="Image" width="800">
     <figcaption>
-     <strong>Figure 3: Stress distribution for mesh consisting of 200x50 CVs</strong>
+     <strong>Figure 3: Stress distribution for mesh consisting of 200x50 cells</strong>
     </figcaption>
 </div>
+
 
 
 
@@ -87,7 +92,7 @@ The curved cantilever beam is fixed on the left side and the right side has pres
 The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/cooksMembrane`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the Allrun consists of creating the mesh using `blockMesh` (`> ./blockMesh`) followed by running the `solids4foam` solver (`> ./solids4Foam`) and `> ./sample` utility. Optionally, if `gnuplot` is installed, the stress distribution is plotted in the `sigmaAtTheta45deg.png` file.
 
 ```warning
-The coupled version of this case, which uses the `coupledUnsLinearGeometryLinearElastic`, can currently only be run using solids4foam built on foam-extend. To modify the case to run with the segregated `linearGeometryTotalDisplacement` solid model, follow the instructions given in `tutorials/solids/linearElasticity/narrowTmember/README.md` file. 
+The coupled version of this case, which uses the `coupledUnsLinearGeometryLinearElastic`, can currently only be run using solids4foam built on foam-extend. To modify the case to run with the segregated `linearGeometryTotalDisplacement` solid model, follow the instructions in `tutorials/solids/linearElasticity/narrowTmember/README.md` file. 
 ```
 
 
