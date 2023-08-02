@@ -132,7 +132,10 @@ class linearElasticMohrCoulombPlastic
         //- Derived plasticity parameter
         const vector sigma_a_;
 
-        //- Effective stress surface field
+        //- Stress variation from initial (sigma = deltaSigma + sigma0)
+        volSymmTensorField deltaSigma_;
+
+        //- Stress variation surface field
         surfaceSymmTensorField deltaSigmaf_;
 
         //- Incremental of strain
@@ -152,10 +155,6 @@ class linearElasticMohrCoulombPlastic
 
         //- Equivalent plastic strain
         volScalarField epsilonPEq_;
-
-        //- stress variation from initial (sigma = deltaSigma + sigma0), used in
-        //  some stress-state-dependent mechLaws for residual calculation
-        volSymmTensorField deltaSigma_;
 
         //- Active yielding flag
         //     1.0 for active yielding

@@ -484,6 +484,19 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     r_lg1_(1, 1, m_),
     r_lg2_(1, m_, m_),
     sigma_a_((2.0*c_*Foam::sqrt(k_)/(k_ - 1.0)).value()*vector::one),
+    deltaSigma_
+    (
+        IOobject
+        (
+            "deltaSigma_",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+    ),
     deltaSigmaf_
     (
         IOobject
@@ -575,19 +588,6 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
         mesh,
         dimensionedScalar("zero", dimless, 0.0)
     ),
-    deltaSigma_
-    (
-        IOobject
-        (
-            "deltaSigma_",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
-    ),
     activeYield_
     (
         IOobject
@@ -610,12 +610,12 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     sigma0();
 
     // Check and warn for zero inital stress
-    if (gSum(mag(sigma0())).value()==0.0)
+    if (gSum(mag(sigma0())).value() < SMALL)
     {
-        WarningIn("linearElasticMohrCoulombPlastic") 
-        << "Initial stress is zero everywhere, "
-        << "since Mohr-Coulomb material law is stress-state dependent, "
-        << "this may lead to problems. Proceed with caution." << endl;
+        WarningIn("linearElasticMohrCoulombPlastic")
+            << "Initial stress is zero everywhere, "
+            << "since Mohr-Coulomb material law is stress-state dependent, "
+            << "this may lead to problems. Proceed with caution." << endl;
     }
 }
 
@@ -788,7 +788,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     deltaSigmaf_.storePrevIter();
 
     // Update the stress variation tensor
-    deltaSigmaf_ = sigma-sigma0f();
+    deltaSigmaf_ = sigma - sigma0f();
     // Note: if a poro-elasto-plastic law is used then the pore-pressure term
     // will be added after this
 }
