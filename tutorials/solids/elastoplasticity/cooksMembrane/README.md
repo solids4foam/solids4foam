@@ -68,7 +68,7 @@ The `solidPointDisplacement` function finds the mesh vertex nearest to the speci
 <div style="text-align: center;">
   <img src="./images/cooksMembrane-sigmay.png" alt="Image" width="500">
     <figcaption>
-        <strong>Figure 3: Contours of &#963<sub>y</sub> stress. The black line denotes the initial undeformed configuration </strong>
+        <strong>Figure 3: Contours of yield stress. The black line denotes the initial undeformed configuration </strong>
     </figcaption>
 </div>
 
