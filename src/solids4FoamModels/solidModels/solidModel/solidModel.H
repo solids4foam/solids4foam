@@ -596,6 +596,36 @@ public:
                 const label interfaceI
             ) const;
 
+            //- Face zone temperature
+            virtual tmp<scalarField> faceZoneTemperature
+            (
+                const label interfaceI
+            ) const
+            {
+                NotImplemented;
+                return tmp<scalarField>(new scalarField());
+            }
+
+            //- Face zone heat flux
+            virtual tmp<scalarField> faceZoneHeatFlux
+            (
+                const label interfaceI
+            ) const
+            {
+                NotImplemented;
+                return tmp<scalarField>(new scalarField());
+            }
+
+            //- Face zone heat transfer coeff (delta/lambda)
+            virtual tmp<scalarField> faceZoneHeatTransferCoeff
+            (
+                const label interfaceI
+            ) const
+            {
+                NotImplemented;
+                return tmp<scalarField>(new scalarField());
+            }
+
             //- Return enforceLinear switch
             const Switch& enforceLinear() const
             {
@@ -666,6 +696,29 @@ public:
                 const label patchID,
                 const vectorField& faceZoneTraction
             );
+
+            //- Set temperature and heat flux at specified patch
+            virtual void setTemperatureAndHeatFlux
+            (
+                const label interfaceI,
+                const label patchID,
+                const scalarField& faceZoneTemperature,
+                const scalarField& faceZoneHeatFlux
+            )
+            {
+                NotImplemented;
+            }
+
+            //- Set equivalent interface heat transfer coefficient
+            virtual void setEqInterHeatTransferCoeff
+            (
+                const label interfaceI,
+                const label patchID,
+                const scalarField& faceZoneHTC
+            )
+            {
+                NotImplemented;
+            }
 
             //- Check if solid model is diverging using the Jacobian field
             virtual Switch& checkEnforceLinear(const volScalarField& J);

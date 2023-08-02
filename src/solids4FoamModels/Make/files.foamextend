@@ -27,6 +27,7 @@ solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
+solidModels/thermalSolid/thermalSolid.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/interFluid/interFluid.C
@@ -41,6 +42,7 @@ fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInt
 fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
 fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
+fluidSolidInterfaces/thermalCouplingInterface/thermalCouplingInterface.C
 
 /*fluidSolidInterfaces/fvPatchFields/fsiInterfaceSolid/fsiInterfaceSolidFvPatchVectorField.C*/
 
@@ -89,6 +91,7 @@ $(thermalLaws)/constantThermal/constantThermal.C
 
 solidFvPatchFields = solidModels/fvPatchFields
 $(solidFvPatchFields)/analyticalPlateHoleTraction/analyticalPlateHoleTractionFvPatchVectorField.C
+$(solidFvPatchFields)/convectiveFlux/convectiveFluxFvPatchScalarField.C
 $(solidFvPatchFields)/displacementOrTraction/displacementOrTractionFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacement/fixedDisplacementFvPatchVectorField.C
 $(solidFvPatchFields)/fixedDisplacementZeroShear/fixedDisplacementZeroShearFvPatchVectorField.C
@@ -115,7 +118,6 @@ $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
 $(solidFvPatchFields)/solidDirectionMixed/solidDirectionMixedFvPatchVectorField.C
 $(solidFvPatchFields)/thermalConvection/thermalConvectionFvPatchScalarField.C
-$(solidFvPatchFields)/convectiveFlux/convectiveFluxFvPatchScalarField.C
 
 pointPatchFields = solidModels/pointPatchFields
 $(pointPatchFields)/componentMixed/componentMixedPointPatchFields.C
@@ -153,6 +155,8 @@ $(fluidFvPatchFields)/paraboloidInletVelocity/paraboloidInletVelocityFvPatchVect
 $(fluidFvPatchFields)/robin/robinFvPatchFields.C
 $(fluidFvPatchFields)/skewCorrectedLinearDC/skewCorrectedLinearDC.C
 $(fluidFvPatchFields)/transitionalParabolicVelocity/transitionalParabolicVelocityFvPatchVectorField.C
+$(fluidFvPatchFields)/thermalRobin/thermalRobinFvPatchScalarField.C
+$(fluidFvPatchFields)/flowRateOutletPressure/flowRateOutletPressureFvPatchScalarField.C
 
 fluidModels/pointPatchFields/timeVaryingVelocity/timeVaryingVelocityPointPatchVectorField.C
 
