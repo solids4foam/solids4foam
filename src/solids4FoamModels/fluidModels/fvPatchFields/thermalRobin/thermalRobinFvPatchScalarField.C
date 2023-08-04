@@ -216,18 +216,24 @@ void thermalRobinFvPatchScalarField::write(Ostream& os) const
     robinFvPatchScalarField::write(os);
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAMESI
     os.writeEntryIfDifferent<Switch>("neumann", true, neumann_);
     os.writeEntryIfDifferent<Switch>("dirichlet", true, dirichlet_);
 #else
     writeEntryIfDifferent<Switch>(os, "neumann", true, neumann_);
     writeEntryIfDifferent<Switch>(os, "dirichlet", true, dirichlet_);
-    
 #endif
 
+    
+#ifdef OPENFOAMFOUNDATION
+    writeEntry(os, "neiTemperature", neiTemperature_);
+    writeEntry(os, "neiHeatFlux", neiHeatFlux_);
+    writeEntry(os, "eqInterHeatTransferCoeff", eqInterHeatTransferCoeff_);    
+#else
     neiTemperature_.writeEntry("neiTemperature", os);
     neiHeatFlux_.writeEntry("neiHeatFlux", os);
     eqInterHeatTransferCoeff_.writeEntry("eqInterHeatTransferCoeff", os);
+#endif
 
     if (lambdaName_ != "lambda")
     {
