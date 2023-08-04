@@ -3,6 +3,7 @@ ifeq ($(WM_PROJECT), foam)
     VERSION_SPECIFIC_LIBS = \
         -lincompressibleTransportModels -lincompressibleTurbulenceModel \
         -lincompressibleRASModels -lincompressibleLESModels -llduSolvers \
+        -lbasicThermophysicalModels -lcompressibleTurbulenceModel \
         -linterfaceProperties -lfiniteArea -loversetMesh -loversetDynamicFvMesh
 else
     VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
