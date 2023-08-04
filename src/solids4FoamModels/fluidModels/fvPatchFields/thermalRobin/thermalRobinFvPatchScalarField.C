@@ -219,18 +219,15 @@ void thermalRobinFvPatchScalarField::write(Ostream& os) const
 #ifdef OPENFOAMESIORFOUNDATION
     os.writeEntryIfDifferent<Switch>("neumann", true, neumann_);
     os.writeEntryIfDifferent<Switch>("dirichlet", true, dirichlet_);
-    
-    writeEntry(os, "neiTemperature", neiTemperature_);
-    writeEntry(os, "neiHeatFlux", neiHeatFlux_);
-    writeEntry(os, "eqInterHeatTransferCoeff", eqInterHeatTransferCoeff_);
 #else
     writeEntryIfDifferent<Switch>(os, "neumann", true, neumann_);
     writeEntryIfDifferent<Switch>(os, "dirichlet", true, dirichlet_);
     
+#endif
+
     neiTemperature_.writeEntry("neiTemperature", os);
     neiHeatFlux_.writeEntry("neiHeatFlux", os);
     eqInterHeatTransferCoeff_.writeEntry("eqInterHeatTransferCoeff", os);
-#endif
 
     if (lambdaName_ != "lambda")
     {
