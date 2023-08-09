@@ -46,20 +46,6 @@ timePrecision   6;
 
 runTimeModifiable no;
 
-functions
-(
-    analyticalSolution
-    {
-        type    contactPatchTestAnalyticalSolution;
+#include "./system/functions"
 
-        // Upper block top surface vertical displacement
-        displacement   0.01;
-
-        // Young's modulus
-        E       1e6;
-
-        // Poisson's ratio
-        nu      1e-15;
-    }
-);
 // ************************************************************************* //
