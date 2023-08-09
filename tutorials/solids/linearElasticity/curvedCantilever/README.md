@@ -12,8 +12,8 @@ Prepared by Ivan Batistić
 
 ## Tutorial Aims
 
-- Demonstrate how to perform a solid-only analysis in s`solids4foam`;
-- To demonstrate solver performance under conditions in which the shear-locking phenomena can occur.
+- Demonstrate how to perform a solid-only analysis in `solids4foam`;
+- Examine solver performance under conditions in which the shear-locking phenomena can occur.
 
 ---
 

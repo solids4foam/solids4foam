@@ -1,3 +1,7 @@
+---
+sort: 5
+---
+
 # Contact patch test: `contactPatchTest`
 
 ---
@@ -8,8 +12,8 @@ Prepared by Ivan Batistić
 
 ## Tutorial Aims
 
-* To check can a uniform pressure field can be transmitted across a non-conformal contact interface;
-* To demonstrate solver performance when solving contact problems in small deformation settings.
+- Demonstrate that a uniform pressure field can be transmitted across a non-conformal contact interface;
+- Examine the solver performance when solving contact problems in small deformation settings.
 
 ---
 
