@@ -12,21 +12,22 @@ Prepared by Ivan Batistić
 
 ## Tutorial Aims
 
-- Demonstrate how to perform a solid-only analysis in solids4foam.
+- Demonstrate how to perform a solid-only analysis in s`solids4foam`;
 - To demonstrate solver performance under conditions in which the shear-locking phenomena can occur.
 
 ---
 
 ## Case Overview
 
-The curved cantilever beam is fixed on the left side, and the right side has prescribed horizontal traction, as shown in Fig 1. The prescribed horizontal traction is 200 Pa. The beam's inner radius is set to $$a= 0.31$$ m and the beam's outer radius to $$b =  0.33$$ m. The Young's modulus is $$E= 100$$ Pa and the Poisson's ratio is $$\nu = 0.3$$. Gravitation effects are neglected, and there are no body forces. The problem is solved as static, using one loading increment.
+The curved cantilever beam is fixed on the left side, and the right side has prescribed horizontal traction, as shown in Fig 1. The prescribed horizontal traction is $$200$$ Pa. The beam's inner radius is set to $$a= 0.31$$ m and the beam's outer radius to $$b =  0.33$$ m. The Young's modulus is $$E= 100$$ Pa and the Poisson's ratio is $$\nu = 0.3$$. Gravitation effects are neglected, and there are no body forces. The problem is solved as static, using one loading increment.
 
 <div style="text-align: center;">
-  <img src="./images/curvedCantilever-geometry.png" alt="Image" width="400">
+  <img src="./images/curvedCantilever-geometry.png" alt="Image" width="300">
     <figcaption>
      <strong>Figure 1: Problem geometry [1]</strong>
     </figcaption>
 </div>
+
 ---
 
 ## Expected results
@@ -35,9 +36,15 @@ The curved cantilever beam is fixed on the left side, and the right side has pre
 
 * The analytical solution for the stress field is [[1]](https://www.sciencedirect.com/book/9780123744463/elasticity):
 $$
-  \sigma_{r} = \frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta)\\
-  \sigma_{\theta} = \frac{P}{N}\left(3r-\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta)\\
-  \tau_{r\theta} = \tau_{\theta r} =-\frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\cos (\theta)
+\sigma_{r} = \frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta)
+$$
+
+$$
+\sigma_{\theta} = \frac{P}{N}\left(3r-\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta)
+$$
+
+$$
+\tau_{r\theta} = \tau_{\theta r} =-\frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\cos (\theta)
 $$
 
 The analytical solution is generated alongside solution fields using the function object located in the `system/controlDict`, where one needs to input geometry and material data:
