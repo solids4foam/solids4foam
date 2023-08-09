@@ -13,7 +13,7 @@ Prepared by Ivan Batistić
 
 ---
 
-## Case overview
+## Case Overview
 
 The contact patch test is designed to check can a uniform pressure field can be transmitted across a non-conformal contact interface. There are different versions of the patch test in the literature [[1](https://link.springer.com/book/10.1007/978-3-662-04864-1), [2](https://www.sciencedirect.com/science/article/abs/pii/S0045794901000487)]; here patch test proposed in [[3]](https://onlinelibrary.wiley.com/doi/abs/10.1002/%28SICI%291097-0207%2820000530%2948%3A3%3C435%3A%3AAID-NME891%3E3.0.CO%3B2-V) is considered. The lower block is fixed at the bottom surface, whereas the upper block has a prescribed displacement $$\Delta = 0.01$$ m at its top surface (see Figure 1). Both blocks have the same dimensions, $$1$$ m width and $$0.5$$ m height, and the same material properties, Young’s modulus $$E = 1 × 10^6$$ Pa and zero Poisson’s ratio $$\nu = 0$$.  Gravitation effects are neglected, and there are no body forces. The problem is solved as static, using one loading increment. At the contact interface, frictionless contact is considered, i.e. $$\mu=0$$.
 
@@ -25,7 +25,7 @@ The contact patch test is designed to check can a uniform pressure field can be 
 </div>
 ---
 
-## Expected results
+## Expected Results
 
 * Under plane strain conditions, the analytical solution to the problem is  [[1]](https://onlinelibrary.wiley.com/doi/abs/10.1002/%28SICI%291097-0207%2820000530%2948%3A3%3C435%3A%3AAID-NME891%3E3.0.CO%3B2-V):
   $$
@@ -58,7 +58,7 @@ Figure 2 shows the distribution of the relative error field $$e$$. The relative 
 $$
 e(\%)=\dfrac{\left| \sigma_y - \sigma_y^{analytical} \right|}{\left|\sigma_y^{analytical}\right|} \cdot 100.
 $$
-One can see that the error distribution is uniform, meaning that the `solidContact` boundary condition can correctly transmit a spatially uniform pressure field across a flat non-conformal interface in complete contact. Results for Fig. 2 are obtained using `foam-extend 4.1`  and `linearGeometryTotalDisplacement` solver, with normal penalty scale set to $$f_n^{scale}=5$$.
+One can see that the error distribution is uniform, meaning that the `solidContact` boundary condition can correctly transmit a spatially uniform pressure field across a flat non-conformal interface in complete contact. Results for Fig. 2 are obtained using `foam-extend 4.1`  and `linearGeometryTotalDisplacement` solver, with the normal penalty scale set to $$f_n^{scale}=5$$.
 
 <div style="text-align: center;">
   <img src="./images/contactPatchTest-relError.png" alt="Image" width="600">
