@@ -29,7 +29,6 @@ else
 endif
 
 ifdef PETSC_DIR
-    include ${PETSC_DIR}/lib/petsc/conf/petscvariables
     ifeq ($(WM_PROJECT), foam)
         include $(RULES)/mplib$(WM_MPLIB)
     else
@@ -40,8 +39,9 @@ ifdef PETSC_DIR
         endif
     endif
     VERSION_SPECIFIC_INC += \
-        $(PINC) $(PETSC_CC_INCLUDES) -DUSE_PETSC
-    VERSION_SPECIFIC_LIBS += $(PETSC_LIB)
+        $(PINC) -I$(PETSC_DIR)/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include \
+        -DUSE_PETSC
+    VERSION_SPECIFIC_LIBS += -L$(PETSC_DIR)/$(PETSC_ARCH)/lib -lpetsc
 endif
 
 ifdef S4F_NO_USE_EIGEN
