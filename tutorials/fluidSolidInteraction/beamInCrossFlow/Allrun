@@ -31,9 +31,9 @@ if command -v gnuplot &> /dev/null
 then
 
     echo "Generating deflection.pdf using gnuplot"
-    export OF_VERSION=`echo $WM_PROJECT_VERSION | sed -e 's/\.x/-9/' -e 's/\./\'$'\n/g' -e 's/-/\'$'\n/g' | grep "[0-9]" | head -2 | tr -d '\n'`
     gnuplot deflection.gnuplot &> /dev/null  
     echo "Generating force.pdf using gnuplot"
+    export OF_VERSION=`echo $WM_PROJECT_VERSION | sed -e 's/\.x/-9/' -e 's/\./\'$'\n/g' -e 's/-/\'$'\n/g' | grep "[0-9]" | head -2 | tr -d '\n'`
     if [ $OF_VERSION -eq 41 ];
     then
         gnuplot force_fe41.gnuplot &> /dev/null
