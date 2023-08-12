@@ -169,7 +169,7 @@ functionObjects/solidTorque/solidTorque.C
 functionObjects/solidTractions/solidTractions.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
 functionObjects/volumetricStrain/volumetricStrain.C
-functionObjects/fsiConvergenceData/fsiConvergenceData.H
+functionObjects/fsiConvergenceData/fsiConvergenceData.C
 
 
 numerics/amiZoneInterpolation/amiZoneInterpolation.C

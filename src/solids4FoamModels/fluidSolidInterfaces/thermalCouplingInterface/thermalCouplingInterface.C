@@ -20,8 +20,9 @@ License
 #include "thermalCouplingInterface.H"
 #include "addToRunTimeSelectionTable.H"
 #include "movingWallPressureFvPatchScalarField.H"
-
 #include "elasticWallPressureFvPatchScalarField.H"
+#include "OSspecific.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

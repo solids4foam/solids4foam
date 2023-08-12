@@ -35,6 +35,7 @@ Author
 #include "OStringStream.H"
 #include "IStringStream.H"
 #include "IOmanip.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
