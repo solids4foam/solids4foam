@@ -28,7 +28,7 @@ Author
     University of Tuscia.
 
 SourceFiles
-    pimpleFluid.foamextend.C
+    pimpleFluid.foundation.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -74,9 +74,6 @@ class pimpleFluid
         //- rAU field
         volScalarField rAU_;
 
-        //- rAUf field
-        surfaceScalarField rAUf_;
-
         //- Pressure reference object
         pressureReference pressureReference_;
 
@@ -104,14 +101,8 @@ class pimpleFluid
 
     // Private Member Functions
 
-        //- Reset flux if mesh changed
-        void updateRobinFsiInterfaceFlux();
-
         //- Update phi for Robin FSI boundary conditions
-        void updateRobinFsiInterface();
-
-        //- Correct phi after solving pressure equation
-        void correctRobinFsiInterfaceFlux();
+        void updateRobinFsiInterface(surfaceScalarField& phiHbyA);
 
         //- Correct phi function
         void correctPhi();

@@ -50,41 +50,7 @@ addToRunTimeSelectionTable(fluidModel, pimpleFluid, dictionary);
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
 
-void pimpleFluid::updateRobinFsiInterfaceFlux()
-{
-    forAll(U().boundaryField(), patchI)
-    {
-        if
-        (
-            (
-                isA<elasticWallPressureFvPatchScalarField>
-                (
-                    p().boundaryField()[patchI]
-                )
-             && isA<elasticSlipWallVelocityFvPatchVectorField>
-                (
-                    U().boundaryField()[patchI]
-                )
-            )
-         || (
-                isA<elasticWallPressureFvPatchScalarField>
-                (
-                    p().boundaryField()[patchI]
-                )
-             && isA<elasticWallVelocityFvPatchVectorField>
-                (
-                    U().boundaryField()[patchI]
-                )
-            )
-        )
-        {
-            Info<< "Mesh changed: updating flux on Robin interface.";
-            phi().boundaryFieldRef()[patchI] = 0;
-        }
-    }
-}
-
-void pimpleFluid::updateRobinFsiInterface()
+void pimpleFluid::updateRobinFsiInterface(surfaceScalarField& phiHbyA)
 {
     forAll(p().boundaryField(), patchI)
     {
@@ -120,10 +86,13 @@ void pimpleFluid::updateRobinFsiInterface()
              == fv::EulerDdtScheme<vector>::typeName
             )
             {
-                phi().boundaryFieldRef()[patchI] =
-                    phi().oldTime().boundaryField()[patchI];
+                phiHbyA.boundaryFieldRef()[patchI] =
+                (
+                    Uf_().oldTime().boundaryField()[patchI] &
+                    mesh().Sf().boundaryField()[patchI]
+                );
 
-                rAUf_.boundaryFieldRef()[patchI] =
+                rAU_.boundaryFieldRef()[patchI] =
                     runTime().deltaT().value();
             }
             else if
@@ -134,96 +103,14 @@ void pimpleFluid::updateRobinFsiInterface()
             {
                 if (runTime().timeIndex() == 1)
                 {
-                    phi().boundaryFieldRef()[patchI] =
-                        phi().oldTime().boundaryField()[patchI];
-                    rAUf_.boundaryFieldRef()[patchI] = runTime().deltaT().value();
+                    phiHbyA.boundaryFieldRef()[patchI] =
+                    (
+                        Uf_().oldTime().boundaryField()[patchI] &
+                        mesh().Sf().boundaryField()[patchI]
+                    );
 
-                    phi().oldTime().oldTime();
-                }
-                else
-                {
-                    scalar deltaT = runTime().deltaT().value();
-                    scalar deltaT0 = runTime().deltaT0().value();
-
-                    scalar Cn = 1 + deltaT/(deltaT + deltaT0);
-                    scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
-                    scalar Co = Cn + Coo;
-
-                    phi().boundaryFieldRef()[patchI] =
-                        (Co/Cn)*phi().oldTime().boundaryField()[patchI]
-                      - (Coo/Cn)
-                       *phi().oldTime().oldTime().boundaryField()[patchI];
-
-                    rAUf_.boundaryFieldRef()[patchI] =
-                        runTime().deltaT().value()/Cn;
-                }
-            }
-        }
-    }
-}
-
-void pimpleFluid::correctRobinFsiInterfaceFlux()
-{
-    forAll(p().boundaryField(), patchI)
-    {
-        if
-        (
-            (
-                isA<elasticWallPressureFvPatchScalarField>
-                (
-                    p().boundaryField()[patchI]
-                )
-             && isA<elasticSlipWallVelocityFvPatchVectorField>
-                (
-                    U().boundaryField()[patchI]
-                )
-            )
-         || (
-                isA<elasticWallPressureFvPatchScalarField>
-                (
-                    p().boundaryField()[patchI]
-                )
-             && isA<elasticWallVelocityFvPatchVectorField>
-                (
-                    U().boundaryField()[patchI]
-                )
-            )
-        )
-        {
-            const word ddtScheme(mesh().ddtScheme("ddt(" + U().name() +')'));
-
-            if
-            (
-                ddtScheme
-             == fv::EulerDdtScheme<vector>::typeName
-            )
-            {
-                phi().boundaryFieldRef()[patchI] =
-                    phi().oldTime().boundaryField()[patchI]
-                  - p().boundaryField()
-                    [
-                        patchI
-                    ].snGrad()*runTime().deltaT().value()
-                   *mesh().magSf().boundaryField()
-                    [
-                        patchI
-                    ];
-            }
-            else if
-            (
-                ddtScheme
-             == fv::backwardDdtScheme<vector>::typeName
-            )
-            {
-                if (runTime().timeIndex() == 1)
-                {
-                    phi().boundaryFieldRef()[patchI] =
-                        phi().oldTime().boundaryField()[patchI];
-
-                    rAUf_.boundaryFieldRef()[patchI] =
+                    rAU_.boundaryFieldRef()[patchI] =
                         runTime().deltaT().value();
-
-                    phi().oldTime().oldTime();
                 }
                 else
                 {
@@ -234,19 +121,25 @@ void pimpleFluid::correctRobinFsiInterfaceFlux()
                     scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
                     scalar Co = Cn + Coo;
 
-                    phi().boundaryFieldRef()[patchI] =
-                        (Co/Cn)*phi().oldTime().boundaryField()[patchI]
-                      - (Coo/Cn)
-                       *phi().oldTime().oldTime().boundaryField()[patchI];
+                    phiHbyA.boundaryFieldRef()[patchI] =
+                        (Co/Cn)*
+                        (
+                            Uf_().oldTime().boundaryField()[patchI] &
+                            mesh().Sf().boundaryField()[patchI]
+                        )
+                      - (Coo/Cn)*
+                        (
+                            Uf_().oldTime().oldTime().boundaryField()[patchI] &
+                            mesh().Sf().boundaryField()[patchI]
+                        );
 
-                    rAUf_.boundaryFieldRef()[patchI] =
-                        runTime().deltaT().value()/Cn;
+                    rAU_.boundaryFieldRef()[patchI] = deltaT/Cn;
                 }
             }
         }
     }
 }
-
+    
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 pimpleFluid::pimpleFluid
@@ -270,20 +163,6 @@ pimpleFluid::pimpleFluid
             mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        runTime.deltaT(),
-        zeroGradientFvPatchScalarField::typeName
-    ),
-    rAUf_
-    (
-        IOobject
-        (
-            "rAUf",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
         ),
         mesh(),
         runTime.deltaT(),
@@ -331,6 +210,23 @@ pimpleFluid::pimpleFluid
       );
     }
 
+    Uf_().oldTime();
+
+    word ddtScheme
+    (
+        mesh().ddtScheme("ddt(" + U().name() +')')
+    );
+
+    if
+    (
+        ddtScheme
+     == fv::backwardDdtScheme<vector>::typeName
+    )
+    {
+        Uf_().oldTime().oldTime();
+    }
+
+    
     if (LTS_)
     {
         Info<< "Using LTS" << endl;
@@ -359,8 +255,6 @@ pimpleFluid::pimpleFluid
         const surfaceScalarField& phi = this->phi();
         #include "CourantNo.H"
     }
-
-
 }
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
@@ -408,7 +302,6 @@ bool pimpleFluid::evolve()
     autoPtr<surfaceVectorField>& Uf = Uf_;
     scalar& cumulativeContErr = cumulativeContErr_;
 
-
     const bool correctPhi = correctPhi_;
     const bool checkMeshCourantNo = checkMeshCourantNo_;
     const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
@@ -419,7 +312,7 @@ bool pimpleFluid::evolve()
         if (pimple.firstPimpleIter() || moveMeshOuterCorrectors)
         {
             // fvModels not added yet
-            //fvModels.preUpdateMesh();
+            // fvModels.preUpdateMesh();
 
             // Ideally we would not need a specific FSI mesh update function
             // Hopefully we can remove the need for it soon
@@ -443,18 +336,10 @@ bool pimpleFluid::evolve()
                     #include "correctPhi.foundation.H"
                 }
 
-
-                   // Update flux in FSI interface with Robin BC
-                   updateRobinFsiInterfaceFlux();
-
-
-
-
                 if (checkMeshCourantNo)
                 {
                     #include "meshCourantNo.H"
                 }
-
             }
         }
 
@@ -466,7 +351,7 @@ bool pimpleFluid::evolve()
         // Solve the Momentum equation
 
         // MRF not implemented yet
-        //MRF.correctBoundaryVelocity(U);
+        // MRF.correctBoundaryVelocity(U);
 
         tmp<fvVectorMatrix> tUEqn
         (
@@ -494,19 +379,22 @@ bool pimpleFluid::evolve()
         // --- Pressure corrector loop
         while (pimple.correct())
         {
-            // pEqn.H
-
-            volScalarField rAU(1.0/UEqn.A());
-            volVectorField HbyA(constrainHbyA(rAU*UEqn.H(), U, p));
+            rAU_ = 1.0/UEqn.A();
+            // volScalarField rAU(1.0/UEqn.A());
+            volVectorField HbyA(constrainHbyA(rAU_*UEqn.H(), U, p));
             surfaceScalarField phiHbyA
             (
                 "phiHbyA",
                 fvc::flux(HbyA)
+              + fvc::interpolate(rAU_)*fvc::ddtCorr(U, phi, Uf)
             //+ MRF.zeroFilter(fvc::interpolate(rAU)*fvc::ddtCorr(U, phi, Uf))
             );
 
             //MRF.makeRelative(phiHbyA);
 
+            // Update flux on the FSI interface for Robin BCs
+            updateRobinFsiInterface(phiHbyA);
+            
             if (p.needReference())
             {
                 fvc::makeRelative(phiHbyA, U);
@@ -514,14 +402,14 @@ bool pimpleFluid::evolve()
                 fvc::makeAbsolute(phiHbyA, U);
             }
 
-            tmp<volScalarField> rAtU(rAU);
+            tmp<volScalarField> rAtU(rAU_);
 
             if (pimple.consistent())
             {
-                rAtU = 1.0/max(1.0/rAU - UEqn.H1(), 0.1/rAU);
+                rAtU = 1.0/max(1.0/rAU_ - UEqn.H1(), 0.1/rAU_);
                 phiHbyA +=
-                    fvc::interpolate(rAtU() - rAU)*fvc::snGrad(p)*mesh.magSf();
-                HbyA -= (rAU - rAtU())*fvc::grad(p);
+                    fvc::interpolate(rAtU() - rAU_)*fvc::snGrad(p)*mesh.magSf();
+                HbyA -= (rAU_ - rAtU())*fvc::grad(p);
             }
 
             if (pimple.nCorrPiso() <= 1)
@@ -532,10 +420,6 @@ bool pimpleFluid::evolve()
             // Update the pressure BCs to ensure flux consistency
             // constrainPressure(p, U, phiHbyA, rAtU(), MRF);
             constrainPressure(p, U, phiHbyA, rAtU());
-
-            // Update flux on the FSI interface for Robin BCs
-            updateRobinFsiInterface();
-
 
             // Non-orthogonal pressure corrector loop
             while (pimple.correctNonOrthogonal())
@@ -561,43 +445,23 @@ bool pimpleFluid::evolve()
 
             #include "continuityErrs.H"
 
-           // Correct flux due for Robin BCs according to temporal
-            // discretization
-            correctRobinFsiInterfaceFlux();
-
             // Explicitly relax pressure for momentum corrector
             p.relax();
 
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
-            //fvConstraints.constrain(U);
-
-            // Correct Uf if the mesh is moving
-            fvc::correctUf(Uf, U, phi);
-
-            // Make the fluxes relative to the mesh motion
-            fvc::makeRelative(phi, U);
+            // fvConstraints.constrain(U);
 
             gradU() = fvc::grad(U);
             ddtU_ = fvc::ddt(U);
-
-            // Make the fluxes absolute to the mesh motion
-            // fvc::makeAbsolute(phi, U);
-
-            // fvc::correctUf already does the steps below
-            // if (mesh.dynamic())
-            // {
-            //     // Update velocity on faces to account for modifications in the
-            //     // flux when using the Robin BCs
-            //     Uf_() = fvc::interpolate(U, "interpolate(U)");
-
-            //     // Get tangential velocity
-            //     Uf_() -= (mesh.Sf() & Uf_())*mesh.Sf()/magSqr(mesh.Sf());
-
-            //     // Update with normal from flux
-            //     Uf_() += phi*mesh.Sf()/magSqr(mesh.Sf());
-            // }
+            
+            // Correct Uf if the mesh is moving
+            fvc::correctUf(Uf, U, phi);
+            
+            // Make the fluxes relative to the mesh motion
+            fvc::makeRelative(phi, U);
         }
+
 
         if (pimple.turbCorr())
         {
@@ -605,6 +469,13 @@ bool pimpleFluid::evolve()
             turbulence_->correct();
         }
     }
+
+    // Make the fluxes absolute to the mesh motion
+    fvc::makeAbsolute(phi, U);
+
+
+    // Make the fluxes relative to the mesh motion
+    fvc::makeRelative(phi, U);
 
     return 0;
 }

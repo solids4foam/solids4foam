@@ -55,7 +55,7 @@ solvers
         mergeLevels     1;
     }
 
-    U
+    "U|UFinal"
     {
         solver          PBiCG;
         preconditioner  DILU;
@@ -63,8 +63,8 @@ solvers
         relTol          1e-3;
         minIter         1;
     }
-    
-    T
+
+    "T|TFinal"
     {
         solver          PBiCG;
         preconditioner  DILU;

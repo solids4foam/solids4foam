@@ -73,7 +73,6 @@ scalar backwardD2dt2Scheme<Type>::deltaT0_
     }
 }
 
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 template<class Type>
@@ -96,7 +95,7 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
-    // Default to 1st order Euler on the first timne step
+    // Default to 1st order Euler on the first time step
     if (mesh().time().timeIndex() == 1)
     {
         return EulerD2dt2Scheme<Type>(mesh()).fvcD2dt2(vf);
@@ -163,7 +162,7 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
-    // Default to 1st order Euler on the first timne step
+    // Default to 1st order Euler on the first time step
     if (mesh().time().timeIndex() == 1)
     {
         return EulerD2dt2Scheme<Type>(mesh()).fvcD2dt2(rho, vf);
@@ -195,11 +194,11 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
                 (
                     mesh()
                 ).fvcDdt(vf)
-                - coefft0*rho.oldTime()*backwardDdtScheme<Type>
+              - coefft0*rho.oldTime()*backwardDdtScheme<Type>
                 (
                     mesh()
                 ).fvcDdt(vf.oldTime())
-                + coefft00*rho.oldTime().oldTime()*backwardDdtScheme<Type>
+              + coefft00*rho.oldTime().oldTime()*backwardDdtScheme<Type>
                 (
                     mesh()
                 ).fvcDdt(vf.oldTime().oldTime())
@@ -229,7 +228,7 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
-    // Default to 1st order Euler on the first timne step
+    // Default to 1st order Euler on the first time step
     if (mesh().time().timeIndex() == 1)
     {
         return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(vf);
@@ -312,7 +311,7 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
-    // Default to 1st order Euler on the first timne step
+    // Default to 1st order Euler on the first time step
     if (mesh().time().timeIndex() == 1)
     {
         return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(rho, vf);
@@ -395,7 +394,7 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
-    // Default to 1st order Euler on the first timne step
+    // Default to 1st order Euler on the first time step
     if (mesh().time().timeIndex() == 1)
     {
         return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(rho, vf);

@@ -86,28 +86,36 @@ thermalCouplingInterface::thermalCouplingInterface
             const standAlonePatch& solidZone =
                 solid().globalPatches()[interI].globalPatch();
         
+#ifdef OPENFOAMESIORFOUNDATION
+            oldSolidFaceZoneTemperature_.set
+            (
+                interI,
+                new scalarField(solidZone.size(), 0)
+            );
+#else
             oldSolidFaceZoneTemperature_.set
             (
                 interI,
                 scalarField(solidZone.size(), 0)
             );
+#endif
             
             oldSolidFaceZoneHeatFlux_.set
             (
                 interI,
-                scalarField(solidZone.size(), 0)
+                new scalarField(solidZone.size(), 0)
             );
             
             oldOldSolidFaceZoneTemperature_.set
             (
                 interI,
-                scalarField(solidZone.size(), 0)
+                new scalarField(solidZone.size(), 0)
             );
             
             oldOldSolidFaceZoneHeatFlux_.set
             (
                 interI,
-                scalarField(solidZone.size(), 0)
+                new scalarField(solidZone.size(), 0)
             );
         }
     }

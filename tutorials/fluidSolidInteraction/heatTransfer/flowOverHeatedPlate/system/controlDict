@@ -52,12 +52,12 @@ maxCo           0.5;
 maxDeltaT       1;
 
 functions
-(
+{
     fsiConvData
     {
         type fsiConvergenceData;        
         region fluid;
     }
-);
+}
 
 // ************************************************************************* //

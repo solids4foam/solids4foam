@@ -25,7 +25,7 @@ Author
     Ported by Philip Cardiff, UCD.
 
 SourceFiles
-    pimpleFluid.foamextend.C
+    pimpleFluid.esi.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -58,6 +58,9 @@ class pimpleFluid
         //- Pointer to the velocity surface field
         autoPtr<surfaceVectorField> Uf_;
 
+        //- rAU field
+        volScalarField rAU_;
+
         //- Reference pressure cell
         label pRefCell_;
 
@@ -85,6 +88,14 @@ class pimpleFluid
         //- Cumulative continuity errors
         scalar cumulativeContErr_;
 
+        //- Solve energy equation
+        Switch solveEnergyEq_;
+
+        //- Temperature field
+        autoPtr<volScalarField> TPtr_;
+
+        //- Thermal conductivity field
+        autoPtr<volScalarField> lambdaEffPtr_;
 
     // Private Member Functions
 
@@ -99,6 +110,15 @@ class pimpleFluid
             const fvVectorMatrix& HUEqn
         );
 
+        //- Update phi for Robin FSI boundary conditions
+        void updateRobinFsiInterface(surfaceScalarField& phiHbyA);
+    
+        //- Solve energy equation if requred
+        void solveEnergyEq();
+
+        //- Return Boussinesq momentu source term
+        tmp<volVectorField> boussinesqMomentumSource() const;
+    
         //- Disallow default bitwise copy construct
         pimpleFluid(const pimpleFluid&);
 
@@ -143,10 +163,57 @@ public:
                 const label patchID
             ) const;
 
+            //- Set temperature and heat flux at specified patch
+            virtual void setTemperatureAndHeatFlux
+            (
+                fvPatchScalarField& patch,
+                const scalarField& temperature,
+                const scalarField& heatFlux
+            );
+
+            //- Set temperature and heat flux at specified patch
+            virtual void setTemperatureAndHeatFlux
+            (
+                const label interfaceI,
+                const label patchID,
+                const scalarField& faceZoneTemperature,
+                const scalarField& faceZoneHeatFlux
+            );
+
+            //- Set temperature and heat flux at specified patch
+            virtual void setEqInterHeatTransferCoeff
+            (
+                fvPatchScalarField& patch,
+                const scalarField& heatTransferCoeff
+            );
+
+            //- Set eq interface heat transfer coeff at specified patch
+            virtual void setEqInterHeatTransferCoeff
+            (
+                const label interfaceI,
+                const label patchID,
+                const scalarField& faceZoneHeatTransferCoeff
+            );
+
+            //- Patch temperature
+            virtual tmp<scalarField> patchTemperature
+            (
+                const label patchID
+            ) const;
+
+            //- Patch heat flux (W/m2)
+            virtual tmp<scalarField> patchHeatFlux(const label patchID) const;
+
+            //- Patch heat transfer coefficient
+            virtual tmp<scalarField> patchHeatTransferCoeff
+            (
+                const label patchID
+            ) const;
+    
         // Edit
 
             //- Evolve the fluid model
-            virtual bool evolve();
+            virtual bool evolve();    
 };
 
 
