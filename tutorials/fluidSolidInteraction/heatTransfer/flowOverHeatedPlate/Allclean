@@ -6,9 +6,6 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
-
 cleanCase
 cleanCase fluid
 cleanCase solid
@@ -25,3 +22,16 @@ fi
 \rm -rf case.foam
 \rm -rf residuals
 
+# Convert case version to FOAM EXTEND
+solids4Foam::convertCaseFormatFoamExtend .
+
+# Check fvSolution for foundation version
+if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
+then
+    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
+    then
+        echo "OpenFOAM.org specific: replacing 'residualControl' with"
+        echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
+        sed -i "s/outerCorrectorResidualControl/residualControl/g" "${CASE_DIR}"/system/fluid/fvSolution
+    fi
+fi

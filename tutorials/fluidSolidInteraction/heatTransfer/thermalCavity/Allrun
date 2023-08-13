@@ -9,24 +9,23 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-#solids4Foam::caseOnlyRunsWithFoamExtend
-
-# Create the mesh
-if [[ $WM_PROJECT == "foam" ]]
+# Check for foundation version
+if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
 then
-m4 -P constant/solid/blockMeshDict.m4 > constant/solid/polyMesh/blockMeshDict
-m4 -P constant/fluid/blockMeshDict.m4 > constant/fluid/polyMesh/blockMeshDict
-else
-m4 -P constant/solid/blockMeshDict.m4 > system/solid/blockMeshDict
-m4 -P constant/fluid/blockMeshDict.m4 > system/fluid/blockMeshDict
+    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
+    then
+        echo "OpenFOAM.org specific: replacing 'residualControl' with"
+        echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
+        sed -i "s/residualControl/outerCorrectorResidualControl/g" "${CASE_DIR}"/system/fluid/fvSolution
+    fi
 fi
 
+# Create the mesh
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run the solver
 solids4Foam::runApplication solids4Foam
-
 
 # ----------------------------------------------------------------- end-of-file
 
