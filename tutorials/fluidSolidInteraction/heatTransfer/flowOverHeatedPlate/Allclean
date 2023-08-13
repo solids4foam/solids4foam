@@ -9,6 +9,7 @@ source solids4FoamScripts.sh
 cleanCase
 cleanCase fluid
 cleanCase solid
+
 if [[ $WM_PROJECT == "foam" ]]
 then
     foamClearPolyMesh -region fluid
@@ -17,6 +18,7 @@ else
     foamCleanPolyMesh -region fluid
     foamCleanPolyMesh -region solid
 fi
+
 \rm -rf history constant/solid/polyMesh/boundary
 \rm -rf constant/solid/polyMesh/[c-z]*
 \rm -rf case.foam
@@ -26,7 +28,8 @@ fi
 solids4Foam::convertCaseFormatFoamExtend .
 
 # Check fvSolution for foundation version
-if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
+
+if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
 then
     if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
     then

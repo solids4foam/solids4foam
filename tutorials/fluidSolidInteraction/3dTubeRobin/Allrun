@@ -16,7 +16,7 @@ source solids4FoamScripts.sh
 solids4Foam::convertCaseFormat .
 
 # Check fvSolution for foundation version
-if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
+if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
 then
     if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
     then
