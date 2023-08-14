@@ -1,4 +1,6 @@
-
+---
+sort: 6
+---
 
 # Indentation of elastic half-space with a flat-ended rigid indenter: `flatEndedRigidIndenter`
 
