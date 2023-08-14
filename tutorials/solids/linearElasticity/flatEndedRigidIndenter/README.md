@@ -33,17 +33,17 @@ A rigid flat-ended indenter is pressed onto an elastic-half space, as shown in F
 ## Expected Results
 
 * The analytical solution for the pressure distribution (plane stress) is [[2]](https://www.cambridge.org/core/books/contact-mechanics/E3707F77C2EBCE727C3911AFBD2E4AC2):
-  $$
+$$
   p_n(x) = \frac{F}{\pi\sqrt{a^2-x^2}} \qquad \text{for } |x| \leq a,
-  $$
-  which is singular at the edge of the fixed contact zone. The indentation depth, i.e. indenter displacement, can be obtained using:
-  $$
+$$
+which is singular at the edge of the fixed contact zone. The indentation depth, i.e. indenter displacement, can be obtained using:
+$$
   u_z = \frac{F}{\pi E}\left[ 2 \text{ln} \left(\frac{2L}{a}\right) - (1+\nu) \right],
-  $$
-  where $L$ is the thickness of the elastic half-space. The boundary displacement outside the contact zone can be calculated as:
-  $$
+$$
+where $L$ is the thickness of the elastic half-space. The boundary displacement outside the contact zone can be calculated as:
+$$
   u_z(x) = \frac{F}{\pi E}\left[ 2 \text{ln} \left(\frac{2L}{a}\right) - (1+\nu) \right].
-  $$
+$$
 
 
 Figure 2 shows the distribution of the contact pressure. The diagram is created automatically within the `Allrun` script using `sample` utility and `gnuplot`. Further mesh refinement would lead to a closer approximation of the analytical solution. As the mesh is refined, the predicted contact pressure at the contact edge goes to infinity, as expected.
@@ -64,13 +64,8 @@ The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/f
 
 ---
 
-### References 
+### References
 
 [1] [Ivan Batistić. Segment-to-Segment Algorithm for Finite Volume Mechanical Contact Simulations. University of Zagreb, PhD thesis, 2022.](https://repozitorij.unizg.hr/islandora/object/fsb%3A8301)
 
 [2] [K. L. Johnson, Contact Mechanics. Cambridge University Press, 1985.](https://www.cambridge.org/core/books/contact-mechanics/E3707F77C2EBCE727C3911AFBD2E4AC2)
-
-
-
-
-
