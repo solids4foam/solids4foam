@@ -139,7 +139,7 @@ void pimpleFluid::updateRobinFsiInterface(surfaceScalarField& phiHbyA)
         }
     }
 }
-    
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 pimpleFluid::pimpleFluid
@@ -218,7 +218,7 @@ pimpleFluid::pimpleFluid
             ),
             fvc::interpolate(U())
         );
-        
+
         Uf_().oldTime();
 
         if
@@ -445,7 +445,7 @@ bool pimpleFluid::evolve()
 
             // Update flux on the FSI interface for Robin BCs
             updateRobinFsiInterface(phiHbyA);
-            
+
             if (p.needReference())
             {
                 fvc::makeRelative(phiHbyA, U);
@@ -505,10 +505,10 @@ bool pimpleFluid::evolve()
 
             gradU() = fvc::grad(U);
             ddtU_ = fvc::ddt(U);
-            
+
             // Correct Uf if the mesh is moving
             fvc::correctUf(Uf, U, phi);
-            
+
             // Make the fluxes relative to the mesh motion
             fvc::makeRelative(phi, U);
         }
@@ -518,7 +518,7 @@ bool pimpleFluid::evolve()
             laminarTransport_.correct();
             turbulence_->correct();
         }
-        
+
         // Solve energy equation if required
         solveEnergyEq();
     }

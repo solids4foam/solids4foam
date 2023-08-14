@@ -426,7 +426,7 @@ bool pimpleFluid::evolve()
 
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), U());
-        
+
     // CourantNo
     fluidModel::CourantNo();
 
@@ -522,7 +522,7 @@ bool pimpleFluid::evolve()
 
             // Make the fluxes relative to the mesh motion
             fvc::makeRelative(phi(), U());
-            
+
             p().relax();
 
             gradp() = fvc::grad(p());
@@ -539,7 +539,7 @@ bool pimpleFluid::evolve()
             laminarTransport_.correct();
             turbulence_->correct();
         }
-        
+
         // Needed for wallPressure bc
         laplNuU_ = fvc::laplacian(turbulence_->nuEff(), U());
         laplNuU_.correctBoundaryConditions();

@@ -23,6 +23,7 @@ Description
 
 Author
     Ported by Philip Cardiff, UCD.
+    Extension to Robin coupling and thermal analysed by Zeljko Tukovic, Zagreb.
 
 SourceFiles
     pimpleFluid.esi.C
@@ -112,13 +113,13 @@ class pimpleFluid
 
         //- Update phi for Robin FSI boundary conditions
         void updateRobinFsiInterface(surfaceScalarField& phiHbyA);
-    
+
         //- Solve energy equation if requred
         void solveEnergyEq();
 
         //- Return Boussinesq momentu source term
         tmp<volVectorField> boussinesqMomentumSource() const;
-    
+
         //- Disallow default bitwise copy construct
         pimpleFluid(const pimpleFluid&);
 
@@ -209,11 +210,11 @@ public:
             (
                 const label patchID
             ) const;
-    
+
         // Edit
 
             //- Evolve the fluid model
-            virtual bool evolve();    
+            virtual bool evolve();
 };
 
 

@@ -128,7 +128,7 @@ class pimpleFluid
 
         //- Return Boussinesq momentu source term
         tmp<volVectorField> boussinesqMomentumSource() const;
-    
+
         //- Disallow default bitwise copy construct
         pimpleFluid(const pimpleFluid&);
 
@@ -219,7 +219,7 @@ public:
             (
                 const label patchID
             ) const;
-    
+
         // Edit
 
             //- Evolve the fluid model

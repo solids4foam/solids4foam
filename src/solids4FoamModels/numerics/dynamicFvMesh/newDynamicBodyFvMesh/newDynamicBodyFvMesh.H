@@ -93,7 +93,7 @@ class newDynamicBodyFvMesh
         //- Rotational motion frequency
         scalar rotationFrequency_;
 
-    
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct

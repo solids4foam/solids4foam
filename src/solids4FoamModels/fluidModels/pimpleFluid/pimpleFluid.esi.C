@@ -144,7 +144,7 @@ void pimpleFluid::updateRobinFsiInterface
     }
 }
 
-    
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 pimpleFluid::pimpleFluid
@@ -217,7 +217,7 @@ pimpleFluid::pimpleFluid
                 (
                     "Uf",
                     runTime.timeName(),
-                    mesh(), 
+                    mesh(),
                     IOobject::READ_IF_PRESENT,
                     IOobject::AUTO_WRITE
                 ),
@@ -240,7 +240,7 @@ pimpleFluid::pimpleFluid
     const fvMesh& mesh = this->mesh();
     const surfaceScalarField& phi = this->phi();
     #include "CourantNo.H"
-    
+
     // Create temperature field if necessary
     if (solveEnergyEq_)
     {
@@ -491,25 +491,25 @@ bool pimpleFluid::evolve()
 
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
-         // fvOptions.correct(U);    
+         // fvOptions.correct(U);
         }
 
         // Correct Uf if the mesh is moving
         fvc::correctUf(Uf, U, phi);
-    
+
         // Make the fluxes relative to the mesh motion
         fvc::makeRelative(phi, U);
-            
+
         if (pimple.turbCorr())
         {
             laminarTransport_.correct();
             turbulence_->correct();
         }
-        
+
         // Solve energy equation if required
         solveEnergyEq();
     }
-        
+
     return 0;
 }
 
