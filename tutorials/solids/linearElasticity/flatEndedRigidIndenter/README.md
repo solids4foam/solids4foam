@@ -38,7 +38,7 @@ $$
 p_n(x) = \frac{F}{\pi\sqrt{a^2-x^2}} \qquad \text{for } |x| \leq a,
 $$
 
-where $$a$$ is half the contact width and $$x$$ is the $$x$$ coordinate. This pressure distribution is singular at the edge ($$|x| \equiv a$$) of the fixed contact zone.
+where $$a$$ is half the contact width and $$x$$ is the $$x$$ coordinate. This pressure distribution is singular at the edge ($$x \equiv \pm a$$) of the fixed contact zone.
 
 The displacement of the rigid indentor ($$d$$) is related to the applied force ($$F$$) can be obtained using:
 
@@ -48,7 +48,7 @@ $$
 
 where $$L$$ is the thickness of the elastic half-space.
 
-The boundary displacement outside the contact zone ($$|x| \geq b$$) can be calculated as:
+The boundary displacement outside the contact zone can be calculated as:
 
 $$
 u_z(x) = u_z + \frac{2(1-\nu^2)F}{\pi E} \text{ ln} \left[ \frac{x}{a} + \sqrt{\frac{x^2}{a^2}-1} \right] \qquad \text{for } |x| \geq a.
