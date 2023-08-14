@@ -235,7 +235,7 @@ bool Foam::contactPatchTestAnalyticalSolution::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::contactPatchTestAnalyticalSolution::write()
 {
-    return writeData();
+    return false;
 }
 #endif
 

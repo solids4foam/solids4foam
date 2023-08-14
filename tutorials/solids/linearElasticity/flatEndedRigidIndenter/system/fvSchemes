@@ -12,40 +12,43 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      controlDict;
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     solids4Foam;
+d2dt2Schemes
+{
+    default            steadyState;
+}
 
-startFrom       startTime;
+ddtSchemes
+{
+    default            steadyState;
+}
 
-startTime       0;
+gradSchemes
+{
+    default            leastSquares;
+}
 
-stopAt          endTime;
+divSchemes
+{
+    default            Gauss linear;
+}
 
-endTime         1;
+laplacianSchemes
+{
+    default            Gauss linear corrected;
+}
 
-deltaT          1;
+snGradSchemes
+{
+    default            corrected;
+}
 
-writeControl    timeStep;
-
-writeInterval   1;
-
-cycleWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression uncompressed;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable no;
-
-#include "./system/functions"
+interpolationSchemes
+{
+    default            linear;
+}
 
 // ************************************************************************* //

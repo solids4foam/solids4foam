@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create mesh
+solids4Foam::runApplication blockMesh
+
+# Mirror mesh
+solids4Foam::runApplication mirrorMesh 
+mv 0/polyMesh/* constant/polyMesh/
+rm -rf 0/polyMesh
+
+# Run solver
+solids4Foam::runApplication solids4Foam
+
+# Create plot
+sample -latestTime > log.sample
+
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating plot using gnuplot"
+    gnuplot plot.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

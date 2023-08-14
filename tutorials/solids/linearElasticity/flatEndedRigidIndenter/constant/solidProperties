@@ -12,40 +12,31 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      controlDict;
+    location    "constant";
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     solids4Foam;
+// linearGeometry: assumes small strains and rotations
+solidModel     linearGeometryTotalDisplacement;
+//solidModel     unsLinearGeometry;
 
-startFrom       startTime;
+"linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+{
+    // Maximum number of momentum correctors
+    nCorrectors     10000;
 
-startTime       0;
+    // Solution tolerance for displacement
+    solutionTolerance 1e-06;
 
-stopAt          endTime;
+    // Alternative solution tolerance for displacement
+    alternativeTolerance 1e-06;
 
-endTime         1;
+    // Material law solution tolerance
+    materialTolerance 1e-04;
 
-deltaT          1;
-
-writeControl    timeStep;
-
-writeInterval   1;
-
-cycleWrite      0;
-
-writeFormat     ascii;
-
-writePrecision  6;
-
-writeCompression uncompressed;
-
-timeFormat      general;
-
-timePrecision   6;
-
-runTimeModifiable no;
-
-#include "./system/functions"
+    // Write frequency for the residuals
+    infoFrequency   100;
+}
 
 // ************************************************************************* //
