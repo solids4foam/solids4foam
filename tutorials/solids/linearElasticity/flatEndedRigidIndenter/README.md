@@ -36,11 +36,16 @@ A rigid flat-ended indenter is pressed onto an elastic-half space, as shown in F
 $$
   p_n(x) = \frac{F}{\pi\sqrt{a^2-x^2}} \qquad \text{for } |x| \leq a,
 $$
-which is singular at the edge of the fixed contact zone. The indentation depth, i.e. indenter displacement, can be obtained using:
+
+This pressure distribution is singular at the edge of the fixed contact zone.
+
+The indentation depth, i.e. indenter displacement, can be obtained using:
 $$
   u_z = \frac{F}{\pi E}\left[ 2 \text{ln} \left(\frac{2L}{a}\right) - (1+\nu) \right],
 $$
-where $L$ is the thickness of the elastic half-space. The boundary displacement outside the contact zone can be calculated as:
+where $L$ is the thickness of the elastic half-space.
+
+The boundary displacement outside the contact zone can be calculated as:
 $$
   u_z(x) = \frac{F}{\pi E}\left[ 2 \text{ln} \left(\frac{2L}{a}\right) - (1+\nu) \right].
 $$
