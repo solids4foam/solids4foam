@@ -46,7 +46,7 @@ $$
 u_z = \frac{F}{\pi E}\left[ 2 \text{ln} \left(\frac{2L}{a}\right) - (1+\nu) \right],
 $$
 
-where $L$ is the thickness of the elastic half-space.
+where $$L$$ is the thickness of the elastic half-space.
 
 The boundary displacement outside the contact zone can be calculated as:
 
