@@ -383,9 +383,11 @@ scalar thermalCouplingInterface::calcThermalResidual()
         );
 
         // Calculate thermal residual
-        scalarField residual =
+        const scalarField residual
+        (
             solidZoneTemperature
-          - fluidZoneTemperature;
+          - fluidZoneTemperature
+        );
 
 
         // Calculate thermal resudal norm
