@@ -155,6 +155,12 @@ function solids4Foam::convertCaseFormat()
         echo "Moving ${CASE_DIR}/system/createPatchDict.openfoam to system/createPatchDict"
         mv "${CASE_DIR}/system/createPatchDict.openfoam" "system/createPatchDict"
     fi
+    # 9. Resolve force post-processing path from foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
+    then
+        echo "found the force.gnuplot, changing the directory path"
+        sed -i  "s|forces/0/forces.dat|./postProcessing/fluid/forces/0/force.dat|g" force.gnuplot
+    fi
 
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
@@ -297,6 +303,12 @@ function solids4Foam::convertCaseFormatFoamExtend()
         mv "${CASE_DIR}/system/createPatchDict" "system/createPatchDict.openfoam"
         echo "Moving ${CASE_DIR}/system/createPatchDict.foamextend to system/createPatchDict"
         mv "${CASE_DIR}/system/createPatchDict.foamextend" "system/createPatchDict"
+    fi
+    # 9. Resolve force post-processing path for foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
+    then
+        echo "found the force.gnuplot, changing the directory path"
+        sed -i "s|./postProcessing/fluid/forces/0/force.dat|forces/0/forces.dat|g" force.gnuplot
     fi
 
     echo

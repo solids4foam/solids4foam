@@ -1,10 +1,10 @@
 functions
-(
+{
     forces
     {
         type                forces;
         region              fluid;
-        functionObjectLibs  ( "libforces.so" );
+        libs                ( "libforces.so" );
         outputControl       timeStep;
         outputInterval      1;
         patches             (interface);
@@ -20,4 +20,4 @@ functions
         type                solidPointDisplacement;
         point               (0.45 0.15 -0.15);
     }
-);
+}
