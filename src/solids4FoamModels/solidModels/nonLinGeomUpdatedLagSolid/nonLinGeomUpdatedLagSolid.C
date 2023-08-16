@@ -161,7 +161,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
     Info<< "Evolving solid solver" << endl;
 
     int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solverPerfDD;
     SolverPerformance<vector>::debug = 0;
 #else
@@ -197,7 +197,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
         solidModel::setCellDisps(DDEqn);
 
         // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
         const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
 #endif
 
@@ -241,7 +241,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
        !converged
         (
             iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             mag(solverPerfDD.initialResidual()),
             cmptMax(solverPerfDD.nIterations()),
 #else
@@ -268,7 +268,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;
@@ -368,7 +368,7 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
     rho_ = rho_.oldTime()/relJ_;
 
     // Move the mesh to the deformed configuration
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const vectorField oldPoints = mesh().points();
 #else
     const vectorField oldPoints = mesh().allPoints();

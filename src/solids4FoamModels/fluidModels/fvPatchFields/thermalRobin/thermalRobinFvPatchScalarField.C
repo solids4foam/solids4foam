@@ -62,7 +62,7 @@ thermalRobinFvPatchScalarField
 )
 :
     robinFvPatchScalarField(ptf, p, iF, mapper),
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     neiTemperature_(mapper(ptf.neiTemperature_)),
     neiHeatFlux_(mapper(ptf.neiHeatFlux_)),
     eqInterHeatTransferCoeff_(mapper(ptf.eqInterHeatTransferCoeff_)),
@@ -116,7 +116,7 @@ thermalRobinFvPatchScalarField
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 thermalRobinFvPatchScalarField::
 thermalRobinFvPatchScalarField
 (
@@ -190,7 +190,7 @@ void thermalRobinFvPatchScalarField::write(Ostream& os) const
 {
     robinFvPatchScalarField::write(os);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "neiTemperature", neiTemperature_);
     writeEntry(os, "neiHeatFlux", neiHeatFlux_);
     writeEntry(os, "eqInterHeatTransferCoeff", eqInterHeatTransferCoeff_);

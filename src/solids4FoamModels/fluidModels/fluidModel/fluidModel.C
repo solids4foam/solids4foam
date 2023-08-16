@@ -118,7 +118,7 @@ void Foam::fluidModel::updateRobinFsiInterface
         )
         {
             const word ddtScheme =
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 word(mesh().ddtScheme("ddt(" + U.name() +')'));
 #else
                 mesh().schemesDict().ddtScheme("ddt(" + U.name() +')');
@@ -126,7 +126,7 @@ void Foam::fluidModel::updateRobinFsiInterface
 
             if (ddtScheme == fv::EulerDdtScheme<vector>::typeName)
             {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 phi.boundaryFieldRef()[patchI] =
                     phi.oldTime().boundaryField()[patchI];
                 rAUf.boundaryFieldRef()[patchI] = runTime().deltaT().value();
@@ -140,7 +140,7 @@ void Foam::fluidModel::updateRobinFsiInterface
             {
                 if (runTime().timeIndex() == 1)
                 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     phi.boundaryFieldRef()[patchI] =
                         phi.oldTime().boundaryField()[patchI];
                     rAUf.boundaryFieldRef()[patchI] = runTime().deltaT().value();
@@ -161,7 +161,7 @@ void Foam::fluidModel::updateRobinFsiInterface
                     scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
                     scalar Co = Cn + Coo;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     phi.boundaryFieldRef()[patchI] =
                         (Co/Cn)*phi.oldTime().boundaryField()[patchI]
                       - (Coo/Cn)
@@ -352,7 +352,7 @@ void Foam::fluidModel::boundPU
     }
 }
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
 Foam::meshObjects::gravity Foam::fluidModel::readG() const
 #else
 Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
@@ -384,7 +384,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
         false // do not register
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if
     (
         wavePropertiesHeader.typeHeaderOk<IOdictionary>(true)
@@ -403,7 +403,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
     // The if-else-if structure is broken to keep the compiler happy with the
     // lack of a return statement above
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if
     (
         wavePropertiesHeader.typeHeaderOk<IOdictionary>(true)
@@ -639,10 +639,10 @@ Foam::fluidModel::fluidModel
     UMax_("UMax", dimVelocity, 0),
     smallU_("smallU", dimVelocity, 1e-10),
     cumulativeContErr_(0.0),
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     fvModels_(fvModels::New(mesh())),
     fvConstraints_(fvConstraints::New(mesh())),
-#elif OPENFOAMESI
+#elif OPENFOAM_COM
     fvOptions_(fv::options::New(mesh())),
 #endif
     fsiMeshUpdate_(false),
@@ -666,7 +666,7 @@ Foam::fluidModel::fluidModel
         }
     }
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     // Check if any finite volume models is present
     if (!fvModels_.PtrListDictionary<fvModel>::size())
     {
@@ -678,7 +678,7 @@ Foam::fluidModel::fluidModel
     {
         Info << "No fvConstraints present" << endl;
     }
-#elif OPENFOAMESI
+#elif OPENFOAM_COM
     // Check if any finite volume option is present
     if (!fvOptions_.optionList::size())
     {
@@ -796,7 +796,7 @@ Foam::tmp<Foam::scalarField> Foam::fluidModel::faceZoneHeatTransferCoeff
 
 void Foam::fluidModel::UisRequired()
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (!Uheader_.typeHeaderOk<volVectorField>(true))
 #else
     if (!Uheader_.headerOk())
@@ -811,7 +811,7 @@ void Foam::fluidModel::UisRequired()
 
 void Foam::fluidModel::pisRequired()
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (!pheader_.typeHeaderOk<volScalarField>(true))
 #else
     if (!pheader_.headerOk())

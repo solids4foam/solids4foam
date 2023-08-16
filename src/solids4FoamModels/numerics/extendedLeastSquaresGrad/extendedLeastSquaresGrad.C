@@ -23,7 +23,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 
 #include "extendedLeastSquaresGrad.H"
 #include "extendedLeastSquaresVectors.H"
@@ -98,7 +98,7 @@ extendedLeastSquaresGrad<Type>::calcGrad
     const surfaceVectorField& ownLs = lsv.pVectors();
     const surfaceVectorField& neiLs = lsv.nVectors();
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     const labelList& owner = mesh.owner();
     const labelList& neighbour = mesh.neighbour();
 #else
@@ -122,7 +122,7 @@ extendedLeastSquaresGrad<Type>::calcGrad
     {
         const fvsPatchVectorField& patchOwnLs = ownLs.boundaryField()[patchi];
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
         const labelList& faceCells =
             lsGrad.boundaryField()[patchi].patch().faceCells();
 #else
@@ -184,6 +184,6 @@ extendedLeastSquaresGrad<Type>::calcGrad
 
 } // End namespace Foam
 
-#endif // end of #ifdef OPENFOAMESIORFOUNDATION
+#endif // end of #ifdef OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

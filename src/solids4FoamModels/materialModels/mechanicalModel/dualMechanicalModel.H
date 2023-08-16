@@ -137,7 +137,7 @@ public:
             //- Return const access to the mesh
             const fvMesh& mesh() const;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             //- Material tangent field defined at dual mesh faces
             tmp< Field< scalarSquareMatrix>> materialTangentFaceField() const;
 #endif

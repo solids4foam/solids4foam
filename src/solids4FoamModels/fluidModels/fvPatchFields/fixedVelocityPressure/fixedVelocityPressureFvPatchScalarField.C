@@ -74,7 +74,7 @@ fixedVelocityPressureFvPatchScalarField
 {}
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 fixedVelocityPressureFvPatchScalarField::
 fixedVelocityPressureFvPatchScalarField
 (
@@ -198,7 +198,7 @@ void fixedVelocityPressureFvPatchScalarField::updateCoeffs()
 void fixedVelocityPressureFvPatchScalarField::write(Ostream& os) const
 {
     fixedGradientFvPatchScalarField::write(os);
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

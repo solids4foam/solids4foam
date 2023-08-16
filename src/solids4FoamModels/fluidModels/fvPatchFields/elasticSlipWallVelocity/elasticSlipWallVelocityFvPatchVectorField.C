@@ -45,7 +45,7 @@ elasticSlipWallVelocityFvPatchVectorField
 )
 :
     solidDirectionMixedFvPatchVectorField(p, iF),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     myTimeIndex_(internalField().mesh().time().timeIndex()),
 #else
     myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
@@ -84,7 +84,7 @@ elasticSlipWallVelocityFvPatchVectorField
 )
 :
     solidDirectionMixedFvPatchVectorField(p, iF),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     myTimeIndex_(internalField().mesh().time().timeIndex()),
 #else
     myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
@@ -96,7 +96,7 @@ elasticSlipWallVelocityFvPatchVectorField
 {
 //     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();
     const pointField& points = mesh.points();
 #else
@@ -158,7 +158,7 @@ elasticSlipWallVelocityFvPatchVectorField
     }
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 elasticSlipWallVelocityFvPatchVectorField::
 elasticSlipWallVelocityFvPatchVectorField
 (
@@ -202,7 +202,7 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
 
     Info << "elasticSlipWallVelocityFvPatchVectorField::updateCoeffs" << endl;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();
     const pointField& points = mesh.points();
 #else
@@ -218,7 +218,7 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
     const volVectorField& U =
         mesh.lookupObject<volVectorField>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             internalField().name()
 #else
             dimensionedInternalField().name()
@@ -227,7 +227,7 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
 
     const word ddtScheme
     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         mesh.ddtScheme("ddt(" + U.name() +')')
 #else
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
@@ -351,7 +351,7 @@ void elasticSlipWallVelocityFvPatchVectorField::updateCoeffs()
 void elasticSlipWallVelocityFvPatchVectorField::write(Ostream& os) const
 {
     fvPatchVectorField::write(os);
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

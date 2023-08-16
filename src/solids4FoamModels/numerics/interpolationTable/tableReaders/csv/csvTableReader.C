@@ -170,7 +170,7 @@ void Foam::csvTableReader<Type>::write(Ostream& os) const
 {
     tableReader<Type>::write(os);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "hasHeaderLine", headerLine_);
     writeEntry(os, "timeColumn", timeColumn_);
 #else
@@ -190,7 +190,7 @@ void Foam::csvTableReader<Type>::write(Ostream& os) const
     }
     os  << token::END_STATEMENT << nl;
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "separator", string(separator_));
 #else
     os.writeKeyword("separator")

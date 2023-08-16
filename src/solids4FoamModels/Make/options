@@ -17,10 +17,9 @@ ifeq (FOAMEXTEND, $(FOAM_FLAVOUR))
         -lincompressibleRASModels -lincompressibleLESModels -llduSolvers \
         -linterfaceProperties -lfiniteArea -loversetMesh -loversetDynamicFvMesh
 else
-    VERSION_SPECIFIC_INC = -DOPENFOAM_NOT_EXTEND -DOPENFOAMESIORFOUNDATION
+    VERSION_SPECIFIC_INC = -DOPENFOAM_NOT_EXTEND
     ifeq (OPENFOAM_COM, $(FOAM_FLAVOUR))
         VERSION_SPECIFIC_INC += -DOPENFOAM_COM
-        VERSION_SPECIFIC_INC += -DOPENFOAMESI
         VERSION_SPECIFIC_LIBS = \
             -lturbulenceModels -lincompressibleTurbulenceModels \
             -ltwoPhaseMixture -limmiscibleIncompressibleTwoPhaseMixture \
@@ -32,7 +31,6 @@ else
             -lincompressibleInterPhaseTransportModels -ladjointOptimisation
     else
         VERSION_SPECIFIC_INC += -DOPENFOAM_ORG
-        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
         VERSION_SPECIFIC_LIBS = \
             -lmomentumTransportModels -lincompressibleMomentumTransportModels \
             -lcompressibleMomentumTransportModels -ltwoPhaseMixture \

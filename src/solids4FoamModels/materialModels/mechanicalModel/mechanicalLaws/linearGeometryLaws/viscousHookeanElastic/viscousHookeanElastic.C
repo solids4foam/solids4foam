@@ -25,7 +25,7 @@ License
 
 #include "viscousHookeanElastic.H"
 #include "addToRunTimeSelectionTable.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "zeroGradientFvPatchFields.H"
 #endif
 
@@ -576,7 +576,7 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
                     (
                         mag
                         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                             hf_[MaxwellModelI].primitiveField()
                           - hf_[MaxwellModelI].prevIter().primitiveField()
 #else
@@ -588,7 +588,7 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
                    /gMax
                     (
                         SMALL
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                       + mag(hf_[MaxwellModelI].prevIter().primitiveField())
 #else
                       + mag(hf_[MaxwellModelI].prevIter().internalField())
@@ -611,7 +611,7 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
                     (
                         mag
                         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                             h_[MaxwellModelI].primitiveField()
                           - h_[MaxwellModelI].prevIter().primitiveField()
 #else
@@ -623,7 +623,7 @@ Foam::scalar Foam::viscousHookeanElastic::residual()
                    /gMax
                     (
                         SMALL
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                       + mag(h_[MaxwellModelI].prevIter().primitiveField())
 #else
                       + mag(h_[MaxwellModelI].prevIter().internalField())

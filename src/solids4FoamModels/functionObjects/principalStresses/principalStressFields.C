@@ -240,7 +240,7 @@ void Foam::writePrincipalStressFields
 
     // References to internalFields for efficiency
     const symmTensorField& sigmaI = sigma.internalField();
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     scalarField& sigmaMaxI = sigmaMax.primitiveFieldRef();
     scalarField& sigmaMidI = sigmaMid.primitiveFieldRef();
     scalarField& sigmaMinI = sigmaMin.primitiveFieldRef();
@@ -284,7 +284,7 @@ void Foam::writePrincipalStressFields
         )
         {
             const symmTensorField& pSigma = sigma.boundaryField()[patchI];
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             scalarField& pSigmaMax = sigmaMax.boundaryFieldRef()[patchI];
             scalarField& pSigmaMid = sigmaMid.boundaryFieldRef()[patchI];
             scalarField& pSigmaMin = sigmaMin.boundaryFieldRef()[patchI];

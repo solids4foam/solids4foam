@@ -71,7 +71,7 @@ extrapolatedPressureValueFvPatchScalarField::extrapolatedPressureValueFvPatchSca
     relaxFac_(readScalar(dict.lookup("relaxFactor")))
 {}
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 extrapolatedPressureValueFvPatchScalarField::extrapolatedPressureValueFvPatchScalarField
 (
     const extrapolatedPressureValueFvPatchScalarField& pivpvf

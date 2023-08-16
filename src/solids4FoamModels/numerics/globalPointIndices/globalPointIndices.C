@@ -214,7 +214,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
                 // Send
                 OPstream::write
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -250,7 +250,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
                 // Receive
                 IPstream::read
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -459,7 +459,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
             // Send
             OPstream::write
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 Pstream::commsTypes::blocking,
 #else
                 Pstream::blocking,
@@ -485,7 +485,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
             // Receive
             IPstream::read
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 Pstream::commsTypes::blocking,
 #else
                 Pstream::blocking,

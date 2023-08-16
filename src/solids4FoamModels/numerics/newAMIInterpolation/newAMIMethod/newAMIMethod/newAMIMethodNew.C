@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
@@ -85,6 +85,6 @@ Foam::newAMIMethod<SourcePatch, TargetPatch>::New
 }
 
 
-#endif // end of #ifdef OPENFOAMFOUNDATION
+#endif // end of #ifdef OPENFOAM_ORG
 
 // ************************************************************************* //

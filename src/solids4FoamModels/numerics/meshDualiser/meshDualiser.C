@@ -29,7 +29,7 @@ Class
 #include "meshDualiser.H"
 #include "meshTools.H"
 #include "polyMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "polyTopoChange.H"
 #else
     #include "directTopoChange.H"

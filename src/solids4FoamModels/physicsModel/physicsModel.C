@@ -18,7 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "physicsModel.H"
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     #include "Time.H"
 #endif
 

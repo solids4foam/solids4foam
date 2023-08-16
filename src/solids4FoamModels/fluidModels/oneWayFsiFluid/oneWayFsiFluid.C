@@ -69,7 +69,7 @@ tmp<vectorField> oneWayFsiFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     tvF.ref() =
 #else
     tvF() =
@@ -87,7 +87,7 @@ tmp<scalarField> oneWayFsiFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     tpF.ref() =
 #else
     tpF() =
@@ -123,7 +123,7 @@ bool oneWayFsiFluid::evolve()
         IOobject::MUST_READ
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if
     (
         Uheader.typeHeaderOk<volVectorField>(true)

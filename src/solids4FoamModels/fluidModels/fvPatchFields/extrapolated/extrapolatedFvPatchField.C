@@ -95,7 +95,7 @@ extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
     }
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 template<class Type>
 extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
 (
@@ -164,7 +164,7 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
 
     const cellList& cells = mesh.cells();
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     const labelList& owner = mesh.owner();
     const labelList& neighbour = mesh.neighbour();
     const labelList& patchCells = this->patch().faceCells();
@@ -223,7 +223,7 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
                     const labelList& cycPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
 #else
@@ -278,7 +278,7 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
                     const labelList& procPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
 #else
@@ -330,7 +330,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
 
     const cellList& cells = mesh.cells();
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     const labelList& owner = mesh.owner();
     const labelList& neighbour = mesh.neighbour();
     const labelList& patchCells = this->patch().faceCells();
@@ -344,7 +344,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
 //     const vectorField faceCentres(mesh.faceCentres());
     const vectorField cellCentres(mesh.cellCentres());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const Field<Type>& phiI = this->primitiveField();
 
     word fieldName =
@@ -420,7 +420,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
                     const labelList& cycPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
 #else
@@ -496,7 +496,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
                     const labelList& procPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
 #else
@@ -682,7 +682,7 @@ void extrapolatedFvPatchField<Type>::write(Ostream& os) const
 {
     fixedGradientFvPatchField<Type>::write(os);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     this->writeEntry("value", os);

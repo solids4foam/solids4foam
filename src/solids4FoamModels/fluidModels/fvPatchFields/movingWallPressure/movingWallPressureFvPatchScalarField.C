@@ -74,7 +74,7 @@ movingWallPressureFvPatchScalarField
 {}
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 movingWallPressureFvPatchScalarField::
 movingWallPressureFvPatchScalarField
 (
@@ -108,7 +108,7 @@ void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
     }
 
     const fvMesh& mesh = this->patch().boundaryMesh().mesh();
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     word fieldName = internalField().name();
 #else
     word fieldName = dimensionedInternalField().name();
@@ -184,7 +184,7 @@ void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
 //     }
 
 //     const fvMesh& mesh = this->patch().boundaryMesh().mesh();
-// #ifdef OPENFOAMESIORFOUNDATION
+// #ifdef OPENFOAM_NOT_EXTEND
 //     word fieldName = internalField().name();
 // #else
 //     word fieldName = dimensionedInternalField().name();
@@ -230,7 +230,7 @@ void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
 void movingWallPressureFvPatchScalarField::write(Ostream& os) const
 {
     fixedGradientFvPatchScalarField::write(os);
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

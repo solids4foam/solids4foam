@@ -70,7 +70,7 @@ outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 {
 //     fvPatchScalarField::operator=(scalarField("value", dict, p.size()));
 
-// #ifdef OPENFOAMESIORFOUNDATION
+// #ifdef OPENFOAM_NOT_EXTEND
 //     const fvMesh& mesh = internalField().mesh();
 //     const pointField& points = mesh.points();
 // #else
@@ -88,7 +88,7 @@ outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 (
     const outflowPressureFvPatchScalarField& pivpvf
@@ -121,7 +121,7 @@ void outflowPressureFvPatchScalarField::updateCoeffs()
 
     scalarField pp(this->patch().size(), 0);
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();
 #else
     const fvMesh& mesh = dimensionedInternalField().mesh();

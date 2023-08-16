@@ -41,7 +41,7 @@ InClass
 
 namespace Foam
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     typedef labelUList unallocLabelList;
 #endif
 }
@@ -537,7 +537,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     // Do not copy pointer objects: they will be re-created.
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 (
     const solidContactFvPatchVectorField& ptf
@@ -574,7 +574,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 {
     // Do not copy pointer objects
 }
-#endif // ifndef OPENFOAMFOUNDATION
+#endif // ifndef OPENFOAM_ORG
 
 Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
 (
@@ -644,7 +644,7 @@ void Foam::solidContactFvPatchVectorField::autoMap
 
     solidTractionFvPatchVectorField::autoMap(m);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     m(contact_, contact_);
 #else
     contact_.autoMap(m);
@@ -656,7 +656,7 @@ void Foam::solidContactFvPatchVectorField::autoMap
     {
         forAll(contactPerShadow_, shadI)
         {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
             m(contactPerShadow_[shadI], contactPerShadow_[shadI]);
 #else
             contactPerShadow_[shadI].autoMap(m);
@@ -758,7 +758,7 @@ Foam::solidContactFvPatchVectorField::shadowPatchField() const
     }
 
     const volVectorField& field =
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         db().lookupObject<volVectorField>(internalField().name());
 #else
         db().lookupObject<volVectorField>(dimensionedInternalField().name());
@@ -789,7 +789,7 @@ Foam::solidContactFvPatchVectorField::normalModels()
         const volVectorField& field =
             db().lookupObject<volVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
 #else
                 dimensionedInternalField().name()
@@ -827,7 +827,7 @@ Foam::solidContactFvPatchVectorField::normalModels() const
         const volVectorField& field =
             db().lookupObject<volVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
 #else
                 dimensionedInternalField().name()
@@ -862,7 +862,7 @@ Foam::solidContactFvPatchVectorField::frictionModels()
         const volVectorField& field =
             db().lookupObject<volVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
 #else
                 dimensionedInternalField().name()
@@ -900,7 +900,7 @@ Foam::solidContactFvPatchVectorField::frictionModels() const
         const volVectorField& field =
             db().lookupObject<volVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
 #else
                 dimensionedInternalField().name()
@@ -938,7 +938,7 @@ Foam::solidContactFvPatchVectorField::normalModelForThisSlave()
     const volVectorField& field =
         db().lookupObject<volVectorField>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             internalField().name()
 #else
             dimensionedInternalField().name()
@@ -1001,7 +1001,7 @@ Foam::solidContactFvPatchVectorField::frictionModelForThisSlave()
     const volVectorField& field =
         db().lookupObject<volVectorField>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             internalField().name()
 #else
             dimensionedInternalField().name()
@@ -1077,7 +1077,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
     const wordList& shadPatchNames = shadowPatchNames();
     forAll(shadPatchNames, shadPatchI)
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         // Clear the interpolators each time
         // Ther is no need to do this in the loop but we will keep it here for
         // tidiness
@@ -1158,7 +1158,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
              (
                 shadowZones()[shadPatchI].globalFaceToPatch
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     zoneToZones()[shadPatchI].interpolateToTarget(zoneDD)()
 #else
                     zoneToZones()[shadPatchI].masterToSlave(zoneDD)()
@@ -1176,7 +1176,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                 shadowPatchFaceNormals,
                 shadowZones()[shadPatchI].globalPointToPatch
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     zoneToZones()[shadPatchI].targetPointDistanceToIntersection()
 #else
                     zoneToZones()[shadPatchI].slavePointDistanceToIntersection()
@@ -1233,7 +1233,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                 (
                     zone().globalFaceToPatch
                     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                         zoneToZones()[shadPatchI].interpolateToSource
 #else
                         zoneToZones()[shadPatchI].slaveToMaster
@@ -1374,7 +1374,7 @@ Foam::solidContactFvPatchVectorField::frictionHeatRate() const
     (
         new scalarField(curTraction.size(), 0.0)
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     scalarField& frictionHeatRate = tfrictionHeatRate.ref();
 #else
     scalarField& frictionHeatRate = tfrictionHeatRate();
@@ -1401,7 +1401,7 @@ Foam::solidContactFvPatchVectorField::frictionHeatRate() const
 
         const vectorField masterZoneSlip
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             zoneToZones()[shadPatchI].interpolateToSource(slaveZoneSlip)
 #else
             zoneToZones()[shadPatchI].slaveToMaster(slaveZoneSlip)
@@ -1480,7 +1480,7 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
         // Write the dictionary
         dict_.write(os, false);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "gradient", gradient());
         writeEntry(os, "value", patchValue);
         writeEntry(os, "traction", traction());
@@ -1508,7 +1508,7 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "shadowPatches", shadowPatchNames());
 #else
         shadowPatchNames().writeEntry("shadowPatches", os);
@@ -1693,7 +1693,7 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
             (
                 zone().globalPointToPatch
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     zoneToZones()[0].sourcePointDistanceToIntersection()
 #else
                     zoneToZones()[0].masterPointDistanceToIntersection()
@@ -1728,7 +1728,7 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
             (
                 shadowZones()[0].globalPointToPatch
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     zoneToZones()[0].targetPointDistanceToIntersection()
 #else
                     zoneToZones()[0].slavePointDistanceToIntersection()

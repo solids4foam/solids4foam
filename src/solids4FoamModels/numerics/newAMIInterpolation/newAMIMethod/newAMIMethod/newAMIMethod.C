@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
 
 #include "newAMIMethod.H"
 #include "meshTools.H"
@@ -347,6 +347,6 @@ bool Foam::newAMIMethod<SourcePatch, TargetPatch>::conformal() const
 }
 
 
-#endif // end of #ifdef OPENFOAMFOUNDATION
+#endif // end of #ifdef OPENFOAM_ORG
 
 // ************************************************************************* //

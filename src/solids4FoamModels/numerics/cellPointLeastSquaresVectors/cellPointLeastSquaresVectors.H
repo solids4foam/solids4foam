@@ -57,7 +57,7 @@ class mapPolyMesh;
 
 class cellPointLeastSquaresVectors
 :
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     public MeshObject<fvMesh, MoveableMeshObject, cellPointLeastSquaresVectors>
 #else
     public MeshObject<fvMesh, cellPointLeastSquaresVectors>
@@ -100,7 +100,7 @@ public:
 
         //- Update after mesh motion:
         //  Delete the least square vectors when the mesh moves
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         virtual bool movePoints();
 #else
         virtual bool movePoints() const;

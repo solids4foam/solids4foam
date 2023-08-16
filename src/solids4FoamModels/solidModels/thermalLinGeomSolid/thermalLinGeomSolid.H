@@ -40,7 +40,7 @@ SourceFiles
 
 #include "solidModel.H"
 #include "thermalModel.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "SolverPerformance.H"
 #endif
 
@@ -101,7 +101,7 @@ class thermalLinGeomSolid
         bool converged
         (
             const int iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const SolverPerformance<vector>& solverPerfD,
             const SolverPerformance<scalar>& solverPerfp,
 #else

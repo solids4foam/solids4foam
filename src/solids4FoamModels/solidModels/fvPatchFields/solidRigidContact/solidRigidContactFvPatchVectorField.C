@@ -353,7 +353,7 @@ Foam::solidRigidContactFvPatchVectorField::solidRigidContactFvPatchVectorField
     // Do not copy pointer objects: they will be re-created.
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 Foam::solidRigidContactFvPatchVectorField::solidRigidContactFvPatchVectorField
 (
     const solidRigidContactFvPatchVectorField& ptf

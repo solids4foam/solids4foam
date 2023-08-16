@@ -67,7 +67,7 @@ tmp<volTensorField> grad
             "zeroGradient"
         )
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     volTensorField& result = tresult.ref();
 #else
     volTensorField& result = tresult();
@@ -143,7 +143,7 @@ tmp<pointTensorField> pGrad
             "calculated"
         )
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     pointTensorField& result = tresult.ref();
 #else
     pointTensorField& result = tresult();
@@ -230,7 +230,7 @@ tmp<surfaceTensorField> fGrad
             )
         )
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     surfaceTensorField& result = tresult.ref();
 #else
     surfaceTensorField& result = tresult();
@@ -312,7 +312,7 @@ tmp<surfaceTensorField> fGrad
                 // Use the gradient in the adjacent primary cell-centre
                 // This will result in inconsistent values at processor patches
                 // Is this an issue?
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
                     gradDI[cellID];
 #else
@@ -348,7 +348,7 @@ tmp<vectorField> d2dt2
 
     // Create result field
     tmp<vectorField> tresult(new vectorField(pointDI.size(), vector::zero));
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     vectorField& result = tresult.ref();
 #else
     vectorField& result = tresult();
@@ -427,7 +427,7 @@ tmp<vectorField> ddt
 
     // Create result field
     tmp<vectorField> tresult(new vectorField(pointPI.size(), vector::zero));
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     vectorField& result = tresult.ref();
 #else
     vectorField& result = tresult();
@@ -568,7 +568,7 @@ tmp<vectorField> ddt
 //             "calculated"
 //         )
 //     );
-// #ifdef OPENFOAMESIORFOUNDATION
+// #ifdef OPENFOAM_NOT_EXTEND
 //     pointVectorField& result = tresult.ref();
 // #else
 //     pointVectorField& result = tresult();

@@ -33,7 +33,7 @@ namespace Foam
         dictionary
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     typedef labelUList unallocLabelList;
 #endif
 }
@@ -86,7 +86,7 @@ void Foam::standardPenaltyFriction::calcFrictionPenaltyFactor()
         scalarField masterV(mesh_.boundary()[masterPatchIndex].size(), 0.0);
         scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const DimensionedField<scalar, volMesh>& V = mesh_.V();
 #else
     const volScalarField::DimensionedInternalField& V = mesh_.V();
@@ -127,7 +127,7 @@ void Foam::standardPenaltyFriction::calcFrictionPenaltyFactor()
         // average contact patch cell volume
         scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const DimensionedField<scalar, volMesh>& V = mesh_.V();
 #else
     const volScalarField::DimensionedInternalField& V = mesh_.V();
@@ -368,7 +368,7 @@ void Foam::standardPenaltyFriction::autoMap(const fvPatchFieldMapper& m)
         )   << "autoMap" << endl;
     }
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     m(slip_, slip_);
 #else
     slip_.autoMap(m);
@@ -376,7 +376,7 @@ void Foam::standardPenaltyFriction::autoMap(const fvPatchFieldMapper& m)
 
     // The internal fields for the volFields should always be zero
     // We will reset them as they may not be zero after field advection
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     slaveTractionVolField_.primitiveFieldRef() = vector::zero;
 #else
     slaveTractionVolField_.internalField() = vector::zero;
