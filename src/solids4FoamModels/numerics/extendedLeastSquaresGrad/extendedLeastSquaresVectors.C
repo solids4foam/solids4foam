@@ -28,6 +28,7 @@ License
 #include "extendedLeastSquaresVectors.H"
 #include "surfaceFields.H"
 #include "volFields.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

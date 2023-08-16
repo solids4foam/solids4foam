@@ -1,12 +1,25 @@
 ifeq ($(WM_PROJECT), foam)
+    FOAM_FLAVOUR = FOAMEXTEND
+else
+    # openfoam.com has -DOPENFOAM= in its flags, or version vYYMM
+    ifneq (,$(findstring -DOPENFOAM=,$(GFLAGS)))
+        FOAM_FLAVOUR = OPENFOAM_COM
+    else ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        FOAM_FLAVOUR = OPENFOAM_COM
+    else
+        FOAM_FLAVOUR = OPENFOAM_ORG
+    endif
+endif
+ifeq (FOAMEXTEND, $(FOAM_FLAVOUR))
     VERSION_SPECIFIC_INC = -DFOAMEXTEND
     VERSION_SPECIFIC_LIBS = \
         -lincompressibleTransportModels -lincompressibleTurbulenceModel \
         -lincompressibleRASModels -lincompressibleLESModels -llduSolvers \
         -linterfaceProperties -lfiniteArea -loversetMesh -loversetDynamicFvMesh
 else
-    VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
-    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+    VERSION_SPECIFIC_INC = -DOPENFOAM_NOT_EXTEND -DOPENFOAMESIORFOUNDATION
+    ifeq (OPENFOAM_COM, $(FOAM_FLAVOUR))
+        VERSION_SPECIFIC_INC += -DOPENFOAM_COM
         VERSION_SPECIFIC_INC += -DOPENFOAMESI
         VERSION_SPECIFIC_LIBS = \
             -lturbulenceModels -lincompressibleTurbulenceModels \
@@ -18,6 +31,7 @@ else
             -lVoFphaseTurbulentTransportModels \
             -lincompressibleInterPhaseTransportModels -ladjointOptimisation
     else
+        VERSION_SPECIFIC_INC += -DOPENFOAM_ORG
         VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
         VERSION_SPECIFIC_LIBS = \
             -lmomentumTransportModels -lincompressibleMomentumTransportModels \

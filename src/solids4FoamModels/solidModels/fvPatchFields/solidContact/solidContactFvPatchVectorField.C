@@ -35,6 +35,7 @@ InClass
 #include "polyPatchID.H"
 #include "ZoneIDs.H"
 #include "lookupSolidModel.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 

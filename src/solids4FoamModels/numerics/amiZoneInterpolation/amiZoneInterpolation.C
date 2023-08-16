@@ -20,6 +20,7 @@ License
 #ifdef OPENFOAMESIORFOUNDATION
 
 #include "amiZoneInterpolation.H"
+#include "demandDrivenData.H"
 // #ifdef OPENFOAMESI
 //     #include "AMIMethod.H"
 //     #include "directAMI.H"

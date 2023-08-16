@@ -25,8 +25,10 @@ License
 
 #include "solidSubMeshes.H"
 #include "twoDPointCorrector.H"
+#include "processorPolyPatch.H"
 #include "wedgePolyPatch.H"
 #include "ZoneIDs.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -2183,8 +2185,18 @@ void Foam::solidSubMeshes::moveSubMeshes()
 #else
             subMeshes()[matI].subMesh().changing(false);
 #endif
+#if (OPENFOAM >= 2206)
+            {
+                auto tmeshPhi(subMeshes()[matI].subMesh().setPhi());
+                if (tmeshPhi)
+                {
+                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
+                }
+            }
+#else
             subMeshes()[matI].subMesh().setPhi().writeOpt() =
                 IOobject::NO_WRITE;
+#endif
 
             if (baseMesh().time().outputTime() && writeSubMeshes_)
             {

@@ -112,6 +112,20 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New
 
     Info<< "Selecting physicsModel " << physicsModelTypeName << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = physicsModelConstructorTable(physicsModelTypeName);
+
+    if (!ctorPtr)
+    {
+        FatalErrorInLookup
+        (
+            "physicsModel",
+            physicsModelTypeName,
+            *physicsModelConstructorTablePtr_
+        ) << exit(FatalError);
+    }
+
+#else
     physicsModelConstructorTable::iterator cstrIter =
         physicsModelConstructorTablePtr_->find(physicsModelTypeName);
 
@@ -127,7 +141,10 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New
             << exit(FatalError);
     }
 
-    return autoPtr<physicsModel>(cstrIter()(runTime, region));
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<physicsModel>(ctorPtr(runTime, region));
 }
 
 

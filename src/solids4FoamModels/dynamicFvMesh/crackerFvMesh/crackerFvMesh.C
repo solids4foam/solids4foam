@@ -29,6 +29,7 @@ License
 //#include "materialInterface.H"
 #include "volFields.H"
 #include "surfaceFields.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

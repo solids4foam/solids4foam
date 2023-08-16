@@ -414,15 +414,12 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
 #endif
     {
         Info<< "Reading g from constant directory" << endl;
-#ifdef OPENFOAMESI
-    #if OPENFOAMESI > 1812
+#if (OPENFOAM >= 1906)
         return meshObjects::gravity(runTime());
-    #else
+#elif (OPENFOAM >= 1812)
         return meshObjects::gravity
         (
-            runTime()
-#if OPENFOAM < 1912
-            ,
+            runTime(),
             IOobject
             (
                 "g",
@@ -431,9 +428,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
                 IOobject::MUST_READ,
                 IOobject::NO_WRITE
             )
-#endif
         );
-    #endif
 #else
         return uniformDimensionedVectorField
         (
@@ -452,15 +447,12 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
     {
         Info<< "g field not found in constant directory: initialising to zero"
             << endl;
-#ifdef OPENFOAMESI
-    #if OPENFOAMESI > 1812
+#if (OPENFOAM >= 1906)
         return meshObjects::gravity(runTime());
-    #else
+#elif (OPENFOAM >= 1812)
         return meshObjects::gravity
         (
-            runTime()
-#if OPENFOAM < 1912
-            ,
+            runTime(),
             IOobject
             (
                 "g",
@@ -469,9 +461,7 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             )
-#endif
         );
-    #endif
 #else
         return uniformDimensionedVectorField
         (
@@ -918,7 +908,7 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
     const word& region
 )
 {
-    word fluidModelTypeName;
+    word modelType;
 
     // Enclose the creation of the dictionary to ensure it is
     // deleted before the fluid is created otherwise the dictionary
@@ -939,27 +929,44 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
         );
 
         fluidProperties.lookup("fluidModel")
-            >> fluidModelTypeName;
+            >> modelType;
     }
 
-    Info<< nl << "Selecting fluidModel " << fluidModelTypeName << endl;
+    Info<< nl << "Selecting fluidModel " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalErrorInLookup
+        (
+            "fluidModel",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(fluidModelTypeName);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
         FatalErrorIn
         (
             "fluidModel::New(Time&, const word&)"
-        )   << "Unknown fluidModel type " << fluidModelTypeName
+        )   << "Unknown fluidModel type " << modelType
             << endl << endl
             << "Valid fluidModel types are :" << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalError);
     }
 
-    return autoPtr<fluidModel>(cstrIter()(runTime, region));
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<fluidModel>(ctorPtr(runTime, region));
 }
 
 

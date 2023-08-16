@@ -28,6 +28,7 @@ License
 #include "mapPolyMesh.H"
 #include "volMesh.H"
 #include "addToRunTimeSelectionTable.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

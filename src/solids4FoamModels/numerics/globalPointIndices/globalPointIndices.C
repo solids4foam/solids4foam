@@ -27,6 +27,7 @@ License
 #include "globalMeshData.H"
 #include "pointMesh.H"
 #include "pointFields.H"
+#include "processorPolyPatch.H"
 #include "processorPointPatchFields.H"
 #include "ListMaxOp.H"
 #include "ListSumOp.H"

@@ -23,6 +23,7 @@ License
 #include "emptyPolyPatch.H"
 #include "wedgePolyPatch.H"
 #include "cyclicFvPatch.H"
+#include "processorPolyPatch.H"
 #include "transform.H"
 #ifdef FOAMEXTEND
     #include "cyclicGgiPolyPatch.H"

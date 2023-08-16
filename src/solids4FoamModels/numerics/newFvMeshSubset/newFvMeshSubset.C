@@ -31,6 +31,7 @@ Description
 #include "emptyPolyPatch.H"
 #include "demandDrivenData.H"
 #include "cyclicPolyPatch.H"
+#include "processorPolyPatch.H"
 #include "dynamicFvMesh.H"
 #if FOAMEXTEND
     #include "oversetPolyPatch.H"

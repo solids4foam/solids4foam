@@ -1,4 +1,15 @@
 ifeq ($(WM_PROJECT), foam)
+    FOAM_FLAVOUR = FOAMEXTEND
+else
+    ifneq (,$(findstring -DOPENFOAM=,$(GFLAGS)))
+        FOAM_FLAVOUR = OPENFOAM_COM
+    else ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        FOAM_FLAVOUR = OPENFOAM_COM
+    else
+        FOAM_FLAVOUR = OPENFOAM_ORG
+    endif
+endif
+ifeq (FOAMEXTEND, $(FOAM_FLAVOUR))
     VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
     ifeq ($(VER), 1)
         VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
@@ -6,10 +17,12 @@ ifeq ($(WM_PROJECT), foam)
         VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
     endif
 else
-    VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
-    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+    VERSION_SPECIFIC_INC = -DOPENFOAM_NOT_EXTEND -DOPENFOAMESIORFOUNDATION
+    ifeq (OPENFOAM_COM, $(FOAM_FLAVOUR))
+        VERSION_SPECIFIC_INC += -DOPENFOAM_COM
         VERSION_SPECIFIC_INC += -DOPENFOAMESI
     else
+        VERSION_SPECIFIC_INC += -DOPENFOAM_ORG
         VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
     endif
 endif

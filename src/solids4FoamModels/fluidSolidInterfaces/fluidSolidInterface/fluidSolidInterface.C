@@ -495,7 +495,7 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
     const word& region
 )
 {
-    word fsiTypeName;
+    word modelType;
 
     // Enclose the creation of the dictionary to ensure it is
     // deleted before the fluid is created otherwise the dictionary
@@ -514,27 +514,44 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
         );
 
         fsiProperties.lookup("fluidSolidInterface")
-            >> fsiTypeName;
+            >> modelType;
     }
 
-    Info<< "Selecting fluidSolidInterface " << fsiTypeName << endl;
+    Info<< "Selecting fluidSolidInterface " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalErrorInLookup
+        (
+            "fluidSolidInterface",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(fsiTypeName);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
         FatalErrorIn
         (
             "fluidSolidInterface::New(Time&, const word&)"
-        )   << "Unknown fluidSolidInterface type " << fsiTypeName
+        )   << "Unknown fluidSolidInterface type " << modelType
             << endl << endl
             << "Valid fluidSolidInterface types are :" << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalError);
     }
 
-    return autoPtr<fluidSolidInterface>(cstrIter()(runTime, region));
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<fluidSolidInterface>(ctorPtr(runTime, region));
 }
 
 

@@ -28,6 +28,7 @@ License
 #include "dictionary.H"
 #include "emptyPolyPatch.H"
 #include "cyclicPolyPatch.H"
+#include "processorPolyPatch.H"
 #include "scalarMatrices.H"
 #include "volFields.H"
 #include "skewCorrectionVectors.H"

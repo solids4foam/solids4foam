@@ -1435,8 +1435,19 @@ void Foam::solidModel::makeGlobalPatches
 #ifndef OPENFOAMESIORFOUNDATION
             const_cast<dynamicFvMesh&>(mesh()).changing(false);
 #endif
+
+#if (OPENFOAM >= 2206)
+            {
+                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
+                if (tmeshPhi)
+                {
+                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
+                }
+            }
+#else
             const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
                 IOobject::NO_WRITE;
+#endif
 
             // Create global patch based on deformed mesh
             globalPatchesPtrList_.set
@@ -1455,8 +1466,18 @@ void Foam::solidModel::makeGlobalPatches
 #ifndef OPENFOAMESIORFOUNDATION
             const_cast<dynamicFvMesh&>(mesh()).changing(false);
 #endif
+#if (OPENFOAM >= 2206)
+            {
+                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
+                if (tmeshPhi)
+                {
+                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
+                }
+            }
+#else
             const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
                 IOobject::NO_WRITE;
+#endif
         }
         else
         {
@@ -1591,7 +1612,7 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     const word& region
 )
 {
-    word solidModelTypeName;
+    word modelType;
 
     // Enclose the creation of the dictionary to ensure it is
     // deleted before the fluid model is created, otherwise the dictionary
@@ -1612,11 +1633,25 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
         );
 
         solidProperties.lookup("solidModel")
-            >> solidModelTypeName;
+            >> modelType;
     }
 
-    Info<< "Selecting solidModel " << solidModelTypeName << endl;
+    Info<< "Selecting solidModel " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalErrorInLookup
+        (
+            "solidModel",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_->find(solidModelTypeName);
 
@@ -1632,7 +1667,10 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
             << exit(FatalError);
     }
 
-    return autoPtr<solidModel>(cstrIter()(runTime, region));
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<solidModel>(ctorPtr(runTime, region));
 }
 
 
@@ -1939,7 +1977,18 @@ void Foam::solidModel::moveMesh
 #ifndef OPENFOAMESIORFOUNDATION
     mesh().changing(false);
 #endif
+#if (OPENFOAM >= 2206)
+    {
+        auto tmeshPhi(mesh().setPhi());
+        if (tmeshPhi)
+        {
+            tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
+        }
+    }
+#else
     mesh().setPhi().writeOpt() = IOobject::NO_WRITE;
+#endif
+
 
 #ifndef OPENFOAMESIORFOUNDATION
     // Tell the mechanical model to move the subMeshes, if they exist
