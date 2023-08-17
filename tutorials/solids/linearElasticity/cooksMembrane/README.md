@@ -2,7 +2,7 @@
 sort: 3
 ---
 
-# Tutorial: `cooksMembrane`
+# Linear Elastic Cook's Membrane: `cooksMembrane`
 
 Prepared by Ivan Batistić
 
@@ -13,18 +13,21 @@ Prepared by Ivan Batistić
 - Demonstrate how to perform a solid-only analysis in solids4foam.
 - To demonstrate solver performance under both shear and bending conditions in combination with a skew numerical mesh.
 
----
+```note
+A finite-strain elastoplastic version of this tutorial is also available in solids4foam at tutorials/elastoplasticity/cooksMembrane
+```
 
 ## Case Overview
 
 Cook's membrane is a well-known bending-dominated benchmark case. The tapered panel (trapezoid) is fixed on one side and subjected to uniform shear traction on the opposite side. The prescribed shear traction is 6250 Pa. The vertices of the trapezoid (in mm) are (0, 0), (48, 44), (48, 60), and (0, 44), as shown in Figure 1. The Young's modulus is 70 Pa, and the Poisson's ratio is 1/3. Gravitation effects are neglected, and there are no body forces. The problem is solved as static, using one loading increment.
 
 <div style="text-align: center;">
-  <img src="./images/membrane_geometry.PNG" alt="Image" width="400">
+  <img src="./images/cooksMembrane-geometry.png" alt="Image" width="400">
     <figcaption>
      <strong>Figure 1: Problem geometry</strong>
     </figcaption>
 </div>
+
 
 ---
 

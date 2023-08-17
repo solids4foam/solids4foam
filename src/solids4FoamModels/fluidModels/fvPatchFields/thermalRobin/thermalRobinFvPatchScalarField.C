@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------* \
+/*---------------------------------------------------------------------------*\
   =========                 |
   \\      /  F ield         | foam-extend: Open Source CFD
    \\    /   O peration     | Version:     4.0
@@ -206,7 +206,7 @@ void thermalRobinFvPatchScalarField::updateCoeffs()
         this->coeff1() = lambda;
         this->rhs() = neiHeatFlux_;
     }
-    
+
     robinFvPatchScalarField::updateCoeffs();
 }
 
@@ -214,7 +214,6 @@ void thermalRobinFvPatchScalarField::updateCoeffs()
 void thermalRobinFvPatchScalarField::write(Ostream& os) const
 {
     robinFvPatchScalarField::write(os);
-
 
 #ifdef OPENFOAMESI
     os.writeEntryIfDifferent<Switch>("neumann", true, neumann_);
@@ -228,7 +227,7 @@ void thermalRobinFvPatchScalarField::write(Ostream& os) const
 #ifdef OPENFOAMFOUNDATION
     writeEntry(os, "neiTemperature", neiTemperature_);
     writeEntry(os, "neiHeatFlux", neiHeatFlux_);
-    writeEntry(os, "eqInterHeatTransferCoeff", eqInterHeatTransferCoeff_);    
+    writeEntry(os, "eqInterHeatTransferCoeff", eqInterHeatTransferCoeff_);
 #else
     neiTemperature_.writeEntry("neiTemperature", os);
     neiHeatFlux_.writeEntry("neiHeatFlux", os);

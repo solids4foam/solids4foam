@@ -51,7 +51,6 @@ addToRunTimeSelectionTable(fluidModel, pimpleFluid, dictionary);
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
 
-
 void pimpleFluid::updateRobinFsiInterface()
 {
     forAll(p().boundaryField(), patchI)
@@ -78,6 +77,16 @@ void pimpleFluid::updateRobinFsiInterface()
                     U().boundaryField()[patchI]
                 )
             )
+         // || (
+         //        isA<elasticWallPressureFvPatchScalarField>
+         //        (
+         //            p().boundaryField()[patchI]
+         //        )
+         //     && isA<robinElasticWallVelocityFvPatchVectorField>
+         //        (
+         //            U().boundaryField()[patchI]
+         //        )
+         //    )
         )
         {
             word ddtScheme
@@ -144,7 +153,6 @@ void pimpleFluid::updateRobinFsiInterface()
         }
     }
 }
-
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -549,6 +557,7 @@ bool pimpleFluid::evolve()
     }
 
     // Make the fluxes absolute
+
     fvc::makeAbsolute(phi(), U());
 
     // Update velocity on faces
@@ -776,7 +785,6 @@ void pimpleFluid::setEqInterHeatTransferCoeff
 #endif
 }
 
-
 tmp<scalarField> pimpleFluid::patchTemperature(const label patchID) const
 {
     tmp<scalarField> tT
@@ -793,6 +801,7 @@ tmp<scalarField> pimpleFluid::patchTemperature(const label patchID) const
 
     return tT;
 }
+
 
 tmp<scalarField> pimpleFluid::patchHeatFlux(const label patchID) const
 {

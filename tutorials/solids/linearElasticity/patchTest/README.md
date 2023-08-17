@@ -2,7 +2,7 @@
 sort: 1
 ---
 
-# Tutorial: `patchTest`
+# Patch Test: `patchTest`
 
 Prepared by Philip Cardiff
 

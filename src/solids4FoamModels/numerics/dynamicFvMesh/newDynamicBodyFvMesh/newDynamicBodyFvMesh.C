@@ -132,6 +132,7 @@ bool Foam::newDynamicBodyFvMesh::update()
     scalar oldTime = curTime - time().deltaT().value();
 
     //Info<< "newDynamicBodyFvMesh::update()" << endl;
+
     {
         vector trans =
             translationAmplitude_

@@ -166,7 +166,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     (
         dict.lookupOrDefault<Switch>("nonOrthogonalCorrections", true)
     ),
-    totalDisp_("value", dict, p.size()),
+    totalDisp_(*this),
     dispSeries_(),
     interpPtr_()
 {

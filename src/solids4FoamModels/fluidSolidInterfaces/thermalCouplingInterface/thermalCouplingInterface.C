@@ -23,7 +23,6 @@ License
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "OSspecific.H"
 
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -86,7 +85,7 @@ thermalCouplingInterface::thermalCouplingInterface
         {
             const standAlonePatch& solidZone =
                 solid().globalPatches()[interI].globalPatch();
-        
+
 #ifdef OPENFOAMESIORFOUNDATION
             oldSolidFaceZoneTemperature_.set
             (
@@ -123,6 +122,7 @@ thermalCouplingInterface::thermalCouplingInterface
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
 
 bool thermalCouplingInterface::evolve()
 {
@@ -388,7 +388,6 @@ scalar thermalCouplingInterface::calcThermalResidual()
             solidZoneTemperature
           - fluidZoneTemperature
         );
-
 
         // Calculate thermal resudal norm
         scalar residualNorm =

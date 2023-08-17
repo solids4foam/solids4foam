@@ -411,33 +411,6 @@ void Foam::mechanicalLaw::makeSigmaHyd()
 }
 
 
-void Foam::mechanicalLaw::makeSigmaEff()
-{
-    if (sigmaEffPtr_.valid())
-    {
-        FatalErrorIn("void " + type() + "::makeSigmaEff()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    sigmaEffPtr_.set
-    (
-        new volSymmTensorField
-        (
-            IOobject
-            (
-                "sigmaEff_",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::READ_IF_PRESENT,
-                IOobject::AUTO_WRITE
-            ),
-            mesh(),
-            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
-        )
-    );
-}
-
-
 // * * * * * * * * * * * * * * Protected Members * * * * * * * * * * * * * * //
 
 bool Foam::mechanicalLaw::planeStress() const
@@ -823,17 +796,6 @@ Foam::volVectorField& Foam::mechanicalLaw::gradSigmaHyd()
     }
 
     return gradSigmaHydPtr_();
-}
-
-
-Foam::volSymmTensorField& Foam::mechanicalLaw::sigmaEff()
-{
-    if (sigmaEffPtr_.empty())
-    {
-        makeSigmaEff();
-    }
-
-    return sigmaEffPtr_();
 }
 
 
@@ -1355,7 +1317,6 @@ Foam::mechanicalLaw::mechanicalLaw
     ),
     sigmaHydPtr_(),
     gradSigmaHydPtr_(),
-    sigmaEffPtr_(),
     curTimeIndex_(-1),
     warnAboutEnforceLinear_(true)
 {

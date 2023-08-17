@@ -132,8 +132,11 @@ class linearElasticMohrCoulombPlastic
         //- Derived plasticity parameter
         const vector sigma_a_;
 
-        //- Effective stress surface field
-        surfaceSymmTensorField sigmaEfff_;
+        //- Stress variation from initial (sigma = deltaSigma + sigma0)
+        volSymmTensorField deltaSigma_;
+
+        //- Stress variation surface field
+        surfaceSymmTensorField deltaSigmaf_;
 
         //- Incremental of strain
         volSymmTensorField DEpsilon_;
