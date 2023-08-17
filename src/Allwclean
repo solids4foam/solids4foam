@@ -5,6 +5,7 @@ echo
 echo "Cleaning src"
 echo
 
+wclean lib RBFMeshMotionSolver
 wclean lib blockCoupledSolids4FoamTools
 wclean lib solids4FoamModels
 

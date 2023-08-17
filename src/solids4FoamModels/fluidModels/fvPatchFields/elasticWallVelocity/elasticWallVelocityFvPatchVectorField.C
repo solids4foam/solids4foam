@@ -229,7 +229,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
         Up = (Fc_ - oldFc_)/mesh.time().deltaT().value();
     }
 
-    // Compute normal velocity component (from mesh flux
+    // Compute normal velocity component from mesh flux
     const scalarField phip
     (
         p.patchField<surfaceScalarField, scalar>(fvc::meshPhi(U))
@@ -238,52 +238,51 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     const vectorField n(p.nf());
     const scalarField& magSf = p.magSf();
     scalarField Un(phip/(magSf + VSMALL));
+    
+    // if (mesh.foundObject<surfaceScalarField>("phi"))
+    // {
+    //     const surfaceScalarField& phi =
+    //         mesh.lookupObject<surfaceScalarField>("phi");
 
-    if (mesh.foundObject<surfaceScalarField>("phi"))
-    {
-        const surfaceScalarField& phi =
-            mesh.lookupObject<surfaceScalarField>("phi");
+    //     const scalarField phipNew
+    //     (
+    //         phi.boundaryField()[this->patch().index()]
+    //     );
 
-        const scalarField phipNew
-        (
-            phi.boundaryField()[this->patch().index()]
-        );
+    //     Un = phipNew/(magSf + VSMALL);
+    // }
+    // else
+    // {
+    //     const volScalarField& pressure =
+    //         mesh.lookupObject<volScalarField>("p");
 
-        Un = phipNew/(magSf + VSMALL);
-    }
-    else
-    {
-        const volScalarField& pressure =
-            mesh.lookupObject<volScalarField>("p");
+    //     const scalarField nGradP
+    //     (
+    //         pressure.boundaryField()[patch().index()].snGrad()
+    //     );
 
-        const scalarField nGradP
-        (
-            pressure.boundaryField()[patch().index()].snGrad()
-        );
+    //     const IOdictionary transportProperties
+    //     (
+    //         IOobject
+    //         (
+    //             "transportProperties",
+    //             mesh.time().constant(),
+    //             mesh,
+    //             IOobject::MUST_READ,
+    //             IOobject::NO_WRITE
+    //         )
+    //     );
 
-        const IOdictionary transportProperties
-        (
-            IOobject
-            (
-                "transportProperties",
-                mesh.time().constant(),
-                mesh,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE,
-                false  // Do not register
-            )
-        );
+    //     const dimensionedScalar rho
+    //     (
+    //         transportProperties.lookup("rho")
+    //     );
 
-        const dimensionedScalar rho
-        (
-            transportProperties.lookup("rho")
-        );
+    //     const vectorField UOld(U.oldTime().boundaryField()[patch().index()]);
 
-        const vectorField UOld(U.oldTime().boundaryField()[patch().index()]);
-
-        Un = (n & UOld) - nGradP*mesh.time().deltaT().value();
-        //Un = (n & UOld) - nGradP*mesh.time().deltaT().value()/rho.value();
-    }
+    //     Un = (n & UOld) - nGradP*mesh.time().deltaT().value();
+    //     //Un = (n & UOld) - nGradP*mesh.time().deltaT().value()/rho.value();
+    // }
 
     // Compute tangential + normal components (from flux)
     Up += n*(Un - (n & Up));

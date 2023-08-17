@@ -25,8 +25,9 @@ Class
     thermalRobinFvPatchScalarField
 
 Description
-    Robin boundary condition for thermal fluid-solid
-    interaction problem.
+    Robin boundary condition for thermal fluid-solid interaction problem. 
+    For example, one can apply dirichlet bc by setting 
+    "dirichlet_ = true" and "neumann_ = false".
 
 Author
     Zeljko Tukovic, FSB Zagreb.  All rights reserved.
@@ -56,6 +57,12 @@ class thermalRobinFvPatchScalarField
 {
     // Private data
 
+        //- Use Neumann bc
+        Switch neumann_;
+    
+        //- Use dirichlet bc
+        Switch dirichlet_;
+    
         //- Neighbour patch temperature
         scalarField neiTemperature_;
     

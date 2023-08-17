@@ -6,6 +6,7 @@ ifneq (,$(findstring -DFOAMEXTEND, $(VERSION_SPECIFIC_INC)))
     VERSION_SPECIFIC_LIBS = \
         -lincompressibleTransportModels -lincompressibleTurbulenceModel \
         -lincompressibleRASModels -lincompressibleLESModels -llduSolvers \
+        -lbasicThermophysicalModels -lcompressibleTurbulenceModel \
         -linterfaceProperties -lfiniteArea -loversetMesh -loversetDynamicFvMesh
 
 else ifneq (,$(findstring -DOPENFOAM_ORG, $(VERSION_SPECIFIC_INC)))

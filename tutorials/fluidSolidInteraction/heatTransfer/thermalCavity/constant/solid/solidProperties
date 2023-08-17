@@ -1,0 +1,35 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+solidModel thermalSolid;
+
+thermalSolidCoeffs
+{
+    // Maximum number of correctors
+    nCorrectors             1000;
+
+    // Solution tolerance
+    solutionTolerance       1e-06;
+
+    // Alternative solution tolerance
+    alternativeTolerance    1e-07;
+
+    // Write frequency for the residuals
+    infoFrequency           1;
+}
+
+
+
+// ************************************************************************* //

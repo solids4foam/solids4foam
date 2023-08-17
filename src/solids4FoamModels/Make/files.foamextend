@@ -182,6 +182,8 @@ functionObjects/solidTorque/solidTorque.C
 functionObjects/solidTractions/solidTractions.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
 functionObjects/volumetricStrain/volumetricStrain.C
+functionObjects/fsiConvergenceData/fsiConvergenceData.H
+
 
 dynamicFvMesh/simpleCrackerFvMesh/simpleCrackerFvMesh.C
 dynamicFvMesh/crackerFvMesh/crackerFvMesh.C

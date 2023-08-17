@@ -267,7 +267,7 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
 
                 allCentres[faceI] =
                     pp.neighbFaceCellCentres()[pp.whichFace(faceID)];
-                
+
                 // label start = mesh().boundaryMesh()[patchID].start();
                 // label localFaceID = faceID - start;
 
@@ -1170,7 +1170,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                             patchCells,
                             procPatch.pointFaces()[pointI]
                         );
-                    
+
                     forAll(curCells, cellI)
                     {
                         // ZT: check only local processor patch cells

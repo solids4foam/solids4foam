@@ -37,6 +37,8 @@ fluidSolidInterfaces/fixedRelaxationCouplingInterface/fixedRelaxationCouplingInt
 fluidSolidInterfaces/IQNILSCouplingInterface/IQNILSCouplingInterface.C
 fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
+fluidSolidInterfaces/thermalCouplingInterface/thermalCouplingInterface.C
+
 
 interfaceToInterface = fluidSolidInterfaces/fluidSolidInterface/interfaceToInterfaceMapping
 $(interfaceToInterface)/interfaceToInterfaceMapping/interfaceToInterfaceMapping.C
@@ -169,6 +171,8 @@ functionObjects/solidTorque/solidTorque.C
 functionObjects/solidTractions/solidTractions.C
 functionObjects/stressTriaxiality/stressTriaxiality.C
 functionObjects/volumetricStrain/volumetricStrain.C
+functionObjects/fsiConvergenceData/fsiConvergenceData.C
+
 
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C

@@ -83,7 +83,7 @@ class pimpleFluid
         //- Velocity field
         surfaceVectorField Uf_;
 
-        //- rAUf field
+        //- rAU field
         volScalarField rAU_;
 
         //- rAUf field
