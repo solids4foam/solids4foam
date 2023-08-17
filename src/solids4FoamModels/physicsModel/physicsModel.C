@@ -72,69 +72,66 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New
     const word& region
 )
 {
-    // Read the model type
-    word physicsModelTypeName;
-    {
-        // Read dictionary and ensure it is deleted before the model is
-        // created otherwise the dictionary is entered in the database twice
-        IOdictionary physicsProperties
-        (
-            IOobject
-            (
-                "physicsProperties",
-                bool(region == dynamicFvMesh::defaultRegion)
-              ? fileName(runTime.caseConstant())
-              : fileName(runTime.caseConstant()/region),
-                runTime,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        );
+    // NB: dictionary must be unregistered to avoid adding to the database
 
-        physicsProperties.lookup("type")
-            >> physicsModelTypeName;
-    }
+    IOdictionary props
+    (
+        IOobject
+        (
+            "physicsProperties",
+            bool(region == dynamicFvMesh::defaultRegion)
+          ? fileName(runTime.caseConstant())
+          : fileName(runTime.caseConstant()/region),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false  // Do not register
+        )
+    );
+
+    word modelType(props.lookup("type"));
 
     // For backwards compatibility, update names
     // This means the user can equivalently select "solid" or "solidModel", etc.
-    if (physicsModelTypeName == "solid")
+    if (modelType == "solid")
     {
-        physicsModelTypeName = "solidModel";
+        modelType = "solidModel";
     }
-    else if (physicsModelTypeName == "fluid")
+    else if (modelType == "fluid")
     {
-        physicsModelTypeName = "fluidModel";
+        modelType = "fluidModel";
     }
-    else if (physicsModelTypeName == "fluidSolidInteraction")
+    else if (modelType == "fluidSolidInteraction")
     {
-        physicsModelTypeName = "fluidSolidInterface";
+        modelType = "fluidSolidInterface";
     }
 
-    Info<< "Selecting physicsModel " << physicsModelTypeName << endl;
+    Info<< "Selecting physicsModel " << modelType << endl;
 
 #if (OPENFOAM >= 2112)
-    auto* ctorPtr = physicsModelConstructorTable(physicsModelTypeName);
+    auto* ctorPtr = physicsModelConstructorTable(modelType);
 
     if (!ctorPtr)
     {
-        FatalErrorInLookup
+        FatalIOErrorInLookup
         (
+            props,
             "physicsModel",
-            physicsModelTypeName,
+            modelType,
             *physicsModelConstructorTablePtr_
-        ) << exit(FatalError);
+        ) << exit(FatalIOError);
     }
 
 #else
     physicsModelConstructorTable::iterator cstrIter =
-        physicsModelConstructorTablePtr_->find(physicsModelTypeName);
+        physicsModelConstructorTablePtr_->find(modelType);
 
     if (cstrIter == physicsModelConstructorTablePtr_->end())
     {
         FatalErrorIn
         (
             "physicsModel::New(Time&)"
-        )   << "Unknown physicsModel type " << physicsModelTypeName
+        )   << "Unknown physicsModel type " << modelType
             << endl << endl
             << "Valid physicsModel types are :" << endl
             << physicsModelConstructorTablePtr_->toc()

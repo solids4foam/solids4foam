@@ -1,5 +1,5 @@
 #!/bin/bash
-cd ${0%/*} || exit 1    # run from this directory
+cd "${0%/*}" || exit  # Run from this directory
 
 # Check if OpenFOAM/FOAM has been sourced
 if [[ -z "${WM_PROJECT}" ]]
@@ -30,3 +30,5 @@ fi
 # Clear all build logs
 echo; echo "Removing all log.Allwmake build logs"; echo
 find . -name log.Allwmake | xargs rm
+
+#------------------------------------------------------------------------------

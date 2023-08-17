@@ -495,27 +495,22 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
     const word& region
 )
 {
-    word modelType;
+    // NB: dictionary must be unregistered to avoid adding to the database
 
-    // Enclose the creation of the dictionary to ensure it is
-    // deleted before the fluid is created otherwise the dictionary
-    // is entered in the database twice
-    {
-        IOdictionary fsiProperties
+    IOdictionary props
+    (
+        IOobject
         (
-            IOobject
-            (
-                "fsiProperties",
-                runTime.constant(),
-                runTime,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        );
+            "fsiProperties",
+            runTime.constant(),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false  // Do not register
+        )
+    );
 
-        fsiProperties.lookup("fluidSolidInterface")
-            >> modelType;
-    }
+    const word modelType(props.lookup("fluidSolidInterface"));
 
     Info<< "Selecting fluidSolidInterface " << modelType << endl;
 
@@ -524,12 +519,13 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
 
     if (!ctorPtr)
     {
-        FatalErrorInLookup
+        FatalIOErrorInLookup
         (
+            props,
             "fluidSolidInterface",
             modelType,
             *dictionaryConstructorTablePtr_
-        ) << exit(FatalError);
+        ) << exit(FatalIOError);
     }
 
 #else
