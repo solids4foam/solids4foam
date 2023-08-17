@@ -24,4 +24,4 @@ else
     fi
 fi
 
-wmake libso
+wmake $* libso

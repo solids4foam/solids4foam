@@ -6,4 +6,4 @@ if [ -f "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments ]
 then  . "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments
 fi
 
-wmake libso
+wmake $* libso

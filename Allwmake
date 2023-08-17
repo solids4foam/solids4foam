@@ -11,16 +11,8 @@ then
     exit 1
 fi
 
-targetType=""
-
-if [ "$WM_PROJECT" = "OpenFOAM" ]
-then
-    # Parse arguments for library compilation
-    . $WM_PROJECT_DIR/wmake/scripts/AllwmakeParseArguments
-fi
-
 # Download ThirdParty software
-(cd ThirdParty && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
+(cd ThirdParty && ./Allwmake $* 2>&1 | tee log.Allwmake)
 
 # Some files in foam-extend may need to be fixed
 (cd optionalFixes && ./Allcheck 2>&1 | tee log.Allcheck)
@@ -34,10 +26,10 @@ then
 fi
 
 # Compile libraries
-(cd src && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
+(cd src && ./Allwmake $* 2>&1 | tee log.Allwmake)
 
 # Compile applications
-(cd applications && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
+(cd applications && ./Allwmake $* 2>&1 | tee log.Allwmake)
 
 # Check if the build succeeded
 echo "Checking if the installation was a success:"
