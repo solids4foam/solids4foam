@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
                 mesh.nFaces(),    // start face index
                 newPatchID,       // patch index
                 patches           // boundary mesh
-#ifdef OPENFOAM
+#ifdef OPENFOAM_NOT_EXTEND
                 ,
                 "patch"           // patch type
 #endif
