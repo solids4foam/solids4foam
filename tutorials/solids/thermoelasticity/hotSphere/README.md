@@ -1,8 +1,5 @@
 ---
 sort: 1
-output:
-  html_document:
-    df_print: paged
 ---
 
 # My first tutorial: `hotSphere`
