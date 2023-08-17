@@ -250,4 +250,4 @@ numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/sparseMatrixTools.C
 
-LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
+LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels
