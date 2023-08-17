@@ -267,6 +267,7 @@ void elasticWallPressureFvPatchScalarField::patchFlux
     scalarField rAU(patch().size(), 0.0);
     if (db().foundObject<volScalarField>("rAU"))
     {
+        Info<< "Found rAU" << endl;
         rAU = patch().lookupPatchField<volScalarField, scalar>("rAU");
     }
     else

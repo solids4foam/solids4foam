@@ -20,8 +20,8 @@ License
 #include "thermalCouplingInterface.H"
 #include "addToRunTimeSelectionTable.H"
 #include "movingWallPressureFvPatchScalarField.H"
-
 #include "elasticWallPressureFvPatchScalarField.H"
+#include "OSspecific.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -85,35 +85,44 @@ thermalCouplingInterface::thermalCouplingInterface
         {
             const standAlonePatch& solidZone =
                 solid().globalPatches()[interI].globalPatch();
-        
+
+#ifdef OPENFOAMESIORFOUNDATION
+            oldSolidFaceZoneTemperature_.set
+            (
+                interI,
+                new scalarField(solidZone.size(), 0)
+            );
+#else
             oldSolidFaceZoneTemperature_.set
             (
                 interI,
                 scalarField(solidZone.size(), 0)
             );
+#endif
             
             oldSolidFaceZoneHeatFlux_.set
             (
                 interI,
-                scalarField(solidZone.size(), 0)
+                new scalarField(solidZone.size(), 0)
             );
             
             oldOldSolidFaceZoneTemperature_.set
             (
                 interI,
-                scalarField(solidZone.size(), 0)
+                new scalarField(solidZone.size(), 0)
             );
             
             oldOldSolidFaceZoneHeatFlux_.set
             (
                 interI,
-                scalarField(solidZone.size(), 0)
+                new scalarField(solidZone.size(), 0)
             );
         }
     }
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
 
 bool thermalCouplingInterface::evolve()
 {
@@ -148,7 +157,7 @@ bool thermalCouplingInterface::evolve()
         // Optional: write residuals to file
         if (writeResidualsToFile() && Pstream::master())
         {
-            residualFile()
+            thermalResidualFile()
                 << runTime().value() << " "
                 << outerCorr() << " "
                 << residualNorm << endl;
@@ -356,7 +365,7 @@ scalar thermalCouplingInterface::calcThermalResidual()
 
         // Initialise the solid zone temperature field
         // interpolated to the fluid zone
-        scalarField solidZoneTemperature(solidZone.size(), 0);
+        scalarField solidZoneTemperature(fluidZone.size(), 0);
 
         // Transfer displacement field from the solid to the fluid
         interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
@@ -374,10 +383,11 @@ scalar thermalCouplingInterface::calcThermalResidual()
         );
 
         // Calculate thermal residual
-        scalarField residual =
+        const scalarField residual
+        (
             solidZoneTemperature
-          - fluidZoneTemperature;
-
+          - fluidZoneTemperature
+        );
 
         // Calculate thermal resudal norm
         scalar residualNorm =
