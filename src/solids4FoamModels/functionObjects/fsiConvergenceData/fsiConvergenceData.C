@@ -176,7 +176,7 @@ bool Foam::fsiConvergenceData::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::fsiConvergenceData::write()
 {
     return writeData();

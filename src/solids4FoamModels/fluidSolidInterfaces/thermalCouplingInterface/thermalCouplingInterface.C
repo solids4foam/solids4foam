@@ -86,7 +86,7 @@ thermalCouplingInterface::thermalCouplingInterface
             const standAlonePatch& solidZone =
                 solid().globalPatches()[interI].globalPatch();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             oldSolidFaceZoneTemperature_.set
             (
                 interI,
