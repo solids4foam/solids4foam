@@ -1612,29 +1612,24 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     const word& region
 )
 {
-    word modelType;
+    // NB: dictionary must be unregistered to avoid adding to the database
 
-    // Enclose the creation of the dictionary to ensure it is
-    // deleted before the fluid model is created, otherwise the dictionary
-    // is entered in the database twice
-    {
-        IOdictionary solidProperties
+    IOdictionary props
+    (
+        IOobject
         (
-            IOobject
-            (
-                "solidProperties",
-                bool(region == dynamicFvMesh::defaultRegion)
-              ? fileName(runTime.caseConstant())
-              : fileName(runTime.caseConstant()/region),
-                runTime,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        );
+            "solidProperties",
+            bool(region == dynamicFvMesh::defaultRegion)
+          ? fileName(runTime.caseConstant())
+          : fileName(runTime.caseConstant()/region),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false  // Do not register
+        )
+    );
 
-        solidProperties.lookup("solidModel")
-            >> modelType;
-    }
+    const word modelType(props.lookup("solidModel"));
 
     Info<< "Selecting solidModel " << modelType << endl;
 
@@ -1643,12 +1638,13 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
 
     if (!ctorPtr)
     {
-        FatalErrorInLookup
+        FatalIOErrorInLookup
         (
+            props,
             "solidModel",
             modelType,
             *dictionaryConstructorTablePtr_
-        ) << exit(FatalError);
+        ) << exit(FatalIOError);
     }
 
 #else

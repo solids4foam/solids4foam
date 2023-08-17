@@ -135,7 +135,8 @@ void outflowPressureFvPatchScalarField::updateCoeffs()
             mesh.time().constant(),
             mesh,
             IOobject::MUST_READ,
-            IOobject::NO_WRITE
+            IOobject::NO_WRITE,
+            false  // Do not register
         )
     );
     dimensionedScalar nu(transportProperties.lookup("nu"));

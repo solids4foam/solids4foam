@@ -1,29 +1,6 @@
-ifeq ($(WM_PROJECT), foam)
-    FOAM_FLAVOUR = FOAMEXTEND
-else
-    ifneq (,$(findstring -DOPENFOAM=,$(GFLAGS)))
-        FOAM_FLAVOUR = OPENFOAM_COM
-    else ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
-        FOAM_FLAVOUR = OPENFOAM_COM
-    else
-        FOAM_FLAVOUR = OPENFOAM_ORG
-    endif
-endif
-ifeq (FOAMEXTEND, $(FOAM_FLAVOUR))
-    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
-    ifeq ($(VER), 1)
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
-    else
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
-    endif
-else
-    VERSION_SPECIFIC_INC = -DOPENFOAM_NOT_EXTEND
-    ifeq (OPENFOAM_COM, $(FOAM_FLAVOUR))
-        VERSION_SPECIFIC_INC += -DOPENFOAM_COM
-    else
-        VERSION_SPECIFIC_INC += -DOPENFOAM_ORG
-    endif
-endif
+SOLIDS4FOAM_ROOT := ../../..
+
+include $(SOLIDS4FOAM_ROOT)/etc/wmake-options
 
 EXE_INC = \
     $(VERSION_SPECIFIC_INC) \
