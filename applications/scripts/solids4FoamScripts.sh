@@ -156,7 +156,23 @@ function solids4Foam::convertCaseFormat()
         mv "${CASE_DIR}/system/createPatchDict.openfoam" "system/createPatchDict"
     fi
 
-    # 9. Resolve force post-processing path from foam-extend
+    # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
+    #    the gradScheme for the solid in OpenFOAM.com, as these are the only
+    #    schemes consistent with boundary non-orthogonal correction
+    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    then
+        if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/fvSchemes"
+            sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/fvSchemes
+        elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/solid/fvSchemes"
+            sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
+        fi
+    fi
+
+    # 10. Resolve force post-processing path from foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
         echo "Updating force.gnuplot"
@@ -306,13 +322,29 @@ function solids4Foam::convertCaseFormatFoamExtend()
         mv "${CASE_DIR}/system/createPatchDict.foamextend" "system/createPatchDict"
     fi
 
-    # 9. Resolve force post-processing path for foam-extend
+    # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
+    #    the gradScheme for the solid in OpenFOAM.com, as these are the only
+    #    schemes consistent with boundary non-orthogonal correction
+    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    then
+        if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/fvSchemes"
+            sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/fvSchemes
+        elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/solid/fvSchemes"
+            sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
+        fi
+    fi
+    
+    # 10. Resolve force post-processing path for foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
         echo "Updating force.gnuplot"
         sed -i "s|./postProcessing/fluid/forces/0/force.dat|forces/0/forces.dat|g" force.gnuplot
     fi
-
+    
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormatFoamExtend end                        |"

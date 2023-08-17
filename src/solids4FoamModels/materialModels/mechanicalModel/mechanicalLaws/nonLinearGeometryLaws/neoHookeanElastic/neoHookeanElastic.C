@@ -124,6 +124,27 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::bulkModulus() const
+{
+    return tmp<volScalarField>
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            K_
+        )
+    );
+}
+
+
 void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
 {
     // Update the deformation gradient field
@@ -143,8 +164,15 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
     // Calculate the deviatoric stress
     const volSymmTensorField s(mu_*dev(bEbar));
 
+    // Update the hydrostatic stress
+    updateSigmaHyd
+    (
+        0.5*K()*(pow(J, 2.0) - 1.0),
+        (4.0/3.0)*mu_ + K_
+    );
+
     // Calculate the Cauchy stress
-    sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
+    sigma = (1.0/J)*(sigmaHyd()*I + s);
 }
 
 

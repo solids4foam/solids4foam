@@ -28,7 +28,7 @@ ddtSchemes
 
 gradSchemes
 {
-    default            extendedLeastSquares 0;
+    default            leastSquares;
     grad(D)            cellLimited Gauss linear 1.0;
 }
 

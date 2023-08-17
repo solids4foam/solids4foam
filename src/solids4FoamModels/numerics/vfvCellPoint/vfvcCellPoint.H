@@ -62,6 +62,14 @@ namespace vfvc
     );
 
     // Gradient field
+    // Returns pointTensorField on primary mesh
+    tmp<pointTensorField> pGrad
+    (
+        const pointVectorField& pointD, // primary mesh point displacement
+        const fvMesh& mesh              // primary mesh
+    );
+
+    // Gradient field
     // Returns surfaceTensorField on dual mesh
     // Only calculates the gradient for internal faces
     tmp<surfaceTensorField> fGrad

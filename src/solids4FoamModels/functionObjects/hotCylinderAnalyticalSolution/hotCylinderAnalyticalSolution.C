@@ -225,7 +225,7 @@ bool Foam::hotCylinderAnalyticalSolution::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::hotCylinderAnalyticalSolution::write()
 {
-    return writeData();
+    return false;
 }
 #endif
 

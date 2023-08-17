@@ -22,14 +22,12 @@ License
 #include "transformField.H"
 #include "volFields.H"
 #include "lookupSolidModel.H"
+#include "patchCorrectionVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
-
-// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
-
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -40,34 +38,39 @@ solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
 )
 :
     directionMixedFvPatchVectorField(p, iF),
+    nonOrthogonalCorrections_(true),
+    secondOrder_(false),
     limitCoeff_(1.0)
 {
+    // solidModel may not exist here, so we cannot look it up
     // Lookup the solidModel object
-    const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
+    // const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
 
-    if (solMod.solidModelDict().found("snGradLimitCoeff"))
-    {
-        limitCoeff_ =
-            readScalar
-            (
-                solMod.solidModelDict().lookup("snGradLimitCoeff")
-            );
+    // if (solMod.solidModelDict().found("snGradLimitCoeff"))
+    // {
+    //     limitCoeff_ =
+    //         readScalar
+    //         (
+    //             solMod.solidModelDict().lookup("snGradLimitCoeff")
+    //         );
 
-        Info<< "snGradLimitCoeff: " << limitCoeff_ << endl;
-    }
+    //     Info<< "snGradLimitCoeff: " << limitCoeff_ << endl;
+    // }
 }
 
 
 solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
 (
-    const solidDirectionMixedFvPatchVectorField& ptf,
+    const solidDirectionMixedFvPatchVectorField& pvf,
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
     const fvPatchFieldMapper& mapper
 )
 :
-    directionMixedFvPatchVectorField(ptf, p, iF, mapper),
-    limitCoeff_(ptf.limitCoeff_)
+    directionMixedFvPatchVectorField(pvf, p, iF, mapper),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    secondOrder_(pvf.secondOrder_),
+    limitCoeff_(pvf.limitCoeff_)
 {}
 
 
@@ -79,6 +82,11 @@ solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
 )
 :
     directionMixedFvPatchVectorField(p, iF, dict),
+    nonOrthogonalCorrections_
+    (
+        dict.lookupOrDefault<Switch>("nonOrthogonalCorrections", true)
+    ),
+    secondOrder_(dict.lookupOrDefault<Switch>("secondOrder", false)),
     limitCoeff_(dict.lookupOrDefault<scalar>("limitCoeff", 1.0))
 {
     Info<< "Creating " << type() << " boundary condition" << endl;
@@ -98,17 +106,20 @@ solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
         Info<< "snGradLimitCoeff: " << limitCoeff_ << endl;
     }
 
-    Info<< "Limiter coefficient: " << limitCoeff_ << endl;
+    Info<< "    Limiter coefficient: " << limitCoeff_ << nl
+        << "    Second order correction: " << secondOrder_ << endl;
 }
 
 solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
 (
-    const solidDirectionMixedFvPatchVectorField& ptf,
+    const solidDirectionMixedFvPatchVectorField& pvf,
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    directionMixedFvPatchVectorField(ptf, iF),
-    limitCoeff_(ptf.limitCoeff_)
+    directionMixedFvPatchVectorField(pvf, iF),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    secondOrder_(pvf.secondOrder_),
+    limitCoeff_(pvf.limitCoeff_)
 {}
 
 
@@ -127,11 +138,11 @@ void solidDirectionMixedFvPatchVectorField::autoMap
 // Reverse-map the given fvPatchField onto this fvPatchField
 void solidDirectionMixedFvPatchVectorField::rmap
 (
-    const fvPatchField<vector>& ptf,
+    const fvPatchField<vector>& pvf,
     const labelList& addr
 )
 {
-    directionMixedFvPatchVectorField::rmap(ptf, addr);
+    directionMixedFvPatchVectorField::rmap(pvf, addr);
 }
 
 
@@ -147,83 +158,102 @@ void solidDirectionMixedFvPatchVectorField::evaluate(const Pstream::commsTypes)
         this->updateCoeffs();
     }
 
-    bool secondOrder_(false);
-
-    // Unit normals
-    const vectorField n(patch().nf());
-
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
-    // Correction vcetors
-    const vectorField k((I - sqr(n)) & delta);
-
-    const fvPatchField<tensor>& gradD =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
-#ifdef OPENFOAMESIORFOUNDATION
-            "grad(" + internalField().name() + ")"
-#else
-            "grad(" + dimensionedInternalField().name() + ")"
-#endif
-        );
-
-    // Calc limited snGrad correction
-
-    vectorField snGradCorrection
-    (
-      - (k & gradD.patchInternalField())*patch().deltaCoeffs()
-    );
-
-    if (limitCoeff_ < (1.0 - SMALL))
+    if (nonOrthogonalCorrections_)
     {
-        const vectorField uncorrectedSnGrad
-        (
+        // Lookup the gradient field
+        const fvPatchField<tensor>& gradD =
+            patch().lookupPatchField<volTensorField, tensor>
             (
-               *this
-             - patchInternalField()
-            )*patch().deltaCoeffs()
+            #ifdef OPENFOAMESIORFOUNDATION
+                "grad(" + internalField().name() + ")"
+            #else
+                "grad(" + dimensionedInternalField().name() + ")"
+            #endif
+            );
+
+        // Non-orthogonal correction vectors
+        const vectorField k(patchCorrectionVectors(patch()));
+
+        // Calc limited snGrad correction
+
+        vectorField snGradCorrection
+        (
+          - (k & gradD.patchInternalField())*patch().deltaCoeffs()
         );
 
-        const scalarField limiter
-        (
-            min
+        if (limitCoeff_ < (1.0 - SMALL))
+        {
+            const vectorField uncorrectedSnGrad
             (
-                limitCoeff_*mag(uncorrectedSnGrad + snGradCorrection)
-               /((1 - limitCoeff_)*mag(snGradCorrection) + SMALL),
-                1.0
-            )
+                (
+                   *this - patchInternalField()
+                )*patch().deltaCoeffs()
+            );
+
+            const scalarField limiter
+            (
+                min
+                (
+                    limitCoeff_*mag(uncorrectedSnGrad + snGradCorrection)
+                   /((1 - limitCoeff_)*mag(snGradCorrection) + SMALL),
+                    1.0
+                )
+            );
+
+            snGradCorrection *= limiter;
+        }
+
+        const Field<vector> normalValue(transform(valueFraction(), refValue()));
+
+        Field<vector> gradValue(patch().size());
+
+        if (secondOrder_)
+        {
+            // Unit normals
+            const vectorField n(patch().nf());
+
+            // Normal gradient at internal cell
+            const vectorField nGradDP(n & gradD.patchInternalField());
+
+            gradValue =
+                patchInternalField()
+              + (k & gradD.patchInternalField())
+              + 0.5*(nGradDP + refGrad())/patch().deltaCoeffs();
+        }
+        else
+        {
+            gradValue =
+                patchInternalField()
+              - snGradCorrection/patch().deltaCoeffs()
+              + refGrad()/patch().deltaCoeffs();
+        }
+
+        const Field<vector> transformGradValue
+        (
+            transform(I - valueFraction(), gradValue)
         );
 
-        snGradCorrection *= limiter;
-    }
-
-    const Field<vector> normalValue(transform(valueFraction(), refValue()));
-
-    Field<vector> gradValue(patch().size());
-    if (!secondOrder_)
-    {
-        gradValue =
-            patchInternalField()
-          - snGradCorrection/patch().deltaCoeffs()
-          + refGrad()/patch().deltaCoeffs();
+        Field<vector>::operator=(normalValue + transformGradValue);
     }
     else
     {
-        const vectorField nGradDP(n & gradD.patchInternalField());
+        // Non-orthogonal correction vectors
+        const vectorField k(patchCorrectionVectors(patch()));
 
-        gradValue =
-            patchInternalField()
-          + (k & gradD.patchInternalField())
-          + 0.5*(nGradDP + refGrad())/patch().deltaCoeffs();
+        const Field<vector> normalValue(transform(valueFraction(), refValue()));
+
+        const Field<vector> gradValue
+        (
+            patchInternalField() + refGrad()/patch().deltaCoeffs()
+        );
+
+        const Field<vector> transformGradValue
+        (
+            transform(I - valueFraction(), gradValue)
+        );
+
+        Field<vector>::operator=(normalValue + transformGradValue);
     }
-
-    const Field<vector> transformGradValue
-    (
-        transform(I - valueFraction(), gradValue)
-    );
-
-    Field<vector>::operator=(normalValue + transformGradValue);
 
     fvPatchField<vector>::evaluate();
 }
@@ -232,107 +262,142 @@ void solidDirectionMixedFvPatchVectorField::evaluate(const Pstream::commsTypes)
 Foam::tmp<Foam::Field<vector> >
 solidDirectionMixedFvPatchVectorField::snGrad() const
 {
-    const bool secondOrder_(false);
+    if (nonOrthogonalCorrections_)
+    {
+        // Lookup the gradient field
+        const fvPatchField<tensor>& gradField =
+            patch().lookupPatchField<volTensorField, tensor>
+            (
+            #ifdef OPENFOAMESIORFOUNDATION
+                "grad(" + internalField().name() + ")"
+            #else
+                "grad(" + dimensionedInternalField().name() + ")"
+            #endif
+            );
 
+        // Non-orthogonal correction vectors
+        const vectorField k(patchCorrectionVectors(patch()));
+
+        // Patch internal field
+        const Field<vector> pif(this->patchInternalField());
+
+        // Patch normal value
+        const Field<vector> normalValue
+        (
+            transform(this->valueFraction(), this->refValue())
+        );
+
+        vectorField snGradCorrection
+        (
+          - (k & gradField.patchInternalField())
+           *patch().deltaCoeffs()
+        );
+
+        if (limitCoeff_ < (1.0 - SMALL))
+        {
+            const vectorField uncorrectedSnGrad
+            (
+                (
+                   *this
+                  - patchInternalField()
+                )*patch().deltaCoeffs()
+            );
+
+            const scalarField limiter
+            (
+                (
+                    min
+                    (
+                        limitCoeff_*mag(uncorrectedSnGrad + snGradCorrection)
+                       /((1 - limitCoeff_)*mag(snGradCorrection) + SMALL),
+                        1.0
+                    )
+                )
+            );
+
+            snGradCorrection *= limiter;
+        }
+
+        Field<vector> gradValue(patch().size(), vector::zero);
+
+        if (secondOrder_)
+        {
+            // Unit normals
+            const vectorField n(patch().nf());
+
+            // Normal gradient at internal cell
+            const vectorField nGradDP(n & gradField.patchInternalField());
+
+            gradValue =
+                patchInternalField()
+              + (k & gradField.patchInternalField())
+              + 0.5*(nGradDP + refGrad())/patch().deltaCoeffs();
+        }
+        else
+        {
+            gradValue =
+                pif
+              - snGradCorrection/patch().deltaCoeffs()
+              + refGrad()/patch().deltaCoeffs();
+        }
+
+        const Field<vector> transformGradValue
+        (
+            transform(I - this->valueFraction(), gradValue)
+        );
+
+        if (secondOrder_)
+        {
+            // Unit normals
+            const vectorField n(patch().nf());
+
+            // Normal gradient at internal cell
+            const vectorField nGradDP(n & gradField.patchInternalField());
+
+            return
+                2.0
+               *(
+                   normalValue + transformGradValue
+                 - (pif + (k & gradField.patchInternalField()))
+               )*patch().deltaCoeffs()
+             - nGradDP;
+        }
+        else
+        {
+            return
+            (
+                normalValue + transformGradValue
+              - (
+                    pif - snGradCorrection/this->patch().deltaCoeffs()
+                )
+            )*patch().deltaCoeffs();
+        }
+    }
+
+    // else, no non-orthogonal correction
+
+    // Patch internal field
     const Field<vector> pif(this->patchInternalField());
 
+    // Patch normal value
     const Field<vector> normalValue
     (
         transform(this->valueFraction(), this->refValue())
     );
 
-    // Unit normals
-    const vectorField n(patch().nf());
-
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
-    // Correction vcetors
-    const vectorField k((I - sqr(n)) & delta);
-
-    const fvPatchField<tensor>& gradD =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
-#ifdef OPENFOAMESIORFOUNDATION
-            "grad(" + internalField().name() + ")"
-#else
-            "grad(" + dimensionedInternalField().name() + ")"
-#endif
-        );
-
-    vectorField snGradCorrection
+    const Field<vector> gradValue
     (
-      - (k & gradD.patchInternalField())
-       *patch().deltaCoeffs()
+        pif + refGrad()/patch().deltaCoeffs()
     );
 
-    if (limitCoeff_ < (1.0 - SMALL))
-    {
-        const vectorField uncorrectedSnGrad
-        (
-            (
-               *this
-              - patchInternalField()
-            )*patch().deltaCoeffs()
-        );
-
-        const scalarField limiter
-        (
-            (
-                min
-                (
-                    limitCoeff_*mag(uncorrectedSnGrad + snGradCorrection)
-                   /((1 - limitCoeff_)*mag(snGradCorrection) + SMALL),
-                    1.0
-                )
-            )
-        );
-
-        snGradCorrection *= limiter;
-    }
-
-    Field<vector> gradValue
-    (
-        pif
-      - snGradCorrection/patch().deltaCoeffs()
-      + refGrad()/patch().deltaCoeffs()
-    );
-
-    if (secondOrder_)
-    {
-        const vectorField nGradDP(n & gradD.patchInternalField());
-
-        gradValue =
-            patchInternalField()
-          + (k & gradD.patchInternalField())
-          + 0.5*(nGradDP + refGrad())/patch().deltaCoeffs();
-    }
-
-    Field<vector> transformGradValue
+    const Field<vector> transformGradValue
     (
         transform(I - this->valueFraction(), gradValue)
     );
 
-    if (secondOrder_)
-    {
-        const vectorField nGradDP(n & gradD.patchInternalField());
-
-        return
-            2.0
-           *(
-               normalValue + transformGradValue
-             - (pif + (k&gradD.patchInternalField()))
-           )*patch().deltaCoeffs()
-         - nGradDP;
-    }
-
     return
     (
-        normalValue + transformGradValue
-      - (
-            pif
-          - snGradCorrection/this->patch().deltaCoeffs()
-        )
+        normalValue + transformGradValue - pif
     )*patch().deltaCoeffs();
 }
 
@@ -340,6 +405,11 @@ solidDirectionMixedFvPatchVectorField::snGrad() const
 void solidDirectionMixedFvPatchVectorField::write(Ostream& os) const
 {
     directionMixedFvPatchVectorField::write(os);
+
+    os.writeKeyword("nonOrthogonalCorrections")
+        << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
+    os.writeKeyword("secondOrder")
+        << secondOrder_ << token::END_STATEMENT << nl;
     os.writeKeyword("limitCoeff")
         << limitCoeff_ << token::END_STATEMENT << nl;
 }

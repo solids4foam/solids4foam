@@ -57,6 +57,9 @@ class solidTractionFvPatchVectorField
 
     // Private Data
 
+        //- Enable non-orthogonal corrections
+        const Switch nonOrthogonalCorrections_;
+
         //- Traction
         vectorField traction_;
 

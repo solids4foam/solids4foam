@@ -204,7 +204,7 @@ bool Foam::solidPotentialEnergy::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::solidPotentialEnergy::write()
 {
-    return writeData();
+    return false;
 }
 #endif
 

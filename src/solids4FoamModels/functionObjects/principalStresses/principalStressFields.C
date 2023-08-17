@@ -272,7 +272,7 @@ void Foam::writePrincipalStressFields
             sigmaMinDirI[cellI]
         );
 
-        sigmaDiffI[cellI] = sigmaMaxI[cellI] - sigmaMinI[cellI];
+        sigmaDiffI[cellI] = sigmaMinI[cellI] - sigmaMaxI[cellI];
     }
 
     forAll(sigma.boundaryField(), patchI)
@@ -316,7 +316,7 @@ void Foam::writePrincipalStressFields
                     pSigmaMinDir[faceI]
                 );
 
-                pSigmaDiff[faceI] = pSigmaMax[faceI] - pSigmaMin[faceI];
+                pSigmaDiff[faceI] = pSigmaMin[faceI] - pSigmaMax[faceI];
             }
         }
     }
@@ -330,13 +330,13 @@ void Foam::writePrincipalStressFields
     sigmaDiff.correctBoundaryConditions();
 
     // Write fields
-    Info<< "    Writing sigmaMax" << nl
-        << "    Writing sigmaMid" << nl
-        << "    Writing sigmaMin" << nl
-        << "    Writing sigmaMaxDir" << nl
-        << "    Writing sigmaMidDir" << nl
-        << "    Writing sigmaMinDir" << nl
-        << "    Writing sigmaDiff" << endl;
+    Info<< "Writing sigmaMax" << nl
+        << "Writing sigmaMid" << nl
+        << "Writing sigmaMin" << nl
+        << "Writing sigmaMaxDir" << nl
+        << "Writing sigmaMidDir" << nl
+        << "Writing sigmaMinDir" << nl
+        << "Writing sigmaDiff" << endl;
 
     sigmaMax.write();
     sigmaMid.write();

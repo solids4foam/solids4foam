@@ -47,6 +47,11 @@ Author
 #include "volFields.H"
 #include "pointFields.H"
 #include "sparseMatrix.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "scalarMatrices.H"
+#else
+    #include "scalarSquareMatrix.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -65,7 +70,7 @@ namespace vfvm
         const fvMesh& dualMesh,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const Field<symmTensor4thOrder>& materialTangentField,
+        const Field<scalarSquareMatrix>& materialTangentField,
         const boolList& fixedDofs,
         const symmTensorField& fixedDofDirections,
         const scalar fixedDofScale,

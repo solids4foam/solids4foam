@@ -38,7 +38,7 @@ boundaryField
     inlet
     {
         // openfoam
-        //type           uniformFixedValue;
+        //type          uniformFixedValue;
         uniformValue     tableFile;
 
         // foam extend

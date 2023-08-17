@@ -25,11 +25,22 @@ License
 
 #include "vfvcCellPoint.H"
 #include "cellPointLeastSquaresVectors.H"
+#include "pointPointLeastSquaresVectors.H"
 #include "patchToPatchInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volTensorField> Foam::vfvc::grad
+namespace Foam
+{
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace vfvc
+{
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+tmp<volTensorField> grad
 (
     const pointVectorField& pointD,
     const fvMesh& mesh
@@ -102,7 +113,88 @@ Foam::tmp<Foam::volTensorField> Foam::vfvc::grad
 }
 
 
-Foam::tmp<Foam::surfaceTensorField> Foam::vfvc::fGrad
+tmp<pointTensorField> pGrad
+(
+    const pointVectorField& pointD,
+    const fvMesh& mesh
+)
+{
+    // Get a reference to the pointMesh
+    const pointMesh& pMesh = pointD.mesh();
+
+    // Prepare the result field
+    tmp<pointTensorField> tresult
+    (
+        new pointTensorField
+        (
+            IOobject
+            (
+                "pGrad("+ pointD.name() +")",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            pMesh,
+            dimensionedTensor
+            (
+                "zero", pointD.dimensions()/dimLength, tensor::zero
+            ),
+            "calculated"
+        )
+    );
+#ifdef OPENFOAMESIORFOUNDATION
+    pointTensorField& result = tresult.ref();
+#else
+    pointTensorField& result = tresult();
+#endif
+
+    // Take references for clarity and efficiency
+
+    tensorField& resultI = result;
+    const labelListList& pointPoints = mesh.pointPoints();
+    const vectorField& pointDI = pointD.internalField();
+    const pointPointLeastSquaresVectors& pointPointLeastSquaresVecs =
+        pointPointLeastSquaresVectors::New(mesh);
+    const List<vectorList>& leastSquaresVecs =
+        pointPointLeastSquaresVecs.vectors();
+
+    // Calculate the gradient for each point
+    forAll(resultI, pointI)
+    {
+        // Point-point neighbours
+        const labelList& curPointPoints = pointPoints[pointI];
+
+        // Least squares vectors for pointI
+        const vectorList& curLeastSquaresVecs = leastSquaresVecs[pointI];
+
+        // Accumulate contribution to the point gradient from each point
+        // neighbour
+        tensor& pointGrad = resultI[pointI];
+        forAll(curPointPoints, ppI)
+        {
+            // Least squares vector from the average point to this neighbour
+            // point
+            const vector& lsVec = curLeastSquaresVecs[ppI];
+
+            // Point index
+            const label pointPointID = curPointPoints[ppI];
+
+            // Delta pointD
+            const vector deltaPointD = pointDI[pointPointID] - pointDI[pointI];
+
+            // Add least squares contribution to the gradient
+            pointGrad += lsVec*deltaPointD;
+        }
+    }
+
+    result.correctBoundaryConditions();
+
+    return tresult;
+}
+
+
+tmp<surfaceTensorField> fGrad
 (
     const pointVectorField& pointD,
     const fvMesh& mesh,
@@ -115,7 +207,7 @@ Foam::tmp<Foam::surfaceTensorField> Foam::vfvc::fGrad
 {
     if (debug)
     {
-        Info<< "surfaceTensorField Foam::vfvc::fGrad(...): start" << endl;
+        Info<< "surfaceTensorField fGrad(...): start" << endl;
     }
 
     // Prepare the result field
@@ -202,18 +294,45 @@ Foam::tmp<Foam::surfaceTensorField> Foam::vfvc::fGrad
                )/edgeLength
               + ((I - zeta*sqr(edgeDir)) & gradDI[cellID]);
         }
+        else // boundary face
+        {
+            // Dual patch which this dual face resides on
+            const label dualPatchID =
+                dualMesh.boundaryMesh().whichPatch(dualFaceI);
+
+            if (dualMesh.boundaryMesh()[dualPatchID].type() != "empty")
+            {
+                // Find local face index
+                const label localDualFaceID =
+                    dualFaceI - dualMesh.boundaryMesh()[dualPatchID].start();
+
+                // Primary mesh cell in which dualFaceI resides
+                const label cellID = dualFaceToCell[dualFaceI];
+
+                // Use the gradient in the adjacent primary cell-centre
+                // This will result in inconsistent values at processor patches
+                // Is this an issue?
+#ifdef OPENFOAMESIORFOUNDATION
+                result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
+                    gradDI[cellID];
+#else
+                result.boundaryField()[dualPatchID][localDualFaceID] =
+                    gradDI[cellID];
+#endif
+            }
+        }
     }
 
     if (debug)
     {
-        Info<< "surfaceTensorField Foam::vfvc::fGrad(...): end" << endl;
+        Info<< "surfaceTensorField fGrad(...): end" << endl;
     }
 
     return tresult;
 }
 
 
-Foam::tmp<Foam::vectorField> Foam::vfvc::d2dt2
+tmp<vectorField> d2dt2
 (
     ITstream& d2dt2Scheme,
     const pointVectorField& pointD, // displacement
@@ -282,7 +401,7 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::d2dt2
     }
     else
     {
-        FatalErrorIn("Foam::tmp<Foam::vectorField> Foam::vfvc::d2dt2(...)")
+        FatalErrorIn("tmp<vectorField> d2dt2(...)")
             << "Not implemented for d2dt2Scheme = " << d2dt2SchemeName << nl
             << "Available d2dt2Schemes are: " << nl
             << "    steadyState" << nl
@@ -296,7 +415,7 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::d2dt2
 }
 
 
-Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
+tmp<vectorField> ddt
 (
     ITstream& ddtScheme,
     ITstream& d2dt2Scheme,
@@ -325,7 +444,7 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
 
         if (ddtSchemeName != d2dt2SchemeName)
         {
-            FatalErrorIn("Foam::tmp<Foam::vectorField> Foam::vfvc::ddt(...)")
+            FatalErrorIn("tmp<vectorField> ddt(...)")
                 << "The ddtScheme and d2dt2Scheme for " << pointP.name()
                 << " are not consistant"
                 << abort(FatalError);
@@ -399,14 +518,14 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
         }
         else
         {
-            FatalErrorIn("Foam::tmp<Foam::vectorField> Foam::vfvc::ddt(...)")
+            FatalErrorIn("tmp<vectorField> ddt(...)")
                 << "NewmarkBeta only implemented for pointD and pointU"
                 << abort(FatalError);
         }
     }
     else
     {
-        FatalErrorIn("Foam::tmp<Foam::vectorField> Foam::vfvc::ddt(...)")
+        FatalErrorIn("tmp<vectorField> ddt(...)")
             << "Not implemented for ddtScheme = " << ddtSchemeName << nl
             << "Available ddtSchemes are: " << nl
             << "    steadyState" << nl
@@ -420,7 +539,7 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
 }
 
 
-// Foam::tmp<Foam::pointVectorField> Foam::vfvc::laplacian
+// tmp<pointVectorField> laplacian
 // (
 //     const tensor& gamma,
 //     const pointVectorField& pf,
@@ -499,5 +618,13 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
 
 //     return tresult;
 // }
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace vfvc
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
 
 // ************************************************************************* //

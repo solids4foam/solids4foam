@@ -24,4 +24,8 @@ If your name is missing, please let philip.cardiff@ucd.ie know.
 * Philipp Milovic
 * Seevani Bali
 * Ivan Batistic
+* Simona Moretti
+* Andrea Luigi Facci
+* Federico Mazzanti
+* Xiaohu Guo
 * Amirhossein Taran

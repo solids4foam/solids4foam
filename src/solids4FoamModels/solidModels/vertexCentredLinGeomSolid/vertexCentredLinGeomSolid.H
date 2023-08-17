@@ -27,12 +27,13 @@ Description
     where the governing equations are integrated over a dual mesh. The dual mesh
     is automatically constructed from the primary mesh using the meshDualiser.
 
+    An implicit Newton-Raphson algorithm is employed.
+
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
     vertexCentredLinGeomSolid.C
-    vertexCentredLinGeomSolidTemplates.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -48,6 +49,9 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
+#ifdef OPENFOAMESI
+    #include "pointVolInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -122,6 +126,11 @@ class vertexCentredLinGeomSolid
 
         //- Local-to-global point map and owner list
         globalPointIndices globalPointIndices_;
+
+#ifdef OPENFOAMESI
+        //- Interpolator from points to cells
+        pointVolInterpolation pointVolInterp_;
+#endif
 
 
     // Private Member Functions
@@ -259,6 +268,11 @@ public:
                 const label patchID,
                 const vectorField& faceZoneTraction
             );
+
+        // Write
+
+            //- Write fields
+            virtual void writeFields(const Time& runTime);
 };
 
 

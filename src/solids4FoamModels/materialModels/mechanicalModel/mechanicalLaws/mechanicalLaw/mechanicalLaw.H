@@ -48,7 +48,11 @@ Author
 #include "tmp.H"
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
-#include "symmTensor4thOrder.H"
+#ifdef OPENFOAMESIORFOUNDATION
+    #include "scalarMatrices.H"
+#else
+    #include "scalarSquareMatrix.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -99,6 +103,9 @@ class mechanicalLaw
         //  measure
         mutable autoPtr<volSymmTensorField> sigma0Ptr_;
 
+        //- Initial (residual) stress surface field
+        mutable autoPtr<surfaceSymmTensorField> sigma0fPtr_;
+
         // Small strain tensor
         mutable autoPtr<volSymmTensorField> epsilonPtr_;
 
@@ -131,13 +138,6 @@ class mechanicalLaw
         // Gradient of the hydrostatic stress field
         autoPtr<volVectorField> gradSigmaHydPtr_;
 
-        //- Effective stress (sigmaEff = sigma + p*I)
-        //  Where:
-        //      sigmaEff is the effective stress
-        //      sigma is the total stress
-        //      p is the pore pressure
-        autoPtr<volSymmTensorField> sigmaEffPtr_;
-
         //- Current time index
         label curTimeIndex_;
 
@@ -162,6 +162,9 @@ class mechanicalLaw
         //- Make the sigma0 field
         void makeSigma0() const;
 
+        //- Make the sigma0f field
+        void makeSigma0f() const;
+
         //- Make the epsilon field
         void makeEpsilon() const;
 
@@ -182,9 +185,6 @@ class mechanicalLaw
 
         //- Make the sigmaHyd field
         void makeSigmaHyd();
-
-        //- Make the sigmaEff field
-        void makeSigmaEff();
 
         //- Disallow copy construct
         mechanicalLaw(const mechanicalLaw&);
@@ -270,6 +270,12 @@ protected:
         //- Return a non-const reference to the sigma0 field
         volSymmTensorField& sigma0();
 
+        //- Return a const reference to the sigma0 surface field
+        const surfaceSymmTensorField& sigma0f() const;
+
+        //- Return a non-const reference to the sigma0 surface field
+        surfaceSymmTensorField& sigma0f();
+
         //- Return a const reference to the epsilon field
         const volSymmTensorField& epsilon() const;
 
@@ -299,9 +305,6 @@ protected:
 
         //- Return a reference to the gradSigmaHyd field
         volVectorField& gradSigmaHyd();
-
-        //- Return a reference to the sigmaEff field
-        volSymmTensorField& sigmaEff();
 
         //- Update epsilon
         void updateEpsilon();
@@ -487,23 +490,25 @@ public:
         virtual tmp<surfaceScalarField> impKf() const;
 
         //- Material tangent for Newton Raphson loop
-        virtual symmTensor4thOrder materialTangent() const
+        virtual scalarSquareMatrix materialTangent() const
         {
             // We could use numerical differentiation for this if needed
             notImplemented("Not yet implemented for this mechanical law");
 
             // Keep compiler happy
-            return symmTensor4thOrder::zero;
+            return scalarSquareMatrix(0);
         }
 
+#ifdef OPENFOAMESIORFOUNDATION
         //- Material tangent field for Newton Raphson loop
         //  The size of this field should be mesh.nFaces()
-        virtual tmp<Field<symmTensor4thOrder>> materialTangentField() const;
+        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
+#endif
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const
         {
-            notImplemented("Not yet implemented for this mechanical law");
+            notImplemented("bulkModulus() const");
 
             // Keep compiler happy
             return rho();

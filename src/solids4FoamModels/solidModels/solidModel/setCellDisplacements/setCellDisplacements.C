@@ -169,8 +169,11 @@ void Foam::setCellDisplacements::readDict()
         timeVaryingDisps_ = newTimeVaryingDisps;
         currentCellDisps_ = newCurrentCellDisps;
 
-        Pout<< type() << ": proc " << Pstream::myProcNo() << " has "
-            << cellIDs_.size() << " cells with setDisplacements" << endl;
+        if (cellIDs_.size() > 0)
+        {
+            Pout<< type() << ": proc " << Pstream::myProcNo() << " has "
+                << cellIDs_.size() << " cells with setDisplacements" << endl;
+        }
     }
 }
 

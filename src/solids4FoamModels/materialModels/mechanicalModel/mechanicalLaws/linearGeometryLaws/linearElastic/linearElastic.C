@@ -40,49 +40,6 @@ namespace Foam
 }
 
 
-// * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
-
-void Foam::linearElastic::makeSigma0f() const
-{
-    if (sigma0fPtr_.valid())
-    {
-        FatalErrorIn("void Foam::linearElastic::makeSigma0f() const")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    sigma0fPtr_.set
-    (
-        new surfaceSymmTensorField
-        (
-            "sigma0f",
-            linearInterpolate(sigma0())
-        )
-    );
-}
-
-
-const Foam::surfaceSymmTensorField& Foam::linearElastic::sigma0f() const
-{
-    if (sigma0fPtr_.empty())
-    {
-        makeSigma0f();
-    }
-
-    return sigma0fPtr_();
-}
-
-
-Foam::surfaceSymmTensorField& Foam::linearElastic::sigma0f()
-{
-    if (sigma0fPtr_.empty())
-    {
-        makeSigma0f();
-    }
-
-    return sigma0fPtr_();
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -99,8 +56,7 @@ Foam::linearElastic::linearElastic
     K_("K", dimPressure, 0.0),
     E_("E", dimPressure, 0.0),
     nu_("nu", dimless, 0.0),
-    lambda_("lambda", dimPressure, 0.0),
-    sigma0fPtr_()
+    lambda_("lambda", dimPressure, 0.0)
 {
     // Store old times
     epsilon().storeOldTime();
@@ -291,18 +247,31 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 }
 
 
-Foam::symmTensor4thOrder Foam::linearElastic::materialTangent() const
+#ifdef OPENFOAMESIORFOUNDATION
+Foam::scalarSquareMatrix
+Foam::linearElastic::materialTangent() const
 {
-    return symmTensor4thOrder
-    (
-        2*mu_.value() + lambda().value(), lambda().value(), lambda().value(),
-                2*mu_.value() + lambda().value(), lambda().value(),
-                        2*mu_.value() + lambda().value(),
-        mu_.value(), // xyxy == yxyx == xyyx == yxxy
-        mu_.value(), // yzyz == zyzy == yzzy == zyyz
-        mu_.value()  // zxzx == xzxz == xzzx == zxxz
-    );
+    scalarSquareMatrix matTang(6, 0.0);
+
+    matTang(0,0) = 2*mu_.value() + lambda().value();
+    matTang(0,1) = lambda().value();
+    matTang(0,2) = lambda().value();
+
+    matTang(1,0) = lambda().value();
+    matTang(1,1) = 2*mu_.value() + lambda().value();
+    matTang(1,2) = lambda().value();
+
+    matTang(2,0) = lambda().value();
+    matTang(2,1) = lambda().value();
+    matTang(2,2) = 2*mu_.value() + lambda().value();
+
+    matTang(3,3) = mu_.value();
+    matTang(4,4) = mu_.value();
+    matTang(5,5) = mu_.value();
+
+    return matTang;
 }
+#endif
 
 
 const Foam::dimensionedScalar& Foam::linearElastic::mu() const

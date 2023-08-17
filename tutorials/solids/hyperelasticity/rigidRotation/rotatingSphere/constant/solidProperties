@@ -25,10 +25,10 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
     //nCorrectors             1000;
 
     // Solution tolerance for displacement
-    solutionTolerance       1e-11;
+    solutionTolerance       1e-12;
 
     // Alternative solution tolerance for displacement
-    alternativeTolerance    1e-11;
+    alternativeTolerance    1e-12;
 
     // Material law solution tolerance
     //materialTolerance       1e-05;

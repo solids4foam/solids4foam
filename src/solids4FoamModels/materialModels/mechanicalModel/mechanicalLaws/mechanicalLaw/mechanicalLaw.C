@@ -185,6 +185,25 @@ void Foam::mechanicalLaw::makeSigma0() const
 }
 
 
+void Foam::mechanicalLaw::makeSigma0f() const
+{
+    if (sigma0fPtr_.valid())
+    {
+        FatalErrorIn("void Foam::mechanicalLaw::makeSigma0f() const")
+            << "pointer already set" << abort(FatalError);
+    }
+
+    sigma0fPtr_.set
+    (
+        new surfaceSymmTensorField
+        (
+            "sigma0f",
+            linearInterpolate(sigma0())
+        )
+    );
+}
+
+
 void Foam::mechanicalLaw::makeEpsilon() const
 {
     if (epsilonPtr_.valid())
@@ -387,33 +406,6 @@ void Foam::mechanicalLaw::makeSigmaHyd()
             ),
             mesh(),
             dimensionedVector("zero", dimPressure/dimLength, vector::zero)
-        )
-    );
-}
-
-
-void Foam::mechanicalLaw::makeSigmaEff()
-{
-    if (sigmaEffPtr_.valid())
-    {
-        FatalErrorIn("void " + type() + "::makeSigmaEff()")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    sigmaEffPtr_.set
-    (
-        new volSymmTensorField
-        (
-            IOobject
-            (
-                "sigmaEff_",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::READ_IF_PRESENT,
-                IOobject::AUTO_WRITE
-            ),
-            mesh(),
-            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
         )
     );
 }
@@ -675,6 +667,28 @@ Foam::volSymmTensorField& Foam::mechanicalLaw::sigma0()
 }
 
 
+const Foam::surfaceSymmTensorField& Foam::mechanicalLaw::sigma0f() const
+{
+    if (sigma0fPtr_.empty())
+    {
+        makeSigma0f();
+    }
+
+    return sigma0fPtr_();
+}
+
+
+Foam::surfaceSymmTensorField& Foam::mechanicalLaw::sigma0f()
+{
+    if (sigma0fPtr_.empty())
+    {
+        makeSigma0f();
+    }
+
+    return sigma0fPtr_();
+}
+
+
 const Foam::volSymmTensorField& Foam::mechanicalLaw::epsilon() const
 {
     if (epsilonPtr_.empty())
@@ -782,17 +796,6 @@ Foam::volVectorField& Foam::mechanicalLaw::gradSigmaHyd()
     }
 
     return gradSigmaHydPtr_();
-}
-
-
-Foam::volSymmTensorField& Foam::mechanicalLaw::sigmaEff()
-{
-    if (sigmaEffPtr_.empty())
-    {
-        makeSigmaEff();
-    }
-
-    return sigmaEffPtr_();
 }
 
 
@@ -1010,6 +1013,12 @@ bool Foam::mechanicalLaw::updateF
     const surfaceScalarField& K
 )
 {
+    if (curTimeIndex_ != mesh().time().timeIndex())
+    {
+        curTimeIndex_ = mesh().time().timeIndex();
+        warnAboutEnforceLinear_ = true;
+    }
+
     // Check if the mathematical model is in total or updated Lagrangian form
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
@@ -1032,10 +1041,16 @@ bool Foam::mechanicalLaw::updateF
 
         if (enforceLinear())
         {
-            WarningIn
-            (
-                "void " + type() + "::correct(surfaceSymmTensorField& sigma)"
-            )   << "Material linearity enforced for stability!" << endl;
+            if (warnAboutEnforceLinear_)
+            {
+                warnAboutEnforceLinear_ = false;
+
+                WarningIn
+                (
+                    "void " + type()
+                    + "::correct(surfaceSymmTensorField& sigma)"
+                )   << "Material linearity enforced for stability!" << endl;
+            }
 
             // Calculate stress using Hooke's law
             sigma =
@@ -1061,11 +1076,16 @@ bool Foam::mechanicalLaw::updateF
 
             if (enforceLinear())
             {
-                WarningIn
-                (
-                    "void " + type()
-                  + "::correct(surfaceSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
+                if (warnAboutEnforceLinear_)
+                {
+                    warnAboutEnforceLinear_ = false;
+
+                    WarningIn
+                    (
+                        "void " + type()
+                      + "::correct(surfaceSymmTensorField& sigma)"
+                    )   << "Material linearity enforced for stability!" << endl;
+                }
 
                 // Calculate stress using Hooke's law
                 sigma =
@@ -1089,11 +1109,16 @@ bool Foam::mechanicalLaw::updateF
 
             if (enforceLinear())
             {
-                WarningIn
-                (
-                    "void " + type()
-                  + "::correct(surfaceSymmTensorField& sigma)"
-                )   << "Material linearity enforced for stability!" << endl;
+                if (warnAboutEnforceLinear_)
+                {
+                    warnAboutEnforceLinear_ = false;
+
+                    WarningIn
+                    (
+                        "void " + type()
+                      + "::correct(surfaceSymmTensorField& sigma)"
+                    )   << "Material linearity enforced for stability!" << endl;
+                }
 
                 // Calculate stress using Hooke's law
                 sigma = 2.0*mu*dev(symm(gradD)) + K*tr(gradD)*I;
@@ -1273,6 +1298,9 @@ Foam::mechanicalLaw::mechanicalLaw
     mufPtr_(),
     KPtr_(),
     KfPtr_(),
+    impKPtr_(),
+    sigma0Ptr_(),
+    sigma0fPtr_(),
     epsilonPtr_(),
     epsilonfPtr_(),
     FPtr_(),
@@ -1289,7 +1317,6 @@ Foam::mechanicalLaw::mechanicalLaw
     ),
     sigmaHydPtr_(),
     gradSigmaHydPtr_(),
-    sigmaEffPtr_(),
     curTimeIndex_(-1),
     warnAboutEnforceLinear_(true)
 {
@@ -1372,18 +1399,20 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalLaw::impKf() const
 }
 
 
-Foam::tmp<Foam::Field<Foam::symmTensor4thOrder>>
+#ifdef OPENFOAMESIORFOUNDATION
+Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::mechanicalLaw::materialTangentField() const
 {
     // Default to uniform field
     // This function can be overwritten in specific mechanical laws
-    tmp<Field<symmTensor4thOrder>> tresult
+    tmp<Field<scalarSquareMatrix>> tresult
     (
-        new Field<symmTensor4thOrder>(mesh().nFaces(), materialTangent())
+        new Field<scalarSquareMatrix>(mesh().nFaces(), materialTangent())
     );
 
     return tresult;
 }
+#endif
 
 
 void Foam::mechanicalLaw::correct(surfaceSymmTensorField&)

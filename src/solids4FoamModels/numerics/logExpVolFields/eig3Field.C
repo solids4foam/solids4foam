@@ -15,17 +15,6 @@ License
     You should have received a copy of the GNU General Public License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
-Description
-    Function to calculate eigen values and eigen vectors of volSymmTensorField
-    Using the main procedure/code from here:
-    http://barnesc.blogspot.ie/2007/02/eigenvectors-of-3x3-symmetric-matrix.html
-    and code here:
-    http://www.connellybarnes.com/code/c/eig3-1.0.0.zip
-    Note: built-in OpenFOAM functions mess-up on a number of different tensors.
-
-Author
-    Philip Cardiff UCD
-
 \*---------------------------------------------------------------------------*/
 
 #include "eig3Field.H"
@@ -148,6 +137,50 @@ void eig3Field
     }
 }
 #endif
+
+
+void eig3Field
+(
+    const surfaceSymmTensorField& A,
+    surfaceTensorField& V,
+    surfaceVectorField& d
+)
+{
+    const symmTensorField& AI = A.internalField();
+#ifdef OPENFOAMESIORFOUNDATION
+    tensorField& VI = V.primitiveFieldRef();
+    vectorField& dI = d.primitiveFieldRef();
+#else
+    tensorField& VI = V.internalField();
+    vectorField& dI = d.internalField();
+#endif
+
+    forAll(AI, cellI)
+    {
+        eig3().eigen_decomposition(AI[cellI], VI[cellI], dI[cellI]);
+    }
+
+    forAll(A.boundaryField(), patchI)
+    {
+        if (A.boundaryField()[patchI].type() != "empty")
+        {
+            const symmTensorField& AB = A.boundaryField()[patchI];
+#ifdef OPENFOAMESIORFOUNDATION
+            tensorField& VB = V.boundaryFieldRef()[patchI];
+            vectorField& dB = d.boundaryFieldRef()[patchI];
+#else
+            tensorField& VB = V.boundaryField()[patchI];
+            vectorField& dB = d.boundaryField()[patchI];
+#endif
+
+            forAll(AB, faceI)
+            {
+                eig3().eigen_decomposition(AB[faceI], VB[faceI], dB[faceI]);
+            }
+        }
+    }
+}
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

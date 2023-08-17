@@ -176,60 +176,63 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                 }
             }
         }
+
+        // ZT: this part is not necessary any more since problem is solve
+        // by lookin for duplicate cell centres below
         // FIX: Ph 2-11-21
         // allow only one face per processor patch to point to a unique cell
         // on the neighbour processor, i.e., allow only one face per cell
-        {
-            labelHashSet removal;
-            forAllConstIter(labelHashSet, procFaceSet, iter)
-            {
-                const label faceID = iter.key();
-                const label patchID = mesh().boundaryMesh().whichPatch(faceID);
-                const polyPatch& pp = mesh().boundaryMesh()[patchID];
+//         {
+//             labelHashSet removal;
+//             forAllConstIter(labelHashSet, procFaceSet, iter)
+//             {
+//                 const label faceID = iter.key();
+//                 const label patchID = mesh().boundaryMesh().whichPatch(faceID);
+//                 const polyPatch& pp = mesh().boundaryMesh()[patchID];
 
-                // we only care about processor patches
-                if (pp.type() != processorPolyPatch::typeName)
-                {
-                    continue;
-                }
-                const pointField& cellCentres =
-                    refCast<const processorPolyPatch>
-                    (pp).neighbFaceCellCentres();
-                const point& cc = cellCentres[pp.whichFace(faceID)];
+//                 // we only care about processor patches
+//                 if (pp.type() != processorPolyPatch::typeName)
+//                 {
+//                     continue;
+//                 }
+//                 const pointField& cellCentres =
+//                     refCast<const processorPolyPatch>
+//                     (pp).neighbFaceCellCentres();
+//                 const point& cc = cellCentres[pp.whichFace(faceID)];
 
-                // XXX: is this expensive?
-                boundBox bb(vectorField(points, pointPoints[pointI]), false);
-#ifdef OPENFOAMESIORFOUNDATION
-                const scalar tol = mesh().globalData().matchTol_*mag(bb.max() - bb.min());
-#else
-                const scalar tol = polyPatch::matchTol_()*mag(bb.max() - bb.min());
-#endif
+//                 // XXX: is this expensive?
+//                 boundBox bb(vectorField(points, pointPoints[pointI]), false);
+// #ifdef OPENFOAMESIORFOUNDATION
+//                 const scalar tol = mesh().globalData().matchTol_*mag(bb.max() - bb.min());
+// #else
+//                 const scalar tol = polyPatch::matchTol_()*mag(bb.max() - bb.min());
+// #endif
 
-                for
-                (
-                    labelHashSet::const_iterator it = iter;
-                    it != procFaceSet.end();
-                    it++
-                )
-                {
-                    label fID = it.key();
-                    label pID = mesh().boundaryMesh().whichPatch(fID);
+//                 for
+//                 (
+//                     labelHashSet::const_iterator it = iter;
+//                     it != procFaceSet.end();
+//                     it++
+//                 )
+//                 {
+//                     label fID = it.key();
+//                     label pID = mesh().boundaryMesh().whichPatch(fID);
 
-                    if (faceID == fID || patchID != pID)
-                    {
-                        continue;
-                    }
-                    const point& c = cellCentres[pp.whichFace(fID)];
+//                     if (faceID == fID || patchID != pID)
+//                     {
+//                         continue;
+//                     }
+//                     const point& c = cellCentres[pp.whichFace(fID)];
 
-                    if (mag(cc - c) < tol)
-                    {
-                        removal.insert(fID);
-                    }
-                }
-            }
+//                     if (mag(cc - c) < tol)
+//                     {
+//                         removal.insert(fID);
+//                     }
+//                 }
+//             }
 
-            procFaceSet -= removal;
-        }
+//             procFaceSet -= removal;
+//         }
 
         pointBndFaces[pointI] = bndFaceSet.toc();
         pointCyclicFaces[pointI] = cyclicFaceSet.toc();
@@ -254,11 +257,22 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
             {
                 label faceID = allPointProcFaces[faceI];
                 label patchID = mesh().boundaryMesh().whichPatch(faceID);
-                label start = mesh().boundaryMesh()[patchID].start();
-                label localFaceID = faceID - start;
+
+                // ZT: 23-06-2023
+                const processorPolyPatch& pp =
+                    refCast<const processorPolyPatch>
+                    (
+                        mesh().boundaryMesh()[patchID]
+                    );
 
                 allCentres[faceI] =
-                    mesh().C().boundaryField()[patchID][localFaceID];
+                    pp.neighbFaceCellCentres()[pp.whichFace(faceID)];
+
+                // label start = mesh().boundaryMesh()[patchID].start();
+                // label localFaceID = faceID - start;
+
+                // allCentres[faceI] =
+                //     mesh().C().boundaryField()[patchID][localFaceID];
             }
 
             boundBox bb(vectorField(points, pointPoints[pointI]), false);
@@ -1149,9 +1163,19 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                 {
                     const labelList& curCells = pointCells[curPoint];
 
+                    // ZT: check only local processor patch cells
+                    labelList localPatchCells =
+                        labelList
+                        (
+                            patchCells,
+                            procPatch.pointFaces()[pointI]
+                        );
+
                     forAll(curCells, cellI)
                     {
-                        if (findIndex(patchCells, curCells[cellI]) == -1)
+                        // ZT: check only local processor patch cells
+                        if (findIndex(localPatchCells, curCells[cellI]) == -1)
+                        // if (findIndex(patchCells, curCells[cellI]) == -1)
                         {
                             if (!cellSet.found(curCells[cellI]))
                             {
@@ -1159,7 +1183,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                             }
 
                             // no need to check, the cell must be new/unique
-                            localCellSet.insert(curCells[cellI]);
+                            // localCellSet.insert(curCells[cellI]);
 
                             if (!pointSet.found(pointI))
                             {
@@ -1173,6 +1197,9 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                         }
                     }
 
+                    // ZT: This bug-fix is not required any more since problem
+                    // problem is solved by checking only local processor patch cells
+                    // (see above)
                     // FIX: Ph 5-5-2021
                     // Temporary fix for the cell-skipping:
                     // if a cell is connected to the current (processor patch)
@@ -1181,61 +1208,62 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                     // point the above condition will skip the cell even
                     // though it should be included (because the cell can't be
                     // accessed through a processor-patch face since the face
-                    // won't be available because it doesn't contain the point)
-                    if
-                    (
-                        curCells.size()
-                     !=
-                        localCellSet.size()
-                      + pointProcFaces()[curPoint].size()
-                    )
-                    {
-                        // grab all the missing cells
-                        labelHashSet missing;
+                    // won't b available because it doesn't contain the point)
+                    // if
+                    // (
+                    //     curCells.size()
+                    //  !=
+                    //     localCellSet.size()
+                    //   + pointProcFaces()[curPoint].size()
+                    // )
+                    // {
+                    //     // grab all the missing cells
+                    //     labelHashSet missing;
 
-                        forAll(curCells, cellI)
-                        {
-                            label thisCell = curCells[cellI];
+                    //     forAll(curCells, cellI)
+                    //     {
+                    //         label thisCell = curCells[cellI];
 
-                            if (!cellSet.found(thisCell))
-                            {
-                                missing.insert(thisCell);
-                            }
-                        }
+                    //         if (!cellSet.found(thisCell))
+                    //         {
+                    //             missing.insert(thisCell);
+                    //         }
+                    //     }
 
-                        // grab all processor-patch (local) faces connected to
-                        // the current point
-                        const labelList& pointFaces =
-                            procPatch.pointFaces()[pointI];
+                    //     // grab all processor-patch (local) faces connected to
+                    //     // the current point
+                    //     const labelList& pointFaces =
+                    //         procPatch.pointFaces()[pointI];
 
-                        // remove missing cells if they're included through
-                        // processor-patch faces connected to the current
-                        // point
-                        forAll(pointFaces, pfI)
-                        {
-                            label thisLocalFace = pointFaces[pfI];
+                    //     // remove missing cells if they're included through
+                    //     // processor-patch faces connected to the current
+                    //     // point
+                    //     forAll(pointFaces, pfI)
+                    //     {
 
-                            if (missing.found(patchCells[thisLocalFace]))
-                            {
-                                missing.unset(patchCells[thisLocalFace]);
-                            }
-                        }
+                    //         label thisLocalFace = pointFaces[pfI];
 
-                        // store everything
-                        forAllConstIter(labelHashSet, missing, iter)
-                        {
-                            cellSet.insert(iter.key());
-                            pointCellSet.insert
-                            (
-                                labelPair (pointI, iter.key())
-                            );
-                        }
+                    //         if (missing.found(patchCells[thisLocalFace]))
+                    //         {
+                    //             missing.unset(patchCells[thisLocalFace]);
+                    //         }
+                    //     }
 
-                        if (!pointSet.found(pointI))
-                        {
-                            pointSet.insert(pointI);
-                        }
-                    }
+                    //     // store everything
+                    //     forAllConstIter(labelHashSet, missing, iter)
+                    //     {
+                    //         cellSet.insert(iter.key());
+                    //         pointCellSet.insert
+                    //         (
+                    //             labelPair (pointI, iter.key())
+                    //         );
+                    //     }
+
+                    //     if (!pointSet.found(pointI))
+                    //     {
+                    //         pointSet.insert(pointI);
+                    //     }
+                    // }
                 }
             }
 
@@ -1266,7 +1294,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
             labelListList patchPointCells(patchPoints.size());
 
-            label nCells = 0;
+            //label nCells = 0;
 
             forAll(patchPointCells, pointI)
             {
@@ -1292,7 +1320,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
 
                 patchPointCells[pointI] = cellSet.toc();
 
-                nCells += patchPointCells[pointI].size();
+                //nCells += patchPointCells[pointI].size();
             }
 
             // Parallel data exchange

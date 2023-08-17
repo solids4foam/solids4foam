@@ -18,17 +18,21 @@ FoamFile
 
 d2dt2Schemes
 {
-    default            backward;
+    default            steadyState;
+    //default            Euler;
+    //default            backward;
 }
 
 ddtSchemes
 {
-    default            backward;
+    default            steadyState;
+    //default            Euler;
+    //default            backward;
 }
 
 gradSchemes
 {
-    default            extendedLeastSquares 0;
+    default            leastSquares;
 }
 
 divSchemes

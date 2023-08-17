@@ -55,6 +55,9 @@ class fixedRotationFvPatchVectorField
 
     // Private Data
 
+        //- Enable non-orthogonal corrections
+        const Switch nonOrthogonalCorrections_;
+
         //- Rotation in degrees
         scalar rotationAngle_;
 

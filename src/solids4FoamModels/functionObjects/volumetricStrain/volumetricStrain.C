@@ -133,7 +133,7 @@ bool Foam::volumetricStrain::read(const dictionary& dict)
 #ifdef OPENFOAMESIORFOUNDATION
 bool Foam::volumetricStrain::write()
 {
-    return writeData();
+    return false;
 }
 #endif
 

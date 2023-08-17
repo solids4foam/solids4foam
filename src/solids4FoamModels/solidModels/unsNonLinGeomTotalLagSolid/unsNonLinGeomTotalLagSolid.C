@@ -191,14 +191,6 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
     rImpK_(1.0/impK_),
     nonLinear_(solidModelDict().lookupOrDefault<Switch>("nonLinear", true)),
     debug_(solidModelDict().lookupOrDefault<Switch>("debug", false)),
-    K_
-    (
-        solidModelDict().lookupOrDefault<dimensionedScalar>
-        (
-            "K",
-            dimensionedScalar("K", dimless/dimTime, 0)
-        )
-    ),
     relativeTol_
     (
         solidModelDict().lookupOrDefault<scalar>
@@ -281,9 +273,9 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         );
 
         // Add damping
-        if (K_.value() > SMALL)
+        if (dampingCoeff().value() > SMALL)
         {
-            DEqn += K_*rho()*fvm::ddt(D());
+            DEqn += dampingCoeff()*rho()*fvm::ddt(D());
         }
 
         // Enforce linear to improve convergence
@@ -379,6 +371,12 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         if (maxIterReached() == nCorr())
         {
             maxIterReached()++;
+        }
+
+        // Force at least one iteration
+	if (iCorr == 0)
+        {
+            res = 1.0;
         }
     }
     while (res > curConvergenceTolerance && ++iCorr < nCorr());
