@@ -1653,14 +1653,14 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
 
 #else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(solidModelTypeName);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
         FatalErrorIn
         (
             "solidModel::New(Time&, const word&)"
-        )   << "Unknown solidModel type " << solidModelTypeName
+        )   << "Unknown solidModel type " << modelType
             << endl << endl
             << "Valid solidModel types are :" << endl
             << dictionaryConstructorTablePtr_->toc()
