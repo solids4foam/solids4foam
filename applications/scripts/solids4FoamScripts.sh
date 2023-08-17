@@ -387,6 +387,22 @@ function solids4Foam::caseOnlyRunsWithFoamExtend()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# caseOnlyRunsWithOpenFOAM
+#     Give error if OpenFOAM version is foam-extend
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::caseDoesNotRunWithFoamExtend()
+{
+    if [[ $WM_PROJECT == "foam" ]]
+    then
+        echo; echo "This case currently does not run with foam-extend"; echo
+        exit 0
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # removeEmptyDirs
 #     Ported from preCICE toolbox
 #     Remove empty time directories that are generated when running FSI cases
