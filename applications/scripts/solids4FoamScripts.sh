@@ -155,10 +155,11 @@ function solids4Foam::convertCaseFormat()
         echo "Moving ${CASE_DIR}/system/createPatchDict.openfoam to system/createPatchDict"
         mv "${CASE_DIR}/system/createPatchDict.openfoam" "system/createPatchDict"
     fi
+
     # 9. Resolve force post-processing path from foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
-        echo "found the force.gnuplot, changing the directory path"
+        echo "Updating force.gnuplot"
         sed -i  "s|forces/0/forces.dat|./postProcessing/fluid/forces/0/force.dat|g" force.gnuplot
     fi
 
@@ -304,10 +305,11 @@ function solids4Foam::convertCaseFormatFoamExtend()
         echo "Moving ${CASE_DIR}/system/createPatchDict.foamextend to system/createPatchDict"
         mv "${CASE_DIR}/system/createPatchDict.foamextend" "system/createPatchDict"
     fi
+
     # 9. Resolve force post-processing path for foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
-        echo "found the force.gnuplot, changing the directory path"
+        echo "Updating force.gnuplot"
         sed -i "s|./postProcessing/fluid/forces/0/force.dat|forces/0/forces.dat|g" force.gnuplot
     fi
 
@@ -377,25 +379,25 @@ function solids4Foam::caseOnlyRunsWithFoamExtend()
 function solids4Foam::removeEmptyDirs()
 {
     (
-	set -e -u
-	echo "Removing time directories without results"
+        set -e -u
+        echo "Removing time directories without results"
 
-	for f in [0-9]* [0-9]*.[0-9]*; do
-	    if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
-		rm -rfv "${f}"
-	    fi
-	done
-	if [ -d processor0 ]; then
-	    for d in processor*; do
-		cd "${d}"
-		for f in [0-9]* [0-9]*.[0-9]*; do
-		    if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
-			rm -rfv "${f}"
-		    fi
-		done
-		cd ..
-	    done
-	fi
+        for f in [0-9]* [0-9]*.[0-9]*; do
+            if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
+                rm -rfv "${f}"
+            fi
+        done
+        if [ -d processor0 ]; then
+            for d in processor*; do
+                cd "${d}"
+                for f in [0-9]* [0-9]*.[0-9]*; do
+                    if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
+                        rm -rfv "${f}"
+                    fi
+                done
+                cd ..
+            done
+        fi
     )
 }
 
