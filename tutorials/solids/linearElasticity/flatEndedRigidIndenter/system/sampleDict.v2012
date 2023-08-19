@@ -18,6 +18,7 @@ FoamFile
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+type    surfaces;
 setFormat raw;
 surfaceFormat raw;
 interpolationScheme cellPoint;
@@ -36,7 +37,7 @@ surfaces
     surface
     {
         type patch;   
-        patchName   foundation;
+        patches   (foundation);
     }
 );
 

@@ -13,20 +13,38 @@ solids4Foam::convertCaseFormat .
 solids4Foam::runApplication blockMesh
 
 # Mirror mesh
-solids4Foam::runApplication mirrorMesh 
-mv 0/polyMesh/* constant/polyMesh/
-rm -rf 0/polyMesh
+if [[ "${WM_PROJECT}" == "foam" ]]
+then
+    solids4Foam::runApplication mirrorMesh
+    mv 0/polyMesh/* constant/polyMesh/
+    #rm -rf 0/polyMesh
+else
+    solids4Foam::runApplication mirrorMesh -overwrite 
+fi
 
 # Run solver
 solids4Foam::runApplication solids4Foam
 
 # Create plot
-sample -latestTime > log.sample
+if [[ "${WM_PROJECT}" == "foam" ]]
+then
+    solids4Foam::runApplication sample -latestTime
+else
+    solids4Foam::runApplication postProcess -func sampleDict.v2012 -latestTime
+fi
 
 if command -v gnuplot &> /dev/null
 then
-    echo "Generating plot using gnuplot"
-    gnuplot plot.gnuplot &> /dev/null
+    if [[ -f "./postProcessing/surfaces/1/sigma_surface.raw" ]]
+    then
+        echo "Generating plot using gnuplot"
+        gnuplot plot.gnuplot &> /dev/null
+    else
+        echo "Generating plot using gnuplot"
+        sed -i  "s|path = .*|path = \"postProcessing/sampleDict.v2012/1/sigma_surface.raw\"|g" plot.gnuplot
+        gnuplot plot.gnuplot &> /dev/null
+        sed -i  "s|path = .*|path = \"postProcessing/surfaces/1/sigma_surface.raw\"|g" plot.gnuplot
+    fi 
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
