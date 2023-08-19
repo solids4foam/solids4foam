@@ -17,7 +17,7 @@ if [[ "${WM_PROJECT}" == "foam" ]]
 then
     solids4Foam::runApplication mirrorMesh
     mv 0/polyMesh/* constant/polyMesh/
-    #rm -rf 0/polyMesh
+    rm -rf 0/polyMesh
 else
     solids4Foam::runApplication mirrorMesh -overwrite 
 fi
