@@ -35,16 +35,8 @@ fi
 
 if command -v gnuplot &> /dev/null
 then
-    if [[ -f "./postProcessing/surfaces/1/sigma_surface.raw" ]]
-    then
-        echo "Generating plot using gnuplot"
-        gnuplot plot.gnuplot &> /dev/null
-    else
-        echo "Generating plot using gnuplot"
-        sed -i  "s|path = .*|path = \"postProcessing/sampleDict.v2012/1/sigma_surface.raw\"|g" plot.gnuplot
-        gnuplot plot.gnuplot &> /dev/null
-        sed -i  "s|path = .*|path = \"postProcessing/surfaces/1/sigma_surface.raw\"|g" plot.gnuplot
-    fi 
+    echo "Generating plot using gnuplot"
+    gnuplot plot.gnuplot &> /dev/null
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
