@@ -9,7 +9,7 @@ source solids4FoamScripts.sh
 cleanCase
 \rm -f constant/polyMesh/boundary case.foam 
 \rm -rf system/*Subset constant/*Subset VTK postProcessing/
-\rm -rf *.png
+\rm -rf *.png 0/cellToRegion
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .
