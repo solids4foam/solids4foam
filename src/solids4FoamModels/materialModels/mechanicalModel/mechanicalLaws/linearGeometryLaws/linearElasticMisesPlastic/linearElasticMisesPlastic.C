@@ -911,11 +911,9 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
     (
         mag(sTrial) - sqrtTwoOverThree_*sigmaYf_.oldTime()
     );
-    const scalarField& fTrialI = fTrial.internalField();
 
     // Return direction
     const surfaceSymmTensorField plasticN(sTrial/magSTrial);
-    const symmTensorField& plasticNI = plasticN.internalField();
 
     // Calculate tangent field
     const Switch numericalTangent(dict().lookup("numericalTangent"));
