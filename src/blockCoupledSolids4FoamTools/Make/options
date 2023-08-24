@@ -1,6 +1,7 @@
 SOLIDS4FOAM_ROOT := ../..
 
-include $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 
 ifdef S4F_NO_USE_EIGEN
     VERSION_SPECIFIC_INC += -DS4F_NO_USE_EIGEN
