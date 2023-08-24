@@ -186,6 +186,15 @@ function solids4Foam::convertCaseFormat()
         sed -i "s|postProcessing/sets/|postProcessing/sample/|g" plot.gnuplot
     fi
 
+    # 11. Resolve sampleDict post-processing path from foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        echo "-------------------"
+        sed -i  "s|path = \"postProcessing/surfaces/1/sigma_surface.raw\"
+                  |path = \"postProcessing/sampleDict.v2012/1/sigma_surface.raw\"|g" plot.gnuplot
+    fi        
+        
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -350,6 +359,14 @@ function solids4Foam::convertCaseFormatFoamExtend()
     then
         echo "Updating force.gnuplot"
         sed -i "s|./postProcessing/fluid/forces/0/force.dat|forces/0/forces.dat|g" force.gnuplot
+    fi
+
+    # 11. Resolve sampleDict post-processing path for foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        sed -i "s|path = \"postProcessing/sampleDict.v2012/1/sigma_surface.raw\"
+                 |path = \"postProcessing/surfaces/1/sigma_surface.raw\"|g" plot.gnuplot
     fi
     
     # 11. Resolve sample post-processing path from foam-extend
