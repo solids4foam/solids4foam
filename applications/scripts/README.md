@@ -1,8 +1,16 @@
+---
+sort: 3
+---
+
 # Bash functions:  `solids4FoamScripts.sh`
+
+---
 
 Prepared by Ivan Batistić
 
 ---
+
+## Section Aims
 
 - This document describes the bash functions in the `solids4foam/applications/scripts/solids4FoamScripts.sh` script;
 - These bash functions within `solids4FoamScripts.sh` are used in `Allrun` and `Allclean` scripts in `solids4foam` tutorial cases;
