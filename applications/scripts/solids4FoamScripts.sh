@@ -176,7 +176,14 @@ function solids4Foam::convertCaseFormat()
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
         echo "Updating force.gnuplot"
-        sed -i  "s|forces/0/forces.dat|./postProcessing/fluid/forces/0/force.dat|g" force.gnuplot
+        sed -i "s|forces/0/forces.dat|./postProcessing/fluid/forces/0/force.dat|g" force.gnuplot
+    fi
+
+    # 11. Resolve sample post-processing path from foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        sed -i "s|postProcessing/sets/|postProcessing/sample/|g" plot.gnuplot
     fi
 
     echo
@@ -345,6 +352,13 @@ function solids4Foam::convertCaseFormatFoamExtend()
         sed -i "s|./postProcessing/fluid/forces/0/force.dat|forces/0/forces.dat|g" force.gnuplot
     fi
     
+    # 11. Resolve sample post-processing path from foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        sed -i "s|postProcessing/sample/|postProcessing/sets/|g" plot.gnuplot
+    fi
+
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormatFoamExtend end                        |"
