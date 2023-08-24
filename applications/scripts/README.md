@@ -1,18 +1,18 @@
-# solids4foam bash functions:  `solids4FoamScripts.sh`
+# Bash functions:  `solids4FoamScripts.sh`
 
 Prepared by Ivan Batistić
 
 ---
 
-- These functions are used in `Allrun` and `Allclean` scripts to run and clean `solids4foam` tutorial cases;
-- The primarily purpose of these functions is to efficiently change between `OpenFOAM` versions by making corresponding changes in `OpenFOAM` case files;
-- In this document, corresponding functions in the `/applications/scripts/solids4FoamScripts.sh` bash script are documented by showing changes in corresponding files.
+- This document describes the bash functions in the `solids4foam/applications/scripts/solids4FoamScripts.sh` script;
+- These bash functions within `solids4FoamScripts.sh` are used in `Allrun` and `Allclean` scripts in `solids4foam` tutorial cases;
+- The primary purpose of these functions is to make a case compatible with the current version of `OpenFOAM`/`foam-extend`, e.g. convert the case from its `foam-extend-4.1` format to its `OpenFOAM-v2012` format.
 
 ---
 
-## Convert case format functions: `solids4foam::convertCaseFormat()` and `solids4foam::convertCaseFormatFoamExtend()`
+## `solids4foam::convertCaseFormat()` and `solids4foam::convertCaseFormatFoamExtend()`
 
-`solids4foam::convertCaseFormat()` is used to convert a case from `foam-extend` format to `OpenFOAM` format, whereas `solids4foam::convertCaseFormatFoamExtend()` is used to convert any case version to the `foam-extend` format.  No changes are applied if the case format matches the format of the `OpenFOAM` version.
+`solids4foam::convertCaseFormat()` is used to convert a case from `foam-extend` format to `OpenFOAM` format, whereas `solids4foam::convertCaseFormatFoamExtend()` is used to convert any case version to the `foam-extend` format.  No changes are applied if the case format matches the format of the current `OpenFOAM`/`foam-extend` version.
 
 - __Function purpose__
   Converts a case from `foam-extend` format to `OpenFOAM` format and vice versa. 
@@ -48,7 +48,7 @@ The following description refers to the function `solids4foam::convertCaseFormat
 
 __1.__ `symmetryPlane` in `foam-extend` becomes `symmetry` in `OpenFOAM`.  
 
-`blockMeshDict` is located and every occurrence of `symmetryPlane` keyword is updated:
+`blockMeshDict` is located, and every occurrence of `symmetryPlane` keyword is updated:
 
 ```c++
 patches
@@ -96,7 +96,7 @@ left
 }
 ```
 
-__2.__ If it is found, `blockMeshDict` is moved to the `/system` directory
+__2.__ If it is found, `blockMeshDict` is moved to the `system/` directory
 
 For solid and fluid simulations, `blockMeshDict` is found in `constant/polyMesh/`:
 
@@ -118,7 +118,7 @@ and it is moved to the `system` directory:
 	└── blockMeshDict
 ```
 
-For FSI simulations, `blockMeshDict` can be used to generate mesh for both solid and fluid. In that case, `blockMeshDict` is located in the corresponding `solid` and `fluid` subdirectories:
+For fluid-solid interaction simulations, there may be two `blockMeshDict` files, each located in the corresponding `solid/` and `fluid/` subdirectories:
 
 ```
 ├── 0
@@ -132,7 +132,7 @@ For FSI simulations, `blockMeshDict` can be used to generate mesh for both solid
 └── system
 ```
 
-and is also relocated to the system:
+These are also relocated to the `system` directory:
 
 ```
 ├── 0
@@ -156,7 +156,7 @@ The function file is used to specify the list of function objects and is loaded 
 #include "./system/functions"
 ```
 
-In `foam-extend` case structure `functions` file is renamed to `functions.foam-extend` whereas `functions.openfoam` is renamed to functions:
+In the `foam-extend` case structure, the `functions` file is renamed to `functions.foam-extend` whereas `functions.openfoam` is renamed to functions:
 
 ```
 └── system
@@ -178,7 +178,7 @@ is transformed into:
     └── functions
 ```
 
-__3.__ Find `turbulenceProperties` file and rename value for the  `simulationType` keyword:
+__3.__ Find the `turbulenceProperties` file and rename the value for the  `simulationType` keyword:
 
 ```c++
 simulationType  RASModel;
@@ -190,7 +190,7 @@ is renamed to:
 simulationType  RAS;
 ```
 
-Note that in the case of FSI simulation `turbulenceProperties` file is located in the `constant/fluid/` directory while for fluid simulations it is located in the `constant/`.
+Note that in a fluid-solid interaction case, `turbulenceProperties` file is located in the `constant/fluid/` directory, while for fluid simulations, it is in the `constant/`.
 
 __4.__ If found,`boundaryData` directory is renamed:
 
@@ -214,7 +214,7 @@ is transformed into:
 └── system
 ```
 
-__5.__ If `sample` file is found in `system/` directory and if the [OpenFOAM.org](OpenFOAM.org) version is used,  `uniform` is replaced with`lineUniform`:
+__5.__ If `sample` file is found in the `system/` directory and if the [OpenFOAM.org](OpenFOAM.org) version is used,  `uniform` is replaced with `lineUniform`:
 
 ``` 
 sets
@@ -246,7 +246,7 @@ sets
 ...
 ```
 
-__6.__ If `p` file is found, and if `type` keyword is set to `timeVaryingUniformFixedValue` its value is changed to `uniformFixedValue` by commenting out the appropriate lines:
+__6.__ If `p` file is found, and if the `type` keyword is set to `timeVaryingUniformFixedValue,` its value is changed to `uniformFixedValue` by commenting out the appropriate lines:
 
 ```c++
 inlet
@@ -276,7 +276,7 @@ inlet
 
 ```
 
-__7.__ If found, version of the`changeDictionaryDict` file is updated:
+__7.__ If found, the version of the`changeDictionaryDict` file is updated:
 
 ```
 ├── 0
@@ -302,7 +302,7 @@ is transformed into:
     └── fvSolution
 ```
 
-__8.__  If found, version of the`createPatchDict` file is updated:
+__8.__  If found, the version of the`createPatchDict` file is updated:
 
 ```bash
 ├── 0
@@ -328,7 +328,7 @@ is transformed into:
     └── fvSolution
 ```
 
-__9.__ In case the [OpenFOAM.com](OpenFOAM.com) version is used to solve solid mechanics or FSI problems,  `leastSquare` gradient method in `fvSchemes` file is replaced with `pointCellsLeastSquares` to account for non-orthogonal correction:
+__9.__ In case the [OpenFOAM.com](OpenFOAM.com) version is used to solve solid mechanics or fluid-solid interaction problems,  the `leastSquare` gradient method in `fvSchemes` file is replaced with `pointCellsLeastSquares` to account for boundary non-orthogonal corrections:
 
 ```c++
 gradSchemes
@@ -346,9 +346,9 @@ gradSchemes
 }
 ```
 
-Note: In case of FSI simulation, this change is performed only on `fvSchemes` which refers to solid and is located in `system/solid/fvSchemes`.
+Note: In fluid-solid interaction cases, this change is performed only on `fvSchemes,` which refers to solid and is located in `system/solid/fvSchemes`.
 
-__10.__ In case the `force.gnuplot` script is found, path to the `force.dat` file is changed. `force.dat` is an output file generated by the `forces` function object. When `foam-extend` is used, it is located in the `forces/0/` directory; otherwise it is located in `postProcessing/fluid/forces/0/`:
+__10.__ In case the `force.gnuplot` script is found, the path to the `force.dat` file is changed. `force.dat` is an output file generated by the `forces` function object. When `foam-extend` is used, it is located in the `forces/0/` directory; otherwise it is located in `postProcessing/fluid/forces/0/`:
 
 ```bash
 plot [0.1:] "< sed s/[\\(\\)]//g forces/0/forces.dat" u 1:2 w l
@@ -372,14 +372,14 @@ is transformed into:
 path = "postProcessing/sampleDict.v2012/1/sigma_surface.raw"
 ```
 
-Note that the updated path has `sampleDict.v2012` in it, and this is because it is called the same in the `system/` directory where `sampleDIct.v2012` is located.
+Note that the updated path has `sampleDict.v2012` in it, and this is because it has the same name in the `system/` directory where `sampleDict.v2012` is located.
 
 ---
 
-## Case only runs with `foam-extend`: `solids4foam::caseOnlyRunsWithFoamExtend()`
+## `solids4foam::caseOnlyRunsWithFoamExtend()`
 
 - __Function purpose__
-  This function gives an error if the `foam-extend` version is not sourced.
+  This function gives an error if the `foam-extend` version is not sourced/loaded.
 
 - __Function arguments__
   None
