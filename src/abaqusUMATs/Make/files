@@ -1,3 +1,3 @@
 abaqusUmatLinearElastic/abaqusUmatLinearElastic.C
 
-LIB = $(FOAM_USER_LIBBIN)/libabaqusUmatLinearElastic
+LIB = $(FOAM_MODULE_LIBBIN)/libabaqusUmatLinearElastic

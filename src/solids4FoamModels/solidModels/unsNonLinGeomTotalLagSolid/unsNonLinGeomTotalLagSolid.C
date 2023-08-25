@@ -51,7 +51,7 @@ scalar unsNonLinGeomTotalLagSolid::residual(const volVectorField& D) const
     return
         gMax
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             DimensionedField<double, volMesh>
 #endif
             (
@@ -60,7 +60,7 @@ scalar unsNonLinGeomTotalLagSolid::residual(const volVectorField& D) const
                 (
                     gMax
                     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                         DimensionedField<double, volMesh>
 #endif
                         (
@@ -231,7 +231,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
 
     int iCorr = 0;
     scalar initialResidual = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solverPerfD;
     SolverPerformance<vector>::debug = 0;
 #else
@@ -247,7 +247,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
 
     do
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         if (SolverPerformance<vector>::debug)
 #else
         if (blockLduMatrix::debug)
@@ -295,7 +295,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         solidModel::setCellDisps(DEqn);
 
         // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
         const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
 #endif
 
@@ -355,7 +355,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
 
         if
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             SolverPerformance<vector>::debug
 #else
             blockLduMatrix::debug
@@ -411,7 +411,7 @@ bool unsNonLinGeomTotalLagSolid::evolve()
         << ", Relative residual = " << res
         << ", enforceLinear = " << enforceLinear() << endl;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

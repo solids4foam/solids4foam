@@ -17,17 +17,18 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 
 #include "amiZoneInterpolation.H"
-// #ifdef OPENFOAMESI
+#include "demandDrivenData.H"
+// #ifdef OPENFOAM_COM
 //     #include "AMIMethod.H"
 //     #include "directAMI.H"
 //     #include "mapNearestAMI.H"
 //     #include "faceAreaWeightAMI.H"
 //     #include "partialFaceAreaWeightAMI.H"
 // #else
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     #include "newAMIMethod.H"
     #include "newDirectAMI.H"
     #include "newMapNearestAMI.H"
@@ -42,14 +43,14 @@ namespace Foam
 {
     defineTypeNameAndDebug(amiZoneInterpolation, 0);
 
-// #ifdef OPENFOAMESI
+// #ifdef OPENFOAM_COM
 //     makeAMIMethod(amiZoneInterpolation);
 //     makeAMIMethodType(amiZoneInterpolation, directAMI);
 //     makeAMIMethodType(amiZoneInterpolation, mapNearestAMI);
 //     makeAMIMethodType(amiZoneInterpolation, faceAreaWeightAMI);
 //     makeAMIMethodType(amiZoneInterpolation, partialFaceAreaWeightAMI);
 // #else
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     makeAMIMethod(amiZoneInterpolation);
     makeAMIMethodType(amiZoneInterpolation, newDirectAMI);
     makeAMIMethodType(amiZoneInterpolation, newMapNearestAMI);
@@ -462,7 +463,7 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
     const bool useGlobalPolyPatch
 )
 :
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     faceAreaWeightAMI
     (
         false, // requireMatch
@@ -484,7 +485,7 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
 #endif
     sourcePatch_(srcPatch),
     targetPatch_(tgtPatch),
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     sourcePrimPatchPtr_(),
     targetPrimPatchPtr_(),
 #endif
@@ -497,7 +498,7 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
     targetPointWeightsPtr_(nullptr),
     targetPointDistancePtr_(nullptr)
 {
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     // Create source primitivePatch
     SubList<face> srcFcs
     (
@@ -610,6 +611,6 @@ Foam::amiZoneInterpolation::targetPointDistanceToIntersection() const
     return *targetPointDistancePtr_;
 }
 
-#endif // end of #ifdef OPENFOAMESIORFOUNDATION
+#endif // end of #ifdef OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

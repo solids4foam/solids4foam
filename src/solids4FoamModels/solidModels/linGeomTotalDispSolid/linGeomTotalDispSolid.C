@@ -88,7 +88,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         // Check ddt scheme for D is not steadyState
         const word ddtDScheme
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             mesh().ddtScheme("ddt(" + D().name() +')')
 #else
             mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
@@ -121,7 +121,7 @@ bool linGeomTotalDispSolid::evolve()
     do
     {
         int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         SolverPerformance<vector> solverPerfD;
         SolverPerformance<vector>::debug = 0;
 #else
@@ -161,7 +161,7 @@ bool linGeomTotalDispSolid::evolve()
             solidModel::setCellDisps(DEqn);
 
             // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
             const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
 #endif
 
@@ -201,7 +201,7 @@ bool linGeomTotalDispSolid::evolve()
             !converged
             (
                 iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 mag(solverPerfD.initialResidual()),
                 cmptMax(solverPerfD.nIterations()),
 #else
@@ -227,7 +227,7 @@ bool linGeomTotalDispSolid::evolve()
     }
     while (mesh().update());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

@@ -183,7 +183,7 @@ void Foam::linearElasticCt::setYoungsModulusFromCt()
 
         // Set the E field
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         scalarField& E_I = E_.primitiveFieldRef();
         scalarField& HuI = Hu.primitiveFieldRef();
         scalarField& relRhoI = relRho.primitiveFieldRef();
@@ -342,7 +342,7 @@ void Foam::linearElasticCt::setYoungsModulusFromCt()
             {
                 Info<< "    iteration " << i << endl;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 scalarField& E_I = E_.primitiveFieldRef();
                 const vectorField& CI = mesh().C().primitiveField();
 #else

@@ -62,7 +62,7 @@ solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
 #else
@@ -97,7 +97,7 @@ solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
 #else
@@ -122,7 +122,7 @@ solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
     );
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 solidWedgeFvPatchScalarField::solidWedgeFvPatchScalarField
 (
     const solidWedgeFvPatchScalarField& ptf
@@ -173,7 +173,7 @@ tmp<Field<scalar> > solidWedgeFvPatchScalarField::snGrad() const
     const fvPatchField<vector>& gradU =
         patch().lookupPatchField<volVectorField, vector>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"
@@ -230,7 +230,7 @@ void solidWedgeFvPatchScalarField::evaluate(const Pstream::commsTypes)
     const fvPatchField<vector>& gradU =
         patch().lookupPatchField<volVectorField, vector>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"

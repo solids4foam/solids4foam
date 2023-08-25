@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
 
 #include "newMapNearestAMI.H"
 
@@ -331,6 +331,6 @@ void Foam::newMapNearestAMI<SourcePatch, TargetPatch>::calculate
 }
 
 
-#endif // end of #ifdef OPENFOAMFOUNDATION
+#endif // end of #ifdef OPENFOAM_ORG
 
 // ************************************************************************* //

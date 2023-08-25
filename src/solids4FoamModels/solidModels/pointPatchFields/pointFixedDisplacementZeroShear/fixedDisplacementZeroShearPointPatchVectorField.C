@@ -29,7 +29,7 @@ License
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "Time.H"
 #endif
 
@@ -65,7 +65,7 @@ fixedDisplacementZeroShearPointPatchVectorField
     dispSeries_(),
     curTimeIndex_(-1)
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     // refValue is only used by foam-extend
     vectorField refValue(patch().size(), vector::zero);
 #else
@@ -101,7 +101,7 @@ fixedDisplacementZeroShearPointPatchVectorField
 
     tmp<vectorField> internalValues = this->patchInternalField();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     this->setInInternalField
     (
         const_cast<vectorField&>(this->primitiveField()),
@@ -142,7 +142,7 @@ fixedDisplacementZeroShearPointPatchVectorField
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 fixedDisplacementZeroShearPointPatchVectorField::
 fixedDisplacementZeroShearPointPatchVectorField
 (

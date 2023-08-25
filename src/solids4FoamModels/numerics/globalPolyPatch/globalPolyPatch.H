@@ -44,7 +44,7 @@ SourceFiles
 #include "dictionary.H"
 #include "standAlonePatch.H"
 #include "polyMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "PrimitivePatchInterpolation.H"
 #else
     #include "PrimitivePatchInterpolationTemplate.H"

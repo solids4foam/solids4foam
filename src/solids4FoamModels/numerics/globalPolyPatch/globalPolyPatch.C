@@ -26,6 +26,7 @@ License
 #include "globalPolyPatch.H"
 #include "polyPatchID.H"
 #include "FieldSumOp.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

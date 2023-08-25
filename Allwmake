@@ -1,5 +1,5 @@
 #!/bin/bash
-cd ${0%/*} || exit 1    # run from this directory
+cd "${0%/*}" || exit  # Run from this directory
 
 # Stop at first error
 set -e
@@ -17,7 +17,7 @@ else
 fi
 
 # Download ThirdParty software
-(cd ThirdParty && ./Allwmake 2>&1 | tee log.Allwmake)
+(cd ThirdParty && ./Allwmake $* 2>&1 | tee log.Allwmake)
 
 # Some files in foam-extend may need to be fixed
 (cd optionalFixes && ./Allcheck 2>&1 | tee log.Allcheck)
@@ -31,10 +31,10 @@ then
 fi
 
 # Compile libraries
-(cd src && ./Allwmake 2>&1 | tee log.Allwmake)
+(cd src && ./Allwmake $* 2>&1 | tee log.Allwmake)
 
 # Compile applications
-(cd applications && ./Allwmake 2>&1 | tee log.Allwmake)
+(cd applications && ./Allwmake $* 2>&1 | tee log.Allwmake)
 
 # Check if the build succeeded
 echo "Checking if the installation was a success:"
@@ -54,3 +54,5 @@ else
     echo "    > cd tutorials && ./Alltest"
 fi
 echo
+
+#------------------------------------------------------------------------------

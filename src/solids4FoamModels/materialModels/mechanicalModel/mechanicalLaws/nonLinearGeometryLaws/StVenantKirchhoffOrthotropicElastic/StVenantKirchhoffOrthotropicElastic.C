@@ -28,6 +28,7 @@ License
 #include "transformField.H"
 #include "transformGeometricField.H"
 #include "fvc.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

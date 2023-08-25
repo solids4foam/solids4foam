@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
     // Read inputs
     const scalar seed(readScalar(perturbDict.lookup("seed")));
     const vector scaleFactor(perturbDict.lookup("scaleFactor"));
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     const Switch Gaussian(perturbDict.lookup("Gaussian"));
 #endif
 
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
     {
         if (!boundaryPoint[pointI])
         {
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
             if (Gaussian)
             {
                 // Gaussian distribution

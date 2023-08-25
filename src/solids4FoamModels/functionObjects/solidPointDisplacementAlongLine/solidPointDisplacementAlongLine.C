@@ -29,7 +29,7 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "OSspecific.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
@@ -323,7 +323,7 @@ bool Foam::solidPointDisplacementAlongLine::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::solidPointDisplacementAlongLine::write()
 {
     return false;

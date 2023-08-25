@@ -48,7 +48,7 @@ Author
 #include "tmp.H"
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "scalarMatrices.H"
 #else
     #include "scalarSquareMatrix.H"
@@ -499,7 +499,7 @@ public:
             return scalarSquareMatrix(0);
         }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent field for Newton Raphson loop
         //  The size of this field should be mesh.nFaces()
         virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;

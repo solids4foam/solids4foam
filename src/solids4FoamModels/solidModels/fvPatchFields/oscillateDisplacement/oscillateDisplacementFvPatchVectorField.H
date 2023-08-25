@@ -94,7 +94,7 @@ public:
         oscillateDisplacementFvPatchVectorField
         (
             const oscillateDisplacementFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );

@@ -110,7 +110,7 @@ public:
             const fvPatchFieldMapper&
         );
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         //- Construct as copy
         transitionalParabolicVelocityFvPatchVectorField
         (

@@ -41,7 +41,7 @@ Author
 #define linearElasticCt_H
 
 #include "mechanicalLaw.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "surfaceFields.H"
 #endif
 

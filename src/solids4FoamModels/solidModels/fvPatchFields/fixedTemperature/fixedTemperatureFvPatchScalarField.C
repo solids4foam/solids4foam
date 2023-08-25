@@ -84,7 +84,7 @@ fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
     }
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 fixedTemperatureFvPatchScalarField::fixedTemperatureFvPatchScalarField
 (
     const fixedTemperatureFvPatchScalarField& pivpvf
@@ -133,7 +133,7 @@ tmp<Foam::Field<scalar> > fixedTemperatureFvPatchScalarField::snGrad() const
     const fvPatchField<vector>& gradField =
         patch().lookupPatchField<volVectorField, vector>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"
@@ -163,7 +163,7 @@ gradientBoundaryCoeffs() const
     const fvPatchField<vector>& gradField =
         patch().lookupPatchField<volVectorField, vector>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"

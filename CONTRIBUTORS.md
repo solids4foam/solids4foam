@@ -29,5 +29,5 @@ If your name is missing, please let philip.cardiff@ucd.ie know.
 * Federico Mazzanti
 * Xiaohu Guo
 * Amirhossein Taran
-* Gowthaman Parivendhan
+* Mark Olesen
 * Sandro Manservisi

@@ -59,7 +59,7 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
             vf
         )
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     volSymmTensorField& result = tresult.ref();
 #else
     volSymmTensorField& result = tresult();
@@ -118,7 +118,7 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
     const tensorField& eigenVecI = eigenVec.internalField();
     symmTensor logEigenVal = symmTensor::zero;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     symmTensorField& resultI = result.primitiveFieldRef();
 #else
     symmTensorField& resultI = result.internalField();
@@ -148,7 +148,7 @@ tmp<volSymmTensorField> log(const volSymmTensorField& vf)
             // Take references
             const vectorField& eigenValB = eigenVal.boundaryField()[patchI];
             const tensorField& eigenVecB = eigenVec.boundaryField()[patchI];
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             symmTensorField& resultB = result.boundaryFieldRef()[patchI];
 #else
             symmTensorField& resultB = result.boundaryField()[patchI];

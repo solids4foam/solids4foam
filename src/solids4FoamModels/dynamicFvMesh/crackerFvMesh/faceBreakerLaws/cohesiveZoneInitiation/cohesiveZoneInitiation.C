@@ -28,7 +28,9 @@ License
 #include "crackerFvMesh.H"
 #include "solidCohesiveFvPatchVectorField.H"
 #include "cohesivePolyPatch.H"
+#include "processorPolyPatch.H"
 #include "lookupSolidModel.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 

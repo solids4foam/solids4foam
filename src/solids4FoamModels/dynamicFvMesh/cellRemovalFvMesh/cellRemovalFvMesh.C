@@ -28,6 +28,7 @@ License
 #include "mapPolyMesh.H"
 #include "volMesh.H"
 #include "addToRunTimeSelectionTable.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -89,7 +90,8 @@ Foam::cellRemovalFvMesh::cellRemovalFvMesh
                 time().constant(),
                 *this,
                 IOobject::MUST_READ,
-                IOobject::NO_WRITE
+                IOobject::NO_WRITE,
+                false  // Do not register
             )
         ).subDict(typeName + "Coeffs")
     ),

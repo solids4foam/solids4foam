@@ -50,7 +50,7 @@ Author
 #include "mechanicalLaw.H"
 #include "Switch.H"
 #include "solidSubMeshes.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
@@ -143,7 +143,7 @@ public:
 
             //- Return a const reference to the vol-to-point base mesh
             //  interpolator
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const volPointInterpolation& volToPoint() const;
 #else
             const newLeastSquaresVolPointInterpolation& volToPoint() const;

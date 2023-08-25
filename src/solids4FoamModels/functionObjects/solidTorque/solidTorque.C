@@ -294,7 +294,7 @@ bool Foam::solidTorque::read(const dictionary& dict)
     return true;
 }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::solidTorque::write()
 {
     return false;

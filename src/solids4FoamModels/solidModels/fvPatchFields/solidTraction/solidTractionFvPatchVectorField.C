@@ -220,7 +220,7 @@ solidTractionFvPatchVectorField
 :
     fixedGradientFvPatchVectorField(pvf, p, iF, mapper),
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     traction_(mapper(pvf.traction_)),
     pressure_(mapper(pvf.pressure_)),
 #else
@@ -237,7 +237,7 @@ solidTractionFvPatchVectorField
     curTimeIndex_(pvf.curTimeIndex_)
 {}
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 solidTractionFvPatchVectorField::
 solidTractionFvPatchVectorField
 (
@@ -290,7 +290,7 @@ void solidTractionFvPatchVectorField::autoMap
 {
     fixedGradientFvPatchVectorField::autoMap(m);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     m(traction_, traction_);
     m(pressure_, pressure_);
 #else
@@ -411,7 +411,7 @@ void solidTractionFvPatchVectorField::evaluate
         const fvPatchField<tensor>& gradField =
             patch().lookupPatchField<volTensorField, tensor>
             (
-            #ifdef OPENFOAMESIORFOUNDATION
+            #ifdef OPENFOAM_NOT_EXTEND
                 "grad(" + internalField().name() + ")"
             #else
                 "grad(" + dimensionedInternalField().name() + ")"
@@ -488,7 +488,7 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "traction", traction_);
 #else
         traction_.writeEntry("traction", os);
@@ -509,7 +509,7 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "pressure", pressure_);
 #else
         pressure_.writeEntry("pressure", os);
@@ -523,7 +523,7 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
     os.writeKeyword("relaxationFactor")
         << relaxFac_ << token::END_STATEMENT << nl;
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
     writeEntry(os, "gradient", gradient());
 #else

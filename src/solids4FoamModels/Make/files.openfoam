@@ -39,7 +39,6 @@ fluidSolidInterfaces/oneWayCouplingInterface/oneWayCouplingInterface.C
 fluidSolidInterfaces/weakCouplingInterface/weakCouplingInterface.C
 fluidSolidInterfaces/thermalCouplingInterface/thermalCouplingInterface.C
 
-
 interfaceToInterface = fluidSolidInterfaces/fluidSolidInterface/interfaceToInterfaceMapping
 $(interfaceToInterface)/interfaceToInterfaceMapping/interfaceToInterfaceMapping.C
 $(interfaceToInterface)/amiInterfaceToInterfaceMapping/amiInterfaceToInterfaceMapping.C
@@ -173,7 +172,6 @@ functionObjects/stressTriaxiality/stressTriaxiality.C
 functionObjects/volumetricStrain/volumetricStrain.C
 functionObjects/fsiConvergenceData/fsiConvergenceData.C
 
-
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
 numerics/backwardDdtScheme/backwardDdtSchemes.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
@@ -208,4 +206,4 @@ numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/sparseMatrixTools.C
 
-LIB = $(FOAM_USER_LIBBIN)/libsolids4FoamModels
+LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

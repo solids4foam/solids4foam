@@ -58,12 +58,9 @@ Foam::newSubsetMotionSolverFvMesh::newSubsetMotionSolverFvMesh(const IOobject& i
                 "dynamicMeshDict",
                 io.time().constant(),
                 *this,
-#if FOAMEXTEND
-                IOobject::MUST_READ_IF_MODIFIED,
-#else
                 IOobject::MUST_READ,
-#endif
-                IOobject::NO_WRITE
+                IOobject::NO_WRITE,
+                false  // Do not register
             )
         ).subDict(typeName + "Coeffs")
     ),
