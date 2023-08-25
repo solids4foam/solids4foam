@@ -172,8 +172,9 @@ functionObjects/stressTriaxiality/stressTriaxiality.C
 functionObjects/volumetricStrain/volumetricStrain.C
 functionObjects/fsiConvergenceData/fsiConvergenceData.C
 
-
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
+numerics/backwardDdtScheme/backwardDdtSchemes.C
+numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
 numerics/fvc/fvcCellLimitedGrad.C

@@ -42,9 +42,9 @@ SourceFiles
 // There are significant differences between OpenFOAM/FOAM versions so to
 // improve readability and maintainability, the ported versions will be given
 // in separate files
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     #include "backwardDdtScheme.foundation.H"
-#elif OPENFOAMESI
+#elif OPENFOAM_COM
     #include "backwardDdtScheme.esi.H"
 #endif
 
