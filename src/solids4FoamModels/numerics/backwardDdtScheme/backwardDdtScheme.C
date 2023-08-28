@@ -5,7 +5,8 @@
     \\  /    A nd           | www.openfoam.com
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
-    Copyright (C) 2011-2015 OpenFOAM Foundation
+    Copyright (C) 2011-2017 OpenFOAM Foundation
+    Copyright (C) 2017 OpenCFD Ltd.
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -25,24 +26,13 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "backwardDdtScheme.H"
-#include "fvMesh.H"
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-
-#ifdef OPENFOAM_NOT_EXTEND
-makeFvDdtScheme(backwardDdtScheme)
+#ifdef OPENFOAM_ORG
+    #include "backwardDdtScheme.foundation.C"
+#elif OPENFOAM_COM
+    #include "backwardDdtScheme.esi.C"
 #else
-namespace Foam
-{
-namespace fv
-{
-    makeFvDdtScheme(backwardDdtScheme)
-}
-}
+    #include "backwardDdtScheme.foamextend.C"
 #endif
-
 
 
 // ************************************************************************* //

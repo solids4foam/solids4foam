@@ -35,18 +35,14 @@ Description
     two previous time-step values.
 
 SourceFiles
-    backwardDdtScheme.H
+    backwardDdtScheme.C
 
 \*---------------------------------------------------------------------------*/
 
-// There are significant differences between OpenFOAM/FOAM versions so to
-// improve readability and maintainability, the ported versions will be given
-// in separate files
 #ifdef OPENFOAM_ORG
     #include "backwardDdtScheme.foundation.H"
 #elif OPENFOAM_COM
     #include "backwardDdtScheme.esi.H"
+#else
+    #include "backwardDdtScheme.foamextend.H"
 #endif
-
-
-// ************************************************************************* //
