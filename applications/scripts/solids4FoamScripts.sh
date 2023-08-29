@@ -172,7 +172,7 @@ function solids4Foam::convertCaseFormat()
         fi
     fi
 
-    # # 10. Resolve force post-processing path from foam-extend
+    # 10. Resolve force post-processing path from foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
         if [[ $WM_PROJECT_VERSION == *"v"* ]]
