@@ -172,11 +172,14 @@ function solids4Foam::convertCaseFormat()
         fi
     fi
 
-    # 10. Resolve force post-processing path from foam-extend
+    # # 10. Resolve force post-processing path from foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
-        echo "Updating force.gnuplot"
-        sed -i  "s|forces/0/forces.dat|./postProcessing/fluid/forces/0/force.dat|g" force.gnuplot
+        if [[ $WM_PROJECT_VERSION == *"v"* ]]
+        then
+            echo "Modifying force.gnuplot in consistent with ESI version"
+            sed -i "s|forces.dat|force.dat|g" force.gnuplot
+        fi
     fi
 
     echo
@@ -337,14 +340,16 @@ function solids4Foam::convertCaseFormatFoamExtend()
             sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
         fi
     fi
-    
+
     # 10. Resolve force post-processing path for foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
-        echo "Updating force.gnuplot"
-        sed -i "s|./postProcessing/fluid/forces/0/force.dat|forces/0/forces.dat|g" force.gnuplot
+        if [[ $WM_PROJECT_VERSION == *"v"* ]]
+        then
+            echo "Reverting force.gnuplot from ESI version to foam-extend or .org "
+            sed -i "s|force.dat|forces.dat|g" force.gnuplot
+        fi
     fi
-    
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormatFoamExtend end                        |"
