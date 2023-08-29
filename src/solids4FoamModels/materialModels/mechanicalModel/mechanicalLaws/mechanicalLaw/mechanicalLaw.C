@@ -1158,7 +1158,7 @@ void Foam::mechanicalLaw::updateSigmaHyd
 {
     if (solvePressureEqn_)
     {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         SolverPerformance<scalar>::debug = 0;
 #endif
 
@@ -1176,7 +1176,7 @@ void Foam::mechanicalLaw::updateSigmaHyd
             }
             else
             {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 FatalErrorIn("void Foam::mechanicalLaw::updateSigmaHyd(...)")
                     << "Multi-materials are not yet ported for this version of "
                     << "OpenFOAM" << abort(FatalError);
@@ -1383,7 +1383,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalLaw::rho() const
         )
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tresult.ref().correctBoundaryConditions();
 #else
     tresult().correctBoundaryConditions();
@@ -1399,7 +1399,7 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalLaw::impKf() const
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::mechanicalLaw::materialTangentField() const
 {

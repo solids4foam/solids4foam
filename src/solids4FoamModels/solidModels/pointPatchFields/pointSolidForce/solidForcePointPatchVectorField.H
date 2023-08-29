@@ -59,7 +59,7 @@ Author
 
 namespace Foam
 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     typedef pointPatchFieldMapper PointPatchFieldMapper;
 #endif
 
@@ -116,7 +116,7 @@ public:
             const PointPatchFieldMapper&
         );
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
         //- Construct as copy
         solidForcePointPatchVectorField
         (
@@ -192,7 +192,7 @@ public:
         //  there's nothing to do
         virtual void initEvaluate
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
 #else
             const Pstream::commsTypes commsType = Pstream::blocking

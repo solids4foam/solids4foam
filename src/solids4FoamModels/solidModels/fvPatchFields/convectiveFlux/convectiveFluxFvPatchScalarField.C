@@ -99,7 +99,7 @@ Foam::convectiveFluxFvPatchScalarField::convectiveFluxFvPatchScalarField
     // lambda_ = dimensionedScalar(transportProperties.lookup("lambda")).value();
 }
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 Foam::convectiveFluxFvPatchScalarField::convectiveFluxFvPatchScalarField
 (
     const convectiveFluxFvPatchScalarField& wbppsf

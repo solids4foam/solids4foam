@@ -133,7 +133,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         // Check ddt scheme for D is not steadyState
         const word ddtDScheme
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             mesh().ddtScheme("ddt(" + D().name() +')')
 #else
             mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
@@ -180,7 +180,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
     }
 
     int iCorr = 0;
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector> solverPerfD;
     SolverPerformance<vector>::debug = 0;
 #else
@@ -215,7 +215,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
         solidModel::setCellDisps(DEqn);
 
         // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
         const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
 #endif
 
@@ -256,7 +256,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
        !converged
         (
             iCorr,
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             mag(solverPerfD.initialResidual()),
             cmptMax(solverPerfD.nIterations()),
 #else
@@ -276,7 +276,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

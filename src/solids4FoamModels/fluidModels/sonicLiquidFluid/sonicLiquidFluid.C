@@ -17,9 +17,9 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     #include "sonicLiquidFluid.foundation.C"
-#elif OPENFOAM_COM
+#elif OPENFOAMESI
     #include "sonicLiquidFluid.esi.C"
 #else
     #include "sonicLiquidFluid.foamextend.C"

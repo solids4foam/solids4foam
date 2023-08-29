@@ -51,7 +51,7 @@ Author
 #include "argList.H"
 #include "polyMesh.H"
 #include "IFstream.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "Time.H"
     #include "polyTopoChange.H"
 #else
@@ -605,7 +605,7 @@ void insertDuplicateMerge
 (
     const polyMesh& mesh,
     const labelList& duplicates,
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     polyTopoChange& meshMod
 #else
     directTopoChange& meshMod
@@ -614,7 +614,7 @@ void insertDuplicateMerge
 {
     const faceList& faces = mesh.faces();
     const labelList& faceOwner = mesh.faceOwner();
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     const meshFaceZones& faceZones = mesh.faceZones();
 #else
     const faceZoneMesh& faceZones = mesh.faceZones();
@@ -707,7 +707,7 @@ void mergeDuplicateFaces(polyMesh& mesh)
     }
 
     // Mesh change engine
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     polyTopoChange meshMod(mesh);
 #else
     directTopoChange meshMod(mesh);
@@ -744,7 +744,7 @@ int main(int argc, char *argv[])
 #   include "createTime.H"
 
     // Read abaqus input file name
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const fileName inputFileName(args[1]);
 #else
     const fileName inputFileName(args.additionalArgs()[0]);
@@ -826,7 +826,7 @@ int main(int argc, char *argv[])
             runTime,
             IOobject::NO_READ
         ),
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         std::move(points),
         std::move(faces),
         std::move(cells),

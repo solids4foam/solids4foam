@@ -92,7 +92,7 @@ bool Foam::solidPotentialEnergy::writeData()
     // gravity direction from the refPoint
     const scalarField h
     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         (-gDir & (mesh.C().primitiveField() + U.primitiveField() - refPoint_))
 #else
         (-gDir & (mesh.C().internalField() + U.internalField() - refPoint_))
@@ -201,7 +201,7 @@ bool Foam::solidPotentialEnergy::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 bool Foam::solidPotentialEnergy::write()
 {
     return false;

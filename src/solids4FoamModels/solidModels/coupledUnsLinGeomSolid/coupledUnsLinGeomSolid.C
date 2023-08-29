@@ -22,7 +22,6 @@ License
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
-#include "processorPolyPatch.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
 #ifdef FOAMEXTEND

@@ -32,7 +32,7 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 
 #ifndef extendedLeastSquaresGrad_H
 #define extendedLeastSquaresGrad_H
@@ -133,6 +133,6 @@ public:
 
 #endif
 
-#endif // end of #ifdef OPENFOAM_NOT_EXTEND
+#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
 // ************************************************************************* //

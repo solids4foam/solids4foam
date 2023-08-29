@@ -98,7 +98,7 @@ public:
         extrapolatedPressureValueFvPatchScalarField
         (
             const extrapolatedPressureValueFvPatchScalarField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

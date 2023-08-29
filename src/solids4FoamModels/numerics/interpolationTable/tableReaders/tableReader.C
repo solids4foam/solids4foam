@@ -33,23 +33,9 @@ Foam::autoPtr<Foam::tableReader<Type>> Foam::tableReader<Type>::New
         "openFoam"
     );
 
-#if (OPENFOAM >= 2112)
-    auto* ctorPtr = dictionaryConstructorTable(readerType);
-
-    if (!ctorPtr)
-    {
-        FatalIOErrorInLookup
-        (
-            spec,
-            "reader",
-            readerType,
-            *dictionaryConstructorTablePtr_
-        ) << exit(FatalIOError);
-    }
-
-#else
     typename dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(readerType);
+        dictionaryConstructorTablePtr_
+            ->find(readerType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -61,10 +47,7 @@ Foam::autoPtr<Foam::tableReader<Type>> Foam::tableReader<Type>::New
             << exit(FatalError);
     }
 
-    auto* ctorPtr = cstrIter();
-#endif
-
-    return autoPtr<tableReader<Type>>(ctorPtr(spec));
+    return autoPtr<tableReader<Type>>(cstrIter()(spec));
 }
 
 
@@ -89,7 +72,7 @@ void Foam::tableReader<Type>::write(Ostream& os) const
 {
     if (this->type() != "openFoam")
     {
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         writeEntry(os, "readerType", this->type());
 #else
         os.writeKeyword("readerType")

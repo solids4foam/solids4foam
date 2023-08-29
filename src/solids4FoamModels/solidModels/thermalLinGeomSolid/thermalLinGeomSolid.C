@@ -45,7 +45,7 @@ addToRunTimeSelectionTable(solidModel, thermalLinGeomSolid, dictionary);
 bool thermalLinGeomSolid::converged
 (
     const int iCorr,
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const SolverPerformance<vector>& solverPerfD,
     const SolverPerformance<scalar>& solverPerfT,
 #else
@@ -63,7 +63,7 @@ bool thermalLinGeomSolid::converged
     const scalar absResidualT =
         gMax
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             DimensionedField<double, volMesh>
             (
                 mag(T.internalField() - T.prevIter().internalField())
@@ -78,7 +78,7 @@ bool thermalLinGeomSolid::converged
         (
             gMax
             (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 DimensionedField<double, volMesh>
                 (
                     mag(T.internalField() - T.oldTime().internalField())
@@ -93,7 +93,7 @@ bool thermalLinGeomSolid::converged
     const scalar residualD =
         gMax
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             DimensionedField<double, volMesh>
 #endif
             (
@@ -102,7 +102,7 @@ bool thermalLinGeomSolid::converged
                 (
                     gMax
                     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                         DimensionedField<double, volMesh>
 #endif
                         (
@@ -268,7 +268,7 @@ bool thermalLinGeomSolid::evolve()
     Info<< "Evolving thermal solid solver" << endl;
 
     int iCorr = 0;
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector> solverPerfD;
     SolverPerformance<scalar> solverPerfT;
     SolverPerformance<scalar>::debug = 0;
@@ -329,7 +329,7 @@ bool thermalLinGeomSolid::evolve()
         solidModel::setCellDisps(DEqn);
 
         // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
         const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
 #endif
 
@@ -377,7 +377,7 @@ bool thermalLinGeomSolid::evolve()
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<scalar>::debug = 1;
     SolverPerformance<vector>::debug = 1;
 #else
@@ -506,7 +506,7 @@ void thermalLinGeomSolid::setTemperatureAndHeatFlux
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneHeatFlux)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     setTemperatureAndHeatFlux
     (
         T_.boundaryFieldRef()[patchID],
@@ -568,7 +568,7 @@ void thermalLinGeomSolid::setEqInterHeatTransferCoeff
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneHTC)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     setEqInterHeatTransferCoeff
     (
         T_.boundaryFieldRef()[patchID],

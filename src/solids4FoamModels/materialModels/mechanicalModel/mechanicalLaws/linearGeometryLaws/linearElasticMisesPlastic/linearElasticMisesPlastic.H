@@ -272,13 +272,13 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         //- Material tangent for Newton Raphson loop
         virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
 #endif
 
         //- Return the implicit stiffness as a diagTensor
-#ifndef OPENFOAM_NOT_EXTEND
+#ifndef OPENFOAMESIORFOUNDATION
         virtual tmp<volDiagTensorField> impKdiagTensor() const;
 #endif
 

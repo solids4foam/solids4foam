@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
 
 #include "tableReaders.H"
 

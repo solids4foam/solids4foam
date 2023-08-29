@@ -72,7 +72,7 @@ fixedTemperatureGradientFvPatchScalarField
     fieldName_(stpvf.fieldName_)
 {}
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 fixedTemperatureGradientFvPatchScalarField::
 fixedTemperatureGradientFvPatchScalarField
 (

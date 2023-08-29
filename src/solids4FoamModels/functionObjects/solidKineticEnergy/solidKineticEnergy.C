@@ -170,7 +170,7 @@ bool Foam::solidKineticEnergy::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 bool Foam::solidKineticEnergy::write()
 {
     return false;

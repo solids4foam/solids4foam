@@ -112,7 +112,7 @@ public:
         thermalRobinFvPatchScalarField
         (
             const thermalRobinFvPatchScalarField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

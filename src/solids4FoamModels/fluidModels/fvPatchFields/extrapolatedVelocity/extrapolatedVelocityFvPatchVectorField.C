@@ -73,7 +73,7 @@ extrapolatedVelocityFvPatchVectorField
     zeroGradientFvPatchVectorField(ptf, p, iF, mapper)
 {}
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 extrapolatedVelocityFvPatchVectorField::
 extrapolatedVelocityFvPatchVectorField
 (
@@ -136,7 +136,7 @@ void extrapolatedVelocityFvPatchVectorField::evaluate(const Pstream::commsTypes)
 //     // Otherwise assume the variable is the static pressure.
 //     if
 //     (
-// #ifdef OPENFOAM_NOT_EXTEND
+// #ifdef OPENFOAMESIORFOUNDATION
 //         internalField().name() == "p_rgh"
 //      || internalField().name() == "pd"
 // #else

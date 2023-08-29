@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
 
 template<class SourcePatch, class TargetPatch>
 inline const Foam::labelList&
@@ -27,6 +27,6 @@ Foam::newAMIMethod<SourcePatch, TargetPatch>::srcNonOverlap() const
 }
 
 
-#endif // end of #ifdef OPENFOAM_ORG
+#endif // end of #ifdef OPENFOAMFOUNDATION
 
 // ************************************************************************* //

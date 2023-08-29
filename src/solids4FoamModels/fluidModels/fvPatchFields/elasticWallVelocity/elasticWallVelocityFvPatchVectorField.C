@@ -44,7 +44,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF),
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     timeIndex_(internalField().mesh().time().timeIndex()),
 #else
     timeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
@@ -87,7 +87,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const fvMesh& mesh = internalField().mesh();
     const pointField& points = mesh.points();
 #else
@@ -105,7 +105,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 }
 
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 (
     const elasticWallVelocityFvPatchVectorField& pivpvf
@@ -143,7 +143,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
         return;
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const fvMesh& mesh = internalField().mesh();
 #else
     const fvMesh& mesh = dimensionedInternalField().mesh();
@@ -159,7 +159,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     const volVectorField& U =
         mesh.lookupObject<volVectorField>
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             internalField().name()
 #else
             dimensionedInternalField().name()
@@ -168,7 +168,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
 
     word ddtScheme
     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         mesh.ddtScheme("ddt(" + U.name() +')')
 #else
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
@@ -238,6 +238,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     const vectorField n(p.nf());
     const scalarField& magSf = p.magSf();
     scalarField Un(phip/(magSf + VSMALL));
+
     
     // if (mesh.foundObject<surfaceScalarField>("phi"))
     // {
@@ -298,7 +299,7 @@ snGrad() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const word UName = internalField().name();
 #else
     const word UName = dimensionedInternalField().name();
@@ -325,7 +326,7 @@ snGrad() const
             new vectorField(this->patch().size(), vector::zero)
         );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         tnGradU.ref() =
             2
            *(
@@ -367,7 +368,7 @@ snGrad() const
         new vectorField(this->patch().size(), vector::zero)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tnGradU.ref() =
         (
             *this
@@ -400,7 +401,7 @@ gradientBoundaryCoeffs() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const word UName = internalField().name();
 #else
     const word UName = dimensionedInternalField().name();
@@ -471,7 +472,7 @@ gradientBoundaryCoeffs() const
 void elasticWallVelocityFvPatchVectorField::write(Ostream& os) const
 {
     fvPatchVectorField::write(os);
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

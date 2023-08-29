@@ -44,27 +44,12 @@ autoPtr<cohesiveZoneModel> cohesiveZoneModel::New
     const dictionary& dict
 )
 {
-    const word modelType(dict.lookup("type"));
+    word lawTypeName = dict.lookup("type");
 
-    Info<< "Selecting cohesive zone model: " << modelType << endl;
+    Info<< "Selecting cohesive zone model: " << lawTypeName << endl;
 
-#if (OPENFOAM >= 2112)
-    auto* ctorPtr = dictionaryConstructorTable(modelType);
-
-    if (!ctorPtr)
-    {
-        FatalIOErrorInLookup
-        (
-            dict,
-            "cohesiveZoneModel",
-            modelType,
-            *dictionaryConstructorTablePtr_
-        ) << exit(FatalIOError);
-    }
-
-#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(modelType);
+        dictionaryConstructorTablePtr_->find(lawTypeName);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -77,16 +62,13 @@ autoPtr<cohesiveZoneModel> cohesiveZoneModel::New
             ")",
             dict
         )   << "Unknown cohesiveZoneModel type "
-            << modelType << endl << endl
+            << lawTypeName << endl << endl
             << "Valid  cohesiveZoneModels are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
-    auto* ctorPtr = cstrIter();
-#endif
-
-    return autoPtr<cohesiveZoneModel>(ctorPtr(name, patch, dict));
+    return autoPtr<cohesiveZoneModel>(cstrIter()(name, patch, dict));
 }
 
 

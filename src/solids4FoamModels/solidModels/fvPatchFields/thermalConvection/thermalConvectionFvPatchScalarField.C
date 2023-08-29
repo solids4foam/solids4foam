@@ -54,7 +54,7 @@ Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
 :
     fixedValueFvPatchScalarField(ptf, p, iF, mapper),
     DTName_(ptf.DTName_),
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     alpha_(mapper(ptf.alpha_)),
 #else
     alpha_(ptf.alpha_, mapper),
@@ -80,7 +80,7 @@ Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
     fvPatchField<scalar>::operator=(patchInternalField());
 }
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
 (
     const thermalConvectionFvPatchScalarField& wbppsf
@@ -219,7 +219,7 @@ void Foam::thermalConvectionFvPatchScalarField::write(Ostream& os) const
         << DTName_ << token::END_STATEMENT << nl;
      os.writeKeyword("Tinf") << Tinf_.value() << token::END_STATEMENT << nl;
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
      writeEntry(os, "alpha", alpha_);
 #else
      alpha_.writeEntry("alpha", os);

@@ -42,7 +42,7 @@ bool Foam::solidModel::converged
     // Calculate displacement residual based on the relative change of vf
     scalar denom = gMax
     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         DimensionedField<scalar, volMesh>
 #else
         Field<scalar>
@@ -57,7 +57,7 @@ bool Foam::solidModel::converged
         (
             gMax
             (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 DimensionedField<scalar, volMesh>(mag(vf.internalField()))
 #else
                 mag(vf.internalField())
@@ -69,7 +69,7 @@ bool Foam::solidModel::converged
     const scalar residualvf =
         gMax
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             DimensionedField<scalar, volMesh>
             (
                 mag(vf.internalField() - vf.prevIter().internalField())

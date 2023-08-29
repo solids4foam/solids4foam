@@ -26,7 +26,7 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
 
 #ifndef newFaceAreaWeightAMI_H
 #define newFaceAreaWeightAMI_H
@@ -184,6 +184,6 @@ public:
 
 #endif
 
-#endif // end of #ifdef OPENFOAM_ORG
+#endif // end of #ifdef OPENFOAMFOUNDATION
 
 // ************************************************************************* //

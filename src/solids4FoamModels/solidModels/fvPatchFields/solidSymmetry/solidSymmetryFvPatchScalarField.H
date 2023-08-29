@@ -92,7 +92,7 @@ public:
         solidSymmetryFvPatchScalarField
         (
             const solidSymmetryFvPatchScalarField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

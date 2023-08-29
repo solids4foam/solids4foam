@@ -92,7 +92,7 @@ void vertexCentredLinGeomSolid::updateSource
     {
         if (dualTraction.boundaryField()[patchI].coupled())
         {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             dualTraction.boundaryFieldRef()[patchI] = vector::zero;
 #else
             dualTraction.boundaryField()[patchI] = vector::zero;
@@ -121,7 +121,7 @@ void vertexCentredLinGeomSolid::updateSource
     // Add transient term
     source += vfvc::d2dt2
     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
         mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
@@ -409,7 +409,7 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
             dualFaceTraction /= nPointsPerDualFace;
 
             // Overwrite the dual patch face traction
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             dualTraction.boundaryFieldRef()[patchI] = dualFaceTraction;
 #else
             dualTraction.boundaryField()[patchI] = dualFaceTraction;
@@ -426,7 +426,7 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
         {
             // Set the dual patch face shear traction to zero
             const vectorField n(dualMesh.boundary()[patchI].nf());
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             dualTraction.boundaryFieldRef()[patchI] =
                 (sqr(n) & dualTraction.boundaryField()[patchI]);
 #else
@@ -469,7 +469,7 @@ bool vertexCentredLinGeomSolid::vertexCentredLinGeomSolid::converged
     const scalar residualNorm = residualAbs/initResidual;
 
     // Calculate the maximum displacement
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const scalar maxMagD = gMax(mag(pointD.primitiveField()));
 #else
     const scalar maxMagD = gMax(mag(pointD.internalField()));
@@ -520,7 +520,7 @@ scalar vertexCentredLinGeomSolid::calculateLineSearchSlope
     pointD.storePrevIter();
 
     // Update pointD
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     pointD.primitiveFieldRef() += eta*pointDcorr;
 #else
     pointD.internalField() += eta*pointDcorr;
@@ -743,7 +743,7 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         "calculated"
     ),
     globalPointIndices_(mesh())
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
     ,
     pointVolInterp_(pMesh(), mesh())
 #endif
@@ -762,7 +762,7 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
 
     // Set the pointVol field
     // Map dualMesh cell volumes to the primary mesh points
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     scalarField& pointVolI = pointVol_.primitiveFieldRef();
 #else
     scalarField& pointVolI = pointVol_.internalField();
@@ -861,7 +861,7 @@ bool vertexCentredLinGeomSolid::evolve()
         // Add d2dt2 coefficients
         vfvm::d2dt2
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
             mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
@@ -881,7 +881,7 @@ bool vertexCentredLinGeomSolid::evolve()
     // Newton-Raphson loop over momentum equation
     int iCorr = 0;
     scalar initResidual = 0.0;
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector> solverPerf;
 #else
     BlockSolverPerformance<vector> solverPerf;
@@ -934,7 +934,7 @@ bool vertexCentredLinGeomSolid::evolve()
             // Add d2dt2 coefficients
             vfvm::d2dt2
             (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
                 mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
@@ -1049,13 +1049,13 @@ bool vertexCentredLinGeomSolid::evolve()
             );
 
             // Update displacement field
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             pointD().primitiveFieldRef() += eta*pointDcorr;
 #else
             pointD().internalField() += eta*pointDcorr;
 #endif
         }
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         else if (mesh().relaxField(pointD().name()))
 #else
         else if (mesh().solutionDict().relaxField(pointD().name()))
@@ -1063,7 +1063,7 @@ bool vertexCentredLinGeomSolid::evolve()
         {
             // Relaxing the correction can help convergence
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             const scalar rf
             (
                 mesh().fieldRelaxationFactor(pointD().name())
@@ -1081,7 +1081,7 @@ bool vertexCentredLinGeomSolid::evolve()
         }
         else
         {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             pointD().primitiveFieldRef() += pointDcorr;
 #else
             pointD().internalField() += pointDcorr;
@@ -1091,7 +1091,7 @@ bool vertexCentredLinGeomSolid::evolve()
 
         // Update point accelerations
         // Note: for NewmarkBeta, this needs to come before the pointU update
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         pointA_.primitiveFieldRef() =
             vfvc::ddt
             (
@@ -1134,7 +1134,7 @@ bool vertexCentredLinGeomSolid::evolve()
             iCorr,
             initResidual,
             solverPerf.finalResidual()[vector::X],
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             cmptMax(solverPerf.nIterations()),
 #else
             solverPerf.nIterations(),
@@ -1178,7 +1178,7 @@ bool vertexCentredLinGeomSolid::evolve()
     // This stress will be first-order accurate
     mechanical().correct(sigma());
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
     // Interpolate pointD to D
     // This is useful for visualisation but it is also needed when using preCICE
     pointVolInterp_.interpolate(pointD(), D());
@@ -1207,7 +1207,7 @@ void vertexCentredLinGeomSolid::setTraction
     );
 
     // Lookup point patch field
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     pointPatchVectorField& ptPatch = pointD().boundaryFieldRef()[patchID];
 #else
     pointPatchVectorField& ptPatch = pointD().boundaryField()[patchID];

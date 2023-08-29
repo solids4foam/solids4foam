@@ -132,7 +132,7 @@ explicitLinGeomTotalDispSolid::explicitLinGeomTotalDispSolid
     updateStress();
 
     // Update initial acceleration
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     a_.primitiveFieldRef() =
 #else
     a_.internalField() =
@@ -169,7 +169,7 @@ void explicitLinGeomTotalDispSolid::setDeltaT(Time& runTime)
         1.0/
         gMax
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             DimensionedField<scalar, Foam::surfaceMesh>
 #else
             Field<scalar>
@@ -235,7 +235,7 @@ bool explicitLinGeomTotalDispSolid::evolve()
         // Note the inclusion of a linear bulk viscosity pressure term to
         // dissipate high frequency energies, and a Rhie-Chow or JST term to
         // suppress checker-boarding
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         a_.primitiveFieldRef() =
 #else
         a_.internalField() =
@@ -271,7 +271,7 @@ bool explicitLinGeomTotalDispSolid::evolve()
                     "laplacian(DU,U)"
                 )().internalField()
             )/rho().internalField()
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
           + g();
 #else
           + g().value();

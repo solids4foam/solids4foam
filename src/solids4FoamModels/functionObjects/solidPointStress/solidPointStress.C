@@ -22,12 +22,12 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "OSspecific.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     #include "OSspecific.H"
 #endif
 
@@ -86,9 +86,9 @@ bool Foam::solidPointStress::writeData()
             dimensionedSymmTensor("zero", sigma.dimensions(), symmTensor::zero)
         );
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         volPointInterpolation::New(mesh).interpolate(sigma, pointSigma);
-#elif OPENFOAM_COM
+#elif OPENFOAMESI
         mesh.lookupObject<volPointInterpolation>
         (
             "volPointInterpolation"
@@ -267,7 +267,7 @@ bool Foam::solidPointStress::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 bool Foam::solidPointStress::write()
 {
     return false;

@@ -30,7 +30,7 @@ License
 #include "twoDPointCorrector.H"
 #include "fixedGradientFvPatchFields.H"
 #include "wedgePolyPatch.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "ZoneIDs.H"
 #else
     #include "ZoneID.H"
@@ -123,7 +123,7 @@ void Foam::mechanicalModel::calcImpKfcorr() const
 
     if (laws.size() > 1)
     {
-#ifndef OPENFOAM_NOT_EXTEND
+#ifndef OPENFOAMESIORFOUNDATION
         // To disable Rhie-Chow correction on bi-material interface, we will set
         // impKfcorr to zero on bi-material interface faces
 
@@ -352,7 +352,7 @@ Foam::mechanicalModel::mechanicalModel
         }
     }
 
-#ifndef OPENFOAM_NOT_EXTEND
+#ifndef OPENFOAMESIORFOUNDATION
     // Check: currently crackerFvMesh only works with a single material
     // The challenge here is to update the subMesh and subMesh fields when a
     // topo-change (crack) occurs in the babse mesh
@@ -383,7 +383,7 @@ const Foam::fvMesh& Foam::mechanicalModel::mesh() const
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 const Foam::volPointInterpolation& Foam::mechanicalModel::volToPoint() const
 {
     return volPointInterpolation::New(mesh_);
@@ -424,7 +424,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::rho() const
             )
         );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         volScalarField& result = tresult.ref();
 #else
         volScalarField& result = tresult();
@@ -482,7 +482,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::impK() const
             )
         );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         volScalarField& result = tresult.ref();
 #else
         volScalarField& result = tresult();
@@ -549,7 +549,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::bulkModulus() const
             )
         );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         volScalarField& result = tresult.ref();
 #else
         volScalarField& result = tresult();

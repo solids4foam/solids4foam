@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
 
 #include "newAMIInterpolation.H"
 #include "mergePoints.H"
@@ -475,6 +475,6 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::calcProcMap
 }
 
 
-#endif // end of #ifdef OPENFOAM_ORG
+#endif // end of #ifdef OPENFOAMFOUNDATION
 
 // ************************************************************************* //

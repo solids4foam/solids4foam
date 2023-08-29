@@ -61,8 +61,7 @@ Foam::newDynamicBodyFvMesh::newDynamicBodyFvMesh(const IOobject& io)
                 io.time().constant(),
                 *this,
                 IOobject::MUST_READ,
-                IOobject::NO_WRITE,
-                false  // Do not register
+                IOobject::NO_WRITE
             )
         ).subDict(typeName + "Coeffs")
     ),

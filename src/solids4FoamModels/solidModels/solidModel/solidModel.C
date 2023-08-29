@@ -22,7 +22,7 @@ License
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "primitivePatchInterpolation.H"
     #include "polyTopoChange.H"
 #else
@@ -43,7 +43,7 @@ namespace Foam
     defineRunTimeSelectionTable(solidModel, dictionary);
     addToRunTimeSelectionTable(physicsModel, solidModel, physicsModel);
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     typedef meshFaceZones faceZoneMesh;
 #endif
 }
@@ -77,7 +77,7 @@ void Foam::solidModel::makeDualMesh() const
                 runTime(),
                 Foam::IOobject::READ_IF_PRESENT
             ),
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             pointField(mesh().points()),
             faceList(mesh().faces()),
             labelList(mesh().faceOwner()),
@@ -180,7 +180,7 @@ void Foam::solidModel::makeDualMesh() const
     }
 
     // Topo change container
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     polyTopoChange meshMod(dualMesh.boundaryMesh().size());
 #else
     directTopoChange meshMod(dualMesh.boundaryMesh().size());
@@ -267,7 +267,7 @@ void Foam::solidModel::simpleMarkFeatures
     labelList& multiCellFeaturePoints
 ) const
 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     scalar minCos = Foam::cos(featureAngle*constant::mathematical::pi/180.0);
 #else
     scalar minCos = Foam::cos(featureAngle*mathematicalConstant::pi/180.0);
@@ -828,7 +828,7 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
             // Fixed under-relaxation is applied on the first iteration
             aitkenAlpha_ = 1.0;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             if (mesh().relaxField(D.name()))
             {
                 aitkenAlpha_ =
@@ -1333,7 +1333,7 @@ const Foam::mechanicalModel& Foam::solidModel::mechanical() const
 
 void Foam::solidModel::DisRequired()
 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (!Dheader_.typeHeaderOk<volVectorField>(true))
 #else
     if (!Dheader_.headerOk())
@@ -1348,7 +1348,7 @@ void Foam::solidModel::DisRequired()
 
 void Foam::solidModel::DDisRequired()
 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (!DDheader_.typeHeaderOk<volVectorField>(true))
 #else
     if (!DDheader_.headerOk())
@@ -1363,7 +1363,7 @@ void Foam::solidModel::DDisRequired()
 
 void Foam::solidModel::pointDisRequired()
 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (!pointDheader_.typeHeaderOk<pointVectorField>(true))
 #else
     if (!pointDheader_.headerOk())
@@ -1432,22 +1432,11 @@ void Foam::solidModel::makeGlobalPatches
             mesh().V();
             const_cast<dynamicFvMesh&>(mesh()).movePoints(newPoints);
             const_cast<dynamicFvMesh&>(mesh()).moving(false);
-#ifdef FOAMEXTEND
+#ifndef OPENFOAMESIORFOUNDATION
             const_cast<dynamicFvMesh&>(mesh()).changing(false);
 #endif
-
-#if (OPENFOAM >= 2206)
-            {
-                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
-                if (tmeshPhi)
-                {
-                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
-                }
-            }
-#else
             const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
                 IOobject::NO_WRITE;
-#endif
 
             // Create global patch based on deformed mesh
             globalPatchesPtrList_.set
@@ -1463,21 +1452,11 @@ void Foam::solidModel::makeGlobalPatches
             const_cast<dynamicFvMesh&>(mesh()).movePoints(pointsBackup);
             mesh().V();
             const_cast<dynamicFvMesh&>(mesh()).moving(false);
-#ifdef FOAMEXTEND
+#ifndef OPENFOAMESIORFOUNDATION
             const_cast<dynamicFvMesh&>(mesh()).changing(false);
 #endif
-#if (OPENFOAM >= 2206)
-            {
-                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
-                if (tmeshPhi)
-                {
-                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
-                }
-            }
-#else
             const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
                 IOobject::NO_WRITE;
-#endif
         }
         else
         {
@@ -1612,61 +1591,48 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     const word& region
 )
 {
-    // NB: dictionary must be unregistered to avoid adding to the database
+    word solidModelTypeName;
 
-    IOdictionary props
-    (
-        IOobject
-        (
-            "solidProperties",
-            bool(region == dynamicFvMesh::defaultRegion)
-          ? fileName(runTime.caseConstant())
-          : fileName(runTime.caseConstant()/region),
-            runTime,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE,
-            false  // Do not register
-        )
-    );
-
-    const word modelType(props.lookup("solidModel"));
-
-    Info<< "Selecting solidModel " << modelType << endl;
-
-#if (OPENFOAM >= 2112)
-    auto* ctorPtr = dictionaryConstructorTable(modelType);
-
-    if (!ctorPtr)
+    // Enclose the creation of the dictionary to ensure it is
+    // deleted before the fluid model is created, otherwise the dictionary
+    // is entered in the database twice
     {
-        FatalIOErrorInLookup
+        IOdictionary solidProperties
         (
-            props,
-            "solidModel",
-            modelType,
-            *dictionaryConstructorTablePtr_
-        ) << exit(FatalIOError);
+            IOobject
+            (
+                "solidProperties",
+                bool(region == dynamicFvMesh::defaultRegion)
+              ? fileName(runTime.caseConstant())
+              : fileName(runTime.caseConstant()/region),
+                runTime,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+
+        solidProperties.lookup("solidModel")
+            >> solidModelTypeName;
     }
 
-#else
+    Info<< "Selecting solidModel " << solidModelTypeName << endl;
+
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(modelType);
+        dictionaryConstructorTablePtr_->find(solidModelTypeName);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
         FatalErrorIn
         (
             "solidModel::New(Time&, const word&)"
-        )   << "Unknown solidModel type " << modelType
+        )   << "Unknown solidModel type " << solidModelTypeName
             << endl << endl
             << "Valid solidModel types are :" << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalError);
     }
 
-    auto* ctorPtr = cstrIter();
-#endif
-
-    return autoPtr<solidModel>(ctorPtr(runTime, region));
+    return autoPtr<solidModel>(cstrIter()(runTime, region));
 }
 
 
@@ -1683,7 +1649,7 @@ void Foam::solidModel::setTraction
 
         patchD.traction() = traction;
     }
-#ifdef FOAMEXTEND
+#ifndef OPENFOAMESIORFOUNDATION
     else if
     (
         tractionPatch.type() == blockSolidTractionFvPatchVectorField::typeName
@@ -1709,7 +1675,7 @@ void Foam::solidModel::setTraction
             << " for patch " << tractionPatch.patch().name()
             << " should instead be type "
             << solidTractionFvPatchVectorField::typeName
-#ifdef FOAMEXTEND
+#ifndef OPENFOAMESIORFOUNDATION
             << " or "
             << blockSolidTractionFvPatchVectorField::typeName
 #endif
@@ -1730,7 +1696,7 @@ void Foam::solidModel::setTraction
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     setTraction(solutionD().boundaryFieldRef()[patchID], patchTraction);
 #else
     setTraction(solutionD().boundaryField()[patchID], patchTraction);
@@ -1813,7 +1779,7 @@ void Foam::solidModel::writeFields(const Time& runTime)
     if (writeResidualField_)
     {
         const volVectorField& D = solutionD();
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         scalar denom =
             gMax(mag(D.primitiveField() - D.oldTime().primitiveField()));
         if (denom < SMALL)
@@ -1872,7 +1838,7 @@ void Foam::solidModel::moveMesh
     // not match neighbour..."
     //pointDD.correctBoundaryConditions();
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     vectorField& pointDDI = pointDD.primitiveFieldRef();
 #else
     vectorField& pointDDI = pointDD.internalField();
@@ -1970,23 +1936,12 @@ void Foam::solidModel::moveMesh
     mesh().movePoints(newPoints);
     mesh().V00();
     mesh().moving(false);
-#ifdef FOAMEXTEND
+#ifndef OPENFOAMESIORFOUNDATION
     mesh().changing(false);
 #endif
-#if (OPENFOAM >= 2206)
-    {
-        auto tmeshPhi(mesh().setPhi());
-        if (tmeshPhi)
-        {
-            tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
-        }
-    }
-#else
     mesh().setPhi().writeOpt() = IOobject::NO_WRITE;
-#endif
 
-
-#ifdef FOAMEXTEND
+#ifndef OPENFOAMESIORFOUNDATION
     // Tell the mechanical model to move the subMeshes, if they exist
     mechanical().moveSubMeshes();
 #endif

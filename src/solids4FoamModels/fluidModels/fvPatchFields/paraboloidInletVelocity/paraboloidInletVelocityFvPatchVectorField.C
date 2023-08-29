@@ -93,7 +93,7 @@ paraboloidInletVelocityFvPatchVectorField
 {}
 
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 paraboloidInletVelocityFvPatchVectorField::
 paraboloidInletVelocityFvPatchVectorField
 (
@@ -169,7 +169,7 @@ paraboloidInletVelocityFvPatchVectorField::snGrad() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const word& UName = internalField().name();
 #else
     const word& UName = dimensionedInternalField().name();
@@ -197,7 +197,7 @@ paraboloidInletVelocityFvPatchVectorField::snGrad() const
             const vectorField dUP(k & gradU.patchInternalField());
             const vectorField nGradUP(n & gradU.patchInternalField());
 
-            #ifdef OPENFOAM_NOT_EXTEND
+            #ifdef OPENFOAMESIORFOUNDATION
             tnGradU.ref() =
             #else
             tnGradU() =
@@ -215,7 +215,7 @@ paraboloidInletVelocityFvPatchVectorField::snGrad() const
         // First order
         const vectorField dUP(k & gradU.patchInternalField());
 
-        #ifdef OPENFOAM_NOT_EXTEND
+        #ifdef OPENFOAMESIORFOUNDATION
         tnGradU.ref() =
         #else
         tnGradU() =
@@ -239,7 +239,7 @@ gradientBoundaryCoeffs() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const word& UName = internalField().name();
 #else
     const word& UName = dimensionedInternalField().name();

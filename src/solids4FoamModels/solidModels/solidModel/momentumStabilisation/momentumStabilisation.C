@@ -76,7 +76,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
             )
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     volVectorField& result = tresult.ref();
 #else
     volVectorField& result = tresult();
@@ -134,7 +134,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
     const labelList& nei = mesh.neighbour();
     const scalarField& gammaI = gamma;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     scalarField& gammafI = gammaf.ref();
 #else
     scalarField& gammafI = gammaf.internalField();
@@ -169,7 +169,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
                 gamma.boundaryField()[patchI].patchNeighbourField()
             );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             scalarField& gammafP = gammaf.boundaryFieldRef()[patchI];
 #else
             scalarField& gammafP = gammaf.boundaryField()[patchI];
@@ -204,7 +204,7 @@ Foam::tmp<Foam::volVectorField> Foam::momentumStabilisation::stabilisation
         else
         {
             // Set stabilisation to zero on non-coupled boundaries
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             gammaf.boundaryFieldRef()[patchI] = 0.0;
 #else
             gammaf.boundaryField()[patchI] = 0.0;

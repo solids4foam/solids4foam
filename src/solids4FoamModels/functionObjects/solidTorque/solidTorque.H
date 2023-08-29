@@ -127,7 +127,7 @@ public:
         //- Read and set the function object if its data has changed
         virtual bool read(const dictionary& dict);
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         //- Write
         virtual bool write();
 #else

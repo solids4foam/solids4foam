@@ -22,7 +22,7 @@ License
 #include "polyPatchID.H"
 #include "primitivePatchInterpolation.H"
 #include "twoDPointCorrector.H"
-#ifndef OPENFOAM_NOT_EXTEND
+#ifndef OPENFOAMESIORFOUNDATION
     #include "tetPointFields.H"
     #include "fixedValueTetPolyPatchFields.H"
     #include "tetPolyPatchInterpolation.H"
@@ -108,7 +108,7 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
     {
         // Lookup the type
         const word type = fsiProperties_.lookupOrDefault<word>
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         (
             "interfaceTransferMethod", "AMI"
         );
@@ -173,7 +173,7 @@ calcAccumulatedFluidInterfacesDisplacements() const
 
         if
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             accumulatedFluidInterfaceDisplacementHeader.typeHeaderOk
             <
             vectorIOField
@@ -495,59 +495,46 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
     const word& region
 )
 {
-    // NB: dictionary must be unregistered to avoid adding to the database
+    word fsiTypeName;
 
-    IOdictionary props
-    (
-        IOobject
-        (
-            "fsiProperties",
-            runTime.constant(),
-            runTime,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE,
-            false  // Do not register
-        )
-    );
-
-    const word modelType(props.lookup("fluidSolidInterface"));
-
-    Info<< "Selecting fluidSolidInterface " << modelType << endl;
-
-#if (OPENFOAM >= 2112)
-    auto* ctorPtr = dictionaryConstructorTable(modelType);
-
-    if (!ctorPtr)
+    // Enclose the creation of the dictionary to ensure it is
+    // deleted before the fluid is created otherwise the dictionary
+    // is entered in the database twice
     {
-        FatalIOErrorInLookup
+        IOdictionary fsiProperties
         (
-            props,
-            "fluidSolidInterface",
-            modelType,
-            *dictionaryConstructorTablePtr_
-        ) << exit(FatalIOError);
+            IOobject
+            (
+                "fsiProperties",
+                runTime.constant(),
+                runTime,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+
+        fsiProperties.lookup("fluidSolidInterface")
+            >> fsiTypeName;
     }
 
-#else
+    Info<< "Selecting fluidSolidInterface " << fsiTypeName << endl;
+
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(modelType);
+        dictionaryConstructorTablePtr_->find(fsiTypeName);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
         FatalErrorIn
         (
             "fluidSolidInterface::New(Time&, const word&)"
-        )   << "Unknown fluidSolidInterface type " << modelType
+        )   << "Unknown fluidSolidInterface type " << fsiTypeName
             << endl << endl
             << "Valid fluidSolidInterface types are :" << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalError);
     }
 
-    auto* ctorPtr = cstrIter();
-#endif
-
-    return autoPtr<fluidSolidInterface>(ctorPtr(runTime, region));
+    return autoPtr<fluidSolidInterface>(cstrIter()(runTime, region));
 }
 
 
@@ -602,7 +589,7 @@ Foam::vector Foam::fluidSolidInterface::totalForceOnInterface
     vectorField S(localFaces.size(), vector::zero);
     forAll(S, faceI)
     {
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         S[faceI] = localFaces[faceI].area(localPoints);
 #else
         S[faceI] = localFaces[faceI].normal(localPoints);
@@ -827,7 +814,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     if (maxDelta < interfaceDeformationLimit())
     {
         // Move only interface points
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         pointField newPoints = fluidMesh().points();
 #else
         pointField newPoints = fluidMesh().allPoints();
@@ -869,7 +856,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         // If the motionU field is in the object registry then we assume that
         // the fe motion solver is being used
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         const bool feMotionSolver = false;
 #else
         const bool feMotionSolver =
@@ -881,7 +868,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         const bool fvMotionSolver =
             fluidMesh().foundObject<pointVectorField>("pointMotionU");
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
         // Check for RBF motion solver
         bool rbfMotionSolver = false;
         if (fluidMesh().foundObject<motionSolver>("dynamicMeshDict"))
@@ -896,7 +883,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         // Set motion on FSI interface
         if (feMotionSolver)
         {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             notImplemented("Not implemented for this version of OpenFOAM/FOAM");
 #else
             tetPointVectorField& motionU =
@@ -948,7 +935,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 fixedValuePointPatchVectorField& motionUFluidPatch =
                     refCast<fixedValuePointPatchVectorField>
                     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                         motionU.boundaryFieldRef()
                         [
                             fluidPatchIndices()[interfaceI]
@@ -965,7 +952,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                     )/fluid().runTime().deltaT().value();
             }
         }
-#ifndef OPENFOAM_NOT_EXTEND
+#ifndef OPENFOAMESIORFOUNDATION
         else if (isA<newSubsetMotionSolverFvMesh>(fluidMesh()))
         {
             newSubsetMotionSolverFvMesh& dynMesh =
@@ -1013,7 +1000,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             }
         }
 #endif
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
         else if (rbfMotionSolver)
         {
             // Prepare list of patch motions

@@ -30,7 +30,7 @@ void eig3Field
 )
 {
     const tensorField& AI = A.internalField();
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tensorField& VI = V.primitiveFieldRef();
     vectorField& dI = d.primitiveFieldRef();
 #else
@@ -48,7 +48,7 @@ void eig3Field
         if (A.boundaryField()[patchI].type() != "empty")
         {
             const tensorField& AB = A.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             tensorField& VB = V.boundaryFieldRef()[patchI];
             vectorField& dB = d.boundaryFieldRef()[patchI];
 #else
@@ -71,7 +71,7 @@ void eig3Field
 )
 {
     const symmTensorField& AI = A.internalField();
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tensorField& VI = V.primitiveFieldRef();
     vectorField& dI = d.primitiveFieldRef();
 #else
@@ -89,7 +89,7 @@ void eig3Field
         if (A.boundaryField()[patchI].type() != "empty")
         {
             const symmTensorField& AB = A.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             tensorField& VB = V.boundaryFieldRef()[patchI];
             vectorField& dB = d.boundaryFieldRef()[patchI];
 #else
@@ -106,7 +106,7 @@ void eig3Field
 }
 
 
-#ifndef OPENFOAM_NOT_EXTEND
+#ifndef OPENFOAMESIORFOUNDATION
 void eig3Field
 (
     const volSymmTensorField& A, volTensorField& V, volDiagTensorField& d
@@ -147,7 +147,7 @@ void eig3Field
 )
 {
     const symmTensorField& AI = A.internalField();
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tensorField& VI = V.primitiveFieldRef();
     vectorField& dI = d.primitiveFieldRef();
 #else
@@ -165,7 +165,7 @@ void eig3Field
         if (A.boundaryField()[patchI].type() != "empty")
         {
             const symmTensorField& AB = A.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             tensorField& VB = V.boundaryFieldRef()[patchI];
             vectorField& dB = d.boundaryFieldRef()[patchI];
 #else

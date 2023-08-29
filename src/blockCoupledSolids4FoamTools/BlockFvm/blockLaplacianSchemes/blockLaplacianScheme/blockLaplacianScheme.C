@@ -72,23 +72,9 @@ tmp<blockLaplacian> blockLaplacian::New
             << exit(FatalIOError);
     }
 
-    const word schemeName(schemeData);
+    word schemeName(schemeData);
 
-#if (OPENFOAM >= 2112)
-    auto* ctorPtr = IstreamConstructorTable(schemeName);
-
-    if (!ctorPtr)
-    {
-        FatalIOErrorInLookup
-        (
-            schemeData,
-            "fvmBlockLaplacian",
-            schemeName,
-            *IstreamConstructorTablePtr_
-        ) << exit(FatalIOError);
-    }
-
-#else
+    //typename IstreamConstructorTable::iterator cstrIter =
     IstreamConstructorTable::iterator cstrIter =
         IstreamConstructorTablePtr_->find(schemeName);
 
@@ -104,10 +90,7 @@ tmp<blockLaplacian> blockLaplacian::New
             << exit(FatalIOError);
     }
 
-    auto* ctorPtr = cstrIter();
-#endif
-
-    return ctorPtr(mesh, schemeData);
+    return cstrIter()(mesh, schemeData);
 }
 
 

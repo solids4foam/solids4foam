@@ -30,12 +30,12 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 
 #ifndef amiZoneInterpolation_H
 #define amiZoneInterpolation_H
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
     #include "faceAreaWeightAMI.H"
 #else
     #include "newAMIInterpolation.H"
@@ -54,7 +54,7 @@ namespace Foam
 
 class amiZoneInterpolation
 :
-# ifdef OPENFOAM_COM
+# ifdef OPENFOAMESI
     public faceAreaWeightAMI
 #else
     public newAMIInterpolation<standAlonePatch, standAlonePatch>
@@ -70,7 +70,7 @@ class amiZoneInterpolation
 
         //- Store primitivePatch version of source and target to allow direct
         //  use of ESI AMI classes
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
 
         //- primitvePatch version of source patch
         autoPtr<primitivePatch> sourcePrimPatchPtr_;
@@ -214,5 +214,5 @@ public:
 
 #endif
 
-#endif // end of #ifdef OPENFOAM_NOT_EXTEND
+#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 // ************************************************************************* //

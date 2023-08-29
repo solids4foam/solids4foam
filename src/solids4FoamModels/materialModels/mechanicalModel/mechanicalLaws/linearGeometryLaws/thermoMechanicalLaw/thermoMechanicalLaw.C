@@ -64,7 +64,7 @@ void Foam::thermoMechanicalLaw::makeTrunTime()
             "system",
             "constant",
             true
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
             ,
             true
 #endif
@@ -173,7 +173,7 @@ bool Foam::thermoMechanicalLaw::readTField()
             IOobject::MUST_READ
         );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         if (Theader.typeHeaderOk<volScalarField>())
 #else
         if (Theader.headerOk())
@@ -209,14 +209,14 @@ bool Foam::thermoMechanicalLaw::readTField()
                 );
 
                 // Copy internal and boundary fields
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 TPtr_().primitiveFieldRef() = TField.primitiveField();
 #else
                 TPtr_().internalField() = TField.internalField();
 #endif
                 forAll(TField.boundaryField(), patchI)
                 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     TPtr_().boundaryFieldRef()[patchI] =
 #else
                     TPtr_().boundaryField()[patchI] =
@@ -242,14 +242,14 @@ bool Foam::thermoMechanicalLaw::readTField()
                 );
 
                 // Copy internal and boundary fields
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 TbaseMesh.primitiveFieldRef() = TField.primitiveField();
 #else
                 TbaseMesh.internalField() = TField.internalField();
 #endif
                 forAll(TField.boundaryField(), patchI)
                 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     TbaseMesh.boundaryFieldRef()[patchI] =
 #else
                     TbaseMesh.boundaryField()[patchI] =

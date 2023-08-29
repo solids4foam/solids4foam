@@ -17,9 +17,9 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     #include "pimpleFluid.foundation.C"
-#elif OPENFOAM_COM
+#elif OPENFOAMESI
     #include "pimpleFluid.esi.C"
 #else
     #include "pimpleFluid.foamextend.C"

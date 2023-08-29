@@ -44,27 +44,12 @@ autoPtr<cellRemovalLaw> cellRemovalLaw::New
     const dictionary& dict
 )
 {
-    const word modelType(dict.lookup("type"));
+    word rheoTypeName = dict.lookup("type");
 
-    Info<< "Selecting meshFailure model " << modelType << endl;
+    Info<< "Selecting meshFailure model " << rheoTypeName << endl;
 
-#if (OPENFOAM >= 2112)
-    auto* ctorPtr = dictionaryConstructorTable(modelType);
-
-    if (!ctorPtr)
-    {
-        FatalIOErrorInLookup
-        (
-            dict,
-            "cellRemovalLaw",
-            modelType,
-            *dictionaryConstructorTablePtr_
-        ) << exit(FatalIOError);
-    }
-
-#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(modelType);
+        dictionaryConstructorTablePtr_->find(rheoTypeName);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -77,16 +62,13 @@ autoPtr<cellRemovalLaw> cellRemovalLaw::New
             ")",
             dict
         )   << "Unknown cellRemovalLaw type "
-            << modelType << endl << endl
+            << rheoTypeName << endl << endl
             << "Valid  cellRemovalLaws are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
-    auto* ctorPtr = cstrIter();
-#endif
-
-    return autoPtr<cellRemovalLaw>(ctorPtr(name, mesh, dict));
+    return autoPtr<cellRemovalLaw>(cstrIter()(name, mesh, dict));
 }
 
 

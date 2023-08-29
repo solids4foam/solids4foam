@@ -28,7 +28,6 @@ License
 #include "dictionary.H"
 #include "emptyPolyPatch.H"
 #include "cyclicPolyPatch.H"
-#include "processorPolyPatch.H"
 #include "scalarMatrices.H"
 #include "volFields.H"
 #include "skewCorrectionVectors.H"
@@ -95,7 +94,7 @@ extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
     }
 }
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 template<class Type>
 extrapolatedFvPatchField<Type>::extrapolatedFvPatchField
 (
@@ -164,7 +163,7 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
 
     const cellList& cells = mesh.cells();
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
     const labelList& owner = mesh.owner();
     const labelList& neighbour = mesh.neighbour();
     const labelList& patchCells = this->patch().faceCells();
@@ -223,7 +222,7 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
                     const labelList& cycPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
 #else
@@ -278,7 +277,7 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
                     const labelList& procPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
 #else
@@ -330,7 +329,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
 
     const cellList& cells = mesh.cells();
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
     const labelList& owner = mesh.owner();
     const labelList& neighbour = mesh.neighbour();
     const labelList& patchCells = this->patch().faceCells();
@@ -344,7 +343,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
 //     const vectorField faceCentres(mesh.faceCentres());
     const vectorField cellCentres(mesh.cellCentres());
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const Field<Type>& phiI = this->primitiveField();
 
     word fieldName =
@@ -420,7 +419,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
                     const labelList& cycPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
 #else
@@ -496,7 +495,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
                     label start = mesh.boundaryMesh()[patchID].start();
                     label localFaceID = curFace - start;
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
                     const labelList& procPatchCells =
                         mesh.boundaryMesh()[patchID].faceCells();
 #else
@@ -682,7 +681,7 @@ void extrapolatedFvPatchField<Type>::write(Ostream& os) const
 {
     fixedGradientFvPatchField<Type>::write(os);
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     writeEntry(os, "value", *this);
 #else
     this->writeEntry("value", os);

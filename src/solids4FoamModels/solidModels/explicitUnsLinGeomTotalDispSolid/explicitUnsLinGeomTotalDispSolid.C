@@ -162,7 +162,7 @@ explicitUnsLinGeomTotalDispSolid::explicitUnsLinGeomTotalDispSolid
     updateStress();
 
     // Update initial acceleration
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     a_.primitiveFieldRef() =
 #else
     a_.internalField() =
@@ -199,7 +199,7 @@ void explicitUnsLinGeomTotalDispSolid::setDeltaT(Time& runTime)
         1.0/
         gMax
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             DimensionedField<scalar, Foam::surfaceMesh>
 #else
             Field<scalar>
@@ -265,7 +265,7 @@ bool explicitUnsLinGeomTotalDispSolid::evolve()
         // Note the inclusion of a linear bulk viscosity pressure term to
         // dissipate high frequency energies, and a Rhie-Chow term to avoid
         // checker-boarding
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         a_.primitiveFieldRef() =
 #else
         a_.internalField() =
@@ -290,7 +290,7 @@ bool explicitUnsLinGeomTotalDispSolid::evolve()
                 )().internalField()
             )/rho().internalField();
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         a_.primitiveFieldRef() += g().value();
 #else
         a_.internalField() += g().value();

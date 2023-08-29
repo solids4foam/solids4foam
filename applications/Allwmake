@@ -1,16 +1,15 @@
 #!/bin/bash
-cd "${0%/*}" || exit  # Run from this directory
+cd ${0%/*} || exit 1    # run from this directory
 
 targetType=""
-optAll="all"
-# Parse arguments for library compilation
-if [ -f "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments ]
-then  . "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments
-    optAll="-all"
+All="all"
+if [ "$WM_PROJECT" = "OpenFOAM" ]
+then
+    # Parse arguments for library compilation
+    . $WM_PROJECT_DIR/wmake/scripts/AllwmakeParseArguments
+    All="-all"
 fi
 
-wmake $optAll $targetType solvers
-wmake $optAll $targetType utilities
-wmake $optAll $targetType scripts
-
-#------------------------------------------------------------------------------
+wmake $All $targetType solvers
+wmake $All $targetType utilities
+wmake $All $targetType scripts

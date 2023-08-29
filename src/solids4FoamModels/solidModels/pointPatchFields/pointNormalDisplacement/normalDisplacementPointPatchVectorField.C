@@ -29,7 +29,7 @@ License
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "Time.H"
 #endif
 
@@ -82,7 +82,7 @@ normalDisplacementPointPatchVectorField
 {}
 
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 normalDisplacementPointPatchVectorField::
 normalDisplacementPointPatchVectorField
 (

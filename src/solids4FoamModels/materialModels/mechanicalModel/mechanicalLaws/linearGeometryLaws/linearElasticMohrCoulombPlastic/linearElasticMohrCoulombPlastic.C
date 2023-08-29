@@ -248,7 +248,7 @@ void Foam::linearElasticMohrCoulombPlastic::calculateEigens
                 const scalar aBy3 = a/3;
 
                 i = m2SqrtQ*Foam::cos(theta/3) - aBy3;
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 ii =
                     m2SqrtQ*Foam::cos((theta + constant::mathematical::twoPi)/3.0)
                   - aBy3;
@@ -440,7 +440,7 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     varPsi_(dict.lookup("dilationAngle")),
     k_
     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         (
             (1 + sin(varPhi_/180.0*constant::mathematical::pi))
            /(1 - sin(varPhi_/180.0*constant::mathematical::pi))
@@ -454,7 +454,7 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     ),
     m_
     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         (
             (1 + sin(varPsi_/180.0*constant::mathematical::pi))
            /(1 - sin(varPsi_/180.0*constant::mathematical::pi))
@@ -694,7 +694,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
     forAll(sigma.boundaryField(), patchI)
     {
         // Take references to the boundary patches for efficiency
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         symmTensorField& sigmaP = sigma.boundaryFieldRef()[patchI];
         scalarField& activeYieldP = activeYield_.boundaryFieldRef()[patchI];
 #else
@@ -743,7 +743,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     symmTensorField& sigmaI = sigma;
     scalarField& activeYieldI = activeYield_;
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
     const labelList& faceOwner = mesh().faceOwner();
     const labelList& faceNeighbour = mesh().faceNeighbour();
 #else
@@ -769,7 +769,7 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     forAll(sigma.boundaryField(), patchI)
     {
         // Take references to the boundary patches for efficiency
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         symmTensorField& sigmaP = sigma.boundaryFieldRef()[patchI];
         scalarField& activeYieldP = activeYield_.boundaryFieldRef()[patchI];
 #else
@@ -804,7 +804,7 @@ Foam::scalar Foam::linearElasticMohrCoulombPlastic::residual()
     )
     {
         return
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             gMax
             (
                 mag
@@ -827,7 +827,7 @@ Foam::scalar Foam::linearElasticMohrCoulombPlastic::residual()
     else
     {
         return
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             gMax
             (
                 mag
@@ -862,7 +862,7 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
 
     // Calculate increment of plastic strain
     // This is complicated because DEpsilonP also has a volumetric term
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     symmTensorField& DEpsilonPI = DEpsilonP_.primitiveFieldRef();
 #else
     symmTensorField& DEpsilonPI = DEpsilonP_.internalField();

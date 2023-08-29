@@ -72,8 +72,7 @@ pimpleOversetFluid::pimpleOversetFluid
                 runTime.constant(),
                 mesh(),
                 IOobject::MUST_READ,
-                IOobject::NO_WRITE,
-                false  // Do not register
+                IOobject::NO_WRITE
             )
         ).lookup("rho")
     ),

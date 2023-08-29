@@ -54,7 +54,7 @@ fixedDisplacementZeroShearFvPatchVectorField
 )
 :
     solidDirectionMixedFvPatchVectorField(pvf, p, iF, mapper),
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     totalDisp_(mapper(pvf.totalDisp_)),
 #else
     totalDisp_(pvf.totalDisp_, mapper),
@@ -141,7 +141,7 @@ void fixedDisplacementZeroShearFvPatchVectorField::autoMap
 {
     solidDirectionMixedFvPatchVectorField::autoMap(m);
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     m(totalDisp_, totalDisp_);;
 #else
     totalDisp_.autoMap(m);
@@ -179,7 +179,7 @@ void fixedDisplacementZeroShearFvPatchVectorField::updateCoeffs()
         disp = dispSeries_(this->db().time().timeOutputValue());
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (internalField().name() == "DD")
 #else
     if (dimensionedInternalField().name() == "DD")

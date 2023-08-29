@@ -151,7 +151,7 @@ public:
         //- Return non-const reference to slave friction traction
         virtual vectorField& slaveTraction()
         {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             return slaveTractionVolField_.boundaryFieldRef()[slavePatchID()];
 #else
             return slaveTractionVolField_.boundaryField()[slavePatchID()];

@@ -297,7 +297,7 @@ pimpleFluid::pimpleFluid
 
     ddtU_.checkIn();
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     mesh().setFluxRequired(p().name());
 #else
     mesh().schemesDict().setFluxRequired(p().name());
@@ -374,7 +374,7 @@ tmp<vectorField> pimpleFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tvF.ref() =
 #else
     tvF() =
@@ -397,7 +397,7 @@ tmp<scalarField> pimpleFluid::patchPressureForce(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tpF.ref() =
 #else
     tpF() =
@@ -504,7 +504,7 @@ bool pimpleFluid::evolve()
 
                 pEqn.setReference(pRefCell, pRefValue);
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 pEqn.solve();
 #else
                 pEqn.solve
@@ -708,7 +708,7 @@ void pimpleFluid::setTemperatureAndHeatFlux
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneHeatFlux)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     setTemperatureAndHeatFlux
     (
         TPtr_().boundaryFieldRef()[patchID],
@@ -770,7 +770,7 @@ void pimpleFluid::setEqInterHeatTransferCoeff
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneHTC)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     setEqInterHeatTransferCoeff
     (
         TPtr_().boundaryFieldRef()[patchID],
@@ -792,7 +792,7 @@ tmp<scalarField> pimpleFluid::patchTemperature(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tT.ref() =
 #else
     tT() =
@@ -810,7 +810,7 @@ tmp<scalarField> pimpleFluid::patchHeatFlux(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tHF.ref() =
 #else
     tHF() =
@@ -832,7 +832,7 @@ tmp<scalarField> pimpleFluid::patchHeatTransferCoeff
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tHTC.ref() =
 #else
     tHTC() =

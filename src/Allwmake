@@ -1,11 +1,12 @@
 #!/bin/bash
-cd "${0%/*}" || exit  # Run from this directory
+cd ${0%/*} || exit 1    # run from this directory
 
 targetType=""
 
-# Parse arguments for library compilation
-if [ -f "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments ]
-then  . "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments
+if [ "$WM_PROJECT" = "OpenFOAM" ]
+then
+    # Parse arguments for library compilation
+    . $WM_PROJECT_DIR/wmake/scripts/AllwmakeParseArguments
 fi
 
 (cd blockCoupledSolids4FoamTools && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
@@ -20,5 +21,3 @@ else
     echo "To use abaqusUMATs, install gfortran and set the S4F_USE_GFORTRAN "
     echo "variable to 1"; echo
 fi
-
-#------------------------------------------------------------------------------

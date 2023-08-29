@@ -27,7 +27,6 @@ License
 #include "globalMeshData.H"
 #include "pointMesh.H"
 #include "pointFields.H"
-#include "processorPolyPatch.H"
 #include "processorPointPatchFields.H"
 #include "ListMaxOp.H"
 #include "ListSumOp.H"
@@ -214,7 +213,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
                 // Send
                 OPstream::write
                 (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -250,7 +249,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
                 // Receive
                 IPstream::read
                 (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -459,7 +458,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
             // Send
             OPstream::write
             (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 Pstream::commsTypes::blocking,
 #else
                 Pstream::blocking,
@@ -485,7 +484,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
             // Receive
             IPstream::read
             (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 Pstream::commsTypes::blocking,
 #else
                 Pstream::blocking,

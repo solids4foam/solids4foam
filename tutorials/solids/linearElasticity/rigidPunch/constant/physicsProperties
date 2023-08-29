@@ -12,34 +12,13 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    system;
-    object      sampleDict;
+    location    "constant";
+    object      physicsProperties;
 }
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// type    fluid;
+type    solid;
+// type    fluidSolidInteraction;
 
-type    surfaces;
-setFormat raw;
-surfaceFormat raw;
-interpolationScheme cellPoint;
-
-fields
-(
-    sigma
-);
-
-sets
-(
-);
-
-surfaces
-(
-    surface
-    {
-        type patch;   
-        patches   (foundation);
-    }
-);
-
-
-// *********************************************************************** //
+// ************************************************************************* //

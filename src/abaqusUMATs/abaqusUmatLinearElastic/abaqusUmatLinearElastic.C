@@ -186,7 +186,7 @@ Foam::tmp<Foam::volScalarField> Foam::abaqusUmatLinearElastic::rho() const
         )
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tresult.ref().correctBoundaryConditions();
 #else
     tresult().correctBoundaryConditions();
@@ -286,7 +286,7 @@ void Foam::abaqusUmatLinearElastic::correct(volSymmTensorField& sigma)
 
     // Internal field
     const symmTensorField& epsilonI = epsilon_.internalField();
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     symmTensorField& sigmaI = sigma.primitiveFieldRef();
 #else
     symmTensorField& sigmaI = sigma.internalField();
@@ -396,7 +396,7 @@ void Foam::abaqusUmatLinearElastic::correct(volSymmTensorField& sigma)
     forAll(epsilon_.boundaryField(), patchI)
     {
         const symmTensorField& epsilonP = epsilon_.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         symmTensorField& sigmaP = sigma.boundaryFieldRef()[patchI];
 #else
         symmTensorField& sigmaP = sigma.boundaryField()[patchI];

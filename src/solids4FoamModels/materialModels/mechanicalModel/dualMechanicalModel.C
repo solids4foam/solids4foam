@@ -30,7 +30,7 @@ License
 #include "twoDPointCorrector.H"
 #include "fixedGradientFvPatchFields.H"
 #include "wedgePolyPatch.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "ZoneIDs.H"
 #else
     #include "ZoneID.H"
@@ -336,7 +336,7 @@ const Foam::fvMesh& Foam::dualMechanicalModel::mesh() const
     return mesh_;
 }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::dualMechanicalModel::materialTangentFaceField() const
 {
@@ -415,7 +415,7 @@ Foam::dualMechanicalModel::bulkModulus() const
             dimensionedScalar("zero", dimPressure, 0.0)
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     surfaceScalarField& result = tresult.ref();
 #else
     surfaceScalarField& result = tresult();

@@ -98,7 +98,7 @@ public:
         newMovingWallVelocityFvPatchVectorField
         (
             const newMovingWallVelocityFvPatchVectorField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

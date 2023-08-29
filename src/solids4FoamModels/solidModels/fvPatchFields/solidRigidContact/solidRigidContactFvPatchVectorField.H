@@ -239,7 +239,7 @@ public:
         solidRigidContactFvPatchVectorField
         (
             const solidRigidContactFvPatchVectorField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

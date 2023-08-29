@@ -26,7 +26,7 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
 
 #ifndef newAMIMethod_H
 #define newAMIMethod_H
@@ -284,6 +284,6 @@ public:
 
 #endif
 
-#endif // end of #ifdef OPENFOAM_ORG
+#endif // end of #ifdef OPENFOAMFOUNDATION
 
 // ************************************************************************* //

@@ -105,7 +105,7 @@ solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
     }
 }
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 solidVelocityFvPatchVectorField::solidVelocityFvPatchVectorField
 (
     const solidVelocityFvPatchVectorField& pivpvf
@@ -139,7 +139,7 @@ void solidVelocityFvPatchVectorField::autoMap
 {
     fixedDisplacementFvPatchVectorField::autoMap(m);
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     m(velocity_, velocity_);
 #else
     velocity_.autoMap(m);
@@ -178,7 +178,7 @@ void solidVelocityFvPatchVectorField::updateCoeffs()
 
     vectorField disp = vectorField(patch().size(), vector::zero);
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (internalField().name() == "DD")
 #else
     if (dimensionedInternalField().name() == "DD")
@@ -221,7 +221,7 @@ void solidVelocityFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         writeEntry(os, "velocity", velocity_);
 #else
         velocity_.writeEntry("velocity", os);

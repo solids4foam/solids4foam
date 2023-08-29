@@ -51,7 +51,7 @@ normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(ptf, p, iF, mapper),
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     normalDisp_(mapper(ptf.normalDisp_)),
 #else
     normalDisp_(ptf.normalDisp_, mapper),
@@ -94,7 +94,7 @@ normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
     }
 }
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 (
     const normalDisplacementFvPatchVectorField& pivpvf
@@ -128,7 +128,7 @@ void normalDisplacementFvPatchVectorField::autoMap
 {
     fixedValueFvPatchVectorField::autoMap(m);
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     m(normalDisp_, normalDisp_);
 #else
     normalDisp_.autoMap(m);
@@ -168,7 +168,7 @@ void normalDisplacementFvPatchVectorField::updateCoeffs()
 
     vectorField disp(nDisp*patch().nf());
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (internalField().name() == "DD")
 #else
     if (dimensionedInternalField().name() == "DD")
@@ -198,7 +198,7 @@ normalDisplacementFvPatchVectorField::snGrad() const
     const fvPatchField<tensor>& gradField =
         patch().lookupPatchField<volTensorField, tensor>
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"
@@ -227,7 +227,7 @@ normalDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
     const fvPatchField<tensor>& gradField =
         patch().lookupPatchField<volTensorField, tensor>
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"
@@ -262,7 +262,7 @@ void normalDisplacementFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         writeEntry(os, "normalDisp", normalDisp_);
 #else
         normalDisp_.writeEntry("normalDisp", os);

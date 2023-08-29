@@ -24,7 +24,6 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "linearElastic.H"
-#include "processorPolyPatch.H"
 #ifdef FOAMEXTEND
     #include "blockSolidTractionFvPatchVectorField.H"
     #include "fvcGradf.H"

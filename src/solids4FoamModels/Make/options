@@ -1,41 +1,43 @@
-SOLIDS4FOAM_ROOT := ../..
-
-sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
-sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
-
-ifneq (,$(findstring -DFOAMEXTEND, $(VERSION_SPECIFIC_INC)))
+ifeq ($(WM_PROJECT), foam)
+    VERSION_SPECIFIC_INC = -DFOAMEXTEND
     VERSION_SPECIFIC_LIBS = \
         -lincompressibleTransportModels -lincompressibleTurbulenceModel \
         -lincompressibleRASModels -lincompressibleLESModels -llduSolvers \
         -lbasicThermophysicalModels -lcompressibleTurbulenceModel \
         -linterfaceProperties -lfiniteArea -loversetMesh -loversetDynamicFvMesh
-
-else ifneq (,$(findstring -DOPENFOAM_ORG, $(VERSION_SPECIFIC_INC)))
-    VERSION_SPECIFIC_LIBS = \
-        -lmomentumTransportModels -lincompressibleMomentumTransportModels \
-        -lcompressibleMomentumTransportModels -ltwoPhaseMixture \
-        -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools \
-        -lfvMotionSolvers -lradiationModels -lfluidThermophysicalModels \
-        -ltwoPhaseChangeModels
 else
-    VERSION_SPECIFIC_LIBS = \
-        -lturbulenceModels -lincompressibleTurbulenceModels \
-        -ltwoPhaseMixture -limmiscibleIncompressibleTwoPhaseMixture \
-        -lfvMotionSolvers -lradiationModels -lfvOptions \
-        -lcompressibleTransportModels -lspecie -lfluidThermophysicalModels \
-        -lcompressibleTurbulenceModels -lsampling \
-        -lincompressibleTransportModels -linterfaceProperties -lwaveModels \
-        -lVoFphaseTurbulentTransportModels \
-        -lincompressibleInterPhaseTransportModels -ladjointOptimisation
+    VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
+    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        VERSION_SPECIFIC_INC += -DOPENFOAMESI
+        VERSION_SPECIFIC_LIBS = \
+            -lturbulenceModels -lincompressibleTurbulenceModels \
+            -ltwoPhaseMixture -limmiscibleIncompressibleTwoPhaseMixture \
+            -lfvMotionSolvers -lradiationModels -lfvOptions \
+            -lcompressibleTransportModels -lspecie -lfluidThermophysicalModels \
+            -lcompressibleTurbulenceModels -lsampling \
+            -lincompressibleTransportModels -linterfaceProperties -lwaveModels \
+            -lVoFphaseTurbulentTransportModels \
+            -lincompressibleInterPhaseTransportModels -ladjointOptimisation
+    else
+        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
+        VERSION_SPECIFIC_LIBS = \
+            -lmomentumTransportModels -lincompressibleMomentumTransportModels \
+            -lcompressibleMomentumTransportModels -ltwoPhaseMixture \
+            -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools \
+            -lfvMotionSolvers -lradiationModels -lfluidThermophysicalModels \
+            -ltwoPhaseChangeModels
+    endif
 endif
 
 ifdef PETSC_DIR
-    ifneq (,$(findstring -DFOAMEXTEND, $(VERSION_SPECIFIC_INC)))
+    ifeq ($(WM_PROJECT), foam)
         include $(RULES)/mplib$(WM_MPLIB)
-    else ifneq (,$(findstring -DOPENFOAM_ORG, $(VERSION_SPECIFIC_INC)))
-        include $(GENERAL_RULES)/mplibType
     else
-        include $(GENERAL_RULES)/mpi-rules
+        ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+            include $(GENERAL_RULES)/mpi-rules
+        else
+            include $(GENERAL_RULES)/mplibType
+        endif
     endif
     VERSION_SPECIFIC_INC += \
         $(PINC) -I$(PETSC_DIR)/include -I$(PETSC_DIR)/$(PETSC_ARCH)/include \
@@ -53,8 +55,8 @@ EXE_INC = \
     -std=c++14 \
     -Wno-old-style-cast -Wno-deprecated-declarations \
     $(VERSION_SPECIFIC_INC) \
-    -I$(SOLIDS4FOAM_ROOT)/src/blockCoupledSolids4FoamTools/lnInclude \
-    -I$(SOLIDS4FOAM_ROOT)/src/RBFMeshMotionSolver/lnInclude \
+    -I../blockCoupledSolids4FoamTools/lnInclude \
+    -I../RBFMeshMotionSolver/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/finiteArea/lnInclude \
@@ -106,10 +108,9 @@ EXE_INC = \
 
 LIB_LIBS = \
     $(VERSION_SPECIFIC_LIBS) \
+    -L$(FOAM_USER_LIBBIN) -lblockCoupledSolids4FoamTools -lRBFMeshMotionSolver \
     -lfiniteVolume \
     -ldynamicFvMesh \
     -ldynamicMesh \
     -lmeshTools \
-    -ltopoChangerFvMesh \
-    -L$(FOAM_MODULE_LIBBIN) \
-    -lblockCoupledSolids4FoamTools -lRBFMeshMotionSolver
+    -ltopoChangerFvMesh

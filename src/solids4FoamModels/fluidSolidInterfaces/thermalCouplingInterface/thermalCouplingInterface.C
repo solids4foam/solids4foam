@@ -86,7 +86,7 @@ thermalCouplingInterface::thermalCouplingInterface
             const standAlonePatch& solidZone =
                 solid().globalPatches()[interI].globalPatch();
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             oldSolidFaceZoneTemperature_.set
             (
                 interI,
@@ -453,7 +453,7 @@ scalar thermalCouplingInterface::heatFlowRateOnInterface
     vectorField S(localFaces.size(), vector::zero);
     forAll(S, faceI)
     {
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         S[faceI] = localFaces[faceI].area(localPoints);
 #else
         S[faceI] = localFaces[faceI].normal(localPoints);

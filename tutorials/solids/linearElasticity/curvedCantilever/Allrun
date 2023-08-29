@@ -18,7 +18,8 @@ solids4Foam::runApplication blockMesh
 solids4Foam::runApplication solids4Foam
 
 # Create plots
-solids4Foam::runApplication sample -latestTime
+#solids4Foam::runApplication postProcess -func sample -latestTime
+sample -latestTime > log.sample
 
 if command -v gnuplot &> /dev/null
 then

@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
 
 #include "newAMIInterpolation.H"
 #include "newAMIMethod.H"
@@ -144,7 +144,7 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::patchMagSf
 
     const pointField& patchPoints = patch.localPoints();
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     triFaceList patchFaceTris;
 #else
     faceList patchFaceTris;
@@ -1713,6 +1713,6 @@ const
 }
 
 
-#endif // end of #ifdef OPENFOAM_ORG
+#endif // end of #ifdef OPENFOAMFOUNDATION
 
 // ************************************************************************* //

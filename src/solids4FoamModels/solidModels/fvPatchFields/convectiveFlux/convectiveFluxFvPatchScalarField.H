@@ -114,7 +114,7 @@ public:
         convectiveFluxFvPatchScalarField
         (
             const convectiveFluxFvPatchScalarField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

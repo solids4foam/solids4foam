@@ -101,7 +101,7 @@ public:
         outflowPressureFvPatchScalarField
         (
             const outflowPressureFvPatchScalarField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

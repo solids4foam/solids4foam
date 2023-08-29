@@ -49,7 +49,7 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
     #include "pointVolInterpolation.H"
 #endif
 
@@ -127,7 +127,7 @@ class vertexCentredLinGeomSolid
         //- Local-to-global point map and owner list
         globalPointIndices globalPointIndices_;
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
         //- Interpolator from points to cells
         pointVolInterpolation pointVolInterp_;
 #endif

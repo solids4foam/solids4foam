@@ -17,8 +17,6 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-solids4Foam::caseDoesNotRunWithFoamExtend
-
 if ! command -v cartesianMesh &> /dev/null
 then
     echo

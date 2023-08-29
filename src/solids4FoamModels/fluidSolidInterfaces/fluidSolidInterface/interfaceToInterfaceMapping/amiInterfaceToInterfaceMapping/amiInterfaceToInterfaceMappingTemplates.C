@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 
 #include "amiInterfaceToInterfaceMapping.H"
 
@@ -207,6 +207,6 @@ void amiInterfaceToInterfaceMapping::transferPointsZoneToZone
 
 } // End namespace Foam
 
-#endif // end of #ifdef OPENFOAM_NOT_EXTEND
+#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
 // ************************************************************************* //

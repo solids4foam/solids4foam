@@ -261,7 +261,7 @@ void Foam::linearElasticMisesPlastic::calculateStress
     surfaceScalarField DLambda("DLambdatmp", 1.0*DLambdaf_);
     surfaceScalarField sigmaY("sigmaYtmp", 1.0*sigmaYf_);
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     // Normalise residual in Newton method with respect to mag(bE)
     const scalar maxMagBE = max(gMax(mag(epsilon.primitiveField())), SMALL);
 
@@ -320,7 +320,7 @@ void Foam::linearElasticMisesPlastic::calculateStress
         // Take references to the boundary patch fields for efficiency
         const scalarField& fTrialP = fTrial.boundaryField()[patchI];
         const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         symmTensorField& plasticNP = plasticN.boundaryFieldRef()[patchI];
         scalarField& DSigmaYP = DSigmaY.boundaryFieldRef()[patchI];
         scalarField& DLambdaP = DLambda.boundaryFieldRef()[patchI];
@@ -753,7 +753,7 @@ Foam::linearElasticMisesPlastic::bulkModulus() const
         )
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tresult.ref().correctBoundaryConditions();
 #else
     tresult().correctBoundaryConditions();
@@ -805,7 +805,7 @@ Foam::linearElasticMisesPlastic::impK() const
 }
 
 
-#ifndef OPENFOAM_NOT_EXTEND
+#ifndef OPENFOAMESIORFOUNDATION
 Foam::tmp<Foam::volDiagTensorField>
 Foam::linearElasticMisesPlastic::impKdiagTensor() const
 {
@@ -877,7 +877,7 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
 #endif
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::linearElasticMisesPlastic::materialTangentField() const
 {
@@ -911,9 +911,11 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
     (
         mag(sTrial) - sqrtTwoOverThree_*sigmaYf_.oldTime()
     );
+    const scalarField& fTrialI = fTrial.internalField();
 
     // Return direction
     const surfaceSymmTensorField plasticN(sTrial/magSTrial);
+    const symmTensorField& plasticNI = plasticN.internalField();
 
     // Calculate tangent field
     const Switch numericalTangent(dict().lookup("numericalTangent"));
@@ -1118,7 +1120,7 @@ void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
         mag(sTrial) - sqrtTwoOverThree_*sigmaY_.oldTime()
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     // Normalise residual in Newton method with respect to mag(bE)
     const scalar maxMagBE = max(gMax(mag(epsilon().primitiveField())), SMALL);
 
@@ -1168,7 +1170,7 @@ void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
         // Take references to the boundary patch fields for efficiency
         const scalarField& fTrialP = fTrial.boundaryField()[patchI];
         const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         symmTensorField& plasticNP = plasticN_.boundaryFieldRef()[patchI];
         scalarField& DSigmaYP = DSigmaY_.boundaryFieldRef()[patchI];
         scalarField& DLambdaP = DLambda_.boundaryFieldRef()[patchI];
@@ -1246,7 +1248,7 @@ void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     // Calculate the yield function
     const surfaceScalarField fTrial(mag(sTrial) - sqrtTwoOverThree_*sigmaYf_);
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     // Normalise residual in Newton method with respect to mag(bE)
     const scalar maxMagBE = max(gMax(mag(epsilonf().primitiveField())), SMALL);
 
@@ -1298,7 +1300,7 @@ void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
         // Take references to the boundary patch fields for efficiency
         const scalarField& fTrialP = fTrial.boundaryField()[patchI];
         const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         symmTensorField& plasticNP = plasticNf_.boundaryFieldRef()[patchI];
         scalarField& DSigmaYP = DSigmaYf_.boundaryFieldRef()[patchI];
         scalarField& DLambdaP = DLambdaf_.boundaryFieldRef()[patchI];
@@ -1384,7 +1386,7 @@ Foam::scalar Foam::linearElasticMisesPlastic::residual()
     )
     {
         return
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             gMax
             (
                 mag
@@ -1407,7 +1409,7 @@ Foam::scalar Foam::linearElasticMisesPlastic::residual()
     else
     {
         return
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             gMax
             (
                 mag
@@ -1435,7 +1437,7 @@ void Foam::linearElasticMisesPlastic::updateTotalFields()
     // Count cells actively yielding
     int numCellsYielding = 0;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     forAll(activeYield_.primitiveField(), celli)
     {
         if (DEpsilonPEq_.primitiveField()[celli] > SMALL)
@@ -1473,7 +1475,7 @@ void Foam::linearElasticMisesPlastic::updateTotalFields()
             {
                 if (DEpsilonPEq_.boundaryField()[patchi][facei] > SMALL)
                 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     activeYield_.boundaryFieldRef()[patchi][facei] = 1.0;
 #else
                     activeYield_.boundaryField()[patchi][facei] = 1.0;
@@ -1481,7 +1483,7 @@ void Foam::linearElasticMisesPlastic::updateTotalFields()
                 }
                 else
                 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     activeYield_.boundaryFieldRef()[patchi][facei] = 0.0;
 #else
                     activeYield_.boundaryField()[patchi][facei] = 0.0;
@@ -1539,7 +1541,7 @@ Foam::scalar Foam::linearElasticMisesPlastic::newDeltaT()
     const volScalarField epsilonEq(sqrt((2.0/3.0)*magSqr(dev(epsilon()))));
 
     // Take reference to internal fields
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const symmTensorField& DEpsilonPI = DEpsilonP_.primitiveField();
     const symmTensorField& plasticNI = plasticN_.primitiveField();
     const symmTensorField& plasticNIold = plasticN_.oldTime().primitiveField();

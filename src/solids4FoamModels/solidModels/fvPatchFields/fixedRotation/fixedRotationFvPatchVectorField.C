@@ -143,7 +143,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 
     if
     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         internalField().name() != "D"
      && internalField().name() != "DD"
 #else
@@ -161,7 +161,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     }
 }
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 (
     const fixedRotationFvPatchVectorField& pvf
@@ -209,7 +209,7 @@ snGrad() const
         const fvPatchField<tensor>& gradField =
             patch().lookupPatchField<volTensorField, tensor>
             (
-            #ifdef OPENFOAM_NOT_EXTEND
+            #ifdef OPENFOAMESIORFOUNDATION
                 "grad(" + internalField().name() + ")"
             #else
                 "grad(" + dimensionedInternalField().name() + ")"
@@ -268,7 +268,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
 
     const fvMesh& mesh = patch().boundaryMesh().mesh();
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (internalField().name() == "DD")
 #else
     if (dimensionedInternalField().name() == "DD")
@@ -291,7 +291,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
     (
         mesh.foundObject<pointVectorField>
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             "point" + internalField().name()
 #else
             "point" + dimensionedInternalField().name()
@@ -304,7 +304,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
             (
                 mesh.lookupObject<pointVectorField>
                 (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     "point" + internalField().name()
 #else
                     "point" + dimensionedInternalField().name()
@@ -321,7 +321,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
             fixedValuePointPatchVectorField& pointD =
                 refCast<fixedValuePointPatchVectorField>
                 (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     pointDField.boundaryFieldRef()[patch().index()]
 #else
                     pointDField.boundaryField()[patch().index()]
@@ -345,7 +345,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
             const labelList& meshPoints =
                 mesh.boundaryMesh()[patch().index()].meshPoints();
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             if (internalField().name() == "DD")
 #else
             if (dimensionedInternalField().name() == "DD")
@@ -377,7 +377,7 @@ gradientBoundaryCoeffs() const
         const fvPatchField<tensor>& gradField =
             patch().lookupPatchField<volTensorField, tensor>
             (
-            #ifdef OPENFOAM_NOT_EXTEND
+            #ifdef OPENFOAMESIORFOUNDATION
                 "grad(" + internalField().name() + ")"
             #else
                 "grad(" + dimensionedInternalField().name() + ")"

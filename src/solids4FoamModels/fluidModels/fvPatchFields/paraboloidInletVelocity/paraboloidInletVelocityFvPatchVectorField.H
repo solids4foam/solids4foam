@@ -116,7 +116,7 @@ public:
         paraboloidInletVelocityFvPatchVectorField
         (
             const paraboloidInletVelocityFvPatchVectorField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

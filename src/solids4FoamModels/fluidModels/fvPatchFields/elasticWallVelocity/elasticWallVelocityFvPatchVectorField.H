@@ -103,7 +103,7 @@ public:
         elasticWallVelocityFvPatchVectorField
         (
             const elasticWallVelocityFvPatchVectorField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

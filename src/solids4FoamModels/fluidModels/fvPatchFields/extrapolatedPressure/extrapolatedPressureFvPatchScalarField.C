@@ -74,7 +74,7 @@ extrapolatedPressureFvPatchScalarField
 {}
 
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 extrapolatedPressureFvPatchScalarField::
 extrapolatedPressureFvPatchScalarField
 (
@@ -101,7 +101,7 @@ extrapolatedPressureFvPatchScalarField
 
 void extrapolatedPressureFvPatchScalarField::evaluate
 (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const Pstream::commsTypes commsType
 #else
     const Pstream::commsTypes commsType
@@ -145,7 +145,7 @@ void extrapolatedPressureFvPatchScalarField::evaluate
 //     // Otherwise assume the variable is the static pressure.
 //     if
 //     (
-// #ifdef OPENFOAM_NOT_EXTEND
+// #ifdef OPENFOAMESIORFOUNDATION
 //         internalField().name() == "p_rgh"
 //      || internalField().name() == "pd"
 // #else
@@ -168,7 +168,7 @@ void extrapolatedPressureFvPatchScalarField::evaluate
 void extrapolatedPressureFvPatchScalarField::write(Ostream& os) const
 {
     zeroGradientFvPatchScalarField::write(os);
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

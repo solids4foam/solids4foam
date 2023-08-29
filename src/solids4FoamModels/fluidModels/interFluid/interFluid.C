@@ -17,9 +17,9 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     #include "interFluid.foundation.C"
-#elif OPENFOAM_COM
+#elif OPENFOAMESI
     #include "interFluid.esi.C"
 #else
     #include "interFluid.foamextend.C"

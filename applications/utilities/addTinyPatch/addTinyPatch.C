@@ -37,7 +37,7 @@ Author
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "polyTopoChange.H"
 #else
     #include "directTopoChange.H"
@@ -61,10 +61,10 @@ int main(int argc, char *argv[])
     const word pointsInstance = mesh.pointsInstance();
 
     // Read arguments
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const word currentPatchName(args[0]);
     const word newTinyPatchName(args[1]);
-    #ifdef OPENFOAM_COM
+    #ifdef OPENFOAMESI
     const vector approxFaceC(args.get<vector>(2));
     #else
     const vector approxFaceC(args.argRead<vector>(2));
@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
 
     // Create topo changer to perform mesh changes
     // This class records what changes are to be made to the mesh
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     polyTopoChange meshMod(mesh);
 #else
     directTopoChange meshMod(mesh);

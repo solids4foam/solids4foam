@@ -9,4 +9,4 @@ RBFFunctions/WendlandC4Function.C
 RBFFunctions/WendlandC6Function.C
 RBFFunctions/LinearFunction.C
 
-LIB = $(FOAM_MODULE_LIBBIN)/libRBFMeshMotionSolver
+LIB = $(FOAM_USER_LIBBIN)/libRBFMeshMotionSolver

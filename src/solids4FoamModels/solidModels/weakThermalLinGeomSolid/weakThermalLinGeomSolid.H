@@ -37,7 +37,7 @@ SourceFiles
 
 #include "linGeomTotalDispSolid.H"
 #include "thermalModel.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "SolverPerformance.H"
 #endif
 
@@ -85,7 +85,7 @@ class weakThermalLinGeomSolid
         bool converged
         (
             const int iCorr,
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             const SolverPerformance<scalar>& solverPerfT,
 #else
             const lduSolverPerformance& solverPerfT,

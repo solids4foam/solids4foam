@@ -73,7 +73,7 @@ robinFvPatchField<Type>::robinFvPatchField
 )
 :
     fvPatchField<Type>(ptf, p, iF, mapper),
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     coeff0_(mapper(ptf.coeff0_)),
     coeff1_(mapper(ptf.coeff1_)),
     rhs_(mapper(ptf.rhs_))
@@ -84,7 +84,7 @@ robinFvPatchField<Type>::robinFvPatchField
 #endif
 {}
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 template<class Type>
 robinFvPatchField<Type>::robinFvPatchField
 (
@@ -121,7 +121,7 @@ void robinFvPatchField<Type>::autoMap
 )
 {
     fvPatchField<Type>::autoMap(m);
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     m(coeff0_, coeff0_);
     m(coeff1_, coeff1_);
     m(rhs_, rhs_);
@@ -222,7 +222,7 @@ template<class Type>
 void robinFvPatchField<Type>::write(Ostream& os) const
 {
     fvPatchField<Type>::write(os);
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     writeEntry(os, "coeff0", coeff0_);
     writeEntry(os, "coeff1", coeff1_);
     writeEntry(os, "rhs", rhs_);

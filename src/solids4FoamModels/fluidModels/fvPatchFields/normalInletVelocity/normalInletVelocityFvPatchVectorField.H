@@ -98,7 +98,7 @@ public:
         normalInletVelocityFvPatchVectorField
         (
             const normalInletVelocityFvPatchVectorField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

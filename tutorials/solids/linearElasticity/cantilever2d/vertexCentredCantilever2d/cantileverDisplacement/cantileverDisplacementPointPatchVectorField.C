@@ -29,7 +29,7 @@ License
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "Time.H"
 #endif
 
@@ -106,7 +106,7 @@ cantileverDisplacementPointPatchVectorField::cantileverDisplacementPointPatchVec
 {}
 
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 cantileverDisplacementPointPatchVectorField::cantileverDisplacementPointPatchVectorField
 (
     const cantileverDisplacementPointPatchVectorField& ptf

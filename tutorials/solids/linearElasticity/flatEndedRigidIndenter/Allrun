@@ -13,25 +13,15 @@ solids4Foam::convertCaseFormat .
 solids4Foam::runApplication blockMesh
 
 # Mirror mesh
-if [[ "${WM_PROJECT}" == "foam" ]]
-then
-    solids4Foam::runApplication mirrorMesh
-    mv 0/polyMesh/* constant/polyMesh/
-    rm -rf 0/polyMesh
-else
-    solids4Foam::runApplication mirrorMesh -overwrite 
-fi
+solids4Foam::runApplication mirrorMesh 
+mv 0/polyMesh/* constant/polyMesh/
+rm -rf 0/polyMesh
 
 # Run solver
 solids4Foam::runApplication solids4Foam
 
 # Create plot
-if [[ "${WM_PROJECT}" == "foam" ]]
-then
-    solids4Foam::runApplication sample -latestTime
-else
-    solids4Foam::runApplication postProcess -func sampleDict.v2012 -latestTime
-fi
+sample -latestTime > log.sample
 
 if command -v gnuplot &> /dev/null
 then

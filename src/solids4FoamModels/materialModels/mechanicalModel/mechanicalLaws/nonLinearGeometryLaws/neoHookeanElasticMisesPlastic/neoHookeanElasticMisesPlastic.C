@@ -296,7 +296,7 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
         )
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     volScalarField& Ibar = tIbar.ref();
 
     // Take reference to internal fields for efficiency
@@ -350,7 +350,7 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
         )
         {
             // Take reference to patch fields for efficiency
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             scalarField& IbarP = Ibar.boundaryFieldRef()[patchI];
 #else
             scalarField& IbarP = Ibar.boundaryField()[patchI];
@@ -444,7 +444,7 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
         )
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     surfaceScalarField& Ibar = tIbar.ref();
 
     // Take reference to internal fields for efficiency
@@ -498,7 +498,7 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
         )
         {
             // Take reference to patch fields for efficiency
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             scalarField& IbarP = Ibar.boundaryFieldRef()[patchI];
 #else
             scalarField& IbarP = Ibar.boundaryField()[patchI];
@@ -543,7 +543,7 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
         }
     }
 
-#ifndef OPENFOAM_NOT_EXTEND
+#ifndef OPENFOAMESIORFOUNDATION
     Ibar.correctBoundaryConditions();
 #endif
 
@@ -1032,7 +1032,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     DEpsilonP_.storePrevIter();
 
     // Normalise residual in Newton method with respect to mag(bE)
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const scalar maxMagBE = max(gMax(mag(bEbarTrial_.primitiveField())), SMALL);
 #else
     const scalar maxMagBE = max(gMax(mag(bEbarTrial_.internalField())), SMALL);
@@ -1046,7 +1046,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     const scalar magHp = mag(Hp_);
 
     // Take references to the internal fields for efficiency
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const scalarField& fTrialI = fTrial.primitiveField();
     const symmTensorField& sTrialI = sTrial.primitiveField();
     symmTensorField& plasticNI = plasticN_.primitiveFieldRef();
@@ -1128,7 +1128,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
         // Take references to the boundary patch fields for efficiency
         const scalarField& fTrialP = fTrial.boundaryField()[patchI];
         const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         symmTensorField& plasticNP = plasticN_.boundaryFieldRef()[patchI];
         scalarField& DSigmaYP = DSigmaY_.boundaryFieldRef()[patchI];
         scalarField& DLambdaP = DLambda_.boundaryFieldRef()[patchI];
@@ -1267,7 +1267,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     DEpsilonPf_.storePrevIter();
 
     // Normalise residual in Newton method with respect to mag(bE)
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const scalar maxMagBE = max(gMax(mag(bEbarTrialf_.primitiveField())), SMALL);
 #else
     const scalar maxMagBE = max(gMax(mag(bEbarTrialf_.internalField())), SMALL);
@@ -1284,7 +1284,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     const scalar magHp = mag(Hp_);
 
     // Take references to the internal fields for efficiency
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const scalarField& fTrialI = fTrial.primitiveField();
     const symmTensorField& sTrialI = sTrial.primitiveField();
     symmTensorField& plasticNI = plasticNf_.primitiveFieldRef();
@@ -1369,7 +1369,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
             // Take references to the boundary patch fields for efficiency
             const scalarField& fTrialP = fTrial.boundaryField()[patchI];
             const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             symmTensorField& plasticNP = plasticNf_.boundaryFieldRef()[patchI];
             scalarField& DSigmaYP = DSigmaYf_.boundaryFieldRef()[patchI];
             scalarField& DLambdaP = DLambdaf_.boundaryFieldRef()[patchI];
@@ -1440,7 +1440,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
         }
     }
 
-#ifndef OPENFOAM_NOT_EXTEND
+#ifndef OPENFOAMESIORFOUNDATION
     DSigmaYf_.correctBoundaryConditions();
     DLambdaf_.correctBoundaryConditions();
     plasticNf_.correctBoundaryConditions();
@@ -1483,7 +1483,7 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::residual()
     )
     {
         return
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             gMax
             (
                 mag
@@ -1506,7 +1506,7 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::residual()
     else
     {
         return
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             gMax
             (
                 mag
@@ -1544,7 +1544,7 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
     // Count cells actively yielding
     int numCellsYielding = 0;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     forAll(activeYield_.primitiveField(), celli)
     {
         if (DEpsilonPEq_.primitiveField()[celli] > SMALL)
@@ -1582,7 +1582,7 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
             {
                 if (DEpsilonPEq_.boundaryField()[patchi][facei] > SMALL)
                 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     activeYield_.boundaryFieldRef()[patchi][facei] = 1.0;
 #else
                     activeYield_.boundaryField()[patchi][facei] = 1.0;
@@ -1590,7 +1590,7 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
                 }
                 else
                 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     activeYield_.boundaryFieldRef()[patchi][facei] = 0.0;
 #else
                     activeYield_.boundaryField()[patchi][facei] = 0.0;
@@ -1637,7 +1637,7 @@ Foam::scalar Foam::neoHookeanElasticMisesPlastic::newDeltaT()
     const volScalarField epsilonEq(sqrt((2.0/3.0)*magSqr(dev(epsilon))));
 
     // Take reference to internal fields
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const symmTensorField& DEpsilonPI = DEpsilonP_.primitiveField();
     const symmTensorField& plasticNI = plasticN_.primitiveField();
     const symmTensorField& plasticNIold = plasticN_.oldTime().primitiveField();

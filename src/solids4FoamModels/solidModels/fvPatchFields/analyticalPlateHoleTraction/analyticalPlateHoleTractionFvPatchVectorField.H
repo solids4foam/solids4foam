@@ -106,7 +106,7 @@ public:
         analyticalPlateHoleTractionFvPatchVectorField
         (
             const analyticalPlateHoleTractionFvPatchVectorField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

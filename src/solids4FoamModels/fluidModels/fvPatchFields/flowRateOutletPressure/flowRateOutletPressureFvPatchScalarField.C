@@ -105,7 +105,7 @@ flowRateOutletPressureFvPatchScalarField
 {}
 
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 Foam::flowRateOutletPressureFvPatchScalarField::
 flowRateOutletPressureFvPatchScalarField
 (
@@ -160,7 +160,7 @@ void Foam::flowRateOutletPressureFvPatchScalarField::updateCoeffs()
         const volScalarField& p =
             db().lookupObject<volScalarField>
             (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 this->internalField().name()
 #else
                 this->dimensionedInternalField().name()
@@ -273,7 +273,7 @@ void Foam::flowRateOutletPressureFvPatchScalarField::updateCoeffs()
 
     scalar reqOutletFlowRate = -inletFlowRate*flowRateFraction_;
     
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     scalarField& phip =
         phi.boundaryFieldRef()[this->patch().index()];
 #else
@@ -367,7 +367,7 @@ void Foam::flowRateOutletPressureFvPatchScalarField::write(Ostream& os) const
 {
     fvPatchScalarField::write(os);
     
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
     os.writeEntryIfDifferent<word>("U", "U", UName_);
     os.writeEntryIfDifferent<word>("phi", "phi", phiName_);
     os.writeEntryIfDifferent<word>("rho", "rho", rhoName_);

@@ -1,0 +1,79 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      meshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+surfaceFile "punch_bottom.ftr";
+
+maxCellSize 16.0;
+
+//boundaryCellSize 8.0;
+
+// localRefinement
+// {
+//     cylinderContact
+//     {
+//         cellSize 10.0;
+//     }
+// }
+
+// objectRefinements
+// {
+//     ear1
+//     {
+//         cellSize 10;
+//         type cone;
+//         p0   (-100 1873 -320);
+//         radius0  200;
+//         p1   (-560 1400 0);
+//         radius1   200;
+//     }
+//     ear2
+//     {
+//         cellSize 10;
+//         type cone;
+//         p0   (-650 1873 -620);
+//         radius0  200;
+//         p1   (-670 1300 0);
+//         radius1  200;
+//     }
+//     tail
+//     {
+//         cellSize 10;
+//         type box;
+//         centre  (500 500 150);
+//         lengthX  100;
+//         lengthY  150;
+//         lengthZ  200;
+//     }
+//     insideTheBody
+//     {
+//         cellSize 10;
+//         type sphere;
+//         centre  (0 700 0);
+//         radius  50;
+//     }
+//     muzzlePiercing
+//     {
+//         cellSize 10;
+//         type line;
+//         p0      (-750 1000 450);
+//         p1      (-750 1500 450);
+//     }
+// }
+
+// ************************************************************************* //

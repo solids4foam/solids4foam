@@ -44,7 +44,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF),
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     myTimeIndex_(internalField().mesh().time().timeIndex()),
 #else
     myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
@@ -79,7 +79,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF),
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     myTimeIndex_(internalField().mesh().time().timeIndex()),
 #else
     myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
@@ -90,7 +90,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const fvMesh& mesh = internalField().mesh();
     const pointField& points = mesh.points();
 #else
@@ -108,7 +108,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 }
 
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 (
     const newMovingWallVelocityFvPatchVectorField& pivpvf
@@ -148,7 +148,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
         return;
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const fvMesh& mesh = internalField().mesh();
     const pointField& points = mesh.points();
 #else
@@ -164,7 +164,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
     const volVectorField& U =
         mesh.lookupObject<volVectorField>
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             internalField().name()
 #else
             dimensionedInternalField().name()
@@ -173,7 +173,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 
     word ddtScheme
     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         mesh.ddtScheme("ddt(" + U.name() +')')
 #else
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
@@ -265,7 +265,7 @@ snGrad() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     word UName = internalField().name();
 #else
     word UName = dimensionedInternalField().name();
@@ -298,7 +298,7 @@ snGrad() const
                 new vectorField(this->patch().size(), vector::zero)
             );
 
-    #ifdef OPENFOAM_NOT_EXTEND
+    #ifdef OPENFOAMESIORFOUNDATION
             tnGradU.ref() =
                 2
                *(
@@ -334,7 +334,7 @@ snGrad() const
     // First order
     // vectorField dUP = (k&gradU.patchInternalField());
 
-    #ifdef OPENFOAM_NOT_EXTEND
+    #ifdef OPENFOAMESIORFOUNDATION
         tnGradU.ref() =
             (
                 *this
@@ -370,7 +370,7 @@ gradientBoundaryCoeffs() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     word UName = internalField().name();
 #else
     word UName = dimensionedInternalField().name();
@@ -452,7 +452,7 @@ gradientBoundaryCoeffs() const
 void newMovingWallVelocityFvPatchVectorField::write(Ostream& os) const
 {
     fvPatchVectorField::write(os);
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

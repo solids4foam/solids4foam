@@ -1,9 +1,4 @@
 #!/bin/bash
-cd "${0%/*}" || exit  # Run from this directory
-
-# Parse arguments for library compilation
-if [ -f "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments ]
-then  . "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments
-fi
+cd ${0%/*} || exit 1    # run from this directory
 
 wmake

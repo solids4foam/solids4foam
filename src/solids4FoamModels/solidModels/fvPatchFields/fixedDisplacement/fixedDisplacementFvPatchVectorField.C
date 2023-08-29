@@ -72,7 +72,7 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
     (
         mesh.foundObject<pointVectorField>
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             "point" + internalField().name()
 #else
             "point" + dimensionedInternalField().name()
@@ -83,7 +83,7 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
         const pointVectorField& pointD =
             mesh.lookupObject<pointVectorField>
             (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 "point" + internalField().name()
 #else
                 "point" + dimensionedInternalField().name()
@@ -104,7 +104,7 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
                     const_cast<pointVectorField&>
                     (
                         pointD
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     ).boundaryFieldRef()[patch().index()]
 #else
                     ).boundaryField()[patch().index()]
@@ -144,7 +144,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 :
     fixedValueFvPatchVectorField(pvf, p, iF, mapper),
     nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     totalDisp_(mapper(pvf.totalDisp_)),
 #else
     totalDisp_(pvf.totalDisp_, mapper),
@@ -186,7 +186,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     }
 }
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 (
     const fixedDisplacementFvPatchVectorField& pvf
@@ -231,7 +231,7 @@ void fixedDisplacementFvPatchVectorField::autoMap
 {
     fixedValueFvPatchVectorField::autoMap(m);
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     m(totalDisp_, totalDisp_);;
 #else
     totalDisp_.autoMap(m);
@@ -269,7 +269,7 @@ void fixedDisplacementFvPatchVectorField::updateCoeffs()
         disp = dispSeries_(this->db().time().timeOutputValue());
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (internalField().name() == "DD")
 #else
     if (dimensionedInternalField().name() == "DD")
@@ -302,7 +302,7 @@ fixedDisplacementFvPatchVectorField::snGrad() const
         const fvPatchField<tensor>& gradField =
             patch().lookupPatchField<volTensorField, tensor>
             (
-            #ifdef OPENFOAM_NOT_EXTEND
+            #ifdef OPENFOAMESIORFOUNDATION
                 "grad(" + internalField().name() + ")"
             #else
                 "grad(" + dimensionedInternalField().name() + ")"
@@ -333,7 +333,7 @@ fixedDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
         const fvPatchField<tensor>& gradField =
             patch().lookupPatchField<volTensorField, tensor>
             (
-            #ifdef OPENFOAM_NOT_EXTEND
+            #ifdef OPENFOAMESIORFOUNDATION
                 "grad(" + internalField().name() + ")"
             #else
                 "grad(" + dimensionedInternalField().name() + ")"

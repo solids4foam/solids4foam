@@ -43,7 +43,7 @@ Author
 
 #include "calculatedPointPatchFields.H"
 #include "interpolationTable.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "pointPatchFieldMapper.H"
 #else
     #include "PointPatchFieldMapper.H"
@@ -53,7 +53,7 @@ Author
 
 namespace Foam
 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     typedef pointPatchFieldMapper PointPatchFieldMapper;
 #endif
 
@@ -116,7 +116,7 @@ public:
             const PointPatchFieldMapper&
         );
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
         //- Construct as copy
         solidTractionPointPatchVectorField
         (
@@ -204,7 +204,7 @@ public:
         //  there's nothing to do
         virtual void initEvaluate
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
 #else
             const Pstream::commsTypes commsType = Pstream::blocking

@@ -41,27 +41,12 @@ autoPtr<faceBreakerLaw> faceBreakerLaw::New
     const dictionary& dict
 )
 {
-    const word modelType(dict.lookup("type"));
+    word lawTypeName = dict.lookup("type");
 
-    Info<< "Selecting face breaker law: " << modelType << endl;
+    Info<< "Selecting face breaker law: " << lawTypeName << endl;
 
-#if (OPENFOAM >= 2112)
-    auto* ctorPtr = dictionaryConstructorTable(modelType);
-
-    if (!ctorPtr)
-    {
-        FatalIOErrorInLookup
-        (
-            dict,
-            "faceBreakerLaw",
-            modelType,
-            *dictionaryConstructorTablePtr_
-        ) << exit(FatalIOError);
-    }
-
-#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(modelType);
+        dictionaryConstructorTablePtr_->find(lawTypeName);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -74,16 +59,13 @@ autoPtr<faceBreakerLaw> faceBreakerLaw::New
             ")",
             dict
         )   << "Unknown faceBreakerLaw type "
-            << modelType << endl << endl
+            << lawTypeName << endl << endl
             << "Valid  faceBreakerLaws are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
-    auto* ctorPtr = cstrIter();
-#endif
-
-    return autoPtr<faceBreakerLaw>(ctorPtr(name, mesh, dict));
+    return autoPtr<faceBreakerLaw>(cstrIter()(name, mesh, dict));
 }
 
 

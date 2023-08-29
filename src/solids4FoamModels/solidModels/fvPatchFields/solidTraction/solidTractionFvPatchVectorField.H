@@ -129,7 +129,7 @@ public:
         solidTractionFvPatchVectorField
         (
             const solidTractionFvPatchVectorField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );
@@ -212,7 +212,7 @@ public:
         //- Evaluate the patch field
         virtual void evaluate
         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
 #else
             const Pstream::commsTypes commsType = Pstream::blocking

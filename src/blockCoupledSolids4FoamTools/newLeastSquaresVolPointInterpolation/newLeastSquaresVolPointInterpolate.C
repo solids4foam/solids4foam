@@ -23,7 +23,6 @@ License
 #include "emptyPolyPatch.H"
 #include "wedgePolyPatch.H"
 #include "cyclicFvPatch.H"
-#include "processorPolyPatch.H"
 #include "transform.H"
 #ifdef FOAMEXTEND
     #include "cyclicGgiPolyPatch.H"
@@ -54,7 +53,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
             << endl;
     }
 
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     const Field<Type>& vfI = vf.primitiveField();
     Field<Type>& pfI = pf.primitiveFieldRef();
 #else
@@ -241,7 +240,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
 
             label sizeby2 = faceCells.size()/2;
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
             if (!isA<processorPolyPatch>(cycPatch) || pTraits<Type>::rank == 0)
 #else
             if (!(cycPatch.parallel() || pTraits<Type>::rank == 0))
@@ -250,7 +249,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
                 if (localFaceID < sizeby2)
                 {
                     source[pointID] =
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
                         cycPatch.transform().transformPosition
                         (
                             vfI[faceCells[localFaceID + sizeby2]]
@@ -268,7 +267,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
                 else
                 {
                     source[pointID] =
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
                         cycPatch.transform().invTransformPosition
                         (
                             vfI[faceCells[localFaceID + sizeby2]]
@@ -322,7 +321,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
 
             label sizeby2 = cycPolyPatch.size()/2;
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
             if (!isA<processorPolyPatch>(cycPolyPatch))
 #else
             if (!(cycPolyPatch.parallel()))
@@ -331,7 +330,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
                 if (cycLocalFaceID < sizeby2)
                 {
                     source[pointID] =
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
                         cycPolyPatch.transform().transformPosition
                         (
                             vf.boundaryField()[patchID][localFaceID]
@@ -349,7 +348,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
                 else
                 {
                     source[pointID] =
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
                         cycPolyPatch.transform().invTransformPosition
                         (
                             vf.boundaryField()[patchID][localFaceID]
@@ -694,7 +693,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
             << endl;
     }
 
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     const Field<Type>& vfI = vf.primitiveField();
 #else
     const Field<Type>& vfI = vf.internalField();
@@ -708,7 +707,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
             pTraits<Type>::zero
         )
     );
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     Field<Type>& ppf = tppf.ref();
 #else
     Field<Type>& ppf = tppf();
@@ -989,7 +988,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 
 //     Info << "patch cell to point interpolation" << endl;
 
-// #if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+// #if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
 //     const Field<Type>& vfI = vf.primitiveField();
 // #else
 //     const Field<Type>& vfI = vf.internalField();
@@ -1003,7 +1002,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 //             pTraits<Type>::zero
 //         )
 //     );
-// #if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+// #if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
 //     Field<Type>& ppf = tppf.ref();
 // #else
 //     Field<Type>& ppf = tppf();
@@ -1206,7 +1205,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
             << endl;
     }
 
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     const Field<Type>& vfI = vf.primitiveField();
 #else
     const Field<Type>& vfI = vf.internalField();
@@ -1485,7 +1484,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //             << endl;
 //     }
 
-// #if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+// #if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
 //     const Field<Type>& vfI = vf.primitiveField();
 // #else
 //     const Field<Type>& vfI = vf.internalField();
@@ -1908,7 +1907,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceFieldData
 
     if (Pstream::parRun())
     {
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         //notImplemented("globalPointNgbProcBndFaceFieldData");
         if (processorBoundariesExist_)
         {
@@ -2028,7 +2027,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
 
     if (Pstream::parRun())
     {
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         // notImplemented("globalPointNgbProcCellFieldData");
         if (processorBoundariesExist_)
         {
@@ -2042,7 +2041,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
 #else
         const labelListList& ptCells = mesh().pointCells();
 
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         const Field<Type>& vfI = vf.primitiveField();
 #else
         const Field<Type>& vfI = vf.internalField();
@@ -2138,7 +2137,7 @@ newLeastSquaresVolPointInterpolation::procCellsFieldData
     (
         new FieldField<Field, Type>(Pstream::nProcs())
     );
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     FieldField<Field, Type>& procPsi = tprocPsi.ref();
 #else
     FieldField<Field, Type>& procPsi = tprocPsi();
@@ -2159,7 +2158,7 @@ newLeastSquaresVolPointInterpolation::procCellsFieldData
 
     if (Pstream::parRun())
     {
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         //notImplemented("procCellsFieldData");
         if (processorBoundariesExist_)
         {
@@ -2248,7 +2247,7 @@ newLeastSquaresVolPointInterpolation::procBndFacesFieldData
     (
         new FieldField<Field, Type>(Pstream::nProcs())
     );
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
     FieldField<Field, Type>& procPsi = tprocPsi.ref();
 #else
     FieldField<Field, Type>& procPsi = tprocPsi();
@@ -2269,7 +2268,7 @@ newLeastSquaresVolPointInterpolation::procBndFacesFieldData
 
     if (Pstream::parRun())
     {
-#if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
+#if (defined(OPENFOAM) || defined(OPENFOAMESIORFOUNDATION))
         // notImplemented("procBndFacesFieldData");
         if (processorBoundariesExist_)
         {

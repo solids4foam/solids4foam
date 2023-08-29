@@ -50,7 +50,7 @@ void eig3Field
     const volSymmTensorField& A, volTensorField& V, volVectorField& d
 );
 
-#ifndef OPENFOAM_NOT_EXTEND
+#ifndef OPENFOAMESIORFOUNDATION
 void eig3Field
 (
     const volSymmTensorField& A, volTensorField& V, volDiagTensorField& d

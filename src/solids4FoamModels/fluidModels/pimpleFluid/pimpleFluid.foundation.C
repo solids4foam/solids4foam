@@ -661,7 +661,7 @@ void pimpleFluid::setTemperatureAndHeatFlux
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneHeatFlux)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     setTemperatureAndHeatFlux
     (
         TPtr_().boundaryFieldRef()[patchID],
@@ -723,7 +723,7 @@ void pimpleFluid::setEqInterHeatTransferCoeff
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneHTC)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     setEqInterHeatTransferCoeff
     (
         TPtr_().boundaryFieldRef()[patchID],
@@ -746,7 +746,7 @@ tmp<scalarField> pimpleFluid::patchTemperature(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tT.ref() =
 #else
     tT() =
@@ -763,7 +763,7 @@ tmp<scalarField> pimpleFluid::patchHeatFlux(const label patchID) const
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tHF.ref() =
 #else
     tHF() =
@@ -785,7 +785,7 @@ tmp<scalarField> pimpleFluid::patchHeatTransferCoeff
         new scalarField(mesh().boundary()[patchID].size(), 0)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     tHTC.ref() =
 #else
     tHTC() =

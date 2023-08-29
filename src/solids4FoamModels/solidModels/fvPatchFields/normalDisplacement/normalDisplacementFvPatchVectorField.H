@@ -96,7 +96,7 @@ public:
         normalDisplacementFvPatchVectorField
         (
             const normalDisplacementFvPatchVectorField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

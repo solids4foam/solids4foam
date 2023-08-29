@@ -44,27 +44,12 @@ autoPtr<crackPathLimiter> crackPathLimiter::New
     const dictionary& dict
 )
 {
-    const word modelType(dict.lookup("type"));
+    word lawTypeName = dict.lookup("type");
 
-    Info<< "Selecting crack path limiter: " << modelType << endl;
+    Info<< "Selecting crack path limiter: " << lawTypeName << endl;
 
-#if (OPENFOAM >= 2112)
-    auto* ctorPtr = dictionaryConstructorTable(modelType);
-
-    if (!ctorPtr)
-    {
-        FatalIOErrorInLookup
-        (
-            dict,
-            "crackPathLimiter",
-            modelType,
-            *dictionaryConstructorTablePtr_
-        ) << exit(FatalIOError);
-    }
-
-#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(modelType);
+        dictionaryConstructorTablePtr_->find(lawTypeName);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -77,16 +62,13 @@ autoPtr<crackPathLimiter> crackPathLimiter::New
             ")",
             dict
         )   << "Unknown crackPathLimiter type "
-            << modelType << endl << endl
+            << lawTypeName << endl << endl
             << "Valid  crackPathLimiters are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
-    auto* ctorPtr = cstrIter();
-#endif
-
-    return autoPtr<crackPathLimiter>(ctorPtr(name, mesh, dict));
+    return autoPtr<crackPathLimiter>(cstrIter()(name, mesh, dict));
 }
 
 

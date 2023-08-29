@@ -1,6 +1,13 @@
-SOLIDS4FOAM_ROOT := ../../../../../..
-
-include $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+ifeq ($(WM_PROJECT), foam)
+    VERSION_SPECIFIC_INC = -DFOAMEXTEND
+else
+    VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
+    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        VERSION_SPECIFIC_INC += -DOPENFOAMESI
+    else
+        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
+    endif
+endif
 
 EXE_INC = \
     -std=c++11 \

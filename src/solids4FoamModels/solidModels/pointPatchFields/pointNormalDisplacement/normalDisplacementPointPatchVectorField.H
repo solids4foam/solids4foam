@@ -42,7 +42,7 @@ Author
 #ifndef normalDisplacementPointPatchVectorField_H
 #define normalDisplacementPointPatchVectorField_H
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "fixedValuePointPatchField.H"
     #include "pointPatchFieldMapper.H"
 #else
@@ -56,10 +56,10 @@ Author
 namespace Foam
 {
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     typedef fixedValuePointPatchField<vector> fixedValuePointPatchVectorField;
 
-    #ifdef OPENFOAM_NOT_EXTEND
+    #ifdef OPENFOAMESIORFOUNDATION
         typedef pointPatchFieldMapper PointPatchFieldMapper;
     #endif
 #endif
@@ -114,7 +114,7 @@ public:
             const PointPatchFieldMapper&
         );
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
         //- Construct as copy
         normalDisplacementPointPatchVectorField
         (

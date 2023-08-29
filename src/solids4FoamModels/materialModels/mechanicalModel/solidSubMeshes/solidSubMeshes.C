@@ -25,10 +25,8 @@ License
 
 #include "solidSubMeshes.H"
 #include "twoDPointCorrector.H"
-#include "processorPolyPatch.H"
 #include "wedgePolyPatch.H"
 #include "ZoneIDs.H"
-#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -141,7 +139,7 @@ void Foam::solidSubMeshes::makeSubMeshVolToPoint() const
         subMeshVolToPoint_.set
         (
             matI,
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             new volPointInterpolation
 #else
             new newLeastSquaresVolPointInterpolation
@@ -176,7 +174,7 @@ void Foam::solidSubMeshes::checkCellZones() const
         baseMesh(),
         dimensionedScalar("zero", dimless, 0.0)
     );
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     scalarField& nCellZonesI = nCellZones.ref();
 #else
     scalarField& nCellZonesI = nCellZones.internalField();
@@ -691,7 +689,7 @@ void Foam::solidSubMeshes::makeInterfaceBaseFaces() const
             baseMesh(),
             dimensionedScalar("0", dimless, 0)
         );
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         scalarField& materialsI = materials.ref();
 #else
         scalarField& materialsI = materials.internalField();
@@ -879,7 +877,7 @@ void Foam::solidSubMeshes::makeIsolatedInterfacePoints() const
         pMesh,
         dimensionedScalar("0", dimless, 0)
     );
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     scalarField& pointMaterialsI = pointMaterials.ref();
 #else
     scalarField& pointMaterialsI = pointMaterials.internalField();
@@ -1176,7 +1174,7 @@ void Foam::solidSubMeshes::updateInterfaceShadowSigma
                 // internal field
                 if (useVolFieldSigma)
                 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     baseSigmaForSyncing.ref()
 #else
                     baseSigmaForSyncing.internalField()
@@ -1191,7 +1189,7 @@ void Foam::solidSubMeshes::updateInterfaceShadowSigma
                 }
                 else
                 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     baseSigmaForSyncing.ref()
 #else
                     baseSigmaForSyncing.internalField()
@@ -1426,7 +1424,7 @@ Foam::PtrList<Foam::newFvMeshSubset>& Foam::solidSubMeshes::subMeshes()
     return subMeshes_;
 }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const Foam::PtrList<Foam::volPointInterpolation>&
 #else
     const Foam::PtrList<Foam::newLeastSquaresVolPointInterpolation>&
@@ -1668,7 +1666,7 @@ void Foam::solidSubMeshes::interpolateDtoSubMeshD
             if (patchMap[patchI] == -1)
             {
                 // Interface displacement
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 vectorField& Dinterface = subMeshD.boundaryFieldRef()[patchI];
 #else
                 vectorField& Dinterface = subMeshD.boundaryField()[patchI];
@@ -2001,7 +1999,7 @@ void Foam::solidSubMeshes::correctBoundarySnGrad
         {
             const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
             const vectorField n(subMesh.boundary()[patchI].nf());
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             tensorField& patchGradD = subMeshGradD.boundaryFieldRef()[patchI];
 #else
             tensorField& patchGradD = subMeshGradD.boundaryField()[patchI];
@@ -2090,7 +2088,7 @@ void Foam::solidSubMeshes::correctBoundarySnGradf
         {
             const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
             const vectorField n(subMesh.boundary()[patchI].nf());
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             tensorField& patchGradDf =
                 subMeshGradDf.boundaryFieldRef()[patchI];
 #else
@@ -2180,23 +2178,13 @@ void Foam::solidSubMeshes::moveSubMeshes()
             subMeshes()[matI].subMesh().movePoints(newPoints);
             subMeshes()[matI].subMesh().V00();
             subMeshes()[matI].subMesh().moving(false);
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
             subMeshes()[matI].subMesh().topoChanging(false);
 #else
             subMeshes()[matI].subMesh().changing(false);
 #endif
-#if (OPENFOAM >= 2206)
-            {
-                auto tmeshPhi(subMeshes()[matI].subMesh().setPhi());
-                if (tmeshPhi)
-                {
-                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
-                }
-            }
-#else
             subMeshes()[matI].subMesh().setPhi().writeOpt() =
                 IOobject::NO_WRITE;
-#endif
 
             if (baseMesh().time().outputTime() && writeSubMeshes_)
             {

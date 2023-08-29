@@ -90,7 +90,7 @@ bool Foam::solidTractions::writeData()
                 if (!traction.boundaryField()[patchI].coupled())
                 {
                     // It is assumed that sigma is the true (Cauchy) stress
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     traction.boundaryFieldRef()[patchI] =
 #else
                     traction.boundaryField()[patchI] =
@@ -138,7 +138,7 @@ bool Foam::solidTractions::writeData()
                     nCurrent /= mag(nCurrent);
 
                    // It is assumed that sigma is the true (Cauchy) stress
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                    traction.boundaryFieldRef()[patchI] =
 #else
                    traction.boundaryField()[patchI] =
@@ -172,7 +172,7 @@ bool Foam::solidTractions::writeData()
             {
                 if (!traction.boundaryField()[patchI].coupled())
                 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     traction.boundaryFieldRef()[patchI] =
 #else
                     traction.boundaryField()[patchI] =
@@ -230,7 +230,7 @@ bool Foam::solidTractions::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 bool Foam::solidTractions::write()
 {
     return false;

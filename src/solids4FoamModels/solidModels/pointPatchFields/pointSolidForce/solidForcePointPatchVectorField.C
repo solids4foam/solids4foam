@@ -29,7 +29,7 @@ License
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "Time.H"
 #endif
 
@@ -124,7 +124,7 @@ solidForcePointPatchVectorField::solidForcePointPatchVectorField
 )
 :
     solidTractionPointPatchVectorField(p, iF),
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     force_(mapper(ptf.force_)),
 #else
     force_(ptf.force_, mapper),
@@ -134,7 +134,7 @@ solidForcePointPatchVectorField::solidForcePointPatchVectorField
 {}
 
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 solidForcePointPatchVectorField::solidForcePointPatchVectorField
 (
     const solidForcePointPatchVectorField& ptf
@@ -170,7 +170,7 @@ void solidForcePointPatchVectorField::autoMap
 )
 {
     //Field<vector>::autoMap(m);
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     m(force_, force_);
 #else
     force_.autoMap(m);
@@ -286,7 +286,7 @@ void solidForcePointPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         writeEntry(os, "force", force_);
 #else
         force_.writeEntry("force", os);

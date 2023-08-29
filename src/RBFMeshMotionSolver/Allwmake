@@ -1,9 +1,10 @@
 #!/bin/bash
-cd "${0%/*}" || exit  # Run from this directory
+cd ${0%/*} || exit 1    # run from this directory
 
-# Parse arguments for library compilation
-if [ -f "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments ]
-then  . "$WM_PROJECT"/wmake/scripts/AllwmakeParseArguments
+if [ "$WM_PROJECT" = "OpenFOAM" ]
+then
+    # Parse arguments for library compilation
+    . $WM_PROJECT_DIR/wmake/scripts/AllwmakeParseArguments
 fi
 
-wmake $* libso
+wmake libso

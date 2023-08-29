@@ -23,12 +23,11 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 
 #include "extendedLeastSquaresVectors.H"
 #include "surfaceFields.H"
 #include "volFields.H"
-#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -114,7 +113,7 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
     surfaceVectorField& lsN = *nVectorsPtr_;
 
     // Set local references to mesh data
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
     const labelList& owner = mesh().owner();
     const labelList& neighbour = mesh().neighbour();
 #else
@@ -145,7 +144,7 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
     forAll(lsP.boundaryField(), patchI)
     {
         const fvPatch& p = mesh().boundary()[patchI];
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
         const labelList& faceCells = p.faceCells();
 #else
         const unallocLabelList& faceCells = p.faceCells();
@@ -254,7 +253,7 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
         fvsPatchVectorField& patchLsP = lsP.boundaryFieldRef()[patchI];
 
         const fvPatch& p = patchLsP.patch();
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
         const labelList& faceCells = p.faceCells();
 #else
         const unallocLabelList& faceCells = p.faceCells();
@@ -350,6 +349,6 @@ bool Foam::extendedLeastSquaresVectors::movePoints()
 }
 
 
-#endif // end of #ifdef OPENFOAM_NOT_EXTEND
+#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
 // ************************************************************************* //

@@ -39,7 +39,7 @@ namespace Foam
 
 Foam::cellPointLeastSquaresVectors::cellPointLeastSquaresVectors(const fvMesh& mesh)
 :
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     MeshObject<fvMesh, MoveableMeshObject, cellPointLeastSquaresVectors>(mesh),
 #else
     MeshObject<fvMesh, cellPointLeastSquaresVectors>(mesh),
@@ -67,7 +67,7 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
             << endl;
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const fvMesh& mesh = mesh_;
 #else
     const fvMesh& mesh = this->mesh();
@@ -124,7 +124,7 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
 
     // Invert least squares matrix using Householder transformations to avoid
     // badly posed cells
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const symmTensorField invDd(inv(dd));
 #else
     const symmTensorField invDd(hinv(dd));
@@ -197,7 +197,7 @@ Foam::cellPointLeastSquaresVectors::vectors() const
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     bool Foam::cellPointLeastSquaresVectors::movePoints()
 #else
     bool Foam::cellPointLeastSquaresVectors::movePoints() const

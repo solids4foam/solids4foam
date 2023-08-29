@@ -29,7 +29,7 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 
 #ifndef amiInterfaceToInterfaceMapping_H
 #define amiInterfaceToInterfaceMapping_H
@@ -224,6 +224,6 @@ public:
 
 #endif
 
-#endif // end of #ifdef OPENFOAM_NOT_EXTEND
+#endif // end of #ifdef OPENFOAMESIORFOUNDATION
 
 // ************************************************************************* //

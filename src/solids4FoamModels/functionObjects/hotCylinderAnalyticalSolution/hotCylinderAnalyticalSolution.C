@@ -70,7 +70,7 @@ bool Foam::hotCylinderAnalyticalSolution::writeData()
         )/dimensionedScalar("one", dimLength, 1)
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (gMin(radii.primitiveField()) < SMALL)
 #else
     if (gMin(radii.internalField()) < SMALL)
@@ -222,7 +222,7 @@ bool Foam::hotCylinderAnalyticalSolution::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 bool Foam::hotCylinderAnalyticalSolution::write()
 {
     return false;

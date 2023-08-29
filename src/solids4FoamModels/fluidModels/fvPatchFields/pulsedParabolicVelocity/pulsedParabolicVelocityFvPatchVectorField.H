@@ -117,7 +117,7 @@ public:
             const fvPatchFieldMapper&
         );
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         //- Construct as copy
         pulsedParabolicVelocityFvPatchVectorField
         (

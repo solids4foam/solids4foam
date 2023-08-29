@@ -40,7 +40,7 @@ Author
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 
 namespace Foam
 {
@@ -147,7 +147,7 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#endif // ifdef OPENFOAM_NOT_EXTEND
+#endif // ifdef OPENFOAMESIORFOUNDATION
 
 #endif
 

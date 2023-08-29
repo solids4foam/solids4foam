@@ -67,7 +67,7 @@ void Foam::solidSubMeshes::mapSubMeshVolFields
 
             if (patchMap[patchI] != -1)
             {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 fvPatchField<Type>& baseMeshFieldP =
                     baseMeshField.boundaryFieldRef()[patchMap[patchI]];
 #else
@@ -140,7 +140,7 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 
             if (patchMap[patchI] != -1)
             {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 fvsPatchField<Type>& baseMeshFieldP =
                     baseMeshField.boundaryFieldRef()[patchMap[patchI]];
 #else
@@ -186,7 +186,7 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
                             globalGlobalMeshFace
                             - baseMesh().boundaryMesh()[curPatch].start();
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                         baseMeshField.boundaryFieldRef()
                         [
                             curPatch
@@ -221,7 +221,7 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 
             OPstream::write
             (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 Pstream::commsTypes::blocking,
 #else
                 Pstream::blocking,
@@ -235,7 +235,7 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 
     forAll(baseMeshField.boundaryField(), patchI)
     {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         fvsPatchField<Type>& baseMeshFieldP =
             baseMeshField.boundaryFieldRef()[patchI];
 #else
@@ -255,7 +255,7 @@ void Foam::solidSubMeshes::mapSubMeshSurfaceFields
 
             IPstream::read
             (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 Pstream::commsTypes::blocking,
 #else
                 Pstream::blocking,
@@ -283,7 +283,7 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
 {
     // Map internal field from sub-mesh to base mesh
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     vectorField& baseMeshFieldI = baseMeshField.ref();
 #else
     vectorField& baseMeshFieldI = baseMeshField.internalField();
@@ -414,7 +414,7 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
                     const processorPointPatchVectorField& procPatchDispl =
                         refCast<processorPointPatchVectorField>
                         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                             baseMeshField.boundaryFieldRef()[patchI]
 #else
                             baseMeshField.boundaryField()[patchI]
@@ -437,7 +437,7 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
 
                     OPstream::write
                     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                         Pstream::commsTypes::blocking,
 #else
                         Pstream::blocking,
@@ -463,7 +463,7 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
                     const processorPointPatchVectorField& procPatchDispl =
                         refCast<processorPointPatchVectorField>
                         (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                             baseMeshField.boundaryFieldRef()[patchI]
 #else
                             baseMeshField.boundaryField()[patchI]
@@ -480,7 +480,7 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
                     (
                         new vectorField(procPatchDispl.size(), vector::zero)
                     );
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                     vectorField& ngbProcPatchDispl = tNgbProcPatchDispl.ref();
 #else
                     vectorField& ngbProcPatchDispl = tNgbProcPatchDispl();
@@ -488,7 +488,7 @@ void Foam::solidSubMeshes::mapSubMeshPointFields
 
                     IPstream::read
                     (
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                         Pstream::commsTypes::blocking,
 #else
                         Pstream::blocking,

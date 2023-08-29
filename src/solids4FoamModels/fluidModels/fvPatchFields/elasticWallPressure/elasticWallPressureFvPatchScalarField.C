@@ -83,7 +83,7 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 }
 
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
 (
     const elasticWallPressureFvPatchScalarField& pivpvf
@@ -135,7 +135,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
         return;
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const fvMesh& mesh = internalField().mesh();
 #else
     const fvMesh& mesh = dimensionedInternalField().mesh();
@@ -202,8 +202,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
             mesh.time().constant(),
             mesh,
             IOobject::MUST_READ,
-            IOobject::NO_WRITE,
-            false  // Do not register
+            IOobject::NO_WRITE
         )
     );
 
@@ -225,7 +224,7 @@ void elasticWallPressureFvPatchScalarField::updateCoeffs()
     const fvPatch& p = patch();
     const vectorField n(p.nf());
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const word fieldName = internalField().name();
 #else
     const word fieldName = dimensionedInternalField().name();
@@ -268,6 +267,7 @@ void elasticWallPressureFvPatchScalarField::patchFlux
     scalarField rAU(patch().size(), 0.0);
     if (db().foundObject<volScalarField>("rAU"))
     {
+        Info<< "Found rAU" << endl;
         rAU = patch().lookupPatchField<volScalarField, scalar>("rAU");
     }
     else
@@ -275,7 +275,7 @@ void elasticWallPressureFvPatchScalarField::patchFlux
         rAU = patch().lookupPatchField<surfaceScalarField, scalar>("rAUf");
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     flux.boundaryFieldRef()[patch().index()] = rAU*snGrad()*patch().magSf();
 #else
     flux.boundaryField()[patch().index()] = rAU*snGrad()*patch().magSf();

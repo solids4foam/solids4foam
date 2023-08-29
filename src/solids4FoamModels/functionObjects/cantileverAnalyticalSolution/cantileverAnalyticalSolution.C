@@ -121,7 +121,7 @@ bool Foam::cantileverAnalyticalSolution::writeData()
         {
             if (mesh.boundary()[patchI].type() != "empty")
             {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
                 vectorField& aDP = analyticalD.boundaryFieldRef()[patchI];
 #else
@@ -393,7 +393,7 @@ bool Foam::cantileverAnalyticalSolution::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
 bool Foam::cantileverAnalyticalSolution::write()
 {
     return false;

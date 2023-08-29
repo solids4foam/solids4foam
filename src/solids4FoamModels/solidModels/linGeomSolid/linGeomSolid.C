@@ -107,7 +107,7 @@ bool linGeomSolid::evolve()
     do
     {
         int iCorr = 0;
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
         SolverPerformance<vector> solverPerfDD;
         SolverPerformance<vector>::debug = 0;
 #else
@@ -142,7 +142,7 @@ bool linGeomSolid::evolve()
             solidModel::setCellDisps(DDEqn);
 
             // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
             const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
 #endif
 
@@ -170,7 +170,7 @@ bool linGeomSolid::evolve()
             !converged
             (
                 iCorr,
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
                 mag(solverPerfDD.initialResidual()),
                 cmptMax(solverPerfDD.nIterations()),
 #else
@@ -195,7 +195,7 @@ bool linGeomSolid::evolve()
     // Store d2dt2
     rhoD2dt2D() = rho()*fvc::d2dt2(D());
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

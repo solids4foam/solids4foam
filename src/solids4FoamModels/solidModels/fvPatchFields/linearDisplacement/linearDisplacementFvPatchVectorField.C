@@ -74,7 +74,7 @@ linearDisplacementFvPatchVectorField::linearDisplacementFvPatchVectorField
     }
 }
 
-#ifndef OPENFOAM_ORG
+#ifndef OPENFOAMFOUNDATION
 linearDisplacementFvPatchVectorField::linearDisplacementFvPatchVectorField
 (
     const linearDisplacementFvPatchVectorField& pivpvf

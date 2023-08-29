@@ -101,7 +101,7 @@ public:
         fixedTemperatureGradientFvPatchScalarField
         (
             const fixedTemperatureGradientFvPatchScalarField&
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         ) = delete;
 #else
         );

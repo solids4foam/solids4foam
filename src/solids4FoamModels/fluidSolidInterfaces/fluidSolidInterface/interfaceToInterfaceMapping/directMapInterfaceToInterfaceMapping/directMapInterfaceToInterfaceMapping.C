@@ -19,7 +19,7 @@ License
 
 #include "directMapInterfaceToInterfaceMapping.H"
 #include "addToRunTimeSelectionTable.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "Time.H"
 #endif
 
@@ -93,7 +93,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBFaceMap() const
         IOobject::MUST_READ
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (mapHeader.typeHeaderOk<labelIOList>(true))
 #else
     if (mapHeader.headerOk())
@@ -225,7 +225,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAFaceMap() const
         IOobject::MUST_READ
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (mapHeader.typeHeaderOk<labelIOList>(true))
 #else
     if (mapHeader.headerOk())
@@ -358,7 +358,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBPointMap() const
         IOobject::MUST_READ
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (mapHeader.typeHeaderOk<labelIOList>(true))
 #else
     if (mapHeader.headerOk())
@@ -479,7 +479,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAPointMap() const
         IOobject::MUST_READ
     );
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     if (mapHeader.typeHeaderOk<labelIOList>(true))
 #else
     if (mapHeader.headerOk())

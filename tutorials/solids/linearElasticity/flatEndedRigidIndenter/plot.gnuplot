@@ -15,7 +15,7 @@ set grid
 set xlabel "x [m]" font "Arial,20"
 set ylabel "p_n [MPa]" font "Arial,20"
 
-path = "postProcessing/surfaces/1/sigma_surface.raw"
+path = "./postProcessing/surfaces/1/sigma_surface.raw"
 
 a = 10    # In mm to get MPa
 F = 10000 # In N

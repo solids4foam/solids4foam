@@ -164,7 +164,7 @@ void solidDirectionMixedFvPatchVectorField::evaluate(const Pstream::commsTypes)
         const fvPatchField<tensor>& gradD =
             patch().lookupPatchField<volTensorField, tensor>
             (
-            #ifdef OPENFOAM_NOT_EXTEND
+            #ifdef OPENFOAMESIORFOUNDATION
                 "grad(" + internalField().name() + ")"
             #else
                 "grad(" + dimensionedInternalField().name() + ")"
@@ -268,7 +268,7 @@ solidDirectionMixedFvPatchVectorField::snGrad() const
         const fvPatchField<tensor>& gradField =
             patch().lookupPatchField<volTensorField, tensor>
             (
-            #ifdef OPENFOAM_NOT_EXTEND
+            #ifdef OPENFOAMESIORFOUNDATION
                 "grad(" + internalField().name() + ")"
             #else
                 "grad(" + dimensionedInternalField().name() + ")"

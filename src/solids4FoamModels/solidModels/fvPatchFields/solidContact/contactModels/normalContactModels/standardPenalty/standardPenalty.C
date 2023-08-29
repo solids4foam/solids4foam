@@ -27,7 +27,7 @@ License
 
 namespace Foam
 {
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     typedef labelUList unallocLabelList;
 #endif
 
@@ -83,7 +83,7 @@ void standardPenalty::calcPenaltyFactor() const
         scalarField masterV(mesh_.boundary()[masterPatchIndex].size(), 0.0);
         scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const DimensionedField<scalar, volMesh>& V = mesh_.V();
 #else
     const volScalarField::DimensionedInternalField& V = mesh_.V();
@@ -124,7 +124,7 @@ void standardPenalty::calcPenaltyFactor() const
         // Average contact patch cell volume
         scalarField slaveV(mesh_.boundary()[slavePatchIndex].size(), 0.0);
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     const DimensionedField<scalar, volMesh>& V = mesh_.V();
 #else
     const volScalarField::DimensionedInternalField& V = mesh_.V();
@@ -424,7 +424,7 @@ void standardPenalty::autoMap(const fvPatchFieldMapper& m)
 
     // The internal fields for the volFields should always be zero
     // We will reset them as they may not be zero after field advection
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     slavePressureVolField_.primitiveFieldRef() = vector::zero;
     areaInContactVolField_.primitiveFieldRef() = 0.0;
 #else

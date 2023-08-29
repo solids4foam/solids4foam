@@ -43,7 +43,7 @@ SourceFiles
 #include "runTimeSelectionTables.H"
 #include "pimpleControl.H"
 #include "pisoControl.H"
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
         #include "gravityMeshObject.H"
 #else
     #include "uniformDimensionedFields.H"
@@ -52,10 +52,10 @@ SourceFiles
 #if FOAMEXTEND
     #include "oversetMesh.H"
 #endif
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
     #include "fvModels.H"
     #include "fvConstraints.H"
-#elif OPENFOAM_COM
+#elif OPENFOAMESI
     #include "fvOptions.H"
 #endif
 
@@ -92,7 +92,7 @@ class fluidModel
         const IOdictionary waveProperties_;
 
         //- Gravitional acceleration
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
         const meshObjects::gravity g_;
 #else
         const uniformDimensionedVectorField g_;
@@ -143,13 +143,13 @@ class fluidModel
         //- Cumulative continuity error
         scalar cumulativeContErr_;
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
         //- fvModels
         fvModels& fvModels_;
 
         //- fvConstraints
         fvConstraints& fvConstraints_;
-#elif OPENFOAM_COM
+#elif OPENFOAMESI
         //- fvOptions
         fv::options& fvOptions_;
 #endif
@@ -179,7 +179,7 @@ class fluidModel
         void makePimpleControl() const;
 
         //- Read g field from disk, if it exists, otherwise return zero field
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
         meshObjects::gravity readG() const;
 #else
         uniformDimensionedVectorField readG() const;
@@ -325,7 +325,7 @@ public:
 #endif
 
             //- Return const gravity field
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
             virtual const meshObjects::gravity& g() const
 #else
             virtual const uniformDimensionedVectorField& g() const
@@ -394,7 +394,7 @@ public:
                 return phiPtr_();
             }
 
-#ifdef OPENFOAM_ORG
+#ifdef OPENFOAMFOUNDATION
             //- Return fvModels
             const fvModels& models() const
             {
@@ -418,7 +418,7 @@ public:
             {
                 return fvConstraints_;
             }
-#elif OPENFOAM_COM
+#elif OPENFOAMESI
             //- Return fvOptions
             const fv::options& options() const
             {

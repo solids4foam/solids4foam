@@ -30,7 +30,7 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_COM
+#ifdef OPENFOAMESI
 
 #ifndef realEigenValues_H
 #define realEigenValues_H
@@ -54,6 +54,6 @@ namespace Foam
 
 #endif
 
-#endif // OPENFOAM_COM
+#endif // OPENFOAMESI
 
 // ************************************************************************* //
