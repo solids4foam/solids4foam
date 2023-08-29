@@ -171,17 +171,29 @@ function solids4Foam::convertCaseFormat()
             sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
         fi
     fi
-
-    # # 10. Resolve force post-processing path from foam-extend
+    # 10. Resolve force post-processing path from foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
-        if [[ $WM_PROJECT_VERSION == *"v"* ]]
-        then
-            echo "Modifying force.gnuplot in consistent with ESI version"
-            sed -i "s|forces.dat|force.dat|g" force.gnuplot
-        fi
+        echo "Updating force.gnuplot"
+        sed -i "s|forces/0/forces.dat|./postProcessing/fluid/forces/0/force.dat|g" force.gnuplot
     fi
 
+    # 11. Resolve sample post-processing path from foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        sed -i "s|postProcessing/sets/|postProcessing/sample/|g" plot.gnuplot
+    fi
+
+    # 11. Resolve sampleDict post-processing path from foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        echo "-------------------"
+        sed -i  "s|path = \"postProcessing/surfaces/1/sigma_surface.raw\"
+                  |path = \"postProcessing/sampleDict.v2012/1/sigma_surface.raw\"|g" plot.gnuplot
+    fi        
+    
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -340,6 +352,28 @@ function solids4Foam::convertCaseFormatFoamExtend()
             sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
         fi
     fi
+    
+    # 10. Resolve force post-processing path for foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
+    then
+        echo "Updating force.gnuplot"
+        sed -i "s|./postProcessing/fluid/forces/0/force.dat|forces/0/forces.dat|g" force.gnuplot
+    fi
+
+    # 11. Resolve sampleDict post-processing path for foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        sed -i "s|path = \"postProcessing/sampleDict.v2012/1/sigma_surface.raw\"
+                 |path = \"postProcessing/surfaces/1/sigma_surface.raw\"|g" plot.gnuplot
+    fi
+    
+    # 11. Resolve sample post-processing path from foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        sed -i "s|postProcessing/sample/|postProcessing/sets/|g" plot.gnuplot
+    fi
 
     # 10. Resolve force post-processing path for foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
@@ -400,6 +434,22 @@ function solids4Foam::caseOnlyRunsWithFoamExtend()
     if [[ $WM_PROJECT != "foam" ]]
     then
         echo; echo "This case currently only runs in foam-extend"; echo
+        exit 0
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# caseOnlyRunsWithOpenFOAM
+#     Give error if OpenFOAM version is foam-extend
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::caseDoesNotRunWithFoamExtend()
+{
+    if [[ $WM_PROJECT == "foam" ]]
+    then
+        echo; echo "This case currently does not run with foam-extend"; echo
         exit 0
     fi
 }

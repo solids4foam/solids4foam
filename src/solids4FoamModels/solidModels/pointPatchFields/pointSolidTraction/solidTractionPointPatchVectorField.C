@@ -29,7 +29,7 @@ License
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "Time.H"
 #endif
 
@@ -134,7 +134,7 @@ solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
 )
 :
     calculatedPointPatchVectorField(p, iF),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     traction_(mapper(ptf.traction_)),
     pressure_(mapper(ptf.pressure_)),
 #else
@@ -147,7 +147,7 @@ solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
 {}
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 solidTractionPointPatchVectorField::solidTractionPointPatchVectorField
 (
     const solidTractionPointPatchVectorField& ptf
@@ -187,7 +187,7 @@ void solidTractionPointPatchVectorField::autoMap
 )
 {
     //Field<vector>::autoMap(m);
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     m(traction_, traction_);
     m(pressure_, pressure_);
 #else
@@ -254,7 +254,7 @@ void solidTractionPointPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "traction", traction_);
 #else
         traction_.writeEntry("traction", os);
@@ -270,7 +270,7 @@ void solidTractionPointPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "pressure", pressure_);
 #else
         pressure_.writeEntry("pressure", os);

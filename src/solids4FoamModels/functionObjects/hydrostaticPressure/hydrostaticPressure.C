@@ -133,7 +133,7 @@ bool Foam::hydrostaticPressure::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::hydrostaticPressure::write()
 {
     return false;

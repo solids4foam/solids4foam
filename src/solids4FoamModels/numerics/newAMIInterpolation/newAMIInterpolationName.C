@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
 
 #include "newAMIInterpolation.H"
 
@@ -29,6 +29,6 @@ defineTypeNameAndDebug(newAMIInterpolationName, 0);
 }
 
 
-#endif // end of #ifdef OPENFOAMFOUNDATION
+#endif // end of #ifdef OPENFOAM_ORG
 
 // ************************************************************************* //

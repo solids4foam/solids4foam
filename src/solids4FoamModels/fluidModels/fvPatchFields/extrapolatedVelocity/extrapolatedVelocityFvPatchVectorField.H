@@ -93,7 +93,7 @@ public:
         extrapolatedVelocityFvPatchVectorField
         (
             const extrapolatedVelocityFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );
@@ -133,7 +133,7 @@ public:
         //- Evaluate the patch field
         virtual void evaluate
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
 #else
             const Pstream::commsTypes commsType = Pstream::blocking

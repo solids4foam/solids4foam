@@ -120,7 +120,7 @@ public:
         fixedRotationFvPatchVectorField
         (
             const fixedRotationFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );

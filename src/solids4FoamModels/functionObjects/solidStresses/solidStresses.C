@@ -220,7 +220,7 @@ bool Foam::solidStresses::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::solidStresses::write()
 {
     return false;

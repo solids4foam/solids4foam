@@ -223,7 +223,7 @@ void Foam::anisotropicBiotElastic::correct(volSymmTensorField& sigma)
     // sigma = C:epsilon
 
     // Take references for convenience and efficiency
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     symmTensorField& sigmaI = sigma.primitiveFieldRef();
 #else
     symmTensorField& sigmaI = sigma.internalField();
@@ -261,7 +261,7 @@ void Foam::anisotropicBiotElastic::correct(volSymmTensorField& sigma)
     forAll(sigma.boundaryField(), patchI)
     {
         // Take references for convenience and efficiency
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         symmTensorField& sigmaP = sigma.boundaryFieldRef()[patchI];
 #else
         symmTensorField& sigmaP = sigma.boundaryField()[patchI];

@@ -67,7 +67,7 @@ linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVec
     Info<< "Creating " << type() << " boundary condition" << endl;
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVectorField
 (
     const linearSpatialDisplacementFvPatchVectorField& ptf

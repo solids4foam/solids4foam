@@ -35,17 +35,32 @@ namespace Foam
 
 Foam::autoPtr<Foam::simpleCohesiveZoneLaw> Foam::simpleCohesiveZoneLaw::New
 (
-    const word& simpleCohesiveZoneLawName,
+    const word& modelType,
     const dictionary& dict
 )
 {
     if (debug)
     {
-        Info << "Selecting cohesive law: " << simpleCohesiveZoneLawName << endl;
+        Info << "Selecting cohesive law: " << modelType << endl;
     }
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            dict,
+            "simpleCohesiveZoneLaw",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(simpleCohesiveZoneLawName);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -53,17 +68,17 @@ Foam::autoPtr<Foam::simpleCohesiveZoneLaw> Foam::simpleCohesiveZoneLaw::New
         (
             "simpleCohesiveZoneLaw::New(const word& simpleCohesiveZoneLawName, "
             "const dictionary& dict)"
-        )   << "Unknown cohesive law " << simpleCohesiveZoneLawName
+        )   << "Unknown cohesive law " << modelType
             << endl << endl
             << "Valid cohesive laws are :" << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalError);
     }
 
-    return autoPtr<simpleCohesiveZoneLaw>
-    (
-        cstrIter()(simpleCohesiveZoneLawName, dict)
-    );
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<simpleCohesiveZoneLaw>(ctorPtr(modelType, dict));
 }
 
 

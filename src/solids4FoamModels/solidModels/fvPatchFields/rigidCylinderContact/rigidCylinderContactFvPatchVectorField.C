@@ -87,7 +87,7 @@ rigidCylinderContactFvPatchVectorField
     relaxFactor_(tdpvf.relaxFactor_)
 {}
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 rigidCylinderContactFvPatchVectorField::
 rigidCylinderContactFvPatchVectorField
 (

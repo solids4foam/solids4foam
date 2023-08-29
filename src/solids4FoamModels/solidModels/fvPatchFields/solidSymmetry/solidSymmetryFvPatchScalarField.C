@@ -69,7 +69,7 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
 #else
@@ -108,7 +108,7 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
 #else
@@ -119,7 +119,7 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
     }
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 (
     const solidSymmetryFvPatchScalarField& ptf
@@ -155,7 +155,7 @@ tmp<Field<scalar> > solidSymmetryFvPatchScalarField::snGrad() const
     const fvPatchField<vector>& gradU =
         patch().lookupPatchField<volVectorField, vector>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"
@@ -195,7 +195,7 @@ void solidSymmetryFvPatchScalarField::evaluate(const Pstream::commsTypes)
     const fvPatchField<vector>& gradU =
         patch().lookupPatchField<volVectorField, vector>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"
@@ -221,7 +221,7 @@ void solidSymmetryFvPatchScalarField::write(Ostream& os) const
 {
     fvPatchScalarField::write(os);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

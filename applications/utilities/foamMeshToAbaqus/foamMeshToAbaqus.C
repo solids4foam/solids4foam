@@ -338,7 +338,7 @@ int main(int argc, char *argv[])
     );
 
     // Check U exists
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (materialsHeader.typeHeaderOk<volScalarField>(true))
 #else
     if (materialsHeader.headerOk())

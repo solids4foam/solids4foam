@@ -108,7 +108,7 @@ public:
         solidForceFvPatchVectorField
         (
             const solidForceFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );

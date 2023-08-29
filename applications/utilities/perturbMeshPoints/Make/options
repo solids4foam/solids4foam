@@ -1,13 +1,7 @@
-ifeq ($(WM_PROJECT), foam)
-    VERSION_SPECIFIC_INC = -DFOAMEXTEND
-else
-    VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
-    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
-        VERSION_SPECIFIC_INC += -DOPENFOAMESI
-    else
-        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
-    endif
-endif
+SOLIDS4FOAM_ROOT := ../../..
+
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 
 EXE_INC = \
     $(VERSION_SPECIFIC_INC) \

@@ -23,7 +23,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
 
 #include "realEigenValues.H"
 
@@ -65,6 +65,6 @@ tensor realEigenVectors(const tensor& t)
 
 } // End namespace Foam
 
-#endif // OPENFOAMESI
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //

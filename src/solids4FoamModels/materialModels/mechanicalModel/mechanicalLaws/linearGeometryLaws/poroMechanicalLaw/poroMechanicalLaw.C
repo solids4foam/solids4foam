@@ -27,6 +27,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
 #include "mechanicalModel.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
