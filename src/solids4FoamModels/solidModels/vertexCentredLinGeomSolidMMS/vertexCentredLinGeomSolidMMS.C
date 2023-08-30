@@ -79,21 +79,24 @@ void vertexCentredLinGeomSolidMMS::updateSource
     //const scalarField& pointRhoI = pointRho_.internalField();
     
     //Coefficients for expression
-    const scalar& ax = 2;
-    const scalar& ay = 4;
-    const scalar& az = 6;
+    const scalar ax = 2;
+    const scalar ay = 4;
+    const scalar az = 6;
     
-	// Read the Young's modulus
-    const scalar& E = 200e9;
+    //pi
+    const scalar pi = constant::mathematical::pi; 
+    
+	// Young's modulus
+    const scalar E = 200e9;
 
-    // Read the Poisson's ratio
-    const scalar& nu = 0.3;
+    // Poisson's ratio
+    const scalar nu = 0.3;
 
     // Set the shear modulus
-    const scalar& mu = E/(2.0*(1.0 + nu));
+    const scalar mu = E/(2.0*(1.0 + nu));
 
     // Set lambda
-    const scalar& lambda = (E*nu)/((1.0+nu)*(1.0-2.0*nu));
+    const scalar lambda = (E*nu)/((1.0+nu)*(1.0-2.0*nu));
 
     // Calculate the tractions on the dual faces
     surfaceVectorField dualTraction
@@ -170,33 +173,35 @@ void vertexCentredLinGeomSolidMMS::updateSource
 	                                                                                                                                             
 		//Set vector in dualCellI for x-equation     	
     	bodyForcesI[vertexI].x() =
-    	(2*mu + lambda)*(-16*ax*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::sin(3.14159*z)) +
-    	mu*(8*ax*3.14159*3.14159*Foam::cos(4*3.14159*x)*Foam::cos(2*3.14159*y)*Foam::sin(3.14159*z) +
-    	4*ax*3.14159*3.14159*Foam::cos(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::cos(3.14159*z) -
-    	16*ay*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::sin(3.14159*z) -
-    	16*az*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::sin(3.14159*z)) +
-    	lambda*(8*ay*3.14159*3.14159*Foam::cos(4*3.14159*x)*Foam::cos(2*3.14159*y)*Foam::sin(3.14159*z) +
-    	4*az*3.14159*3.14159*Foam::cos(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::cos(3.14159*z));
+    	(2*mu + lambda)*(-16*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) +
+    	mu*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) +
+    	4*ax*pi*pi*Foam::cos(4*pi*x)*Foam::sin(2*pi*y)*Foam::cos(pi*z) -
+    	16*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z) -
+    	16*az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) +
+    	lambda*(8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) +
+    	4*az*pi*pi*Foam::cos(4*pi*x)*Foam::sin(2*pi*y)*Foam::cos(pi*z));
  
 		//Set vector in dualCellI for y-equation  
-    	bodyForcesI[vertexI].y() =
-    	(2*mu + lambda)*(-4*ay*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::sin(3.14159*z)) +
-    	mu*(2*ay*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::cos(2*3.14159*y)*Foam::cos(3.14159*z) +
-    	8*ay*3.14159*3.14159*Foam::cos(4*3.14159*x)*Foam::cos(2*3.14159*y)*Foam::sin(3.14159*z) -
-    	4*ax*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::sin(3.14159*z) -
-    	4*az*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::sin(3.14159*z)) +
-    	lambda*(8*ax*3.14159*3.14159*Foam::cos(4*3.14159*x)*Foam::cos(2*3.14159*y)*Foam::sin(3.14159*z) +
-    	2*az*3.14159*3.14159*Foam::cos(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::cos(3.14159*z));    	
+    	bodyForcesI[vertexI].y() = 
+    	(2*mu + lambda)*(-4*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) +
+    	mu*(2*ay*pi*pi*Foam::sin(4*pi*x)*Foam::cos(2*pi*y)*Foam::cos(pi*z) +
+    	8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) -
+    	4*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z) -
+    	4*az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) +
+    	lambda*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) +
+    	2*az*pi*pi*Foam::cos(4*pi*x)*Foam::sin(2*pi*y)*Foam::cos(pi*z));    	
  
     	//Set vector in dualCellI for z-equation  
     	bodyForcesI[vertexI].z() =
-    	(2*mu + lambda)*(-az*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::sin(3.14159*z)) +
-    	mu*(4*az*3.14159*3.14159*Foam::cos(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::cos(3.14159*z) +
-    	2*az*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::cos(2*3.14159*y)*Foam::cos(3.14159*z) -
-    	ax*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::sin(3.14159*z) -
-    	ay*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::sin(3.14159*z)) +
-    	lambda*(4*ax*3.14159*3.14159*Foam::cos(4*3.14159*x)*Foam::sin(2*3.14159*y)*Foam::cos(3.14159*z) +
-    	2*ay*3.14159*3.14159*Foam::sin(4*3.14159*x)*Foam::cos(2*3.14159*y)*Foam::cos(3.14159*z));
+    	(2*mu + lambda)*(-az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) +
+    	mu*(4*az*pi*pi*Foam::cos(4*pi*x)*Foam::sin(2*pi*y)*Foam::cos(pi*z) +
+    	2*az*pi*pi*Foam::sin(4*pi*x)*Foam::cos(2*pi*y)*Foam::cos(pi*z) -
+    	ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z) -
+    	ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) +
+    	lambda*(4*ax*pi*pi*Foam::cos(4*pi*x)*Foam::sin(2*pi*y)*Foam::cos(pi*z) +
+    	2*ay*pi*pi*Foam::sin(4*pi*x)*Foam::cos(2*pi*y)*Foam::cos(pi*z));
+    	
+    	//Info << "bodyforce for vertex " << vertexI << " with coordinates ( " << x << " " << y << " " << z << " ): " << bodyForcesI[vertexI] << endl; 
     	
  
     }
@@ -204,7 +209,7 @@ void vertexCentredLinGeomSolidMMS::updateSource
     // Add body force field to source
     source -= bodyForcesI;
     
-    Info << "source: " << source;
+    //Info << "source: " << source;
     
 //    forAll(dualDivSigma, dualCellI)
 //    {
