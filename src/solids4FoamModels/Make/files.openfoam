@@ -20,7 +20,8 @@ solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
-solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
+/* solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C */
+solidModels/vertexCentredLinGeomSolidMMS/vertexCentredLinGeomSolidMMS.C
 /* solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C */
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
@@ -146,6 +147,7 @@ functionObjects/cantileverAnalyticalSolution/cantileverStressDisplacement.C
 functionObjects/hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
 functionObjects/hydrostaticPressure/hydrostaticPressure.C
 functionObjects/plateHoleAnalyticalSolution/plateHoleAnalyticalSolution.C
+functionObjects/MMSCubeAnalyticalSolution/MMSCubeAnalyticalSolution.C
 functionObjects/principalStresses/principalStresses.C
 functionObjects/principalStresses/principalStressFields.C
 functionObjects/solidDisplacements/solidDisplacements.C
