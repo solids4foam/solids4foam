@@ -131,22 +131,27 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
 
     // Point coordinates
     const pointField& points = mesh.points();
+    
+    //Cell-centre coordinates 
+    const volVectorField& C = mesh.C();
+    const vectorField& CI = C;
 
     // Point analytical fields
     if (pointDisplacement_ || pointStress_)
     {
-        pointSymmTensorField analyticalStress
+        volSymmTensorField analyticalStress
         (
             IOobject
             (
-                "analyticalPointStress",
+                "analyticalCellStress",
                 time_.timeName(),
                 mesh,
                 IOobject::NO_READ,
                 IOobject::AUTO_WRITE
             ),
-            pMesh,
-            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+            mesh,
+            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero),
+            "calculated"
         );
 
         pointVectorField analyticalD
@@ -166,18 +171,42 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
         symmTensorField& sI = analyticalStress;
         vectorField& aDI = analyticalD;
 
-        forAll(sI, pointI)
+        forAll(sI, cellI)
         {
             if (pointStress_)
             {
-                sI[pointI] = MMSCubeStress(points[pointI]);
+                sI[cellI] = MMSCubeStress(CI[cellI]);
             }
+            
+        }
+            
+        forAll(aDI, pointI)
+        {
 
             if (pointDisplacement_)
             {
                 aDI[pointI] = MMSCubeDisplacement(points[pointI]);
             }
         }
+        
+        forAll(analyticalStress.boundaryField(), patchI)
+        {
+            if (mesh.boundary()[patchI].type() != "empty")
+            {
+#ifdef OPENFOAMESIORFOUNDATION
+                symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
+#else
+                symmTensorField& sP = analyticalStress.boundaryField()[patchI];
+#endif
+                const vectorField& CP = C.boundaryField()[patchI];
+
+                forAll(sP, faceI)
+                {
+                	sP[faceI] = MMSCubeStress(CP[faceI]);
+                }
+            }
+        }
+        
 
         // Write point analytical fields
         if (pointStress_)
@@ -230,29 +259,50 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
                 << nl << endl;
         }
         
+        
         //Not working
         if
         (
             pointStress_
-         && mesh.foundObject<pointTensorField>("sigma")
+         && mesh.foundObject<volSymmTensorField>("sigma")
         )
         {
             
-            const pointTensorField& pointSigma =
-                mesh.lookupObject<pointTensorField>("sigma");
+            const volSymmTensorField& pointSigma =
+                mesh.lookupObject<volSymmTensorField>("sigma");
 
-            const pointTensorField diffSigma
+            const volSymmTensorField diffSigma
             (
                 "pointSigmaDifference", analyticalStress - pointSigma
             );
             Info<< "Writing pointSigmaDifference field" << endl;
             diffSigma.write();
 
-            const tensorField& diffSigmaI = diffSigma;
+            const symmTensorField& diffSigmaI = diffSigma;
             Info<< "    Sigma norms: mean L1, mean L2, LInf: " << nl
-                << "    " << gAverage(mag(diffSigmaI))
-                << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI)))
-                << " " << gMax(mag(diffSigmaI))
+                << "    Component XX: " << gAverage(mag(diffSigmaI.component(0)))
+                << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(0))))
+                << " " << gMax(mag(diffSigmaI.component(0)))
+                << nl 
+                << "    Component XY: " << gAverage(mag(diffSigmaI.component(1)))
+                << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(1))))
+                << " " << gMax(mag(diffSigmaI.component(1)))
+                << nl 
+                << "    Component XZ: " << gAverage(mag(diffSigmaI.component(2)))
+                << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(2))))
+                << " " << gMax(mag(diffSigmaI.component(2)))
+                << nl 
+                << "    Component YY: " << gAverage(mag(diffSigmaI.component(3)))
+                << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(3))))
+                << " " << gMax(mag(diffSigmaI.component(3)))
+                << nl 
+                << "    Component YZ: " << gAverage(mag(diffSigmaI.component(4)))
+                << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(4))))
+                << " " << gMax(mag(diffSigmaI.component(4)))
+                << nl 
+                << "    Component ZZ: " << gAverage(mag(diffSigmaI.component(5)))
+                << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(5))))
+                << " " << gMax(mag(diffSigmaI.component(5)))
                 << nl << endl;
         }
     }
