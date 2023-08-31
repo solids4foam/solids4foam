@@ -96,7 +96,7 @@ void vertexCentredLinGeomSolidMMS::updateSource
     const scalar mu = E/(2.0*(1.0 + nu));
 
     // Set lambda
-    const scalar lambda = (E*nu)/((1.0+nu)*(1.0-2.0*nu));
+    const scalar lambda = (E*nu)/((1.0 + nu)*(1.0 - 2.0*nu));
 
     // Calculate the tractions on the dual faces
     surfaceVectorField dualTraction
@@ -151,7 +151,7 @@ void vertexCentredLinGeomSolidMMS::updateSource
 	forAll(bodyForcesI, vertexI)
 	{
 
-//	    // Take a reference to the current primary volume
+	    // Take a reference to the current primary volume
 //	    const scalar curV = V[vertexI];
 //	    
 //	    //Take a reference to the current primary cell
@@ -175,44 +175,34 @@ void vertexCentredLinGeomSolidMMS::updateSource
 	    const scalar z = points[vertexI].z();
 	                                                                                                                                             
 		//Set vector in dualCellI for x-equation     	
-    	bodyForcesI[vertexI].x() = 
-    	mu*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-    	+ 4*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
-    	- 16*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z) 
-    	- 16*az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-    	+ lambda*(8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-    	+ 4*az*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)) 
-    	- 16*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)*(lambda + 2*mu);
- 
+    	bodyForcesI[vertexI].x() =
+    	lambda*(8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
+    	+ 4*az*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
+    	- 16*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+    	+ mu*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
+    	+ 4*az*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
+    	- 5*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+    	- 32*ax*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
 
- 
 		//Set vector in dualCellI for y-equation  
-    	bodyForcesI[vertexI].y() = 
-    	mu*(8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-    	+ 2*ay*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-    	- 4*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z) 
-    	- 4*az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-    	+ lambda*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-    	+ 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)) 
-    	- 4*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)*(lambda + 2*mu);
- 
-  	
- 
-    	//Set vector in dualCellI for z-equation  
-    	bodyForcesI[vertexI].z() = 
-    	mu*(4*az*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
+    	bodyForcesI[vertexI].y() =
+    	lambda*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
     	+ 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-    	- ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z) 
-    	- ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-    	+ lambda*(4*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
-    	+ 2*ay*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)) 
-    	- az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)*(lambda + 2*mu);
+    	- 4*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+    	+ mu*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
+    	+ 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
+    	- 17*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+    	- 8*ax*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
  
-
-    	
-    	//Info << "bodyforce for vertex " << vertexI << " with coordinates ( " << x << " " << y << " " << z << " ): " << bodyForcesI[vertexI] << endl; 
-    	
- 
+    	//Set vector in dualCellI for -equation  
+    	bodyForcesI[vertexI].z() =
+    	lambda*(4*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
+    	+ 2*ay*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
+    	- az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+    	+ mu*(4*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
+    	+ 2*ay*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
+    	- 20*az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+    	- 2*az*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
     }
     
     // Add body force field to source
