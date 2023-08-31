@@ -1,8 +1,11 @@
 #!/bin/bash
 # This script was adapted from foamChangeCopyright in foam-extend-4.1
 
+# Read original file
+orig_file=$(< "$1")
+
 perl -0777 -p -i -e '
-s!(([#% ]*) *)License\n.*?\n[#%]*\n.*?\n[#%]*\n.*?\n[#%]*\n.*?\n[#%]*\n!$1License
+s!(([#% ]*) *)(  =========.*?\n)\n.*?\n[#%]*\n.*?\n[#%]*\n.*?\n[#%]*\n!$1License
 $1    This file is part of solids4foam.
 $2
 $1    solids4foam is free software: you can redistribute it and/or modify it
@@ -21,4 +24,16 @@ $2
 !s;
 s/[ \t]+$//mg;
 ' $1
+
+# Read modified file
+mod_file=$(< "$1")
+
+# Compare original and modified file
+if [ "$orig_file" != "$mod_file" ]; then
+    echo "The header has been updated!"
+    exit 1;
+else
+    echo "No changes have been made!"
+    exit 0;
+fi
 
