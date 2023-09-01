@@ -66,13 +66,6 @@ then
         "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/EulerDdtScheme" \
         "$FOAM_SRC/finiteVolume"
     if [ $? -ne 0 ]; then result=1; fi
-    # This fixes consistent Rhie-Chow interpolation
-    # for Euler scheme
-    checkAndReport \
-        "backwardDdtScheme.C" \
-        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
-        "$FOAM_SRC/finiteVolume"
-    if [ $? -ne 0 ]; then result=1; fi
 else
     echo "No fixes needed for this version of OpenFOAM"; echo
     exit 0;
