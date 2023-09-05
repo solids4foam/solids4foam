@@ -394,7 +394,7 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
     E_("zero", dimPressure, 0.0),
@@ -631,7 +631,7 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
     Hp_(0.0),
     maxDeltaErr_
     (
-        mesh.time().controlDict().lookupOrDefault<scalar>("maxDeltaErr", 0.01)
+        mesh.time().controlDict().lookupOrAddDefault<scalar>("maxDeltaErr", 0.01)
     )
 {
     if (planeStress())

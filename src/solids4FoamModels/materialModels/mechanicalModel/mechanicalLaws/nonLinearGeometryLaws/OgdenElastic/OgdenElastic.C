@@ -51,7 +51,7 @@ Foam::OgdenElastic::OgdenElastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
     mu1_(dict.lookup("mu1")),
     mu2_(dict.lookup("mu2")),
     mu3_(dict.lookup("mu3")),

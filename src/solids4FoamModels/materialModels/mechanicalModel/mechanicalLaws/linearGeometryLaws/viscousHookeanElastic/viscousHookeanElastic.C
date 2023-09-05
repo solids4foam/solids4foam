@@ -52,7 +52,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
     EInf_(dict.lookup("EInfinity")),
     E_(dict.lookup("E")),
     tau_(dict.lookup("relaxationTimes")),
@@ -92,7 +92,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     ),
     WilliamsLandelFerryShift_
     (
-        dict.lookupOrDefault<Switch>("WilliamsLandelFerry", false)
+        dict.lookupOrAddDefault<Switch>("WilliamsLandelFerry", false)
     ),
     C1_
     (

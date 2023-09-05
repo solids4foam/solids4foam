@@ -1475,4 +1475,10 @@ void Foam::fluidSolidInterface::writeFields(const Time& runTime)
     solid().writeFields(runTime);
 }
 
+void Foam::fluidSolidInterface::end()
+{
+    *this->IOobject::name()=*this->IOobject::name()+"_out";
+    *this->IOobject::write();
+}
+
 // ************************************************************************* //

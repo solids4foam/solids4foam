@@ -563,7 +563,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
     JPtr_(),
@@ -851,7 +851,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     nonLinearPlasticity_(stressPlasticStrainSeries_.size() > 2),
     updateBEbarConsistent_
     (
-        dict.lookupOrDefault<Switch>
+        dict.lookupOrAddDefault<Switch>
         (
             "updateBEbarConsistent",
             Switch(true)
@@ -860,7 +860,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     Hp_(0.0),
     maxDeltaErr_
     (
-        mesh.time().controlDict().lookupOrDefault<scalar>("maxDeltaErr", 0.01)
+        mesh.time().controlDict().lookupOrAddDefault<scalar>("maxDeltaErr", 0.01)
     )
 {
     Info<< "    updateBEbarConsistent: " << updateBEbarConsistent_ << endl;

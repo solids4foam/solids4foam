@@ -64,7 +64,7 @@ void Foam::mechanicalModel::makeSolSubMeshes() const
             mesh_,
             cellZoneNames_,
             incremental_,
-            lookupOrDefault<Switch>("writeSubMeshes",  false)
+            lookupOrAddDefault<Switch>("writeSubMeshes",  false)
         )
     );
 }

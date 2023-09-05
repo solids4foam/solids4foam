@@ -53,7 +53,7 @@ Foam::linearElasticFromFile::linearElasticFromFile
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
     E_
     (
         IOobject

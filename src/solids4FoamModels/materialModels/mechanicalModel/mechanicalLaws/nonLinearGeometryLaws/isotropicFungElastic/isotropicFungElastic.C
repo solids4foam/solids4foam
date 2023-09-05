@@ -50,7 +50,7 @@ Foam::isotropicFungElastic::isotropicFungElastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
     c1_
     (
         IOobject

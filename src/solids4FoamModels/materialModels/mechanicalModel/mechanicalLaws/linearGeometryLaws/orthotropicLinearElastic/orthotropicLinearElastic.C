@@ -296,7 +296,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
     E1_(dict.lookup("E1")),
     E2_(dict.lookup("E2")),
     E3_(dict.lookup("E3")),
@@ -329,7 +329,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
         dimensionedVector
         (
 #ifdef FOAMEXTEND
-            dict.lookupOrDefault<vector>("materialDirectionX", vector(1,0,0))
+            dict.lookupOrAddDefault<vector>("materialDirectionX", vector(1,0,0))
 #else
             vector(1,0,0) // Only global directions allowed
 #endif
@@ -353,7 +353,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
         dimensionedVector
         (
 #ifdef FOAMEXTEND
-            dict.lookupOrDefault<vector>("materialDirectionX", vector(0,1,0))
+            dict.lookupOrAddDefault<vector>("materialDirectionX", vector(0,1,0))
 #else
             vector(0,1,0) // Only global directions allowed
 #endif
@@ -377,7 +377,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
         dimensionedVector
         (
 #ifdef FOAMEXTEND
-            dict.lookupOrDefault<vector>("materialDirectionX", vector(0,0,1))
+            dict.lookupOrAddDefault<vector>("materialDirectionX", vector(0,0,1))
 #else
             vector(0,0,1) // Only global directions allowed
 #endif

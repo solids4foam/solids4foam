@@ -114,15 +114,15 @@ void Foam::solidModel::makeDualMesh() const
     // Hard-coded settings
     const scalar featureAngle
     (
-        solidModelDict().lookupOrDefault<scalar>("featureAngle", 30)
+        solidModelDict().lookupOrAddDefault<scalar>("featureAngle", 30)
     );
     const bool doNotPreserveFaceZones
     (
-        solidModelDict().lookupOrDefault<bool>("doNotPreserveFaceZones", false)
+        solidModelDict().lookupOrAddDefault<bool>("doNotPreserveFaceZones", false)
     );
     const bool concaveMultiCells
     (
-        solidModelDict().lookupOrDefault<bool>("concaveMultiCells", false)
+        solidModelDict().lookupOrAddDefault<bool>("concaveMultiCells", false)
     );
 
     Info<< "    featureAngle: " << featureAngle << nl
@@ -212,7 +212,7 @@ void Foam::solidModel::makeDualMesh() const
         dualMesh.movePoints(map().preMotionPoints());
     }
 
-    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false))
+    if (solidModelDict().lookupOrAddDefault<Switch>("writeDualMesh", false))
     {
         dualMesh.setInstance(runTime().constant());
         Info<< "Writing dualMesh to " << dualMesh.polyMesh::instance() << endl;
@@ -1098,7 +1098,7 @@ Foam::solidModel::solidModel
     ),
     dampingCoeff_
     (
-        solidModelDict().lookupOrDefault<dimensionedScalar>
+        solidModelDict().lookupOrAddDefault<dimensionedScalar>
         (
             "dampingCoeff",
             dimensionedScalar("dampingCoeff", dimless/dimTime, 0)
@@ -1107,32 +1107,32 @@ Foam::solidModel::solidModel
     stabilisationPtr_(),
     solutionTol_
     (
-        solidModelDict().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
+        solidModelDict().lookupOrAddDefault<scalar>("solutionTolerance", 1e-06)
     ),
     alternativeTol_
     (
-        solidModelDict().lookupOrDefault<scalar>("alternativeTolerance", 1e-07)
+        solidModelDict().lookupOrAddDefault<scalar>("alternativeTolerance", 1e-07)
     ),
     materialTol_
     (
-        solidModelDict().lookupOrDefault<scalar>("materialTolerance", 1e-05)
+        solidModelDict().lookupOrAddDefault<scalar>("materialTolerance", 1e-05)
     ),
     infoFrequency_
     (
-        solidModelDict().lookupOrDefault<int>("infoFrequency", 100)
+        solidModelDict().lookupOrAddDefault<int>("infoFrequency", 100)
     ),
-    nCorr_(solidModelDict().lookupOrDefault<int>("nCorrectors", 10000)),
-    minCorr_(solidModelDict().lookupOrDefault<int>("minCorrectors", 1)),
+    nCorr_(solidModelDict().lookupOrAddDefault<int>("nCorrectors", 10000)),
+    minCorr_(solidModelDict().lookupOrAddDefault<int>("minCorrectors", 1)),
     maxIterReached_(0),
     residualFilePtr_(),
     writeResidualField_
     (
-        solidModelDict().lookupOrDefault<Switch>("writeResidualField", false)
+        solidModelDict().lookupOrAddDefault<Switch>("writeResidualField", false)
     ),
     enforceLinear_(false),
     relaxationMethod_
     (
-        solidModelDict().lookupOrDefault<word>("relaxationMethod", "fixed")
+        solidModelDict().lookupOrAddDefault<word>("relaxationMethod", "fixed")
     ),
     aitkenAlpha_
     (
@@ -1162,7 +1162,7 @@ Foam::solidModel::solidModel
     ),
     QuasiNewtonRestartFreq_
     (
-        solidModelDict().lookupOrDefault<int>("QuasiNewtonRestartFrequency", 25)
+        solidModelDict().lookupOrAddDefault<int>("QuasiNewtonRestartFrequency", 25)
     ),
     QuasiNewtonV_(QuasiNewtonRestartFreq_ + 2),
     QuasiNewtonW_(QuasiNewtonRestartFreq_ + 2),
@@ -1197,7 +1197,7 @@ Foam::solidModel::solidModel
     setCellDispsPtr_(),
     restart_
     (
-        solidModelDict().lookupOrDefault<Switch>("restart", false)
+        solidModelDict().lookupOrAddDefault<Switch>("restart", false)
     ),
     rhoD2dt2DPtr_()
 {
@@ -1248,7 +1248,7 @@ Foam::solidModel::solidModel
     }
 
     // If requested, create the residual file
-    if (solidModelDict().lookupOrDefault<Switch>("residualFile", false))
+    if (solidModelDict().lookupOrAddDefault<Switch>("residualFile", false))
     {
         if (Pstream::master())
         {
@@ -1592,6 +1592,19 @@ void Foam::solidModel::updateTotalFields()
 
 void Foam::solidModel::end()
 {
+    solidProperties().IOobject::name() = solidProperties().IOobject::name()+"_out";
+    solidProperties().write();
+    if (!mechanicalPtr_.empty())
+    {
+        mechanical().IOobject::name() = mechanical().IOobject::name()+"_out";
+        mechanical().write();
+    }
+    if (!thermalPtr_.empty())
+    {
+        thermal().IOobject::name() = thermal().IOobject::name()+"_out";
+        thermal().write();
+    }
+
     if (maxIterReached_ > 0)
     {
         WarningIn(type() + "::end()")
@@ -1603,6 +1616,8 @@ void Foam::solidModel::end()
         Info<< "The momentum equation converged in all time-steps"
             << nl << endl;
     }
+
+    physicsModel::end();
 }
 
 

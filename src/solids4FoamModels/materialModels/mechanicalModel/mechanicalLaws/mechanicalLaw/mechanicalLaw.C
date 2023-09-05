@@ -1283,6 +1283,7 @@ bool Foam::mechanicalLaw::incremental() const
 
 Foam::mechanicalLaw::mechanicalLaw
 (
+    const word& type,
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
@@ -1290,6 +1291,7 @@ Foam::mechanicalLaw::mechanicalLaw
 )
 :
     name_(name),
+    type_(type),
     mesh_(mesh),
     dict_(dict),
     baseMeshRegionName_(),
@@ -1309,11 +1311,11 @@ Foam::mechanicalLaw::mechanicalLaw
     relFfPtr_(),
     solvePressureEqn_
     (
-        dict.lookupOrDefault<Switch>("solvePressureEqn", false)
+        dict.lookupOrAddDefault<Switch>("solvePressureEqn", false)
     ),
     pressureSmoothingScaleFactor_
     (
-        dict.lookupOrDefault<scalar>("pressureSmoothingScaleFactor", 100.0)
+        dict.lookupOrAddDefault<scalar>("pressureSmoothingScaleFactor", 100.0)
     ),
     sigmaHydPtr_(),
     gradSigmaHydPtr_(),

@@ -147,6 +147,24 @@ public:
 
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        virtual tmp<volScalarField> biotCoeff() const
+        {
+            tmp<volScalarField> tb(
+                new volScalarField(
+                  IOobject(
+                  "biotCoeff",
+                  mesh().time().timeName(),
+                  mesh(),
+                  IOobject::NO_READ,
+                  IOobject::NO_WRITE  
+                  ),
+                  mesh(),
+                  b_
+                )
+            );
+            return tb;
+        }
 };
 
 
