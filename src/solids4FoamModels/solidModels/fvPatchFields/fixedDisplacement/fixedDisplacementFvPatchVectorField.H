@@ -117,7 +117,7 @@ public:
         fixedDisplacementFvPatchVectorField
         (
             const fixedDisplacementFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );

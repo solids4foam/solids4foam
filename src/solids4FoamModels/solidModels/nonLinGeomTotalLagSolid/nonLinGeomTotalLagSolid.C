@@ -127,7 +127,7 @@ bool nonLinGeomTotalLagSolid::evolve()
     Info<< "Evolving solid solver" << endl;
 
     int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solverPerfDD;
     SolverPerformance<vector>::debug = 0;
 #else
@@ -177,7 +177,7 @@ bool nonLinGeomTotalLagSolid::evolve()
         solidModel::setCellDisps(DDEqn);
 
         // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
         const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
 #endif
 
@@ -232,7 +232,7 @@ bool nonLinGeomTotalLagSolid::evolve()
        !converged
         (
             iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             mag(solverPerfDD.initialResidual()),
             cmptMax(solverPerfDD.nIterations()),
 #else
@@ -255,7 +255,7 @@ bool nonLinGeomTotalLagSolid::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

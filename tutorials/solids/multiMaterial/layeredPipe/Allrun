@@ -19,8 +19,15 @@ solids4Foam::runApplication setsToZones
 # Run solver
 solids4Foam::runApplication solids4Foam
 
+# Sample stress along lines
+if [[ $WM_PROJECT = "foam" ]]
+then
+    solids4Foam::runApplication sample -latestTime
+else
+    solids4Foam::runApplication postProcess -func sample -latestTime
+fi
+
 # Create plots
-solids4Foam::runApplication postProcess -func sample -latestTime
 if command -v gnuplot &> /dev/null
 then
     echo "Generating sigmaXX_lineXX.png and sigmaXX_lineYY.png using gnuplot"

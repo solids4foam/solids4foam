@@ -22,12 +22,12 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "OSspecific.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     #include "OSspecific.H"
 #endif
 
@@ -248,7 +248,7 @@ bool Foam::solidPointDisplacement::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::solidPointDisplacement::write()
 {
     return false;

@@ -35,7 +35,7 @@ Author
 #define multiplyCoeff_H
 
 #include "fieldTypes.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "scalarMatrices.H"
 #else
     #include "scalarSquareMatrix.H"

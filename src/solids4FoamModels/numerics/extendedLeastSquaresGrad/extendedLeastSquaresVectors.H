@@ -32,7 +32,7 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 
 #ifndef extendedLeastSquaresVectors_H
 #define extendedLeastSquaresVectors_H
@@ -124,6 +124,6 @@ public:
 
 #endif
 
-#endif // end of #ifdef OPENFOAMESIORFOUNDATION
+#endif // end of #ifdef OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

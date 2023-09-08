@@ -47,7 +47,7 @@ addToRunTimeSelectionTable(solidModel, thermalSolid, dictionary);
 bool thermalSolid::converged
 (
     const int iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const SolverPerformance<scalar>& solverPerfT,
 #else
     const lduSolverPerformance& solverPerfT,
@@ -62,7 +62,7 @@ bool thermalSolid::converged
     const scalar absResidualT =
         gMax
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             DimensionedField<double, volMesh>
             (
                 mag(T.internalField() - T.prevIter().internalField())
@@ -77,7 +77,7 @@ bool thermalSolid::converged
         (
             gMax
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 DimensionedField<double, volMesh>
                 (
                     mag(T.internalField() - T.oldTime().internalField())
@@ -217,7 +217,7 @@ bool thermalSolid::evolve()
     Info<< "Evolving thermal solid solver" << endl;
 
     int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<scalar> solverPerfT;
     SolverPerformance<scalar>::debug = 0;
 #else
@@ -254,7 +254,7 @@ bool thermalSolid::evolve()
         gradT_ = fvc::grad(T_);
 
         // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
         const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
 #endif
     }
@@ -264,7 +264,7 @@ bool thermalSolid::evolve()
      && ++iCorr < nCorr()
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<scalar>::debug = 1;
 #else
     blockLduMatrix::debug = 1;
@@ -368,7 +368,7 @@ void thermalSolid::setTemperatureAndHeatFlux
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneHeatFlux)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     setTemperatureAndHeatFlux
     (
         T_.boundaryFieldRef()[patchID],
@@ -430,7 +430,7 @@ void thermalSolid::setEqInterHeatTransferCoeff
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneHTC)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     setEqInterHeatTransferCoeff
     (
         T_.boundaryFieldRef()[patchID],

@@ -234,7 +234,7 @@ bool Foam::solidDisplacements::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::solidDisplacements::write()
 {
     return false;

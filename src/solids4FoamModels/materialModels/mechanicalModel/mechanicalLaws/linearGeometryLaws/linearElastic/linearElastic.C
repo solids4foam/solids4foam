@@ -193,7 +193,7 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::bulkModulus() const
         )
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     tresult.ref().correctBoundaryConditions();
 #else
     tresult().correctBoundaryConditions();
@@ -247,7 +247,7 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 Foam::scalarSquareMatrix
 Foam::linearElastic::materialTangent() const
 {

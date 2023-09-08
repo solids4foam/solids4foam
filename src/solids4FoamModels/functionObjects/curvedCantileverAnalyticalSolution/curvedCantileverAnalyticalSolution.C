@@ -97,7 +97,7 @@ Foam::symmTensor Foam::curvedCantileverAnalyticalSolution::curvedCantileverStres
     sigma.yx() = sigma.xy();
     
     // Transformation to Cartesian coordinate system
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     sigma = ((cs.R().R() & sigma) & cs.R().R().T());
 #else
     sigma = ((cs.R() & sigma) & cs.R().T());
@@ -159,7 +159,7 @@ bool Foam::curvedCantileverAnalyticalSolution::writeData()
     {
         if (mesh.boundary()[patchI].type() != "empty")
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
 #else
             symmTensorField& sP = analyticalStress.boundaryField()[patchI];
@@ -239,7 +239,7 @@ bool Foam::curvedCantileverAnalyticalSolution::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::curvedCantileverAnalyticalSolution::write()
 {
     return writeData();

@@ -35,7 +35,7 @@ Author
 #ifndef standAlonePatch_H
 #define standAlonePatch_H
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "PrimitivePatch.H"
 #else
     #include "PrimitivePatchTemplate.H"
@@ -48,9 +48,9 @@ Author
 
 namespace Foam
 {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     typedef PrimitivePatch<List<face>, pointField> standAlonePatch;
-#elif OPENFOAMESI
+#elif OPENFOAM_COM
     typedef PrimitivePatch<faceList, pointField> standAlonePatch;
 #else
     typedef PrimitivePatch<face, List, pointField> standAlonePatch;

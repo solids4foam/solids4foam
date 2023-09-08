@@ -72,9 +72,23 @@ tmp<divSigmaScheme> divSigmaScheme::New
             << exit(FatalIOError);
     }
 
-    word schemeName(schemeData);
+    const word schemeName(schemeData);
 
-//     typename IstreamConstructorTable::iterator cstrIter =
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = IstreamConstructorTable(schemeName);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            schemeData,
+            "fvmDiv(sigma)",
+            schemeName,
+            *IstreamConstructorTablePtr_
+        ) << exit(FatalIOError);
+    }
+
+#else
     IstreamConstructorTable::iterator cstrIter =
         IstreamConstructorTablePtr_->find(schemeName);
 
@@ -90,7 +104,10 @@ tmp<divSigmaScheme> divSigmaScheme::New
             << exit(FatalIOError);
     }
 
-    return cstrIter()(mesh, schemeData);
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return ctorPtr(mesh, schemeData);
 }
 
 

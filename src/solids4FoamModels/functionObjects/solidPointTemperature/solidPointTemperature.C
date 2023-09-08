@@ -22,12 +22,12 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "OSspecific.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     #include "OSspecific.H"
 #endif
 
@@ -85,9 +85,9 @@ bool Foam::solidPointTemperature::writeData()
             dimensionedScalar("zero", T.dimensions(), 0.0)
         );
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         volPointInterpolation::New(mesh).interpolate(T, pointT);
-#elif OPENFOAMESI
+#elif OPENFOAM_COM
         mesh.lookupObject<volPointInterpolation>
         (
             "volPointInterpolation"
@@ -261,7 +261,7 @@ bool Foam::solidPointTemperature::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::solidPointTemperature::write()
 {
     return false;

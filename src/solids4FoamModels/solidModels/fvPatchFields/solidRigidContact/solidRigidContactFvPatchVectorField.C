@@ -35,6 +35,7 @@ InClass
 #include "polyPatchID.H"
 #include "ZoneIDs.H"
 #include "lookupSolidModel.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -352,7 +353,7 @@ Foam::solidRigidContactFvPatchVectorField::solidRigidContactFvPatchVectorField
     // Do not copy pointer objects: they will be re-created.
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 Foam::solidRigidContactFvPatchVectorField::solidRigidContactFvPatchVectorField
 (
     const solidRigidContactFvPatchVectorField& ptf

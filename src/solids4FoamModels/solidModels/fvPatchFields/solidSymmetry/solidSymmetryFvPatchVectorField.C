@@ -65,7 +65,7 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
 #else
@@ -111,7 +111,7 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
 #else
@@ -122,7 +122,7 @@ solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
     }
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 solidSymmetryFvPatchVectorField::solidSymmetryFvPatchVectorField
 (
     const solidSymmetryFvPatchVectorField& ptf
@@ -160,7 +160,7 @@ tmp<Field<vector> > solidSymmetryFvPatchVectorField::snGrad() const
     const fvPatchField<tensor>& gradD =
         patch().lookupPatchField<volTensorField, tensor>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"
@@ -218,7 +218,7 @@ evaluate(const Pstream::commsTypes)
     const fvPatchField<tensor>& gradD =
         patch().lookupPatchField<volTensorField, tensor>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"
@@ -267,7 +267,7 @@ void solidSymmetryFvPatchVectorField::write(Ostream& os) const
     os.writeKeyword("secondOrder")
         << secondOrder_ << token::END_STATEMENT << nl;
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

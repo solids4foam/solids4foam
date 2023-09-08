@@ -23,7 +23,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 
 #include "fvMesh.H"
 #include "extendedLeastSquaresGrad.H"
@@ -32,6 +32,6 @@ License
 
 makeFvGradScheme(extendedLeastSquaresGrad)
 
-#endif // end of #ifdef OPENFOAMESIORFOUNDATION
+#endif // end of #ifdef OPENFOAM_NOT_EXTEND
 
 // ************************************************************************* //

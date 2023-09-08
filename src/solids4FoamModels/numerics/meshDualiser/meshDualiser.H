@@ -58,7 +58,7 @@ namespace Foam
 {
 
 class polyMesh;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     class polyTopoChange;
     typedef polyTopoChange directTopoChange;
 #else

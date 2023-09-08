@@ -100,7 +100,7 @@ bool Foam::contactPatchTestAnalyticalSolution::writeData()
     {
         if (mesh.boundary()[patchI].type() != "empty")
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
 #else
             symmTensorField& sP = analyticalStress.boundaryField()[patchI];
@@ -148,7 +148,7 @@ bool Foam::contactPatchTestAnalyticalSolution::writeData()
         {
             if (mesh.boundary()[patchI].type() != "empty")
             {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 scalarField& sP = relError.boundaryFieldRef()[patchI];
 #else
                 scalarField& sP = relError.boundaryField()[patchI];
@@ -232,7 +232,7 @@ bool Foam::contactPatchTestAnalyticalSolution::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::contactPatchTestAnalyticalSolution::write()
 {
     return false;

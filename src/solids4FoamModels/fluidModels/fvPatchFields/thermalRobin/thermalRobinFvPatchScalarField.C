@@ -45,6 +45,8 @@ thermalRobinFvPatchScalarField
 )
 :
     robinFvPatchScalarField(p, iF),
+    neumann_(true),
+    dirichlet_(true),
     neiTemperature_(p.patch().size(), 0),
     neiHeatFlux_(p.patch().size(), 0),
     eqInterHeatTransferCoeff_(p.patch().size(), 0),
@@ -62,7 +64,9 @@ thermalRobinFvPatchScalarField
 )
 :
     robinFvPatchScalarField(ptf, p, iF, mapper),
-#ifdef OPENFOAMFOUNDATION
+    neumann_(ptf.neumann_),
+    dirichlet_(ptf.dirichlet_),
+#ifdef OPENFOAM_ORG
     neiTemperature_(mapper(ptf.neiTemperature_)),
     neiHeatFlux_(mapper(ptf.neiHeatFlux_)),
     eqInterHeatTransferCoeff_(mapper(ptf.eqInterHeatTransferCoeff_)),
@@ -84,6 +88,8 @@ thermalRobinFvPatchScalarField
 )
 :
     robinFvPatchScalarField(p, iF),
+    neumann_(dict.lookupOrDefault<Switch>("neumann", true)),
+    dirichlet_(dict.lookupOrDefault<Switch>("dirichlet", true)),
     neiTemperature_(p.patch().size(), 0),
     neiHeatFlux_(p.patch().size(), 0),
     eqInterHeatTransferCoeff_(p.patch().size(), 1),
@@ -116,7 +122,7 @@ thermalRobinFvPatchScalarField
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 thermalRobinFvPatchScalarField::
 thermalRobinFvPatchScalarField
 (
@@ -124,6 +130,8 @@ thermalRobinFvPatchScalarField
 )
 :
     robinFvPatchScalarField(pivpvf),
+    neumann_(pivpvf.neumann_),
+    dirichlet_(pivpvf.dirichlet_),
     neiTemperature_(pivpvf.neiTemperature_),
     neiHeatFlux_(pivpvf.neiHeatFlux_),
     eqInterHeatTransferCoeff_(pivpvf.eqInterHeatTransferCoeff_),
@@ -140,6 +148,8 @@ thermalRobinFvPatchScalarField
 )
 :
     robinFvPatchScalarField(pivpvf, iF),
+    neumann_(pivpvf.neumann_),
+    dirichlet_(pivpvf.dirichlet_),
     neiTemperature_(pivpvf.neiTemperature_),
     neiHeatFlux_(pivpvf.neiHeatFlux_),
     eqInterHeatTransferCoeff_(pivpvf.eqInterHeatTransferCoeff_),
@@ -178,9 +188,24 @@ void thermalRobinFvPatchScalarField::updateCoeffs()
     const scalarField lambda =
         patch().lookupPatchField<volScalarField, scalar>(lambdaName_);
 
-    this->coeff0() = 1.0;
-    this->coeff1() = eqInterHeatTransferCoeff_*lambda;
-    this->rhs() = neiTemperature_ + eqInterHeatTransferCoeff_*neiHeatFlux_;
+    if (dirichlet_ && neumann_)
+    {
+        this->coeff0() = 1.0;
+        this->coeff1() = eqInterHeatTransferCoeff_*lambda;
+        this->rhs() = neiTemperature_ + eqInterHeatTransferCoeff_*neiHeatFlux_;
+    }
+    else if (dirichlet_ && !neumann_)
+    {
+        this->coeff0() = 1.0;
+        this->coeff1() = 0.0;
+        this->rhs() = neiTemperature_;
+    }
+    else if (!dirichlet_ && neumann_)
+    {
+        this->coeff0() = 0.0;
+        this->coeff1() = lambda;
+        this->rhs() = neiHeatFlux_;
+    }
 
     robinFvPatchScalarField::updateCoeffs();
 }
@@ -190,7 +215,16 @@ void thermalRobinFvPatchScalarField::write(Ostream& os) const
 {
     robinFvPatchScalarField::write(os);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_COM
+    os.writeEntryIfDifferent<Switch>("neumann", true, neumann_);
+    os.writeEntryIfDifferent<Switch>("dirichlet", true, dirichlet_);
+#else
+    writeEntryIfDifferent<Switch>(os, "neumann", true, neumann_);
+    writeEntryIfDifferent<Switch>(os, "dirichlet", true, dirichlet_);
+#endif
+
+    
+#ifdef OPENFOAM_ORG
     writeEntry(os, "neiTemperature", neiTemperature_);
     writeEntry(os, "neiHeatFlux", neiHeatFlux_);
     writeEntry(os, "eqInterHeatTransferCoeff", eqInterHeatTransferCoeff_);

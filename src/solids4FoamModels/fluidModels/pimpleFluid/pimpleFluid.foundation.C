@@ -33,7 +33,7 @@ License
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "elasticWallPressureFvPatchScalarField.H"
-
+#include "thermalRobinFvPatchScalarField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -50,41 +50,7 @@ addToRunTimeSelectionTable(fluidModel, pimpleFluid, dictionary);
 
 // * * * * * * * * * * * * * * * Private Members * * * * * * * * * * * * * * //
 
-void pimpleFluid::updateRobinFsiInterfaceFlux()
-{
-    forAll(U().boundaryField(), patchI)
-    {
-        if
-        (
-            (
-                isA<elasticWallPressureFvPatchScalarField>
-                (
-                    p().boundaryField()[patchI]
-                )
-             && isA<elasticSlipWallVelocityFvPatchVectorField>
-                (
-                    U().boundaryField()[patchI]
-                )
-            )
-         || (
-                isA<elasticWallPressureFvPatchScalarField>
-                (
-                    p().boundaryField()[patchI]
-                )
-             && isA<elasticWallVelocityFvPatchVectorField>
-                (
-                    U().boundaryField()[patchI]
-                )
-            )
-        )
-        {
-            Info<< "Mesh changed: updating flux on Robin interface.";
-            phi().boundaryFieldRef()[patchI] = 0;
-        }
-    }
-}
-
-void pimpleFluid::updateRobinFsiInterface()
+void pimpleFluid::updateRobinFsiInterface(surfaceScalarField& phiHbyA)
 {
     forAll(p().boundaryField(), patchI)
     {
@@ -120,10 +86,13 @@ void pimpleFluid::updateRobinFsiInterface()
              == fv::EulerDdtScheme<vector>::typeName
             )
             {
-                phi().boundaryFieldRef()[patchI] =
-                    phi().oldTime().boundaryField()[patchI];
+                phiHbyA.boundaryFieldRef()[patchI] =
+                (
+                    Uf_().oldTime().boundaryField()[patchI] &
+                    mesh().Sf().boundaryField()[patchI]
+                );
 
-                rAUf_.boundaryFieldRef()[patchI] =
+                rAU_.boundaryFieldRef()[patchI] =
                     runTime().deltaT().value();
             }
             else if
@@ -134,96 +103,14 @@ void pimpleFluid::updateRobinFsiInterface()
             {
                 if (runTime().timeIndex() == 1)
                 {
-                    phi().boundaryFieldRef()[patchI] =
-                        phi().oldTime().boundaryField()[patchI];
-                    rAUf_.boundaryFieldRef()[patchI] = runTime().deltaT().value();
+                    phiHbyA.boundaryFieldRef()[patchI] =
+                    (
+                        Uf_().oldTime().boundaryField()[patchI] &
+                        mesh().Sf().boundaryField()[patchI]
+                    );
 
-                    phi().oldTime().oldTime();
-                }
-                else
-                {
-                    scalar deltaT = runTime().deltaT().value();
-                    scalar deltaT0 = runTime().deltaT0().value();
-
-                    scalar Cn = 1 + deltaT/(deltaT + deltaT0);
-                    scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
-                    scalar Co = Cn + Coo;
-
-                    phi().boundaryFieldRef()[patchI] =
-                        (Co/Cn)*phi().oldTime().boundaryField()[patchI]
-                      - (Coo/Cn)
-                       *phi().oldTime().oldTime().boundaryField()[patchI];
-
-                    rAUf_.boundaryFieldRef()[patchI] =
-                        runTime().deltaT().value()/Cn;
-                }
-            }
-        }
-    }
-}
-
-void pimpleFluid::correctRobinFsiInterfaceFlux()
-{
-    forAll(p().boundaryField(), patchI)
-    {
-        if
-        (
-            (
-                isA<elasticWallPressureFvPatchScalarField>
-                (
-                    p().boundaryField()[patchI]
-                )
-             && isA<elasticSlipWallVelocityFvPatchVectorField>
-                (
-                    U().boundaryField()[patchI]
-                )
-            )
-         || (
-                isA<elasticWallPressureFvPatchScalarField>
-                (
-                    p().boundaryField()[patchI]
-                )
-             && isA<elasticWallVelocityFvPatchVectorField>
-                (
-                    U().boundaryField()[patchI]
-                )
-            )
-        )
-        {
-            const word ddtScheme(mesh().ddtScheme("ddt(" + U().name() +')'));
-
-            if
-            (
-                ddtScheme
-             == fv::EulerDdtScheme<vector>::typeName
-            )
-            {
-                phi().boundaryFieldRef()[patchI] =
-                    phi().oldTime().boundaryField()[patchI]
-                  - p().boundaryField()
-                    [
-                        patchI
-                    ].snGrad()*runTime().deltaT().value()
-                   *mesh().magSf().boundaryField()
-                    [
-                        patchI
-                    ];
-            }
-            else if
-            (
-                ddtScheme
-             == fv::backwardDdtScheme<vector>::typeName
-            )
-            {
-                if (runTime().timeIndex() == 1)
-                {
-                    phi().boundaryFieldRef()[patchI] =
-                        phi().oldTime().boundaryField()[patchI];
-
-                    rAUf_.boundaryFieldRef()[patchI] =
+                    rAU_.boundaryFieldRef()[patchI] =
                         runTime().deltaT().value();
-
-                    phi().oldTime().oldTime();
                 }
                 else
                 {
@@ -234,13 +121,19 @@ void pimpleFluid::correctRobinFsiInterfaceFlux()
                     scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
                     scalar Co = Cn + Coo;
 
-                    phi().boundaryFieldRef()[patchI] =
-                        (Co/Cn)*phi().oldTime().boundaryField()[patchI]
-                      - (Coo/Cn)
-                       *phi().oldTime().oldTime().boundaryField()[patchI];
+                    phiHbyA.boundaryFieldRef()[patchI] =
+                        (Co/Cn)*
+                        (
+                            Uf_().oldTime().boundaryField()[patchI] &
+                            mesh().Sf().boundaryField()[patchI]
+                        )
+                      - (Coo/Cn)*
+                        (
+                            Uf_().oldTime().oldTime().boundaryField()[patchI] &
+                            mesh().Sf().boundaryField()[patchI]
+                        );
 
-                    rAUf_.boundaryFieldRef()[patchI] =
-                        runTime().deltaT().value()/Cn;
+                    rAU_.boundaryFieldRef()[patchI] = deltaT/Cn;
                 }
             }
         }
@@ -273,20 +166,6 @@ pimpleFluid::pimpleFluid
         ),
         mesh(),
         runTime.deltaT(),
-        zeroGradientFvPatchScalarField::typeName
-    ),
-    rAUf_
-    (
-        IOobject
-        (
-            "rAUf",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh(),
-        runTime.deltaT(),
         calculatedFvPatchScalarField::typeName
     ),
     pressureReference_(p(), pimple().dict()),
@@ -308,7 +187,17 @@ pimpleFluid::pimpleFluid
     (
         pimple().dict().lookupOrDefault("moveMeshOuterCorrectors", false)
     ),
-    cumulativeContErr_(0)
+    cumulativeContErr_(0),
+    solveEnergyEq_
+    (
+        fluidProperties().lookupOrDefault<Switch>
+        (
+            "solveEnergyEq",
+            false
+        )
+    ),
+    TPtr_(),
+    lambdaEffPtr_()
 {
     mesh().setFluxRequired(p().name());
     turbulence_->validate();
@@ -328,7 +217,18 @@ pimpleFluid::pimpleFluid
                 IOobject::AUTO_WRITE
             ),
             fvc::interpolate(U())
-      );
+        );
+
+        Uf_().oldTime();
+
+        if
+        (
+            word(mesh().ddtScheme("ddt(" + U().name() +')'))
+         == fv::backwardDdtScheme<vector>::typeName
+        )
+        {
+            Uf_().oldTime().oldTime();
+        }
     }
 
     if (LTS_)
@@ -360,7 +260,50 @@ pimpleFluid::pimpleFluid
         #include "CourantNo.H"
     }
 
+    // Create temperature field if necessary
+    if (solveEnergyEq_)
+    {
+        TPtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "T",
+                    runTime.timeName(),
+                    mesh(),
+                    IOobject::MUST_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh()
+            )
+        );
 
+        // Heat capacity [J/kgK]
+        dimensionedScalar Cp(laminarTransport_.lookup("Cp"));
+
+        // Thermal conductivity [W/(m K)]
+        dimensionedScalar lambda(laminarTransport_.lookup("lambda"));
+
+        // Turbulent Prandtl number
+        dimensionedScalar Prt(laminarTransport_.lookup("Prt"));
+
+        lambdaEffPtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "lambdaEff",
+                    runTime.timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                lambda + rho_*Cp*(turbulence_->nut()/Prt)
+            )
+        );
+    }
 }
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
@@ -408,7 +351,6 @@ bool pimpleFluid::evolve()
     autoPtr<surfaceVectorField>& Uf = Uf_;
     scalar& cumulativeContErr = cumulativeContErr_;
 
-
     const bool correctPhi = correctPhi_;
     const bool checkMeshCourantNo = checkMeshCourantNo_;
     const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
@@ -419,7 +361,7 @@ bool pimpleFluid::evolve()
         if (pimple.firstPimpleIter() || moveMeshOuterCorrectors)
         {
             // fvModels not added yet
-            //fvModels.preUpdateMesh();
+            // fvModels.preUpdateMesh();
 
             // Ideally we would not need a specific FSI mesh update function
             // Hopefully we can remove the need for it soon
@@ -443,18 +385,10 @@ bool pimpleFluid::evolve()
                     #include "correctPhi.foundation.H"
                 }
 
-
-                   // Update flux in FSI interface with Robin BC
-                   updateRobinFsiInterfaceFlux();
-
-
-
-
                 if (checkMeshCourantNo)
                 {
                     #include "meshCourantNo.H"
                 }
-
             }
         }
 
@@ -466,13 +400,15 @@ bool pimpleFluid::evolve()
         // Solve the Momentum equation
 
         // MRF not implemented yet
-        //MRF.correctBoundaryVelocity(U);
+        // MRF.correctBoundaryVelocity(U);
 
         tmp<fvVectorMatrix> tUEqn
         (
-            fvm::ddt(U) + fvm::div(phi, U)
+            fvm::ddt(U)
+          + fvm::div(phi, U)
             // + MRF.DDt(U)
           + turbulence_->divDevSigma(U)
+          - boussinesqMomentumSource()
          // ==
          //    fvModels.source(U)
         );
@@ -494,18 +430,21 @@ bool pimpleFluid::evolve()
         // --- Pressure corrector loop
         while (pimple.correct())
         {
-            // pEqn.H
-
-            volScalarField rAU(1.0/UEqn.A());
-            volVectorField HbyA(constrainHbyA(rAU*UEqn.H(), U, p));
+            rAU_ = 1.0/UEqn.A();
+            // volScalarField rAU(1.0/UEqn.A());
+            volVectorField HbyA(constrainHbyA(rAU_*UEqn.H(), U, p));
             surfaceScalarField phiHbyA
             (
                 "phiHbyA",
                 fvc::flux(HbyA)
+              + fvc::interpolate(rAU_)*fvc::ddtCorr(U, phi, Uf)
             //+ MRF.zeroFilter(fvc::interpolate(rAU)*fvc::ddtCorr(U, phi, Uf))
             );
 
             //MRF.makeRelative(phiHbyA);
+
+            // Update flux on the FSI interface for Robin BCs
+            updateRobinFsiInterface(phiHbyA);
 
             if (p.needReference())
             {
@@ -514,14 +453,14 @@ bool pimpleFluid::evolve()
                 fvc::makeAbsolute(phiHbyA, U);
             }
 
-            tmp<volScalarField> rAtU(rAU);
+            tmp<volScalarField> rAtU(rAU_);
 
             if (pimple.consistent())
             {
-                rAtU = 1.0/max(1.0/rAU - UEqn.H1(), 0.1/rAU);
+                rAtU = 1.0/max(1.0/rAU_ - UEqn.H1(), 0.1/rAU_);
                 phiHbyA +=
-                    fvc::interpolate(rAtU() - rAU)*fvc::snGrad(p)*mesh.magSf();
-                HbyA -= (rAU - rAtU())*fvc::grad(p);
+                    fvc::interpolate(rAtU() - rAU_)*fvc::snGrad(p)*mesh.magSf();
+                HbyA -= (rAU_ - rAtU())*fvc::grad(p);
             }
 
             if (pimple.nCorrPiso() <= 1)
@@ -532,10 +471,6 @@ bool pimpleFluid::evolve()
             // Update the pressure BCs to ensure flux consistency
             // constrainPressure(p, U, phiHbyA, rAtU(), MRF);
             constrainPressure(p, U, phiHbyA, rAtU());
-
-            // Update flux on the FSI interface for Robin BCs
-            updateRobinFsiInterface();
-
 
             // Non-orthogonal pressure corrector loop
             while (pimple.correctNonOrthogonal())
@@ -561,42 +496,21 @@ bool pimpleFluid::evolve()
 
             #include "continuityErrs.H"
 
-           // Correct flux due for Robin BCs according to temporal
-            // discretization
-            correctRobinFsiInterfaceFlux();
-
             // Explicitly relax pressure for momentum corrector
             p.relax();
 
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
-            //fvConstraints.constrain(U);
+            // fvConstraints.constrain(U);
+
+            gradU() = fvc::grad(U);
+            ddtU_ = fvc::ddt(U);
 
             // Correct Uf if the mesh is moving
             fvc::correctUf(Uf, U, phi);
 
             // Make the fluxes relative to the mesh motion
             fvc::makeRelative(phi, U);
-
-            gradU() = fvc::grad(U);
-            ddtU_ = fvc::ddt(U);
-
-            // Make the fluxes absolute to the mesh motion
-            // fvc::makeAbsolute(phi, U);
-
-            // fvc::correctUf already does the steps below
-            // if (mesh.dynamic())
-            // {
-            //     // Update velocity on faces to account for modifications in the
-            //     // flux when using the Robin BCs
-            //     Uf_() = fvc::interpolate(U, "interpolate(U)");
-
-            //     // Get tangential velocity
-            //     Uf_() -= (mesh.Sf() & Uf_())*mesh.Sf()/magSqr(mesh.Sf());
-
-            //     // Update with normal from flux
-            //     Uf_() += phi*mesh.Sf()/magSqr(mesh.Sf());
-            // }
         }
 
         if (pimple.turbCorr())
@@ -604,11 +518,283 @@ bool pimpleFluid::evolve()
             laminarTransport_.correct();
             turbulence_->correct();
         }
+
+        // Solve energy equation if required
+        solveEnergyEq();
     }
+
+    // Make the fluxes absolute to the mesh motion
+    fvc::makeAbsolute(phi, U);
+
+    // Make the fluxes relative to the mesh motion
+    fvc::makeRelative(phi, U);
 
     return 0;
 }
 
+void pimpleFluid::solveEnergyEq()
+{
+    if (solveEnergyEq_)
+    {
+        // Heat capacity [J/kgK]
+        dimensionedScalar Cp(laminarTransport_.lookup("Cp"));
+
+        // Thermal conductivity [W/(m K)]
+        dimensionedScalar lambda(laminarTransport_.lookup("lambda"));
+
+        // Turbulent Prandtl number
+        dimensionedScalar Prt(laminarTransport_.lookup("Prt"));
+
+        // Update effective thermal conductivity
+        lambdaEffPtr_() =
+            lambda + rho_*Cp*(turbulence_->nut()/Prt);
+
+        // Store fields for under-relaxation and residual calculation
+        TPtr_().storePrevIter();
+
+        fvScalarMatrix TEqn
+        (
+            rho_*Cp*
+            (
+                fvm::ddt(TPtr_())
+              + fvm::div(phi(), TPtr_())
+            )
+          - fvm::laplacian(lambdaEffPtr_(), TPtr_())
+        );
+
+        // Under-relaxation the linear system
+        TEqn.relax();
+
+        // Solve the linear system
+        TEqn.solve();
+
+        // Under-relax the field
+        TPtr_().relax();
+    }
+}
+
+
+tmp<volVectorField> pimpleFluid::boussinesqMomentumSource() const
+{
+    tmp<volVectorField> tSource
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "boussinesqMomentumSource",
+                runTime().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedVector("0", dimVelocity/dimTime, vector::zero)
+        )
+    );
+
+    if (solveEnergyEq_)
+    {
+        // Thermal expansion coefficient [1/K]
+        dimensionedScalar beta(laminarTransport_.lookup("beta"));
+
+        // Reference temperature [K]
+        dimensionedScalar TRef(laminarTransport_.lookup("TRef"));
+
+        tSource.ref() = -beta*(TPtr_() - TRef)*g();
+    }
+
+    return tSource;
+}
+
+
+void pimpleFluid::setTemperatureAndHeatFlux
+(
+    fvPatchScalarField& temperaturePatch,
+    const scalarField& temperature,
+    const scalarField& heatFlux
+)
+{
+    if (temperaturePatch.type() == thermalRobinFvPatchScalarField::typeName)
+    {
+        thermalRobinFvPatchScalarField& patchT =
+            refCast<thermalRobinFvPatchScalarField>(temperaturePatch);
+
+        patchT.temperature() = temperature;
+        patchT.heatFlux() = heatFlux;
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void pimpleFluid::setTemperature\n"
+            "(\n"
+            "    fvPatchScalarField& temperaturePatch,\n"
+            "    const scalarField& temperature,\n"
+            "    const scalarField& heatFlux\n"
+            ")"
+        )   << "Boundary condition "
+            << temperaturePatch.type()
+            << " for patch " << temperaturePatch.patch().name()
+            << " should instead be type "
+            << thermalRobinFvPatchScalarField::typeName
+            << abort(FatalError);
+    }
+}
+
+
+void pimpleFluid::setTemperatureAndHeatFlux
+(
+    const label interfaceI,
+    const label patchID,
+    const scalarField& faceZoneTemperature,
+    const scalarField& faceZoneHeatFlux
+)
+{
+    const scalarField patchTemperature
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneTemperature)
+    );
+
+    const scalarField patchHeatFlux
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneHeatFlux)
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    setTemperatureAndHeatFlux
+    (
+        TPtr_().boundaryFieldRef()[patchID],
+        patchTemperature,
+        patchHeatFlux
+    );
+#else
+    setTemperatureAndHeatFlux
+    (
+        TPtr_().boundaryField()[patchID],
+        patchTemperature,
+        patchHeatFlux
+    );
+#endif
+}
+
+
+void pimpleFluid::setEqInterHeatTransferCoeff
+(
+    fvPatchScalarField& temperaturePatch,
+    const scalarField& heatTransferCoeff
+)
+{
+    if (temperaturePatch.type() == thermalRobinFvPatchScalarField::typeName)
+    {
+        thermalRobinFvPatchScalarField& patchT =
+            refCast<thermalRobinFvPatchScalarField>(temperaturePatch);
+
+        patchT.eqInterHeatTransferCoeff() = heatTransferCoeff;
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "void pimpleFluid::setEqInterHeatTransferCoeff\n"
+            "(\n"
+            "    fvPatchScalarField& temperaturePatch,\n"
+            "    const scalarField& heatTransferCoeff\n"
+            ")"
+        )   << "Boundary condition "
+            << temperaturePatch.type()
+            << " for patch " << temperaturePatch.patch().name()
+            << " should instead be type "
+            << thermalRobinFvPatchScalarField::typeName
+            << abort(FatalError);
+    }
+}
+
+
+void pimpleFluid::setEqInterHeatTransferCoeff
+(
+    const label interfaceI,
+    const label patchID,
+    const scalarField& faceZoneHTC
+)
+{
+    const scalarField patchHTC
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneHTC)
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    setEqInterHeatTransferCoeff
+    (
+        TPtr_().boundaryFieldRef()[patchID],
+        patchHTC
+    );
+#else
+    setEqInterHeatTransferCoeff
+    (
+        TPtr_().boundaryField()[patchID],
+        patchHTC
+    );
+#endif
+}
+
+
+tmp<scalarField> pimpleFluid::patchTemperature(const label patchID) const
+{
+    tmp<scalarField> tT
+    (
+        new scalarField(mesh().boundary()[patchID].size(), 0)
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    tT.ref() =
+#else
+    tT() =
+#endif
+        TPtr_().boundaryField()[patchID];
+
+    return tT;
+}
+
+tmp<scalarField> pimpleFluid::patchHeatFlux(const label patchID) const
+{
+    tmp<scalarField> tHF
+    (
+        new scalarField(mesh().boundary()[patchID].size(), 0)
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    tHF.ref() =
+#else
+    tHF() =
+#endif
+        lambdaEffPtr_().boundaryField()[patchID]*
+        TPtr_().boundaryField()[patchID].snGrad();
+
+    return tHF;
+}
+
+
+tmp<scalarField> pimpleFluid::patchHeatTransferCoeff
+(
+    const label patchID
+) const
+{
+    tmp<scalarField> tHTC
+    (
+        new scalarField(mesh().boundary()[patchID].size(), 0)
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    tHTC.ref() =
+#else
+    tHTC() =
+#endif
+        (1.0/mesh().deltaCoeffs().boundaryField()[patchID])/
+        lambdaEffPtr_().boundaryField()[patchID];
+
+    return tHTC;
+}
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

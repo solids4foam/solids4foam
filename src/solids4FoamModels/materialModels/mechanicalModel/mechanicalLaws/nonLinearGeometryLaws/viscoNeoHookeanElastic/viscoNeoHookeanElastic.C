@@ -31,7 +31,7 @@ License
 #include "fvm.H"
 #include "fixedGradientFvPatchFields.H"
 #include "zeroGradientFvPatchFields.H"
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     #include "realEigenValues.H"
 #endif
 
@@ -542,7 +542,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     const volTensorField Cbar(pow(J, -2.0/3.0)*C);
 
     // Take references to the internal fields for efficiency
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const tensorField& CI = C.primitiveField();
     const scalarField& JI = J.primitiveField();
     symmTensorField& transformNeededI = transformNeeded_.primitiveFieldRef();
@@ -560,7 +560,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     forAll(transformNeededI, cellI)
     {
         // Calculate principal stretches: lambda^2, which are eigenvalues of C
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
         eigenValues = Foam::realEigenValues(CI[cellI]);
 #else
         eigenValues = Foam::eigenValues(CI[cellI]);
@@ -593,7 +593,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
         // Take references to the patch fields for efficiency
         const tensorField& CP = C.boundaryField()[patchI];
         const scalarField& JP = J.boundaryField()[patchI];
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         symmTensorField& transformNeededP =
             transformNeeded_.boundaryFieldRef()[patchI];
 #else
@@ -605,7 +605,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
         {
              // Calculate principal stretches: lambda^2, which are eigenvalues
              // of C
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
             eigenValues = Foam::realEigenValues(CP[faceI]);
 #else
             eigenValues = Foam::eigenValues(CP[faceI]);
@@ -720,7 +720,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     const surfaceTensorField Cbar(pow(J, -2.0/3.0)*C);
 
     // Take references to the internal fields for efficiency
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const tensorField& CI = C.primitiveField();
     const scalarField& JI = J.primitiveField();
     symmTensorField& transformNeededI = transformNeededf_.primitiveFieldRef();
@@ -738,7 +738,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     forAll(transformNeededI, faceI)
     {
         // Calculate principal stretches: lambda^2, which are eigenvalues of C
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
         eigenValues = Foam::realEigenValues(CI[faceI]);
 #else
         eigenValues = Foam::eigenValues(CI[faceI]);
@@ -771,7 +771,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         // Take references to the patch fields for efficiency
         const tensorField& CP = C.boundaryField()[patchI];
         const scalarField& JP = J.boundaryField()[patchI];
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         symmTensorField& transformNeededP =
             transformNeededf_.boundaryFieldRef()[patchI];
 #else
@@ -783,7 +783,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         {
              // Calculate principal stretches: lambda^2, which are eigenvalues
              // of C
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
             eigenValues = Foam::realEigenValues(CP[faceI]);
 #else
             eigenValues = Foam::eigenValues(CP[faceI]);

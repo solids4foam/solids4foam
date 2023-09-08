@@ -61,7 +61,8 @@ Foam::newDynamicBodyFvMesh::newDynamicBodyFvMesh(const IOobject& io)
                 io.time().constant(),
                 *this,
                 IOobject::MUST_READ,
-                IOobject::NO_WRITE
+                IOobject::NO_WRITE,
+                false  // Do not register
             )
         ).subDict(typeName + "Coeffs")
     ),
@@ -131,7 +132,8 @@ bool Foam::newDynamicBodyFvMesh::update()
     scalar curTime = time().value();
     scalar oldTime = curTime - time().deltaT().value();
 
-    Info << "newDynamicBodyFvMesh::update()" << endl;
+    //Info<< "newDynamicBodyFvMesh::update()" << endl;
+
     {
         vector trans =
             translationAmplitude_

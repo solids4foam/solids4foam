@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
 
 template<class SourcePatch, class TargetPatch>
 inline Foam::label
@@ -157,6 +157,6 @@ Foam::newAMIInterpolation<SourcePatch, TargetPatch>::tgtMap() const
 }
 
 
-#endif // end of #ifdef OPENFOAMFOUNDATION
+#endif // end of #ifdef OPENFOAM_ORG
 
 // ************************************************************************* //

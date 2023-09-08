@@ -42,7 +42,7 @@ Foam::pointPointLeastSquaresVectors::pointPointLeastSquaresVectors
     const fvMesh& mesh
 )
 :
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     MeshObject<fvMesh, MoveableMeshObject, pointPointLeastSquaresVectors>(mesh),
 #else
     MeshObject<fvMesh, pointPointLeastSquaresVectors>(mesh),
@@ -81,7 +81,7 @@ void Foam::pointPointLeastSquaresVectors::makeLeastSquaresVectors() const
         );
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = mesh_;
 #else
     const fvMesh& mesh = this->mesh();
@@ -122,7 +122,7 @@ void Foam::pointPointLeastSquaresVectors::makeLeastSquaresVectors() const
 
     // Invert least squares matrix using Householder transformations to avoid
     // badly posed cells
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const symmTensorField invDd(inv(dd));
 #else
     const symmTensorField invDd(hinv(dd));
@@ -173,7 +173,7 @@ Foam::pointPointLeastSquaresVectors::vectors() const
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     bool Foam::pointPointLeastSquaresVectors::movePoints()
 #else
     bool Foam::pointPointLeastSquaresVectors::movePoints() const

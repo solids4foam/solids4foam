@@ -102,7 +102,7 @@ public:
         elasticWallPressureFvPatchScalarField
         (
             const elasticWallPressureFvPatchScalarField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );
