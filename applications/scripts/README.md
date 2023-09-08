@@ -386,13 +386,13 @@ Note that the updated path has `sampleDict.v2012` in it, and this is because it 
 
 ## `solids4foam::caseOnlyRunsWithFoamExtend()`
 
-- __Function purpose __ 
+- __Function purpose__   
   This function gives an error if the `foam-extend` version is not sourced/loaded.
 
-- __Function arguments __ 
+- __Function arguments__   
   None
 
-- __Example of usage__
+- __Example of usage__ 
 
   ```bash
   #!/bin/bash
@@ -430,10 +430,10 @@ Note that the updated path has `sampleDict.v2012` in it, and this is because it 
 
 Function loops over time directories (whose name is composed of digits or digits and the dot) and removes them if there are no results. Checked resulting fields are `U`, `T`, `D`, `pointD`, `DD`, `pointDD`. The compressed version of these files with `.gz` extension is also checked. The function also works when the case is decomposed.
 
-- __Function purpose__  
+- __Function purpose__   
   Remove empty time directories that are inadvertently created when running FSI cases with preCICE.
 
-- __Function arguments __ 
+- __Function arguments__  
   None
 
 - __Example of usage__
@@ -454,10 +454,10 @@ solids4Foam::removeEmptyDirs
 
 It will construct a message string with the current date time and timezone offset. The message passed as an argument to the `err()` function will be appended to this message string. The string is written to a file named `error.txt` and is also displayed on the console as an error output. In case an optional argument (file name) is prescribed, the context of the file name is written to `errorCommandLog.txt` file.
 
-- __Function purpose __ 
+- __Function purpose__ 
   This function is designed to handle and report errors in a script. 
 
-- __Function arguments __ 
+- __Function arguments__ 
   "error message" - stored to `error.txt`  
   optional parameter - name of the log file which will be stored to `errorCommandLog.txt`
 
@@ -512,7 +512,7 @@ It will construct a message string with the current date time and timezone offse
 
 ## `solids4foam::runApplication()`
 
-- __Function purpose __ 
+- __Function purpose__ 
   This function is designed to run `OpenFOAM` and `solids4foam` applications with additional logging and error handling.  
 
 - __Function options__  
@@ -521,7 +521,7 @@ It will construct a message string with the current date time and timezone offse
   `-s` = suffix (adding suffix to the log file)      
   `-decomposeParDict <locationOfAlternativeDecomposeParDict>` Alternative option for `decomposeParDict` dictionary location  
   
-- __Function arguments __   
+- __Function arguments__   
   `<appName>`  Name of the executable (command to run)     
   
   _Note_: Parameters which are added **after** the executable will be passed on to it!    
