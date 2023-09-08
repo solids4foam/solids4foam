@@ -483,8 +483,6 @@ It will construct a message string with the current date time and timezone offse
   [2023-09-05T10:19:18+0200]: The postProcessing directory already exists: run Allclean
   ```
 
-  
-
   If an optional argument wants to be used, the command should look like this:
 
   ```bash
@@ -499,7 +497,7 @@ It will construct a message string with the current date time and timezone offse
   	solids4foam::err "The data.dat file already exists: run Allclean to delete" postProcessing/data.dat
   fi 
   ```
-
+  
   The console output of this will be :
 
   ```ERROR: see error.txt
@@ -507,7 +505,7 @@ It will construct a message string with the current date time and timezone offse
   [2023-09-05T10:19:18+0200]: The postProcessing directory already exists: run Allclean to delete postProcessing/data.dat
          see errorCommandLog.txt
   ```
-
+  
   The context of the  `data.dat` is stored in the errorCommandLog.txt file.
 
 ---
@@ -582,6 +580,6 @@ is simply replaced with:
 
 `solids4Foam::runParallel executable`  
 
-`DecomposeParDict` located in the `system` is automatically checked to get the number of processors  `nProcs`.     
+`decomposeParDict` located in the `system` is automatically checked to get the number of processors  `nProcs`.     
 
 In case that `$FOAM_MPI` is set to `msmpi`, `mpirun` is replaced with `msmpi`.    
