@@ -39,7 +39,7 @@ Prepared by Ivan Batistić
   $ abaqusMeshToFoam mesh.inp
   ```
 
-  ```Note
+  ```note
   - Only the following Abaqus element types are supported: C3D8 and C3D8R.  
   - Only the first PART is used and the rest are ignored. 
   - Node sets, element sets and surfaces are not converted. 
@@ -75,7 +75,7 @@ Prepared by Ivan Batistić
     </figcaption>
 </div>
 
-```Note
+```note
 When using `addTinyPatch` the original mesh is overwritten!
 ```
 
@@ -105,7 +105,7 @@ When using `addTinyPatch` the original mesh is overwritten!
   Creates a node set and and element set and a surface for each boundary  patch.  
   Also creates a element set for each material in the materials file (if it is exists).
 
-  ```Note
+  ```note
   - Only works for hexahedral cells as yet.
   - Created for Abaqus-6.9-2, but should work for new versions too. 
   ```
@@ -155,11 +155,11 @@ When using `addTinyPatch` the original mesh is overwritten!
     </figcaption>
 </div>
 
-```Note
+```note
 Perturbed mesh (`polyMesh`) is stored in the `0` directory and needs to be moved to `constant` before running the simulation!
 ```
 
-```Note
+```tip
 For 2-D simulations, there is no need to perturb points in the `empty` direction. For an empty direction, zero scaling should be used, e.g.:  
 `scaleFactor (5e-3 5e-3 0);`
 ```
@@ -208,7 +208,7 @@ For 2-D simulations, there is no need to perturb points in the `empty` direction
       </figcaption>
   </div>
 
-  ```Note
+  ```note
   The mesh with the new patch is stored in a new time-step directory (`1` for example) and should be moved to the `constant` before running the simulation. Alternatively, the `-overwrite` option can be used to overwrite the original mesh.
   ```
 
