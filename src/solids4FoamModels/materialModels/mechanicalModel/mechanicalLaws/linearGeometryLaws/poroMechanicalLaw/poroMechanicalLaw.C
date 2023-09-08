@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -49,7 +43,7 @@ bool Foam::poroMechanicalLaw::checkSigmaEffReady(const volSymmTensorField& sigma
     {
         return true;
     }
-    
+
     sigmaEff_.set(
         new volSymmTensorField{
             IOobject
@@ -72,7 +66,7 @@ bool Foam::poroMechanicalLaw::checkSigmaEffReady(const surfaceSymmTensorField& s
     {
         return true;
     }
-    
+
     sigmaEfff_.set(
         new surfaceSymmTensorField{
             IOobject

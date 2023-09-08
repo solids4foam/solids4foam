@@ -20,7 +20,7 @@ Class
 
 Description
     FunctionObject that generates the analytical solution for contact patch test
-    
+
     The solution is taken from
         Crisfield MA. Re-visiting the contact patch test.
         Int J Numer Methods Eng. 2000
@@ -66,7 +66,7 @@ class contactPatchTestAnalyticalSolution
 
         //- Reference to main object registry
         const Time& time_;
-       
+
         //- Beam end traction
         const scalar displacement_;
 
@@ -78,7 +78,7 @@ class contactPatchTestAnalyticalSolution
 
 
     // Private Member Functions
-    
+
         //- Calculate stress tensor for given point
         symmTensor contactPatchTestStress();
 

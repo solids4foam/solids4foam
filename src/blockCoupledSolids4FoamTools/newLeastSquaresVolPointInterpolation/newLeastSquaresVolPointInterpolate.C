@@ -622,7 +622,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
     }
 
     pf.correctBoundaryConditions();
-    
+
     // Correct axis point values
     forAll(mesh().boundaryMesh(), patchI)
     {

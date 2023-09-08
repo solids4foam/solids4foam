@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -238,7 +232,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     const vectorField n(p.nf());
     const scalarField& magSf = p.magSf();
     scalarField Un(phip/(magSf + VSMALL));
-    
+
     // if (mesh.foundObject<surfaceScalarField>("phi"))
     // {
     //     const surfaceScalarField& phi =

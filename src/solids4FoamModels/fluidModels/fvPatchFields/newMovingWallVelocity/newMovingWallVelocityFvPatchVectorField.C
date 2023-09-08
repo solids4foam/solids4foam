@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -203,7 +197,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 
         scalar deltaT = mesh.time().deltaT().value();
         scalar deltaT0 = mesh.time().deltaT0().value();
-        
+
         if
         (
             U.oldTime().timeIndex() == U.oldTime().oldTime().timeIndex()
@@ -223,7 +217,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 
         Up = coefft*(Fc_ - oldFc_)/deltaT
           - coefft00*(oldFc_ - oldoldFc_)/deltaT;
-        
+
 //         Info << max(mag(Up)) << endl;
     }
     else // Euler
@@ -271,7 +265,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
     {
         scalar deltaT = mesh.time().deltaT().value();
         scalar deltaT0 = mesh.time().deltaT0().value();
-        
+
         scalar coefft   = 1 + deltaT/(deltaT + deltaT0);
         scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
         scalar coefft0  = coefft + coefft00;

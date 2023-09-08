@@ -1358,7 +1358,7 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
                         ]
                     )
                 ).prevAcceleration();
-            
+
             if (coupled())
             {
                 prevAcceleration = fluidPatchAcceleration;
@@ -1444,7 +1444,7 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                         ]
                     )
                 ).prevPressure();
-                
+
             if (coupled())
             {
                 prevAcceleration = fluidPatchAcceleration;

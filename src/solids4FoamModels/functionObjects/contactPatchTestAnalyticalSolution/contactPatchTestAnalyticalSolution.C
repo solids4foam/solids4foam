@@ -41,17 +41,17 @@ namespace Foam
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-Foam::symmTensor 
+Foam::symmTensor
 Foam::contactPatchTestAnalyticalSolution::contactPatchTestStress()
 {
     symmTensor sigma = symmTensor::zero;
-       
+
     sigma.xx() = 0.0;
-        
+
     sigma.yy() = -E_ / (1-Foam::sqr(nu_)) * Foam::mag(displacement_);
-        
+
     sigma.xy() = 0.0;
-    
+
     sigma.zz() = nu_ * sigma.yy();
 
     return sigma;
@@ -111,7 +111,7 @@ bool Foam::contactPatchTestAnalyticalSolution::writeData()
             }
         }
     }
-   
+
     if (mesh.foundObject<volSymmTensorField>("sigma"))
     {
         const volSymmTensorField& sigma =
@@ -130,20 +130,20 @@ bool Foam::contactPatchTestAnalyticalSolution::writeData()
             mesh,
             dimensionedScalar("zero", dimless, 0.0)
         );
-        
+
         scalarField& sI = relError;
-        
+
         const scalar analyticalSigmayy = contactPatchTestStress().yy();
-        
+
         forAll(sI, cellI)
         {
-            sI[cellI] = 
+            sI[cellI] =
                     (Foam::mag(sigma[cellI].yy() - analyticalSigmayy))
                   / Foam::mag(analyticalSigmayy);
 
             sI[cellI] *= 100;
         }
-        
+
         forAll(relError.boundaryField(), patchI)
         {
             if (mesh.boundary()[patchI].type() != "empty")
@@ -159,19 +159,19 @@ bool Foam::contactPatchTestAnalyticalSolution::writeData()
                         (
                             Foam::mag
                             (
-                                sigma.boundaryField()[patchI][faceI].yy() 
+                                sigma.boundaryField()[patchI][faceI].yy()
                               - analyticalSigmayy
                             )
                         ) / Foam::mag(analyticalSigmayy);
-                 
+
                     sP[faceI] *= 100;
                 }
             }
         }
-        
+
         Info<< "\tWriting sigma_y relative error field (in %)" << endl;
         relError.write();
-        
+
         Info<< "\tAverage relative error in sigma_y field: "
             << gAverage(relError) << "%" << nl << endl;
     }
@@ -196,7 +196,7 @@ Foam::contactPatchTestAnalyticalSolution::contactPatchTestAnalyticalSolution
     displacement_(readScalar(dict.lookup("displacement"))),
     E_(readScalar(dict.lookup("E"))),
     nu_(readScalar(dict.lookup("nu")))
-{   
+{
     Info<< "Creating " << this->name() << " function object" << endl;
 
     if (E_ < SMALL || nu_ < SMALL)
