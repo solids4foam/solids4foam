@@ -8,19 +8,20 @@ Prepared by Ivan Batistić
 
 ## Section Aims
 
-- This document describes the `solids4Foam` utilities located in `applications/utilities`;
-- Each version of the `OpenFOAM` comes with its own set of utilities, which can be found in the `$FOAM_UTILITIES` directory (type `util` in console). The list of available utilities can be found on the following links: [OpenFOAM.com](https://www.openfoam.com/documentation/user-guide/a-reference/a.2-standard-utilities), [OpenFOAM.org](https://doc.cfd.direct/openfoam/user-guide-v8/standard-utilities), [OpenFOAM-wiki](https://openfoamwiki.net/index.php/Main_OFUtilities);
-- The utility is executable with the same name as the directory name where it is located and is run simply by typing its name in the console with corresponding arguments/parameters if any.
+- This document describes the `solids4foam` utilities located in `applications/utilities`;
+- Utilities are executables that provide various pre and post-processing functionalities;
+- These `solids4foam` utilities provide functionalities not available in the standard `OpenFOAM` utilities ([OpenFOAM-wiki](https://openfoamwiki.net/index.php/Main_OFUtilities)).
 
 ---
 
 ## `abaqusMeshToFoam`
 
 - __Utility purpose__
-  Mesh converter; converts [Abaqus](https://www.3ds.com/products-services/simulia/products/abaqus/) mesh (in `*.inp` format) into the FOAM mesh format.  
+  Mesh converter: converts [Abaqus](https://www.3ds.com/products-services/simulia/products/abaqus/) mesh (in `*.inp` format) into the FOAM mesh format.  
+  Currently, this utility only supports 3-D hexahedral cells/elements.
   Details regarding the FOAM mesh format can be found, for example, [here](https://www.openfoam.com/documentation/user-guide/4-mesh-generation-and-conversion/4.1-mesh-description#:~:text=By%20default%20OpenFOAM%20defines%20a,any%20restriction%20on%20its%20alignment.).  
-  Note that each distribution of `OpenFOAM` comes with a set of mesh converters, see the available one [here](https://www.openfoam.com/documentation/user-guide/4-mesh-generation-and-conversion/4.5-mesh-conversion).  
-
+  Note that each distribution of `OpenFOAM` comes with a set of mesh converters (but not for Abaqus), see the available one [here](https://www.openfoam.com/documentation/user-guide/4-mesh-generation-and-conversion/4.5-mesh-conversion).  
+  
 - __Arguments__
 
   - `<mesh.inp>` name of the Abaqus mesh file.
@@ -35,7 +36,7 @@ Prepared by Ivan Batistić
   ```
 
   ```Note
-  - Only the following element types are supported: C3D8 and C3D8R.  
+  - Only the following Abaqus element types are supported: C3D8 and C3D8R.  
   - Only the first PART is used and the rest are ignored. 
   - Node sets, element sets and surfaces are not converted. 
   ```
@@ -46,12 +47,12 @@ Prepared by Ivan Batistić
 
 - __Utility purpose__
   For a chosen patch, find the closest face to the specified location and separate it into a new patch.   
-  The utility can be used, for example, for specifying point loads.
+  The utility can be used, for example, to create patches for specifying point loads.
 
 - __Arguments__
 
   - `<currentPatchName>` chosen patch name;
-  - `<newTinyPatchName>` name of the newly created one-face patch;
+  - `<newTinyPatchName>` name of the one-face patch to be created;
   - `"(x y z)"` location vector. 
 
 - __Options/parameters__
@@ -79,8 +80,9 @@ When using `addTinyPatch` the original mesh is overwritten!
 ## `foamMeshToAbaqus`
 
 - __Utility purpose__
-  Mesh converter; converts FOAM mesh into [Abaqus](https://www.3ds.com/products-services/simulia/products/abaqus/) mesh (`*.inp` format).   
-
+  Mesh converter: converts FOAM mesh into [Abaqus](https://www.3ds.com/products-services/simulia/products/abaqus/) mesh (`*.inp` format).
+  Currently, this utility only supports 3-D hexahedral cells/elements.
+  
 - __Arguments__
 
   None
@@ -109,8 +111,8 @@ When using `addTinyPatch` the original mesh is overwritten!
 ## `perturbMeshPoints`
 
 - __Utility purpose__  
-  Add a random perturbation to each interior mesh point. Boundary points are perturbed only in case of `empty` or `wedge` patches.   
-  The utility is used to create a distorted mesh to test the behavior of the discretisation procedure.
+  Add a random perturbation to each interior mesh point. Boundary points are not perturbed, except for in-plane motion on `empty` and `wedge` patches.   
+  The utility can be used to create a distorted mesh to test the behavior (accuracy, order of accuracy, stability, etc.) of a discretisation procedure.
 
 - __Arguments__  
   None
@@ -154,7 +156,7 @@ Perturbed mesh (`polyMesh`) is stored in the `0` directory and needs to be moved
 ```
 
 ```Note
-For 2D simulations, there is no need to perturb points in the `empty` direction. For an empty direction, zero scaling should be used, e.g.:  
+For 2-D simulations, there is no need to perturb points in the `empty` direction. For an empty direction, zero scaling should be used, e.g.:  
 `scaleFactor (5e-3 5e-3 0);`
 ```
 
@@ -163,7 +165,7 @@ For 2D simulations, there is no need to perturb points in the `empty` direction.
 ## `splitPatch`
 
 - __Utility purpose__
-  Splits up a patch by putting faces in the given bounding box in a new patch.
+  Splits a patch into two patches by putting faces in the given bounding box in a new patch.
 
 - __Arguments__
   None
