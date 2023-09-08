@@ -52,14 +52,16 @@ class newMovingWallVelocityFvPatchVectorField
     public fixedValueFvPatchVectorField
 {
 
-    //To keep track when to copy patch face centres
+    // To keep track when to copy patch face centres
     label myTimeIndex_;
 
-    //Old face centres of patch. Needed for (second order) time integration
+    // Old face centres of patch. Needed for (second order) time integration
     vectorField Fc_;
     vectorField oldFc_;
     vectorField oldoldFc_;
 
+    // Acceleration
+    vectorField acceleration_;
 
 public:
 
@@ -136,10 +138,18 @@ public:
 
     // Member functions
 
+        // Access functions
+
+            //- Get patch (moving wall) acceleration
+            const vectorField& acceleration() const
+            {
+                return acceleration_;
+            }
+    
+    // Evaluation functions
+
         //- Update the coefficients associated with the patch field
         virtual void updateCoeffs();
-
-    // Evaluation functions
 
         //- Return patch-normal gradient
         virtual tmp<Field<vector> > snGrad() const;

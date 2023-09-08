@@ -23,7 +23,7 @@ if [[ "$1" == "parallel" ]]; then
     solids4Foam::runApplication -s solid reconstructPar -region solid
 else
     # Run serial
-    solids4Foam::runApplication solids4Foam -noFunctionObjects
+    solids4Foam::runApplication solids4Foam
 fi
 
 # Create plots

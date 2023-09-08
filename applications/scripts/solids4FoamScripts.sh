@@ -175,8 +175,11 @@ function solids4Foam::convertCaseFormat()
     # 10. Resolve force post-processing path from foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
-        echo "Updating force.gnuplot"
-        sed -i "s|forces/0/forces.dat|./postProcessing/fluid/forces/0/force.dat|g" force.gnuplot
+        if [[ $WM_PROJECT_VERSION == *"v"* ]]
+        then
+            echo "Modifying force.gnuplot in consistent with ESI version"
+            sed -i "s|forces.dat|force.dat|g" force.gnuplot
+        fi
     fi
 
     # 11. Resolve sample post-processing path from foam-extend
@@ -193,8 +196,8 @@ function solids4Foam::convertCaseFormat()
         echo "-------------------"
         sed -i  "s|path = \"postProcessing/surfaces/1/sigma_surface.raw\"
                   |path = \"postProcessing/sampleDict.v2012/1/sigma_surface.raw\"|g" plot.gnuplot
-    fi        
-        
+    fi
+
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -353,12 +356,15 @@ function solids4Foam::convertCaseFormatFoamExtend()
             sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
         fi
     fi
-    
+
     # 10. Resolve force post-processing path for foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
     then
-        echo "Updating force.gnuplot"
-        sed -i "s|./postProcessing/fluid/forces/0/force.dat|forces/0/forces.dat|g" force.gnuplot
+        if [[ $WM_PROJECT_VERSION == *"v"* ]]
+        then
+            echo "Reverting force.gnuplot from ESI version to foam-extend or .org "
+            sed -i "s|force.dat|forces.dat|g" force.gnuplot
+        fi
     fi
 
     # 11. Resolve sampleDict post-processing path for foam-extend
@@ -368,7 +374,7 @@ function solids4Foam::convertCaseFormatFoamExtend()
         sed -i "s|path = \"postProcessing/sampleDict.v2012/1/sigma_surface.raw\"
                  |path = \"postProcessing/surfaces/1/sigma_surface.raw\"|g" plot.gnuplot
     fi
-    
+
     # 11. Resolve sample post-processing path from foam-extend
     if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
     then

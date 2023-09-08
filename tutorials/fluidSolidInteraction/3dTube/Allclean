@@ -9,7 +9,7 @@ source solids4FoamScripts.sh
 cleanCase
 cleanCase fluid
 cleanCase solid
-rm -rf case.foam postProcessing
+rm -rf case.foam postProcessing residuals
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

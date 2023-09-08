@@ -49,9 +49,10 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 #else
     myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
 #endif
-    Fc_(p.patch().size(),vector::zero),
-    oldFc_(p.patch().size(),vector::zero),
-    oldoldFc_(p.patch().size(),vector::zero)
+    Fc_(p.patch().size(), vector::zero),
+    oldFc_(p.patch().size(), vector::zero),
+    oldoldFc_(p.patch().size(), vector::zero),
+    acceleration_(p.patch().size(), vector::zero)
 {}
 
 
@@ -65,9 +66,10 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 :
     fixedValueFvPatchVectorField(ptf, p, iF, mapper),
     myTimeIndex_(ptf.myTimeIndex_),
-    Fc_(p.patch().size(),vector::zero),
-    oldFc_(p.patch().size(),vector::zero),
-    oldoldFc_(p.patch().size(),vector::zero)
+    Fc_(p.patch().size(), vector::zero),
+    oldFc_(p.patch().size(), vector::zero),
+    oldoldFc_(p.patch().size(), vector::zero),
+    acceleration_(p.patch().size(), vector::zero)
 {}
 
 
@@ -84,9 +86,10 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 #else
     myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
 #endif
-    Fc_(p.patch().size(),vector::zero),
-    oldFc_(p.patch().size(),vector::zero),
-    oldoldFc_(p.patch().size(),vector::zero)
+    Fc_(p.patch().size(), vector::zero),
+    oldFc_(p.patch().size(), vector::zero),
+    oldoldFc_(p.patch().size(), vector::zero),
+    acceleration_(p.patch().size(), vector::zero)
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
@@ -118,7 +121,8 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     myTimeIndex_(pivpvf.myTimeIndex_),
     Fc_(pivpvf.Fc_),
     oldFc_(pivpvf.oldFc_),
-    oldoldFc_(pivpvf.oldoldFc_)
+    oldoldFc_(pivpvf.oldoldFc_),
+    acceleration_(pivpvf.acceleration_)
 {}
 #endif
 
@@ -133,7 +137,8 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     myTimeIndex_(pivpvf.myTimeIndex_),
     Fc_(pivpvf.oldFc_),
     oldFc_(pivpvf.oldFc_),
-    oldoldFc_(pivpvf.oldoldFc_)
+    oldoldFc_(pivpvf.oldoldFc_),
+    acceleration_(pivpvf.acceleration_)
 {}
 
 
@@ -198,6 +203,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 
         scalar deltaT = mesh.time().deltaT().value();
         scalar deltaT0 = mesh.time().deltaT0().value();
+        
         if
         (
             U.oldTime().timeIndex() == U.oldTime().oldTime().timeIndex()
@@ -217,7 +223,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 
         Up = coefft*(Fc_ - oldFc_)/deltaT
           - coefft00*(oldFc_ - oldoldFc_)/deltaT;
-
+        
 //         Info << max(mag(Up)) << endl;
     }
     else // Euler
@@ -255,6 +261,37 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
     vectorField::operator=(Up);
 
 //     Info << "mwvuc " << max(mag(Up)) << ", " << average(mag(Up)) << endl;
+
+    // Update acceleration
+    if
+    (
+        (ddtScheme == fv::backwardDdtScheme<vector>::typeName)
+     && (myTimeIndex_ > 1)
+    )
+    {
+        scalar deltaT = mesh.time().deltaT().value();
+        scalar deltaT0 = mesh.time().deltaT0().value();
+        
+        scalar coefft   = 1 + deltaT/(deltaT + deltaT0);
+        scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
+        scalar coefft0  = coefft + coefft00;
+
+        acceleration_ =
+            (
+                coefft*Up
+              - coefft0
+               *U.oldTime().boundaryField()[this->patch().index()]
+              + coefft00
+               *U.oldTime().oldTime().boundaryField()[this->patch().index()]
+            )
+           /mesh.time().deltaT().value();
+    }
+    else
+    {
+        acceleration_ =
+            (Up - U.oldTime().boundaryField()[this->patch().index()])/
+            mesh.time().deltaT().value();
+    }
 
     fixedValueFvPatchVectorField::updateCoeffs();
 }

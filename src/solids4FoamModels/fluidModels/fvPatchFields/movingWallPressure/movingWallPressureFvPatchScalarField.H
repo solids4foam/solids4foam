@@ -130,8 +130,8 @@ public:
 
     // Member functions
 
-//         //- Update the coefficients associated with the patch field
-//         virtual void updateCoeffs();
+        //- Update the coefficients associated with the patch field
+        virtual void updateCoeffs();
 
         //- Get previous pressure patch field
         const vectorField& prevAcceleration() const
@@ -145,15 +145,15 @@ public:
             return prevAcceleration_;
         }
 
-        //- Evaluate the patch field
-        virtual void evaluate
-        (
-#ifdef OPENFOAM_NOT_EXTEND
-            const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
-#else
-            const Pstream::commsTypes commsType = Pstream::blocking
-#endif
-        );
+//         //- Evaluate the patch field
+//         virtual void evaluate
+//         (
+// #ifdef OPENFOAM_NOT_EXTEND
+//             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
+// #else
+//             const Pstream::commsTypes commsType = Pstream::blocking
+// #endif
+//         );
 
         //- Write
         virtual void write(Ostream&) const;
