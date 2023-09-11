@@ -35,7 +35,11 @@ SourceFiles
 #ifndef nonLinearGeometry_H
 #define nonLinearGeometry_H
 
+#ifdef OPENFOAM_COM
+#include "Enum.H"
+#else
 #include "NamedEnum.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,7 +62,11 @@ public:
             TOTAL_LAGRANGIAN
         };
 
+#ifdef OPENFOAM_COM
+        static const Enum<nonLinearType> nonLinearNames_;
+#else
         static const NamedEnum<nonLinearType, 3> nonLinearNames_;
+#endif
 };
 
 
