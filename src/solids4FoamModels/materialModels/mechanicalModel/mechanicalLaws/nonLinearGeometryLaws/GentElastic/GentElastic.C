@@ -49,7 +49,7 @@ Foam::GentElastic::GentElastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
     mu_(E_/(2.0*(1.0 + nu_))),

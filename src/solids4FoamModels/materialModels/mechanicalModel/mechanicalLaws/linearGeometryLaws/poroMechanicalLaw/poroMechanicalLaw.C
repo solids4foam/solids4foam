@@ -159,7 +159,7 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     effectiveStressMechLawPtr_
     (
         mechanicalLaw::NewLinGeomMechLaw

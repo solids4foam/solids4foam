@@ -49,7 +49,7 @@ Foam::rotationInvariantLinearElastic::rotationInvariantLinearElastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     biotStrain_
     (
         IOobject

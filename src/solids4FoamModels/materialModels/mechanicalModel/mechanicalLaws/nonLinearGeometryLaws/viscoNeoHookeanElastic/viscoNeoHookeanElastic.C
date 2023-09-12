@@ -57,7 +57,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     EInf_(dict.lookup("EInfinity")),
     E_(dict.lookup("E")),
     tau_(dict.lookup("relaxationTimes")),

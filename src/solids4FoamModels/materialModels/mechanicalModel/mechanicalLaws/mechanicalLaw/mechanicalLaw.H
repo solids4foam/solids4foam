@@ -70,9 +70,6 @@ class mechanicalLaw
         //- Name
         const word name_;
 
-        //- Type
-        const word type_;
-
         //- Const reference to mesh
         const fvMesh& mesh_;
 
@@ -451,7 +448,6 @@ public:
         //- Construct from dictionary
         mechanicalLaw
         (
-            const word& type,
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
@@ -471,12 +467,6 @@ public:
         const word& name() const
         {
             return name_;
-        }
-
-        //- Return name
-        const word& type() const
-        {
-            return type_;
         }
 
         //- Return const reference to dict

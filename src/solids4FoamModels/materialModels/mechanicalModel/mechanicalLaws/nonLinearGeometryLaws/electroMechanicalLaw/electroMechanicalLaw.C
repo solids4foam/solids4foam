@@ -112,7 +112,7 @@ Foam::electroMechanicalLaw::electroMechanicalLaw
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     passiveMechLawPtr_
     (
         mechanicalLaw::NewNonLinGeomMechLaw

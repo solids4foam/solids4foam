@@ -563,7 +563,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
     JPtr_(),

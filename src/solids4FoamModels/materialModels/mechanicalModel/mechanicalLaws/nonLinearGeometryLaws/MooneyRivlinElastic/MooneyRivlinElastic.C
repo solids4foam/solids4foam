@@ -50,7 +50,7 @@ Foam::MooneyRivlinElastic::MooneyRivlinElastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     c10_
     (
         IOobject

@@ -296,7 +296,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     E1_(dict.lookup("E1")),
     E2_(dict.lookup("E2")),
     E3_(dict.lookup("E3")),

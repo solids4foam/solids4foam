@@ -411,7 +411,7 @@ Foam::linearElasticCt::linearElasticCt
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(typeName, name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     E_
     (
         IOobject
