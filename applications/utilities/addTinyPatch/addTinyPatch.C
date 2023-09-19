@@ -62,12 +62,12 @@ int main(int argc, char *argv[])
 
     // Read arguments
 #ifdef OPENFOAM_NOT_EXTEND
-    const word currentPatchName(args[0]);
-    const word newTinyPatchName(args[1]);
+    const word currentPatchName(args[1]);
+    const word newTinyPatchName(args[2]);
     #ifdef OPENFOAM_COM
-    const vector approxFaceC(args.get<vector>(2));
+    const vector approxFaceC(args.get<vector>(3));
     #else
-    const vector approxFaceC(args.argRead<vector>(2));
+    const vector approxFaceC(args.argRead<vector>(3));
     #endif
 #else
     const word currentPatchName(args.additionalArgs()[0]);

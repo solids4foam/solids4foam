@@ -395,7 +395,7 @@ gradientBoundaryCoeffs() const
     }
     else
     {
-        return (patch().deltaCoeffs()*(*this));        
+        return (patch().deltaCoeffs()*(*this));
     }
 }
 

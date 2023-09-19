@@ -1,25 +1,19 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.1
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
-    This file is part of foam-extend.
+    This file is part of solids4foam.
 
-    foam-extend is free software: you can redistribute it and/or modify it
+    solids4foam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the
     Free Software Foundation, either version 3 of the License, or (at your
     option) any later version.
 
-    foam-extend is distributed in the hope that it will be useful, but
+    solids4foam is distributed in the hope that it will be useful, but
     WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
     General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
 
@@ -211,7 +205,7 @@ void Foam::flowRateOutletPressureFvPatchScalarField::updateCoeffs()
             scalar specArea =
                 totOutletArea*specFlowRateFraction/
                 (1.0-specFlowRateFraction);
-            
+
             flowRateFraction_ =
                 gSum(this->patch().magSf())/
                 (totOutletArea + specArea);
@@ -227,7 +221,7 @@ void Foam::flowRateOutletPressureFvPatchScalarField::updateCoeffs()
     if (inletPatchIndices_.size() == 0)
     {
         DynamicList<label> ips;
-        
+
         forAll(U.boundaryField(), patchI)
         {
             if
@@ -272,7 +266,7 @@ void Foam::flowRateOutletPressureFvPatchScalarField::updateCoeffs()
     }
 
     scalar reqOutletFlowRate = -inletFlowRate*flowRateFraction_;
-    
+
 #ifdef OPENFOAM_NOT_EXTEND
     scalarField& phip =
         phi.boundaryFieldRef()[this->patch().index()];
@@ -311,7 +305,7 @@ void Foam::flowRateOutletPressureFvPatchScalarField::updateCoeffs()
         adjustableFlowRateOut + adjustableFlowRateIn;
 
     phiCorr_ = 0;
-    
+
     if (totAdjustableFlowRate < SMALL)
     {
         if (mag(netFlowRate) > SMALL)
@@ -366,7 +360,7 @@ manipulateMatrix(fvMatrix<scalar>& matrix)
 void Foam::flowRateOutletPressureFvPatchScalarField::write(Ostream& os) const
 {
     fvPatchScalarField::write(os);
-    
+
 #ifdef OPENFOAM_COM
     os.writeEntryIfDifferent<word>("U", "U", UName_);
     os.writeEntryIfDifferent<word>("phi", "phi", phiName_);
@@ -376,7 +370,7 @@ void Foam::flowRateOutletPressureFvPatchScalarField::write(Ostream& os) const
     writeEntryIfDifferent<word>(os, "phi", "phi", phiName_);
     writeEntryIfDifferent<word>(os, "rho", "rho", rhoName_);
 #endif
-    
+
     os.writeKeyword("flowRateFraction")
         << flowRateFraction_ << token::END_STATEMENT << nl;
 }

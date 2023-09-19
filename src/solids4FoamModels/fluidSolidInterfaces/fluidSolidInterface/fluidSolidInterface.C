@@ -1164,34 +1164,36 @@ void Foam::fluidSolidInterface::updateForce()
             << totalForceOnInterface(solidZone, solidZoneTotalTraction) << nl
             << endl;
 
-        // Set interface pressure for elasticWallPressure boundary condition
-        const label fluidPatchID = fluidPatchIndices()[interfaceI];
-        if
-        (
-            isA<elasticWallPressureFvPatchScalarField>
-            (
-                fluid().p().boundaryField()[fluidPatchID]
-            )
-        )
-        {
-            scalarField& prevPressure =
-                const_cast<elasticWallPressureFvPatchScalarField&>
-                (
-                    refCast<const elasticWallPressureFvPatchScalarField>
-                    (
-                        fluid().p().boundaryField()[fluidPatchID]
-                    )
-                ).prevPressure();
+        // ZT: move this part of the code into
+        // updateElasticWallPressureAcceleration() function
+        // // Set interface pressure for elasticWallPressure boundary condition
+        // const label fluidPatchID = fluidPatchIndices()[interfaceI];
+        // if
+        // (
+        //     isA<elasticWallPressureFvPatchScalarField>
+        //     (
+        //         fluid().p().boundaryField()[fluidPatchID]
+        //     )
+        // )
+        // {
+        //     scalarField& prevPressure =
+        //         const_cast<elasticWallPressureFvPatchScalarField&>
+        //         (
+        //             refCast<const elasticWallPressureFvPatchScalarField>
+        //             (
+        //                 fluid().p().boundaryField()[fluidPatchID]
+        //             )
+        //         ).prevPressure();
 
-            if (coupled())
-            {
-                prevPressure = fluid().patchPressureForce(fluidPatchID);
-            }
-            else
-            {
-                prevPressure = 0;
-            }
-        }
+        //     if (coupled())
+        //     {
+        //         prevPressure = fluid().patchPressureForce(fluidPatchID);
+        //     }
+        //     else
+        //     {
+        //         prevPressure = 0;
+        //     }
+        // }
     }
 }
 
@@ -1345,16 +1347,26 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
                 ].globalFaceToPatch(fluidZoneAcceleration)
             );
 
-            const_cast<movingWallPressureFvPatchScalarField&>
-            (
-                refCast<const movingWallPressureFvPatchScalarField>
+            vectorField& prevAcceleration =
+                const_cast<movingWallPressureFvPatchScalarField&>
                 (
-                    fluid().p().boundaryField()
-                    [
-                        fluid().globalPatches()[interfaceI].patch().index()
-                    ]
-                )
-            ).prevAcceleration() = fluidPatchAcceleration;
+                    refCast<const movingWallPressureFvPatchScalarField>
+                    (
+                        fluid().p().boundaryField()
+                        [
+                            fluidPatchIndices()[interfaceI]
+                        ]
+                    )
+                ).prevAcceleration();
+
+            if (coupled())
+            {
+                prevAcceleration = fluidPatchAcceleration;
+            }
+            else
+            {
+                prevAcceleration = vector::zero;
+            }
         }
     }
 }
@@ -1409,16 +1421,53 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 ].globalFaceToPatch(fluidZoneAcceleration)
             );
 
-            const_cast<elasticWallPressureFvPatchScalarField&>
-            (
-                refCast<const elasticWallPressureFvPatchScalarField>
+            vectorField& prevAcceleration =
+                const_cast<elasticWallPressureFvPatchScalarField&>
                 (
-                    fluid().p().boundaryField()
-                    [
-                        fluid().globalPatches()[interfaceI].patch().index()
-                    ]
-                )
-            ).prevAcceleration() = fluidPatchAcceleration;
+                    refCast<const elasticWallPressureFvPatchScalarField>
+                    (
+                        fluid().p().boundaryField()
+                        [
+                            fluidPatchIndices()[interfaceI]
+                        ]
+                    )
+                ).prevAcceleration();
+
+            scalarField& prevPressure =
+                const_cast<elasticWallPressureFvPatchScalarField&>
+                (
+                    refCast<const elasticWallPressureFvPatchScalarField>
+                    (
+                        fluid().p().boundaryField()
+                        [
+                            fluidPatchIndices()[interfaceI]
+                        ]
+                    )
+                ).prevPressure();
+
+            if (coupled())
+            {
+                prevAcceleration = fluidPatchAcceleration;
+                prevPressure =
+                    fluid().patchPressureForce
+                    (
+                        fluidPatchIndices()[interfaceI]
+                    );
+            }
+            else
+            {
+                // ZT: Helps to improve stability in case of
+                // uncoupled simulation where acceleration
+                // shoud be exactly zero.
+                prevAcceleration = vector::zero;
+                // ZT: Pressure is not zero.
+                // prevPressure = 0;
+                prevPressure =
+                    fluid().patchPressureForce
+                    (
+                        fluidPatchIndices()[interfaceI]
+                    );
+            }
         }
     }
 }
