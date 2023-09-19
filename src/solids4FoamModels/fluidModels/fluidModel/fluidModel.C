@@ -624,15 +624,15 @@ Foam::fluidModel::fluidModel
     ),
     adjustTimeStep_
     (
-        runTime.controlDict().lookupOrAddDefault<Switch>("adjustTimeStep", false)
+        runTime.controlDict().lookupOrDefault<Switch>("adjustTimeStep", false)
     ),
     maxCo_
     (
-        runTime.controlDict().lookupOrAddDefault<scalar>("maxCo", 1.0)
+        runTime.controlDict().lookupOrDefault<scalar>("maxCo", 1.0)
     ),
     maxDeltaT_
     (
-        runTime.controlDict().lookupOrAddDefault<scalar>("maxDeltaT", GREAT)
+        runTime.controlDict().lookupOrDefault<scalar>("maxDeltaT", GREAT)
     ),
     pMin_("pMin", dimPressure, 0),
     pMax_("pMax", dimPressure, 0),
@@ -988,7 +988,7 @@ bool Foam::fluidModel::read()
 
 void Foam::fluidModel::end()
 {
-    *this->IOobject::name() = *this->IOobject::name()+"_out";
-    *this->IOobject::write();
+    this->IOobject::rename(this->IOobject::name()+"_out");
+    this->regIOobject::write();
 }
 // ************************************************************************* //

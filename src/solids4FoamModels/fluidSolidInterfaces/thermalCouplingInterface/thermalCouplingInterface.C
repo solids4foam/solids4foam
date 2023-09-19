@@ -51,11 +51,11 @@ thermalCouplingInterface::thermalCouplingInterface
     fluidSolidInterface(typeName, runTime, region),
     relaxationFactor_
     (
-        fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
+        fsiProperties().lookupOrAddDefault<scalar>("relaxationFactor", 0.01)
     ),
     predictTemperatureAndHeatFlux_
     (
-        fsiProperties().lookupOrDefault<bool>
+        fsiProperties().lookupOrAddDefault<bool>
         (
             "predictTemperatureAndHeatFlux",
             false

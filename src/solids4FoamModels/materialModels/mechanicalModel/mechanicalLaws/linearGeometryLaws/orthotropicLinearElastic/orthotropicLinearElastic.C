@@ -292,7 +292,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict,
+    dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -396,7 +396,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Material law not implemented for planeStress!"
             << abort(FatalError);
@@ -419,7 +419,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "E1, E2, E3, G12, G23, G31 should all be greater than zero!"
             << abort(FatalError);
@@ -439,7 +439,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Unphysical Poisson's ratio!"
             << " mag(nu_ij) should be less sqrt(E_i/E_j)"
@@ -460,7 +460,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Unphysical Poisson's ratio!"
             << " (1 - nu12*nu21 - nu23*nu32 "
@@ -483,7 +483,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "The direction vectors must not have zero length!"
             << abort(FatalError);
@@ -508,7 +508,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "The direction vectors should be locally orthogonal!"
             << abort(FatalError);

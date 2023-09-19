@@ -114,14 +114,14 @@ interFluid::interFluid
     ghf_("ghf", (g() & mesh().Cf()) - ghRef_),
     pressureReferencePtr_(),
     rAU_(),
-    correctPhi_(pimple().dict().lookupOrAddDefault("correctPhi", false)),
+    correctPhi_(pimple().dict().lookupOrDefault("correctPhi", false)),
     checkMeshCourantNo_
     (
-        pimple().dict().lookupOrAddDefault("checkMeshCourantNo", false)
+        pimple().dict().lookupOrDefault("checkMeshCourantNo", false)
     ),
     moveMeshOuterCorrectors_
     (
-        pimple().dict().lookupOrAddDefault("moveMeshOuterCorrectors", false)
+        pimple().dict().lookupOrDefault("moveMeshOuterCorrectors", false)
     ),
     cumulativeContErr_(0),
     alphaPhi10Header_

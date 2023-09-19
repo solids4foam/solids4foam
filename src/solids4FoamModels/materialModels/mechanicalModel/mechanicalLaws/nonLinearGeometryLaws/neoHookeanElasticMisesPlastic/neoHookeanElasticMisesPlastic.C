@@ -559,7 +559,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict,
+    dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -860,7 +860,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     Hp_(0.0),
     maxDeltaErr_
     (
-        mesh.time().controlDict().lookupOrAddDefault<scalar>("maxDeltaErr", 0.01)
+        mesh.time().controlDict().lookupOrDefault<scalar>("maxDeltaErr", 0.01)
     )
 {
     Info<< "    updateBEbarConsistent: " << updateBEbarConsistent_ << endl;

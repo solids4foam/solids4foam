@@ -41,7 +41,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewLinGeomMechLaw
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict,
+    dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 {
@@ -96,7 +96,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewLinGeomMechLaw
                 "mechanicalLaw::New(\n"
                 "    const word& name,\n"
                 "    const fvMesh& mesh,\n"
-                "    const dictionary& dict,\n"
+                "    dictionary& dict,\n"
                 "    const nonLinearGeometry::nonLinearType& nonLinGeom\n"
                 ")",
                 dict
@@ -114,7 +114,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewLinGeomMechLaw
                 "mechanicalLaw::New(\n"
                 "    const word& name,\n"
                 "    const fvMesh& mesh,\n"
-                "    const dictionary& dict,\n"
+                "    dictionary& dict,\n"
                 "    const nonLinearGeometry::nonLinearType& nonLinGeom\n"
                 ")",
                 dict
@@ -137,7 +137,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict,
+    dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 {
@@ -194,7 +194,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
                 "mechanicalLaw::New(\n"
                 "    const word& name,\n"
                 "    const fvMesh& mesh,\n"
-                "    const dictionary& dict,\n"
+                "    dictionary& dict,\n"
                 "    const nonLinearGeometry::nonLinearType& nonLinGeom\n"
                 ")",
                 dict
@@ -212,7 +212,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
                 "mechanicalLaw::New(\n"
                 "    const word& name,\n"
                 "    const fvMesh& mesh,\n"
-                "    const dictionary& dict,\n"
+                "    dictionary& dict,\n"
                 "    const nonLinearGeometry::nonLinearType& nonLinGeom\n"
                 ")",
                 dict

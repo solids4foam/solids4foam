@@ -178,14 +178,14 @@ pimpleFluid::pimpleFluid
         )
     ),
     rho_(laminarTransport_.lookup("rho")),
-    correctPhi_(pimple().dict().lookupOrAddDefault("correctPhi", false)),
+    correctPhi_(pimple().dict().lookupOrDefault("correctPhi", false)),
     checkMeshCourantNo_
     (
-        pimple().dict().lookupOrAddDefault("checkMeshCourantNo", false)
+        pimple().dict().lookupOrDefault("checkMeshCourantNo", false)
     ),
     moveMeshOuterCorrectors_
     (
-        pimple().dict().lookupOrAddDefault("moveMeshOuterCorrectors", false)
+        pimple().dict().lookupOrDefault("moveMeshOuterCorrectors", false)
     ),
     cumulativeContErr_(0),
     solveEnergyEq_

@@ -62,7 +62,7 @@ class fluidSolidInterface
     // Private data
 
         //- FSI properties dictionary
-        mutable dictionary fsiProperties_;
+        dictionary &fsiProperties_;
 
         //- Flow solver
         autoPtr<fluidModel> fluid_;
@@ -180,6 +180,14 @@ class fluidSolidInterface
         //- Disallow default bitwise assignment
         void operator=(const fluidSolidInterface&);
 
+protected:
+    // Protected Member Functions
+
+        //- Return sub-dictionary
+        dictionary& fsiProperties()
+        {
+            return fsiProperties_;
+        }
 
 public:
 

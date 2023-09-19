@@ -348,7 +348,7 @@ bool sonicLiquidFluid::evolve()
 
     bool correctPhi
     (
-        pimple().dict().lookupOrAddDefault("correctPhi", false)
+        pimple().dict().lookupOrDefault("correctPhi", false)
     );
 
     if (correctPhi && meshChanged)

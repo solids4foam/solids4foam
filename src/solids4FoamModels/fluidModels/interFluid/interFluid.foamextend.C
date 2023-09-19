@@ -105,10 +105,10 @@ interFluid::interFluid
     pdRefCell_(0),
     pdRefValue_(0.0),
     pRefValue_(0.0),
-    correctPhi_(pimple().dict().lookupOrAddDefault("correctPhi", false)),
+    correctPhi_(pimple().dict().lookupOrDefault("correctPhi", false)),
     checkMeshCourantNo_
     (
-        pimple().dict().lookupOrAddDefault("checkMeshCourantNo", false)
+        pimple().dict().lookupOrDefault("checkMeshCourantNo", false)
     ),
     turbulence_
     (

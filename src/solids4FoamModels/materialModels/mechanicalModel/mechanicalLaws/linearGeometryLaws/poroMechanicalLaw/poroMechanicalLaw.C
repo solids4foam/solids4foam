@@ -155,7 +155,7 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict,
+    dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -179,8 +179,8 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
             "biotCoeff", dimensionedScalar("0", dimless, 1.0)
         )
     ),
-    pName_(dict.lookupOrAddDefault<word>("pressureFieldName", "p")),
-    pRegion_(dict.lookupOrAddDefault<word>("pressureFieldRegion", "region0")),
+    pName_(dict.lookupOrDefault<word>("pressureFieldName", "p")),
+    pRegion_(dict.lookupOrDefault<word>("pressureFieldRegion", "region0")),
     p0_
     (
         IOobject
@@ -192,7 +192,7 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
             IOobject::NO_WRITE
         ),
         mesh,
-        dict.lookupOrAddDefault<dimensionedScalar>
+        dict.lookupOrDefault<dimensionedScalar>
         (
             "p0",
             dimensionedScalar("zero", dimPressure, 0.0)

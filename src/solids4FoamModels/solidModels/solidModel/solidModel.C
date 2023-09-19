@@ -111,18 +111,19 @@ void Foam::solidModel::makeDualMesh() const
     // Create one dual face between cell centres and face centres
     const bool splitAllFaces = true;
 
-    // Hard-coded settings
+    // Hard-coded settings --> these can not be added to dictionary and returned in output-dict, because
+    // this function is qualified as 'const'. This is, even though dictionary is mutable. (Solutions?)
     const scalar featureAngle
     (
-        solidModelDict().lookupOrAddDefault<scalar>("featureAngle", 30)
+        solidModelDict().lookupOrDefault<scalar>(word("featureAngle"), scalar(30))
     );
     const bool doNotPreserveFaceZones
     (
-        solidModelDict().lookupOrAddDefault<bool>("doNotPreserveFaceZones", false)
+        solidModelDict().lookupOrDefault<bool>("doNotPreserveFaceZones", false)
     );
     const bool concaveMultiCells
     (
-        solidModelDict().lookupOrAddDefault<bool>("concaveMultiCells", false)
+        solidModelDict().lookupOrDefault<bool>("concaveMultiCells", false)
     );
 
     Info<< "    featureAngle: " << featureAngle << nl
@@ -212,7 +213,7 @@ void Foam::solidModel::makeDualMesh() const
         dualMesh.movePoints(map().preMotionPoints());
     }
 
-    if (solidModelDict().lookupOrAddDefault<Switch>("writeDualMesh", false))
+    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false))
     {
         dualMesh.setInstance(runTime().constant());
         Info<< "Writing dualMesh to " << dualMesh.polyMesh::instance() << endl;
@@ -1592,17 +1593,17 @@ void Foam::solidModel::updateTotalFields()
 
 void Foam::solidModel::end()
 {
-    solidProperties().IOobject::name() = solidProperties().IOobject::name()+"_out";
-    solidProperties().write();
+    solidProperties_.IOobject::rename(solidProperties().IOobject::name()+"_out");
+    solidProperties().regIOobject::write();
     if (!mechanicalPtr_.empty())
     {
-        mechanical().IOobject::name() = mechanical().IOobject::name()+"_out";
-        mechanical().write();
+        mechanical().IOobject::rename(mechanical().IOobject::name()+"_out");
+        static_cast<const IOdictionary>(mechanical()).regIOobject::write();
     }
     if (!thermalPtr_.empty())
     {
-        thermal().IOobject::name() = thermal().IOobject::name()+"_out";
-        thermal().write();
+        thermal().IOobject::rename(thermal().IOobject::name()+"_out");
+        static_cast<const IOdictionary>(thermal()).regIOobject::write();
     }
 
     if (maxIterReached_ > 0)

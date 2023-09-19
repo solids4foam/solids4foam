@@ -129,14 +129,14 @@ interFluid::interFluid
     pRefCell_(0.0),
     pRefValue_(0.0),
     rAU_(),
-    correctPhi_(pimple().dict().lookupOrAddDefault("correctPhi", false)),
+    correctPhi_(pimple().dict().lookupOrDefault("correctPhi", false)),
     checkMeshCourantNo_
     (
-        pimple().dict().lookupOrAddDefault("checkMeshCourantNo", false)
+        pimple().dict().lookupOrDefault("checkMeshCourantNo", false)
     ),
     moveMeshOuterCorrectors_
     (
-        pimple().dict().lookupOrAddDefault("moveMeshOuterCorrectors", false)
+        pimple().dict().lookupOrDefault("moveMeshOuterCorrectors", false)
     ),
     cumulativeContErr_(0),
     alphaPhiUn_

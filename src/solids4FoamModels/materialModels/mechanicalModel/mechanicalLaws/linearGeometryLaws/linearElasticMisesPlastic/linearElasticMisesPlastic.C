@@ -390,7 +390,7 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
 (
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict,
+    dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -631,7 +631,7 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
     Hp_(0.0),
     maxDeltaErr_
     (
-        mesh.time().controlDict().lookupOrAddDefault<scalar>("maxDeltaErr", 0.01)
+        mesh.time().controlDict().lookupOrDefault<scalar>("maxDeltaErr", 0.01)
     )
 {
     if (planeStress())

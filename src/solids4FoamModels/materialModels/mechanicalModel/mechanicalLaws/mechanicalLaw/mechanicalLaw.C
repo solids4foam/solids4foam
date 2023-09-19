@@ -1283,15 +1283,13 @@ bool Foam::mechanicalLaw::incremental() const
 
 Foam::mechanicalLaw::mechanicalLaw
 (
-    const word& type,
     const word& name,
     const fvMesh& mesh,
-    const dictionary& dict,
+    dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
     name_(name),
-    type_(type),
     mesh_(mesh),
     dict_(dict),
     baseMeshRegionName_(),
@@ -1341,7 +1339,7 @@ Foam::mechanicalLaw::mechanicalLaw
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         ) << "solid region name not found" << abort(FatalError);
     }

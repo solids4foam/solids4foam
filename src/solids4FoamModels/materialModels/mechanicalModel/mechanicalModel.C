@@ -64,7 +64,7 @@ void Foam::mechanicalModel::makeSolSubMeshes() const
             mesh_,
             cellZoneNames_,
             incremental_,
-            lookupOrAddDefault<Switch>("writeSubMeshes",  false)
+            lookupOrDefault<Switch>("writeSubMeshes",  false)
         )
     );
 }
@@ -238,7 +238,7 @@ Foam::mechanicalModel::mechanicalModel
     Info<< "Creating the mechanicalModel" << endl;
 
     // Read the mechanical laws
-    const PtrList<entry> lawEntries(lookup("mechanical"));
+    PtrList<entry> lawEntries(lookup("mechanical"));
 
     PtrList<mechanicalLaw>& laws = *this;
     laws.setSize(lawEntries.size());
