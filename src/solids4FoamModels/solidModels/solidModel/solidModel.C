@@ -1612,6 +1612,13 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     const word& region
 )
 {
+
+    // In case a case, that is set up for a muti-region calculation, is supposed to be run as simple (single region)
+    // calculation (i. e. to check the convergence of that single region) the solver can be 
+    // set to solid in physicsProperties and in the controlDict under the subDict 'solid' one can select the region.
+    // This also allows the region name of a calulation not to be 'region0' or 'solid' but user defined.  
+    word runRegion(runTime.controlDict().subOrEmptyDict("solid").lookupOrDefault<word>("region",region));
+
     // NB: dictionary must be unregistered to avoid adding to the database
 
     IOdictionary props
@@ -1619,9 +1626,9 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
         IOobject
         (
             "solidProperties",
-            bool(region == dynamicFvMesh::defaultRegion)
+            bool(runRegion == dynamicFvMesh::defaultRegion)
           ? fileName(runTime.caseConstant())
-          : fileName(runTime.caseConstant()/region),
+          : fileName(runTime.caseConstant()/runRegion),
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE,
@@ -1666,7 +1673,7 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     auto* ctorPtr = cstrIter();
 #endif
 
-    return autoPtr<solidModel>(ctorPtr(runTime, region));
+    return autoPtr<solidModel>(ctorPtr(runTime, runRegion));
 }
 
 
@@ -1736,7 +1743,6 @@ void Foam::solidModel::setTraction
     setTraction(solutionD().boundaryField()[patchID], patchTraction);
 #endif
 }
-
 
 Foam::Switch& Foam::solidModel::checkEnforceLinear(const volScalarField& J)
 {
