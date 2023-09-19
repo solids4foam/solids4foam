@@ -637,7 +637,7 @@ tmp<scalarField> thermalLinGeomSolid::faceZoneHeatTransferCoeff
     );
 }
 
-    
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace solidModels

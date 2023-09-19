@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -65,7 +59,7 @@ class pointPointLeastSquaresVectors
     // Private data
 
         //- Least-squares gradient vectors
-        //  There is a vector for each point-neighbour of aa point 
+        //  There is a vector for each point-neighbour of aa point
         mutable autoPtr< List<vectorList> > vectorsPtr_;
 
 

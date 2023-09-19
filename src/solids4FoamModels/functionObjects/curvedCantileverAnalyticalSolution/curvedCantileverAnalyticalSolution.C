@@ -47,9 +47,9 @@ Foam::symmTensor Foam::curvedCantileverAnalyticalSolution::curvedCantileverStres
 )
 {
     tensor sigma = tensor::zero;
-    
+
     const scalar r = Foam::sqrt(Foam::sqr(C.x()) + Foam::sqr(C.y()));
-    
+
     if (r < SMALL)
     {
         FatalErrorIn("Foam::symmTensor Foam::"
@@ -59,43 +59,43 @@ Foam::symmTensor Foam::curvedCantileverAnalyticalSolution::curvedCantileverStres
             << "The beam's center of curvature should be centered at the origin"
             << abort(FatalError);
     }
-       
+
     const scalar theta = Foam::atan2(C.y(), C.x());
-    
+
     const coordinateSystem cs("polarCS", C, vector(0, 0, 1), C/mag(C));
 
     const scalar& a = rInner_;
     const scalar& b = rOuter_;
-    
-    const scalar N = Foam::sqr(a) - Foam::sqr(b) 
+
+    const scalar N = Foam::sqr(a) - Foam::sqr(b)
         + (Foam::sqr(a) + Foam::sqr(b))*Foam::log(b/a);
-        
+
     sigma.xx() =
         - (force_ / N) * Foam::sin(theta)
       * (
-            r 
+            r
          + ((Foam::sqr(a)*Foam::sqr(b))/Foam::pow(r,3))
          - ((Foam::sqr(a)+Foam::sqr(b))/r)
         );
-        
+
     sigma.yy() =
         - (force_ / N) * Foam::sin(theta)
       * (
-            3*r 
+            3*r
          - ((Foam::sqr(a)*Foam::sqr(b))/Foam::pow(r,3))
          - ((Foam::sqr(a)+Foam::sqr(b))/r)
         );
-        
+
     sigma.xy() =
         (force_ / N) * Foam::cos(theta)
       * (
-            r 
+            r
          + ((Foam::sqr(a)*Foam::sqr(b))/Foam::pow(r,3))
          - ((Foam::sqr(a)+Foam::sqr(b))/r)
         );
-        
+
     sigma.yx() = sigma.xy();
-    
+
     // Transformation to Cartesian coordinate system
 #ifdef OPENFOAM_ORG
     sigma = ((cs.R().R() & sigma) & cs.R().R().T());
@@ -196,7 +196,7 @@ Foam::curvedCantileverAnalyticalSolution::curvedCantileverAnalyticalSolution
     E_(readScalar(dict.lookup("E"))),
     nu_(readScalar(dict.lookup("nu")))
 {
-   
+
     Info<< "Creating " << this->name() << " function object" << endl;
 
     if (rInner_ >= rOuter_)
