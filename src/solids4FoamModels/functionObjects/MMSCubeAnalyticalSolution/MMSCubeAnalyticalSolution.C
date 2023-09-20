@@ -61,29 +61,29 @@ Foam::symmTensor Foam::MMSCubeAnalyticalSolution::MMSCubeStress
     + 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
     + az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())) 
     + 8*ax_*mu*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z());
-    
+ 
     sigma.yy() =
-    lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z()) 
-    + 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
-    + az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())) 
-    + 4*ay_*mu*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z());
-    
+	lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z()) 
+	+ 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
+	+ az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())) 
+	+ 4*ay_*mu*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z());
+ 
     sigma.zz() = 
-    lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z()) 
-    + 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
-    + az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())) 
-    + 2*az_*mu*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y());
-    
+	lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z()) 
+	+ 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
+	+ az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())) 
+	+ 2*az_*mu*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y());
+
     sigma.xy() = 
-    2*ax_*mu*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
-    + 4*ay_*mu*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z());
-    
+	2*ax_*mu*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
+	+ 4*ay_*mu*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z());
+ 
     sigma.yx() = sigma.xy();
     
     sigma.yz() = 
     ay_*mu*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y()) 
     + 2*az_*mu*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z());
-    
+ 
     sigma.zy() = sigma.yz();
     
     sigma.xz() =
@@ -94,7 +94,6 @@ Foam::symmTensor Foam::MMSCubeAnalyticalSolution::MMSCubeStress
 
     return sigma;
 }
-
 
 Foam::vector Foam::MMSCubeAnalyticalSolution::MMSCubeDisplacement
 (
@@ -153,6 +152,21 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             dimensionedSymmTensor("zero", dimPressure, symmTensor::zero),
             "calculated"
         );
+        
+        volScalarField analyticalStressEq
+        (
+            IOobject
+            (
+                "analyticalCellStressEq",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("zero", dimPressure, 0),
+            "calculated"
+        );
 
         pointVectorField analyticalD
         (
@@ -169,6 +183,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
         );
 
         symmTensorField& sI = analyticalStress;
+        scalarField& sEqI = analyticalStressEq;
         vectorField& aDI = analyticalD;
 
         forAll(sI, cellI)
@@ -176,6 +191,8 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             if (pointStress_)
             {
                 sI[cellI] = MMSCubeStress(CI[cellI]);
+                sEqI[cellI] = sqrt((sqr(sI[cellI].xx() - sI[cellI].yy()) + sqr(sI[cellI].yy() - sI[cellI].zz()) + sqr(sI[cellI].zz() - sI[cellI].xx()) +
+                6*(sqr(sI[cellI].xy()) + sqr(sI[cellI].yz()) + sqr(sI[cellI].zx())))/2); 
             }
             
         }
@@ -195,14 +212,18 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             {
 #ifdef OPENFOAMESIORFOUNDATION
                 symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
+                scalarField& sEqP = analyticalStressEq.boundaryFieldRef()[patchI];
 #else
                 symmTensorField& sP = analyticalStress.boundaryField()[patchI];
+                scalarField& sEqP = analyticalStressEq.boundaryField()[patchI]; 
 #endif
                 const vectorField& CP = C.boundaryField()[patchI];
 
                 forAll(sP, faceI)
                 {
                 	sP[faceI] = MMSCubeStress(CP[faceI]);
+                	sEqP[faceI] = sqrt((sqr(sP[faceI].xx() - sP[faceI].yy()) + sqr(sP[faceI].yy() - sP[faceI].zz()) + sqr(sP[faceI].zz() - sP[faceI].xx()) +
+                6*(sqr(sP[faceI].xy()) + sqr(sP[faceI].yz()) + sqr(sP[faceI].zx())))/2);
                 }
             }
         }
@@ -211,9 +232,10 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
         // Write point analytical fields
         if (pointStress_)
         {
-            Info<< "Writing analyticalPointStress"
+            Info<< "Writing analyticalPointStress and analyticalPointStressEq"
                 << nl << endl;
             analyticalStress.write();
+            analyticalStressEq.write();
         }
 
         if (pointDisplacement_)
@@ -260,7 +282,6 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
         }
         
         
-        //Not working
         if
         (
             pointStress_
@@ -270,15 +291,34 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             
             const volSymmTensorField& pointSigma =
                 mesh.lookupObject<volSymmTensorField>("sigma");
+            
+//            const scalarField& pointSigmaEq(mesh.nPoints(),0);
+                
+//            forAll (pointSigma, pointI)
+//            {
+//            pointSigmaEq[pointI] = 
+//            sqrt((sqr(pointSigma[pointI].xx() - pointSigma[pointI].yy()) + sqr(pointSigma[pointI].yy() - pointSigma[pointI].zz()) + 
+//            sqr(pointSigma[pointI].zz() - pointSigma[pointI].xx()) + 6*(sqr(pointSigma[pointI].xy()) + sqr(pointSigma[pointI].yz()) 
+//            + sqr(pointSigma[pointI].zx())))/2);
+//            }
+            
 
             const volSymmTensorField diffSigma
             (
                 "pointSigmaDifference", analyticalStress - pointSigma
             );
-            Info<< "Writing pointSigmaDifference field" << endl;
+            
+//            const volScalarField diffSigmaEq
+//            (
+//                "pointSigmaEqDifference", analyticalStressEq - pointSigmaEq
+//            );
+            
+            Info<< "Writing pointSigmaDifference and pointSigmaEqDifference fields" << endl;
             diffSigma.write();
+            //diffSigmaEq.write();
 
             const symmTensorField& diffSigmaI = diffSigma;
+            //const scalarField& diffSigmaEqI = diffSigmaEq;
             Info<< "    Sigma norms: mean L1, mean L2, LInf: " << nl
                 << "    Component XX: " << gAverage(mag(diffSigmaI.component(0)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(0))))
@@ -304,6 +344,10 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
                 << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(5))))
                 << " " << gMax(mag(diffSigmaI.component(5)))
                 << nl << endl;
+//                << "    SigmaEq: " << gAverage(mag(diffSigmaEqI))
+//                << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI)))
+//                << " " << gMax(mag(diffSigmaI))
+//                << nl << endl;
         }
     }
 

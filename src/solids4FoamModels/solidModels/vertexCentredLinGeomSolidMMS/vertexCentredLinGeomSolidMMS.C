@@ -136,29 +136,41 @@ void vertexCentredLinGeomSolidMMS::updateSource
     // Body force field
     vectorField bodyForcesI(mesh().nPoints(), vector::zero);
     
-//    // List of primary cells
-//    const cellList& cells = mesh().cells();
+    // List of primary cells
+    const cellList& cells = mesh().cells();
  
     // List of primary points
     const pointField& points = mesh().points();
 
-//    // List of primary faces
-//    const faceList& faces = mesh().faces();
+    // List of primary faces
+    const faceList& faces = mesh().faces();
+    
+    // List of dual cells
+    const cellList& dualCells = dualMesh().cells();
+    
+    // List of dual points
+    const pointField& dualPoints = dualMesh().points();
 
-//    // List of dual cell volumes
-//    const scalarField& V = mesh().V();
+    // List of dual faces
+    const faceList& dualFaces = dualMesh().faces();
+
+    // List of dual cell volumes
+    const scalarField& dualV = dualMesh().V();
+    
+    // List of cell volumes
+    const scalarField& V = mesh().V();    
     
 	forAll(bodyForcesI, vertexI)
 	{
 
-	    // Take a reference to the current primary volume
-//	    const scalar curV = V[vertexI];
+//	    // Take a reference to the current primary volume
+//	    const scalar curDualV = dualV[vertexI];
 //	    
-//	    //Take a reference to the current primary cell
-//	    const cell& curCell = cells[vertexI];
+//	    //Take a reference to the current dual cell
+//	    const cell& curDualCell = dualCells[vertexI];
 //	    
 //	    //Create a bounding box around the current dual cell
-//	    const boundBox bb(curCell.points(faces, points), false);
+//	    const boundBox bb(curDualCell.points(dualFaces, dualPoints), false);
 //	    
 //	    //Get the most negative x and y coordinates of the dual cell
 //	    const scalar x1 = bb.min().x();
@@ -170,6 +182,9 @@ void vertexCentredLinGeomSolidMMS::updateSource
 //	    const scalar y2 = bb.max().y();
 //	    const scalar z2 = bb.max().z();
 	    
+	    // Take a reference to the current primary volume
+	    const scalar curV = V[vertexI]; 
+	    
 	    const scalar x = points[vertexI].x();
 	    const scalar y = points[vertexI].y();
 	    const scalar z = points[vertexI].z();
@@ -179,20 +194,23 @@ void vertexCentredLinGeomSolidMMS::updateSource
     	lambda*(8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
     	+ 4*az*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
     	- 16*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-    	+ mu*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
+    	+ mu*(8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
     	+ 4*az*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
     	- 5*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
     	- 32*ax*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+ 
+
 
 		//Set vector in dualCellI for y-equation  
     	bodyForcesI[vertexI].y() =
-    	lambda*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-    	+ 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-    	- 4*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-    	+ mu*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-    	+ 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-    	- 17*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-    	- 8*ax*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+		lambda*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
+		+ 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
+		- 4*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+		+ mu*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
+		+ 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
+		- 17*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+		- 8*ay*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+ 
  
     	//Set vector in dualCellI for -equation  
     	bodyForcesI[vertexI].z() =
@@ -203,6 +221,8 @@ void vertexCentredLinGeomSolidMMS::updateSource
     	+ 2*ay*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
     	- 20*az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
     	- 2*az*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+
+
     }
     
     // Add body force field to source

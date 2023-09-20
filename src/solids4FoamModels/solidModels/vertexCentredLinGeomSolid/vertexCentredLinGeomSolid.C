@@ -83,15 +83,11 @@ void vertexCentredLinGeomSolid::updateSource
     );
 
     // Enforce extract tractions on traction boundaries
-    
-    //Info << "dualTraction before: " << dualTraction.boundaryField()[2] << endl;
-    
+
     enforceTractionBoundaries
     (
         pointD(), dualTraction, mesh(), dualMeshMap().pointToDualFaces()
     );
-    
-    //Info << "dualTraction after: " << dualTraction.boundaryField()[2]  << endl;
 
     // Set coupled boundary (e.g. processor) traction fields to zero: this
     // ensures their global contribution is zero
@@ -114,6 +110,7 @@ void vertexCentredLinGeomSolid::updateSource
     
     // Map dual cell field to primary mesh point field
     vectorField pointDivSigma(mesh().nPoints(), vector::zero);
+    
     forAll(dualDivSigma, dualCellI)
     {
         const label pointID = dualCellToPoint[dualCellI];
