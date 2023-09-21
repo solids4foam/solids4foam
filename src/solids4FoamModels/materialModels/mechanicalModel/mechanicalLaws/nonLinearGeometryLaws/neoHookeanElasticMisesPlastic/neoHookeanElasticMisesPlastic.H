@@ -81,7 +81,7 @@ class neoHookeanElasticMisesPlastic
         //- Jacobian of the toal deformation gradient surfaceField
         autoPtr<surfaceScalarField> JfPtr_;
 
-        //- Table of post-yield stress versus plastic strain
+        //- Table of plastic strain versus post-yield stress
         //  For large strain total Lagrangian models, it expects
         //  the true stress and true plastic strain.
         interpolationTable<scalar> stressPlasticStrainSeries_;
