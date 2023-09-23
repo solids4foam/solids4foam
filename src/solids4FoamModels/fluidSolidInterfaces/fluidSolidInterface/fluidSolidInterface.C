@@ -1477,7 +1477,7 @@ void Foam::fluidSolidInterface::writeFields(const Time& runTime)
 
 void Foam::fluidSolidInterface::end()
 {
-    this->IOobject::rename(this->IOobject::name()+"_out");
+    this->IOobject::rename(this->IOobject::name()+"_withDefaultValues");
     this->regIOobject::write();
     solid().end();
     fluid().end();

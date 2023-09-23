@@ -111,19 +111,18 @@ void Foam::solidModel::makeDualMesh() const
     // Create one dual face between cell centres and face centres
     const bool splitAllFaces = true;
 
-    // Hard-coded settings --> these can not be added to dictionary and returned in output-dict, because
-    // this function is qualified as 'const'. This is, even though dictionary is mutable. (Solutions?)
+    // Hard-coded settings
     const scalar featureAngle
     (
-        solidModelDict().lookupOrDefault<scalar>(word("featureAngle"), scalar(30))
+        solidModelDict().lookupOrDefault<scalar>(word("featureAngle"), scalar(30))  //Find a way to add this default value to 'solidProperties' dict in the future
     );
     const bool doNotPreserveFaceZones
     (
-        solidModelDict().lookupOrDefault<bool>("doNotPreserveFaceZones", false)
+        solidModelDict().lookupOrDefault<bool>("doNotPreserveFaceZones", false) //Find a way to add this default value to 'solidProperties' dict in the future
     );
     const bool concaveMultiCells
     (
-        solidModelDict().lookupOrDefault<bool>("concaveMultiCells", false)
+        solidModelDict().lookupOrDefault<bool>("concaveMultiCells", false) //Find a way to add this default value to 'solidProperties' dict in the future
     );
 
     Info<< "    featureAngle: " << featureAngle << nl
@@ -213,7 +212,7 @@ void Foam::solidModel::makeDualMesh() const
         dualMesh.movePoints(map().preMotionPoints());
     }
 
-    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false))
+    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false)) //Find a way to add this default value to 'solidProperties' dict in the future
     {
         dualMesh.setInstance(runTime().constant());
         Info<< "Writing dualMesh to " << dualMesh.polyMesh::instance() << endl;
@@ -959,16 +958,23 @@ Foam::solidModel::solidModel
     dualMeshPtr_(),
     dualMeshToMeshMapPtr_(),
     solidProperties_
-    (
-        IOobject
+    (   // If region == "region0" then read from the main case
+        // Otherwise, read from the region/sub-mesh directory e.g.
+        // constant/fluid or constant/solid
+        bool(region == dynamicFvMesh::defaultRegion)
+        ?IOobject
         (
             "solidProperties",
-            // If region == "region0" then read from the main case
-            // Otherwise, read from the region/sub-mesh directory e.g.
-            // constant/fluid or constant/solid
-            bool(region == dynamicFvMesh::defaultRegion)
-          ? fileName(runTime.caseConstant())
-          : fileName(runTime.caseConstant()/region),
+            runTime.caseConstant(),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+        :IOobject
+        (
+            "solidProperties",
+            runTime.caseConstant(),
+            region, //using 'local' property of IOobject
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
@@ -1593,16 +1599,16 @@ void Foam::solidModel::updateTotalFields()
 
 void Foam::solidModel::end()
 {
-    solidProperties_.IOobject::rename(solidProperties().IOobject::name()+"_out");
-    solidProperties().regIOobject::write();
+    solidProperties_.IOobject::rename(solidProperties().IOobject::name()+"_withDefaultValues");
+    solidProperties_.regIOobject::write();
     if (!mechanicalPtr_.empty())
     {
-        mechanical().IOobject::rename(mechanical().IOobject::name()+"_out");
-        static_cast<const IOdictionary>(mechanical()).regIOobject::write();
+        mechanical().IOobject::rename(mechanical().IOobject::name()+"_withDefaultValues");
+        mechanical().writeDict();
     }
     if (!thermalPtr_.empty())
     {
-        thermal().IOobject::rename(thermal().IOobject::name()+"_out");
+        thermal().IOobject::rename(thermal().IOobject::name()+"_withDefaultValues");
         static_cast<const IOdictionary>(thermal()).regIOobject::write();
     }
 

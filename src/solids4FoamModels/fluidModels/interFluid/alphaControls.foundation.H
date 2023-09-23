@@ -11,5 +11,5 @@ const bool MULESCorr(alphaControls.lookupOrAddDefault<Switch>("MULESCorr", false
 // once the alpha field is reasonably steady, i.e. fully developed
 const bool alphaApplyPrevCorr
 (
-    alphaControls.lookupOrAddDefault<Switch>("alphaApplyPrevCorr", false)
+    alphaControls.lookupOrDefault<Switch>("alphaApplyPrevCorr", false)
 );

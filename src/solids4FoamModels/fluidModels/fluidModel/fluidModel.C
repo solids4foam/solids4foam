@@ -492,16 +492,23 @@ Foam::fluidModel::fluidModel
 :
     physicsModel(type, runTime),
     IOdictionary
-    (
-        IOobject
+    (   // If region == "region0" then read from the main case
+        // Otherwise, read from the region/sub-mesh directory e.g.
+        // constant/fluid or constant/solid
+        bool(region == dynamicFvMesh::defaultRegion)
+        ?IOobject
         (
             "fluidProperties",
-            // If region == "region0" then read from the main case
-            // Otherwise, read from the region/sub-mesh directory e.g.
-            // constant/fluid or constant/solid
-            bool(region == dynamicFvMesh::defaultRegion)
-          ? fileName(runTime.caseConstant())
-          : fileName(runTime.caseConstant()/region),
+            runTime.caseConstant(),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+        :IOobject
+        (
+            "fluidProperties",
+            runTime.caseConstant(),
+            region, // using 'local' property of IOobject
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
@@ -988,7 +995,7 @@ bool Foam::fluidModel::read()
 
 void Foam::fluidModel::end()
 {
-    this->IOobject::rename(this->IOobject::name()+"_out");
+    this->IOobject::rename(this->IOobject::name()+"_withDefaultValues");
     this->regIOobject::write();
 }
 // ************************************************************************* //
