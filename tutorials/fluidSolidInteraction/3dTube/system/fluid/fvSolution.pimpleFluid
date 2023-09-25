@@ -71,9 +71,18 @@ PIMPLE
     //correctPhi          true;
     //checkMeshCourantNo  true;
 
-    nOuterCorrectors            1;
+    nOuterCorrectors            20;
     nCorrectors                 3;
     nNonOrthogonalCorrectors    1;
+    
+    outerCorrectorResidualControl
+    {
+        U
+        {
+            relTol 1e-7;
+            tolerance 1e-7;
+        }
+    }
 }
 
 // ************************************************************************* //

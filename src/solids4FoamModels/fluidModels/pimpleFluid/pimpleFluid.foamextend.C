@@ -33,6 +33,7 @@ License
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "elasticWallPressureFvPatchScalarField.H"
+#include "movingWallPressureFvPatchScalarField.H"
 #include "flowRateOutletPressureFvPatchScalarField.H"
 #include "thermalRobinFvPatchScalarField.H"
 
@@ -77,16 +78,6 @@ void pimpleFluid::updateRobinFsiInterface()
                     U().boundaryField()[patchI]
                 )
             )
-         // || (
-         //        isA<elasticWallPressureFvPatchScalarField>
-         //        (
-         //            p().boundaryField()[patchI]
-         //        )
-         //     && isA<robinElasticWallVelocityFvPatchVectorField>
-         //        (
-         //            U().boundaryField()[patchI]
-         //        )
-         //    )
         )
         {
             word ddtScheme
@@ -150,6 +141,19 @@ void pimpleFluid::updateRobinFsiInterface()
                     rAU_.boundaryField()[patchI] = deltaT/Cn;
                 }
             }
+        }
+        else if
+        (
+            isA<movingWallPressureFvPatchScalarField>
+            (
+                p().boundaryField()[patchI]
+            )
+        )
+        {
+            phi().boundaryField()[patchI] +=
+                rAU_.boundaryField()[patchI]
+               *p().boundaryField()[patchI].snGrad()
+               *mesh().magSf().boundaryField()[patchI];
         }
     }
 }

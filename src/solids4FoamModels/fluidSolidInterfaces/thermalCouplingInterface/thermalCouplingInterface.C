@@ -80,7 +80,7 @@ thermalCouplingInterface::thermalCouplingInterface
         oldSolidFaceZoneHeatFlux_.setSize(nGlobalPatches());
         oldOldSolidFaceZoneTemperature_.setSize(nGlobalPatches());
         oldOldSolidFaceZoneHeatFlux_.setSize(nGlobalPatches());
-    
+
         forAll(oldSolidFaceZoneTemperature_, interI)
         {
             const standAlonePatch& solidZone =
@@ -99,19 +99,19 @@ thermalCouplingInterface::thermalCouplingInterface
                 scalarField(solidZone.size(), 0)
             );
 #endif
-            
+
             oldSolidFaceZoneHeatFlux_.set
             (
                 interI,
                 new scalarField(solidZone.size(), 0)
             );
-            
+
             oldOldSolidFaceZoneTemperature_.set
             (
                 interI,
                 new scalarField(solidZone.size(), 0)
             );
-            
+
             oldOldSolidFaceZoneHeatFlux_.set
             (
                 interI,
@@ -222,10 +222,10 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnFluidInterface()
                     2*oldSolidFaceZoneHeatFlux_[interfaceI]
                   - oldOldSolidFaceZoneHeatFlux_[interfaceI];
             }
-            
+
             timeIndex_ = runTime().timeIndex();
         }
-        
+
         // Initialise the fluid zone temperature field
         // that is to be interpolated from the solid zone
         scalarField fluidZoneTemperature(fluidZone.size(), 0);
@@ -321,7 +321,7 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnSolidInterface()
             fluidZoneHeatFlux,         // from field
             solidZoneHeatFlux          // to field
         );
-        
+
         solidZoneHeatFlux *= -1;
 
         // Set temperature on fluid interface

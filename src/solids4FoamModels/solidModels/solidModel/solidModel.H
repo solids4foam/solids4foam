@@ -720,6 +720,9 @@ public:
                 NotImplemented;
             }
 
+            //- Let the material model recalculate the density
+            virtual void recalculateRho();
+
             //- Check if solid model is diverging using the Jacobian field
             virtual Switch& checkEnforceLinear(const volScalarField& J);
 

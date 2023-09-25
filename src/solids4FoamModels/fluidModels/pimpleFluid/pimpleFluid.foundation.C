@@ -33,6 +33,7 @@ License
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "elasticWallPressureFvPatchScalarField.H"
+#include "movingWallPressureFvPatchScalarField.H"
 #include "thermalRobinFvPatchScalarField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -136,6 +137,19 @@ void pimpleFluid::updateRobinFsiInterface(surfaceScalarField& phiHbyA)
                     rAU_.boundaryFieldRef()[patchI] = deltaT/Cn;
                 }
             }
+        }
+        else if
+        (
+            isA<movingWallPressureFvPatchScalarField>
+            (
+                p().boundaryField()[patchI]
+            )
+        )
+        {
+            phiHbyA.boundaryFieldRef()[patchI] +=
+                rAU_.boundaryField()[patchI]
+               *p().boundaryField()[patchI].snGrad()
+               *mesh().magSf().boundaryField()[patchI];
         }
     }
 }

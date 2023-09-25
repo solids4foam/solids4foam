@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -28,6 +22,7 @@ License
 #include "fvPatchFieldMapper.H"
 #include "volFields.H"
 #include "uniformDimensionedFields.H"
+#include "newMovingWallVelocityFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -43,7 +38,8 @@ movingWallPressureFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    fixedGradientFvPatchScalarField(p, iF)
+    fixedGradientFvPatchScalarField(p, iF),
+    prevAcceleration_(p.patch().size(), vector::zero)
 {}
 
 
@@ -55,7 +51,8 @@ movingWallPressureFvPatchScalarField
     const dictionary& dict
 )
 :
-    fixedGradientFvPatchScalarField(p, iF)
+    fixedGradientFvPatchScalarField(p, iF),
+    prevAcceleration_(p.patch().size(), vector::zero)
 {
     fvPatchField<scalar>::operator=(patchInternalField());
 }
@@ -70,7 +67,8 @@ movingWallPressureFvPatchScalarField
     const fvPatchFieldMapper& mapper
 )
 :
-    fixedGradientFvPatchScalarField(ptf, p, iF, mapper)
+    fixedGradientFvPatchScalarField(ptf, p, iF, mapper),
+    prevAcceleration_(p.patch().size(), vector::zero)
 {}
 
 
@@ -81,7 +79,8 @@ movingWallPressureFvPatchScalarField
     const movingWallPressureFvPatchScalarField& ptf
 )
 :
-    fixedGradientFvPatchScalarField(ptf)
+    fixedGradientFvPatchScalarField(ptf),
+    prevAcceleration_(ptf.prevAcceleration_)
 {}
 #endif
 
@@ -93,95 +92,19 @@ movingWallPressureFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    fixedGradientFvPatchScalarField(ptf, iF)
+    fixedGradientFvPatchScalarField(ptf, iF),
+    prevAcceleration_(ptf.prevAcceleration_)
 {}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
-{
-    if (!this->updated())
-    {
-        this->updateCoeffs();
-    }
-
-    const fvMesh& mesh = this->patch().boundaryMesh().mesh();
-#ifdef OPENFOAM_NOT_EXTEND
-    word fieldName = internalField().name();
-#else
-    word fieldName = dimensionedInternalField().name();
-#endif
-
-    const volScalarField& p =
-        mesh.lookupObject<volScalarField>(fieldName);
-
-    const fvPatchField<vector>& gradP =
-        patch().lookupPatchField<volVectorField, vector>("grad(p)");
-
-    const fvPatchField<vector>& ddtU =
-        patch().lookupPatchField<volVectorField, vector>("ddt(U)");
-
-    const vectorField n(patch().nf());
-    const vectorField delta(patch().delta());
-    const vectorField k((I - sqr(n)) & delta);
-
-    const scalarField dPP(k & gradP.patchInternalField());
-
-    scalarField nGradPb(patch().size(), 0);
-
-    if (p.dimensions() == dimPressure)
-    {
-        const IOdictionary transportProperties
-        (
-            IOobject
-            (
-                "transportProperties",
-                mesh.time().constant(),
-                mesh,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE,
-                false  // Do not register
-            )
-        );
-
-        const dimensionedScalar rho
-        (
-            transportProperties.lookup("rho")
-        );
-
-        nGradPb = -rho.value()*(n&ddtU);
-    }
-    else
-    {
-        nGradPb = -(n&ddtU);
-    }
-
-    Info<< "ddtUn, max: " << max(n&ddtU)
-        << ", avg: " << average(n&ddtU)
-        << ", min: " << min(n&ddtU) << endl;
-
-    Field<scalar>::operator=
-    (
-        this->patchInternalField() + dPP
-      + nGradPb/this->patch().deltaCoeffs()
-    //+ 0.5*(gradient() + gradPp)/this->patch().deltaCoeffs()
-    );
-
-    Info<< "p, max: " << max(*this)
-        << ", avg: " << average(*this)
-        << ", min: " << min(*this) << endl;
-
-    fvPatchField<scalar>::evaluate();
-}
-
-
-// void movingWallPressureFvPatchScalarField::updateCoeffs()
+// void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
 // {
-//     if (updated())
+//     if (!this->updated())
 //     {
-//         return;
+//         this->updateCoeffs();
 //     }
 
 //     const fvMesh& mesh = this->patch().boundaryMesh().mesh();
@@ -190,17 +113,27 @@ void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
 // #else
 //     word fieldName = dimensionedInternalField().name();
 // #endif
+
 //     const volScalarField& p =
 //         mesh.lookupObject<volScalarField>(fieldName);
+
+//     const fvPatchField<vector>& gradP =
+//         patch().lookupPatchField<volVectorField, vector>("grad(p)");
 
 //     const fvPatchField<vector>& ddtU =
 //         patch().lookupPatchField<volVectorField, vector>("ddt(U)");
 
-//     vectorField n(patch().nf());
+//     const vectorField n(patch().nf());
+//     const vectorField delta(patch().delta());
+//     const vectorField k((I - sqr(n)) & delta);
+
+//     const scalarField dPP(k & gradP.patchInternalField());
+
+//     scalarField nGradPb(patch().size(), 0);
 
 //     if (p.dimensions() == dimPressure)
 //     {
-//         IOdictionary transportProperties
+//         const IOdictionary transportProperties
 //         (
 //             IOobject
 //             (
@@ -208,24 +141,100 @@ void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
 //                 mesh.time().constant(),
 //                 mesh,
 //                 IOobject::MUST_READ,
-//                 IOobject::NO_WRITE
+//                 IOobject::NO_WRITE,
+//                 false  // Do not register
 //             )
 //         );
 
-//         dimensionedScalar rho
+//         const dimensionedScalar rho
 //         (
 //             transportProperties.lookup("rho")
 //         );
 
-//         gradient() = -rho.value()*(n&ddtU);
+//         nGradPb = -rho.value()*(n&ddtU);
 //     }
 //     else
 //     {
-//         gradient() = -(n&ddtU);
+//         nGradPb = -(n&ddtU);
 //     }
 
-//     fixedGradientFvPatchScalarField::updateCoeffs();
+//     Info<< "ddtUn, max: " << max(n&ddtU)
+//         << ", avg: " << average(n&ddtU)
+//         << ", min: " << min(n&ddtU) << endl;
+
+//     Field<scalar>::operator=
+//     (
+//         this->patchInternalField() + dPP
+//       + nGradPb/this->patch().deltaCoeffs()
+//     //+ 0.5*(gradient() + gradPp)/this->patch().deltaCoeffs()
+//     );
+
+//     Info<< "p, max: " << max(*this)
+//         << ", avg: " << average(*this)
+//         << ", min: " << min(*this) << endl;
+
+//     fvPatchField<scalar>::evaluate();
 // }
+
+
+void movingWallPressureFvPatchScalarField::updateCoeffs()
+{
+    if (updated())
+    {
+        return;
+    }
+
+    const fvMesh& mesh = this->patch().boundaryMesh().mesh();
+#ifdef OPENFOAM_NOT_EXTEND
+    word fieldName = internalField().name();
+#else
+    word fieldName = dimensionedInternalField().name();
+#endif
+    const volScalarField& p =
+        mesh.lookupObject<volScalarField>(fieldName);
+
+    // const fvPatchField<vector>& ddtU =
+    //      patch().lookupPatchField<volVectorField, vector>("ddt(U)");
+
+    const newMovingWallVelocityFvPatchVectorField& movingWallVelocity =
+        refCast<const newMovingWallVelocityFvPatchVectorField>
+        (
+            patch().lookupPatchField<volVectorField, vector>("U")
+        );
+
+    vectorField n(patch().nf());
+
+    if (p.dimensions() == dimPressure)
+    {
+        IOdictionary transportProperties
+        (
+            IOobject
+            (
+                "transportProperties",
+                mesh.time().constant(),
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+
+        dimensionedScalar rho
+        (
+            transportProperties.lookup("rho")
+        );
+
+        gradient() = -rho.value()*(n & movingWallVelocity.acceleration());
+        // gradient() = -rho.value()*(n & prevAcceleration_);
+    }
+    else
+    {
+        gradient() = -(n & movingWallVelocity.acceleration());
+        // gradient() = -(n & prevAcceleration_);
+        // gradient() = -(n&ddtU);
+    }
+
+    fixedGradientFvPatchScalarField::updateCoeffs();
+}
 
 
 void movingWallPressureFvPatchScalarField::write(Ostream& os) const

@@ -22,10 +22,10 @@ Prepared by Ivan Batistić
 
 `solids4foam::convertCaseFormat()` is used to convert a case from `foam-extend` format to `OpenFOAM` format, whereas `solids4foam::convertCaseFormatFoamExtend()` is used to convert any case version to the `foam-extend` format.  No changes are applied if the case format matches the format of the current `OpenFOAM`/`foam-extend` version.
 
-- __Function purpose__
+- __Function purpose__  
   Converts a case from `foam-extend` format to `OpenFOAM` format and vice versa. 
 
-- __Function arguments__
+- __Function arguments__  
   Path to case directory (most often `.` is used, referring to the current directory)
 
 - __Example of usage__
@@ -386,13 +386,13 @@ Note that the updated path has `sampleDict.v2012` in it, and this is because it 
 
 ## `solids4foam::caseOnlyRunsWithFoamExtend()`
 
-- __Function purpose__
+- __Function purpose__   
   This function gives an error if the `foam-extend` version is not sourced/loaded.
 
-- __Function arguments__
+- __Function arguments__   
   None
 
-- __Example of usage__
+- __Example of usage__ 
 
   ```bash
   #!/bin/bash
@@ -405,3 +405,181 @@ Note that the updated path has `sampleDict.v2012` in it, and this is because it 
 
 ---
 
+## `solids4foam::caseDoesNotRunWithFoamExtend()`
+
+- __Function purpose__  
+  This function gives an error if the [OpenFOAM.com](OpenFOAM.com) or [OpenFOAM.org](OpenFOAM.org) version is not sourced/loaded.
+
+- __Function arguments__   
+  None
+
+- __Example of usage__
+
+  ```bash
+  #!/bin/bash
+  
+  # Source solids4Foam scripts
+  source solids4FoamScripts.sh
+  
+  solids4Foam::caseDoesNotRunWithFoamExtend
+  ```
+
+---
+
+## `solids4foam::removeEmptyDirs()`
+
+Function loops over time directories (whose name is composed of digits or digits and the dot) and removes them if there are no results. Checked resulting fields are `U`, `T`, `D`, `pointD`, `DD`, `pointDD`. The compressed version of these files with `.gz` extension is also checked. The function also works when the case is decomposed.
+
+- __Function purpose__   
+  Remove empty time directories that are inadvertently created when running FSI cases with preCICE.
+
+- __Function arguments__  
+  None
+
+- __Example of usage__
+
+```bash
+#!/bin/bash
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Remove empty time directories created by preCICE
+solids4Foam::removeEmptyDirs
+```
+
+---
+
+## `solids4foam::err()`
+
+It will construct a message string with the current date time and timezone offset. The message passed as an argument to the `err()` function will be appended to this message string. The string is written to a file named `error.txt` and is also displayed on the console as an error output. In case an optional argument (file name) is prescribed, the context of the file name is written to `errorCommandLog.txt` file.
+
+- __Function purpose__ 
+  This function is designed to handle and report errors in a script. 
+
+- __Function arguments__ 
+  "error message" - stored to `error.txt`  
+  optional parameter - name of the log file which will be stored to `errorCommandLog.txt`
+
+- __Example of usage__
+
+  ```bash
+  #!/bin/bash
+  
+  # Source solids4Foam scripts
+  source solids4FoamScripts.sh
+  
+  # Check if a 0 directory already exists                                  
+  if [[ -d "postProcessing" ]]                                                   
+  then                                                                        
+  	solids4foam::err "The postProcessing directory already exists: run Allclean"  
+  fi 
+  ```
+
+  In the above example, the error message is stored in the `error.txt` file and printed in the console as:
+
+  ```
+  ERROR: see error.txt
+  [2023-09-05T10:19:18+0200]: The postProcessing directory already exists: run Allclean
+  ```
+
+  If an optional argument wants to be used, the command should look like this:
+
+  ```bash
+  #!/bin/bash
+  
+  # Source solids4Foam scripts
+  source solids4FoamScripts.sh
+  
+  # Check if a 0 directory already exists                                  
+  if [[ -f "postProcessing/data.dat" ]]                                                   
+  then                                                                        
+  	solids4foam::err "The data.dat file already exists: run Allclean to delete" postProcessing/data.dat
+  fi 
+  ```
+  
+  The console output of this will be :
+
+  ```ERROR: see error.txt
+  ERROR: see error.txt
+  [2023-09-05T10:19:18+0200]: The postProcessing directory already exists: run Allclean to delete postProcessing/data.dat
+         see errorCommandLog.txt
+  ```
+  
+  The context of the  `data.dat` is stored in the errorCommandLog.txt file.
+
+---
+
+## `solids4foam::runApplication()`
+
+- __Function purpose__ 
+  This function is designed to run `OpenFOAM` and `solids4foam` applications with additional logging and error handling.  
+
+- __Function options__  
+  `-a`  = append  (append to an existing log file)  
+  `-o` = overwrite  (overwrite existing log file)  
+  `-s` = suffix (adding suffix to the log file)      
+  `-decomposeParDict <locationOfAlternativeDecomposeParDict>` Alternative option for `decomposeParDict` dictionary location  
+  
+- __Function arguments__   
+  `<appName>`  Name of the executable (command to run)     
+  
+  _Note_: Parameters which are added **after** the executable will be passed on to it!    
+  
+- __Example of usage__  
+
+```bash
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid  
+```
+
+In the example above, the word `solid` is the suffix. `blockMesh` is the name of the executable with `-region solid` as an parameter for the`blockMesh`.
+
+```bash
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Create cellZones for materials
+solids4Foam::runApplication setSet -batch batch.setSet
+solids4Foam::runApplication setsToZones
+
+# Run the solver
+solids4Foam::runApplication solids4Foam
+
+```
+
+In this example, options are not used. `setSet` is executable with `-batch batch.setSet` parameter whereas `setsToZones` and `solids4Foam` are executables without arguments.       
+
+In case the log file already exists and the `-a` option is not set, it will exit and print that the executable is already running at this location.     
+
+Both standard error `sterr` and standard output `stdout` are redirected to the log file. If the application returns an error (non-zero exit code), it appears as “ERROR” in the log file. The name of the log file is `log.<executable name>`. In case the option `-s` is activated, the name of the log file is `log.<executable name>.<suffix>`.     
+
+---
+
+## `solids4foam::runParallel()`
+
+This function has the same functionalities and options as `solids4Foam::runApplication` function described previously.   
+The difference is that the executable is run in parallel using MPI.   
+
+`mpirun -n nProcs executable -parallel >> log.executable ` 
+
+is simply replaced with:    
+
+`solids4Foam::runParallel executable`  
+
+`decomposeParDict` located in the `system` is automatically checked to get the number of processors  `nProcs`.     
+
+In case that `$FOAM_MPI` is set to `msmpi`, `mpirun` is replaced with `msmpi`.    

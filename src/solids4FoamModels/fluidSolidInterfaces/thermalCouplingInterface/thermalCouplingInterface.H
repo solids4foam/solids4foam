@@ -67,19 +67,19 @@ class thermalCouplingInterface
 
         //- Old-time solid face-zone temperature
         mutable PtrList<scalarField> oldSolidFaceZoneTemperature_;
-    
+
         //- Old-time solid face-zone heat flux
         mutable PtrList<scalarField> oldSolidFaceZoneHeatFlux_;
-    
+
         //- Old-old-time solid face-zone temperature
         mutable PtrList<scalarField> oldOldSolidFaceZoneTemperature_;
-    
+
         //- Old-old-time solid face-zone heat flux
         mutable PtrList<scalarField> oldOldSolidFaceZoneHeatFlux_;
-    
+
         //- Time index
         label timeIndex_;
-    
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct

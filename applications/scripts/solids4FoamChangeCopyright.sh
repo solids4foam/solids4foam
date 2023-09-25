@@ -71,9 +71,10 @@ mod_file=$(< "$1")
 
 # Compare original and modified file
 if [ "$orig_file" != "$mod_file" ]; then
+    echo "File header does not match the expected header"
     echo "The header has been updated!"
     exit 1;
 else
-    echo "No changes have been made!"
+    echo "File header matches the expected header."
     exit 0;
 fi

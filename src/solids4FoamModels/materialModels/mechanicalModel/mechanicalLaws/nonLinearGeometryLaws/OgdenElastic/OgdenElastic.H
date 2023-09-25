@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -32,7 +26,7 @@ Description
     sigma =  s - (mu1_ + mu2_ + mu3_)*I - p*I
 
     and
-    
+
     pbi = mu1*sqrt(lambdai)^alpha1 + mu2*sqrt(lambdai)^alpha2 + mu3*sqrt(lambdai)^alpha3
 
     where
