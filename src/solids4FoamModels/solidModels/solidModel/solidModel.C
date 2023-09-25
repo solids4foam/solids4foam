@@ -1614,9 +1614,9 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
 {
 
     // In case a case, that is set up for a muti-region calculation, is supposed to be run as simple (single region)
-    // calculation (i. e. to check the convergence of that single region) the solver can be 
+    // calculation (i. e. to check the convergence of that single region) the solver can be
     // set to solid in physicsProperties and in the controlDict under the subDict 'solid' one can select the region.
-    // This also allows the region name of a calulation not to be 'region0' or 'solid' but user defined.  
+    // This also allows the region name of a calulation not to be 'region0' or 'solid' but user defined.
     word runRegion(runTime.controlDict().subOrEmptyDict("solid").lookupOrDefault<word>("region",region));
 
     // NB: dictionary must be unregistered to avoid adding to the database
