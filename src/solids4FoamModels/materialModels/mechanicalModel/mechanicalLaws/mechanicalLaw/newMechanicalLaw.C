@@ -41,7 +41,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewLinGeomMechLaw
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 {
@@ -137,7 +137,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 {

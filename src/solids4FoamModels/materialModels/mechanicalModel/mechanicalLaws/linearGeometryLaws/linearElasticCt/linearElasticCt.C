@@ -407,7 +407,7 @@ Foam::linearElasticCt::linearElasticCt
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -455,7 +455,7 @@ Foam::linearElasticCt::linearElasticCt
     lambdaf_(fvc::interpolate(lambda_)),
     useRotationMatrix_
     (
-        dict.lookupOrAddDefault<Switch>("useRotationMatrix", false)
+        dict().lookupOrAddDefault<Switch>("useRotationMatrix", false)
     ),
     rotationMatrix_(I),
     centreOfRotation_(vector::zero)

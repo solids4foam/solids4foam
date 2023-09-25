@@ -46,7 +46,7 @@ Foam::isotropicFungElastic::isotropicFungElastic
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -80,7 +80,7 @@ Foam::isotropicFungElastic::isotropicFungElastic
     else if (dict.found("nu") && !dict.found("K"))
     {
         const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
-        
+
         // Young's modulus
         const volScalarField E(3.0*c1_);
 

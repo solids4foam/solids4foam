@@ -204,7 +204,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -245,7 +245,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
                 vector(1,0,0)
                *vector
                 (
-                    dict.lookupOrAddDefault<vector>
+                    mechanicalLaw::dict().lookupOrAddDefault<vector>
                     (
                         "materialDirection1", vector(1,0,0)
                     )
@@ -253,7 +253,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
               + vector(0,1,0)
                *vector
                 (
-                    dict.lookupOrAddDefault<vector>
+                    mechanicalLaw::dict().lookupOrAddDefault<vector>
                     (
                         "materialDirection2", vector(0,1,0)
                     )
@@ -261,7 +261,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
               + vector(0,0,1)
                *vector
                 (
-                    dict.lookupOrAddDefault<vector>
+                    mechanicalLaw::dict().lookupOrAddDefault<vector>
                     (
                         "materialDirection2", vector(0,0,1)
                     )

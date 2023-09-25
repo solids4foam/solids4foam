@@ -95,7 +95,7 @@ class poroMechanicalLaw
 
         //- check if sigmaEfff has been initalized already
         bool checkSigmaEffReady(const surfaceSymmTensorField& sigma, const surfaceScalarField& p);
-        
+
         //- Make the initial pore-pressure surface field
         void makeP0f() const;
 
@@ -126,7 +126,7 @@ public:
         (
             const word& name,
             const fvMesh& mesh,
-            dictionary& dict,
+            const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
@@ -157,7 +157,7 @@ public:
                   mesh().time().timeName(),
                   mesh(),
                   IOobject::NO_READ,
-                  IOobject::NO_WRITE  
+                  IOobject::NO_WRITE
                   ),
                   mesh(),
                   b_

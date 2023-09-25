@@ -64,7 +64,7 @@ void Foam::mechanicalModel::makeSolSubMeshes() const
             mesh_,
             cellZoneNames_,
             incremental_,
-            lookupOrDefault<Switch>("writeSubMeshes",  false) //Find a way to add this default value to 'mechanicalProperties' dict in the future
+            lookupOrDefault<Switch>("writeSubMeshes",  false)
         )
     );
 }
@@ -228,7 +228,6 @@ Foam::mechanicalModel::mechanicalModel
         )
     ),
     PtrList<mechanicalLaw>(),
-    lawDicts(lookup("mechanical")), // Read the mechanical laws
     mesh_(mesh),
     planeStress_(lookup("planeStress")),
     incremental_(incremental),
@@ -238,15 +237,18 @@ Foam::mechanicalModel::mechanicalModel
 {
     Info<< "Creating the mechanicalModel" << endl;
 
+    // Read the mechanical laws
+    const PtrList<entry> lawEntries(lookup("mechanical"));
+
     PtrList<mechanicalLaw>& laws = *this;
-    laws.setSize(lawDicts.size());
+    laws.setSize(lawEntries.size());
 
     // Create the list of cellZones names: they are used during the construction
     // of the subMeshes
     cellZoneNames_.setSize(laws.size());
     forAll(laws, lawI)
     {
-        cellZoneNames_[lawI] = lawDicts[lawI].keyword();
+        cellZoneNames_[lawI] = lawEntries[lawI].keyword();
     }
 
     // Create mechancial laws
@@ -259,9 +261,9 @@ Foam::mechanicalModel::mechanicalModel
                 0,
                 mechanicalLaw::NewLinGeomMechLaw
                 (
-                    lawDicts[0].keyword(),
+                    lawEntries[0].keyword(),
                     mesh,
-                    lawDicts[0].dict(),
+                    lawEntries[0].dict(),
                     nonLinGeom
                 )
             );
@@ -277,9 +279,9 @@ Foam::mechanicalModel::mechanicalModel
                 0,
                 mechanicalLaw::NewNonLinGeomMechLaw
                 (
-                    lawDicts[0].keyword(),
+                    lawEntries[0].keyword(),
                     mesh,
-                    lawDicts[0].dict(),
+                    lawEntries[0].dict(),
                     nonLinGeom
                 )
             );
@@ -309,9 +311,9 @@ Foam::mechanicalModel::mechanicalModel
                     lawI,
                     mechanicalLaw::NewLinGeomMechLaw
                     (
-                        lawDicts[lawI].keyword(),
+                        lawEntries[lawI].keyword(),
                         solSubMeshes().subMeshes()[lawI].subMesh(),
-                        lawDicts[lawI].dict(),
+                        lawEntries[lawI].dict(),
                         nonLinGeom
                     )
                 );
@@ -327,9 +329,9 @@ Foam::mechanicalModel::mechanicalModel
                     lawI,
                     mechanicalLaw::NewNonLinGeomMechLaw
                     (
-                        lawDicts[lawI].keyword(),
+                        lawEntries[lawI].keyword(),
                         solSubMeshes().subMeshes()[lawI].subMesh(),
-                        lawDicts[lawI].dict(),
+                        lawEntries[lawI].dict(),
                         nonLinGeom
                     )
                 );
@@ -1033,13 +1035,32 @@ void Foam::mechanicalModel::setRestart()
 
 void Foam::mechanicalModel::writeDict()
 {
-    // This has to be done, because lawDicts can only be read as IStream and so
+    // This has to be done, because law Dicts can only be read as IStream and so
     // they are not references to the entries in the 'mechanicalProperties' but
-    // seperate entry object. Because of this they have to be added back to 
-    // 'mechanicalProperties' before writing to disk. 
-    dictionary& mechanicalDict(*this);
+    // seperate entry object and dictionary objects. Because of this they have to be added back to
+    // 'mechanicalProperties' before writing to disk.
+    PtrList<mechanicalLaw>& laws = *this;
+
+    // Adding all law dictionaries to a single pointer list
+    PtrList<primitiveEntry> lawDicts;
+    lawDicts.setSize(laws.size());
+    forAll(laws,lawI)
+    {
+        lawDicts.set(
+            lawI,
+            new primitiveEntry(
+                laws[lawI].name(),
+                laws[lawI].dict()
+            )
+        );
+    }
+
+    // Creating an entry from pointer list and replacing 'mechanical' entry in
+    // IOdictionary ('materialProperties') with it
     primitiveEntry lawsEntry("mechanical",lawDicts);
-    mechanicalDict.set(lawsEntry);
+    this->IOdictionary::set(lawsEntry);
+
+    // Writing to disk
     this->regIOobject::write();
 }
 

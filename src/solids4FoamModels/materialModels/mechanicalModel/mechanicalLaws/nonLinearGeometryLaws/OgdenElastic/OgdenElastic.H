@@ -32,7 +32,7 @@ Description
     sigma =  s - (mu1_ + mu2_ + mu3_)*I - p*I
 
     and
-    
+
     pbi = mu1*sqrt(lambdai)^alpha1 + mu2*sqrt(lambdai)^alpha2 + mu3*sqrt(lambdai)^alpha3
 
     where
@@ -125,7 +125,7 @@ public:
         (
             const word& name,
             const fvMesh& mesh,
-            dictionary& dict,
+            const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 

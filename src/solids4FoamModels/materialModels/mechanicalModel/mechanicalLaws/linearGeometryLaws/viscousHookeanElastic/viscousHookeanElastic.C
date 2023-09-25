@@ -48,7 +48,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -92,7 +92,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     ),
     WilliamsLandelFerryShift_
     (
-        dict.lookupOrAddDefault<Switch>("WilliamsLandelFerry", false)
+        mechanicalLaw::dict().lookupOrAddDefault<Switch>("WilliamsLandelFerry", false)
     ),
     C1_
     (

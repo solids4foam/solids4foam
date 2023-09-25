@@ -321,7 +321,7 @@ Foam::thermoMechanicalLaw::thermoMechanicalLaw
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -340,7 +340,7 @@ Foam::thermoMechanicalLaw::thermoMechanicalLaw
     T0_(dict.lookup("T0")),
     TPtr_(),
     TFieldWasReadFromDisk_(false),
-    TcaseDir_(dict.lookupOrAddDefault<fileName>("TcaseDirectory", ".")),
+    TcaseDir_(mechanicalLaw::dict().lookupOrAddDefault<fileName>("TcaseDirectory", ".")),
     TrunTimePtr_(),
     TmeshPtr_(),
     curTimeIndex_(-1)

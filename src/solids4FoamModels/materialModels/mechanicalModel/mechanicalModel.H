@@ -58,6 +58,7 @@ Author
 #include "nonLinearGeometry.H"
 #include "volFields.H"
 #include "surfaceFields.H"
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -72,11 +73,6 @@ class mechanicalModel
     public PtrList<mechanicalLaw>
 {
     // Private data
-
-        //- Dict entries for the mechanical laws
-        // Info: Since these are read from IStream they are not references
-        // to the base class IOdictionary entries but seperate entry objects.
-        PtrList<entry> lawDicts;
 
         //- Const reference to the mesh
         const fvMesh& mesh_;
@@ -257,7 +253,7 @@ public:
             //  fields accordingly
             void setRestart();
 
-            //- Write dictionary to disk
+            //- Write current state of 'materialProperties' dictionary to disk
             void writeDict();
 };
 

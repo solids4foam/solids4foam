@@ -1285,7 +1285,7 @@ Foam::mechanicalLaw::mechanicalLaw
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -1309,11 +1309,11 @@ Foam::mechanicalLaw::mechanicalLaw
     relFfPtr_(),
     solvePressureEqn_
     (
-        dict.lookupOrAddDefault<Switch>("solvePressureEqn", false)
+        dict_.lookupOrAddDefault<Switch>("solvePressureEqn", false)
     ),
     pressureSmoothingScaleFactor_
     (
-        dict.lookupOrAddDefault<scalar>("pressureSmoothingScaleFactor", 100.0)
+        dict_.lookupOrAddDefault<scalar>("pressureSmoothingScaleFactor", 100.0)
     ),
     sigmaHydPtr_(),
     gradSigmaHydPtr_(),

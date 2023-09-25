@@ -46,7 +46,7 @@ Foam::YeohElastic::YeohElastic
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -107,7 +107,7 @@ Foam::YeohElastic::YeohElastic
     else if (dict.found("nu") && !dict.found("K"))
     {
         const dimensionedScalar nu = dimensionedScalar(dict.lookup("nu"));
-        
+
         // Young's modulus
         const volScalarField E(6.0*c1_);
 

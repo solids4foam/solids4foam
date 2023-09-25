@@ -108,7 +108,7 @@ Foam::electroMechanicalLaw::electroMechanicalLaw
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -126,13 +126,13 @@ Foam::electroMechanicalLaw::electroMechanicalLaw
     Ta_(dict.lookup("activeTension"))
     // b_
     // (
-    //     dict.lookupOrAddDefault<dimensionedScalar>
+    //     mechanicalLaw::dict().lookupOrAddDefault<dimensionedScalar>
     //     (
     //         "biotCoeff", dimensionedScalar("0", dimless, 1.0)
     //     )
     // ),
-    // pName_(dict.lookupOrAddDefault<word>("pressureFieldName", "p")),
-    // pRegion_(dict.lookupOrAddDefault<word>("pressureFieldRegion", "region0")),
+    // pName_(mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldName", "p")),
+    // pRegion_(mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldRegion", "region0")),
     // p0_
     // (
     //     IOobject
@@ -144,7 +144,7 @@ Foam::electroMechanicalLaw::electroMechanicalLaw
     //         IOobject::NO_WRITE
     //     ),
     //     mesh,
-    //     dict.lookupOrAddDefault<dimensionedScalar>
+    //     mechanicalLaw::dict().lookupOrAddDefault<dimensionedScalar>
     //     (
     //         "p0",
     //         dimensionedScalar("zero", dimPressure, 0.0)

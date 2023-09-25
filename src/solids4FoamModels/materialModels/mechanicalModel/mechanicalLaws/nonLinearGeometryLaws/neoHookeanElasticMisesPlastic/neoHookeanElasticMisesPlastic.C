@@ -559,7 +559,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -851,7 +851,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     nonLinearPlasticity_(stressPlasticStrainSeries_.size() > 2),
     updateBEbarConsistent_
     (
-        dict.lookupOrAddDefault<Switch>
+        mechanicalLaw::dict().lookupOrAddDefault<Switch>
         (
             "updateBEbarConsistent",
             Switch(true)

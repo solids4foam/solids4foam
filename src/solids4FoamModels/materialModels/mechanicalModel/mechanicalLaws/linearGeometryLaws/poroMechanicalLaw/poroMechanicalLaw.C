@@ -49,7 +49,7 @@ bool Foam::poroMechanicalLaw::checkSigmaEffReady(const volSymmTensorField& sigma
     {
         return true;
     }
-    
+
     sigmaEff_.set(
         new volSymmTensorField{
             IOobject
@@ -72,7 +72,7 @@ bool Foam::poroMechanicalLaw::checkSigmaEffReady(const surfaceSymmTensorField& s
     {
         return true;
     }
-    
+
     sigmaEfff_.set(
         new surfaceSymmTensorField{
             IOobject
@@ -155,7 +155,7 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
 (
     const word& name,
     const fvMesh& mesh,
-    dictionary& dict,
+    const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
@@ -174,13 +174,13 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
     sigmaEfff_(),
     b_
     (
-        dict.lookupOrAddDefault<dimensionedScalar>
+        mechanicalLaw::dict().lookupOrAddDefault<dimensionedScalar>
         (
             "biotCoeff", dimensionedScalar("0", dimless, 1.0)
         )
     ),
-    pName_(dict.lookupOrAddDefault<word>("pressureFieldName", "p")),
-    pRegion_(dict.lookupOrAddDefault<word>("pressureFieldRegion", "region0")),
+    pName_(mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldName", "p")),
+    pRegion_(mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldRegion", "region0")),
     p0_
     (
         IOobject
@@ -192,7 +192,7 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
             IOobject::NO_WRITE
         ),
         mesh,
-        dict.lookupOrAddDefault<dimensionedScalar>
+        mechanicalLaw::dict().lookupOrAddDefault<dimensionedScalar>
         (
             "p0",
             dimensionedScalar("zero", dimPressure, 0.0)
