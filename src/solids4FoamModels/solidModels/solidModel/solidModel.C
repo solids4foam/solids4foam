@@ -1744,6 +1744,12 @@ void Foam::solidModel::setTraction
 #endif
 }
 
+void Foam::solidModel::recalculateRho()
+{
+    rhoPtr_.clear();
+    makeRho();
+}
+
 Foam::Switch& Foam::solidModel::checkEnforceLinear(const volScalarField& J)
 {
     scalar minJ = min(J).value();

@@ -80,7 +80,7 @@ class linearElasticMisesPlastic
         //- Poisson's ratio
         dimensionedScalar nu_;
 
-        //- Table of post-yield stress versus plastic strain
+        //- Table of plastic strain versus post-yield stress
         interpolationTable<scalar> stressPlasticStrainSeries_;
 
         //- Yield stress
