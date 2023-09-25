@@ -237,7 +237,7 @@ public:
             (
                 const label interfaceI
             ) const;
-    
+
             //- Write fields
             virtual void writeFields(const Time& runTime);
 };

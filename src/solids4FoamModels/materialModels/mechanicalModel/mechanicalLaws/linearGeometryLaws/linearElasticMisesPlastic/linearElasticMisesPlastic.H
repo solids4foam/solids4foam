@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -86,7 +80,7 @@ class linearElasticMisesPlastic
         //- Poisson's ratio
         dimensionedScalar nu_;
 
-        //- Table of post-yield stress versus plastic strain
+        //- Table of plastic strain versus post-yield stress
         interpolationTable<scalar> stressPlasticStrainSeries_;
 
         //- Yield stress

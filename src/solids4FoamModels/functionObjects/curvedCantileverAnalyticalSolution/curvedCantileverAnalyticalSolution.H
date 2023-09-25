@@ -19,10 +19,10 @@ Class
     curvedCantileverAnalyticalSolution
 
 Description
-    FunctionObject that generates the analytical solution for a curved 
+    FunctionObject that generates the analytical solution for a curved
     cantilever beam with end loading
-    
-    The solution is taken from 
+
+    The solution is taken from
         Sadd MH. Elasticity: Theory, Applications, and Numerics. Elsevier 2009.
 
     The analytical solution requires the following inputs:
@@ -32,9 +32,9 @@ Description
         - E : Young's modulus
         - nu : Poisson's ratio
 
-    Young's modulus and Poisson's factor are currently excess, but they are left 
-    because they will be needed if one wants to add the analytical displacement 
-    
+    Young's modulus and Poisson's factor are currently excess, but they are left
+    because they will be needed if one wants to add the analytical displacement
+
     It is assumed that the inner and outer beam surfaces are traction-free.
 
 Author
@@ -79,7 +79,7 @@ class curvedCantileverAnalyticalSolution
 
         //- Outer beam radius
         const scalar rOuter_;
-        
+
         //- Beam end traction
         const scalar force_;
 
@@ -91,7 +91,7 @@ class curvedCantileverAnalyticalSolution
 
 
     // Private Member Functions
-    
+
         //- Calculate stress tensor for given point
         symmTensor curvedCantileverStress(const vector& C);
 
