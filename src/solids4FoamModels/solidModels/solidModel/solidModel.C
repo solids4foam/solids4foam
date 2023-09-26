@@ -224,7 +224,7 @@ void Foam::solidModel::makeDualMesh() const
             IOobject
             (
                 "cellFeaturePoints",
-		runTime().timeName(),
+                runTime().timeName(),
                 runTime(),
                 IOobject::NO_READ,
                 IOobject::AUTO_WRITE
@@ -1613,11 +1613,19 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
 )
 {
 
-    // In case a case, that is set up for a muti-region calculation, is supposed to be run as simple (single region)
-    // calculation (i. e. to check the convergence of that single region) the solver can be
-    // set to solid in physicsProperties and in the controlDict under the subDict 'solid' one can select the region.
-    // This also allows the region name of a calulation not to be 'region0' or 'solid' but user defined.
-    word runRegion(runTime.controlDict().subOrEmptyDict("solid").lookupOrDefault<word>("region", region));
+    // It is possible to run a single region of a multi-region case (e.g., to
+    // check the convergence of that single region) by setting it in
+    // physicsProperties and in the controlDict under the subDict 'solid'.
+    // This also allows the region name not to be 'region0'
+    // or 'solid' but user defined.
+    // See https://github.com/solids4foam/solids4foam/pull/83
+    const word runRegion
+    (
+        runTime.controlDict().subOrEmptyDict("solid").lookupOrDefault<word>
+        (
+            "region", region
+        )
+    );
 
     // NB: dictionary must be unregistered to avoid adding to the database
 
