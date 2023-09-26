@@ -1617,7 +1617,7 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     // calculation (i. e. to check the convergence of that single region) the solver can be
     // set to solid in physicsProperties and in the controlDict under the subDict 'solid' one can select the region.
     // This also allows the region name of a calulation not to be 'region0' or 'solid' but user defined.
-    word runRegion(runTime.controlDict().subOrEmptyDict("solid").lookupOrDefault<word>("region",region));
+    word runRegion(runTime.controlDict().subOrEmptyDict("solid").lookupOrDefault<word>("region", region));
 
     // NB: dictionary must be unregistered to avoid adding to the database
 
