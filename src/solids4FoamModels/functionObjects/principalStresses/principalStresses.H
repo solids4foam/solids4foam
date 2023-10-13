@@ -40,7 +40,7 @@ Description
 
         // Where to load it from (if not already in solver)
         // Note: this is not required if the solver already loads this library.
-        functionObjectLibs ("libsolidModelsBekaert.so");
+        functionObjectLibs ("libsolids4FoamModels.so");
 
         // Optional: specifiy mesh region for multi-region solvers, defaults to
         // region0
@@ -52,7 +52,7 @@ Description
     @endverbatim
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
     principalStresses.C

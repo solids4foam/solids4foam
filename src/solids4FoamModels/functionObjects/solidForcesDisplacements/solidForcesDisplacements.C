@@ -175,9 +175,8 @@ Foam::solidForcesDisplacements::solidForcesDisplacements
     }
     else
     {
-        FatalErrorIn(this->name() + " function object constructor")
-            << "historyPatch not specified."
-            << abort(FatalError);
+        WarningIn(this->name() + " function object constructor")
+            << "historyPatch not specified." << endl;
     }
 
     // Lookup the solid mesh
