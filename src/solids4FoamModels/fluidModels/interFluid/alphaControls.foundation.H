@@ -4,7 +4,7 @@ const label nAlphaCorr(alphaControls.lookup<label>("nAlphaCorr"));
 
 const label nAlphaSubCycles(alphaControls.lookup<label>("nAlphaSubCycles"));
 
-const bool MULESCorr(alphaControls.lookupOrAddDefault<Switch>("MULESCorr", false));
+const bool MULESCorr(alphaControls.lookupOrDefault<Switch>("MULESCorr", false));
 
 // Apply the compression correction from the previous iteration
 // Improves efficiency for steady-simulations but can only be applied

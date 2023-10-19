@@ -1063,8 +1063,14 @@ void Foam::mechanicalModel::writeDict()
             IOobject::AUTO_WRITE
         )
     ));
+
+#ifdef OPENFOAM_NOT_EXTEND
     outputMechLawProps.ref() = *this;
     outputMechLawProps.ref().IOdictionary::set(lawsEntry);
+#else
+    outputMechLawProps() = *this;
+    outputMechLawProps().IOdictionary::set(lawsEntry);
+#endif
 
     // Writing to disk
     outputMechLawProps().regIOobject::write();
