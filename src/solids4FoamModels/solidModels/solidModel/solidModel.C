@@ -1603,7 +1603,6 @@ void Foam::solidModel::end()
     solidProperties_.regIOobject::write();
     if (!mechanicalPtr_.empty())
     {
-        mechanical().IOobject::rename(mechanical().IOobject::name()+"_withDefaultValues");
         mechanical().writeDict();
     }
     if (!thermalPtr_.empty())

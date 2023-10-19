@@ -1048,14 +1048,27 @@ void Foam::mechanicalModel::writeDict()
             )
         );
     }
-
     // Creating an entry from pointer list and replacing 'mechanical' entry in
     // IOdictionary ('materialProperties') with it
     primitiveEntry lawsEntry("mechanical",lawDicts);
-    this->IOdictionary::set(lawsEntry);
+    autoPtr<IOdictionary> outputMechLawProps
+    (
+        new IOdictionary(
+        IOobject
+        (
+            "mechanicalProperties_withDefaultValues",
+            mesh().time().constant(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        )
+    ));
+    outputMechLawProps.ref() = *this;
+    outputMechLawProps.ref().IOdictionary::set(lawsEntry);
 
     // Writing to disk
-    this->regIOobject::write();
+    outputMechLawProps().regIOobject::write();
+    outputMechLawProps.clear();
 }
 
 // ************************************************************************* //
