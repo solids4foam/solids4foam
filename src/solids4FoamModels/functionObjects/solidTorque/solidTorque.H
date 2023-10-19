@@ -28,7 +28,7 @@ Description
     direction.
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
     solidTorque.C

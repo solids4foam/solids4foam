@@ -59,7 +59,7 @@ bool Foam::fsiConvergenceData::writeData()
 
     if (Pstream::master())
     {
-        historyFilePtr_() << time_.time().value() << tab
+        historyFilePtr_() << time_.time().value() << " "
                           << fsi.outerCorr() << endl;
     }
 
@@ -107,20 +107,18 @@ Foam::fsiConvergenceData::fsiConvergenceData
             {
                 // Put in undecomposed case (Note: gives problems for
                 // distributed data running)
-                historyDir = time_.path()/".."/"history"/startTimeName;
+                historyDir = time_.path()/".."/"postProcessing"/startTimeName;
             }
             else
             {
-                historyDir = time_.path()/"history"/startTimeName;
+                historyDir = time_.path()/"postProcessing"/startTimeName;
             }
 
             // Create directory if does not exist.
             mkDir(historyDir);
 
 
-
             // Open new file at start up
-
             OStringStream FileName;
             FileName() << "fsiConvergenceData.dat";
 
@@ -133,7 +131,7 @@ Foam::fsiConvergenceData::fsiConvergenceData
             if (historyFilePtr_.valid())
             {
                 historyFilePtr_()
-                    << "# Time" << tab << "nFsiCorrectors" << endl;
+                    << "# Time" << " " << "nFsiCorrectors" << endl;
 
             }
         }
