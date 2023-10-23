@@ -323,7 +323,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
         dimensionedVector
         (
 #ifdef FOAMEXTEND
-            dict().lookupOrAddDefault<vector>("materialDirectionX", vector(1,0,0))
+            mechanicalLaw::dict().lookupOrAddDefault<vector>("materialDirectionX", vector(1,0,0))
 #else
             vector(1,0,0) // Only global directions allowed
 #endif
@@ -347,7 +347,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
         dimensionedVector
         (
 #ifdef FOAMEXTEND
-            dict().lookupOrAddDefault<vector>("materialDirectionX", vector(0,1,0))
+            mechanicalLaw::dict().lookupOrAddDefault<vector>("materialDirectionX", vector(0,1,0))
 #else
             vector(0,1,0) // Only global directions allowed
 #endif
@@ -371,7 +371,7 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
         dimensionedVector
         (
 #ifdef FOAMEXTEND
-            dict().lookupOrAddDefault<vector>("materialDirectionX", vector(0,0,1))
+            mechanicalLaw::dict().lookupOrAddDefault<vector>("materialDirectionX", vector(0,0,1))
 #else
             vector(0,0,1) // Only global directions allowed
 #endif
