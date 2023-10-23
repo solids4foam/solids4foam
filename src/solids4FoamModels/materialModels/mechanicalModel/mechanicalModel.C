@@ -1064,7 +1064,7 @@ void Foam::mechanicalModel::writeDict()
         )
     ));
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_ESI
     outputMechLawProps.ref() = *this;
     outputMechLawProps.ref().IOdictionary::set(lawsEntry);
 #else
