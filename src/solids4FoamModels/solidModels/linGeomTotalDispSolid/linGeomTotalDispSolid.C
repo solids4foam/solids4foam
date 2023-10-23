@@ -159,7 +159,7 @@ bool linGeomTotalDispSolid::evolve()
 
             // Enforce any cell displacements
             solidModel::setCellDisps(DEqn);
-            
+
             // Hack to avoid expensive copy of residuals
 #ifdef OPENFOAM_COM
             const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
