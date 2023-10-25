@@ -500,6 +500,9 @@ public:
         //  The size of this field should be mesh.nFaces()
         virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
 
+		//- Sensitivity term for Newton Raphson loop in total Lagrangian formulation
+		virtual tmp<Field<RectangularMatrix<scalar>>> sensitivityTermTotalLagField() const;
+
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const
         {

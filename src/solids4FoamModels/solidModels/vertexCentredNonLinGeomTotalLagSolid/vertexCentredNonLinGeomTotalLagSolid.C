@@ -22,7 +22,7 @@ License
 #include "sparseMatrix.H"
 #include "symmTensor4thOrder.H"
 #include "vfvcCellPoint.H"
-#include "vfvmCellPoint.H"
+#include "vfvmCellPointExtended.H"
 #include "fvcDiv.H"
 #include "fixedValuePointPatchFields.H"
 #include "solidTractionPointPatchVectorField.H"
@@ -885,6 +885,15 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
         dualMechanicalPtr_().materialTangentFaceField()
     );
     
+    // Store sensitivity term field for dual mesh faces
+    Field<RectangularMatrix<scalar>> sensitivityTerm
+    (
+        dualMechanicalPtr_().sensitivityTermTotalLagFaceField()
+    );
+    
+    // Calculate stress field at dual faces
+	dualMechanicalPtr_().correct(dualSigmaf_);
+
     // Lookup compact edge gradient factor
     const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
     if (debug)
@@ -899,11 +908,13 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 
     if (!fullNewton_)
     {
+    	// Obtain sigmaField at the dual faces
+    	
         // Assemble matrix once per time-step
         Info<< "    Assembling the matrix" << endl;
 
         // Add div(sigma) coefficients
-        vfvm::divSigma 
+        vfvm::divSigmaExtended 
         (
             matrix,
             mesh(),
@@ -911,6 +922,8 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
             dualMeshMap().dualFaceToCell(),
             dualMeshMap().dualCellToPoint(),
             materialTangent,
+            sensitivityTerm,
+            dualSigmaf_,
             fixedDofs_,
             fixedDofDirections_,
             fixedDofScale_,
@@ -919,7 +932,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
         );
 
         // Add d2dt2 coefficients
-        vfvm::d2dt2 
+        vfvm::d2dt2Extended 
         (
 #ifdef OPENFOAMESIORFOUNDATION
             mesh().d2dt2Scheme("d2dt2(pointD)"),
@@ -986,9 +999,12 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 
             // Update material tangent
             materialTangent = dualMechanicalPtr_().materialTangentFaceField();
+            
+            // Update sensitivity term
+			sensitivityTerm = dualMechanicalPtr_().sensitivityTermTotalLagFaceField();
 
             // Add div(sigma) coefficients
-            vfvm::divSigma
+            vfvm::divSigmaExtended
             (
                 matrix,
                 mesh(),
@@ -996,6 +1012,8 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
                 dualMeshMap().dualFaceToCell(),
                 dualMeshMap().dualCellToPoint(),
                 materialTangent,
+                sensitivityTerm,
+                dualSigmaf_,
                 fixedDofs_,
                 fixedDofDirections_,
                 fixedDofScale_,
@@ -1003,7 +1021,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
             );
 
             // Add d2dt2 coefficients
-            vfvm::d2dt2
+            vfvm::d2dt2Extended
             (
 #ifdef OPENFOAMESIORFOUNDATION
                 mesh().d2dt2Scheme("d2dt2(pointD)"),
@@ -1019,16 +1037,16 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
             );
         }
         
-        Info << endl << "Before enforcing DOFs: " << endl << endl;
-        matrix.print();
-        Info << endl << "Print out the source: " << endl << endl;
+//        Info << endl << "Before enforcing DOFs: " << endl << endl;
+//        matrix.print();
+//        Info << endl << "Print out the source: " << endl << endl;
         
-        for (int i = 0; i < source.size(); i++)
-        {
-            Info << "(" << i << ", 0) : " << source[i] << endl;
-            
-        } 
-        Info << endl;
+//        for (int i = 0; i < source.size(); i++)
+//        {
+//            Info << "(" << i << ", 0) : " << source[i] << endl;
+//            
+//        } 
+//        Info << endl;
 
         // Enforce fixed DOF on the linear system
         sparseMatrixTools::enforceFixedDof
@@ -1041,15 +1059,15 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
             fixedDofScale_
         );
 
-        Info << endl << "After enforcing DOFs " << endl << endl;
-        matrix.print();
-        Info << endl << "Print out the source: " << endl << endl;
-        
-        for (int i = 0; i < source.size(); i++)
-        {
-            Info << "(" << i << ", 0) : " << source[i] << endl;
-            
-        } 
+//        Info << endl << "After enforcing DOFs " << endl << endl;
+//        matrix.print();
+//        Info << endl << "Print out the source: " << endl << endl;
+//        
+//        for (int i = 0; i < source.size(); i++)
+//        {
+//            Info << "(" << i << ", 0) : " << source[i] << endl;
+//            
+//        } 
 
         // Solve linear system for displacement correction
         if (debug)

@@ -249,6 +249,13 @@ class neoHookeanElasticMisesPlastic
         (
             const surfaceSymmTensorField& devBEbar
         );
+        
+        //- Calculate stress given F
+        void calculateStress
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceSymmTensorField& F
+        );
 
 public:
 
@@ -280,6 +287,12 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
+        
+        //- Material tangent for Newton Raphson loop
+        virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField();
+        
+        //- Sentitivity term for Newton Raphson loop in total Lagrangian formulation
+        virtual tmp<Field<RectangularMatrix<scalar>>> sensitivityTermTotalLagField() const;
 
         //- Update the stress
         virtual void correct(volSymmTensorField& sigma);

@@ -23,14 +23,14 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "vfvmCellPoint.H"
-#include "multiplyCoeffRectMat.H"
+#include "vfvmCellPointExtended.H"
+#include "multiplyCoeffExtended.H"
 #include "sparseMatrixTools.H"
 #include "RectangularMatrix.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-void Foam::vfvm::divSigma
+void Foam::vfvm::divSigmaExtended
 (
     sparseMatrix& matrix,
     const fvMesh& mesh,
@@ -38,6 +38,8 @@ void Foam::vfvm::divSigma
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
     const Field<RectangularMatrix<scalar>>& materialTangentField,
+	const Field<RectangularMatrix<scalar>>& sensitivityTermField,
+	const symmTensorField& sigmaField,
     const boolList& fixedDofs,
     const symmTensorField& fixedDofDirections,
     const scalar fixedDofScale,
@@ -47,7 +49,7 @@ void Foam::vfvm::divSigma
 {
     if (debug)
     {
-        Info<< "void Foam::vfvm::divSigma(...): start" << endl;
+        Info<< "void Foam::vfvm::divSigmaExtended(...): start" << endl;
     }
 
     // Take reference for clarity and efficiency
@@ -70,6 +72,13 @@ void Foam::vfvm::divSigma
         // Material tangent at the dual mesh face
         const RectangularMatrix<scalar>& materialTangent =
             materialTangentField[dualFaceI];
+            
+        // Sensitivity term at the dual mesh face
+        const RectangularMatrix<scalar>& sensitivityTerm =
+        	sensitivityTermField[dualFaceI];
+       	
+       	// Sigma at the dual mesh face
+       	const symmTensor sigma = sigmaField[dualFaceI];
 
         // Points in cellID
         const labelList& curCellPoints = cellPoints[cellID];
@@ -119,7 +128,15 @@ void Foam::vfvm::divSigma
 
             // Calculate the coefficient for this point coming from dualFaceI
             tensor coeff;
-            multiplyCoeffRectMat(coeff, curDualSf, materialTangent, lsVec);
+            multiplyCoeffExtended
+            (
+            	coeff, 
+            	curDualSf, 
+            	materialTangent, 
+            	sensitivityTerm,
+            	sigma, 
+            	lsVec
+            );
             
             // Add the coefficient to the ownPointID equation coming from
             // pointID
@@ -139,9 +156,14 @@ void Foam::vfvm::divSigma
 
         // Compact edge direction coefficient
         tensor edgeDirCoeff;
-        multiplyCoeffRectMat
+        multiplyCoeffExtended
         (
-            edgeDirCoeff, curDualSf, materialTangent, eOverLength
+        	edgeDirCoeff, 
+        	curDualSf, 
+        	materialTangent, 
+        	sensitivityTerm,
+        	sigma, 
+        	eOverLength
         );
         edgeDirCoeff *= zeta;	
 
@@ -166,12 +188,12 @@ void Foam::vfvm::divSigma
 
     if (debug)
     {
-        Info<< "void Foam::vfvm::divSigma(...): end" << endl;
+        Info<< "void Foam::vfvm::divSigmaExtended(...): end" << endl;
     }
 }
 
 
-void Foam::vfvm::d2dt2
+void Foam::vfvm::d2dt2Extended
 (
     ITstream& d2dt2Scheme,
     const scalar& deltaT,
@@ -184,7 +206,7 @@ void Foam::vfvm::d2dt2
 {
     if (debug)
     {
-        Info<< "void Foam::vfvm::d2dt2(...): start" << endl;
+        Info<< "void Foam::vfvm::d2dt2Extended(...): start" << endl;
     }
 
     // Read time scheme
@@ -226,7 +248,7 @@ void Foam::vfvm::d2dt2
 
     if (debug)
     {
-        Info<< "void Foam::vfvm::d2dt2(...): end" << endl;
+        Info<< "void Foam::vfvm::d2dt2Extended(...): end" << endl;
     }
 }
 

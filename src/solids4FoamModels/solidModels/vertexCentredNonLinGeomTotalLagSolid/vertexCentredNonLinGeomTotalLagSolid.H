@@ -211,7 +211,7 @@ protected:
 public:
 
     //- Runtime type information
-    TypeName("vertexCentredNonLinearGeometry");
+    TypeName("vertexCentredTotalLagGeometry");
 
     // Constructors
 

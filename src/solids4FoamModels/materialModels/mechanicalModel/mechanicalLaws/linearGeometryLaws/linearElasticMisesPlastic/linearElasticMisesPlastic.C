@@ -1064,32 +1064,32 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
                 }
             }
             
-            result[faceI](3,0) = 0;
-            result[faceI](4,0) = 0;
-            result[faceI](5,0) = 0;
-            result[faceI](3,1) = 0;
-            result[faceI](4,1) = 0;
-            result[faceI](5,1) = 0;
-            result[faceI](3,2) = 0;
-            result[faceI](4,2) = 0;
-            result[faceI](5,2) = 0;
-            
-            result[faceI](0,3) = 0;
-            result[faceI](0,4) = 0;
-            result[faceI](0,5) = 0;
-            result[faceI](1,3) = 0;
-            result[faceI](1,4) = 0;
-            result[faceI](1,5) = 0;
-            result[faceI](2,3) = 0;
-            result[faceI](2,3) = 0;
-            result[faceI](2,5) = 0;
-            
-            result[faceI](4,3) = 0;
-            result[faceI](5,3) = 0;
-            result[faceI](5,4) = 0;
-            result[faceI](4,5) = 0;
-            result[faceI](3,4) = 0;
-            result[faceI](3,5) = 0;
+//            result[faceI](3,0) = 0;
+//            result[faceI](4,0) = 0;
+//            result[faceI](5,0) = 0;
+//            result[faceI](3,1) = 0;
+//            result[faceI](4,1) = 0;
+//            result[faceI](5,1) = 0;
+//            result[faceI](3,2) = 0;
+//            result[faceI](4,2) = 0;
+//            result[faceI](5,2) = 0;
+//            
+//            result[faceI](0,3) = 0;
+//            result[faceI](0,4) = 0;
+//            result[faceI](0,5) = 0;
+//            result[faceI](1,3) = 0;
+//            result[faceI](1,4) = 0;
+//            result[faceI](1,5) = 0;
+//            result[faceI](2,3) = 0;
+//            result[faceI](2,3) = 0;
+//            result[faceI](2,5) = 0;
+//            
+//            result[faceI](4,3) = 0;
+//            result[faceI](5,3) = 0;
+//            result[faceI](5,4) = 0;
+//            result[faceI](4,5) = 0;
+//            result[faceI](3,4) = 0;
+//            result[faceI](3,5) = 0;
            
         }
     }
@@ -1219,7 +1219,6 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
     }
     return tresult;
 }
-
 
 void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
 {

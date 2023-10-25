@@ -1385,6 +1385,19 @@ Foam::mechanicalLaw::materialTangentField() const
     return tresult;
 }
 
+Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
+Foam::mechanicalLaw::sensitivityTermTotalLagField() const
+{
+    // Default to uniform field
+    // This function can be overwritten in specific mechanical laws
+    tmp<Field<RectangularMatrix<scalar>>> tresult
+    (
+        new Field<RectangularMatrix<scalar>>(mesh().nFaces(), RectangularMatrix<scalar>(3,6))
+    );
+
+    return tresult;
+}
+
 
 void Foam::mechanicalLaw::correct(surfaceSymmTensorField&)
 {
