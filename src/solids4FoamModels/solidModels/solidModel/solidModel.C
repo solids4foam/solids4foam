@@ -112,17 +112,22 @@ void Foam::solidModel::makeDualMesh() const
     const bool splitAllFaces = true;
 
     // Hard-coded settings
+    // Find a way to add this default value to 'solidProperties' dict in the
+    // future
     const scalar featureAngle
     (
-        solidModelDict().lookupOrDefault<scalar>(word("featureAngle"), scalar(30))  //Find a way to add this default value to 'solidProperties' dict in the future
+        solidModelDict().lookupOrDefault<scalar>
+        (
+            word("featureAngle"), scalar(30)
+        )
     );
     const bool doNotPreserveFaceZones
     (
-        solidModelDict().lookupOrDefault<bool>("doNotPreserveFaceZones", false) //Find a way to add this default value to 'solidProperties' dict in the future
+        solidModelDict().lookupOrDefault<bool>("doNotPreserveFaceZones", false)
     );
     const bool concaveMultiCells
     (
-        solidModelDict().lookupOrDefault<bool>("concaveMultiCells", false) //Find a way to add this default value to 'solidProperties' dict in the future
+        solidModelDict().lookupOrDefault<bool>("concaveMultiCells", false)
     );
 
     Info<< "    featureAngle: " << featureAngle << nl
@@ -958,11 +963,12 @@ Foam::solidModel::solidModel
     dualMeshPtr_(),
     dualMeshToMeshMapPtr_(),
     solidProperties_
-    (   // If region == "region0" then read from the main case
+    (
+        // If region == "region0" then read from the main case
         // Otherwise, read from the region/sub-mesh directory e.g.
         // constant/fluid or constant/solid
         bool(region == dynamicFvMesh::defaultRegion)
-        ?IOobject
+      ? IOobject
         (
             "solidProperties",
             runTime.caseConstant(),
@@ -970,11 +976,11 @@ Foam::solidModel::solidModel
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
-        :IOobject
+      : IOobject
         (
             "solidProperties",
             runTime.caseConstant(),
-            region, //using 'local' property of IOobject
+            region, // using 'local' property of IOobject
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
@@ -1118,7 +1124,10 @@ Foam::solidModel::solidModel
     ),
     alternativeTol_
     (
-        solidModelDict().lookupOrAddDefault<scalar>("alternativeTolerance", 1e-07)
+        solidModelDict().lookupOrAddDefault<scalar>
+        (
+            "alternativeTolerance", 1e-07
+        )
     ),
     materialTol_
     (
@@ -1599,15 +1608,23 @@ void Foam::solidModel::updateTotalFields()
 
 void Foam::solidModel::end()
 {
-    solidProperties_.IOobject::rename(solidProperties().IOobject::name()+"_withDefaultValues");
+    solidProperties_.IOobject::rename
+    (
+        solidProperties().IOobject::name() + "_withDefaultValues"
+    );
     solidProperties_.regIOobject::write();
+
     if (!mechanicalPtr_.empty())
     {
         mechanical().writeDict();
     }
+
     if (!thermalPtr_.empty())
     {
-        thermal().IOobject::rename(thermal().IOobject::name()+"_withDefaultValues");
+        thermal().IOobject::rename
+        (
+            thermal().IOobject::name() + "_withDefaultValues"
+        );
         static_cast<const IOdictionary>(thermal()).regIOobject::write();
     }
 
