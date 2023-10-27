@@ -80,7 +80,7 @@ class fluidModel
         autoPtr<dynamicFvMesh> meshPtr_;
 
         //- Fluid properties dictionary
-        dictionary &fluidProperties_;
+        dictionary& fluidProperties_;
 
         //- Piso control
         mutable autoPtr<pisoControl> pisoPtr_;
@@ -197,7 +197,7 @@ protected:
     // Protected member functions
 
         //- Return fluid properties dictionary
-        dictionary &fluidProperties()
+        dictionary& fluidProperties()
         {
             return fluidProperties_;
         }

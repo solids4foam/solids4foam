@@ -62,7 +62,7 @@ class fluidSolidInterface
     // Private data
 
         //- FSI properties dictionary
-        dictionary &fsiProperties_;
+        dictionary& fsiProperties_;
 
         //- Flow solver
         autoPtr<fluidModel> fluid_;
