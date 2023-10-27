@@ -37,15 +37,20 @@ namespace Foam
 
 // * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
 
-bool Foam::poroMechanicalLaw::checkSigmaEffReady(const volSymmTensorField& sigma, const volScalarField& p)
+bool Foam::poroMechanicalLaw::checkSigmaEffReady
+(
+    const volSymmTensorField& sigma, const volScalarField& p
+)
 {
     if (sigmaEff_.valid())
     {
         return true;
     }
 
-    sigmaEff_.set(
-        new volSymmTensorField{
+    sigmaEff_.set
+    (
+        new volSymmTensorField
+        (
             IOobject
             (
                 "sigmaEff",
@@ -55,20 +60,27 @@ bool Foam::poroMechanicalLaw::checkSigmaEffReady(const volSymmTensorField& sigma
                 IOobject::AUTO_WRITE
             ),
            sigma + b_*(p + p0_)*symmTensor(I)
-        }
+        )
     );
+
     return true;
 }
 
-bool Foam::poroMechanicalLaw::checkSigmaEffReady(const surfaceSymmTensorField& sigma, const surfaceScalarField& p)
+
+bool Foam::poroMechanicalLaw::checkSigmaEffReady
+(
+    const surfaceSymmTensorField& sigma, const surfaceScalarField& p
+)
 {
     if (sigmaEfff_.valid())
     {
         return true;
     }
 
-    sigmaEfff_.set(
-        new surfaceSymmTensorField{
+    sigmaEfff_.set
+    (
+        new surfaceSymmTensorField
+        (
             IOobject
             (
                 "sigmaEfff",
@@ -78,8 +90,9 @@ bool Foam::poroMechanicalLaw::checkSigmaEffReady(const surfaceSymmTensorField& s
                 IOobject::AUTO_WRITE
             ),
            sigma + b_*(p + p0f())*symmTensor(I)
-        }
+        )
     );
+
     return true;
 }
 
@@ -173,8 +186,17 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
             "biotCoeff", dimensionedScalar("0", dimless, 1.0)
         )
     ),
-    pName_(mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldName", "p")),
-    pRegion_(mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldRegion", "region0")),
+    pName_
+    (
+        mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldName", "p")
+    ),
+    pRegion_
+    (
+        mechanicalLaw::dict().lookupOrAddDefault<word>
+        (
+            "pressureFieldRegion", "region0"
+        )
+    ),
     p0_
     (
         IOobject
@@ -212,6 +234,27 @@ Foam::poroMechanicalLaw::~poroMechanicalLaw()
 Foam::tmp<Foam::volScalarField> Foam::poroMechanicalLaw::impK() const
 {
     return effectiveStressMechLawPtr_->impK();
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::poroMechanicalLaw::biotCoeff() const
+{
+    return tmp<volScalarField>
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "biotCoeff",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            b_
+        )
+    );
 }
 
 
