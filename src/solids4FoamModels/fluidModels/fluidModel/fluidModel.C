@@ -492,11 +492,12 @@ Foam::fluidModel::fluidModel
 :
     physicsModel(type, runTime),
     IOdictionary
-    (   // If region == "region0" then read from the main case
+    (
+        // If region == "region0" then read from the main case
         // Otherwise, read from the region/sub-mesh directory e.g.
         // constant/fluid or constant/solid
         bool(region == dynamicFvMesh::defaultRegion)
-        ?IOobject
+      ? IOobject
         (
             "fluidProperties",
             runTime.caseConstant(),
@@ -504,7 +505,7 @@ Foam::fluidModel::fluidModel
             IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
-        :IOobject
+      : IOobject
         (
             "fluidProperties",
             runTime.caseConstant(),

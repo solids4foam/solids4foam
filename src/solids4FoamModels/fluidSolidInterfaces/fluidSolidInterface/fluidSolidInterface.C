@@ -305,7 +305,10 @@ Foam::fluidSolidInterface::fluidSolidInterface
     predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", false)),
     interfaceDeformationLimit_
     (
-        fsiProperties_.lookupOrAddDefault<scalar>("interfaceDeformationLimit", 0.0)
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "interfaceDeformationLimit", 0.0
+        )
     ),
     fluidZonesPointsDispls_(),
     fluidZonesPointsDisplsRef_(),
