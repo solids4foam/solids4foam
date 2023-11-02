@@ -68,7 +68,7 @@ class mechanicalLaw
         const fvMesh& mesh_;
 
         //- Mechanical law dictionary
-        const dictionary dict_;
+        mutable dictionary dict_;
 
         //- Name of the baseMesh region
         word baseMeshRegionName_;
@@ -464,7 +464,7 @@ public:
         }
 
         //- Return const reference to dict
-        const dictionary& dict() const
+        dictionary& dict() const
         {
             return dict_;
         }

@@ -80,7 +80,7 @@ class fluidModel
         autoPtr<dynamicFvMesh> meshPtr_;
 
         //- Fluid properties dictionary
-        dictionary fluidProperties_;
+        dictionary& fluidProperties_;
 
         //- Piso control
         mutable autoPtr<pisoControl> pisoPtr_;
@@ -195,6 +195,12 @@ class fluidModel
 protected:
 
     // Protected member functions
+
+        //- Return fluid properties dictionary
+        dictionary& fluidProperties()
+        {
+            return fluidProperties_;
+        }
 
         //- Return fluid properties dictionary
         const dictionary& fluidProperties() const
@@ -561,6 +567,9 @@ public:
 
             //- Write fields
             virtual void writeFields(const Time& runTime);
+
+            //- This function is called at the end of the simulation
+            virtual void end();
 };
 
 

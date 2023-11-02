@@ -57,10 +57,10 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
     fluidSolidInterface(typeName, runTime, region),
     relaxationFactor_
     (
-        fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
+        fsiProperties().lookupOrAddDefault<scalar>("relaxationFactor", 0.01)
     ),
-    couplingReuse_(fsiProperties().lookupOrDefault<int>("couplingReuse", 0)),
-    predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true)),
+    couplingReuse_(fsiProperties().lookupOrAddDefault<int>("couplingReuse", 0)),
+    predictSolid_(fsiProperties().lookupOrAddDefault<bool>("predictSolid", true)),
     fluidPatchesPointsV_(nGlobalPatches()),
     fluidPatchesPointsW_(nGlobalPatches()),
     fluidPatchesPointsT_(nGlobalPatches())

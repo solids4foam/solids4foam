@@ -136,6 +136,9 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+        //- Return biotCoeff as a field
+        virtual tmp<volScalarField> biotCoeff() const;
+
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
 

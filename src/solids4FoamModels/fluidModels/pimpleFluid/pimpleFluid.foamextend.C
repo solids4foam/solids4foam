@@ -246,7 +246,7 @@ pimpleFluid::pimpleFluid
     refPressureSeries_(),
     ddtCorr_
     (
-        fluidProperties().lookupOrDefault<Switch>
+        fluidProperties().lookupOrAddDefault<Switch>
         (
             "ddtCorr",
             false
@@ -255,7 +255,7 @@ pimpleFluid::pimpleFluid
     adjustPhi_(true),
     solveEnergyEq_
     (
-        fluidProperties().lookupOrDefault<Switch>
+        fluidProperties().lookupOrAddDefault<Switch>
         (
             "solveEnergyEq",
             false

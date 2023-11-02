@@ -262,7 +262,7 @@ Foam::dualMechanicalModel::dualMechanicalModel
     Info<< "Creating the dualMechanicalModel" << endl;
 
     // Read the mechanical laws
-    const PtrList<entry> lawEntries(mechModel.lookup("mechanical"));
+    PtrList<entry> lawEntries(mechModel.lookup("mechanical"));
 
     PtrList<mechanicalLaw>& laws = *this;
     laws.setSize(lawEntries.size());

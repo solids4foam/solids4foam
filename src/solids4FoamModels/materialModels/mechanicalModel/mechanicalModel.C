@@ -1027,4 +1027,59 @@ void Foam::mechanicalModel::setRestart()
     }
 }
 
+void Foam::mechanicalModel::writeDict()
+{
+    // This has to be done, because law dicts can only be read as IStream and so
+    // they are not references to the entries in the 'mechanicalProperties' but
+    // seperate entry object and dictionary objects. Because of this they have
+    // to be added back to 'mechanicalProperties' before writing to disk.
+    PtrList<mechanicalLaw>& laws = *this;
+
+    // Adding all law dictionaries to a single pointer list
+    PtrList<primitiveEntry> lawDicts;
+    lawDicts.setSize(laws.size());
+    forAll(laws,lawI)
+    {
+        lawDicts.set
+        (
+            lawI,
+            new primitiveEntry
+            (
+                laws[lawI].name(),
+                laws[lawI].dict()
+            )
+        );
+    }
+
+    // Creating an entry from pointer list and replacing 'mechanical' entry in
+    // IOdictionary ('materialProperties') with it
+    primitiveEntry lawsEntry("mechanical",lawDicts);
+    autoPtr<IOdictionary> outputMechLawProps
+    (
+        new IOdictionary
+        (
+            IOobject
+            (
+                "mechanicalProperties.withDefaultValues",
+                mesh().time().constant(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            )
+        )
+    );
+
+#ifdef OPENFOAM_ESI
+    outputMechLawProps.ref() = *this;
+    outputMechLawProps.ref().IOdictionary::set(lawsEntry);
+#else
+    outputMechLawProps() = *this;
+    outputMechLawProps().IOdictionary::set(lawsEntry);
+#endif
+
+    // Writing to disk
+    outputMechLawProps().regIOobject::write();
+    outputMechLawProps.clear();
+}
+
 // ************************************************************************* //

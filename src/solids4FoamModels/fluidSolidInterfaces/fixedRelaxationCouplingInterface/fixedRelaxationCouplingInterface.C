@@ -49,9 +49,9 @@ fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface
     fluidSolidInterface(typeName, runTime, region),
     relaxationFactor_
     (
-        fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
+        fsiProperties().lookupOrAddDefault<scalar>("relaxationFactor", 0.01)
     ),
-    predictSolid_(fsiProperties().lookupOrDefault<bool>("predictSolid", true))
+    predictSolid_(fsiProperties().lookupOrAddDefault<bool>("predictSolid", true))
 {}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

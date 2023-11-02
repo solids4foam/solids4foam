@@ -1303,11 +1303,11 @@ Foam::mechanicalLaw::mechanicalLaw
     relFfPtr_(),
     solvePressureEqn_
     (
-        dict.lookupOrDefault<Switch>("solvePressureEqn", false)
+        dict_.lookupOrAddDefault<Switch>("solvePressureEqn", false)
     ),
     pressureSmoothingScaleFactor_
     (
-        dict.lookupOrDefault<scalar>("pressureSmoothingScaleFactor", 100.0)
+        dict_.lookupOrAddDefault<scalar>("pressureSmoothingScaleFactor", 100.0)
     ),
     sigmaHydPtr_(),
     gradSigmaHydPtr_(),
@@ -1333,7 +1333,7 @@ Foam::mechanicalLaw::mechanicalLaw
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         ) << "solid region name not found" << abort(FatalError);
     }

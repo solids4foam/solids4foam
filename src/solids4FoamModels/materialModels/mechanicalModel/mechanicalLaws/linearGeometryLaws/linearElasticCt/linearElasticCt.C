@@ -44,7 +44,7 @@ namespace Foam
 void Foam::linearElasticCt::setYoungsModulusFromCt()
 {
     // Optional constant E
-    if (dict().lookupOrDefault<Switch>("constantE", false))
+    if (dict().lookupOrAddDefault<Switch>("constantE", false))
     {
         Info<< nl << "Creating constant E field\n" << endl;
 
@@ -449,7 +449,7 @@ Foam::linearElasticCt::linearElasticCt
     lambdaf_(fvc::interpolate(lambda_)),
     useRotationMatrix_
     (
-        dict.lookupOrDefault<Switch>("useRotationMatrix", false)
+        dict().lookupOrAddDefault<Switch>("useRotationMatrix", false)
     ),
     rotationMatrix_(I),
     centreOfRotation_(vector::zero)
