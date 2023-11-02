@@ -996,7 +996,7 @@ bool Foam::fluidModel::read()
 
 void Foam::fluidModel::end()
 {
-    this->IOobject::rename(this->IOobject::name()+"_withDefaultValues");
+    this->IOobject::rename(this->IOobject::name()+".withDefaultValues");
     this->regIOobject::write();
 }
 // ************************************************************************* //

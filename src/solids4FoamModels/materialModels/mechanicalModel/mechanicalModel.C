@@ -1060,7 +1060,7 @@ void Foam::mechanicalModel::writeDict()
         (
             IOobject
             (
-                "mechanicalProperties_withDefaultValues",
+                "mechanicalProperties.withDefaultValues",
                 mesh().time().constant(),
                 mesh(),
                 IOobject::NO_READ,

@@ -1610,7 +1610,7 @@ void Foam::solidModel::end()
 {
     solidProperties_.IOobject::rename
     (
-        solidProperties().IOobject::name() + "_withDefaultValues"
+        solidProperties().IOobject::name() + ".withDefaultValues"
     );
     solidProperties_.regIOobject::write();
 
@@ -1623,7 +1623,7 @@ void Foam::solidModel::end()
     {
         thermal().IOobject::rename
         (
-            thermal().IOobject::name() + "_withDefaultValues"
+            thermal().IOobject::name() + ".withDefaultValues"
         );
         static_cast<const IOdictionary>(thermal()).regIOobject::write();
     }
