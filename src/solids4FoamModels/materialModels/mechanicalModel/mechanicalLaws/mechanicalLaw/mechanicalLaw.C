@@ -160,22 +160,58 @@ void Foam::mechanicalLaw::makeSigma0() const
             << "pointer already set" << abort(FatalError);
     }
 
-    sigma0Ptr_.set
-    (
-        new volSymmTensorField
+    // Check if a single
+    if (mesh() == baseMesh())
+    {
+        sigma0Ptr_.set
+        (
+            new volSymmTensorField
+            (
+                IOobject
+                (
+                    "sigma0",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+            )
+        );
+    }
+    else // multi-material case
+    {
+        // Read sigma0 from the baseMesh
+        const volSymmTensorField sigma0BaseMesh
         (
             IOobject
             (
                 "sigma0",
-                mesh().time().timeName(),
-                mesh(),
+                baseMesh().time().timeName(),
+                baseMesh(),
                 IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
-            mesh(),
+            baseMesh(),
             dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
-        )
-    );
+        );
+
+        // Map sigma0 from the baseMesh to this mesh
+        sigma0Ptr_.set
+        (
+            new volSymmTensorField
+            (
+                baseMesh().lookupObject<mechanicalModel>
+                (
+                    "mechanicalProperties"
+                ).solSubMeshes().lookupBaseMeshVolField<symmTensor>
+                (
+                    "sigma0", mesh()
+                )()
+            )
+        );
+    }
 }
 
 
