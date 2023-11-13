@@ -139,9 +139,6 @@ public:
 
             //- Material tangent field defined at dual mesh faces
             tmp< Field< RectangularMatrix<scalar>>> materialTangentFaceField() const;
-            
-            //- Sensitivity term field defined at dual mesh faces in total Lagrangian formulation
-            tmp< Field< RectangularMatrix<scalar>>> sensitivityTermTotalLagFaceField() const;
 
         // Edit
 

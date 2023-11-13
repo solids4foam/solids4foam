@@ -649,6 +649,159 @@ scalar vertexCentredNonLinGeomTotalLagSolid::calculateLineSearchFactor
     return eta;
 }
 
+Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
+vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
+(
+	const surfaceVectorField SfUndef, //Undeformed surface area vector field
+	const surfaceSymmTensorField gradDRef //Reference gradD 
+) const 
+{
+    // Prepare tmp field
+    tmp<Field<Foam::RectangularMatrix<Foam::scalar>>> tresult
+    (
+        new Field<Foam::RectangularMatrix<Foam::scalar>>(mesh().nFaces(), Foam::RectangularMatrix<scalar>(3,6,0))
+    );
+#ifdef OPENFOAMESIORFOUNDATION
+    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult.ref();
+#else
+    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult();
+#endif
+
+    // Calculate surface vector as per the total Lagrangian formulation
+    // gamma = JF^-T*Sf0
+    
+    // Calculate unperturbed F 
+    surfaceSymmTensorField FRef = I + gradDRef.T(); 
+    
+    // Calculate unperturbed invF
+    surfaceSymmTensorField invFRef = inv(FRef); 
+    
+    // Calculate unperturbed J
+    surfaceScalarField JRef = det(FRef);
+    
+    // Calculate unperturbed deformed Sf
+    surfaceVectorField SfRef = (JRef*invFRef.T()) & SfUndef;
+    
+    // Create field to be used for perturbations
+    surfaceSymmTensorField gradDPerturb = gradDRef;
+    surfaceSymmTensorField FPerturb = FRef;
+    surfaceSymmTensorField invFPerturb = invFRef;
+    surfaceScalarField JPerturb = JRef;
+    surfaceVectorField SfPerturb = SfRef;
+    
+	// Small number used for perturbations
+	const scalar eps(solidModelDict().lookupOrDefault<scalar>("tangentEps", 1e-10));
+
+	// For each component of gradD, sequentially apply a perturbation and
+	// then calculate the resulting sigma
+	for (label cmptI = 0; cmptI < symmTensor::nComponents; cmptI++)
+	{
+	    // Perturb this component of gradD and calculate SfPerturb
+	    gradDPerturb.replace(cmptI, gradDRef.component(cmptI) + eps);
+	    FPerturb = I + gradDPerturb.T();
+	    invFPerturb = inv(FPerturb);
+	    JPerturb = det(FPerturb);
+	    SfPerturb = (JPerturb*invFPerturb.T()) & SfUndef;
+
+	    // Calculate each component
+	    const surfaceVectorField tangCmpt((SfPerturb - SfRef)/eps);
+	    const vectorField& tangCmptI = tangCmpt.internalField();
+
+	    // Insert each component
+	    forAll(tangCmptI, faceI)
+	    {
+	        if (cmptI == symmTensor::XX)
+	        {
+	            result[faceI](0,0) = tangCmptI[faceI][0]; 
+	            result[faceI](1,0) = tangCmptI[faceI][1];
+	            result[faceI](2,0) = tangCmptI[faceI][2];
+	        }
+	        else if (cmptI == symmTensor::YY)
+	        {
+	            result[faceI](0,1) = tangCmptI[faceI][0]; 
+	            result[faceI](1,1) = tangCmptI[faceI][1];
+	            result[faceI](2,1) = tangCmptI[faceI][2];
+	        }
+	        else if (cmptI == symmTensor::ZZ)
+	        {
+	            result[faceI](0,2) = tangCmptI[faceI][0]; 
+	            result[faceI](1,2) = tangCmptI[faceI][1];
+	            result[faceI](2,2) = tangCmptI[faceI][2];
+	        }
+	        else if (cmptI == symmTensor::XY)
+	        {
+	            result[faceI](0,3) = tangCmptI[faceI][0]; 
+	            result[faceI](1,3) = tangCmptI[faceI][1];
+	            result[faceI](2,3) = tangCmptI[faceI][2];
+	        }
+	        else if (cmptI == symmTensor::YZ)
+	        {
+	            result[faceI](0,4) = tangCmptI[faceI][0]; 
+	            result[faceI](1,4) = tangCmptI[faceI][1];
+	            result[faceI](2,4) = tangCmptI[faceI][2];
+	        }
+	        else // if (cmptI == symmTensor::XZ)
+	        {
+	            result[faceI](0,5) = tangCmptI[faceI][0]; 
+	            result[faceI](1,5) = tangCmptI[faceI][1];
+	            result[faceI](2,5) = tangCmptI[faceI][2];
+	        }
+	    }
+
+	    forAll(tangCmpt.boundaryField(), patchI)
+	    {
+	        const vectorField& tangCmptP =
+	            tangCmpt.boundaryField()[patchI];
+	        const label start = mesh().boundaryMesh()[patchI].start();
+
+	        forAll(tangCmptP, fI)
+	        {
+	            const label faceID = start + fI;
+
+	            if (cmptI == symmTensor::XX)
+	            {
+	                result[faceID](0,0) = tangCmptI[fI][0]; 
+	                result[faceID](1,0) = tangCmptI[fI][1];
+	                result[faceID](2,0) = tangCmptI[fI][2];
+	            }
+	            else if (cmptI == symmTensor::YY)
+	            {
+	                result[faceID](0,1) = tangCmptI[fI][0]; 
+	                result[faceID](1,1) = tangCmptI[fI][1];
+	                result[faceID](2,1) = tangCmptI[fI][2];
+	            }
+	            else if (cmptI == symmTensor::ZZ)
+	            {
+	                result[faceID](0,2) = tangCmptI[fI][0]; 
+	                result[faceID](1,2) = tangCmptI[fI][1];
+	                result[faceID](2,2) = tangCmptI[fI][2];
+	            }
+	            else if (cmptI == symmTensor::XY)
+	            {
+	                result[faceID](0,3) = tangCmptI[fI][0]; 
+	                result[faceID](1,3) = tangCmptI[fI][1];
+	                result[faceID](2,3) = tangCmptI[fI][2];
+	            }
+	            else if (cmptI == symmTensor::YZ)
+	            {
+	                result[faceID](0,4) = tangCmptI[fI][0]; 
+	                result[faceID](1,4) = tangCmptI[fI][1];
+	                result[faceID](2,4) = tangCmptI[fI][2];
+	            }
+	            else // if (cmptI == symmTensor::XZ)
+	            {
+	                result[faceID](0,5) = tangCmptI[fI][0]; 
+	                result[faceID](1,5) = tangCmptI[fI][1];
+	                result[faceID](2,5) = tangCmptI[fI][2];
+	            }
+	        }
+	    }
+	}
+
+	return tresult;
+
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -809,6 +962,8 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
     ),
     globalPointIndices_(mesh())
 {
+
+	Info<< "File = " << __FILE__ << ", line = " << __LINE__ << endl;
     // Create dual mesh and set write option
     dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
 
@@ -885,11 +1040,21 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
         dualMechanicalPtr_().materialTangentFaceField()
     );
     
-    // Store sensitivity term field for dual mesh faces
-    Field<RectangularMatrix<scalar>> sensitivityTerm
-    (
-        dualMechanicalPtr_().sensitivityTermTotalLagFaceField()
-    );
+    //Obtain undeformed surface vector field
+    surfaceVectorField SfUndef = mesh().Sf();  
+    
+    // Obtain gradD from object registry
+    surfaceSymmTensorField gradDRef = dualMesh().lookupObject<surfaceSymmTensorField>("grad(D)f");
+    
+    // Calculate geometric stiffness field for dual mesh faces
+	Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
+	(
+		geometricStiffnessField
+		(
+			SfUndef,
+			gradDRef 
+		)
+	);
     
     // Calculate stress field at dual faces
 	dualMechanicalPtr_().correct(dualSigmaf_);
@@ -922,8 +1087,9 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
             dualMeshMap().dualFaceToCell(),
             dualMeshMap().dualCellToPoint(),
             materialTangent,
-            sensitivityTerm,
+            geometricStiffness,
             dualSigmaf_,
+            dualGradDf_,
             fixedDofs_,
             fixedDofDirections_,
             fixedDofScale_,
@@ -1000,8 +1166,17 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
             // Update material tangent
             materialTangent = dualMechanicalPtr_().materialTangentFaceField();
             
-            // Update sensitivity term
-			sensitivityTerm = dualMechanicalPtr_().sensitivityTermTotalLagFaceField();
+            // Update geometricStiffness
+			surfaceSymmTensorField gradDRef = mesh().lookupObject<surfaceSymmTensorField>("grad(D)f");
+			
+			Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
+			(
+				geometricStiffnessField
+				(
+					SfUndef,
+					gradDRef 
+				)
+			);
 
             // Add div(sigma) coefficients
             vfvm::divSigmaExtended
@@ -1012,8 +1187,9 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
                 dualMeshMap().dualFaceToCell(),
                 dualMeshMap().dualCellToPoint(),
                 materialTangent,
-                sensitivityTerm,
+                geometricStiffness,
                 dualSigmaf_,
+                dualGradDf_,
                 fixedDofs_,
                 fixedDofDirections_,
                 fixedDofScale_,

@@ -31,17 +31,17 @@ void Foam::multiplyCoeffExtended
     const vector& g
 )
 {
-    //Define indexes for readability.
-    scalar XX = 0;
-    scalar YY = 1;
-    scalar ZZ = 2;
-    scalar XY = 3;
-    scalar YZ = 4;
-    scalar ZX = 5;
+    //Define indexes for readability only for C and G.
+    const label XX = 0;
+    const label  YY = 1;
+    const label  ZZ = 2;
+    const label  XY = 3;
+    const label  YZ = 4;
+    const label  ZX = 5;
     
-    scalar X = 0;
-    scalar Y = 1;
-    scalar Z = 2;
+    const label  X = 0;
+    const label  Y = 1;
+    const label  Z = 2;
 
     // Index notation
     // coeff_ij = (Sf_m C_mikl + G_mkl sigma_mi) g_k delta_lj

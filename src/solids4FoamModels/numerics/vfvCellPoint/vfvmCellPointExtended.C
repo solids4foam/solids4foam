@@ -38,8 +38,9 @@ void Foam::vfvm::divSigmaExtended
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
     const Field<RectangularMatrix<scalar>>& materialTangentField,
-	const Field<RectangularMatrix<scalar>>& sensitivityTermField,
+	const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
 	const symmTensorField& sigmaField,
+	const tensorField& dualGradDField,
     const boolList& fixedDofs,
     const symmTensorField& fixedDofDirections,
     const scalar fixedDofScale,
@@ -74,8 +75,8 @@ void Foam::vfvm::divSigmaExtended
             materialTangentField[dualFaceI];
             
         // Sensitivity term at the dual mesh face
-        const RectangularMatrix<scalar>& sensitivityTerm =
-        	sensitivityTermField[dualFaceI];
+        const RectangularMatrix<scalar>& geometricStiffness =
+        	geometricStiffnessField[dualFaceI];
        	
        	// Sigma at the dual mesh face
        	const symmTensor sigma = sigmaField[dualFaceI];
@@ -97,6 +98,21 @@ void Foam::vfvm::divSigmaExtended
 
         // dualFaceI area vector
         const vector& curDualSf = dualSf[dualFaceI];
+        
+        // gradD at the dual mesh face
+        const tensor& dualGradD = dualGradDField[dualFaceI];
+        
+		// Calculate F for dual faces
+		const tensor& dualF = I + dualGradD.T(); 
+		
+		// Calculate invF for dual faces
+		const tensor& dualInvF = inv(dualF); 
+		
+		// Calculate J for dual faces
+		const scalar& dualJ = det(dualF);
+		
+		// Calculate deformed Sf
+		const vector& curDualSfDef = (dualJ*dualInvF.T()) & curDualSf;
 
         // Least squares vectors for cellID
         const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
@@ -131,9 +147,9 @@ void Foam::vfvm::divSigmaExtended
             multiplyCoeffExtended
             (
             	coeff, 
-            	curDualSf, 
+            	curDualSfDef, 
             	materialTangent, 
-            	sensitivityTerm,
+            	geometricStiffness,
             	sigma, 
             	lsVec
             );
@@ -159,9 +175,9 @@ void Foam::vfvm::divSigmaExtended
         multiplyCoeffExtended
         (
         	edgeDirCoeff, 
-        	curDualSf, 
+        	curDualSfDef, 
         	materialTangent, 
-        	sensitivityTerm,
+        	geometricStiffness,
         	sigma, 
         	eOverLength
         );

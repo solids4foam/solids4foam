@@ -251,7 +251,7 @@ Foam::mechanicalModel::mechanicalModel
         cellZoneNames_[lawI] = lawEntries[lawI].keyword();
     }
 
-    // Create mechancial laws
+    // Create mechanical laws
     if (laws.size() == 1)
     {
         if (nonLinGeom == nonLinearGeometry::LINEAR_GEOMETRY)

@@ -263,15 +263,18 @@ Foam::dualMechanicalModel::dualMechanicalModel
     cellInThisMaterialList_(),
     dualFaceInThisMaterialList_()
 {
+	Info << "File = " << __FILE__ << ", Line = " << __LINE__ << endl;
     Info<< "Creating the dualMechanicalModel" << endl;
 
     // Read the mechanical laws
     const PtrList<entry> lawEntries(mechModel.lookup("mechanical"));
 
+    Info << "File = " << __FILE__ << ", Line = " << __LINE__ << endl;
     PtrList<mechanicalLaw>& laws = *this;
     laws.setSize(lawEntries.size());
 
-    // Create mechancial laws
+    Info << "File = " << __FILE__ << ", Line = " << __LINE__ << endl;
+    // Create mechanical laws
     forAll(laws, lawI)
     {
         if (nonLinGeom == nonLinearGeometry::LINEAR_GEOMETRY)
@@ -316,6 +319,8 @@ Foam::dualMechanicalModel::dualMechanicalModel
                 << abort(FatalError);
         }
     }
+    
+    Info << "File = " << __FILE__ << ", Line = " << __LINE__ << endl;
 }
 
 
@@ -389,62 +394,6 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
 
     return tresult;
 }
-
-Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
-Foam::dualMechanicalModel::sensitivityTermTotalLagFaceField() const
-{
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    // Prepare the field
-    tmp< Field<RectangularMatrix<scalar>> > tresult
-    (
-        new Field<RectangularMatrix<scalar>>(mesh().nFaces(), RectangularMatrix<scalar>(3,6))
-    );
-#ifdef OPENFOAMESIORFOUNDATION
-    Field<RectangularMatrix<scalar>>& result = tresult.ref();
-#else
-    Field<RectangularMatrix<scalar>>& result = tresult();
-#endif
-
-    if (laws.size() == 1)
-    {
-        result = laws[0].sensitivityTermTotalLagField();
-
-        if (result.size() != mesh().nFaces())
-        {
-            FatalErrorIn("dualMechanicalModel::sensitivityTermTotalLagField()")
-                << "The sensitivityTermTotalLagField field for law 0 is the wrong size!"
-                << abort(FatalError);
-        }
-    }
-    else
-    {
-/*        // Accumulate data for all materials
-        // Note: the value on each dual face is uniquely set by one material law
-        forAll(laws, lawI)
-        {
-            const Field<RectangularMatrix<scalar>> matTanI
-            (
-                laws[lawI].materialTangentField()
-            );
-
-            if (matTanI.size() != mesh().nFaces())
-            {
-                FatalErrorIn("dualMechanicalModel::materialTangentField()")
-                    << "The materialTangentField field for law " << lawI
-                    << " is the wrong size!" << abort(FatalError);
-            }
-
-            // Insert values from actual material region into main sigma field
-            result += dualFaceInThisMaterialList()[lawI]*matTanI;
-        }  */
-        
-        notImplemented("Not implemented for more than one material");
-    }
-
-    return tresult;
-}
-
 
 void Foam::dualMechanicalModel::correct(surfaceSymmTensorField& sigma)
 {

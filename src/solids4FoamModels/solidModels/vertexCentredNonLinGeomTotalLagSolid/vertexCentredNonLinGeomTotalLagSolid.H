@@ -189,6 +189,13 @@ class vertexCentredNonLinGeomTotalLagSolid
             const vectorField& source, // Linear system source
             const scalar zeta // Discretisation parameter
         );
+        
+        Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
+		geometricStiffnessField
+		(
+			const surfaceVectorField SfUndef, //Undeformed surface area vector field
+			const surfaceSymmTensorField gradDRef //Reference gradD 
+		) const; 
 
         //- Disallow default bitwise copy construct
         vertexCentredNonLinGeomTotalLagSolid(const vertexCentredNonLinGeomTotalLagSolid&);
@@ -211,7 +218,7 @@ protected:
 public:
 
     //- Runtime type information
-    TypeName("vertexCentredTotalLagGeometry");
+    TypeName("vertexCentredNonLinTotalLagGeometry");
 
     // Constructors
 

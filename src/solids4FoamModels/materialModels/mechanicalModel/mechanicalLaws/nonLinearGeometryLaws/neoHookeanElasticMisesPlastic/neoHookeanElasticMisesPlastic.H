@@ -289,10 +289,7 @@ public:
         virtual tmp<volScalarField> impK() const;
         
         //- Material tangent for Newton Raphson loop
-        virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField();
-        
-        //- Sentitivity term for Newton Raphson loop in total Lagrangian formulation
-        virtual tmp<Field<RectangularMatrix<scalar>>> sensitivityTermTotalLagField() const;
+        virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
 
         //- Update the stress
         virtual void correct(volSymmTensorField& sigma);
