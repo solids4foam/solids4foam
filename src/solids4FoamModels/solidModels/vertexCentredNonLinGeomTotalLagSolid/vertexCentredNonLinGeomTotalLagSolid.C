@@ -671,23 +671,23 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
     // gamma = JF^-T*Sf0
     
     // Calculate unperturbed F 
-    surfaceSymmTensorField FRef = I + gradDRef.T(); 
+    surfaceSymmTensorField FRef(I + gradDRef.T()); 
     
     // Calculate unperturbed invF
-    surfaceSymmTensorField invFRef = inv(FRef); 
+    surfaceSymmTensorField invFRef(inv(FRef));
     
     // Calculate unperturbed J
-    surfaceScalarField JRef = det(FRef);
+    surfaceScalarField JRef(det(FRef));
     
     // Calculate unperturbed deformed Sf
-    surfaceVectorField SfRef = (JRef*invFRef.T()) & SfUndef;
+    surfaceVectorField SfRef((JRef*invFRef.T()) & SfUndef);
     
     // Create field to be used for perturbations
-    surfaceSymmTensorField gradDPerturb = gradDRef;
-    surfaceSymmTensorField FPerturb = FRef;
-    surfaceSymmTensorField invFPerturb = invFRef;
-    surfaceScalarField JPerturb = JRef;
-    surfaceVectorField SfPerturb = SfRef;
+    surfaceSymmTensorField gradDPerturb(gradDRef);
+    surfaceSymmTensorField FPerturb(FRef);
+    surfaceSymmTensorField invFPerturb(invFRef);
+    surfaceScalarField JPerturb(JRef);
+    surfaceVectorField SfPerturb(SfRef);
     
 	// Small number used for perturbations
 	const scalar eps(solidModelDict().lookupOrDefault<scalar>("tangentEps", 1e-10));

@@ -564,7 +564,7 @@ void Foam::neoHookeanElasticMisesPlastic::calculateStress
 
     // Calculate the relative deformation gradient with the volumetric term
     // removed
-    const surfaceTensorField relFbar = pow(relJ, -1.0/3.0)*relFf();
+    const surfaceTensorField relFbar(pow(relJ, -1.0/3.0)*relFf());
 
     // Update bE trial
     bEbarTrialf_ = transform(relFbar, bEbarf_.oldTime());
