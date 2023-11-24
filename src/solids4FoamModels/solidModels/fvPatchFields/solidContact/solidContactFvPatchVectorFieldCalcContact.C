@@ -345,7 +345,7 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
                     zone().globalPatch(),
                     shadowZones()[shadPatchI].globalPatch(),
                     faceAreaIntersect::tmMesh, // triMode
-                    true,   // requireMatch
+                    false,   // requireMatch
                     -1,     // lowWeightCorrection
                     false,  // reverseTarget
                     true    // use globalPolyPatch
