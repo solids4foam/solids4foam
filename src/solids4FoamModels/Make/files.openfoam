@@ -173,6 +173,11 @@ functionObjects/volumetricStrain/volumetricStrain.C
 functionObjects/fsiConvergenceData/fsiConvergenceData.C
 
 numerics/amiZoneInterpolation/amiZoneInterpolation.C
+numerics/AMIInterpolationS4F/AMIInterpolationS4F.C
+numerics/AMIInterpolationS4F/AMIInterpolationS4FNew.C
+numerics/AMIInterpolationS4F/advancingFrontAMIS4F/advancingFrontAMIS4F.C
+numerics/AMIInterpolationS4F/advancingFrontAMIS4F/advancingFrontAMIS4FParallelOps.C
+numerics/AMIInterpolationS4F/faceAreaWeightAMIS4F/faceAreaWeightAMIS4F.C
 numerics/backwardDdtScheme/backwardDdtSchemes.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
