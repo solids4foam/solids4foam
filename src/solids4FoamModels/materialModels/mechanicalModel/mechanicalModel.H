@@ -246,6 +246,9 @@ public:
             //- Set restart: some mechanical laws may change the writeOpt of
             //  fields accordingly
             void setRestart();
+
+            //- Write current state of 'materialProperties' dictionary to disk
+            void writeDict();
 };
 
 

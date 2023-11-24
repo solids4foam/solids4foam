@@ -206,7 +206,7 @@ pimpleFluid::pimpleFluid
     cumulativeContErr_(0),
     solveEnergyEq_
     (
-        fluidProperties().lookupOrDefault<Switch>
+        fluidProperties().lookupOrAddDefault<Switch>
         (
             "solveEnergyEq",
             false

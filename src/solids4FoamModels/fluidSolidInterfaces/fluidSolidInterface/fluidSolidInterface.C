@@ -107,7 +107,7 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Lookup the type
-        const word type = fsiProperties_.lookupOrDefault<word>
+        const word type = fsiProperties_.lookupOrAddDefault<word>
 #ifdef OPENFOAM_NOT_EXTEND
         (
             "interfaceTransferMethod", "AMI"
@@ -281,31 +281,34 @@ Foam::fluidSolidInterface::fluidSolidInterface
     interfaceToInterfaceList_(),
     outerCorrTolerance_
     (
-        fsiProperties_.lookupOrDefault<scalar>("outerCorrTolerance", 1e-06)
+        fsiProperties_.lookupOrAddDefault<scalar>("outerCorrTolerance", 1e-06)
     ),
     nOuterCorr_
     (
-        fsiProperties_.lookupOrDefault<int>("nOuterCorr", 30)
+        fsiProperties_.lookupOrAddDefault<int>("nOuterCorr", 30)
     ),
     additionalMeshCorrection_
     (
-        fsiProperties_.lookupOrDefault<Switch>
+        fsiProperties_.lookupOrAddDefault<Switch>
         (
             "additionalMeshCorrection", false
         )
     ),
     coupled_
     (
-        fsiProperties_.lookupOrDefault<Switch>("coupled", true)
+        fsiProperties_.lookupOrAddDefault<Switch>("coupled", true)
     ),
     couplingStartTime_
     (
-        fsiProperties_.lookupOrDefault<scalar>("couplingStartTime", -1.0)
+        fsiProperties_.lookupOrAddDefault<scalar>("couplingStartTime", -1.0)
     ),
-    predictor_(fsiProperties_.lookupOrDefault<Switch>("predictor", false)),
+    predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", false)),
     interfaceDeformationLimit_
     (
-        fsiProperties_.lookupOrDefault<scalar>("interfaceDeformationLimit", 0.0)
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "interfaceDeformationLimit", 0.0
+        )
     ),
     fluidZonesPointsDispls_(),
     fluidZonesPointsDisplsRef_(),
@@ -321,12 +324,12 @@ Foam::fluidSolidInterface::fluidSolidInterface
     outerCorr_(0),
     writeResidualsToFile_
     (
-        fsiProperties_.lookupOrDefault<Switch>("writeResidualsToFile", false)
+        fsiProperties_.lookupOrAddDefault<Switch>("writeResidualsToFile", false)
     ),
     residualFilePtr_(),
     interpolatorUpdateFrequency_
     (
-        fsiProperties_.lookupOrDefault<int>("interpolatorUpdateFrequency", 0)
+        fsiProperties_.lookupOrAddDefault<int>("interpolatorUpdateFrequency", 0)
     ),
     accumulatedFluidInterfacesDisplacementsList_()
 {
@@ -1522,6 +1525,14 @@ void Foam::fluidSolidInterface::writeFields(const Time& runTime)
     // writeField function then they will not be created/written
     //fluid().writeFields(runTime);
     solid().writeFields(runTime);
+}
+
+void Foam::fluidSolidInterface::end()
+{
+    this->IOobject::rename(this->IOobject::name()+".withDefaultValues");
+    this->regIOobject::write();
+    solid().end();
+    fluid().end();
 }
 
 // ************************************************************************* //

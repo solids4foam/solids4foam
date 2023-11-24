@@ -160,7 +160,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Unphysical Poisson's ratio: nu should be >= -1.0 and <= 0.5"
             << abort(FatalError);
@@ -184,7 +184,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                 "(\n"
                 "    const word& name,\n"
                 "    const fvMesh& mesh,\n"
-                "    const dictionary& dict\n"
+                "    dictionary& dict\n"
                 ")"
             )   << "We cannot specify k and nu independently as well as "
                 << "Young's/shear modulii!" << abort(FatalError);
@@ -214,7 +214,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                 "(\n"
                 "    const word& name,\n"
                 "    const fvMesh& mesh,\n"
-                "    const dictionary& dict\n"
+                "    dictionary& dict\n"
                 ")"
             )   << "k is directly looked up from the dictionary; "
                 << "it is not calculated from mu and lambda" << endl;
@@ -233,7 +233,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "The E and tau lists should have the same length!"
             << abort(FatalError);
@@ -259,7 +259,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "All relaxation times should be positive!"
             << abort(FatalError);
@@ -274,7 +274,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "All values of stiffness E should be positive!"
             << abort(FatalError);

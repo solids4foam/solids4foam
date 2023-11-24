@@ -845,7 +845,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     nonLinearPlasticity_(stressPlasticStrainSeries_.size() > 2),
     updateBEbarConsistent_
     (
-        dict.lookupOrDefault<Switch>
+        mechanicalLaw::dict().lookupOrAddDefault<Switch>
         (
             "updateBEbarConsistent",
             Switch(true)

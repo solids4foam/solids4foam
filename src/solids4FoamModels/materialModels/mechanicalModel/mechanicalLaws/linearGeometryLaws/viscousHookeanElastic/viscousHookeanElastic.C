@@ -86,7 +86,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     ),
     WilliamsLandelFerryShift_
     (
-        dict.lookupOrDefault<Switch>("WilliamsLandelFerry", false)
+        mechanicalLaw::dict().lookupOrAddDefault<Switch>("WilliamsLandelFerry", false)
     ),
     C1_
     (
@@ -125,7 +125,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "The E and relaxationTimes lists should have the same length!"
             << abort(FatalError);
@@ -152,7 +152,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "All relaxation times should be positive!"
             << abort(FatalError);
@@ -167,7 +167,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "All values of stiffness E should be positive!"
             << abort(FatalError);
@@ -251,7 +251,7 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Unphysical Poisson's ratio: nu should be >= -1.0 and <= 0.5"
             << abort(FatalError);

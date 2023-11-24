@@ -78,7 +78,7 @@ class solidModel
         mutable autoPtr<dualMeshToMeshMap> dualMeshToMeshMapPtr_;
 
         //- Solid properties dictionary
-        IOdictionary solidProperties_;
+        mutable IOdictionary solidProperties_;
 
         //- Derived solidModel type
         const word type_;
