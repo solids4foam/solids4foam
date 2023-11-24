@@ -154,7 +154,7 @@ void explicitVertexCentredNonLinGeomTotalLagSolid::updatePointDivSigma
     // Calculate absolute divergence of stress (force)
     // We do this to allow syncing of forces at points on processor boundaries
     const vectorField dualDivSigmaAbs(dualDivSigma*dualMesh().V());
-    
+
     // Map dual cell field to primary mesh point field
     // We temporarily use the pointDivSigma field to hold absolute forces
     // but convert them back to force per unit volume below
