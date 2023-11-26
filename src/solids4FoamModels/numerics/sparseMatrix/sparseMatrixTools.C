@@ -66,8 +66,6 @@ bool Foam::sparseMatrixTools::checkTwoD(const polyMesh& mesh)
             << "Only implemented for 2-D and 3-D models!"
             << abort(FatalError);
     }
-    
-	Info<< "File = " << __FILE__ << ", line = " << __LINE__ << endl;
 
     return twoD;
 }
@@ -661,13 +659,12 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         }
     }
 
-
     // Solve linear system
     if (debug)
     {
         Pout<< "        Solving the linear solver: start" << endl;
     }
-
+	
     ierr = KSPSolve(ksp, b, x); checkErr(ierr);
 
     if (debug)

@@ -194,7 +194,7 @@ class vertexCentredNonLinGeomTotalLagSolid
 		geometricStiffnessField
 		(
 			const surfaceVectorField SfUndef, //Undeformed surface area vector field
-			const surfaceSymmTensorField gradDRef //Reference gradD 
+			const surfaceTensorField gradDRef //Reference gradD 
 		) const; 
 
         //- Disallow default bitwise copy construct

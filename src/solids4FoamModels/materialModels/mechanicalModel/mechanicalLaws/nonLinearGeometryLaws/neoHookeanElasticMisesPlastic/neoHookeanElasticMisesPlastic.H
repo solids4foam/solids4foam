@@ -254,7 +254,7 @@ class neoHookeanElasticMisesPlastic
         void calculateStress
         (
             surfaceSymmTensorField& sigma,
-            const surfaceSymmTensorField& F
+            const surfaceTensorField& F
         );
 
 public:

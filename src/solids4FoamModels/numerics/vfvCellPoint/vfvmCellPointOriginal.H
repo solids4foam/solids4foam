@@ -41,8 +41,8 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef vfvmCellPoint_H
-#define vfvmCellPoint_H
+#ifndef vfvmCellPointOriginal_H
+#define vfvmCellPointOriginal_H
 
 #include "volFields.H"
 #include "pointFields.H"
@@ -60,7 +60,7 @@ namespace vfvm
     // Add coefficients to the matrix for the divergence of stress
     // Note: this function does not calculate contributions to the right-hand
     // side
-    void divSigma
+    void divSigmaOriginal
     (
         sparseMatrix& matrix,
         const fvMesh& mesh,
@@ -79,7 +79,7 @@ namespace vfvm
     // Add coefficients to the matrix for the second time derivative
     // Note: this function does not calculate contributions to the right-hand
     // side
-    void d2dt2
+    void d2dt2Original
     (
         ITstream& d2dt2Scheme,
         const scalar& deltaT,           // time-step
@@ -96,9 +96,9 @@ namespace vfvm
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#ifdef NoRepository
-#   include "vfvmCellPoint.C"
-#endif
+//ifdef NoRepository
+//#   include "vfvmCellPoint.C"
+//#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

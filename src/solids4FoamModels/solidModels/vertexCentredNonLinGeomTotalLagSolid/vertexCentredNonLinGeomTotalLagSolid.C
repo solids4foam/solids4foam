@@ -20,7 +20,6 @@ License
 #include "vertexCentredNonLinGeomTotalLagSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "sparseMatrix.H"
-#include "symmTensor4thOrder.H"
 #include "vfvcCellPoint.H"
 #include "vfvmCellPointExtended.H"
 #include "fvcDiv.H"
@@ -111,6 +110,7 @@ void vertexCentredNonLinGeomTotalLagSolid::updateSource
     }
 
     // Calculate divergence of stress for the dual cells
+    
     const vectorField dualDivSigma = fvc::div(dualTraction*deformedDualMagSf);
 
     // Map dual cell fields to primary mesh point fields
@@ -653,13 +653,13 @@ Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
 (
 	const surfaceVectorField SfUndef, //Undeformed surface area vector field
-	const surfaceSymmTensorField gradDRef //Reference gradD 
+	const surfaceTensorField gradDRef //Reference gradD 
 ) const 
 {
     // Prepare tmp field
     tmp<Field<Foam::RectangularMatrix<Foam::scalar>>> tresult
     (
-        new Field<Foam::RectangularMatrix<Foam::scalar>>(mesh().nFaces(), Foam::RectangularMatrix<scalar>(3,6,0))
+        new Field<Foam::RectangularMatrix<Foam::scalar>>(dualMesh().nFaces(), Foam::RectangularMatrix<scalar>(3,9,0))
     );
 #ifdef OPENFOAMESIORFOUNDATION
     Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult.ref();
@@ -671,37 +671,42 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
     // gamma = JF^-T*Sf0
     
     // Calculate unperturbed F 
-    surfaceSymmTensorField FRef(I + gradDRef.T()); 
+    
+    surfaceTensorField FRef = I + gradDRef.T(); 
     
     // Calculate unperturbed invF
-    surfaceSymmTensorField invFRef(inv(FRef));
+    surfaceTensorField invFRef = inv(FRef); 
     
     // Calculate unperturbed J
-    surfaceScalarField JRef(det(FRef));
+    surfaceScalarField JRef = det(FRef);
     
     // Calculate unperturbed deformed Sf
-    surfaceVectorField SfRef((JRef*invFRef.T()) & SfUndef);
+    surfaceVectorField SfRef = (JRef*invFRef.T()) & SfUndef;
     
     // Create field to be used for perturbations
-    surfaceSymmTensorField gradDPerturb(gradDRef);
-    surfaceSymmTensorField FPerturb(FRef);
-    surfaceSymmTensorField invFPerturb(invFRef);
-    surfaceScalarField JPerturb(JRef);
-    surfaceVectorField SfPerturb(SfRef);
+    surfaceTensorField gradDPerturb("gradDPerturb", gradDRef);
     
 	// Small number used for perturbations
 	const scalar eps(solidModelDict().lookupOrDefault<scalar>("tangentEps", 1e-10));
 
 	// For each component of gradD, sequentially apply a perturbation and
 	// then calculate the resulting sigma
-	for (label cmptI = 0; cmptI < symmTensor::nComponents; cmptI++)
+	for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
 	{
+	
+		// Reset gradDPerturb and multiply by 1.0 to avoid it being removed 
+		// from the object registry
+		gradDPerturb = 1.0*gradDRef;
+		
 	    // Perturb this component of gradD and calculate SfPerturb
 	    gradDPerturb.replace(cmptI, gradDRef.component(cmptI) + eps);
-	    FPerturb = I + gradDPerturb.T();
-	    invFPerturb = inv(FPerturb);
-	    JPerturb = det(FPerturb);
-	    SfPerturb = (JPerturb*invFPerturb.T()) & SfUndef;
+	    
+	    //Info << gradDPerturb[0] - gradDRef[0] << endl;
+	    
+	    surfaceTensorField FPerturb = I + gradDPerturb.T();
+	    surfaceTensorField invFPerturb = inv(FPerturb);
+	    surfaceScalarField JPerturb = det(FPerturb);
+	    surfaceVectorField SfPerturb = (JPerturb*invFPerturb.T()) & SfUndef;
 
 	    // Calculate each component
 	    const surfaceVectorField tangCmpt((SfPerturb - SfRef)/eps);
@@ -710,41 +715,59 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
 	    // Insert each component
 	    forAll(tangCmptI, faceI)
 	    {
-	        if (cmptI == symmTensor::XX)
+	        if (cmptI == tensor::XX)
 	        {
 	            result[faceI](0,0) = tangCmptI[faceI][0]; 
 	            result[faceI](1,0) = tangCmptI[faceI][1];
 	            result[faceI](2,0) = tangCmptI[faceI][2];
 	        }
-	        else if (cmptI == symmTensor::YY)
+	        else if (cmptI == tensor::XY)
 	        {
 	            result[faceI](0,1) = tangCmptI[faceI][0]; 
 	            result[faceI](1,1) = tangCmptI[faceI][1];
 	            result[faceI](2,1) = tangCmptI[faceI][2];
 	        }
-	        else if (cmptI == symmTensor::ZZ)
+	        else if (cmptI == tensor::XZ)
 	        {
 	            result[faceI](0,2) = tangCmptI[faceI][0]; 
 	            result[faceI](1,2) = tangCmptI[faceI][1];
 	            result[faceI](2,2) = tangCmptI[faceI][2];
 	        }
-	        else if (cmptI == symmTensor::XY)
+	        else if (cmptI == tensor::YX)
 	        {
 	            result[faceI](0,3) = tangCmptI[faceI][0]; 
 	            result[faceI](1,3) = tangCmptI[faceI][1];
 	            result[faceI](2,3) = tangCmptI[faceI][2];
 	        }
-	        else if (cmptI == symmTensor::YZ)
+	        else if (cmptI == tensor::YY)
 	        {
 	            result[faceI](0,4) = tangCmptI[faceI][0]; 
 	            result[faceI](1,4) = tangCmptI[faceI][1];
 	            result[faceI](2,4) = tangCmptI[faceI][2];
 	        }
-	        else // if (cmptI == symmTensor::XZ)
+	        else if (cmptI == tensor::YZ)
 	        {
 	            result[faceI](0,5) = tangCmptI[faceI][0]; 
 	            result[faceI](1,5) = tangCmptI[faceI][1];
 	            result[faceI](2,5) = tangCmptI[faceI][2];
+	        }	
+	        else if (cmptI == tensor::ZX)
+	        {
+	            result[faceI](0,6) = tangCmptI[faceI][0]; 
+	            result[faceI](1,6) = tangCmptI[faceI][1];
+	            result[faceI](2,6) = tangCmptI[faceI][2];
+	        }
+	        else if (cmptI == tensor::ZY)
+	        {
+	            result[faceI](0,7) = tangCmptI[faceI][0]; 
+	            result[faceI](1,7) = tangCmptI[faceI][1];
+	            result[faceI](2,7) = tangCmptI[faceI][2];
+	        }           
+	        else if (cmptI == tensor::ZZ)
+	        {
+	            result[faceI](0,8) = tangCmptI[faceI][0]; 
+	            result[faceI](1,8) = tangCmptI[faceI][1];
+	            result[faceI](2,8) = tangCmptI[faceI][2];
 	        }
 	    }
 
@@ -758,43 +781,61 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
 	        {
 	            const label faceID = start + fI;
 
-	            if (cmptI == symmTensor::XX)
-	            {
-	                result[faceID](0,0) = tangCmptI[fI][0]; 
-	                result[faceID](1,0) = tangCmptI[fI][1];
-	                result[faceID](2,0) = tangCmptI[fI][2];
-	            }
-	            else if (cmptI == symmTensor::YY)
-	            {
-	                result[faceID](0,1) = tangCmptI[fI][0]; 
-	                result[faceID](1,1) = tangCmptI[fI][1];
-	                result[faceID](2,1) = tangCmptI[fI][2];
-	            }
-	            else if (cmptI == symmTensor::ZZ)
-	            {
-	                result[faceID](0,2) = tangCmptI[fI][0]; 
-	                result[faceID](1,2) = tangCmptI[fI][1];
-	                result[faceID](2,2) = tangCmptI[fI][2];
-	            }
-	            else if (cmptI == symmTensor::XY)
-	            {
-	                result[faceID](0,3) = tangCmptI[fI][0]; 
-	                result[faceID](1,3) = tangCmptI[fI][1];
-	                result[faceID](2,3) = tangCmptI[fI][2];
-	            }
-	            else if (cmptI == symmTensor::YZ)
-	            {
-	                result[faceID](0,4) = tangCmptI[fI][0]; 
-	                result[faceID](1,4) = tangCmptI[fI][1];
-	                result[faceID](2,4) = tangCmptI[fI][2];
-	            }
-	            else // if (cmptI == symmTensor::XZ)
-	            {
-	                result[faceID](0,5) = tangCmptI[fI][0]; 
-	                result[faceID](1,5) = tangCmptI[fI][1];
-	                result[faceID](2,5) = tangCmptI[fI][2];
-	            }
-	        }
+			    if (cmptI == tensor::XX)
+			    {
+			        result[faceID](0,0) = tangCmptI[fI][0]; 
+			        result[faceID](1,0) = tangCmptI[fI][1];
+			        result[faceID](2,0) = tangCmptI[fI][2];
+			    }
+			    else if (cmptI == tensor::XY)
+			    {
+			        result[faceID](0,1) = tangCmptI[fI][0]; 
+			        result[faceID](1,1) = tangCmptI[fI][1];
+			        result[faceID](2,1) = tangCmptI[fI][2];
+			    }
+			    else if (cmptI == tensor::XZ)
+			    {
+			        result[faceID](0,2) = tangCmptI[fI][0]; 
+			        result[faceID](1,2) = tangCmptI[fI][1];
+			        result[faceID](2,2) = tangCmptI[fI][2];
+			    }
+			    else if (cmptI == tensor::YX)
+			    {
+			        result[faceID](0,3) = tangCmptI[fI][0]; 
+			        result[faceID](1,3) = tangCmptI[fI][1];
+			        result[faceID](2,3) = tangCmptI[fI][2];
+			    }
+			    else if (cmptI == tensor::YY)
+			    {
+			        result[faceID](0,4) = tangCmptI[fI][0]; 
+			        result[faceID](1,4) = tangCmptI[fI][1];
+			        result[faceID](2,4) = tangCmptI[fI][2];
+			    }
+			    else if (cmptI == tensor::YZ)
+			    {
+			        result[faceID](0,5) = tangCmptI[fI][0]; 
+			        result[faceID](1,5) = tangCmptI[fI][1];
+			        result[faceID](2,5) = tangCmptI[fI][2];
+			    }	
+			    else if (cmptI == tensor::ZX)
+			    {
+			        result[faceID](0,6) = tangCmptI[fI][0]; 
+			        result[faceID](1,6) = tangCmptI[fI][1];
+			        result[faceID](2,6) = tangCmptI[fI][2];
+			    }
+			    else if (cmptI == tensor::ZY)
+			    {
+			        result[faceID](0,7) = tangCmptI[fI][0]; 
+			        result[faceID](1,7) = tangCmptI[fI][1];
+			        result[faceID](2,7) = tangCmptI[fI][2];
+			    }           
+			    else if (cmptI == tensor::ZZ)
+			    {
+			        result[faceID](0,8) = tangCmptI[fI][0]; 
+			        result[faceID](1,8) = tangCmptI[fI][1];
+			        result[faceID](2,8) = tangCmptI[fI][2];
+			    }
+			}	            
 	    }
 	}
 
@@ -899,7 +940,7 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
             "grad(D)f",
             runTime.timeName(),
             dualMesh(),
-            IOobject::NO_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
         dualMesh(),
@@ -944,7 +985,9 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-        inv(dualFf_)
+        dualMesh(),
+        dimensionedTensor("zero", dimless, tensor::zero),
+        "calculated"
     ),
     dualJf_
     (
@@ -962,8 +1005,6 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
     ),
     globalPointIndices_(mesh())
 {
-
-	Info<< "File = " << __FILE__ << ", line = " << __LINE__ << endl;
     // Create dual mesh and set write option
     dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
 
@@ -1040,22 +1081,6 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
         dualMechanicalPtr_().materialTangentFaceField()
     );
     
-    //Obtain undeformed surface vector field
-    surfaceVectorField SfUndef = mesh().Sf();  
-    
-    // Obtain gradD from object registry
-    surfaceSymmTensorField gradDRef = dualMesh().lookupObject<surfaceSymmTensorField>("grad(D)f");
-    
-    // Calculate geometric stiffness field for dual mesh faces
-	Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
-	(
-		geometricStiffnessField
-		(
-			SfUndef,
-			gradDRef 
-		)
-	);
-    
     // Calculate stress field at dual faces
 	dualMechanicalPtr_().correct(dualSigmaf_);
 
@@ -1077,6 +1102,22 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     	
         // Assemble matrix once per time-step
         Info<< "    Assembling the matrix" << endl;
+        
+		//Obtain undeformed surface vector field
+		surfaceVectorField SfUndef = dualMesh().Sf();  
+		
+		// Store gradD at dual mesh faces
+		surfaceTensorField gradDRef = dualGradDf_;
+		
+		// Calculate geometric stiffness field for dual mesh faces
+		Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
+		(
+			geometricStiffnessField
+			(
+				SfUndef,
+				gradDRef 
+			)
+		);
 
         // Add div(sigma) coefficients
         vfvm::divSigmaExtended 
@@ -1166,8 +1207,11 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
             // Update material tangent
             materialTangent = dualMechanicalPtr_().materialTangentFaceField();
             
+            //Obtain undeformed surface vector field
+			surfaceVectorField SfUndef = dualMesh().Sf();  
+            
             // Update geometricStiffness
-			surfaceSymmTensorField gradDRef = mesh().lookupObject<surfaceSymmTensorField>("grad(D)f");
+			surfaceTensorField gradDRef = dualGradDf_;
 			
 			Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
 			(
@@ -1177,8 +1221,35 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 					gradDRef 
 				)
 			);
+			
+//			for (int i = 0; i < 3; i++)
+//		    {
+//		    	for (int k = 0; k < 9; k++)
+//		    	{
+//		        Info << "(" << i << ", " << k << ") : " << geometricStiffness[0](i,k) << endl;
+//		        }
+//		    } 
+//		    Info << endl;
 
-            // Add div(sigma) coefficients
+            // Add div(sigma) coefficients 
+//		    vfvm::divSigmaOriginal 
+//		    (
+//		        matrix,
+//		        mesh(),
+//		        dualMesh(),
+//		        dualMeshMap().dualFaceToCell(),
+//		        dualMeshMap().dualCellToPoint(),
+//		        materialTangent,
+//		        fixedDofs_,
+//		        fixedDofDirections_,
+//		        fixedDofScale_,
+//		        zeta,
+//		        debug
+//		    );
+
+			//Info << "geometricStiffness = " << geometricStiffness[0] << endl;
+		    //Info << "material tangent: " << materialTangent[0] << endl;
+		    
             vfvm::divSigmaExtended
             (
                 matrix,
@@ -1238,7 +1309,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 //        Info << endl << "After enforcing DOFs " << endl << endl;
 //        matrix.print();
 //        Info << endl << "Print out the source: " << endl << endl;
-//        
+        
 //        for (int i = 0; i < source.size(); i++)
 //        {
 //            Info << "(" << i << ", 0) : " << source[i] << endl;

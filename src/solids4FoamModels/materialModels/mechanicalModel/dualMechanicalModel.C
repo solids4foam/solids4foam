@@ -263,17 +263,14 @@ Foam::dualMechanicalModel::dualMechanicalModel
     cellInThisMaterialList_(),
     dualFaceInThisMaterialList_()
 {
-	Info << "File = " << __FILE__ << ", Line = " << __LINE__ << endl;
     Info<< "Creating the dualMechanicalModel" << endl;
 
     // Read the mechanical laws
     const PtrList<entry> lawEntries(mechModel.lookup("mechanical"));
 
-    Info << "File = " << __FILE__ << ", Line = " << __LINE__ << endl;
     PtrList<mechanicalLaw>& laws = *this;
     laws.setSize(lawEntries.size());
 
-    Info << "File = " << __FILE__ << ", Line = " << __LINE__ << endl;
     // Create mechanical laws
     forAll(laws, lawI)
     {
@@ -319,8 +316,6 @@ Foam::dualMechanicalModel::dualMechanicalModel
                 << abort(FatalError);
         }
     }
-    
-    Info << "File = " << __FILE__ << ", Line = " << __LINE__ << endl;
 }
 
 
