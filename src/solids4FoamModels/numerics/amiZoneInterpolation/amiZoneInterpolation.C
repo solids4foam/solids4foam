@@ -585,9 +585,11 @@ Foam::amiZoneInterpolation::targetPointDistanceToIntersection() const
 
 void Foam::amiZoneInterpolation::movePoints()
 {
+#ifdef OPENFOAM_COM
     this->upToDate() = false;
 
     calculate(sourcePatch_, targetPatch_);
+#endif
 }
 
 #endif // end of #ifdef OPENFOAM_NOT_EXTEND

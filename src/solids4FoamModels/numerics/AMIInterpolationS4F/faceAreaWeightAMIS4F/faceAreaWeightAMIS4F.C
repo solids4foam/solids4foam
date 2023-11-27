@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_COM
+
 #include "faceAreaWeightAMIS4F.H"
 #include "profiling.H"
 //#include "OBJstream.H"
@@ -792,5 +794,6 @@ void Foam::faceAreaWeightAMIS4F::write(Ostream& os) const
     }
 }
 
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //

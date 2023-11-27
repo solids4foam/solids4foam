@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_COM
+
 #include "AMIInterpolationS4F.H"
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -78,5 +80,7 @@ Foam::autoPtr<Foam::AMIInterpolationS4F> Foam::AMIInterpolationS4F::New
         )
     );
 }
+
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //

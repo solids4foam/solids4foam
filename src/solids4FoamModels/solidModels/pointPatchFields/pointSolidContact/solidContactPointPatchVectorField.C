@@ -524,7 +524,7 @@ solidContactPointPatchVectorField::solidContactPointPatchVectorField
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 solidContactPointPatchVectorField::solidContactPointPatchVectorField
 (
     const solidContactPointPatchVectorField& ptf
@@ -620,7 +620,7 @@ void solidContactPointPatchVectorField::autoMap
     const PointPatchFieldMapper& m
 )
 {
-// #ifdef OPENFOAMFOUNDATION
+// #ifdef OPENFOAM_ORG
 //     m(contact_, contact_);
 // #else
 //     contact_.autoMap(m);
@@ -632,7 +632,7 @@ void solidContactPointPatchVectorField::autoMap
 //     {
 //         forAll(contactPerShadow_, shadI)
 //         {
-// #ifdef OPENFOAMFOUNDATION
+// #ifdef OPENFOAM_ORG
 //             m(contactPerShadow_[shadI], contactPerShadow_[shadI]);
 // #else
 //             contactPerShadow_[shadI].autoMap(m);
@@ -1332,7 +1332,7 @@ void solidContactPointPatchVectorField::write(Ostream& os) const
         // Write the dictionary
         dict_.write(os, false);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         // writeEntry(os, "gradient", gradient());
         writeEntry(os, "value", patchValue);
         writeEntry(os, "traction", traction());
@@ -1360,7 +1360,7 @@ void solidContactPointPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "shadowPatches", shadowPatchNames());
 #else
         shadowPatchNames().writeEntry("shadowPatches", os);

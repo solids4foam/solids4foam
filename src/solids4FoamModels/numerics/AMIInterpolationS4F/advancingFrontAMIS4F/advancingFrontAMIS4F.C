@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_COM
+
 #include "advancingFrontAMIS4F.H"
 #include "meshTools.H"
 #include "mapDistribute.H"
@@ -452,5 +454,6 @@ bool Foam::advancingFrontAMIS4F::conformal() const
     return true;
 }
 
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //
