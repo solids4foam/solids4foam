@@ -185,6 +185,7 @@ numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/vfvCellPoint/vfvmCellPointExtended.C
+numerics/vfvCellPoint/vfvmCellPointOriginal.C
 
 numerics/interpolationTable/tableReaders/tableReaders.C
 numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C
