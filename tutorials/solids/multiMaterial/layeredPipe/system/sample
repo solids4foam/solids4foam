@@ -21,35 +21,25 @@ FoamFile
 type sets;
 //libs ("libsampling.so");
 
-//interpolationScheme cellPointFace;
-interpolationScheme cellPatchConstrained;
+interpolationScheme cellPointFace;
+//interpolationScheme cellPatchConstrained;
 
 setFormat raw;
 
 sets
 (
-    lineXX
+    line
     {
-        type uniform;
-        axis            x;
-        nPoints         50;
-        start (0.05 1e-6 0.0005);
-        end   (0.1 1e-6 0.0005);
+        type       face;
+        axis       distance;
+        start (0.0 0.0 0.0005);
+        end   (0.07 0.07 0.0005);
     }
-    lineYY
-    {
-        type uniform;
-        axis            y;
-        nPoints         50;
-        start (1e-6 0.05 0.0005);
-        end   (1e-6 0.1 0.0005);
-    }
-
 );
 
 fields
 (
-    sigma
+    sigma:Transformed
 );
 
 

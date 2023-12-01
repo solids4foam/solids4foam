@@ -1,0 +1,24 @@
+functions
+{
+    transformStressToCylCS
+    {                                                                               
+        type    fieldCoordinateSystemTransform;                                     
+        libs    (fieldFunctionObjects);                                             
+
+        fields  ( sigma );                                                              
+                                                                                    
+        writeControl writeTime;                                                     
+                                                                                    
+        coordinateSystem                                                            
+        {                                                                           
+            type    cylindrical;                                                    
+            origin  (0 0 0);        
+                                                
+            rotation                                                                
+            {                                                                       
+                type cylindrical;                                                   
+                axis (0 0 1);                                          
+            }                                                                       
+        }                                                                           
+    }
+}  
