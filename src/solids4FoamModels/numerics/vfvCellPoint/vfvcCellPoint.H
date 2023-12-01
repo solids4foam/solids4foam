@@ -37,6 +37,7 @@ Author
 #define vfvcCellPoint_H
 
 #include "volFields.H"
+#include "surfaceFields.H"
 #include "pointFields.H"
 #include "vectorList.H"
 
@@ -111,11 +112,6 @@ namespace vfvc
 
 } // End namespace Foam
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-#ifdef NoRepository
-#   include "vfvcCellPoint.C"
-#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

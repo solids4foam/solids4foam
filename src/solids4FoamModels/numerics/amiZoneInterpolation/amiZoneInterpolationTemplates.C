@@ -158,7 +158,7 @@ Foam::amiZoneInterpolation::interpolateToSourcePoints
         {
             FatalErrorIn
             (
-                "ExtendedAMIInterpolation::interpolateToSourcePoints"
+                "amiZoneInterpolation::interpolateToSourcePoints"
                 "(const Field<Type> pf)"
             )   << "Source point addressing is not correct"
                 << abort(FatalError);
