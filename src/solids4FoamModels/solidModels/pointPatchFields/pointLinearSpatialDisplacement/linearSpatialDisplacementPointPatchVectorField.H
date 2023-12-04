@@ -16,96 +16,82 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    cantileverTractionPointPatchVectorField
+	linearSpatialDisplacementPointPatchVectorField
 
 Description
-    The boundary condition applies the analytical point traction to the
-    fixed end of a simple bending cantilever test case, as described in:
+    Displacement varying linearly in space as:
 
-    C.E. Augarde, A.J. Deeks, The use of Timoshenko’s exact solution for a
-    cantilever beam in adaptive analysis. Finite Elements in Analysis and
-    Design, 44, 2008, 595–601, 10.1016/j.finel.2008.01.010.
+        u(x_i) = a_i + cmptMultiply(b_i, x_i)
 
-    It is assumed that the origin is at the centre of the fixed patch.
-
-    The beam is L long and D deep (thick).
+    where a_i and b_i are the vector coefficients and x_i are the patch face
+    centre positions.
 
 SourceFiles
-    cantileverTractionPointPatchVectorField.C
+	linearSpatialDisplacementPointPatchVectorField.C
 
 Author
+    Federico Mazzanti, UCD.
     Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef cantileverTractionPointPatchVectorField_H
-#define cantileverTractionPointPatchVectorField_H
+#ifndef linearSpatialDisplacementPointPatchVectorField_H
+#define linearSpatialDisplacementPointPatchVectorField_H
 
-#include "solidTractionPointPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
+    #include "fixedValuePointPatchField.H"
     #include "pointPatchFieldMapper.H"
 #else
+    #include "fixedValuePointPatchFields.H"
     #include "PointPatchFieldMapper.H"
 #endif
+#include "interpolationTable.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+
 #ifdef OPENFOAM_NOT_EXTEND
-    typedef pointPatchFieldMapper PointPatchFieldMapper;
+    typedef fixedValuePointPatchField<vector> fixedValuePointPatchVectorField;
+
+    #ifdef OPENFOAM_NOT_EXTEND
+        typedef pointPatchFieldMapper PointPatchFieldMapper;
+    #endif
 #endif
 
-/*---------------------------------------------------------------------------*\
-            Class cantileverTractionPointPatchVectorField Declaration
+/*---------------------------------------------------------------------------* \
+       Class linearSpatialDisplacementPointPatchVectorField Declaration
 \*---------------------------------------------------------------------------*/
 
-class cantileverTractionPointPatchVectorField
+class linearSpatialDisplacementPointPatchVectorField
 :
-    public solidTractionPointPatchVectorField
+    public fixedValuePointPatchVectorField
 {
+    // Private Data
 
-    // Private data
-
-        //- Load applied in the minus y direction at the other end of the beam
-        const scalar P_;
-
-        //- Young's modulus
-        const scalar E_;
-
-        //- Poisson's ratio
-        const scalar nu_;
-
-        //- Length of the beam
-        const scalar L_;
-
-        //- Depth of the beam
-        const scalar D_;
-
-        //- Second moment of area
-        const scalar I_;
-
-        //- Current time index
-        label curTimeIndex_;
+        //- Coefficients
+        vector a_;
+        vector b_;
 
 
 public:
 
     //- Runtime type information
-    TypeName("pointCantileverTraction");
+    TypeName("pointLinearSpatialDisplacement");
 
 
     // Constructors
 
         //- Construct from patch and internal field
-        cantileverTractionPointPatchVectorField
+        linearSpatialDisplacementPointPatchVectorField
         (
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&
         );
 
         //- Construct from patch, internal field and dictionary
-        cantileverTractionPointPatchVectorField
+        linearSpatialDisplacementPointPatchVectorField
         (
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&,
@@ -113,9 +99,9 @@ public:
         );
 
         //- Construct by mapping given patchField<vector> onto a new patch
-        cantileverTractionPointPatchVectorField
+        linearSpatialDisplacementPointPatchVectorField
         (
-            const cantileverTractionPointPatchVectorField&,
+            const linearSpatialDisplacementPointPatchVectorField&,
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&,
             const PointPatchFieldMapper&
@@ -123,9 +109,9 @@ public:
 
 #ifndef OPENFOAM_ORG
         //- Construct as copy
-        cantileverTractionPointPatchVectorField
+        linearSpatialDisplacementPointPatchVectorField
         (
-            const cantileverTractionPointPatchVectorField&
+            const linearSpatialDisplacementPointPatchVectorField&
         );
 
         //- Construct and return a clone
@@ -133,15 +119,15 @@ public:
         {
             return autoPtr<pointPatchField<vector> >
             (
-                new cantileverTractionPointPatchVectorField(*this)
+                new linearSpatialDisplacementPointPatchVectorField(*this)
             );
         }
 #endif
 
         //- Construct as copy setting internal field reference
-        cantileverTractionPointPatchVectorField
+        linearSpatialDisplacementPointPatchVectorField
         (
-            const cantileverTractionPointPatchVectorField&,
+            const linearSpatialDisplacementPointPatchVectorField&,
             const DimensionedField<vector, pointMesh>&
         );
 
@@ -153,7 +139,7 @@ public:
         {
             return autoPtr<pointPatchField<vector> >
             (
-                new cantileverTractionPointPatchVectorField(*this, iF)
+                new linearSpatialDisplacementPointPatchVectorField(*this, iF)
             );
         }
 
@@ -176,6 +162,8 @@ public:
                 const labelList&
             );
 
+        //- Update the coefficients associated with the patch field
+        virtual void updateCoeffs();
 
         //- Insert boundary value into the internal field
         //  Fixed values need to be inserted first. In the second go,

@@ -16,17 +16,18 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 InClass
-    solidContactFvPatchVectorField
+    solidContactPointPatchVectorField
 
 \*---------------------------------------------------------------------------*/
 
-#include "solidContactFvPatchVectorField.H"
+#include "solidContactPointPatchVectorField.H"
 #include "pointFields.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 void
-Foam::solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()
+Foam::solidContactPointPatchVectorField::moveZonesToDeformedConfiguration()
 {
     // Only the master moves the zones
     if (!master_)
@@ -35,65 +36,41 @@ Foam::solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()
     }
 
     // Method
-    // We will interpolate the patch face displacements to the patch vertices
-    // and then add these vertex/point displacements to the initial patch
-    // points
+    // We add the vertex/point displacements to the initial patch points
     // We need to take care in parallel, and also realise that the solidModel
     // might have a moving or stationary mesh
 
+    // Lookup the point displacement field
     // Assemble the zone face displacement field to move the zones
 
     // First we will move the master zone
-
-    vectorField zoneD(zone().globalPatch().size(), vector::zero);
 
     // For a non-moving mesh, we will move the zones by the total
     // displacement, whereas for a moving mesh (updated Lagrangian), we will
     // move the zones by the displacement increment
 
+    // Lookup the current total displacement field
+    const pointVectorField& pointD =
+        db().lookupObject<pointVectorField>("pointD");
+
+    // Patch total displacement
+    vectorField patchD(patchInternalField());
+
     if (movingMesh())
     {
-        // Updated Lagrangian, so we will move the zones by the displacement
-        // increment
-
-        // Lookup the current total displacement field
-        const volVectorField& DD = db().lookupObject<volVectorField>("DD");
-
-        // Take a reference to the patch face displacement increment field
-        const vectorField& patchDD =
-            DD.boundaryField()[patch().index()];
-
-        zoneD = zone().patchFaceToGlobal(patchDD);
+        // Subtract the old-time displacement
+        patchD -=
+            pointD.oldTime().boundaryField()
+            [
+                patch().index()
+            ].patchInternalField();
     }
-    else
-    {
-        // Non-moving mesh: we will move the zones by the total displacement
-
-        // Lookup the current total displacement field
-        const volVectorField& D = db().lookupObject<volVectorField>("D");
-
-        // Take a reference to the patch face total displacement field
-        const vectorField& patchD =
-            D.boundaryField()[patch().index()];
-
-        zoneD = zone().patchFaceToGlobal(patchD);
-    }
-
-    // Interpolate the zone face field to the zone points
-    const pointField zonePointD
-    (
-        zone().interpolator().faceToPointInterpolate(zoneD)
-    );
 
     // The zone deformed points are the initial position plus the
     // displacement
     const pointField zoneNewPoints
     (
-        zone().patchPointToGlobal
-        (
-            patch().patch().localPoints()
-        )
-      + zonePointD
+        zone().patchPointToGlobal(pointField(patch().localPoints() + patchD))
     );
 
     // Remove zone weights
@@ -108,10 +85,13 @@ Foam::solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()
 
     forAll(shadowPatchNames(), shadPatchI)
     {
-        vectorField shadowZoneD
+        // Total displacement on the shadown patch
+        vectorField shadowPatchD
         (
-            shadowZones()[shadPatchI].globalPatch().size(),
-            vector::zero
+            pointD.boundaryField()
+            [
+                shadowPatchIndices()[shadPatchI]
+            ].patchInternalField()
         );
 
         // For a non-moving mesh, we will move the zones by the total
@@ -120,46 +100,13 @@ Foam::solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()
 
         if (movingMesh())
         {
-            // Updated Lagrangian, so we will move the zones by the displacement
-            // increment
-
-            // Lookup the current total displacement field
-            const volVectorField& DD = db().lookupObject<volVectorField>("DD");
-
-            // Take a reference to the patch face displacement increment field
-            const vectorField& shadowPatchDD =
-                DD.boundaryField()[shadowPatchIndices()[shadPatchI]];
-
-            shadowZoneD = shadowZones()[shadPatchI].patchFaceToGlobal
-            (
-                shadowPatchDD
-            );
+            // Subtract the old-time displacement
+            shadowPatchD -=
+                pointD.oldTime().boundaryField()
+                [
+                   shadowPatchIndices()[shadPatchI]
+                ].patchInternalField();
         }
-        else
-        {
-            // Non-moving mesh: we will move the zones by the total displacement
-
-            // Lookup the current total displacement field
-            const volVectorField& D = db().lookupObject<volVectorField>("D");
-
-            // Take a reference to the patch face total displacement field
-            const vectorField& shadowPatchD =
-                D.boundaryField()[shadowPatchIndices()[shadPatchI]];
-
-            shadowZoneD = shadowZones()[shadPatchI].patchFaceToGlobal
-            (
-                shadowPatchD
-            );
-        }
-
-        // Interpolate the zone face field to the zone points
-        const pointField shadowZonePointD
-        (
-            shadowZones()[shadPatchI].interpolator().faceToPointInterpolate
-            (
-                shadowZoneD
-            )
-        );
 
         // The zone deformed points are the initial position plus the
         // displacement
@@ -167,9 +114,12 @@ Foam::solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()
         (
             shadowZones()[shadPatchI].patchPointToGlobal
             (
-                shadowZones()[shadPatchI].patch().localPoints()
+                pointField
+                (
+                    shadowZones()[shadPatchI].patch().localPoints()
+                  + shadowPatchD
+                )
             )
-          + shadowZonePointD
         );
 
         // Remove zone weights
@@ -186,11 +136,11 @@ Foam::solidContactFvPatchVectorField::moveZonesToDeformedConfiguration()
 }
 
 
-void Foam::solidContactFvPatchVectorField::calcZone() const
+void Foam::solidContactPointPatchVectorField::calcZone() const
 {
     if (debug)
     {
-        InfoIn("void Foam::solidContactFvPatchVectorField::calcZone() const")
+        InfoIn("void Foam::solidContactPointPatchVectorField::calcZone() const")
             << patch().name() << " : making the zone" << endl;
     }
 
@@ -198,7 +148,7 @@ void Foam::solidContactFvPatchVectorField::calcZone() const
     {
         FatalErrorIn
         (
-            "void Foam::solidContactFvPatchVectorField::calcZone() const"
+            "void Foam::solidContactPointPatchVectorField::calcZone() const"
         )   << "Trying to create zone on a slave" << abort(FatalError);
     }
 
@@ -206,7 +156,7 @@ void Foam::solidContactFvPatchVectorField::calcZone() const
     {
         FatalErrorIn
         (
-            "void Foam::solidContactFvPatchVectorField::calcZone() const"
+            "void Foam::solidContactPointPatchVectorField::calcZone() const"
         )   << "pointer already set" << abort(FatalError);
     }
 
@@ -215,18 +165,18 @@ void Foam::solidContactFvPatchVectorField::calcZone() const
     zonePtr_ = new globalPolyPatch
     (
         patch().name(),
-        patch().boundaryMesh().mesh()
+        lookupSolidModel(db()).mesh()
     );
 }
 
 
-void Foam::solidContactFvPatchVectorField::calcShadowZones() const
+void Foam::solidContactPointPatchVectorField::calcShadowZones() const
 {
     if (debug)
     {
         InfoIn
         (
-            "void Foam::solidContactFvPatchVectorField::calcShadowZones() const"
+            "void Foam::solidContactPointPatchVectorField::calcShadowZones() const"
         )   << patch().name() << " : making the shadow zones" << endl;
     }
 
@@ -234,7 +184,7 @@ void Foam::solidContactFvPatchVectorField::calcShadowZones() const
     {
         FatalErrorIn
         (
-            "void Foam::solidContactFvPatchVectorField::"
+            "void Foam::solidContactPointPatchVectorField::"
             "calcShadowZones() const"
         )   << "Trying to create shadow zones on a slave" << abort(FatalError);
     }
@@ -243,7 +193,7 @@ void Foam::solidContactFvPatchVectorField::calcShadowZones() const
     {
         FatalErrorIn
         (
-            "void Foam::solidContactFvPatchVectorField::"
+            "void Foam::solidContactPointPatchVectorField::"
             "calcShadowZones() const"
         )   << "pointer already set" << abort(FatalError);
     }
@@ -262,20 +212,20 @@ void Foam::solidContactFvPatchVectorField::calcShadowZones() const
             new globalPolyPatch
             (
                 shadPatchNames[shadPatchI],
-                patch().boundaryMesh().mesh()
+                lookupSolidModel(db()).mesh()
             )
         );
     }
 }
 
 
-void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
+void Foam::solidContactPointPatchVectorField::calcZoneToZones() const
 {
     if (debug)
     {
         InfoIn
         (
-            "void Foam::solidContactFvPatchVectorField::calcZoneToZones() const"
+            "void Foam::solidContactPointPatchVectorField::calcZoneToZones() const"
         )   << patch().name() << " : making the zoneToZone" << endl;
     }
 
@@ -290,8 +240,8 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
     }
 
     // Check master and slave patch
-    const volVectorField& field =
-        db().lookupObject<volVectorField>
+    const pointVectorField& field =
+        db().lookupObject<pointVectorField>
         (
 #ifdef OPENFOAM_NOT_EXTEND
             internalField().name()
@@ -304,8 +254,8 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
 
     forAll (zoneToZones_, shadPatchI)
     {
-        const solidContactFvPatchVectorField& shadowPatchField =
-            refCast<const solidContactFvPatchVectorField>
+        const solidContactPointPatchVectorField& shadowPatchField =
+            refCast<const solidContactPointPatchVectorField>
             (
                 field.boundaryField()[shadowPatchIndices()[shadPatchI]]
             );
@@ -346,8 +296,8 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
                     shadowZones()[shadPatchI].globalPatch(),
                     faceAreaIntersect::tmMesh, // triMode
                     false,   // requireMatch
-                    -1,     // lowWeightCorrection
                     false,  // reverseTarget
+                    -1,     // lowWeightCorrection
                     true    // use globalPolyPatch
                 )
 #else
@@ -434,7 +384,7 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
         {
             FatalErrorIn
             (
-                "void solidContactFvPatchVectorField::"
+                "void solidContactPointPatchVectorField::"
                 "calcZoneToZones() const"
             )   << "Attempting to create GGIInterpolation on a shadow patch"
                 << abort(FatalError);
@@ -443,35 +393,35 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
 }
 
 
-void Foam::solidContactFvPatchVectorField::calcContactPerShadow() const
-{
-    if (contactPerShadow_.size() > 0)
-    {
-        FatalErrorIn
-        (
-            "void thermalContactFvPatchScalarField::"
-            "calcContactPerShadow() const"
-        )   << "already calculated"
-            << abort(FatalError);
-    }
+// void Foam::solidContactPointPatchVectorField::calcContactPerShadow() const
+// {
+//     if (contactPerShadow_.size() > 0)
+//     {
+//         FatalErrorIn
+//         (
+//             "void thermalContactFvPatchScalarField::"
+//             "calcContactPerShadow() const"
+//         )   << "already calculated"
+//             << abort(FatalError);
+//     }
 
-    contactPerShadow_.setSize(shadowPatchNames().size());
+//     contactPerShadow_.setSize(shadowPatchNames().size());
 
-    forAll(contactPerShadow_, i)
-    {
-        contactPerShadow_.set
-        (
-            i,
-            new scalarField(patch().size(), 0.0)
-        );
-    }
-}
+//     forAll(contactPerShadow_, i)
+//     {
+//         contactPerShadow_.set
+//         (
+//             i,
+//             new scalarField(patch().size(), 0.0)
+//         );
+//     }
+// }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 const Foam::globalPolyPatch&
-Foam::solidContactFvPatchVectorField::zone() const
+Foam::solidContactPointPatchVectorField::zone() const
 {
     if (master_)
     {
@@ -484,8 +434,8 @@ Foam::solidContactFvPatchVectorField::zone() const
     }
     else
     {
-        const volVectorField& field =
-            db().lookupObject<volVectorField>
+        const pointVectorField& field =
+            db().lookupObject<pointVectorField>
             (
 #ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
@@ -494,8 +444,8 @@ Foam::solidContactFvPatchVectorField::zone() const
 #endif
             );
 
-        const solidContactFvPatchVectorField& shadowPatchField =
-            refCast<const solidContactFvPatchVectorField>
+        const solidContactPointPatchVectorField& shadowPatchField =
+            refCast<const solidContactPointPatchVectorField>
             (
                 field.boundaryField()[shadowPatchIndices()[0]]
             );
@@ -505,7 +455,7 @@ Foam::solidContactFvPatchVectorField::zone() const
 }
 
 
-Foam::globalPolyPatch& Foam::solidContactFvPatchVectorField::zone()
+Foam::globalPolyPatch& Foam::solidContactPointPatchVectorField::zone()
 {
     if (master_)
     {
@@ -518,8 +468,8 @@ Foam::globalPolyPatch& Foam::solidContactFvPatchVectorField::zone()
     }
     else
     {
-        const volVectorField& field =
-            db().lookupObject<volVectorField>
+        const pointVectorField& field =
+            db().lookupObject<pointVectorField>
             (
 #ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
@@ -528,10 +478,10 @@ Foam::globalPolyPatch& Foam::solidContactFvPatchVectorField::zone()
 #endif
             );
 
-        solidContactFvPatchVectorField& shadowPatchField =
-            const_cast<solidContactFvPatchVectorField&>
+        solidContactPointPatchVectorField& shadowPatchField =
+            const_cast<solidContactPointPatchVectorField&>
             (
-                refCast<const solidContactFvPatchVectorField>
+                refCast<const solidContactPointPatchVectorField>
                 (
                     field.boundaryField()[shadowPatchIndices()[0]]
                 )
@@ -543,7 +493,7 @@ Foam::globalPolyPatch& Foam::solidContactFvPatchVectorField::zone()
 
 
 const Foam::PtrList<Foam::globalPolyPatch>&
-Foam::solidContactFvPatchVectorField::shadowZones() const
+Foam::solidContactPointPatchVectorField::shadowZones() const
 {
     if (master_)
     {
@@ -556,8 +506,8 @@ Foam::solidContactFvPatchVectorField::shadowZones() const
     }
     else
     {
-        const volVectorField& field =
-            db().lookupObject<volVectorField>
+        const pointVectorField& field =
+            db().lookupObject<pointVectorField>
             (
 #ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
@@ -566,8 +516,8 @@ Foam::solidContactFvPatchVectorField::shadowZones() const
 #endif
             );
 
-        const solidContactFvPatchVectorField& shadowPatchField =
-            refCast<const solidContactFvPatchVectorField>
+        const solidContactPointPatchVectorField& shadowPatchField =
+            refCast<const solidContactPointPatchVectorField>
             (
                 field.boundaryField()[shadowPatchIndices()[0]]
             );
@@ -578,7 +528,7 @@ Foam::solidContactFvPatchVectorField::shadowZones() const
 
 
 Foam::PtrList<Foam::globalPolyPatch>&
-Foam::solidContactFvPatchVectorField::shadowZones()
+Foam::solidContactPointPatchVectorField::shadowZones()
 {
     if (master_)
     {
@@ -591,8 +541,8 @@ Foam::solidContactFvPatchVectorField::shadowZones()
     }
     else
     {
-        const volVectorField& field =
-            db().lookupObject<volVectorField>
+        const pointVectorField& field =
+            db().lookupObject<pointVectorField>
             (
 #ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
@@ -601,10 +551,10 @@ Foam::solidContactFvPatchVectorField::shadowZones()
 #endif
             );
 
-        solidContactFvPatchVectorField& shadowPatchField =
-            const_cast<solidContactFvPatchVectorField&>
+        solidContactPointPatchVectorField& shadowPatchField =
+            const_cast<solidContactPointPatchVectorField&>
             (
-                refCast<const solidContactFvPatchVectorField>
+                refCast<const solidContactPointPatchVectorField>
                 (
                     field.boundaryField()[shadowPatchIndices()[0]]
                 )
@@ -620,7 +570,7 @@ const Foam::PtrList<Foam::amiZoneInterpolation>&
 #else
 const Foam::PtrList<Foam::newGgiStandAlonePatchInterpolation>&
 #endif
-Foam::solidContactFvPatchVectorField::zoneToZones() const
+Foam::solidContactPointPatchVectorField::zoneToZones() const
 {
     if (master_)
     {
@@ -633,8 +583,8 @@ Foam::solidContactFvPatchVectorField::zoneToZones() const
     }
     else
     {
-        const volVectorField& field =
-            db().lookupObject<volVectorField>
+        const pointVectorField& field =
+            db().lookupObject<pointVectorField>
             (
 #ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
@@ -643,8 +593,8 @@ Foam::solidContactFvPatchVectorField::zoneToZones() const
 #endif
             );
 
-        const solidContactFvPatchVectorField& shadowPatchField =
-            refCast<const solidContactFvPatchVectorField>
+        const solidContactPointPatchVectorField& shadowPatchField =
+            refCast<const solidContactPointPatchVectorField>
             (
                 field.boundaryField()[shadowPatchIndices()[0]]
             );
@@ -659,7 +609,7 @@ Foam::PtrList<Foam::amiZoneInterpolation>&
 #else
 Foam::PtrList<Foam::newGgiStandAlonePatchInterpolation>&
 #endif
-Foam::solidContactFvPatchVectorField::zoneToZones()
+Foam::solidContactPointPatchVectorField::zoneToZones()
 {
     if (master_)
     {
@@ -674,8 +624,8 @@ Foam::solidContactFvPatchVectorField::zoneToZones()
     {
         // We will const_cast the shadow patch so we can delete the weights when
         // the zones move
-        const volVectorField& field =
-            db().lookupObject<volVectorField>
+        const pointVectorField& field =
+            db().lookupObject<pointVectorField>
             (
 #ifdef OPENFOAM_NOT_EXTEND
                 internalField().name()
@@ -684,10 +634,10 @@ Foam::solidContactFvPatchVectorField::zoneToZones()
 #endif
             );
 
-        solidContactFvPatchVectorField& shadowPatchField =
-            const_cast<solidContactFvPatchVectorField&>
+        solidContactPointPatchVectorField& shadowPatchField =
+            const_cast<solidContactPointPatchVectorField&>
             (
-                refCast<const solidContactFvPatchVectorField>
+                refCast<const solidContactPointPatchVectorField>
                 (
                     field.boundaryField()[shadowPatchIndices()[0]]
                 )
@@ -704,14 +654,14 @@ const Foam::amiZoneInterpolation&
 #else
 const Foam::newGgiStandAlonePatchInterpolation&
 #endif
-Foam::solidContactFvPatchVectorField::zoneToZoneForThisSlave() const
+Foam::solidContactPointPatchVectorField::zoneToZoneForThisSlave() const
 {
     if (master_)
     {
         FatalErrorIn
         (
             "const Foam::newGgiStandAlonePatchInterpolation&"
-            " Foam::solidContactFvPatchVectorField::"
+            " Foam::solidContactPointPatchVectorField::"
             "zoneToZoneForThisSlave() const"
         )   << "The master patch is not allowed to call this function"
             << abort(FatalError);
@@ -735,7 +685,7 @@ Foam::solidContactFvPatchVectorField::zoneToZoneForThisSlave() const
         FatalErrorIn
         (
             "const Foam::newGgiStandAlonePatchInterpolation&"
-            " Foam::solidContactFvPatchVectorField::"
+            " Foam::solidContactPointPatchVectorField::"
             "zoneToZoneForThisSlave() const"
         )   << "Something went wrong when looking for the shadowPatch"
             << abort(FatalError);
@@ -747,14 +697,14 @@ Foam::solidContactFvPatchVectorField::zoneToZoneForThisSlave() const
 
 
 const Foam::globalPolyPatch&
-Foam::solidContactFvPatchVectorField::zoneForThisSlave() const
+Foam::solidContactPointPatchVectorField::zoneForThisSlave() const
 {
     if (master_)
     {
         FatalErrorIn
         (
             "const Foam::globalPolyPatch&"
-            " Foam::solidContactFvPatchVectorField::zoneForThisSlave() const"
+            " Foam::solidContactPointPatchVectorField::zoneForThisSlave() const"
         )   << "The master patch is not allowed to call this function"
             << abort(FatalError);
     }
@@ -777,7 +727,7 @@ Foam::solidContactFvPatchVectorField::zoneForThisSlave() const
         FatalErrorIn
         (
             "const Foam::globalPolyPatch&"
-            " Foam::solidContactFvPatchVectorField::zoneForThisSlave() const"
+            " Foam::solidContactPointPatchVectorField::zoneForThisSlave() const"
         )   << "Something went wrong when looking for the shadowPatch"
             << abort(FatalError);
     }

@@ -21,13 +21,6 @@ License
 
 #include "amiZoneInterpolation.H"
 #include "demandDrivenData.H"
-// #ifdef OPENFOAM_COM
-//     #include "AMIMethod.H"
-//     #include "directAMI.H"
-//     #include "mapNearestAMI.H"
-//     #include "faceAreaWeightAMI.H"
-//     #include "partialFaceAreaWeightAMI.H"
-// #else
 #ifdef OPENFOAM_ORG
     #include "newAMIMethod.H"
     #include "newDirectAMI.H"
@@ -43,13 +36,6 @@ namespace Foam
 {
     defineTypeNameAndDebug(amiZoneInterpolation, 0);
 
-// #ifdef OPENFOAM_COM
-//     makeAMIMethod(amiZoneInterpolation);
-//     makeAMIMethodType(amiZoneInterpolation, directAMI);
-//     makeAMIMethodType(amiZoneInterpolation, mapNearestAMI);
-//     makeAMIMethodType(amiZoneInterpolation, faceAreaWeightAMI);
-//     makeAMIMethodType(amiZoneInterpolation, partialFaceAreaWeightAMI);
-// #else
 #ifdef OPENFOAM_ORG
     makeAMIMethod(amiZoneInterpolation);
     makeAMIMethodType(amiZoneInterpolation, newDirectAMI);
@@ -464,11 +450,14 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
 )
 :
 #ifdef OPENFOAM_COM
-    faceAreaWeightAMI
+    faceAreaWeightAMIS4F
     (
-        false, // requireMatch
-        false, // reverseTarget
-        -1     // lowWeightCorrection
+        requireMatch,
+        reverseTarget,
+        lowWeightCorrection,
+        triMode,
+        true // restartUncoveredSourceFace
+        // useGlobalPolyPatch: this is set below
     ),
 #else
     newAMIInterpolation<standAlonePatch, standAlonePatch>
@@ -485,10 +474,10 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
 #endif
     sourcePatch_(srcPatch),
     targetPatch_(tgtPatch),
-#ifdef OPENFOAM_COM
-    sourcePrimPatchPtr_(),
-    targetPrimPatchPtr_(),
-#endif
+// #ifdef OPENFOAM_COM
+//     sourcePrimPatchPtr_(),
+//     targetPrimPatchPtr_(),
+// #endif
     sourcePatchInterp_(sourcePatch_),
     targetPatchInterp_(targetPatch_),
     sourcePointAddressingPtr_(nullptr),
@@ -499,28 +488,11 @@ Foam::amiZoneInterpolation::amiZoneInterpolation
     targetPointDistancePtr_(nullptr)
 {
 #ifdef OPENFOAM_COM
-    // Create source primitivePatch
-    SubList<face> srcFcs
-    (
-        sourcePatch_.localFaces(), sourcePatch_.localFaces().size()
-    );
-    sourcePrimPatchPtr_.set
-    (
-        new primitivePatch(srcFcs, sourcePatch_.localPoints())
-    );
-
-    // Create target primitivePatch
-    SubList<face> tgtFcs
-    (
-        targetPatch_.localFaces(), targetPatch_.localFaces().size()
-    );
-    targetPrimPatchPtr_.set
-    (
-        new primitivePatch(tgtFcs, targetPatch_.localPoints())
-    );
+    // Set useGlobalPolyPatch switch before calling calculate
+    this->useGlobalPolyPatch() = useGlobalPolyPatch;
 
     // Calculate AMI weights and addressing
-    calculate(sourcePrimPatchPtr_(), targetPrimPatchPtr_());
+    calculate(sourcePatch_, targetPatch_);
 #endif
 }
 
@@ -609,6 +581,15 @@ Foam::amiZoneInterpolation::targetPointDistanceToIntersection() const
     }
 
     return *targetPointDistancePtr_;
+}
+
+void Foam::amiZoneInterpolation::movePoints()
+{
+#ifdef OPENFOAM_COM
+    this->upToDate() = false;
+
+    calculate(sourcePatch_, targetPatch_);
+#endif
 }
 
 #endif // end of #ifdef OPENFOAM_NOT_EXTEND
