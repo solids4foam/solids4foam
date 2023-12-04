@@ -125,6 +125,9 @@ function solids4Foam::convertCaseFormat()
         then
            echo "OpenFOAM.org specific: replacing 'uniform' with 'lineUniform' in system/sample"
            sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
+           
+           echo "OpenFOAM.org specific: replacing 'face' with 'lineFace' in system/sample"
+           sed -i "s/type.*face;/type lineFace;/g" "${CASE_DIR}"/system/sample
         fi
     fi
 
@@ -307,6 +310,9 @@ function solids4Foam::convertCaseFormatFoamExtend()
         then
            echo "OpenFOAM.org specific: replacing 'lineUniform' with 'uniform' in system/sample"
            sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
+           
+           echo "OpenFOAM.org specific: replacing 'lineFace' with 'face' in system/sample"
+           sed -i "s/type.*lineFace;/type face;/g" "${CASE_DIR}"/system/sample
         fi
     fi
 

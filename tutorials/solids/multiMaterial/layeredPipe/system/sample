@@ -30,7 +30,7 @@ sets
 (
     line
     {
-        type       face;
+        type face;
         axis       distance;
         start (0.0 0.0 0.0005);
         end   (0.07 0.07 0.0005);

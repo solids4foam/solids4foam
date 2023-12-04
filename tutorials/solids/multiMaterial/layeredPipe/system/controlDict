@@ -46,6 +46,15 @@ timePrecision   6;
 
 runTimeModifiable no;
 
-#include "./system/functions"
+functions
+{
+    transformStressToCylindrical
+    {
+        type        transformStressToCylindrical;
+
+        origin      (0 0 0);
+        axis        (0 0 1);
+    }
+}
 
 // ************************************************************************* //
