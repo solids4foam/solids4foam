@@ -113,9 +113,9 @@ bool Foam::transformStressToCylindrical::writeData()
                 coordinateSystem localCS("localCS", origin_, axis_, Cf);
 
 #if OPENFOAM_ORG
-            const tensor R = localCS.R().R();
+                const tensor R = localCS.R().R();
 #else
-            const tensor R = localCS.R();
+                const tensor R = localCS.R();
 #endif
 
                 sigmaTP[faceI] = Foam::symm(R.T() & (sigmaP[faceI] & R));
