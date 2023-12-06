@@ -20,8 +20,9 @@ solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
-/* solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C */
-/* solidModels/vertexCentredLinGeomSolidMMS/vertexCentredLinGeomSolidMMS.C */
+solidModels/explicitVertexCentredLinGeomSolid/explicitVertexCentredLinGeomSolid.C
+solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
+solidModels/vertexCentredLinGeomSolidMMS/vertexCentredLinGeomSolidMMS.C
 solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
@@ -186,6 +187,8 @@ numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/vfvCellPoint/vfvmCellPointExtended.C
 numerics/vfvCellPoint/vfvmCellPointOriginal.C
+numerics/vfvCellPoint/vfvcCellPoint.C
+numerics/vfvCellPoint/vfvmCellPoint.C
 
 numerics/interpolationTable/tableReaders/tableReaders.C
 numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C

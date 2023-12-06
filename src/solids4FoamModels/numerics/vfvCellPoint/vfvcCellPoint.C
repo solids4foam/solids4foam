@@ -244,7 +244,7 @@ Foam::tmp<Foam::surfaceTensorField> Foam::vfvc::fGrad
     // Calculate constant gradient in each primary mesh cell
     const volTensorField gradD(vfvc::grad(pointD, mesh));
     const tensorField& gradDI = gradD.internalField();
-
+    
     // Set dual face gradient to primary mesh constant cell gradient and
     // replace the component in the edge direction
     // We only replace the edge component for internal dual faces

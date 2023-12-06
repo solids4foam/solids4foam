@@ -950,6 +950,8 @@ bool Foam::mechanicalLaw::updateF
                 mesh().lookupObject<volTensorField>("grad(D)");
 
             // Update the total deformation gradient
+            //Info << "gradD: " << gradD << endl;
+            
             F() = I + gradD.T();
 
             // Update the relative deformation gradient: not needed

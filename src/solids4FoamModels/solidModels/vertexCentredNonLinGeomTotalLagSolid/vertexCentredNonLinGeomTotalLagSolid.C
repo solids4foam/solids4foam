@@ -667,6 +667,12 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
     Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult();
 #endif
 
+	//For small strain the geometric stiffness is zero
+	if (!largeStrain_)
+	{
+		return tresult;
+    }
+
     // Calculate surface vector as per the total Lagrangian formulation
     // gamma = JF^-T*Sf0
     
@@ -865,6 +871,7 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
         )
     ),
     fullNewton_(solidModelDict().lookup("fullNewton")),
+    largeStrain_(solidModelDict().lookup("largeStrain")),
     steadyState_(false),
     twoD_(sparseMatrixTools::checkTwoD(mesh())),
     fixedDofs_(mesh().nPoints(), false),
@@ -1083,6 +1090,9 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     
     // Calculate stress field at dual faces
 	dualMechanicalPtr_().correct(dualSigmaf_);
+	
+	// Calculate stress for primary cells
+	mechanical().correct(sigma());
 
     // Lookup compact edge gradient factor
     const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
@@ -1213,6 +1223,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
             // Update geometricStiffness
 			surfaceTensorField gradDRef = dualGradDf_;
 			
+			// Calculate geometric stiffness field for dual mesh faces
 			Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
 			(
 				geometricStiffnessField
@@ -1222,6 +1233,8 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 				)
 			);
 			
+			//Info << geometricStiffness[0] << endl;
+			
 //			for (int i = 0; i < 3; i++)
 //		    {
 //		    	for (int k = 0; k < 9; k++)
@@ -1230,6 +1243,8 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 //		        }
 //		    } 
 //		    Info << endl;
+
+//			Info << materialTangent[0] << endl;
 
             // Add div(sigma) coefficients 
 //		    vfvm::divSigmaOriginal 
@@ -1287,7 +1302,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 //        Info << endl << "Before enforcing DOFs: " << endl << endl;
 //        matrix.print();
 //        Info << endl << "Print out the source: " << endl << endl;
-        
+//        
 //        for (int i = 0; i < source.size(); i++)
 //        {
 //            Info << "(" << i << ", 0) : " << source[i] << endl;
@@ -1309,7 +1324,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 //        Info << endl << "After enforcing DOFs " << endl << endl;
 //        matrix.print();
 //        Info << endl << "Print out the source: " << endl << endl;
-        
+//        
 //        for (int i = 0; i < source.size(); i++)
 //        {
 //            Info << "(" << i << ", 0) : " << source[i] << endl;
@@ -1530,6 +1545,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     // Update primary mesh cell stress field, assuming it is constant per
     // primary mesh cell
     // This stress will be first-order accurate
+    
     mechanical().correct(sigma());
 
     return true;

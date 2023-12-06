@@ -379,90 +379,6 @@ Foam::neoHookeanElastic::materialTangentField() const
 		        }                    
             }
         }
-
-        // Include 0.5 factor for shear components
-//        forAll(result, faceI)
-//        {                     
-//            
-//            for (int i = 3; i < 6; i++)
-//            {
-//                for (int j = 3; j < 6; j++)
-//                {
-//                    result[faceI](i,j) *= 0.5;
-//                }
-//            }
-            
-            
-//            result[faceI](0,0) = 9.418e10;
-//            result[faceI](1,0) = 4.038e10;
-//            result[faceI](2,0) = 4.038e10;
-//            result[faceI](3,0) = 0;
-//            result[faceI](4,0) = 0;
-//            result[faceI](5,0) = 0; 
-//            
-//            result[faceI](0,1) = 4.038e10;
-//            result[faceI](1,1) = 9.418e10;
-//            result[faceI](2,1) = 4.038e10;
-//            result[faceI](3,1) = 0;
-//            result[faceI](4,1) = 0;
-//            result[faceI](5,1) = 0;  
-
-//            result[faceI](0,2) = 4.038e10;
-//            result[faceI](1,2) = 4.038e10;
-//            result[faceI](2,2) = 9.418e10;
-//            result[faceI](3,2) = 0;
-//            result[faceI](4,2) = 0;
-//            result[faceI](5,2) = 0;  
-//            
-//            result[faceI](0,3) = 0;
-//            result[faceI](1,3) = 0;
-//            result[faceI](2,3) = 0;
-//            result[faceI](3,3) = 2.69e10;
-//            result[faceI](4,3) = 0;
-//            result[faceI](5,3) = 0; 
-//            
-//            result[faceI](0,4) = 0;
-//            result[faceI](1,4) = 0;
-//            result[faceI](2,4) = 0;
-//            result[faceI](3,4) = 0;
-//            result[faceI](4,4) = 2.69e10;
-//            result[faceI](5,4) = 0; 
-//            
-//            result[faceI](0,5) = 0;
-//            result[faceI](1,5) = 0;
-//            result[faceI](2,5) = 0;
-//            result[faceI](3,5) = 0;
-//            result[faceI](4,5) = 0;
-//            result[faceI](5,5) = 2.69e10;                        
-                                 
-//            result[faceI](3,0) = 0;
-//            result[faceI](4,0) = 0;
-//            result[faceI](5,0) = 0;
-//            result[faceI](3,1) = 0;
-//            result[faceI](4,1) = 0;
-//            result[faceI](5,1) = 0;
-//            result[faceI](3,2) = 0;
-//            result[faceI](4,2) = 0;
-//            result[faceI](5,2) = 0;
-//            
-//            result[faceI](0,3) = 0;
-//            result[faceI](0,4) = 0;
-//            result[faceI](0,5) = 0;
-//            result[faceI](1,3) = 0;
-//            result[faceI](1,4) = 0;
-//            result[faceI](1,5) = 0;
-//            result[faceI](2,3) = 0;
-//            result[faceI](2,3) = 0;
-//            result[faceI](2,5) = 0;
-//            
-//            result[faceI](4,3) = 0;
-//            result[faceI](5,3) = 0;
-//            result[faceI](5,4) = 0;
-//            result[faceI](4,5) = 0;
-//            result[faceI](3,4) = 0;
-//            result[faceI](3,5) = 0;
-           
-//        }
     }
     else // Analytical tangent
     {
@@ -470,7 +386,6 @@ Foam::neoHookeanElastic::materialTangentField() const
         notImplemented("Analytical tangent not implemented");
         
     }
-    //Info << "material tangent: " << result[0] << endl;
     
     return tresult;
 }
@@ -515,7 +430,7 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
     const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(Ff() & Ff().T()));
-
+	
     // Calculate deviatoric stress
     const surfaceSymmTensorField s(mu_*dev(bEbar));
 

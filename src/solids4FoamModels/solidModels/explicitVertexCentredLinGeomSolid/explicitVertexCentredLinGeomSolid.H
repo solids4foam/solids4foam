@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------*\
+/*---------------------------------------------------------------------------* \
 License
     This file is part of solids4foam.
 
@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    vertexCentredLinGeomSolid
+    explicitVertexCentredLinGeomSolid
 
 Description
     Mathematical model where linear geometry is assumed i.e. small strains and
@@ -27,26 +27,32 @@ Description
     where the governing equations are integrated over a dual mesh. The dual mesh
     is automatically constructed from the primary mesh using the meshDualiser.
 
+    An explicit solution algorithm is employed in contrast to the implicit
+    solution algorithm used in vertexCentredLinGeomSolid.
+
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
-    vertexCentredNonLinGeomTotalLagSolid.C
+    explicitVertexCentredLinGeomSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef vertexCentredNonLinGeomTotalLagSolid_H
-#define vertexCentredNonLinGeomTotalLagSolid_H
+#ifndef explicitVertexCentredLinGeomSolid_H
+#define explicitVertexCentredLinGeomSolid_H
 
 #include "solidModel.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
-#include "sparseMatrix.H"
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
+#include "twoDPointCorrector.H"
+#ifdef OPENFOAM_COM
+    #include "pointVolInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -59,50 +65,34 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class vertexCentredLinGeomSolid Declaration
+                        Class explicitVertexCentredLinGeomSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class vertexCentredNonLinGeomTotalLagSolid
+class explicitVertexCentredLinGeomSolid
 :
     public solidModel
 {
     // Private Data
 
+        //- Store stiffness field: only used by pointSolidContact boundaries for
+        //  calculating the penalty factor
+        const volScalarField impK_;
+
+        //- Compact edge gradient factor
+        const scalar zeta_;
+
+        //- Damping coefficient
+        const dimensionedScalar dampingCoeff_;
+
         //- Mechanical model for dual mesh
         autoPtr<dualMechanicalModel> dualMechanicalPtr_;
-
-        //- Flag to enable full Newton-Raphson approach, where the stiffness
-        //  matrix is updated once per outer iteration. Alternatively, the
-        //  stiffness matrix is only updated once per time-step
-        const Switch fullNewton_;
-        
-        //- Flag to switch between small-strain and large-strain stiffness
-        //  matrix
-        const Switch largeStrain_;
-
-        //- Flag to enable steadyState
-        Switch steadyState_;
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
 
-        //- Field of flags indicating the degrees of freedom where the value is
-        //  set
-        //  Currently the size of this list is equal to the number of points
-        boolList fixedDofs_;
-
-        //- Values for fixed degrees of freedom
-        //  Currently the size of this list is equal to the number of points
-        pointField fixedDofValues_;
-
-        //- Fixed directions for fixed degrees of freedom
-        //  Calculated as sqr(n) where n is a fixed direction, e.g. I for fully
-        //  fixed
-        symmTensorField fixedDofDirections_;
-
-        //- Scale factor for the fixed degree of freedom equations to improve the
-        //  matrix conditioning
-        const scalar fixedDofScale_;
+        //- Object for correcting the displacement field in 2-D
+        //  This ensures the front and back planes have the same displacements
+        twoDPointCorrector twoDCorrector_;
 
         //- Point velocity
         pointVectorField pointU_;
@@ -117,42 +107,34 @@ class vertexCentredNonLinGeomTotalLagSolid
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
 
+        //- Divergence of sigma at each primary point
+        pointVectorField pointDivSigma_;
+
         //- Displacement gradient field at the dual mesh faces
         surfaceTensorField dualGradDf_;
 
         //- Stress field at the dual mesh faces
         surfaceSymmTensorField dualSigmaf_;
 
-        //- Deformation gradient field at the dual mesh faces
-        surfaceTensorField dualFf_;
-
-        //- Inverse of the deformation gradient field at the dual mesh faces
-        surfaceTensorField dualFinvf_;
-
-        //- Jacobian of the deformation gradient field at the dual mesh faces
-        surfaceScalarField dualJf_;
-
         //- Local-to-global point map and owner list
         globalPointIndices globalPointIndices_;
+
+#ifdef OPENFOAM_COM
+        //- Interpolator from points to cells
+        pointVolInterpolation pointVolInterp_;
+#endif
 
 
     // Private Member Functions
 
-        //- Update the source vector for the linear system
-        void updateSource
-        (
-            vectorField& source,
-            const labelList& dualCellToPoint
-        );
-
-        //- Set fixed degree of freedom lists
-        void setFixedDofs
+        //- Update the divergence of stress based on the current pointD field
+        void updatePointDivSigma
         (
             const pointVectorField& pointD,
-            boolList& fixedDofs,
-            pointField& fixedDofValues,
-            symmTensorField& fixedDofDirections
-        ) const;
+            surfaceTensorField& dualGradDf,
+            surfaceSymmTensorField& dualSigmaf,
+            pointVectorField& pointDivSigma
+        );
 
         //- Enforce extact tractions on traction boundaries
         void enforceTractionBoundaries
@@ -163,49 +145,11 @@ class vertexCentredNonLinGeomTotalLagSolid
             const labelListList& pointToDualFaces
         ) const;
 
-        //- Check convergence of Newton-Raphson loop
-        bool converged
-        (
-            const label iCorr,
-            scalar& initResidual,
-            const scalar res,
-            const label nInterations,
-            const pointVectorField& pointD,
-            const vectorField& pointDcorr
-        ) const;
-
-        //- Calculate line search slope for the given eta parameter
-        scalar calculateLineSearchSlope
-        (
-            const scalar eta,
-            const vectorField& pointDcorr,
-            pointVectorField& pointD,
-            surfaceTensorField& dualGradDf,
-            surfaceSymmTensorField& dualSigmaf,
-            const scalar zeta
-        );
-
-        scalar calculateLineSearchFactor
-        (
-            const scalar rTol, // Slope reduction tolerance
-            const int maxIter, // Maximum number of line search iterations
-            const vectorField& pointDcorr, // Point displacement correction
-            const vectorField& source, // Linear system source
-            const scalar zeta // Discretisation parameter
-        );
-        
-        Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
-		geometricStiffnessField
-		(
-			const surfaceVectorField SfUndef, //Undeformed surface area vector field
-			const surfaceTensorField gradDRef //Reference gradD 
-		) const; 
-
         //- Disallow default bitwise copy construct
-        vertexCentredNonLinGeomTotalLagSolid(const vertexCentredNonLinGeomTotalLagSolid&);
+        explicitVertexCentredLinGeomSolid(const explicitVertexCentredLinGeomSolid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const vertexCentredNonLinGeomTotalLagSolid&);
+        void operator=(const explicitVertexCentredLinGeomSolid&);
 
 
 protected:
@@ -215,19 +159,19 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            return nonLinearGeometry::TOTAL_LAGRANGIAN;
+            return nonLinearGeometry::LINEAR_GEOMETRY;
         }
 
 
 public:
 
     //- Runtime type information
-    TypeName("vertexCentredNonLinTotalLagGeometry");
+    TypeName("explicitVertexCentredLinearGeometry");
 
     // Constructors
 
         //- Construct from components
-        vertexCentredNonLinGeomTotalLagSolid
+        explicitVertexCentredLinGeomSolid
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -235,7 +179,7 @@ public:
 
     // Destructor
 
-        virtual ~vertexCentredNonLinGeomTotalLagSolid();
+        virtual ~explicitVertexCentredLinGeomSolid();
 
 
     // Member Functions
@@ -253,6 +197,9 @@ public:
             }
 
         // Edit
+
+            //- Update the size of the time-step
+            virtual void setDeltaT(Time& runTime);
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
@@ -278,7 +225,7 @@ public:
                 const label patchID,
                 const vectorField& faceZoneTraction
             );
-        
+
         // Write
 
             //- Write fields

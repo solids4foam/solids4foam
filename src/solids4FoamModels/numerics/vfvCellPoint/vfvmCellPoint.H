@@ -96,9 +96,9 @@ namespace vfvm
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#ifdef NoRepository
-#   include "vfvmCellPoint.C"
-#endif
+//#ifdef NoRepository
+//#   include "vfvmCellPoint.C"
+//#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

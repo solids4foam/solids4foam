@@ -79,6 +79,9 @@ class MMSCubeAnalyticalSolution
         //- Calculate point stress fields
         const Switch pointStress_;
         
+        //- Calculate point epsilon fields
+        const Switch pointEpsilon_;
+        
         //-Parameters for analytical equation
         const scalar ax_;
         const scalar ay_;
@@ -89,6 +92,9 @@ class MMSCubeAnalyticalSolution
 
         //- Analytical stress solution
         symmTensor MMSCubeStress(const vector& point);
+        
+        //- Analytical point strain solution  
+        symmTensor MMSCubeEpsilon(const vector& point);
 
         //- Analytical displacement solution
         vector MMSCubeDisplacement(const vector& point);

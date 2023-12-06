@@ -108,6 +108,8 @@ void vertexCentredLinGeomSolid::updateSource
     
     const vectorField dualDivSigma = fvc::div(dualTraction*dualMesh().magSf());
     
+    Info << dualDivSigma[0] << endl;
+    
     // Map dual cell field to primary mesh point field
     vectorField pointDivSigma(mesh().nPoints(), vector::zero);
     
@@ -1184,7 +1186,7 @@ bool vertexCentredLinGeomSolid::evolve()
     // Calculate cell gradient
     // This assumes a constant gradient within each primary mesh cell
     gradD() = vfvc::grad(pointD(), mesh());
-
+    
     // Map primary cell gradD field to sub-meshes for multi-material cases
     if (mechanical().PtrList<mechanicalLaw>::size() > 1) //Meaning??
     {

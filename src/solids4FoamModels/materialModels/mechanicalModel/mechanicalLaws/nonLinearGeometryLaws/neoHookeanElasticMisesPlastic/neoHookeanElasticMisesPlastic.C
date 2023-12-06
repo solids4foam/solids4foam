@@ -550,7 +550,6 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
     return tIbar;
 }
 
-
 void Foam::neoHookeanElasticMisesPlastic::calculateStress
 (
  surfaceSymmTensorField& sigma,
@@ -1277,7 +1276,7 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
 			// from the object registry
 			gradDPerturb = 1.0*gradDRef;
 
-            // Perturb this component of gradD and calculate FPerturb
+            // Perturb this component of gradD
             gradDPerturb.replace(cmptI, gradDRef.component(cmptI) + eps);
 
             // Calculate perturbed stress
@@ -1286,6 +1285,7 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
             // Calculate tangent component
             const surfaceSymmTensorField tangCmpt((sigmaPerturb - sigmaRef)/eps);
             const symmTensorField& tangCmptI = tangCmpt.internalField();
+
 
             // Insert tangent component
             forAll(tangCmptI, faceI)
@@ -1467,90 +1467,6 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
 		        }                    
             }
         }
-
-        // Include 0.5 factor for shear components
-//        forAll(result, faceI)
-//        {                     
-//            
-//            for (int i = 3; i < 6; i++)
-//            {
-//                for (int j = 3; j < 6; j++)
-//                {
-//                    result[faceI](i,j) *= 0.5;
-//                }
-//            }
-            
-            
-//            result[faceI](0,0) = 9.418e10;
-//            result[faceI](1,0) = 4.038e10;
-//            result[faceI](2,0) = 4.038e10;
-//            result[faceI](3,0) = 0;
-//            result[faceI](4,0) = 0;
-//            result[faceI](5,0) = 0; 
-//            
-//            result[faceI](0,1) = 4.038e10;
-//            result[faceI](1,1) = 9.418e10;
-//            result[faceI](2,1) = 4.038e10;
-//            result[faceI](3,1) = 0;
-//            result[faceI](4,1) = 0;
-//            result[faceI](5,1) = 0;  
-
-//            result[faceI](0,2) = 4.038e10;
-//            result[faceI](1,2) = 4.038e10;
-//            result[faceI](2,2) = 9.418e10;
-//            result[faceI](3,2) = 0;
-//            result[faceI](4,2) = 0;
-//            result[faceI](5,2) = 0;  
-//            
-//            result[faceI](0,3) = 0;
-//            result[faceI](1,3) = 0;
-//            result[faceI](2,3) = 0;
-//            result[faceI](3,3) = 2.69e10;
-//            result[faceI](4,3) = 0;
-//            result[faceI](5,3) = 0; 
-//            
-//            result[faceI](0,4) = 0;
-//            result[faceI](1,4) = 0;
-//            result[faceI](2,4) = 0;
-//            result[faceI](3,4) = 0;
-//            result[faceI](4,4) = 2.69e10;
-//            result[faceI](5,4) = 0; 
-//            
-//            result[faceI](0,5) = 0;
-//            result[faceI](1,5) = 0;
-//            result[faceI](2,5) = 0;
-//            result[faceI](3,5) = 0;
-//            result[faceI](4,5) = 0;
-//            result[faceI](5,5) = 2.69e10;                        
-                                 
-//            result[faceI](3,0) = 0;
-//            result[faceI](4,0) = 0;
-//            result[faceI](5,0) = 0;
-//            result[faceI](3,1) = 0;
-//            result[faceI](4,1) = 0;
-//            result[faceI](5,1) = 0;
-//            result[faceI](3,2) = 0;
-//            result[faceI](4,2) = 0;
-//            result[faceI](5,2) = 0;
-//            
-//            result[faceI](0,3) = 0;
-//            result[faceI](0,4) = 0;
-//            result[faceI](0,5) = 0;
-//            result[faceI](1,3) = 0;
-//            result[faceI](1,4) = 0;
-//            result[faceI](1,5) = 0;
-//            result[faceI](2,3) = 0;
-//            result[faceI](2,3) = 0;
-//            result[faceI](2,5) = 0;
-//            
-//            result[faceI](4,3) = 0;
-//            result[faceI](5,3) = 0;
-//            result[faceI](5,4) = 0;
-//            result[faceI](4,5) = 0;
-//            result[faceI](3,4) = 0;
-//            result[faceI](3,5) = 0;
-           
-//        }
     }
     else // Analytical tangent
     {
@@ -1572,18 +1488,43 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
 //    {
 //        return;
 //    }
+//    
+//    // Update the Jacobian of the total deformation gradient
+//    J() = det(F());
+//    
+//    Info << "F after: " << F()[0] << endl;
+////    Info <<" J: " << J()[0] << endl;
+//    
+//    // Calculate the relative Jacobian
+//    const volScalarField relJ(J()/J().oldTime());
+//    
+////    Info << "relJ: " << relJ << endl;
 
-//    // Calculate the Jacobian of the deformation gradient
-//    const volScalarField J(det(F()));
-
-//    // Calculate the volume preserving left Cauchy Green strain
-//    const volSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F() & F().T()));
+//    // Calculate the relative deformation gradient with the volumetric term
+//    // removed
+//    const volTensorField relFbar(pow(relJ, -1.0/3.0)*relF());
+//    
+//    Info << "relF after: " << relF()[0] << endl;  
+////    Info << "relFbar: " << relFbar[0] << endl; 
+////    Info << "bEbar_.oldTime(): " << bEbar_.oldTime() << endl;  
+//    
+//    // Update bE trial
+//    bEbarTrial_ = transform(relFbar, bEbar_.oldTime());
+//    
+//    Info << "bEbarTrial: " << bEbarTrial_[0] << endl;
+////    Info << "dev(bEbarTrial): " << dev(bEbarTrial_[0]) << endl;
 
 //    // Calculate the deviatoric stress
-//    const volSymmTensorField s(mu_*dev(bEbar));
+//    const volSymmTensorField s(mu_*dev(bEbarTrial_));
+//    
+////    Info << "Jf: " << J()[0] << endl;
+////    Info << "K: " << K_ << endl;
+////    Info << "s: " << s[0] << endl;
 
 //    // Calculate the Cauchy stress
-//    sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
+//    sigma = (1.0/J())*(0.5*K_*(pow(J(), 2) - 1)*I + s);
+//    
+////    Info << "sigma " << sigma[0] << endl;
 //}
 
 
@@ -1608,8 +1549,9 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
 
 //    //Calculate the Cauchy stress
 //    sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
+//    
+//    //Info << "J: " << J << endl;
 //}
-
 
 
 void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
@@ -1631,7 +1573,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     // Calculate the relative deformation gradient with the volumetric term
     // removed
     const volTensorField relFbar(pow(relJ, -1.0/3.0)*relF());
-
+    
     // Update bE trial
     bEbarTrial_ = transform(relFbar, bEbar_.oldTime());
 
@@ -1849,6 +1791,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 
 void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 {
+
     // Update the deformation gradient field
     // Note: if true is returned, it means that linearised elasticity was
     // enforced by the solver via the enforceLinear switch
@@ -1866,6 +1809,11 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     // Calculate the relative deformation gradient with the volumetric term
     // removed
     const surfaceTensorField relFbar(pow(relJ, -1.0/3.0)*relFf());
+    
+//    Info << "Ff: " << Ff()[0] << endl;
+//    Info << "relFf: " << relFf()[0] << endl;
+    
+    //bEbarTrialf_ = pow(relJ, -2.0/3.0)*symm(relFf() & relFf().T());
 
     // Update bE trial
     bEbarTrialf_ = transform(relFbar, bEbarf_.oldTime());
@@ -2082,7 +2030,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     {
         bEbarf_ = (s/mu_) + Ibar*I;
     }
-
+    
     // Update the Cauchy stress
     // Note: updayeSigmaHyd is not implemented for surface fields
     sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
@@ -2153,7 +2101,7 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
     sigmaY_ += DSigmaY_;
     sigmaYf_ += DSigmaYf_;
 
-    Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq_) << endl;
+    //Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq_) << endl;
     epsilonPEq_ += DEpsilonPEq_;
     epsilonPEqf_ += DEpsilonPEqf_;
     epsilonP_ += DEpsilonP_;
@@ -2219,9 +2167,19 @@ void Foam::neoHookeanElasticMisesPlastic::updateTotalFields()
     }
 
     activeYield_.correctBoundaryConditions();
+    
+    const int nTotalCells = returnReduce(mesh().nCells(), sumOp<int>());
+    
+	Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq_) << nl
+	    << "    " << numCellsYielding << " cells ("
+	    << 100.0*scalar(numCellsYielding)/scalar(nTotalCells)
+	    << "% of the cells in this material) are actively yielding"
+	    << nl << endl;
 
-    Info<< "    " << numCellsYielding << " cells are actively yielding"
-        << nl << endl;
+//    Info<< "    " << numCellsYielding << " cells ("
+//		    << 100.0*scalar(numCellsYielding)/scalar(nTotalCells)
+//		    << "% of the cells in this material) are actively yielding"
+//		    << nl << endl;
 }
 
 

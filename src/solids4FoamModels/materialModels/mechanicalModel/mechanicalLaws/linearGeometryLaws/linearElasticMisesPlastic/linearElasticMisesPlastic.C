@@ -1614,12 +1614,15 @@ void Foam::linearElasticMisesPlastic::updateTotalFields()
 
     const int nTotalCells = returnReduce(mesh().nCells(), sumOp<int>());
 
-    Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq_) << nl
-        << "    " << numCellsYielding << " cells ("
-        << 100.0*scalar(numCellsYielding)/scalar(nTotalCells)
-        << "% of the cells in this material) are actively yielding"
-        << nl << endl;
-
+    if (debug)
+    {
+		Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq_) << nl
+		    << "    " << numCellsYielding << " cells ("
+		    << 100.0*scalar(numCellsYielding)/scalar(nTotalCells)
+		    << "% of the cells in this material) are actively yielding"
+		    << nl << endl;
+	}
+	
     // Write out magnitude of plastic strain
     // if (mesh().time().outputTime())
     // {
