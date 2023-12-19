@@ -28,7 +28,7 @@ In this case, an internally pressurised bi-material thick-walled cylinder is ana
 ## Expected Results
 
 * Comparison between numerical and analytical solutions is performed in terms of circumferential
-  and radial stresses in the radial direction through the cylinder, for which analytical solutions are as follows [[1]](file:///home/ibatistic/Downloads/Tukovic_Ivankovic_Karac_OFF%20done.pdf):
+  and radial stresses in the radial direction through the cylinder, for which the analytical solutions are as follows [[1]](file:///home/ibatistic/Downloads/Tukovic_Ivankovic_Karac_OFF%20done.pdf):
 
 $$
 \sigma_r = \frac{r_1^2p_i-r_2^2p_{12}+(p_{12}-p_i)\left(\dfrac{r_1r_2}{r}\right)^2}{r_2^2-r_1^2} \qquad \text{for } r_1 \leq r < r_2,
@@ -97,6 +97,7 @@ sets
     }
 );
 ```
+
 ---
 
 ## Running the Case
