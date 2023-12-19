@@ -1,3 +1,7 @@
+---
+sort: 1
+---
+
 # Internally pressurised bi-material thick-walled cylinder: `layeredPipe`
 
 ---
@@ -103,12 +107,11 @@ sets
 
 ## Running the Case
 
-The tutorial case is located at `solids4foam/tutorials/solids/multiMaterial/layeredPipe`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the `Allrun` creates the mesh using `blockMesh` (`> blockMesh`) followed by calls to the `setSet` and `setsToZones` utilities to create cell zones for inner and outer cylinder materials. After that, the case is run with `solids4foam` solver (`> solids4Foam`). As the last step, the `sample` utility is used to extract data. Optionally, if `gnuplot` is installed, the radial and circumferential stress distributions are plotted in the `sigmaR.png`  and `sigmaTheta.png`  files.
+The tutorial case is located at `solids4foam/tutorials/solids/multiMaterial/layeredPipe`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the `Allrun` creates the mesh using `blockMesh` (`> blockMesh`) followed by calls to the `setSet` and `setsToZones` utilities to create cell zones for inner and outer cylinder materials. After that, the case is run with the `solids4Foam` solver (`> solids4Foam`). As the last step, the `sample` utility is used to extract data. Optionally, if `gnuplot` is installed, the radial and circumferential stress distributions are plotted in the `sigmaR.png`  and `sigmaTheta.png`  files.
 
 ```note
 For multi-material cases, solids4foam expects to find a cellZone for each material defined in constant/mechanicalProperties, where the cellZone name is assumed to be the same as the material name in constant/mechanicalProperties.
 ```
-
 
 
 ---
