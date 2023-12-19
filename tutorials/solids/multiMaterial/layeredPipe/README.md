@@ -19,7 +19,7 @@ Prepared by Željko Tukovic, Philip Cardiff and Ivan Batistić
 
 ## Case Overview
 
-In this case, an internally pressurised bi-material thick-walled cylinder is analysed (Figure 1).  The problem is considered *plane stress*, with a quarter of the domain modelled because of symmetry.  The case is simulated as a steady state using one loading step. The outside surface is modelled as stress-free, and the left and bottom boundaries are symmetry planes. The inner bore surface has a prescribed constant pressure $$p_i=1\times 10^5$$ Pa. The inner material (region 1 in Figure 1) has a Poisson’s ratio of $$\nu_1=0.35$$ and a Young's modulus of $E_1 = 20$ GPa, while the outer material (region 2 in Figure 1) has a Poisson’s ratio of  $$\nu_2=0.3$$and a Young's modulus of $E_2 = 200$ GPa; this results in an order of magnitude difference between the Young's modulii, i.e.,  $$E_2/E_1=10$$. The number of cells is set to $$120$$ circumferentially and $$50$$ radially.
+In this case, an internally pressurised bi-material thick-walled cylinder is analysed (Figure 1).  The problem is considered *plane stress*, with a quarter of the domain modelled because of symmetry.  The case is simulated as a steady state using one loading step. The outside surface is modelled as stress-free, and the left and bottom boundaries are symmetry planes. The inner bore surface has a prescribed constant pressure $$p_i=1\times 10^5$$ Pa. The inner material (region 1 in Figure 1) has a Poisson’s ratio of $$\nu_1=0.35$$ and a Young's modulus of $$E_1 = 20$$ GPa, while the outer material (region 2 in Figure 1) has a Poisson’s ratio of  $$\nu_2=0.3$$ and a Young's modulus of $$E_2 = 200$$ GPa; this results in an order of magnitude difference between the Young's modulii, i.e.,  $$E_2/E_1=10$$. The number of cells is set to $$120$$ circumferentially and $$50$$ radially.
 
 <div style="text-align: center;">
   <img src="./images/layeredPipe-geometry.png" alt="Image" width="300">
@@ -50,7 +50,7 @@ $$
 \sigma_{\theta} = \frac{r_2^2p_{12}+p_{12}\left(\dfrac{r_2r_3}{r}\right)^2}{r_3^2-r_2^2} \qquad \text{for } r_2 < r \leq r_3,
 $$
 
-​	where the pressure at the interface, $p_{12}$ is given as follows:
+​	where the pressure at the interface, $$p_{12}$$ is given as follows:
 $$
 p_{12}=\dfrac{\dfrac{2r_1^2p_i}{E_1(r_2^2-r_1^2)}}{\dfrac{1}{E2}\left(\dfrac{r_3^2+r_2^2}{r_3^2-r_2^2}+\nu_2  \right) + \dfrac{1}{E1}\left(\dfrac{r_2^2+r_1^2}{r_2^2-r_1^2}-\nu_1  \right)}.
 $$
