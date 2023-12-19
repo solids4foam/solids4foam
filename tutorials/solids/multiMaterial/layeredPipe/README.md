@@ -28,7 +28,7 @@ In this case, an internally pressurised bi-material thick-walled cylinder is ana
 ## Expected Results
 
 * Comparison between numerical and analytical solutions is performed in terms of circumferential
-  and radial stresses in radial direction through cylinder, for which analytical solutions are as follows [[1]](file:///home/ibatistic/Downloads/Tukovic_Ivankovic_Karac_OFF%20done.pdf):
+  and radial stresses in the radial direction through the cylinder, for which the analytical solutions are as follows [[1]](file:///home/ibatistic/Downloads/Tukovic_Ivankovic_Karac_OFF%20done.pdf):
 
 $$
 \sigma_r = \frac{r_1^2p_i-r_2^2p_{12}+(p_{12}-p_i)\left(\dfrac{r_1r_2}{r}\right)^2}{r_2^2-r_1^2} \qquad \text{for } r_1 \leq r < r_2,
@@ -67,25 +67,19 @@ $$
 </div>
 
 
-The diagrams are created automatically within the `Allrun` script using `sample` utility and `gnuplot`.  `fieldCoordinateSystemTransform` function object is used to transform the $$\sigma$$ stress tensor from Cartesian coordinates to the cylindrical one: 
+The diagrams are created automatically within the `Allrun` script using `sample` utility and `gnuplot`. `transformStressToCylindrical` function object is used to transform the $$\sigma$$ stress tensor from Cartesian coordinates to the cylindrical one: 
 
 ```c++
-type    fieldCoordinateSystemTransform;                                     
-libs    (fieldFunctionObjects);                                             
+functions
+{
+    transformStressToCylindrical
+    {
+        type        transformStressToCylindrical;
 
-fields  ( sigma );                                                              
-                                                                              
-coordinateSystem                                                            
-{                                                                           
-	type    cylindrical;                                                    
-    origin  (0 0 0);        
-                                                
-    rotation                                                                
-    {                                                                       
-    	type cylindrical;                                                   
-        axis (0 0 1);                                          
-    }                                                                       
-}  
+        origin      (0 0 0);
+        axis        (0 0 1);
+    }
+}
 ```
 
 The transformed $$\sigma$$ tensor field is available within solution fields and is named `sigma:Transformed`. Stresses written in cylindrical coordinates (i.e. `sigma:Transformed`) are plotted at $$\theta=45^{\circ}$$ line using the `sample` utility:
@@ -102,10 +96,6 @@ sets
         end   (0.07 0.07 0.0005);
     }
 );
-```
-
-```warning
-In `foam-extend`, the `fieldCoordinateSystemTransform` function object can be used only to transform from one Cartesian coordinate system to another. Because of that, transformation is set up to be correct only at the line at which results are extracted.
 ```
 
 ---
