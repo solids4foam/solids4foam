@@ -31,8 +31,7 @@ In this case, an internally pressurised bi-material thick-walled cylinder is ana
 
 ## Expected Results
 
-* Comparison between numerical and analytical solutions is performed in terms of circumferential
-  and radial stresses in the radial direction through the cylinder, for which the analytical solutions are as follows [1]:
+Comparison between numerical and analytical solutions is performed in terms of circumferential and radial stresses in the radial direction through the cylinder, for which the analytical solutions are as follows [1]:
 
 $$
 \sigma_r = \frac{r_1^2p_i-r_2^2p_{12}+(p_{12}-p_i)\left(\dfrac{r_1r_2}{r}\right)^2}{r_2^2-r_1^2} \qquad \text{for } r_1 \leq r < r_2,
@@ -50,10 +49,12 @@ $$
 \sigma_{\theta} = \frac{r_2^2p_{12}+p_{12}\left(\dfrac{r_2r_3}{r}\right)^2}{r_3^2-r_2^2} \qquad \text{for } r_2 < r \leq r_3,
 $$
 
-​	where the pressure at the interface, $$p_{12}$$ is given as follows:
+where the pressure at the interface, $$p_{12}$$ is given as follows:
+
 $$
-p_{12}=\dfrac{\dfrac{2r_1^2p_i}{E_1(r_2^2-r_1^2)}}{\dfrac{1}{E2}\left(\dfrac{r_3^2+r_2^2}{r_3^2-r_2^2}+\nu_2  \right) + \dfrac{1}{E1}\left(\dfrac{r_2^2+r_1^2}{r_2^2-r_1^2}-\nu_1  \right)}.
+p_{12}=\dfrac{\dfrac{2r_1^2p_i}{E_1(r_2^2-r_1^2)}}{\dfrac{1}{E_2}\left(\dfrac{r_3^2+r_2^2}{r_3^2-r_2^2}+\nu_2  \right) + \dfrac{1}{E_1}\left(\dfrac{r_2^2+r_1^2}{r_2^2-r_1^2}-\nu_1  \right)}.
 $$
+
 Figures 2 and 3 show a comparison between the analytical and numerical solutions of radial $$\sigma_r$$ and circumferential $$\sigma_{\theta}$$ stress distributions. One can see that the numerical solution closely matches the analytical one.
 
 <div style="text-align: center;">
@@ -72,7 +73,7 @@ Figures 2 and 3 show a comparison between the analytical and numerical solutions
 
 
 
-The Figures above are created automatically within the `Allrun` script using `sample` utility and `gnuplot`. The `transformStressToCylindrical` function object in `system/controlDict` is used to transform the $$\sigma$$ stress tensor from Cartesian coordinates to the cylindrical:
+The plots above are created automatically within the `Allrun` script using `sample` utility and `gnuplot`. The `transformStressToCylindrical` function object in `system/controlDict` is used to transform the $$\sigma$$ stress tensor from Cartesian coordinates to the cylindrical:
 
 ```c++
 functions
@@ -80,7 +81,6 @@ functions
     transformStressToCylindrical
     {
         type        transformStressToCylindrical;
-
         origin      (0 0 0);
         axis        (0 0 1);
     }
@@ -97,8 +97,8 @@ sets
     {
         type       face;
         axis       distance;
-        start (0.0 0.0 0.0005);
-        end   (0.07 0.07 0.0005);
+        start      (0.0 0.0 0.0005);
+        end        (0.07 0.07 0.0005);
     }
 );
 ```
