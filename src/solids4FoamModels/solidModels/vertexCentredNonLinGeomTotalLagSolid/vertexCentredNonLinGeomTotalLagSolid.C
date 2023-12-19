@@ -1263,7 +1263,12 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 //		    );
 
 			//Info << "geometricStiffness = " << geometricStiffness[0] << endl;
-		    //Info << "material tangent: " << materialTangent[0] << endl;
+			
+//			for (int i = 0; i < mesh().nPoints(); i++)
+//		    {
+//		        Info << "Vertex " << i << ": " << materialTangent[i] << endl;
+//		    } 
+//		    Info << endl;
 		    
             vfvm::divSigmaExtended
             (

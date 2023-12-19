@@ -108,8 +108,6 @@ void vertexCentredLinGeomSolid::updateSource
     
     const vectorField dualDivSigma = fvc::div(dualTraction*dualMesh().magSf());
     
-    Info << dualDivSigma[0] << endl;
-    
     // Map dual cell field to primary mesh point field
     vectorField pointDivSigma(mesh().nPoints(), vector::zero);
     
@@ -925,6 +923,12 @@ bool vertexCentredLinGeomSolid::evolve()
 
             // Update material tangent
             materialTangent = dualMechanicalPtr_().materialTangentFaceField();
+            
+//			for (int i = 0; i < mesh().nPoints(); i++)
+//		    {
+//		        Info << "Vertex " << i << ": " << materialTangent[i] << endl;
+//		    } 
+//		    Info << endl;
 
             // Add div(sigma) coefficients
             vfvm::divSigma

@@ -1427,6 +1427,63 @@ void vertexCentredLinGeomSolidMMS::writeFields(const Time& runTime)
     pEpsilonEq.write();
 
     Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;
+    
+    // Stress at the points
+    pointSymmTensorField pSigma
+    (
+        IOobject
+        (
+            "pSigma",
+            runTime.timeName(),
+            runTime,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedSymmTensor("0", dimless, symmTensor::zero)
+    );
+    
+	scalar lambda = 1.15e11;
+	scalar mu = 7.69e10;
+  
+#ifdef FOAMEXTEND
+    pSigma.internalField() = 2*mu*(pEpsilon.internalField()) + lambda*tr(pEpsilon.internalField())*I;
+#else
+    pSigma.primitiveFieldRef() = 2*mu*(pEpsilon.internalField()) + lambda*tr(pEpsilon.internalField())*I;
+#endif
+    pSigma.write();    
+    
+//    // Equivalent stress at the points
+//    pointScalarField pSigmaEq
+//    (
+//        IOobject
+//        (
+//            "pSigmaEq",
+//            runTime.timeName(),
+//            runTime,
+//            IOobject::NO_READ,
+//            IOobject::AUTO_WRITE
+//        ),
+//        pMesh(),
+//        dimensionedScalar("0", dimless, 0.0)
+//    );
+
+//#ifdef FOAMEXTEND
+//    pSigmaEq.internalField() =
+//        sqrt(0.5*((pSigma.XX().internalField() - pSigma.YY().internalField())^2 
+//        + (pSigma.YY().internalField() - pSigma.ZZ().internalField())^2 +
+//        (pSigma.ZZ().internalField() - pSigma.XX().internalField())^2) + 
+//        3*(pSigma.XY().internalField() + pSigma.YZ().internalField() + pSigma.ZX().internalField()));
+//#else
+//    pSigmaEq.primitiveFieldRef() =
+//        sqrt(0.5*((pSigma.XX().internalField() - pSigma.YY().internalField())^2 
+//        + (pSigma.YY().internalField() - pSigma.ZZ().internalField())^2 +
+//        (pSigma.ZZ().internalField() - pSigma.XX().internalField())^2) + 
+//        3*(pSigma.XY().internalField() + pSigma.YZ().internalField() + pSigma.ZX().internalField()));
+//#endif
+//    pSigmaEq.write();
+
+//    Info<< "Max pSigmaEq = " << gMax(pSigmaEq) << endl;
 
     solidModel::writeFields(runTime);
 }

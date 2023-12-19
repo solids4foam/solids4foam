@@ -235,7 +235,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             "calculated"
         );
 
-        pointVectorField analyticalD
+        pointVectorField analyticalPointD
         (
             IOobject
             (
@@ -248,12 +248,28 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             pMesh,
             dimensionedVector("zero", dimLength, vector::zero)
         );
+        
+        volVectorField analyticalD
+        (
+            IOobject
+            (
+                "analyticalD",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedVector("zero", dimLength, vector::zero)
+        );
 
         symmTensorField& sI = analyticalStress;
         symmTensorField& pEI = analyticalPointEpsilon;
         scalarField& pEEqI = analyticalPointEpsilonEq;
         scalarField& sEqI = analyticalStressEq;
+        vectorField& aPDI = analyticalPointD;
         vectorField& aDI = analyticalD;
+        
 
         forAll(sI, cellI)
         {
@@ -277,12 +293,21 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             
         }        
             
-        forAll(aDI, pointI)
+        forAll(aPDI, pointI)
         {
 
             if (pointDisplacement_)
             {
-                aDI[pointI] = MMSCubeDisplacement(points[pointI]);
+                aPDI[pointI] = MMSCubeDisplacement(points[pointI]);
+            }
+        }
+        
+        forAll(aDI, cellI)
+        {
+
+            if (pointDisplacement_)
+            {
+                aDI[cellI] = MMSCubeDisplacement(CI[cellI]);
             }
         }
         
@@ -327,8 +352,9 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
 
         if (pointDisplacement_)
         {
-            Info<< "Writing analyticalPointDisplacement"
+            Info<< "Writing analyticalPointDisplacement and analyticalDisplacement"
                 << nl << endl;
+            analyticalPointD.write();
             analyticalD.write();
         }
 
@@ -343,9 +369,45 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
 
             const pointVectorField diff
             (
-                "pointDDifference", analyticalD - pointD
+                "pointDDifference", analyticalPointD - pointD
             );
             Info<< "Writing pointDDifference field" << endl;
+            diff.write();
+
+            const vectorField& diffI = diff;
+            Info<< "    Displacement norms: mean L1, mean L2, LInf: " << nl
+                << "	Magnitude: " << gAverage(mag(diffI))
+                << " " << Foam::sqrt(gAverage(magSqr(diffI)))
+                << " " << gMax(mag(diffI))
+                << nl 
+                << "	u: " << gAverage(mag(diffI.component(0)))
+                << " " << Foam::sqrt(gAverage(magSqr(diffI.component(0))))
+                << " " << gMax(mag(diffI.component(0)))
+                << nl 
+                << "	v: " << gAverage(mag(diffI.component(1)))
+                << " " << Foam::sqrt(gAverage(magSqr(diffI.component(1))))
+                << " " << gMax(mag(diffI.component(1)))
+                << nl 
+                << "	w: " << gAverage(mag(diffI.component(2)))
+                << " " << Foam::sqrt(gAverage(magSqr(diffI.component(2))))
+                << " " << gMax(mag(diffI.component(2)))
+                << nl << endl;
+        }
+        
+        if
+        (
+            pointDisplacement_
+         && mesh.foundObject<volVectorField>("D")
+        )
+        {
+            const volVectorField& D =
+                mesh.lookupObject<volVectorField>("D");
+
+            const volVectorField diff
+            (
+                "DDifference", analyticalD - D
+            );
+            Info<< "Writing DDifference field" << endl;
             diff.write();
 
             const vectorField& diffI = diff;

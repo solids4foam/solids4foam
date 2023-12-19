@@ -234,7 +234,7 @@ class linearElasticMisesPlastic
         void calculateStress
         (
             surfaceSymmTensorField& sigma,
-            const surfaceSymmTensorField& epsilon
+            const surfaceTensorField& gradD
         ) const;
 
 
