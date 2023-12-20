@@ -118,4 +118,4 @@ For multi-material cases, solids4foam expects to find a cellZone for each materi
 
 ### References
 
-[1] Ž. Tuković, A. Ivanković, and A. Karač, “Finite-volume stress analysis in multi-material linear elastic body,” International Journal for Numerical Methods in Engineering, vol. 93, no. 4, pp. 400–419, 2013.
+[1] [Ž. Tuković, A. Ivanković, and A. Karač, “Finite-volume stress analysis in multi-material linear elastic body,” International Journal for Numerical Methods in Engineering, vol. 93, no. 4, pp. 400–419, 2013.](https://repozitorij.fsb.hr/4072/1/Finite_Tukovic.pdf)

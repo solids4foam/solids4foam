@@ -69,7 +69,7 @@ The tutorial case is located at `solids4foam/tutorials/solids/elastoplasticity/c
 
 ### References 
 
-[1] [I. Batistić, P. Cardiff, and Ž. Tuković, “A finite volume penalty based segment-to-segment method for frictional contact problems,” Applied Mathematical Modelling, vol. 101, pp. 673–693, 2022.](https://www.sciencedirect.com/science/article/abs/pii/S0307904X21004248)https://www.sciencedirect.com/science/article/abs/pii/S0045782515003643
+[1] [I. Batistić, P. Cardiff, and Ž. Tuković, “A finite volume penalty based segment-to-segment method for frictional contact problems,” Applied Mathematical Modelling, vol. 101, pp. 673–693, 2022.](https://www.sciencedirect.com/science/article/abs/pii/S0307904X21004248)
 
 [2] [D. Neto, M. Oliveira, L. Menezes, and J. Alves, “A contact smoothing method for arbitrary surface meshes using Nagata patches,” Computer Methods in Applied Mechanics and Engineering, vol. 299, pp. 283 – 315, 2016.](https://www.sciencedirect.com/science/article/abs/pii/S0045782515003643)
 
