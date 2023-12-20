@@ -8,7 +8,7 @@ Prepared by Philip Cardiff, Duo Huang and Ivan Batistić
 
 ## Tutorial Aims
 
-- Demonstrate the solution of a thermal stress problem;
+- Demonstrate how to perform a thermo-elastic analysis;
 - Check the accuracy of a solid model against the expected solution.
 
 ---

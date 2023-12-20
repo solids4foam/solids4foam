@@ -14,3 +14,21 @@ solids4Foam::runApplication blockMesh
 
 # Run the solver
 solids4Foam::runApplication solids4Foam
+
+# Sample stress along lines
+if [[ $WM_PROJECT = "foam" ]]
+then
+    solids4Foam::runApplication sample -latestTime
+else
+    solids4Foam::runApplication postProcess -func sample -latestTime
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating sigmaR.png and sigmaTheta.png using gnuplot"
+    gnuplot plot.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
+
