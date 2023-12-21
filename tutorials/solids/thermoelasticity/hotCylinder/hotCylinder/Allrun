@@ -26,9 +26,24 @@ fi
 # Create plots
 if command -v gnuplot &> /dev/null
 then
-    echo "Generating sigmaR.png and sigmaTheta.png using gnuplot"
-    gnuplot plot.gnuplot &> /dev/null
+
+    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    then
+        echo -e "\nTo generate plots using COM version, following should be " \
+             "changed in plot.gnuplot script:"
+
+        echo "line_analyticalRadialStress_analyticalHoopStress_T_analyticalT.xy"\
+             " -> " \
+             "line_T_analyticalHoopStress_analyticalRadialStress_analyticalT.x"
+
+        echo "path1 using 1:(\$2*1e-6) -> path1 using 1:(\$4*1e-6)"
+        echo "path1 using 1:4 -> path1 using 1:2"
+
+    else
+
+        echo "Generating sigmaR.png and sigmaTheta.png using gnuplot"
+        gnuplot plot.gnuplot &> /dev/null
+    fi
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
-
