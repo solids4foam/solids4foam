@@ -32,11 +32,11 @@ One way to validate the implemented Fluid-Structure Interaction (FSI) model is b
 | Parameter   | Value    |
 | :-----: | :---: |
 | Solid Youngs' Modules (E) | 1 Mpa   |
-| Solid Density ($\rho$) | 2500 kg/$m^3$   |
-| Solid Poisson Ratio ($\nu$) | 0   |
-| Fluid Viscosity ($\mu$) | 0.001 Pa.s   |
-| Fluid Density ($\rho$) | 1000 kg/$m^3$   |
-| gravity | 9.81 m/$s^2$   |
+| Solid Density ($$\rho$$) | 2500 $$kg/m^3$$   |
+| Solid Poisson Ratio ($$\nu$$) | 0   |
+| Fluid Viscosity ($$\mu$$) | 0.001 Pa.s   |
+| Fluid Density ($$\rho$$) | 1000 $$kg/m^3$$   |
+| gravity | 9.81  $$m/s^2$$   |
 | L | 0.0146 m   |
 | H | 0.080 m   |
 | W | 0.012 m   |
