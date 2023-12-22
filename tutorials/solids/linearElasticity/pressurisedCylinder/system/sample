@@ -12,21 +12,35 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    location    "system";
+    object      sample;
 }
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress     no;
+type sets;
+//libs ("libsampling.so");
 
-mechanical
+interpolationScheme cellPointFace;
+//interpolationScheme cellPatchConstrained;
+
+setFormat raw;
+
+sets
 (
-    rubber
+    line
     {
-	    type            linearElastic;
-            rho             rho [1 -3 0 0 0 0 0] 1000;
-	    E               E [1 -1 -2 0 0 0 0] 1e+10;
-	    nu              nu [0 0 0 0 0 0 0] 0.3;
+        type face;
+        axis       distance;
+        start (0.0 0 0.5);
+        end   (13.2 13.2 0.5);
     }
 );
+
+fields
+(
+    sigma:Transformed D
+);
+
 
 // ************************************************************************* //
