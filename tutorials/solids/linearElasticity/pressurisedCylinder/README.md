@@ -39,6 +39,10 @@ $$
 \sigma_r = p \dfrac{r_i^2}{r_o^2-r_i^2}\left(1+\dfrac{r_o^2}{r^2}\right),
 $$
 
+$$
+\sigma_{z} = 0,
+$$
+
 ​	and for radial displacement:
 $$
 u_r = \dfrac{p}{E}\dfrac{r_i^2}{r_o^2-r_i^2}\left[(1-\nu)r+(1+\nu)\dfrac{r_o^2}{r}\right].

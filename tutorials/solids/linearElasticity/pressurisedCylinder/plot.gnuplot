@@ -15,7 +15,7 @@ Ri = 7        # Inner cylinder radius
 Ro = 18.625   # Outer cylinder radius
 E = 1e10      # Young modulus
 p = 10e6      # Internal pressure
-nu = 0.495     # Poissons ratio
+nu = 0.3     # Poissons ratio
 
 sigmaR(x) = (p*Ri**2 / (Ro**2-Ri**2))*(1-Ro**2/x**2)/p
 sigmatheta(x) = (p*Ri**2 / (Ro**2-Ri**2))*(1+Ro**2/x**2)/p
