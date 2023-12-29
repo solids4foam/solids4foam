@@ -79,7 +79,7 @@ functions
 
 ## Running the Case
 
-The tutorial case is located at `solids4foam/tutorials/viscoelasticity/viscoTube`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the `Allrun` creates the mesh using `blockMesh` (`> blockMesh`) followed by  `solids4Foam` solver (`> solids4Foam`).
+The tutorial case is located at `solids4foam/tutorials/solids/viscoelasticity/viscoTube`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the `Allrun` creates the mesh using `blockMesh` (`> blockMesh`) followed by  `solids4Foam` solver (`> solids4Foam`).
 
 
 ---

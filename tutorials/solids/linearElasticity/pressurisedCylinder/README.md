@@ -15,7 +15,7 @@ Prepared by Philip Cardiff and Ivan Batistić
 
 ## Case Overview
 
-In this case, a homogeneous thick-wall cylindrical pressure vessel with inner radius $$r_i = 7$$ m, outer radius $$R_o = 18.625$$ m, and loaded internally with pressure $$p = 100$$ MPa is analysed. The material is considered linear elastic with Young modulus $$E=10$$ GPa and Poisson's ratio $$\nu=0.3$$. The problem is considered **plane stress**, with the computational domain made of a quarter of the cylinder geometry. The cylinder is discretised with $$30$$ CVs both in the radial and circumferential direction. Gravitational and inertial effects are neglected, and the case is solved using one loading increment. 
+In this case, a homogeneous thick-wall cylindrical pressure vessel with inner radius $$r_i = 7$$ m, outer radius $$R_o = 18.625$$ m, and loaded internally with pressure $$p = 100$$ MPa is analysed. The material is considered linear elastic with Young modulus $$E=10$$ GPa and Poisson's ratio $$\nu=0.3$$. The problem is considered **plane stress**, with the 2D computational domain made of a quarter of the cylinder geometry. The cylinder is discretised with $$30$$ CVs both in the radial and circumferential direction. Gravitational and inertial effects are neglected, and the case is solved using one loading increment.
 
 <div style="text-align: center;">
   <img src="./images/pressurisedCylinder-geometry-3D.png" alt="Image" width="400">
