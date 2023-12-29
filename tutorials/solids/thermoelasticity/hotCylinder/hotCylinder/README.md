@@ -39,7 +39,7 @@ This case considers a thick-walled cylinder subjected to temperature difference 
 - The analytical equation for temperature distribution [1]:
 
   $$
-  T = \dfrac{(T_i - T_o)}{\ln\dfrac{r_o}{r_i}}\ln\dfrac{r_o}{r},
+  T = \dfrac{(T_i - T_o)}{\ln\dfrac{r_o}{r_i}}\ln\dfrac{r_o}{r}.
   $$
   `hotCylinderAnalyticalSolution` function object in `system/controlDict`is used to generate analytical solution fields (`analyticalT`, `analyticalRadialStress` and `analyticalHoopStress`):
 

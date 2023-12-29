@@ -40,7 +40,7 @@ The two end surfaces of the bar are slowly displaced through a distance of $$7$$
 |         ---          |      ---       |          ---          |
 |   Young’s modulus    |     $$E$$      |      $$200$$ GPa      |
 |   Poisson's ratio    |    $$\nu$$     |        $$0.3$$        |
-| Initial yield stress |  $$\sigma_Y$$  |        451 MPa        |
+| Initial yield stress |  $$\sigma_Y$$  |      $$451$$ MPa      |
 
 
 ---
