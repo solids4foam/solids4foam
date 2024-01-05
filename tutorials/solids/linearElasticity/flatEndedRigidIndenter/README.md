@@ -65,6 +65,15 @@ The main cause of the shift between the analytical and the numerical curve is th
      <strong>Figure 2: Contact pressure distribution</strong>
     </figcaption>
 </div>
+Figure 3 shows the displacement profile of the half-space top surface. The displacement profile from `solids4Foam` matches the analytical one; a small discrepancy between results exists because the analytical solution has an abrupt profile change at the contact edge. Same as for Figure 2, the diagram shown in Figure 3 is automatically created within the `Allrun` script using `sample` utility and `gnuplot`. 
+
+<div style="text-align: center;">
+  <img src="./images/flatEndedRigidIndenter-displacement.png" alt="Image" width="600">
+    <figcaption>
+     <strong>Figure 3: Vertical displacement of top half-space surface</strong>
+    </figcaption>
+</div>
+
 ---
 
 ## Running the Case

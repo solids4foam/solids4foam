@@ -53,9 +53,9 @@ blocks
     // Foundation coarse zone
     hex (0 1 2 3 4 5 6 7) (70 40 1) simpleGrading (25 0.02 1)
     // Indenter
-    hex (8 9 10 11 12 13 14 15) (5 5 1) simpleGrading (1 1 1) 
+    hex (8 9 10 11 12 13 14 15) (5 5 1) simpleGrading (1 1 1)
     // Founcation fine contact zone
-    hex (16 0 3 17 18 4 7 19) (38 40 1) simpleGrading (1 0.02 1) 
+    hex (16 0 3 17 18 4 7 19) (38 40 1) simpleGrading (1 0.02 1)
 );
 
 edges
@@ -69,7 +69,6 @@ patches
         (1 5 6 2)
         (13 14 10 9)
         (12 8 11 15)
-        (7 3 2 6)
     )
 
     empty frontAndBack
@@ -101,6 +100,7 @@ patches
     patch foundation
     (
         (19 7 3 17)
+        (7 3 2 6)
     )
 
 );

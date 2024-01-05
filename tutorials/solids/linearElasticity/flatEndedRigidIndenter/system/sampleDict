@@ -24,7 +24,7 @@ interpolationScheme cellPoint;
 
 fields
 (
-    sigma
+    sigma D
 );
 
 sets

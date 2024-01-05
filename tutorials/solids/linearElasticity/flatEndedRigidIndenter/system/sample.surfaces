@@ -25,7 +25,7 @@ interpolationScheme cellPoint;
 
 fields
 (
-    sigma
+    sigma D
 );
 
 sets
@@ -36,7 +36,7 @@ surfaces
 (
     surface
     {
-        type patch;   
+        type patch;
         patches   (foundation);
     }
 );

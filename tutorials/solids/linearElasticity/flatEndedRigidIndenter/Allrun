@@ -30,7 +30,7 @@ if [[ "${WM_PROJECT}" == "foam" ]]
 then
     solids4Foam::runApplication sample -latestTime
 else
-    solids4Foam::runApplication postProcess -func sampleDict.v2012 -latestTime
+    solids4Foam::runApplication postProcess -func sample.surfaces -latestTime
 fi
 
 if command -v gnuplot &> /dev/null
