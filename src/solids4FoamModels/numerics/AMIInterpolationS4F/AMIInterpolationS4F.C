@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_COM
+
 #include "AMIInterpolationS4F.H"
 #include "meshTools.H"
 #include "mapDistribute.H"
@@ -1312,5 +1314,6 @@ void Foam::AMIInterpolationS4F::write(Ostream& os) const
     }
 }
 
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //

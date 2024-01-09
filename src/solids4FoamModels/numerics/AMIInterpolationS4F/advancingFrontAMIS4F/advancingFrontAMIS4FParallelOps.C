@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_COM
+
 #include "advancingFrontAMIS4F.H"
 #include "mergePoints.H"
 #include "mapDistribute.H"
@@ -384,5 +386,6 @@ Foam::autoPtr<Foam::mapDistribute> Foam::advancingFrontAMIS4F::calcProcMap
     );
 }
 
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //

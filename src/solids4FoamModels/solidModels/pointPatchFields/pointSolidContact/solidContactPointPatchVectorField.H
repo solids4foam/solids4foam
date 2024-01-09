@@ -225,7 +225,7 @@ public:
             const PointPatchFieldMapper&
         );
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
         //- Construct as copy
         solidContactPointPatchVectorField
         (
