@@ -12,14 +12,14 @@ Prepared by Ivan Batistić
 
 ## Tutorial Aims
 
-- Demonstrate a contact problem between a rigid and deformable body;
-- Compare the accuracy of a solid model against the available analytical solution.
+- Demonstrate the analysis of a contact problem between rigid and deformable bodies.
+- Determine the accuracy of the solver for a contact problem by comparing its predictions with an available analytical solution.
 
 ---
 
 ## Case Overview
 
-A rigid flat-ended indenter is pressed onto an elastic-half space, as shown in Fig. 1. The elastic half-space is modelled as finite, with dimensions $$2H \times H$$, with Young’s modulus $$E = 200$$ GPa and Poisson’s ratio $$\nu= 0.3$$. The problem is solved by assuming a plane stress state and a 2D model with unit thickness. The top surface of the rigid indenter has a prescribed vertical displacement $$u_z = 0.0967$$ mm corresponding to vertical force $$F_z = 10 000$$ N (see Eq (4)). The bottom surface of the finite half-space is held fixed (zero displacement). The contact between the punch and the elastic half-space is modelled as frictionless.
+This case consists of a rigid flat-ended indenter pressed onto an elastic-half space (Figure 1). The elastic half-space is modelled as finite, with dimensions $$2H \times H$$, a Young’s modulus $$E = 200$$ GPa and a Poisson’s ratio $$\nu= 0.3$$. The problem is solved by assuming a plane stress state and a 2-D model with unit thickness. The top surface of the rigid indenter has a prescribed vertical displacement $$u_z = 0.0967$$ mm corresponding to vertical force $$F_z = 10 000$$ N (see Eq (4)). The bottom surface of the finite half-space is held fixed (zero displacement). The contact between the punch and the elastic half-space is modelled as frictionless.
 
 <div style="text-align: center;">
   <img src="./images/flatEndedRigidIndenter-geometry.png" alt="Image" width="300">
@@ -32,15 +32,14 @@ A rigid flat-ended indenter is pressed onto an elastic-half space, as shown in F
 
 ## Expected Results
 
-* The analytical solution for the pressure distribution (plane stress) is [[2]](https://www.cambridge.org/core/books/contact-mechanics/E3707F77C2EBCE727C3911AFBD2E4AC2):
-
+The analytical solution for the pressure distribution (plane stress) is [[2]](https://www.cambridge.org/core/books/contact-mechanics/E3707F77C2EBCE727C3911AFBD2E4AC2):
 $$
 p_n(x) = \frac{F}{\pi\sqrt{a^2-x^2}} \qquad \text{for } |x| \leq a,
 $$
 
-where $$a$$ is half the contact width and $$x$$ is the $$x$$ coordinate. This pressure distribution is singular at the edge ($$x \equiv \pm a$$) of the fixed contact zone.
+where $$a$$ is half the contact width and $$x$$ is the horizontal coordinate. This pressure distribution is singular at the edge ($$x \equiv \pm a$$) of the fixed contact zone.
 
-The displacement of the rigid indentor ($$d$$) is related to the applied force ($$F$$) can be obtained using:
+The displacement of the rigid indentor $$d$$, related to the applied force $$F$$, can be obtained using:
 
 $$
 u_z = \frac{F}{\pi E}\left[ 2 \text{ln} \left(\frac{2L}{a}\right) - (1+\nu) \right],
@@ -65,14 +64,15 @@ The main cause of the shift between the analytical and the numerical curve is th
      <strong>Figure 2: Contact pressure distribution</strong>
     </figcaption>
 </div>
-Figure 3 shows the displacement profile of the half-space top surface. The displacement profile from `solids4Foam` matches the analytical one; a small discrepancy between results exists because the analytical solution has an abrupt profile change at the contact edge. Same as for Figure 2, the diagram shown in Figure 3 is automatically created within the `Allrun` script using `sample` utility and `gnuplot`. 
+Figure 3 shows the displacement profile of the half-space top surface. The displacement profile from `solids4Foam` matches the analytical one; a small discrepancy between results exists because the analytical solution has an abrupt profile change at the contact edge. As in Figure 2, the diagram shown in Figure 3 is automatically created within the `Allrun` script using `sample` utility and `gnuplot`. 
 
 <div style="text-align: center;">
   <img src="./images/flatEndedRigidIndenter-displacement.png" alt="Image" width="600">
     <figcaption>
-     <strong>Figure 3: Vertical displacement of top half-space surface</strong>
+     <strong>Figure 3: Vertical displacement of the top half-space surface</strong>
     </figcaption>
 </div>
+
 
 ---
 
