@@ -2,19 +2,25 @@
 
 ---
 
+Prepared by Philip Cardiff and Ivan Batistić
+
+
+---
+
 ## Tutorial Aims
 
-- Demonstrate the solution of a transient viscoelastic analysis;
+- Demonstrate a transient viscoelastic analysis;
+- Compare viscoelastic predictions with a reference finite element solution.
 
 ---
 
 ## Case Overview
 
-This case consists of a tube constructed from a viscoelastic material, where the inner surface is quickly displaced in the radial direction; the tube relaxes towards a steady-state after initially experiencing high wall stresses. The case is modelled as 2-D with quarter symmetries, as schematically shown in Figure 1. The cylindrical tube has an inner radius of $$5$$ mm and an outer radius of $$10$$ mm.  The tube material is assumed to be a viscoelastic polymer and its deviatoric response is represented by a Prony series, whereas its bulk/volumetric response is assumed to be elastic; the mechanical properties are given in Table 1.
+This case consists of a tube constructed from a viscoelastic material [1], where the inner surface is quickly displaced in the radial direction; subsequently, the tube relaxes towards a steady state after initially experiencing high wall stresses. The case is modelled as 2-D with quarter symmetries, as schematically shown in Figure 1. The cylindrical tube has an inner radius of $$5$$ mm and an outer radius of $$10$$ mm.  The tube material is assumed to be a viscoelastic polymer where a Prony series represents its deviatoric response, and its bulk/volumetric response is assumed to be elastic. The mechanical parameters for the Prony series Maxwell models are given in Table 1.
 
 **Table 1: Viscoelastic mechanical properties given in terms of a Prony series**
 
-|     _Maxwell Models_      |                |               |
+|    Material parameter     |     Symbol     |     Value     |
 | :-----------------------: | :------------: | :-----------: |
 |     Young’s modulus 1     |    $$E_1$$     | $$2.93$$ GPa  |
 |     Young’s modulus 2     |    $$E_2$$     | $$5.86$$ GPa  |
@@ -28,7 +34,7 @@ This case consists of a tube constructed from a viscoelastic material, where the
 | _Relaxed_ Young’s modulus | $$E_{\infty}$$ | $$39.58$$ GPa |
 |      Poisson's ratio      |    $$\nu$$     |   $$0.33$$    |
 
-The inner surface of the tube is displaced $$1$$ µm in the radial direction; in order to mimic the displacement occurring instantaneously, it is applied within the first time step. The outer surface of the tube is traction-free. The case is solved over a period of $$7000$$ s with a time step of $$800$$ s. Inertia and gravity terms are neglected and the problem is solved as a plane strain. The cylinder is discretised with $$24$$ CVs in radial and $$48$$ CVs in circumferential direction.
+The inner surface of the tube is displaced $$1$$ µm in the radial direction. To mimic the displacement occurring instantaneously, it is applied within the first time step. The outer surface of the tube is traction-free. The case is solved over a period of $$7000$$ s with a time step of $$800$$ s. Inertia and gravity terms are neglected, and the problem is solved as a plane strain. The cylinder is discretised with $$1,152$$ cells: $$24$$ cells in the radial direction and $$48$$ cells in the circumferential direction.
 
 <div style="text-align: center;">
   <img src="./images/viscoTube-geometry.png" alt="Image" width="350">
@@ -41,18 +47,19 @@ The inner surface of the tube is displaced $$1$$ µm in the radial direction; in
 
 ## Expected Results
 
-In  [[1]](https://arxiv.org/abs/1808.10736), the predicted radial stress and radial displacement on the inner tube surface are compared with the Abaqus results. To illustrate the effect of loading increment size on the employed material law integration, four separate time step sizes are examined ($$700$$, $$350$$, $$175$$, and $$87.5$$ s). From Fig. 2 one can see that the predicted stresses and displacements are relatively insensitive to time-step, and as the step size is reduced, the predictions are seen to approach the reference solution.
+In Cardiff et al. [[1]](https://arxiv.org/abs/1808.10736), the predicted radial stress and radial displacement on the inner tube surface are compared with results from commercial finite element software Abaqus. To illustrate the effect of loading increment size on the employed material law integration, four separate time step sizes are examined ($$700$$, $$350$$, $$175$$, and $$87.5$$ s). From Figure 2, one can see that the predicted stresses and displacements are relatively insensitive to time-step size. As the step size is reduced, the predictions are seen to approach the reference finite element solution ("Abaqus FE").
 
 <div style="text-align: center;">
   <img src="./images/viscoTube-radialStress.png" alt="Image" width="500">
   <img src="./images/viscoTube-radialDisplacement.png" alt="Image" width="500">
     <figcaption>
-     <strong>Figure 2: Radial stress and radial displacement predictions across the wall thickness, showing the effect of loading step size [1]</strong>
+     <strong>Figure 2: Radial stress and radial displacement predictions across the wall thickness, showing the effect of loading step size [1]. Comparison is given with finite element results from Abaqus ("Abaqus FE") </strong>
     </figcaption>
 </div>
 
 
-The above plots can be easily reproduced by using post-processing function objects added to `controlDict`. For the chosen point in the domain, the `solidPointStress` function object is used to write the corresponding stress tensor and `solidPointDisplacement` to write displacement values.
+
+The above plots can be easily reproduced using post-processing function objects added to `controlDict`. For the chosen point in the domain, the `solidPointStress` function object is used to write the corresponding stress tensor and the `solidPointDisplacement` fuction object to write displacement values.
 
 ```c++
 functions
