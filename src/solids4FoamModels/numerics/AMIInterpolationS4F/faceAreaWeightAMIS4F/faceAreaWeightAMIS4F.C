@@ -400,7 +400,7 @@ void Foam::faceAreaWeightAMIS4F::calcInterArea
     {
         inter.calc(src, tgt, n/magN, area, centroid);
     }
-    else
+    else if (debug)
     {
         WarningInFunction
             << "Invalid normal for source face " << srcFacei
@@ -479,7 +479,7 @@ bool Foam::faceAreaWeightAMIS4F::overlaps
     {
         return inter.overlaps(src, tgt, n/magN, threshold);
     }
-    else
+    else if (debug)
     {
         WarningInFunction
             << "Invalid normal for source face " << srcFacei
