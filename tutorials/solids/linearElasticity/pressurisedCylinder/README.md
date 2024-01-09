@@ -36,7 +36,7 @@ $$
 $$
 
 $$
-\sigma_r = p \dfrac{r_i^2}{r_o^2-r_i^2}\left(1+\dfrac{r_o^2}{r^2}\right),
+\sigma_{\theta} = p \dfrac{r_i^2}{r_o^2-r_i^2}\left(1+\dfrac{r_o^2}{r^2}\right),
 $$
 
 $$
