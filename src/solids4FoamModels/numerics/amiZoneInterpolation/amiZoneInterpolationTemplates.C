@@ -154,15 +154,6 @@ Foam::amiZoneInterpolation::interpolateToSourcePoints
               + weights[pointI][1]*pf[hitFace.nextLabel(pI)]
               + weights[pointI][2]*ctrF;
         }
-        else
-        {
-            FatalErrorIn
-            (
-                "amiZoneInterpolation::interpolateToSourcePoints"
-                "(const Field<Type> pf)"
-            )   << "Source point addressing is not correct"
-                << abort(FatalError);
-        }
     }
 
     return tresult;
