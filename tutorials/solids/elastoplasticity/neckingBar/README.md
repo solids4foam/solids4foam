@@ -1,3 +1,7 @@
+---
+sort: 4
+---
+
 # Necking of a Cylindrical Bar: `neckingBar`
 
 Prepared by Philip Cardiff and Ivan Batistić

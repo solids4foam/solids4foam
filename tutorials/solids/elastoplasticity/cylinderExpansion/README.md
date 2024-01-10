@@ -1,3 +1,7 @@
+---
+sort: 3
+---
+
 # Expansion of Thick-Walled Cylinder: `cylinderExpansion`
 
 Prepared by Philip Cardiff and Ivan Batistić
