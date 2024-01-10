@@ -30,7 +30,7 @@ fi
 # Create plots
 if command -v gnuplot &> /dev/null
 then
-    echo "Generating sigmaXX_lineXX.png and sigmaXX_lineYY.png using gnuplot"
+    echo "Generating sigmaR.png and sigmaTheta.png using gnuplot"
     gnuplot plot.gnuplot &> /dev/null
 else
     echo "Please install gnuplot if you would like to generate the plots"

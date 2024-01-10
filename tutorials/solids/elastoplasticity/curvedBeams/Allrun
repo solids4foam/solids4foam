@@ -12,8 +12,12 @@ solids4Foam::caseOnlyRunsWithFoamExtend
 # Check case version is correct
 #solids4Foam::convertCaseFormat .
 
-# Create mesh
+# Create the blockMeshDict
+mkdir -p constant/polyMesh
 m4 -P system/blockMeshDict.m4 > constant/polyMesh/blockMeshDict
+#m4 -P system/blockMeshDict.m4 > system/blockMeshDict
+
+# Create mesh
 solids4Foam::runApplication blockMesh
 
 # Run solver
