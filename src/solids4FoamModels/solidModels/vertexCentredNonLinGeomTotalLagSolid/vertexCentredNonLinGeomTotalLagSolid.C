@@ -668,7 +668,7 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
 #endif
 
 	//For small strain the geometric stiffness is zero
-	if (!largeStrain_)
+	if (!geometricStiffness_)
 	{
 		return tresult;
     }
@@ -871,7 +871,22 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
         )
     ),
     fullNewton_(solidModelDict().lookup("fullNewton")),
-    largeStrain_(solidModelDict().lookup("largeStrain")),
+    geometricStiffness_(solidModelDict().lookup("largeStrain")),
+    solvePressureEquation_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "solvePressureEquation",
+            false
+        )
+    ),
+    pressureFactor_
+    (
+        solidModelDict().lookupOrDefault<scalar>
+        (
+            "pressureFactor", 0.5
+        )
+    ),
     steadyState_(false),
     twoD_(sparseMatrixTools::checkTwoD(mesh())),
     fixedDofs_(mesh().nPoints(), false),
@@ -913,6 +928,19 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
         ),
         pMesh(),
         dimensionedVector("0", dimVelocity/dimTime, vector::zero)
+    ),
+    pointP_
+    (
+        IOobject
+        (
+            "pointP",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        pMesh(),
+        dimensionedScalar("0", dimPressure, 0.0)
     ),
     pointRho_
     (
@@ -1010,6 +1038,20 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
         dimensionedScalar("zero", dimless, 0.0),
         "calculated"
     ),
+    dualPf_
+    (
+        IOobject
+        (
+            "pf",
+            runTime.timeName(),
+            dualMesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        dualMesh(),
+        dimensionedScalar("zero", dimPressure, 0.0),
+        "calculated"
+    ),
     globalPointIndices_(mesh())
 {
     // Create dual mesh and set write option
@@ -1045,6 +1087,7 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
 
     // Store old time fields
     pointD().oldTime().storeOldTime();
+    pointP_.oldTime().storeOldTime();
     pointU_.oldTime().storeOldTime();
     pointA_.storeOldTime();
 
@@ -1167,6 +1210,8 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 
     // Solution field: point displacement correction
     vectorField pointDcorr(pointD().internalField().size(), vector::zero);
+    // Solution field: point pressure correction
+    scalarField pointPcorr(pointP_.internalField().size(), 0);
 
     // Newton-Raphson loop over momentum equation
     int iCorr = 0;

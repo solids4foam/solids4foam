@@ -553,7 +553,8 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
 void Foam::neoHookeanElasticMisesPlastic::calculateStress
 (
  surfaceSymmTensorField& sigma,
- const surfaceTensorField& gradD
+ const surfaceTensorField& gradD,
+ const surfaceScalarField& p
 )
 {
 	// Calculate F
@@ -790,7 +791,16 @@ void Foam::neoHookeanElasticMisesPlastic::calculateStress
 
     // Update the Cauchy stress
     // Note: updayeSigmaHyd is not implemented for surface fields
-    sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
+
+    if (solvePressureEquation_)
+    {
+    	sigma = dev( (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s) ) - p*I;
+    
+    }
+    else
+    {
+    	sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
+    }  
 }
 
 
@@ -810,7 +820,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
     K_("zero", dimPressure, 0.0),
     JPtr_(),
     JfPtr_(),
-    stressPlasticStrainSeries_(dict),
+    stressPlasticStrainSeries_(dict),        
     sigmaY_
     (
         IOobject
@@ -1090,6 +1100,7 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
         mesh,
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
+    
     nonLinearPlasticity_(stressPlasticStrainSeries_.size() > 2),
     updateBEbarConsistent_
     (
@@ -1097,6 +1108,14 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
         (
             "updateBEbarConsistent",
             Switch(true)
+        )
+    ),
+    solvePressureEquation_
+    (
+        dict.lookupOrDefault<Switch>
+        (
+            "solvePressureEquation",
+            false
         )
     ),
     Hp_(0.0),
@@ -1254,6 +1273,11 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
     const Switch numericalTangent(dict().lookup("numericalTangent"));
     if (numericalTangent)
     {
+
+		// Look up current pressure and store it as the reference 
+		const surfaceScalarField& pRef = 
+        	mesh().lookupObject<surfaceScalarField>("pf");
+            
         // Lookup current stress and store it as the reference
         const surfaceSymmTensorField& sigmaRef = 
             mesh().lookupObject<surfaceSymmTensorField>("sigmaf");
@@ -1280,7 +1304,7 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
             gradDPerturb.replace(cmptI, gradDRef.component(cmptI) + eps);
 
             // Calculate perturbed stress
-            const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateStress(sigmaPerturb, gradDPerturb);
+            const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateStress(sigmaPerturb, gradDPerturb, pRef);
 
             // Calculate tangent component
             const surfaceSymmTensorField tangCmpt((sigmaPerturb - sigmaRef)/eps);
@@ -2033,6 +2057,15 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     
     // Update the Cauchy stress
     // Note: updayeSigmaHyd is not implemented for surface fields
+    
+//    if (solvePressureEquation_)
+//    {
+//    	sigma = dev( (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s) ) - p*I;
+//    }
+//    else
+//    {
+//    	sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
+//    }
     sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
 }
 

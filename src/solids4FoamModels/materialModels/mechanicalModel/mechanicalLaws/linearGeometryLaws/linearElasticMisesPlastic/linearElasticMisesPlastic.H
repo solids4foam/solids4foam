@@ -58,6 +58,7 @@ Author
 #include "surfaceMesh.H"
 #include "zeroGradientFvPatchFields.H"
 #include "interpolationTable.H"
+#include "pointFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -94,18 +95,27 @@ class linearElasticMisesPlastic
 
         //- Yield stress surface field
         surfaceScalarField sigmaYf_;
+        
+        //- Yield stress point field
+        pointScalarField pSigmaY_;
 
         //- Incremental change in sigmaY
         volScalarField DSigmaY_;
 
         //- Incremental change in sigmaY surface field
         surfaceScalarField DSigmaYf_;
+        
+        //- Incremental change in sigmaY point field
+        pointScalarField pDSigmaY_;
 
         //- Total plastic strain
         volSymmTensorField epsilonP_;
 
         //- Total plastic strain surface field
         surfaceSymmTensorField epsilonPf_;
+        
+        //- Total plastic strain point field
+        pointSymmTensorField pEpsilonP_;
 
         //- Incremental change of plastic strain
         volSymmTensorField DEpsilonP_;
@@ -124,6 +134,9 @@ class linearElasticMisesPlastic
 
         //- Plastic multiplier increment - surface field
         surfaceScalarField DLambdaf_;
+        
+        //- Plastic multiplier increment - point field
+        pointScalarField pDLambda_;
 
         //- Equivalent plastic strain
         volScalarField epsilonPEq_;
@@ -141,6 +154,9 @@ class linearElasticMisesPlastic
 
         //- plasticN surface field
         surfaceSymmTensorField plasticNf_;
+        
+        //- plasticN point field
+        pointSymmTensorField pPlasticN_;
 
         //- An iterative procedure is used when the yield stress is a nonlinear
         //  function of plastic strain
@@ -236,6 +252,13 @@ class linearElasticMisesPlastic
             surfaceSymmTensorField& sigma,
             const surfaceTensorField& gradD
         ) const;
+        
+        //- Calculate stress at the points
+		void calculatePStress
+		(
+			pointSymmTensorField& pSigma,
+			const pointTensorField& pGradD
+		) const;
 
 
 public:
@@ -244,7 +267,7 @@ public:
     TypeName("linearElasticMisesPlastic");
 
     // Static data members
-
+    
 
     // Constructors
 

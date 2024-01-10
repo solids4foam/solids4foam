@@ -91,6 +91,9 @@ class neoHookeanElasticMisesPlastic
         //  For large strain total Lagrangian models, it expects
         //  the true stress and true plastic strain.
         interpolationTable<scalar> stressPlasticStrainSeries_;
+        
+        //- Flag to add pressure
+        const Switch solvePressureEquation_;
 
         //- Cauchy yield stress
         volScalarField sigmaY_;
@@ -250,11 +253,12 @@ class neoHookeanElasticMisesPlastic
             const surfaceSymmTensorField& devBEbar
         );
         
-        //- Calculate stress given F
+        //- Calculate stress given gradD
         void calculateStress
         (
             surfaceSymmTensorField& sigma,
-            const surfaceTensorField& F
+            const surfaceTensorField& gradD,
+            const surfaceScalarField& p
         );
 
 public:

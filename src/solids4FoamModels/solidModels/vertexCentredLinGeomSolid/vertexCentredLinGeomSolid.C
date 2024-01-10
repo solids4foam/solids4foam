@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "vertexCentredLinGeomSolid.H"
+#include "linearElasticMisesPlastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "sparseMatrix.H"
 #include "symmTensor4thOrder.H"
@@ -1314,8 +1315,37 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
     pEpsilonEq.write();
 
     Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;
-
+    
+    // Stress at the points
+    pointSymmTensorField pSigma
+	(
+		IOobject
+		(
+		    "pSigma",
+		    runTime.timeName(),
+		    runTime,
+		    IOobject::NO_READ,
+		    IOobject::AUTO_WRITE
+		),
+		pMesh(),
+		dimensionedSymmTensor("0", dimless, symmTensor::zero)
+    );
+    
+    //linearElasticMisesPlastic::calculatePStress(pSigma, pGradD);
+    
+//#ifdef FOAMEXTEND
+//    pSigma.internalField() = linearElasticMisesPlastic::calculatePStress(pSigma, pGradD);
+//#else
+//    pSigma.primitiveFieldRef() = linearElasticMisesPlastic::calculatePStress(pSigma, pGradD);
+//#endif
+//    
+//    //pSigma.internalField() = linearElasticMisesPlastic::calculatePStress(pSigma, pGradD);
+    
+    pSigma.write();
+    
     solidModel::writeFields(runTime);
+    
+    
 }
 
 
