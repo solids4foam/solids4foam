@@ -1,4 +1,6 @@
-
+---
+sort: 1
+---
 
 # Thermally loaded cylinder: `hotCylinder`
 
