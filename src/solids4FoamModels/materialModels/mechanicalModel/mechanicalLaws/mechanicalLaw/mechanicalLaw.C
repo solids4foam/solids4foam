@@ -491,7 +491,7 @@ const Foam::volScalarField& Foam::mechanicalLaw::mu() const
 {
     if (muPtr_.empty())
     {
-        // Resolves #93
+        // Resolves temporarily #90
         //makeMu();
         FatalErrorIn
         (
@@ -509,7 +509,7 @@ Foam::volScalarField& Foam::mechanicalLaw::mu()
 {
     if (muPtr_.empty())
     {
-        // Resolves #93
+        // Resolves temporarily #90
         //makeMu();
         FatalErrorIn("Foam::volScalarField& Foam::mechanicalLaw::mu()")
             << "mu field has not been set. Please construct the field first"
@@ -525,7 +525,7 @@ const Foam::surfaceScalarField& Foam::mechanicalLaw::muf() const
 {
     if (mufPtr_.empty())
     {
-        // Resolves #93
+        // Resolves temporarily #90
         //makeMuf();
         FatalErrorIn
         (
@@ -543,7 +543,7 @@ Foam::surfaceScalarField& Foam::mechanicalLaw::muf()
 {
     if (mufPtr_.empty())
     {
-        // Resolves #93
+        // Resolves temporarily #90
         //makeMuf();
         FatalErrorIn("Foam::surfaceScalarField& Foam::mechanicalLaw::muf()")
             << "muf field has not been set. Please construct the field first"
@@ -625,7 +625,7 @@ const Foam::volScalarField& Foam::mechanicalLaw::K() const
 {
     if (KPtr_.empty())
     {
-        // Resolves #93
+        // Resolves temporarily #90
         //makeK();
         FatalErrorIn("const Foam::volScalarField& Foam::mechanicalLaw::K()")
             << "K field has not been set. Please construct the field first"
@@ -641,7 +641,7 @@ Foam::volScalarField& Foam::mechanicalLaw::K()
 {
     if (KPtr_.empty())
     {
-        // Resolves #93
+        // Resolves temporarily #90
         //makeK();
         FatalErrorIn("Foam::volScalarField& Foam::mechanicalLaw::K()")
             << "K field has not been set. Please construct the field first"
@@ -657,7 +657,7 @@ const Foam::surfaceScalarField& Foam::mechanicalLaw::Kf() const
 {
     if (KfPtr_.empty())
     {
-        // Resolves #93
+        // Resolves temporarily #90
         //makeKf();
         FatalErrorIn
         (
@@ -675,7 +675,7 @@ Foam::surfaceScalarField& Foam::mechanicalLaw::Kf()
 {
     if (KfPtr_.empty())
     {
-        // Resolves #93
+        // Resolves temporarily #90
         //makeKf();
         FatalErrorIn("Foam::surfaceScalarField& Foam::mechanicalLaw::Kf()")
             << "Kf field has not been set. Please construct the field first"
