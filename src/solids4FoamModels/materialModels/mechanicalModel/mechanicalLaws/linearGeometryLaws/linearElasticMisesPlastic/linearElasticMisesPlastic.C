@@ -510,6 +510,7 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
+    pMesh_(pointMesh::New(mesh)),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
     E_("zero", dimPressure, 0.0),
@@ -552,12 +553,12 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
         IOobject
         (
             "pSigmaY",
-            pSigmaY_.mesh().mesh().time().timeName(),
-            pSigmaY_.mesh().mesh(),
+            mesh.time().timeName(),
+            mesh,
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        pSigmaY_.mesh(),
+        pMesh_,
         dimensionedScalar
         (
            "initialYieldStress", dimPressure, stressPlasticStrainSeries_(0.0)
@@ -817,6 +818,7 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
         mesh.time().controlDict().lookupOrDefault<scalar>("maxDeltaErr", 0.01)
     )
 {
+    Info<< __FILE__ << " " << __LINE__ << endl;
     if (planeStress())
     {
         FatalErrorIn

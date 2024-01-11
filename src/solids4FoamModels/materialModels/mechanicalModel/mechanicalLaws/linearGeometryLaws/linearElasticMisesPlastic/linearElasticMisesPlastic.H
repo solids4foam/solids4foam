@@ -75,6 +75,9 @@ class linearElasticMisesPlastic
 {
     // Private data
 
+        //- Point mesh
+        const pointMesh& pMesh_;
+
         //- Shear modulus
         dimensionedScalar mu_;
 
