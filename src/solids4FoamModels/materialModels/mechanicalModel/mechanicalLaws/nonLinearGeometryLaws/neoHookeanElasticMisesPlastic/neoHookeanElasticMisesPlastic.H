@@ -91,9 +91,6 @@ class neoHookeanElasticMisesPlastic
         //  For large strain total Lagrangian models, it expects
         //  the true stress and true plastic strain.
         interpolationTable<scalar> stressPlasticStrainSeries_;
-        
-        //- Flag to add pressure
-        const Switch solvePressureEquation_;
 
         //- Cauchy yield stress
         volScalarField sigmaY_;
@@ -170,6 +167,9 @@ class neoHookeanElasticMisesPlastic
         //- Update bEbar consistently with the assumption that det(bEbar) == 1
         //  defaults to off
         const Switch updateBEbarConsistent_;
+
+        //- Flag to add pressure
+        const Switch solvePressureEquation_;
 
         //- Linear plastic modulus. It is only used if plasticity is linear,
         //  defined by two points on the stress-plastic strain curve
@@ -252,7 +252,7 @@ class neoHookeanElasticMisesPlastic
         (
             const surfaceSymmTensorField& devBEbar
         );
-        
+
         //- Calculate stress given gradD
         void calculateStress
         (
@@ -291,7 +291,7 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
-        
+
         //- Material tangent for Newton Raphson loop
         virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
 
