@@ -491,7 +491,14 @@ const Foam::volScalarField& Foam::mechanicalLaw::mu() const
 {
     if (muPtr_.empty())
     {
-        makeMu();
+        // Resolves #93
+        //makeMu();
+        FatalErrorIn
+        (
+            "const Foam::volScalarField& Foam::mechanicalLaw::mu() const"
+        )   << "mu field has not been set. Please construct the field first"
+            << " using mu(const dimensionedScalar& mu)"
+            << abort(FatalError);
     }
 
     return muPtr_();
@@ -502,7 +509,12 @@ Foam::volScalarField& Foam::mechanicalLaw::mu()
 {
     if (muPtr_.empty())
     {
-        makeMu();
+        // Resolves #93
+        //makeMu();
+        FatalErrorIn("Foam::volScalarField& Foam::mechanicalLaw::mu()")
+            << "mu field has not been set. Please construct the field first"
+            << " using mu(const dimensionedScalar& mu)"
+            << abort(FatalError);
     }
 
     return muPtr_();
@@ -513,7 +525,14 @@ const Foam::surfaceScalarField& Foam::mechanicalLaw::muf() const
 {
     if (mufPtr_.empty())
     {
-        makeMuf();
+        // Resolves #93
+        //makeMuf();
+        FatalErrorIn
+        (
+            "const Foam::surfaceScalarField& Foam::mechanicalLaw::muf() const"
+        )   << "muf field has not been set. Please construct the field first"
+            << " using muf(const dimensionedScalar& mu)"
+            << abort(FatalError);
     }
 
     return mufPtr_();
@@ -524,7 +543,12 @@ Foam::surfaceScalarField& Foam::mechanicalLaw::muf()
 {
     if (mufPtr_.empty())
     {
-        makeMuf();
+        // Resolves #93
+        //makeMuf();
+        FatalErrorIn("Foam::surfaceScalarField& Foam::mechanicalLaw::muf()")
+            << "muf field has not been set. Please construct the field first"
+            << " using muf(const dimensionedScalar& mu)"
+            << abort(FatalError);
     }
 
     return mufPtr_();
@@ -539,6 +563,21 @@ const Foam::volScalarField& Foam::mechanicalLaw::mu(const dimensionedScalar& mu)
     }
 
     // Set constant field, overwriting any existing values
+    muPtr_() = mu;
+
+    // Return a reference to the field
+    return muPtr_();
+}
+
+
+const Foam::volScalarField& Foam::mechanicalLaw::mu(const volScalarField& mu)
+{
+    if (muPtr_.empty())
+    {
+        makeMu();
+    }
+
+    // Set variable field, overwriting any existing values
     muPtr_() = mu;
 
     // Return a reference to the field
@@ -564,11 +603,34 @@ const Foam::surfaceScalarField& Foam::mechanicalLaw::muf
 }
 
 
+const Foam::surfaceScalarField& Foam::mechanicalLaw::muf
+(
+    const surfaceScalarField& mu
+)
+{
+    if (mufPtr_.empty())
+    {
+        makeMuf();
+    }
+
+    // Set variable field, overwriting any existing values
+    mufPtr_() = mu;
+
+    // Return a reference to the field
+    return mufPtr_();
+}
+
+
 const Foam::volScalarField& Foam::mechanicalLaw::K() const
 {
     if (KPtr_.empty())
     {
-        makeK();
+        // Resolves #93
+        //makeK();
+        FatalErrorIn("const Foam::volScalarField& Foam::mechanicalLaw::K()")
+            << "K field has not been set. Please construct the field first"
+            << " using K(const dimensionedScalar& K)"
+            << abort(FatalError);
     }
 
     return KPtr_();
@@ -579,7 +641,12 @@ Foam::volScalarField& Foam::mechanicalLaw::K()
 {
     if (KPtr_.empty())
     {
-        makeK();
+        // Resolves #93
+        //makeK();
+        FatalErrorIn("Foam::volScalarField& Foam::mechanicalLaw::K()")
+            << "K field has not been set. Please construct the field first"
+            << " using K(const dimensionedScalar& K)"
+            << abort(FatalError);
     }
 
     return KPtr_();
@@ -590,7 +657,14 @@ const Foam::surfaceScalarField& Foam::mechanicalLaw::Kf() const
 {
     if (KfPtr_.empty())
     {
-        makeKf();
+        // Resolves #93
+        //makeKf();
+        FatalErrorIn
+        (
+            "const Foam::surfaceScalarField& Foam::mechanicalLaw::Kf() const"
+        )   << "Kf field has not been set. Please construct the field first"
+            << " using Kf(const dimensionedScalar& K)"
+            << abort(FatalError);
     }
 
     return KfPtr_();
@@ -601,7 +675,12 @@ Foam::surfaceScalarField& Foam::mechanicalLaw::Kf()
 {
     if (KfPtr_.empty())
     {
-        makeKf();
+        // Resolves #93
+        //makeKf();
+        FatalErrorIn("Foam::surfaceScalarField& Foam::mechanicalLaw::Kf()")
+            << "Kf field has not been set. Please construct the field first"
+            << " using Kf(const dimensionedScalar& K)"
+            << abort(FatalError);
     }
 
     return KfPtr_();
@@ -623,6 +702,21 @@ const Foam::volScalarField& Foam::mechanicalLaw::K(const dimensionedScalar& K)
 }
 
 
+const Foam::volScalarField& Foam::mechanicalLaw::K(const volScalarField& K)
+{
+    if (KPtr_.empty())
+    {
+        makeK();
+    }
+
+    // Set variable field, overwriting any existing values
+    KPtr_() = K;
+
+    // Return a reference to the field
+    return KPtr_();
+}
+
+
 const Foam::surfaceScalarField& Foam::mechanicalLaw::Kf
 (
     const dimensionedScalar& K
@@ -634,6 +728,24 @@ const Foam::surfaceScalarField& Foam::mechanicalLaw::Kf
     }
 
     // Set constant field, overwriting any existing values
+    KfPtr_() = K;
+
+    // Return a reference to the field
+    return KfPtr_();
+}
+
+
+const Foam::surfaceScalarField& Foam::mechanicalLaw::Kf
+(
+    const surfaceScalarField& K
+)
+{
+    if (KfPtr_.empty())
+    {
+        makeKf();
+    }
+
+    // Set variable field, overwriting any existing values
     KfPtr_() = K;
 
     // Return a reference to the field

@@ -234,8 +234,14 @@ protected:
         //- Assign a constant mu field and return a reference to it
         const volScalarField& mu(const dimensionedScalar& mu);
 
+        //- Assign a variable mu field and return a reference to it
+        const volScalarField& mu(const volScalarField& mu);
+
         //- Assign a constant muf field and return a reference to it
         const surfaceScalarField& muf(const dimensionedScalar& mu);
+
+        //- Assign a variable muf field and return a reference to it
+        const surfaceScalarField& muf(const surfaceScalarField& mu);
 
         //- Return a const reference to the K field
         const volScalarField& K() const;
@@ -252,8 +258,14 @@ protected:
         //- Assign a constant Ku field and return a reference to it
         const volScalarField& K(const dimensionedScalar& K);
 
+        //- Assign a variable Ku field and return a reference to it
+        const volScalarField& K(const volScalarField& K);
+
         //- Assign a constant Kuf field and return a reference to it
         const surfaceScalarField& Kf(const dimensionedScalar& K);
+
+        //- Assign a variable Kuf field and return a reference to it
+        const surfaceScalarField& Kf(const surfaceScalarField& K);
 
         //- Assign a constant impK field and return a reference to it
         const volScalarField& impK(const dimensionedScalar& impK);
