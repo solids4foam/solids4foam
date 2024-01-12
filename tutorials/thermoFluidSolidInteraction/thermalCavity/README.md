@@ -20,7 +20,7 @@ Prepared by Željko Tuković and Philip Cardiff
 
 This case extends the traditional OpenFOAM `cavity` tutorial to include a coupled thermal analysis. The right wall of the cavity is assumed to be elastic and initially hotter than the cavity fluid (Figure 1). A coupled thermo-fluid-solid interaction analysis is performed where the heat equation is solved in the fluid and solid regions in addition to the Navier-Stokes equations in the fluid and the momentum equation in the solid. The coupling procedure enforces temperature and heat flux continuity at the fluid-solid interface. Within the fluid, the temperature differences generate forces that drive fluid flow, while in the solid, increases in temperature cause volumetric expansion.
 
-At time $$t = 0$$, the fluid temperature is $$283$$ K, whereas the solid temperature is $$323$$ K. The top, left, and bottom of the fluid domain are assumed to be stationary no-slip walls. The top and bottom of the solid domain are fixed (zero displacement), while the right has a zero-traction condition. The left of the fluid boundary is held at a fixed temperature of $$283$$ K, while the right of the solid is held at $$323$$ K. All other external boundaries are assumed to be adiabatic (zero heat flux). The right of the fluid domain and the left of the solid domain represent the fluid-solid interface, where kinematic (velocity continuity), kinetic (force continuity) and thermal constraints (temperature and heat flux continuity) are enforced. In both fluid and solid, gravity is assumed to act in the negative vertical direction $$(0 -9.81 0)$$ and inertial effects are included. Small deformations are assumed in the solid.
+At time $$t = 0$$, the fluid temperature is $$283$$ K, whereas the solid temperature is $$323$$ K. The top, left, and bottom of the fluid domain are assumed to be stationary no-slip walls. The top and bottom of the solid domain are fixed (zero displacement), while the right has a zero-traction condition. The left of the fluid boundary is held at a fixed temperature of $$283$$ K, while the right of the solid is held at $$323$$ K. All other external boundaries are assumed to be adiabatic (zero heat flux). The right of the fluid domain and the left of the solid domain represent the fluid-solid interface, where kinematic (velocity continuity), kinetic (force continuity) and thermal constraints (temperature and heat flux continuity) are enforced. In both fluid and solid, gravity is assumed to act in the negative vertical direction $$(0\;$$-$$9.81\; 0)$$ m/s$$^{2}$$ and inertial effects are included. Small deformations are assumed in the solid.
 
 <div style="text-align: center;">
   <img src="./images/thermalCavity-geometry.png" alt="Image" width="600">
@@ -58,18 +58,18 @@ Over the duration of the simulation, the solid heats the fluid, causing a therma
 <div style="text-align: center;">
   <img src="./images/thermalCavity-temperature.png" alt="Image" width="500">
     <figcaption>
-     <strong>Figure 2: Temperature distribution at $$t = 10$$ s</strong>
+     <strong>Figure 2: Temperature distribution at the end time</strong>
     </figcaption>
 </div>
 
 {% include youtube.html id="5cIkFAXWTzQ" %}
 
-**Video 1: Evolution of the temperature and veloecity distributions within the fluid and solid domains**
+**Video 1: Evolution of the temperature and velocity distributions within the fluid and solid domains**
 
 <div style="text-align: center;">
   <img src="./images/thermalCavity-deformation.png" alt="Image" width="600">
     <figcaption>
-     <strong>Figure 3: Velocity distribution in the fluid and displacement distribution in the solid at $$t = 10$$ s</strong>
+     <strong>Figure 3: Velocity distribution in the fluid and displacement distribution in the solid at the end time</strong>
     </figcaption>
 </div>
 
