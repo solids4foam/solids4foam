@@ -366,4 +366,49 @@ void Foam::multiplyCoeffExtended
       
 }
 
+void Foam::multiplyCoeffPressure
+(
+    vector& coeff,
+    const vector& Sf,
+    const symmTensor& P
+)
+{
+	// Index notation
+    // coeff_i = Sf_m P_mi
+
+	// coeff_1 = Sf_m P_m1 
+	//		
+	//		   = Sf_1 P_11
+	//		     + Sf_2 P_21
+	//		     + Sf_3 P_31 
+	
+	coeff[vector::X] =
+        Sf[vector::X]*P[symmTensor::XX]
+      + Sf[vector::Y]*P[symmTensor::XY]
+      + Sf[vector::Z]*P[symmTensor::XZ];	
+      
+	// coeff_2 = Sf_m P_m2 
+	//		
+	//		   = Sf_1 P_12
+	//		     + Sf_2 P_22
+	//		     + Sf_3 P_32 
+	
+	coeff[vector::Y] =
+        Sf[vector::X]*P[symmTensor::XY]
+      + Sf[vector::Y]*P[symmTensor::YY]
+      + Sf[vector::Z]*P[symmTensor::YZ];
+      
+	// coeff_3 = Sf_m P_m3 
+	//		
+	//		   = Sf_1 P_13
+	//		     + Sf_2 P_23
+	//		     + Sf_3 P_33 
+	
+	coeff[vector::Z] =
+        Sf[vector::X]*P[symmTensor::XZ]
+      + Sf[vector::Y]*P[symmTensor::YZ]
+      + Sf[vector::Z]*P[symmTensor::ZZ];    
+
+}
+
 // ************************************************************************* //

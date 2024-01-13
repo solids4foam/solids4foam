@@ -74,6 +74,9 @@ class linearElasticMisesPlastic
     public mechanicalLaw
 {
     // Private data
+    
+        //- Point mesh
+        const pointMesh& pMesh_;
 
         //- Shear modulus
         dimensionedScalar mu_;
@@ -252,14 +255,6 @@ class linearElasticMisesPlastic
             surfaceSymmTensorField& sigma,
             const surfaceTensorField& gradD
         ) const;
-        
-        //- Calculate stress at the points
-		void calculatePStress
-		(
-			pointSymmTensorField& pSigma,
-			const pointTensorField& pGradD
-		) const;
-
 
 public:
 
@@ -279,6 +274,13 @@ public:
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom
         );
+        
+        //- Calculate stress at the points
+		void calculatePStress
+		(
+			pointSymmTensorField& pSigma,
+			const pointTensorField& pGradD
+		) const;
 
 
     // Destructor
