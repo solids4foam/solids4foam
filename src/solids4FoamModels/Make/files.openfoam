@@ -191,6 +191,8 @@ numerics/vfvCellPoint/vfvmCellPointExtended.C
 numerics/vfvCellPoint/vfvmCellPointOriginal.C
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
+numerics/patchCorrectionVectors/patchCorrectionVectors.C
+numerics/pointFieldFunctions/pointFieldFunctions.C
 
 numerics/interpolationTable/tableReaders/tableReaders.C
 numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C

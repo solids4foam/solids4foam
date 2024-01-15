@@ -1328,24 +1328,56 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 		    IOobject::AUTO_WRITE
 		),
 		pMesh(),
-		dimensionedSymmTensor("0", dimless, symmTensor::zero)
+		dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
     );
     
-    //linearElasticMisesPlastic::calculatePStress(pSigma, pGradD);
+    // Acces the linearElasticMisesPlastic mechanical law
+    const PtrList<mechanicalLaw>& mechLaws = mechanical();
+    const linearElasticMisesPlastic& mech = refCast<const linearElasticMisesPlastic>(mechLaws[0]);
     
-//#ifdef FOAMEXTEND
-//    pSigma.internalField() = linearElasticMisesPlastic::calculatePStress(pSigma, pGradD);
-//#else
-//    pSigma.primitiveFieldRef() = linearElasticMisesPlastic::calculatePStress(pSigma, pGradD);
-//#endif
-//    
-//    //pSigma.internalField() = linearElasticMisesPlastic::calculatePStress(pSigma, pGradD);
+    // Calculate the stress at the points
+    mech.calculatePStress(pSigma, pGradD); 
     
     pSigma.write();
     
+//    // Equivalent stress at the points
+//    pointScalarField pSigmaEq
+//    (
+//        IOobject
+//        (
+//            "pSigmaEq",
+//            runTime.timeName(),
+//            runTime,
+//            IOobject::NO_READ,
+//            IOobject::AUTO_WRITE
+//        ),
+//        pMesh(),
+//        dimensionedScalar("0", dimPressure, 0.0)
+//    );
+
+//    pSigmaEq.primitiveFieldRef() =
+//        sqrt(0.5*((pSigma.component(symmTensor::XX) - pSigma.component(symmTensor::YY))^2 +
+//        (pSigma.component(symmTensor::YY) - pSigma.component(symmTensor::ZZ))^2 +
+//        (pSigma.component(symmTensor::ZZ) - component(symmTensor::XX))^2) +
+//        3*(pSigma.component(symmTensor::XY)^2 + pSigma.component(symmTensor::YZ)^2 + pSigma.component(symmTensor::XZ)^2));
+
+//#ifdef FOAMEXTEND
+//    pSigmaEq.internalField() =
+//        sqrt(0.5*((pSigma.XX().internalField() - pSigma.internalField().YY())^2 +
+//        (pSigma.internalField().YY() - pSigma.internalField().ZZ())^2 +
+//        (pSigma.internalField().ZZ() - pSigma.internalField().XX())^2) +
+//        3*(pSigma.internalField().XY()^2 + pSigma.internalField().YZ()^2 + pSigma.internalField().XZ()^2));
+//#else
+//    pSigmaEq.primitiveFieldRef() =
+//        sqrt(0.5*((pSigma.component(symmTensor::XX).internalField() - pSigma.internalField().YY())^2 +
+//        (pSigma.internalField().YY() - pSigma.internalField().ZZ())^2 +
+//        (pSigma.internalField().ZZ() - pSigma.internalField().XX())^2) +
+//        3*(pSigma.internalField().XY()^2 + pSigma.internalField().YZ()^2 + pSigma.internalField().XZ()^2));
+//#endif
+//    pSigmaEq.write();
+    
     solidModel::writeFields(runTime);
-    
-    
+      
 }
 
 

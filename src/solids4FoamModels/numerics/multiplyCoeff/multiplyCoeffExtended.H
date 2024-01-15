@@ -54,6 +54,15 @@ namespace Foam
         const symmTensor& sigma,
         const vector& g
     );
+    
+    // The multiplication evaluates the following in index notation:
+    //     coeff_i = Sf_m P_mi where P = d(s - pI)/dp
+    void multiplyCoeffPressure
+	(
+		vector& coeff,
+		const vector& Sf,
+		const symmTensor& P
+	);
 
 } // End namespace Foam
 

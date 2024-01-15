@@ -56,9 +56,9 @@ tmp<pointSymmTensorField> symm(const pointTensorField& ptr)
 
 	//Set the result field to be symm(ptr)
 #ifdef OPENFOAMESIORFOUNDATION
-    result.primitiveFieldRef() = symm(ptr);
+    result.primitiveFieldRef() = symm(ptr.primitiveField());
 #else
-    pointD.internalField() = symm(ptr);
+    result.internalField() = symm(ptr.internalField());
 #endif 
 	
 	//Call the correctBoundaryConditions function
@@ -98,9 +98,9 @@ tmp<pointSymmTensorField> dev(const pointSymmTensorField& ptr)
 
 	//Set the result field to be symm(ptr)
 #ifdef OPENFOAMESIORFOUNDATION
-    result.primitiveFieldRef() = dev(ptr);
+    result.primitiveFieldRef() = dev(ptr.primitiveField());
 #else
-    pointD.internalField() = dev(ptr);
+    pointD.internalField() = dev(ptr.internalField());
 #endif 
 	
 	//Call the correctBoundaryConditions function
@@ -140,9 +140,9 @@ tmp<pointScalarField> tr(const pointSymmTensorField& ptr)
 
 	//Set the result field to be symm(ptr)
 #ifdef OPENFOAMESIORFOUNDATION
-    result.primitiveFieldRef() = tr(ptr);
+    result.primitiveFieldRef() = tr(ptr.primitiveField());
 #else
-    pointD.internalField() = tr(ptr);
+    pointD.internalField() = tr(ptr.internalField());
 #endif 
 	
 	//Call the correctBoundaryConditions function
