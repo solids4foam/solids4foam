@@ -110,7 +110,7 @@ bool unsLinGeomSolidMMS::evolve()
     const scalar az_ = 6;
     
 	int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 	SolverPerformance<vector> solverPerfD;
 	SolverPerformance<vector>::debug = 0;
 #else
@@ -138,7 +138,7 @@ bool unsLinGeomSolidMMS::evolve()
 	//volVectorField bodyForces(mesh().nCells(), vector::zero);
 	
 	// List of primary cells
-	const cellList& cells = mesh().cells();
+	// const cellList& cells = mesh().cells();
 	
 	// Cell-centre position vectors
 	const vectorField& C = mesh().C().internalField();
@@ -165,7 +165,7 @@ bool unsLinGeomSolidMMS::evolve()
 	//const scalarField& dualV = dualMesh().V();
 	
 	// List of cell volumes
-	const scalarField& V = mesh().V();  
+	// const scalarField& V = mesh().V();  
 	
 	// Body forces field (list of values)
 	vectorField& bodyForcesI = bodyForces.field();  
@@ -174,7 +174,7 @@ bool unsLinGeomSolidMMS::evolve()
 	{
 		
 		// Take a reference to the current primary volume
-		const scalar curV = V[cellI]; 
+                //const scalar curV = V[cellI]; 
 		
 		const scalar x = C[cellI].x();
 		const scalar y = C[cellI].y();
@@ -238,11 +238,6 @@ bool unsLinGeomSolidMMS::evolve()
         // Enforce any cell displacements
         solidModel::setCellDisps(DEqn);
 
-        // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
-        const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
-#endif
-
         // Solve the linear system
         solverPerfD = DEqn.solve();
 
@@ -270,7 +265,7 @@ bool unsLinGeomSolidMMS::evolve()
        !converged
         (
             iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             mag(solverPerfD.initialResidual()),
             cmptMax(solverPerfD.nIterations()),
 #else
@@ -287,7 +282,7 @@ bool unsLinGeomSolidMMS::evolve()
     // Velocity
     U() = fvc::ddt(D());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

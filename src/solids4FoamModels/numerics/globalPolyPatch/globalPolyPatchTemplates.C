@@ -45,7 +45,7 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::patchPointToGlobal
     (
         new Field<Type>(globalPatch().nPoints(), pTraits<Type>::zero)
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Field<Type>& gField = tgField.ref();
 #else
     Field<Type>& gField = tgField();
@@ -106,7 +106,7 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::globalPointToPatch
     (
         new Field<Type>(patch().nPoints(), pTraits<Type>::zero)
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Field<Type>& pField = tpField.ref();
 #else
     Field<Type>& pField = tpField();
@@ -153,7 +153,7 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::patchFaceToGlobal
     (
         new Field<Type>(globalPatch().size(), pTraits<Type>::zero)
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Field<Type>& gField = tgField.ref();
 #else
     Field<Type>& gField = tgField();
@@ -204,7 +204,7 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::globalFaceToPatch
     (
         new Field<Type>(patch().size(), pTraits<Type>::zero)
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Field<Type>& pField = tpField.ref();
 #else
     Field<Type>& pField = tpField();

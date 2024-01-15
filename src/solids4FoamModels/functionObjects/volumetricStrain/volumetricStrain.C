@@ -130,10 +130,10 @@ bool Foam::volumetricStrain::read(const dictionary& dict)
     return true;
 }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::volumetricStrain::write()
 {
-    return writeData();
+    return false;
 }
 #endif
 

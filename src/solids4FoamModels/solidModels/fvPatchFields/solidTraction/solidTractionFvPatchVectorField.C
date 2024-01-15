@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
 #include "lookupSolidModel.H"
+#include "patchCorrectionVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -37,6 +38,7 @@ solidTractionFvPatchVectorField
 )
 :
     fixedGradientFvPatchVectorField(p, iF),
+    nonOrthogonalCorrections_(true),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
@@ -62,6 +64,10 @@ solidTractionFvPatchVectorField
 )
 :
     fixedGradientFvPatchVectorField(p, iF),
+    nonOrthogonalCorrections_
+    (
+        dict.lookupOrDefault<Switch>("nonOrthogonalCorrections", true)
+    ),
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
@@ -206,69 +212,72 @@ solidTractionFvPatchVectorField
 solidTractionFvPatchVectorField::
 solidTractionFvPatchVectorField
 (
-    const solidTractionFvPatchVectorField& stpvf,
+    const solidTractionFvPatchVectorField& pvf,
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
     const fvPatchFieldMapper& mapper
 )
 :
-    fixedGradientFvPatchVectorField(stpvf, p, iF, mapper),
-#ifdef OPENFOAMFOUNDATION
-    traction_(mapper(stpvf.traction_)),
-    pressure_(mapper(stpvf.pressure_)),
+    fixedGradientFvPatchVectorField(pvf, p, iF, mapper),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+#ifdef OPENFOAM_ORG
+    traction_(mapper(pvf.traction_)),
+    pressure_(mapper(pvf.pressure_)),
 #else
-    traction_(stpvf.traction_, mapper),
-    pressure_(stpvf.pressure_, mapper),
+    traction_(pvf.traction_, mapper),
+    pressure_(pvf.pressure_, mapper),
 #endif
-    tractionSeries_(stpvf.tractionSeries_),
-    pressureSeries_(stpvf.pressureSeries_),
+    tractionSeries_(pvf.tractionSeries_),
+    pressureSeries_(pvf.pressureSeries_),
     tractionFieldPtr_(),
     pressureFieldPtr_(),
-    secondOrder_(stpvf.secondOrder_),
-    setEffectiveTraction_(stpvf.setEffectiveTraction_),
-    relaxFac_(stpvf.relaxFac_),
-    curTimeIndex_(stpvf.curTimeIndex_)
+    secondOrder_(pvf.secondOrder_),
+    setEffectiveTraction_(pvf.setEffectiveTraction_),
+    relaxFac_(pvf.relaxFac_),
+    curTimeIndex_(pvf.curTimeIndex_)
 {}
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 solidTractionFvPatchVectorField::
 solidTractionFvPatchVectorField
 (
-    const solidTractionFvPatchVectorField& stpvf
+    const solidTractionFvPatchVectorField& pvf
 )
 :
-    fixedGradientFvPatchVectorField(stpvf),
-    traction_(stpvf.traction_),
-    pressure_(stpvf.pressure_),
-    tractionSeries_(stpvf.tractionSeries_),
-    pressureSeries_(stpvf.pressureSeries_),
+    fixedGradientFvPatchVectorField(pvf),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    traction_(pvf.traction_),
+    pressure_(pvf.pressure_),
+    tractionSeries_(pvf.tractionSeries_),
+    pressureSeries_(pvf.pressureSeries_),
     tractionFieldPtr_(),
     pressureFieldPtr_(),
-    secondOrder_(stpvf.secondOrder_),
-    setEffectiveTraction_(stpvf.setEffectiveTraction_),
-    relaxFac_(stpvf.relaxFac_),
-    curTimeIndex_(stpvf.curTimeIndex_)
+    secondOrder_(pvf.secondOrder_),
+    setEffectiveTraction_(pvf.setEffectiveTraction_),
+    relaxFac_(pvf.relaxFac_),
+    curTimeIndex_(pvf.curTimeIndex_)
 {}
 #endif
 
 solidTractionFvPatchVectorField::
 solidTractionFvPatchVectorField
 (
-    const solidTractionFvPatchVectorField& stpvf,
+    const solidTractionFvPatchVectorField& pvf,
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    fixedGradientFvPatchVectorField(stpvf, iF),
-    traction_(stpvf.traction_),
-    pressure_(stpvf.pressure_),
-    tractionSeries_(stpvf.tractionSeries_),
-    pressureSeries_(stpvf.pressureSeries_),
+    fixedGradientFvPatchVectorField(pvf, iF),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    traction_(pvf.traction_),
+    pressure_(pvf.pressure_),
+    tractionSeries_(pvf.tractionSeries_),
+    pressureSeries_(pvf.pressureSeries_),
     tractionFieldPtr_(),
     pressureFieldPtr_(),
-    secondOrder_(stpvf.secondOrder_),
-    setEffectiveTraction_(stpvf.setEffectiveTraction_),
-    relaxFac_(stpvf.relaxFac_),
-    curTimeIndex_(stpvf.curTimeIndex_)
+    secondOrder_(pvf.secondOrder_),
+    setEffectiveTraction_(pvf.setEffectiveTraction_),
+    relaxFac_(pvf.relaxFac_),
+    curTimeIndex_(pvf.curTimeIndex_)
 {}
 
 
@@ -281,7 +290,7 @@ void solidTractionFvPatchVectorField::autoMap
 {
     fixedGradientFvPatchVectorField::autoMap(m);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     m(traction_, traction_);
     m(pressure_, pressure_);
 #else
@@ -294,17 +303,17 @@ void solidTractionFvPatchVectorField::autoMap
 // Reverse-map the given fvPatchField onto this fvPatchField
 void solidTractionFvPatchVectorField::rmap
 (
-    const fvPatchVectorField& ptf,
+    const fvPatchVectorField& pvf,
     const labelList& addr
 )
 {
-    fixedGradientFvPatchVectorField::rmap(ptf, addr);
+    fixedGradientFvPatchVectorField::rmap(pvf, addr);
 
-    const solidTractionFvPatchVectorField& dmptf =
-        refCast<const solidTractionFvPatchVectorField>(ptf);
+    const solidTractionFvPatchVectorField& rpvf =
+        refCast<const solidTractionFvPatchVectorField>(pvf);
 
-    traction_.rmap(dmptf.traction_, addr);
-    pressure_.rmap(dmptf.pressure_, addr);
+    traction_.rmap(rpvf.traction_, addr);
+    pressure_.rmap(rpvf.pressure_, addr);
 }
 
 
@@ -396,46 +405,57 @@ void solidTractionFvPatchVectorField::evaluate
         this->updateCoeffs();
     }
 
-    // Lookup the gradient field
-    const fvPatchField<tensor>& gradField =
-        patch().lookupPatchField<volTensorField, tensor>
-        (
-#ifdef OPENFOAMESIORFOUNDATION
-            "grad(" + internalField().name() + ")"
-#else
-            "grad(" + dimensionedInternalField().name() + ")"
-#endif
-        );
-
-    // Face unit normals
-    const vectorField n(patch().nf());
-
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
-    // Non-orthogonal correction vectors
-    const vectorField k((I - sqr(n)) & delta);
-
-    if (secondOrder_)
+    if (nonOrthogonalCorrections_)
     {
-        const vectorField dUP(k & gradField.patchInternalField());
-        const vectorField nGradUP(n & gradField.patchInternalField());
+        // Lookup the gradient field
+        const fvPatchField<tensor>& gradField =
+            patch().lookupPatchField<volTensorField, tensor>
+            (
+            #ifdef OPENFOAM_NOT_EXTEND
+                "grad(" + internalField().name() + ")"
+            #else
+                "grad(" + dimensionedInternalField().name() + ")"
+            #endif
+            );
 
-        Field<vector>::operator=
-        (
-            patchInternalField()
-          + dUP
-          + 0.5*(gradient() + nGradUP)/patch().deltaCoeffs()
-        );
+        // Non-orthogonal correction vectors
+        const vectorField k(patchCorrectionVectors(patch()));
+
+        if (secondOrder_)
+        {
+            // Face unit normals
+            const vectorField n(patch().nf());
+
+            // Correction to internal field cells
+            const vectorField dUP(k & gradField.patchInternalField());
+
+            // Normal gradient at internal field cells
+            const vectorField nGradUP(n & gradField.patchInternalField());
+
+            Field<vector>::operator=
+            (
+                patchInternalField()
+              + dUP
+              + 0.5*(gradient() + nGradUP)/patch().deltaCoeffs()
+            );
+        }
+        else
+        {
+
+            Field<vector>::operator=
+            (
+                patchInternalField()
+              + (k & gradField.patchInternalField())
+              + gradient()/patch().deltaCoeffs()
+            );
+        }
     }
     else
     {
-
+        // No non-orthogonal correction
         Field<vector>::operator=
         (
-            patchInternalField()
-          + (k & gradField.patchInternalField())
-          + gradient()/patch().deltaCoeffs()
+            patchInternalField() + gradient()/patch().deltaCoeffs()
         );
     }
 
@@ -451,6 +471,9 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
     //fixedGradientFvPatchVectorField::write(os);
     fvPatchVectorField::write(os);
 
+    os.writeKeyword("nonOrthogonalCorrections")
+        << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
+
     if (tractionFieldPtr_.valid())
     {
         os.writeKeyword("tractionField")
@@ -465,7 +488,7 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "traction", traction_);
 #else
         traction_.writeEntry("traction", os);
@@ -486,7 +509,7 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "pressure", pressure_);
 #else
         pressure_.writeEntry("pressure", os);
@@ -500,7 +523,7 @@ void solidTractionFvPatchVectorField::write(Ostream& os) const
     os.writeKeyword("relaxationFactor")
         << relaxFac_ << token::END_STATEMENT << nl;
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
     writeEntry(os, "gradient", gradient());
 #else

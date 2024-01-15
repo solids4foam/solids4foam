@@ -22,7 +22,7 @@ License
 #include "polyPatchID.H"
 #include "primitivePatchInterpolation.H"
 #include "twoDPointCorrector.H"
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
     #include "tetPointFields.H"
     #include "fixedValueTetPolyPatchFields.H"
     #include "tetPolyPatchInterpolation.H"
@@ -107,8 +107,8 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Lookup the type
-        const word type = fsiProperties_.lookupOrDefault<word>
-#ifdef OPENFOAMESIORFOUNDATION
+        const word type = fsiProperties_.lookupOrAddDefault<word>
+#ifdef OPENFOAM_NOT_EXTEND
         (
             "interfaceTransferMethod", "AMI"
         );
@@ -173,7 +173,7 @@ calcAccumulatedFluidInterfacesDisplacements() const
 
         if
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             accumulatedFluidInterfaceDisplacementHeader.typeHeaderOk
             <
             vectorIOField
@@ -281,31 +281,34 @@ Foam::fluidSolidInterface::fluidSolidInterface
     interfaceToInterfaceList_(),
     outerCorrTolerance_
     (
-        fsiProperties_.lookupOrDefault<scalar>("outerCorrTolerance", 1e-06)
+        fsiProperties_.lookupOrAddDefault<scalar>("outerCorrTolerance", 1e-06)
     ),
     nOuterCorr_
     (
-        fsiProperties_.lookupOrDefault<int>("nOuterCorr", 30)
+        fsiProperties_.lookupOrAddDefault<int>("nOuterCorr", 30)
     ),
     additionalMeshCorrection_
     (
-        fsiProperties_.lookupOrDefault<Switch>
+        fsiProperties_.lookupOrAddDefault<Switch>
         (
             "additionalMeshCorrection", false
         )
     ),
     coupled_
     (
-        fsiProperties_.lookupOrDefault<Switch>("coupled", true)
+        fsiProperties_.lookupOrAddDefault<Switch>("coupled", true)
     ),
     couplingStartTime_
     (
-        fsiProperties_.lookupOrDefault<scalar>("couplingStartTime", -1.0)
+        fsiProperties_.lookupOrAddDefault<scalar>("couplingStartTime", -1.0)
     ),
-    predictor_(fsiProperties_.lookupOrDefault<Switch>("predictor", false)),
+    predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", false)),
     interfaceDeformationLimit_
     (
-        fsiProperties_.lookupOrDefault<scalar>("interfaceDeformationLimit", 0.0)
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "interfaceDeformationLimit", 0.0
+        )
     ),
     fluidZonesPointsDispls_(),
     fluidZonesPointsDisplsRef_(),
@@ -321,12 +324,12 @@ Foam::fluidSolidInterface::fluidSolidInterface
     outerCorr_(0),
     writeResidualsToFile_
     (
-        fsiProperties_.lookupOrDefault<Switch>("writeResidualsToFile", false)
+        fsiProperties_.lookupOrAddDefault<Switch>("writeResidualsToFile", false)
     ),
     residualFilePtr_(),
     interpolatorUpdateFrequency_
     (
-        fsiProperties_.lookupOrDefault<int>("interpolatorUpdateFrequency", 0)
+        fsiProperties_.lookupOrAddDefault<int>("interpolatorUpdateFrequency", 0)
     ),
     accumulatedFluidInterfacesDisplacementsList_()
 {
@@ -495,46 +498,59 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
     const word& region
 )
 {
-    word fsiTypeName;
+    // NB: dictionary must be unregistered to avoid adding to the database
 
-    // Enclose the creation of the dictionary to ensure it is
-    // deleted before the fluid is created otherwise the dictionary
-    // is entered in the database twice
-    {
-        IOdictionary fsiProperties
+    IOdictionary props
+    (
+        IOobject
         (
-            IOobject
-            (
-                "fsiProperties",
-                runTime.constant(),
-                runTime,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        );
+            "fsiProperties",
+            runTime.constant(),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false  // Do not register
+        )
+    );
 
-        fsiProperties.lookup("fluidSolidInterface")
-            >> fsiTypeName;
+    const word modelType(props.lookup("fluidSolidInterface"));
+
+    Info<< "Selecting fluidSolidInterface " << modelType << endl;
+
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            props,
+            "fluidSolidInterface",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
     }
 
-    Info<< "Selecting fluidSolidInterface " << fsiTypeName << endl;
-
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(fsiTypeName);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
         FatalErrorIn
         (
             "fluidSolidInterface::New(Time&, const word&)"
-        )   << "Unknown fluidSolidInterface type " << fsiTypeName
+        )   << "Unknown fluidSolidInterface type " << modelType
             << endl << endl
             << "Valid fluidSolidInterface types are :" << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalError);
     }
 
-    return autoPtr<fluidSolidInterface>(cstrIter()(runTime, region));
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<fluidSolidInterface>(ctorPtr(runTime, region));
 }
 
 
@@ -589,7 +605,7 @@ Foam::vector Foam::fluidSolidInterface::totalForceOnInterface
     vectorField S(localFaces.size(), vector::zero);
     forAll(S, faceI)
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         S[faceI] = localFaces[faceI].area(localPoints);
 #else
         S[faceI] = localFaces[faceI].normal(localPoints);
@@ -814,7 +830,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     if (maxDelta < interfaceDeformationLimit())
     {
         // Move only interface points
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         pointField newPoints = fluidMesh().points();
 #else
         pointField newPoints = fluidMesh().allPoints();
@@ -856,7 +872,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         // If the motionU field is in the object registry then we assume that
         // the fe motion solver is being used
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         const bool feMotionSolver = false;
 #else
         const bool feMotionSolver =
@@ -868,7 +884,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         const bool fvMotionSolver =
             fluidMesh().foundObject<pointVectorField>("pointMotionU");
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
         // Check for RBF motion solver
         bool rbfMotionSolver = false;
         if (fluidMesh().foundObject<motionSolver>("dynamicMeshDict"))
@@ -883,7 +899,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         // Set motion on FSI interface
         if (feMotionSolver)
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             notImplemented("Not implemented for this version of OpenFOAM/FOAM");
 #else
             tetPointVectorField& motionU =
@@ -935,7 +951,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                 fixedValuePointPatchVectorField& motionUFluidPatch =
                     refCast<fixedValuePointPatchVectorField>
                     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                         motionU.boundaryFieldRef()
                         [
                             fluidPatchIndices()[interfaceI]
@@ -952,7 +968,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                     )/fluid().runTime().deltaT().value();
             }
         }
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
         else if (isA<newSubsetMotionSolverFvMesh>(fluidMesh()))
         {
             newSubsetMotionSolverFvMesh& dynMesh =
@@ -1000,7 +1016,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             }
         }
 #endif
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
         else if (rbfMotionSolver)
         {
             // Prepare list of patch motions
@@ -1151,34 +1167,36 @@ void Foam::fluidSolidInterface::updateForce()
             << totalForceOnInterface(solidZone, solidZoneTotalTraction) << nl
             << endl;
 
-        // Set interface pressure for elasticWallPressure boundary condition
-        const label fluidPatchID = fluidPatchIndices()[interfaceI];
-        if
-        (
-            isA<elasticWallPressureFvPatchScalarField>
-            (
-                fluid().p().boundaryField()[fluidPatchID]
-            )
-        )
-        {
-            scalarField& prevPressure =
-                const_cast<elasticWallPressureFvPatchScalarField&>
-                (
-                    refCast<const elasticWallPressureFvPatchScalarField>
-                    (
-                        fluid().p().boundaryField()[fluidPatchID]
-                    )
-                ).prevPressure();
+        // ZT: move this part of the code into
+        // updateElasticWallPressureAcceleration() function
+        // // Set interface pressure for elasticWallPressure boundary condition
+        // const label fluidPatchID = fluidPatchIndices()[interfaceI];
+        // if
+        // (
+        //     isA<elasticWallPressureFvPatchScalarField>
+        //     (
+        //         fluid().p().boundaryField()[fluidPatchID]
+        //     )
+        // )
+        // {
+        //     scalarField& prevPressure =
+        //         const_cast<elasticWallPressureFvPatchScalarField&>
+        //         (
+        //             refCast<const elasticWallPressureFvPatchScalarField>
+        //             (
+        //                 fluid().p().boundaryField()[fluidPatchID]
+        //             )
+        //         ).prevPressure();
 
-            if (coupled())
-            {
-                prevPressure = fluid().patchPressureForce(fluidPatchID);
-            }
-            else
-            {
-                prevPressure = 0;
-            }
-        }
+        //     if (coupled())
+        //     {
+        //         prevPressure = fluid().patchPressureForce(fluidPatchID);
+        //     }
+        //     else
+        //     {
+        //         prevPressure = 0;
+        //     }
+        // }
     }
 }
 
@@ -1332,16 +1350,26 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
                 ].globalFaceToPatch(fluidZoneAcceleration)
             );
 
-            const_cast<movingWallPressureFvPatchScalarField&>
-            (
-                refCast<const movingWallPressureFvPatchScalarField>
+            vectorField& prevAcceleration =
+                const_cast<movingWallPressureFvPatchScalarField&>
                 (
-                    fluid().p().boundaryField()
-                    [
-                        fluid().globalPatches()[interfaceI].patch().index()
-                    ]
-                )
-            ).prevAcceleration() = fluidPatchAcceleration;
+                    refCast<const movingWallPressureFvPatchScalarField>
+                    (
+                        fluid().p().boundaryField()
+                        [
+                            fluidPatchIndices()[interfaceI]
+                        ]
+                    )
+                ).prevAcceleration();
+
+            if (coupled())
+            {
+                prevAcceleration = fluidPatchAcceleration;
+            }
+            else
+            {
+                prevAcceleration = vector::zero;
+            }
         }
     }
 }
@@ -1396,16 +1424,53 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 ].globalFaceToPatch(fluidZoneAcceleration)
             );
 
-            const_cast<elasticWallPressureFvPatchScalarField&>
-            (
-                refCast<const elasticWallPressureFvPatchScalarField>
+            vectorField& prevAcceleration =
+                const_cast<elasticWallPressureFvPatchScalarField&>
                 (
-                    fluid().p().boundaryField()
-                    [
-                        fluid().globalPatches()[interfaceI].patch().index()
-                    ]
-                )
-            ).prevAcceleration() = fluidPatchAcceleration;
+                    refCast<const elasticWallPressureFvPatchScalarField>
+                    (
+                        fluid().p().boundaryField()
+                        [
+                            fluidPatchIndices()[interfaceI]
+                        ]
+                    )
+                ).prevAcceleration();
+
+            scalarField& prevPressure =
+                const_cast<elasticWallPressureFvPatchScalarField&>
+                (
+                    refCast<const elasticWallPressureFvPatchScalarField>
+                    (
+                        fluid().p().boundaryField()
+                        [
+                            fluidPatchIndices()[interfaceI]
+                        ]
+                    )
+                ).prevPressure();
+
+            if (coupled())
+            {
+                prevAcceleration = fluidPatchAcceleration;
+                prevPressure =
+                    fluid().patchPressureForce
+                    (
+                        fluidPatchIndices()[interfaceI]
+                    );
+            }
+            else
+            {
+                // ZT: Helps to improve stability in case of
+                // uncoupled simulation where acceleration
+                // shoud be exactly zero.
+                prevAcceleration = vector::zero;
+                // ZT: Pressure is not zero.
+                // prevPressure = 0;
+                prevPressure =
+                    fluid().patchPressureForce
+                    (
+                        fluidPatchIndices()[interfaceI]
+                    );
+            }
         }
     }
 }
@@ -1460,6 +1525,14 @@ void Foam::fluidSolidInterface::writeFields(const Time& runTime)
     // writeField function then they will not be created/written
     //fluid().writeFields(runTime);
     solid().writeFields(runTime);
+}
+
+void Foam::fluidSolidInterface::end()
+{
+    this->IOobject::rename(this->IOobject::name()+".withDefaultValues");
+    this->regIOobject::write();
+    solid().end();
+    fluid().end();
 }
 
 // ************************************************************************* //

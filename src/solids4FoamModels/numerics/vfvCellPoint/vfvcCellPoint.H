@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -43,6 +37,7 @@ Author
 #define vfvcCellPoint_H
 
 #include "volFields.H"
+#include "surfaceFields.H"
 #include "pointFields.H"
 #include "vectorList.H"
 
@@ -60,7 +55,7 @@ namespace vfvc
         const pointVectorField& pointD, // primary mesh point displacement
         const fvMesh& mesh              // primary mesh
     );
-    
+
     // Gradient field
     // Returns pointTensorField on primary mesh
     tmp<pointTensorField> pGrad
@@ -117,11 +112,6 @@ namespace vfvc
 
 } // End namespace Foam
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-//#ifdef NoRepository
-//#   include "vfvcCellPoint.C"
-//#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

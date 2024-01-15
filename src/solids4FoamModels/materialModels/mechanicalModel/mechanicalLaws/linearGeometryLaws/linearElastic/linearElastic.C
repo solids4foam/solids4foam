@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -40,49 +34,6 @@ namespace Foam
 }
 
 
-// * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
-
-void Foam::linearElastic::makeSigma0f() const
-{
-    if (sigma0fPtr_.valid())
-    {
-        FatalErrorIn("void Foam::linearElastic::makeSigma0f() const")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    sigma0fPtr_.set
-    (
-        new surfaceSymmTensorField
-        (
-            "sigma0f",
-            linearInterpolate(sigma0())
-        )
-    );
-}
-
-
-const Foam::surfaceSymmTensorField& Foam::linearElastic::sigma0f() const
-{
-    if (sigma0fPtr_.empty())
-    {
-        makeSigma0f();
-    }
-
-    return sigma0fPtr_();
-}
-
-
-Foam::surfaceSymmTensorField& Foam::linearElastic::sigma0f()
-{
-    if (sigma0fPtr_.empty())
-    {
-        makeSigma0f();
-    }
-
-    return sigma0fPtr_();
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -99,8 +50,7 @@ Foam::linearElastic::linearElastic
     K_("K", dimPressure, 0.0),
     E_("E", dimPressure, 0.0),
     nu_("nu", dimless, 0.0),
-    lambda_("lambda", dimPressure, 0.0),
-    sigma0fPtr_()
+    lambda_("lambda", dimPressure, 0.0)
 {
     // Store old times
     epsilon().storeOldTime();
@@ -187,7 +137,7 @@ Foam::linearElastic::linearElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Unphysical Poisson's ratio: nu should be >= -1.0 and <= 0.5"
             << abort(FatalError);
@@ -237,7 +187,7 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::bulkModulus() const
         )
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     tresult.ref().correctBoundaryConditions();
 #else
     tresult().correctBoundaryConditions();
@@ -291,24 +241,26 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 }
 
 
+#ifdef OPENFOAM_NOT_EXTEND
 Foam::RectangularMatrix<Foam::scalar> Foam::linearElastic::materialTangent() const
 {
-    RectangularMatrix<scalar> matTang(6,6,0); 
+    RectangularMatrix<scalar> matTang(6,6,0);
     matTang(0,0) = 2*mu_.value() + lambda().value();
     matTang(0,1) = lambda().value();
-    matTang(0,2) = lambda().value(); 
-    matTang(1,0) = lambda().value(); 
+    matTang(0,2) = lambda().value();
+    matTang(1,0) = lambda().value();
     matTang(1,1) = 2*mu_.value() + lambda().value();
-    matTang(1,2) = lambda().value(); 
-    matTang(2,0) = lambda().value(); 
+    matTang(1,2) = lambda().value();
+    matTang(2,0) = lambda().value();
     matTang(2,1) = lambda().value();
-    matTang(2,2) = 2*mu_.value() + lambda().value(); 
-    matTang(3,3) = mu_.value(); 
+    matTang(2,2) = 2*mu_.value() + lambda().value();
+    matTang(3,3) = mu_.value();
     matTang(4,4) = mu_.value();
-    matTang(5,5) = mu_.value();      
+    matTang(5,5) = mu_.value();
 
     return matTang;
 }
+#endif
 
 
 const Foam::dimensionedScalar& Foam::linearElastic::mu() const

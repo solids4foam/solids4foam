@@ -94,7 +94,7 @@ bool linGeomSolidMMS::evolve()
     do
     {
         int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         SolverPerformance<vector> solverPerfDD;
         SolverPerformance<vector>::debug = 0;
 #else
@@ -122,7 +122,7 @@ bool linGeomSolidMMS::evolve()
 		//volVectorField bodyForces(mesh().nCells(), vector::zero);
 		
 		// List of primary cells
-		const cellList& cells = mesh().cells();
+		//const cellList& cells = mesh().cells();
 		
 		// Cell-centre position vectors
 		const vectorField& C = mesh().C().internalField();
@@ -149,7 +149,7 @@ bool linGeomSolidMMS::evolve()
 		//const scalarField& dualV = dualMesh().V();
 		
 		// List of cell volumes
-		const scalarField& V = mesh().V();  
+		//const scalarField& V = mesh().V();  
 		
 		// Body forces field (list of values)
 		vectorField& bodyForcesI = bodyForces.field();  
@@ -177,7 +177,7 @@ bool linGeomSolidMMS::evolve()
 	//	    const scalar z2 = bb.max().z();
 			
 			// Take a reference to the current primary volume
-			const scalar curV = V[cellI]; 
+                        //const scalar curV = V[cellI]; 
 			
 			const scalar x = C[cellI].x();
 			const scalar y = C[cellI].y();
@@ -244,11 +244,6 @@ bool linGeomSolidMMS::evolve()
             // Enforce any cell displacements
             solidModel::setCellDisps(DDEqn);
 
-            // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
-            const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
-#endif
-
             // Solve the linear system
             solverPerfDD = DDEqn.solve();
 
@@ -273,7 +268,7 @@ bool linGeomSolidMMS::evolve()
             !converged
             (
                 iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 mag(solverPerfDD.initialResidual()),
                 cmptMax(solverPerfDD.nIterations()),
 #else
@@ -298,7 +293,7 @@ bool linGeomSolidMMS::evolve()
     // Store ddt old term
     rhoDdtD_0_ = rho()*fvc::d2dt2(D());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

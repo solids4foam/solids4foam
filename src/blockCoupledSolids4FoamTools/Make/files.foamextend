@@ -42,4 +42,4 @@ BlockFvm/blockLaplacianTraceSchemes/pointGaussLsBlockLaplacianTraceScheme/pointG
 BlockFvm/blockLaplacianTraceSchemes/pointGaussLsBlockLaplacianTraceScheme/pointGaussLsBlockLaplacianTraceSchemeTang.C
 
 
-LIB = $(FOAM_USER_LIBBIN)/libblockCoupledSolids4FoamTools
+LIB = $(FOAM_MODULE_LIBBIN)/libblockCoupledSolids4FoamTools

@@ -98,7 +98,7 @@ public:
         linearSpatialDisplacementFvPatchVectorField
         (
             const linearSpatialDisplacementFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );

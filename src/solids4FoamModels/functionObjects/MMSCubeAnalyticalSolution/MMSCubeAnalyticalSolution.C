@@ -315,7 +315,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
         {
             if (mesh.boundary()[patchI].type() != "empty")
             {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
                 scalarField& sEqP = analyticalStressEq.boundaryFieldRef()[patchI];
 #else
@@ -561,9 +561,6 @@ Foam::MMSCubeAnalyticalSolution::MMSCubeAnalyticalSolution
     time_(t),
     E_(readScalar(dict.lookup("E"))),
     nu_(readScalar(dict.lookup("nu"))),
-    ax_(readScalar(dict.lookup("ax"))),
-    ay_(readScalar(dict.lookup("ay"))),
-    az_(readScalar(dict.lookup("az"))),
     pointDisplacement_
     (
         dict.lookupOrDefault<Switch>("pointDisplacement", true)
@@ -575,7 +572,10 @@ Foam::MMSCubeAnalyticalSolution::MMSCubeAnalyticalSolution
     pointEpsilon_
     (
         dict.lookupOrDefault<Switch>("pointEpsilon", true)
-    )
+    ),
+    ax_(readScalar(dict.lookup("ax"))),
+    ay_(readScalar(dict.lookup("ay"))),
+    az_(readScalar(dict.lookup("az")))
 {
     Info<< "Creating " << this->name() << " function object" << endl;
 
@@ -612,7 +612,7 @@ bool Foam::MMSCubeAnalyticalSolution::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::MMSCubeAnalyticalSolution::write()
 {
     return true;

@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -137,8 +131,13 @@ public:
             //- Return const access to the mesh
             const fvMesh& mesh() const;
 
+#ifdef OPENFOAM_NOT_EXTEND
             //- Material tangent field defined at dual mesh faces
             tmp< Field< RectangularMatrix<scalar>>> materialTangentFaceField() const;
+#endif
+
+            //- Bulk modulus field at the faces
+            tmp<surfaceScalarField> bulkModulus() const;
 
         // Edit
 

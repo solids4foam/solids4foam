@@ -23,7 +23,7 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "momentumStabilisation.H"
-
+#include "backwardDdtScheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -46,10 +46,9 @@ addToRunTimeSelectionTable(solidModel, linGeomTotalDispSolid, dictionary);
 
 void linGeomTotalDispSolid::predict()
 {
-    Info<< "Linear predictor using DD" << endl;
+    Info<< "Applying linear predictor to D" << endl;
 
-    // Predict D using the increment of displacement field from the previous
-    // time-step
+    // Predict D using previous time steps
     D() = D().oldTime() + U()*runTime().deltaT();
 
     // Update gradient of displacement
@@ -89,7 +88,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         // Check ddt scheme for D is not steadyState
         const word ddtDScheme
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             mesh().ddtScheme("ddt(" + D().name() +')')
 #else
             mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
@@ -122,7 +121,7 @@ bool linGeomTotalDispSolid::evolve()
     do
     {
         int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         SolverPerformance<vector> solverPerfD;
         SolverPerformance<vector>::debug = 0;
 #else
@@ -149,16 +148,17 @@ bool linGeomTotalDispSolid::evolve()
               + stabilisation().stabilisation(D(), gradD(), impK_)
             );
 
+            // Add damping
+            if (dampingCoeff().value() > SMALL)
+            {
+                DEqn += dampingCoeff()*rho()*fvm::ddt(D());
+            }
+
             // Under-relaxation the linear system
             DEqn.relax();
 
             // Enforce any cell displacements
             solidModel::setCellDisps(DEqn);
-
-            // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
-            const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
-#endif
 
             // Solve the linear system
             solverPerfD = DEqn.solve();
@@ -196,7 +196,7 @@ bool linGeomTotalDispSolid::evolve()
             !converged
             (
                 iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 mag(solverPerfD.initialResidual()),
                 cmptMax(solverPerfD.nIterations()),
 #else
@@ -222,7 +222,7 @@ bool linGeomTotalDispSolid::evolve()
     }
     while (mesh().update());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

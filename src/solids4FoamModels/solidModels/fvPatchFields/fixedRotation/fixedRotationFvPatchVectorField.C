@@ -24,6 +24,7 @@ License
 #include "fvcMeshPhi.H"
 #include "RodriguesRotation.H"
 #include "fixedValuePointPatchFields.H"
+#include "patchCorrectionVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -39,6 +40,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF),
+    nonOrthogonalCorrections_(true),
     rotationAngle_(0.0),
     rotationAxis_(vector::zero),
     rotationOrigin_(vector::zero),
@@ -52,21 +54,22 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 
 fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 (
-    const fixedRotationFvPatchVectorField& ptf,
+    const fixedRotationFvPatchVectorField& pvf,
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
     const fvPatchFieldMapper& mapper
 )
 :
-    fixedValueFvPatchVectorField(ptf, p, iF, mapper),
-    rotationAngle_(ptf.rotationAngle_),
-    rotationAxis_(ptf.rotationAxis_),
-    rotationOrigin_(ptf.rotationOrigin_),
-    origFaceCentres_(ptf.origFaceCentres_),
-    origPatchPoints_(ptf.origPatchPoints_),
-    angleSeries_(ptf.angleSeries_),
-    dispSeries_(ptf.dispSeries_),
-    originSeries_(ptf.originSeries_)
+    fixedValueFvPatchVectorField(pvf, p, iF, mapper),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    rotationAngle_(pvf.rotationAngle_),
+    rotationAxis_(pvf.rotationAxis_),
+    rotationOrigin_(pvf.rotationOrigin_),
+    origFaceCentres_(pvf.origFaceCentres_),
+    origPatchPoints_(pvf.origPatchPoints_),
+    angleSeries_(pvf.angleSeries_),
+    dispSeries_(pvf.dispSeries_),
+    originSeries_(pvf.originSeries_)
 {}
 
 
@@ -78,6 +81,10 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF, dict),
+    nonOrthogonalCorrections_
+    (
+        dict.lookupOrDefault<Switch>("nonOrthogonalCorrections", true)
+    ),
     rotationAngle_(0.0),
     rotationAxis_(dict.lookup("rotationAxis")),
     rotationOrigin_(vector::zero),
@@ -136,7 +143,7 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 
     if
     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         internalField().name() != "D"
      && internalField().name() != "DD"
 #else
@@ -154,39 +161,41 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
     }
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 (
-    const fixedRotationFvPatchVectorField& pivpvf
+    const fixedRotationFvPatchVectorField& pvf
 )
 :
-    fixedValueFvPatchVectorField(pivpvf),
-    rotationAngle_(pivpvf.rotationAngle_),
-    rotationAxis_(pivpvf.rotationAxis_),
-    rotationOrigin_(pivpvf.rotationOrigin_),
-    origFaceCentres_(pivpvf.origFaceCentres_),
-    origPatchPoints_(pivpvf.origPatchPoints_),
-    angleSeries_(pivpvf.angleSeries_),
-    dispSeries_(pivpvf.dispSeries_),
-    originSeries_(pivpvf.originSeries_)
+    fixedValueFvPatchVectorField(pvf),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    rotationAngle_(pvf.rotationAngle_),
+    rotationAxis_(pvf.rotationAxis_),
+    rotationOrigin_(pvf.rotationOrigin_),
+    origFaceCentres_(pvf.origFaceCentres_),
+    origPatchPoints_(pvf.origPatchPoints_),
+    angleSeries_(pvf.angleSeries_),
+    dispSeries_(pvf.dispSeries_),
+    originSeries_(pvf.originSeries_)
 {}
 #endif
 
 fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 (
-    const fixedRotationFvPatchVectorField& pivpvf,
+    const fixedRotationFvPatchVectorField& pvf,
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    fixedValueFvPatchVectorField(pivpvf, iF),
-    rotationAngle_(pivpvf.rotationAngle_),
-    rotationAxis_(pivpvf.rotationAxis_),
-    rotationOrigin_(pivpvf.rotationOrigin_),
-    origFaceCentres_(pivpvf.origFaceCentres_),
-    origPatchPoints_(pivpvf.origPatchPoints_),
-    angleSeries_(pivpvf.angleSeries_),
-    dispSeries_(pivpvf.dispSeries_),
-    originSeries_(pivpvf.originSeries_)
+    fixedValueFvPatchVectorField(pvf, iF),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    rotationAngle_(pvf.rotationAngle_),
+    rotationAxis_(pvf.rotationAxis_),
+    rotationOrigin_(pvf.rotationOrigin_),
+    origFaceCentres_(pvf.origFaceCentres_),
+    origPatchPoints_(pvf.origPatchPoints_),
+    angleSeries_(pvf.angleSeries_),
+    dispSeries_(pvf.dispSeries_),
+    originSeries_(pvf.originSeries_)
 {}
 
 
@@ -195,33 +204,32 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
 Foam::tmp<Foam::Field<vector> > fixedRotationFvPatchVectorField::
 snGrad() const
 {
-    // fixedValue snGrad with no correction
-    // return (*this - patchInternalField())*this->patch().deltaCoeffs();
+    if (nonOrthogonalCorrections_)
+    {
+        const fvPatchField<tensor>& gradField =
+            patch().lookupPatchField<volTensorField, tensor>
+            (
+            #ifdef OPENFOAM_NOT_EXTEND
+                "grad(" + internalField().name() + ")"
+            #else
+                "grad(" + dimensionedInternalField().name() + ")"
+            #endif
+            );
 
-    const fvPatchField<tensor>& gradField =
-        patch().lookupPatchField<volTensorField, tensor>
+        // Non-orthogonal correction vectors
+        const vectorField k(patchCorrectionVectors(patch()));
+
+        return
         (
-#ifdef OPENFOAMESIORFOUNDATION
-            "grad(" + internalField().name() + ")"
-#else
-            "grad(" + dimensionedInternalField().name() + ")"
-#endif
-        );
-
-    // Face unit normals
-    const vectorField n(patch().nf());
-
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
-    // Non-orthogonal correction vectors
-    const vectorField k((I - sqr(n)) & delta);
-
-    return
-    (
-        *this
-      - (patchInternalField() + (k & gradField.patchInternalField()))
-    )*patch().deltaCoeffs();
+            *this
+          - (patchInternalField() + (k & gradField.patchInternalField()))
+        )*patch().deltaCoeffs();
+    }
+    else
+    {
+        // fixedValue snGrad with no correction
+        return (*this - patchInternalField())*patch().deltaCoeffs();
+    }
 }
 
 
@@ -260,7 +268,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
 
     const fvMesh& mesh = patch().boundaryMesh().mesh();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (internalField().name() == "DD")
 #else
     if (dimensionedInternalField().name() == "DD")
@@ -283,7 +291,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
     (
         mesh.foundObject<pointVectorField>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "point" + internalField().name()
 #else
             "point" + dimensionedInternalField().name()
@@ -296,7 +304,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
             (
                 mesh.lookupObject<pointVectorField>
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     "point" + internalField().name()
 #else
                     "point" + dimensionedInternalField().name()
@@ -313,7 +321,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
             fixedValuePointPatchVectorField& pointD =
                 refCast<fixedValuePointPatchVectorField>
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     pointDField.boundaryFieldRef()[patch().index()]
 #else
                     pointDField.boundaryField()[patch().index()]
@@ -337,7 +345,7 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
             const labelList& meshPoints =
                 mesh.boundaryMesh()[patch().index()].meshPoints();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             if (internalField().name() == "DD")
 #else
             if (dimensionedInternalField().name() == "DD")
@@ -364,29 +372,31 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
 tmp<Field<vector> > fixedRotationFvPatchVectorField::
 gradientBoundaryCoeffs() const
 {
-    const fvPatchField<tensor>& gradField =
-        patch().lookupPatchField<volTensorField, tensor>
+    if (nonOrthogonalCorrections_)
+    {
+        const fvPatchField<tensor>& gradField =
+            patch().lookupPatchField<volTensorField, tensor>
+            (
+            #ifdef OPENFOAM_NOT_EXTEND
+                "grad(" + internalField().name() + ")"
+            #else
+                "grad(" + dimensionedInternalField().name() + ")"
+            #endif
+            );
+
+        // Non-orthogonal correction vectors
+        const vectorField k(patchCorrectionVectors(patch()));
+
+        return
         (
-#ifdef OPENFOAMESIORFOUNDATION
-            "grad(" + internalField().name() + ")"
-#else
-            "grad(" + dimensionedInternalField().name() + ")"
-#endif
+            patch().deltaCoeffs()
+           *(*this - (k & gradField.patchInternalField()))
         );
-
-    // Face unit normals
-    const vectorField n(patch().nf());
-
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
-    // Non-orthogonal correction vectors
-    const vectorField k((I - sqr(n)) & delta);
-
-    return patch().deltaCoeffs()*
-    (
-       *this - (k & gradField.patchInternalField())
-    );
+    }
+    else
+    {
+        return (patch().deltaCoeffs()*(*this));
+    }
 }
 
 

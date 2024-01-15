@@ -25,8 +25,12 @@ boundaryField
     boundary
     {
         type            linearSpatialDisplacement;
-        a               (1e-6 2e-6 0);
-        b               (3e-6 4e-6 0);
+        a               (1e-6 4e-6 0);
+        b               (
+                            2e-6 3e-6 0
+                            5e-6 6e-6 0
+                            0 0 0
+                        );
         value           uniform (0 0 0);
     }
     defaultFaces

@@ -1,25 +1,19 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
-    This file is part of foam-extend.
+    This file is part of solids4foam.
 
-    foam-extend is free software: you can redistribute it and/or modify it
+    solids4foam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the
     Free Software Foundation, either version 3 of the License, or (at your
     option) any later version.
 
-    foam-extend is distributed in the hope that it will be useful, but
+    solids4foam is distributed in the hope that it will be useful, but
     WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
     General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     cantileverTractionPointPatchVectorField
@@ -48,7 +42,7 @@ Author
 #define cantileverTractionPointPatchVectorField_H
 
 #include "solidTractionPointPatchVectorField.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "pointPatchFieldMapper.H"
 #else
     #include "PointPatchFieldMapper.H"
@@ -58,7 +52,7 @@ Author
 
 namespace Foam
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     typedef pointPatchFieldMapper PointPatchFieldMapper;
 #endif
 
@@ -127,7 +121,7 @@ public:
             const PointPatchFieldMapper&
         );
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
         //- Construct as copy
         cantileverTractionPointPatchVectorField
         (
@@ -188,7 +182,7 @@ public:
         //  there's nothing to do
         virtual void initEvaluate
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
 #else
             const Pstream::commsTypes commsType = Pstream::blocking

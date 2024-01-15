@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -149,6 +143,26 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::impK() const
 }
 
 
+Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::bulkModulus() const
+{
+    return tmp<volScalarField>
+    (
+     new volScalarField
+     (
+      IOobject
+      (
+       "impK",
+       mesh().time().timeName(),
+       mesh(),
+       IOobject::NO_READ,
+       IOobject::NO_WRITE
+       ),
+      mesh(),
+      K_
+      )
+     );
+}
+
 Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 Foam::neoHookeanElastic::materialTangentField() const
 {
@@ -157,7 +171,7 @@ Foam::neoHookeanElastic::materialTangentField() const
     (
         new Field<Foam::RectangularMatrix<Foam::scalar>>(mesh().nFaces(), Foam::RectangularMatrix<scalar>(6,9,0))
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult.ref();
 #else
     Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult();
@@ -410,8 +424,15 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
     // Calculate the deviatoric stress
     const volSymmTensorField s(mu_*dev(bEbar));
 
+    // Update the hydrostatic stress
+    updateSigmaHyd
+    (
+        0.5*K()*(pow(J, 2.0) - 1.0),
+        (4.0/3.0)*mu_ + K_
+    );
+
     // Calculate the Cauchy stress
-    sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
+    sigma = (1.0/J)*(sigmaHyd()*I + s);
 }
 
 
@@ -430,7 +451,7 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
     const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(Ff() & Ff().T()));
-	
+
     // Calculate deviatoric stress
     const surfaceSymmTensorField s(mu_*dev(bEbar));
 

@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -98,7 +92,7 @@ public:
         robinFvPatchField
         (
             const robinFvPatchField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );
@@ -207,7 +201,7 @@ public:
             //- Evaluate the patch field
             virtual void evaluate
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
 #else
             const Pstream::commsTypes commsType = Pstream::blocking

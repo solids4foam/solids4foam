@@ -48,14 +48,14 @@ tmp<pointSymmTensorField> symm(const pointTensorField& ptr)
 	    )
 	);
 	
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 	pointSymmTensorField& result = tresult.ref();
 #else
 	pointSymmTensorField& result = tresult();
 #endif
 
 	//Set the result field to be symm(ptr)
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     result.primitiveFieldRef() = symm(ptr.primitiveField());
 #else
     result.internalField() = symm(ptr.internalField());
@@ -90,14 +90,14 @@ tmp<pointSymmTensorField> dev(const pointSymmTensorField& ptr)
 	    )
 	);
 	
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 	pointSymmTensorField& result = tresult.ref();
 #else
 	pointSymmTensorField& result = tresult();
 #endif
 
 	//Set the result field to be symm(ptr)
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     result.primitiveFieldRef() = dev(ptr.primitiveField());
 #else
     pointD.internalField() = dev(ptr.internalField());
@@ -132,14 +132,14 @@ tmp<pointScalarField> tr(const pointSymmTensorField& ptr)
 	    )
 	);
 	
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 	pointScalarField& result = tresult.ref();
 #else
 	pointScalarField& result = tresult();
 #endif
 
 	//Set the result field to be symm(ptr)
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     result.primitiveFieldRef() = tr(ptr.primitiveField());
 #else
     pointD.internalField() = tr(ptr.internalField());

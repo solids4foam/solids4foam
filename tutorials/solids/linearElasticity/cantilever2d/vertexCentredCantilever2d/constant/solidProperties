@@ -49,6 +49,8 @@ solidModel     vertexCentredLinearGeometry;
     // Use PETSc, else use Eigen SparseLU
     usePETSc yes;
     optionsFile "$FOAM_CASE/petscOptions";
+    //optionsFile "$FOAM_CASE/petscOptions.mumps";
+    //optionsFile "$FOAM_CASE/petscOptions.superlu_dist";
 }
 
 // ************************************************************************* //
