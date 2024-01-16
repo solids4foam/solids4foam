@@ -1298,7 +1298,7 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
     pEpsilonEq.write();
 
     Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;
-    
+
     // Stress at the points
     pointSymmTensorField pSigma
 	(
@@ -1313,16 +1313,16 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 		pMesh(),
 		dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
     );
-    
+
     // Acces the linearElasticMisesPlastic mechanical law
     const PtrList<mechanicalLaw>& mechLaws = mechanical();
     const linearElasticMisesPlastic& mech = refCast<const linearElasticMisesPlastic>(mechLaws[0]);
-    
+
     // Calculate the stress at the points
-    mech.calculatePStress(pSigma, pGradD); 
-    
+    mech.calculatePStress(pSigma, pGradD);
+
     pSigma.write();
-    
+
 //    // Equivalent stress at the points
 //    pointScalarField pSigmaEq
 //    (
@@ -1358,9 +1358,9 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 //        3*(pSigma.internalField().XY()^2 + pSigma.internalField().YZ()^2 + pSigma.internalField().XZ()^2));
 //#endif
 //    pSigmaEq.write();
-    
+
     solidModel::writeFields(runTime);
-      
+
 }
 
 

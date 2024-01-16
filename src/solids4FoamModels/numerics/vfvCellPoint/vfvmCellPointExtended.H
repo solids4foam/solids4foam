@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -94,7 +88,7 @@ namespace vfvm
         const scalarField& pointVolI,
         const int debug  // debug switch
     );
-    
+
 } // End namespace vfvm
 
 } // End namespace Foam

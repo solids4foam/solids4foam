@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -120,14 +114,14 @@ void Foam::vfvm::divSigmaOriginal
             // Calculate the coefficient for this point coming from dualFaceI
             tensor coeff;
             multiplyCoeffRectMat(coeff, curDualSf, materialTangent, lsVec);
-            
+
             // Add the coefficient to the ownPointID equation coming from
             // pointID
             matrix(ownPointID, pointID) += coeff;
 
             // Add the coefficient to the neiPointID equation coming from
             // pointID
-            matrix(neiPointID, pointID) -= coeff;            
+            matrix(neiPointID, pointID) -= coeff;
         }
 
         // Add compact central-differencing component in the edge direction
@@ -143,7 +137,7 @@ void Foam::vfvm::divSigmaOriginal
         (
             edgeDirCoeff, curDualSf, materialTangent, eOverLength
         );
-        edgeDirCoeff *= zeta;	
+        edgeDirCoeff *= zeta;
 
         // Insert coefficients for the ownPoint
         matrix(ownPointID, ownPointID) -= edgeDirCoeff;
@@ -151,8 +145,8 @@ void Foam::vfvm::divSigmaOriginal
 
         // Insert coefficients for the neiPoint
         matrix(neiPointID, neiPointID) -= edgeDirCoeff;
-        matrix(neiPointID, ownPointID) += edgeDirCoeff;       
-        
+        matrix(neiPointID, ownPointID) += edgeDirCoeff;
+
     }
 
     // Enforce fixed degrees of freedom

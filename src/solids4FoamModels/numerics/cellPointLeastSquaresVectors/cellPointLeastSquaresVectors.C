@@ -88,7 +88,7 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
         }
 
         cellAvPoint[cellI] /= curCellPoints.size();
-        
+
     }
 
     // Set up temporary storage for the dd tensor (before inversion)
@@ -115,7 +115,7 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
 
             dd[cellI] += w*sqr(d);
 		}
- 
+
     }
 
     // Invert least squares matrix using Householder transformations to avoid
@@ -170,13 +170,13 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
         {
             curLs[cpI] -= cellAvLsVec;
         }
-        
+
     }
 
     if (debug)
     {
         Info<< "cellPointLeastSquaresVectors::makeLeastSquaresVectors() :"
-            << "Finished constructing least square gradient vectors" 
+            << "Finished constructing least square gradient vectors"
             << endl;
     }
 }

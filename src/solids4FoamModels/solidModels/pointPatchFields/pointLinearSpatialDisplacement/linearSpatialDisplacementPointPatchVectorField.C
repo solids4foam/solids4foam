@@ -74,7 +74,7 @@ linearSpatialDisplacementPointPatchVectorField
 :
     fixedValuePointPatchVectorField(p, iF),
     a_(vector::zero),
-    b_(tensor::zero) 
+    b_(tensor::zero)
 {}
 
 

@@ -259,7 +259,7 @@ public:
                 const label patchID,
                 const vectorField& faceZoneTraction
             );
-            
+
          // Write
 
             //- Write fields

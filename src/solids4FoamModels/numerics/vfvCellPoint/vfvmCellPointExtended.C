@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -52,20 +46,20 @@ void Foam::vfvm::divSigmaExtended
     {
         Info<< "void Foam::vfvm::divSigmaExtended(...): start" << endl;
     }
-    
+
 //    Info << "sigmaField = " << sigmaField << endl;
 //    Info << sigmaField.size() << endl;
 //    Info << materialTangentField.size() << endl;
 //    Info << geometricStiffnessField.size() << endl;
 //    Info << dualGradDField.size() << endl;
-    
+
 //    for (int i = 0; i < geometricStiffnessField.size(); i++)
 //    {
 //        Info << "(" << i << ", 0) : " << geometricStiffnessField[i] << endl;
-//        
-//    } 
+//
+//    }
 //    Info << endl;
-    
+
 
     // Take reference for clarity and efficiency
     const labelListList& cellPoints = mesh.cellPoints();
@@ -87,11 +81,11 @@ void Foam::vfvm::divSigmaExtended
         // Material tangent at the dual mesh face
         const RectangularMatrix<scalar>& materialTangent =
             materialTangentField[dualFaceI];
-            
+
         // Sensitivity term at the dual mesh face
         const RectangularMatrix<scalar>& geometricStiffness =
         	geometricStiffnessField[dualFaceI];
-       	
+
        	// Sigma at the dual mesh face
        	const symmTensor sigma = sigmaField[dualFaceI];
 
@@ -112,19 +106,19 @@ void Foam::vfvm::divSigmaExtended
 
         // dualFaceI area vector
         const vector& curDualSf = dualSf[dualFaceI];
-        
+
         // gradD at the dual mesh face
         const tensor& dualGradD = dualGradDField[dualFaceI];
-        
+
 		// Calculate F for dual faces
-		const tensor& dualF = I + dualGradD.T(); 
-		
+		const tensor& dualF = I + dualGradD.T();
+
 		// Calculate invF for dual faces
-		const tensor& dualInvF = inv(dualF); 
-		
+		const tensor& dualInvF = inv(dualF);
+
 		// Calculate J for dual faces
 		const scalar& dualJ = det(dualF);
-		
+
 		// Calculate deformed Sf
 		const vector& curDualSfDef = (dualJ*dualInvF.T()) & curDualSf;
 
@@ -160,21 +154,21 @@ void Foam::vfvm::divSigmaExtended
             tensor coeff;
             multiplyCoeffExtended
             (
-            	coeff, 
-            	curDualSfDef, 
-            	materialTangent, 
+            	coeff,
+            	curDualSfDef,
+            	materialTangent,
             	geometricStiffness,
-            	sigma, 
+            	sigma,
             	lsVec
             );
-            
+
             // Add the coefficient to the ownPointID equation coming from
             // pointID
             matrix(ownPointID, pointID) += coeff;
 
             // Add the coefficient to the neiPointID equation coming from
             // pointID
-            matrix(neiPointID, pointID) -= coeff;            
+            matrix(neiPointID, pointID) -= coeff;
         }
 
         // Add compact central-differencing component in the edge direction
@@ -188,14 +182,14 @@ void Foam::vfvm::divSigmaExtended
         tensor edgeDirCoeff;
         multiplyCoeffExtended
         (
-        	edgeDirCoeff, 
-        	curDualSfDef, 
-        	materialTangent, 
+        	edgeDirCoeff,
+        	curDualSfDef,
+        	materialTangent,
         	geometricStiffness,
-        	sigma, 
+        	sigma,
         	eOverLength
         );
-        edgeDirCoeff *= zeta;	
+        edgeDirCoeff *= zeta;
 
         // Insert coefficients for the ownPoint
         matrix(ownPointID, ownPointID) -= edgeDirCoeff;
@@ -203,8 +197,8 @@ void Foam::vfvm::divSigmaExtended
 
         // Insert coefficients for the neiPoint
         matrix(neiPointID, neiPointID) -= edgeDirCoeff;
-        matrix(neiPointID, ownPointID) += edgeDirCoeff;       
-        
+        matrix(neiPointID, ownPointID) += edgeDirCoeff;
+
     }
 
     // Enforce fixed degrees of freedom

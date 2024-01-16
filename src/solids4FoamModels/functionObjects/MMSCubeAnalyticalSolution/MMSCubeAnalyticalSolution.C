@@ -46,50 +46,50 @@ Foam::symmTensor Foam::MMSCubeAnalyticalSolution::MMSCubeStress
 )
 {
     symmTensor sigma = symmTensor::zero;
-    
+
     // Shear modulus
     const scalar mu = E_/(2.0*(1.0 + nu_));
-    
+
     // Lambda parameter
     const scalar lambda = (E_*nu_)/((1.0+nu_)*(1.0-2.0*nu_));
-    
+
     //pi
     const scalar pi = Foam::constant::mathematical::pi;
 
     sigma.xx() =
-    lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z()) 
-    + 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
-    + az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())) 
+    lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z())
+    + 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z())
+    + az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y()))
     + 8*ax_*mu*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z());
- 
+
     sigma.yy() =
-	lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z()) 
-	+ 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
-	+ az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())) 
+	lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z())
+	+ 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z())
+	+ az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y()))
 	+ 4*ay_*mu*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z());
- 
-    sigma.zz() = 
-	lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z()) 
-	+ 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
-	+ az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())) 
+
+    sigma.zz() =
+	lambda*(4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z())
+	+ 2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z())
+	+ az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y()))
 	+ 2*az_*mu*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y());
 
-    sigma.xy() = 
-	2*ax_*mu*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) 
+    sigma.xy() =
+	2*ax_*mu*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z())
 	+ 4*ay_*mu*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z());
- 
+
     sigma.yx() = sigma.xy();
-    
-    sigma.yz() = 
-    ay_*mu*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y()) 
+
+    sigma.yz() =
+    ay_*mu*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())
     + 2*az_*mu*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z());
- 
+
     sigma.zy() = sigma.yz();
-    
+
     sigma.xz() =
-    ax_*mu*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y()) 
+    ax_*mu*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y())
     + 4*az_*mu*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z());
-    
+
     sigma.zx() = sigma.xz();
 
     return sigma;
@@ -101,32 +101,32 @@ Foam::symmTensor Foam::MMSCubeAnalyticalSolution::MMSCubeEpsilon
 )
 {
     symmTensor epsilon = symmTensor::zero;
-    
+
     //pi
     const scalar pi = Foam::constant::mathematical::pi;
 
     epsilon.xx() =
     4*ax_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z());
- 
+
     epsilon.yy() =
     2*ay_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z());
- 
-    epsilon.zz() = 
+
+    epsilon.zz() =
     az_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y());
 
-    epsilon.xy() = 
+    epsilon.xy() =
     ax_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z()) + 2*ay_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z());
- 
+
     epsilon.yx() = epsilon.xy();
-    
-    epsilon.yz() = 
+
+    epsilon.yz() =
     (ay_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y()))/2 + az_*pi*Foam::cos(2*pi*point.y())*Foam::sin(4*pi*point.x())*Foam::sin(pi*point.z());
- 
+
     epsilon.zy() = epsilon.yz();
-    
+
     epsilon.xz() =
     (ax_*pi*Foam::cos(pi*point.z())*Foam::sin(4*pi*point.x())*Foam::sin(2*pi*point.y()))/2 + 2*az_*pi*Foam::cos(4*pi*point.x())*Foam::sin(2*pi*point.y())*Foam::sin(pi*point.z());
-    
+
     epsilon.zx() = epsilon.xz();
 
     return epsilon;
@@ -136,7 +136,7 @@ Foam::vector Foam::MMSCubeAnalyticalSolution::MMSCubeDisplacement
 (
     const vector& point
 )
-{    
+{
     //pi
     const scalar pi = Foam::constant::mathematical::pi;
 
@@ -167,8 +167,8 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
 
     // Point coordinates
     const pointField& points = mesh.points();
-    
-    //Cell-centre coordinates 
+
+    //Cell-centre coordinates
     const volVectorField& C = mesh.C();
     const vectorField& CI = C;
 
@@ -189,7 +189,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             dimensionedSymmTensor("zero", dimPressure, symmTensor::zero),
             "calculated"
         );
-        
+
         pointSymmTensorField analyticalPointEpsilon
         (
             IOobject
@@ -204,7 +204,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             dimensionedSymmTensor("zero", dimPressure, symmTensor::zero),
             "calculated"
         );
-        
+
 		pointScalarField analyticalPointEpsilonEq
 		(
 		    IOobject
@@ -219,7 +219,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
 		    dimensionedScalar("0", dimless, 0.0),
 		    "calculated"
 		);
-        
+
         volScalarField analyticalStressEq
         (
             IOobject
@@ -248,7 +248,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             pMesh,
             dimensionedVector("zero", dimLength, vector::zero)
         );
-        
+
         volVectorField analyticalD
         (
             IOobject
@@ -269,7 +269,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
         scalarField& sEqI = analyticalStressEq;
         vectorField& aPDI = analyticalPointD;
         vectorField& aDI = analyticalD;
-        
+
 
         forAll(sI, cellI)
         {
@@ -277,22 +277,22 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             {
                 sI[cellI] = MMSCubeStress(CI[cellI]);
                 sEqI[cellI] = sqrt((sqr(sI[cellI].xx() - sI[cellI].yy()) + sqr(sI[cellI].yy() - sI[cellI].zz()) + sqr(sI[cellI].zz() - sI[cellI].xx()) +
-                6*(sqr(sI[cellI].xy()) + sqr(sI[cellI].yz()) + sqr(sI[cellI].zx())))/2); 
+                6*(sqr(sI[cellI].xy()) + sqr(sI[cellI].yz()) + sqr(sI[cellI].zx())))/2);
             }
-            
+
         }
-        
+
         forAll(pEI, pointI)
         {
             if (pointEpsilon_)
             {
                 pEI[pointI] = MMSCubeEpsilon(points[pointI]);
                 pEEqI[pointI] = sqrt((2.0/3.0)*magSqr(dev(pEI[pointI])));
-                
+
             }
-            
-        }        
-            
+
+        }
+
         forAll(aPDI, pointI)
         {
 
@@ -301,7 +301,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
                 aPDI[pointI] = MMSCubeDisplacement(points[pointI]);
             }
         }
-        
+
         forAll(aDI, cellI)
         {
 
@@ -310,7 +310,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
                 aDI[cellI] = MMSCubeDisplacement(CI[cellI]);
             }
         }
-        
+
         forAll(analyticalStress.boundaryField(), patchI)
         {
             if (mesh.boundary()[patchI].type() != "empty")
@@ -320,7 +320,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
                 scalarField& sEqP = analyticalStressEq.boundaryFieldRef()[patchI];
 #else
                 symmTensorField& sP = analyticalStress.boundaryField()[patchI];
-                scalarField& sEqP = analyticalStressEq.boundaryField()[patchI]; 
+                scalarField& sEqP = analyticalStressEq.boundaryField()[patchI];
 #endif
                 const vectorField& CP = C.boundaryField()[patchI];
 
@@ -341,7 +341,7 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
             analyticalStress.write();
             analyticalStressEq.write();
         }
-        
+
         if (pointEpsilon_)
         {
             Info<< "Writing analyticalPointEpsilon and analyticalPointEpsilonEq"
@@ -379,21 +379,21 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
                 << "	Magnitude: " << gAverage(mag(diffI))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI)))
                 << " " << gMax(mag(diffI))
-                << nl 
+                << nl
                 << "	u: " << gAverage(mag(diffI.component(0)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI.component(0))))
                 << " " << gMax(mag(diffI.component(0)))
-                << nl 
+                << nl
                 << "	v: " << gAverage(mag(diffI.component(1)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI.component(1))))
                 << " " << gMax(mag(diffI.component(1)))
-                << nl 
+                << nl
                 << "	w: " << gAverage(mag(diffI.component(2)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI.component(2))))
                 << " " << gMax(mag(diffI.component(2)))
                 << nl << endl;
         }
-        
+
         if
         (
             pointDisplacement_
@@ -415,21 +415,21 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
                 << "	Magnitude: " << gAverage(mag(diffI))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI)))
                 << " " << gMax(mag(diffI))
-                << nl 
+                << nl
                 << "	u: " << gAverage(mag(diffI.component(0)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI.component(0))))
                 << " " << gMax(mag(diffI.component(0)))
-                << nl 
+                << nl
                 << "	v: " << gAverage(mag(diffI.component(1)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI.component(1))))
                 << " " << gMax(mag(diffI.component(1)))
-                << nl 
+                << nl
                 << "	w: " << gAverage(mag(diffI.component(2)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffI.component(2))))
                 << " " << gMax(mag(diffI.component(2)))
                 << nl << endl;
         }
-        
+
         if
         (
             pointEpsilon_
@@ -451,61 +451,61 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
                 << "    Component XX: " << gAverage(mag(diffEpsilonI.component(0)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffEpsilonI.component(0))))
                 << " " << gMax(mag(diffEpsilonI.component(0)))
-                << nl 
+                << nl
                 << "    Component XY: " << gAverage(mag(diffEpsilonI.component(1)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffEpsilonI.component(1))))
                 << " " << gMax(mag(diffEpsilonI.component(1)))
-                << nl 
+                << nl
                 << "    Component XZ: " << gAverage(mag(diffEpsilonI.component(2)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffEpsilonI.component(2))))
                 << " " << gMax(mag(diffEpsilonI.component(2)))
-                << nl 
+                << nl
                 << "    Component YY: " << gAverage(mag(diffEpsilonI.component(3)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffEpsilonI.component(3))))
                 << " " << gMax(mag(diffEpsilonI.component(3)))
-                << nl 
+                << nl
                 << "    Component YZ: " << gAverage(mag(diffEpsilonI.component(4)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffEpsilonI.component(4))))
                 << " " << gMax(mag(diffEpsilonI.component(4)))
-                << nl 
+                << nl
                 << "    Component ZZ: " << gAverage(mag(diffEpsilonI.component(5)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffEpsilonI.component(5))))
                 << " " << gMax(mag(diffEpsilonI.component(5)))
                 << nl << endl;
         }
-        
-        
+
+
         if
         (
             pointStress_
          && mesh.foundObject<volSymmTensorField>("sigma")
         )
         {
-            
+
             const volSymmTensorField& pointSigma =
                 mesh.lookupObject<volSymmTensorField>("sigma");
-            
+
 //            const scalarField& pointSigmaEq(mesh.nPoints(),0);
-                
+
 //            forAll (pointSigma, pointI)
 //            {
-//            pointSigmaEq[pointI] = 
-//            sqrt((sqr(pointSigma[pointI].xx() - pointSigma[pointI].yy()) + sqr(pointSigma[pointI].yy() - pointSigma[pointI].zz()) + 
-//            sqr(pointSigma[pointI].zz() - pointSigma[pointI].xx()) + 6*(sqr(pointSigma[pointI].xy()) + sqr(pointSigma[pointI].yz()) 
+//            pointSigmaEq[pointI] =
+//            sqrt((sqr(pointSigma[pointI].xx() - pointSigma[pointI].yy()) + sqr(pointSigma[pointI].yy() - pointSigma[pointI].zz()) +
+//            sqr(pointSigma[pointI].zz() - pointSigma[pointI].xx()) + 6*(sqr(pointSigma[pointI].xy()) + sqr(pointSigma[pointI].yz())
 //            + sqr(pointSigma[pointI].zx())))/2);
 //            }
-            
+
 
             const volSymmTensorField diffSigma
             (
                 "pointSigmaDifference", analyticalStress - pointSigma
             );
-            
+
 //            const volScalarField diffSigmaEq
 //            (
 //                "pointSigmaEqDifference", analyticalStressEq - pointSigmaEq
 //            );
-            
+
             Info<< "Writing pointSigmaDifference and pointSigmaEqDifference fields" << endl;
             diffSigma.write();
             //diffSigmaEq.write();
@@ -516,23 +516,23 @@ bool Foam::MMSCubeAnalyticalSolution::writeData()
                 << "    Component XX: " << gAverage(mag(diffSigmaI.component(0)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(0))))
                 << " " << gMax(mag(diffSigmaI.component(0)))
-                << nl 
+                << nl
                 << "    Component XY: " << gAverage(mag(diffSigmaI.component(1)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(1))))
                 << " " << gMax(mag(diffSigmaI.component(1)))
-                << nl 
+                << nl
                 << "    Component XZ: " << gAverage(mag(diffSigmaI.component(2)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(2))))
                 << " " << gMax(mag(diffSigmaI.component(2)))
-                << nl 
+                << nl
                 << "    Component YY: " << gAverage(mag(diffSigmaI.component(3)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(3))))
                 << " " << gMax(mag(diffSigmaI.component(3)))
-                << nl 
+                << nl
                 << "    Component YZ: " << gAverage(mag(diffSigmaI.component(4)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(4))))
                 << " " << gMax(mag(diffSigmaI.component(4)))
-                << nl 
+                << nl
                 << "    Component ZZ: " << gAverage(mag(diffSigmaI.component(5)))
                 << " " << Foam::sqrt(gAverage(magSqr(diffSigmaI.component(5))))
                 << " " << gMax(mag(diffSigmaI.component(5)))

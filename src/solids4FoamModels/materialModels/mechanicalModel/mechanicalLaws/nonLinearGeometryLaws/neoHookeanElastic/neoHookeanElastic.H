@@ -82,7 +82,7 @@ class neoHookeanElastic
 
         //- Disallow default bitwise copy construct
         neoHookeanElastic(const neoHookeanElastic&);
-        
+
         //- Calculate stress
         void calculateStress
         (
@@ -123,7 +123,7 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
-        
+
         //- Return material tangent
         Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 		materialTangentField() const;

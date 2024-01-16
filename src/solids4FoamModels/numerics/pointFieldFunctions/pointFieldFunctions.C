@@ -29,7 +29,7 @@ tmp<pointSymmTensorField> symm(const pointTensorField& ptr)
 {
 
 	const pointMesh& pMesh =  ptr.mesh();
-	
+
 	// Prepare the temporary field
 	tmp<pointSymmTensorField> tresult
 	(
@@ -47,7 +47,7 @@ tmp<pointSymmTensorField> symm(const pointTensorField& ptr)
 	        dimensionedSymmTensor("0", dimless, symmTensor::zero)
 	    )
 	);
-	
+
 #ifdef OPENFOAM_NOT_EXTEND
 	pointSymmTensorField& result = tresult.ref();
 #else
@@ -59,8 +59,8 @@ tmp<pointSymmTensorField> symm(const pointTensorField& ptr)
     result.primitiveFieldRef() = symm(ptr.primitiveField());
 #else
     result.internalField() = symm(ptr.internalField());
-#endif 
-	
+#endif
+
 	//Call the correctBoundaryConditions function
 	result.correctBoundaryConditions();
 
@@ -71,7 +71,7 @@ tmp<pointSymmTensorField> dev(const pointSymmTensorField& ptr)
 {
 
 	const pointMesh& pMesh =  ptr.mesh();
-	
+
 	// Prepare the temporary field
 	tmp<pointSymmTensorField> tresult
 	(
@@ -89,7 +89,7 @@ tmp<pointSymmTensorField> dev(const pointSymmTensorField& ptr)
 	        dimensionedSymmTensor("0", dimless, symmTensor::zero)
 	    )
 	);
-	
+
 #ifdef OPENFOAM_NOT_EXTEND
 	pointSymmTensorField& result = tresult.ref();
 #else
@@ -101,8 +101,8 @@ tmp<pointSymmTensorField> dev(const pointSymmTensorField& ptr)
     result.primitiveFieldRef() = dev(ptr.primitiveField());
 #else
     pointD.internalField() = dev(ptr.internalField());
-#endif 
-	
+#endif
+
 	//Call the correctBoundaryConditions function
 	result.correctBoundaryConditions();
 
@@ -113,7 +113,7 @@ tmp<pointScalarField> tr(const pointSymmTensorField& ptr)
 {
 
 	const pointMesh& pMesh =  ptr.mesh();
-	
+
 	// Prepare the temporary field
 	tmp<pointScalarField> tresult
 	(
@@ -131,7 +131,7 @@ tmp<pointScalarField> tr(const pointSymmTensorField& ptr)
 	        dimensionedScalar("0", dimless, 0.0)
 	    )
 	);
-	
+
 #ifdef OPENFOAM_NOT_EXTEND
 	pointScalarField& result = tresult.ref();
 #else
@@ -143,8 +143,8 @@ tmp<pointScalarField> tr(const pointSymmTensorField& ptr)
     result.primitiveFieldRef() = tr(ptr.primitiveField());
 #else
     pointD.internalField() = tr(ptr.internalField());
-#endif 
-	
+#endif
+
 	//Call the correctBoundaryConditions function
 	result.correctBoundaryConditions();
 
