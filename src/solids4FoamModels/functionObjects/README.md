@@ -1,3 +1,7 @@
+---
+sort: 5
+---
+
 # Function Objects
 
 ---
@@ -12,7 +16,7 @@ Prepared by Ivan Batistić
 
 - Function objects are various post-processing functionalities that are executing during simulation run time;
 
-- Function objects are placed at the bottom of the `system/controlDict` file:
+- Function objects are placed at the bottom of the `system/controlDict` file; for example:
 
   ```c++
   functions
@@ -24,8 +28,8 @@ Prepared by Ivan Batistić
       }
       patchForce
       {
-          type    solidForces;
-          historyPatch     top;
+          type    			solidForces;
+          historyPatch  top;
       }
   }
   ```
