@@ -152,15 +152,15 @@ Foam::linearElastic::linearElastic
     }
 
     // Read the initial stress
-    if (dict.found("sigma0"))
-    {
-        Info<< "Reading sigma0 from the dict" << endl;
-        sigma0() = dimensionedSymmTensor(dict.lookup("sigma0"));
-    }
-    else if (gMax(mag(sigma0())()) > SMALL)
-    {
-        Info<< "Reading sigma0 stress field" << endl;
-    }
+    // if (dict.found("sigma0"))
+    // {
+    //     Info<< "Reading sigma0 from the dict" << endl;
+    //     sigma0() = dimensionedSymmTensor(dict.lookup("sigma0"));
+    // }
+    // else if (gMax(mag(sigma0())()) > SMALL)
+    // {
+    //     Info<< "Reading sigma0 stress field" << endl;
+    // }
 }
 
 
@@ -304,12 +304,12 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
         updateSigmaHyd(K_*tr(epsilon()), 2*mu_ + lambda_);
 
         // Hooke's law: partitioned deviatoric and dilation form
-        sigma = 2.0*mu_*dev(epsilon()) + sigmaHyd()*I + sigma0();
+        sigma = 2.0*mu_*dev(epsilon()) + sigmaHyd()*I; // + sigma0();
     }
     else
     {
         // Hooke's law: standard form
-        sigma = 2.0*mu_*epsilon() + lambda_*tr(epsilon())*I + sigma0();
+        sigma = 2.0*mu_*epsilon() + lambda_*tr(epsilon())*I; // + sigma0();
 
         // Update sigmaHyd variable
         sigmaHyd() = -K_*tr(epsilon());
@@ -333,12 +333,12 @@ void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
         const surfaceScalarField sigmaHydf(fvc::interpolate(sigmaHyd()));
 
         // Add deviatoric and initial stresses
-        sigma = 2.0*mu_*dev(epsilonf()) + sigmaHydf*I + sigma0f();
+        sigma = 2.0*mu_*dev(epsilonf()) + sigmaHydf*I; // + sigma0f();
     }
     else
     {
         // Hooke's law : standard form
-        sigma = 2.0*mu_*epsilonf() + lambda_*tr(epsilonf())*I + sigma0f();
+        sigma = 2.0*mu_*epsilonf() + lambda_*tr(epsilonf())*I; // + sigma0f();
     }
 }
 
