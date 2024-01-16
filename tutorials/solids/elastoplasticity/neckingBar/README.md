@@ -34,6 +34,7 @@ The two end surfaces of the bar are slowly displaced through a distance of $$7$$
 | Initial yield stress |  $$\sigma_Y$$  |      $$451$$ MPa      |
 
 **Table 2: Hardening behaviour**
+
 | Plastic strain | Yield Stress (in MPa) |
 | ------------ | ------------------- |
 |   $$0.000$$    |        $$451$$        |

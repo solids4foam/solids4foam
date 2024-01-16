@@ -34,17 +34,19 @@ The curved cantilever beam is fixed on the left side, and the right side has pre
 
 * Stress is dependent on the angular coordinate $$\theta$$;
 
-* The analytical solution for the stress field is [[1]](https://www.sciencedirect.com/book/9780123744463/elasticity):  
-  $$
-  N = {a}^2 - {b}^2 + ({a}^2+{b}^2)\;\text{ln}\left(\frac{b}{a}\right),
-  $$
+* The analytical solution for the stress field is [[1]](https://www.sciencedirect.com/book/9780123744463/elasticity):
+
+$$
+N = {a}^2 - {b}^2 + ({a}^2+{b}^2)\;\text{ln}\left(\frac{b}{a}\right),
+$$
+
 $$
 \sigma_{r} = \frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta),
 $$
 
 $$
 \sigma_{\theta} = \frac{P}{N}\left(3r-\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta),
-$$ {,}
+$$
 
 $$
 \tau_{r\theta} = \tau_{\theta r} =-\frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\cos (\theta).

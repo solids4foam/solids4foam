@@ -24,6 +24,7 @@ This case considers a thick-walled cylinder subjected to a temperature differenc
 ## Expected Results
 
 Comparison between numerical and analytical solutions is performed in terms of circumferential and radial stresses in the radial direction through the cylinder, for which the analytical solutions are as follows [1]:
+
 $$
 \sigma_r = \dfrac{\alpha E (T_i-T_o)}{2(1-\nu)\ln\dfrac{r_o}{r_i}}\left[-\ln\dfrac{r_o}{r}-\dfrac{r_i^2}{r_o^2-r_i^2}\left(1-\dfrac{r_o^2}{r^2}\right) \ln\dfrac{r_o}{r_i}  \right],
 $$
@@ -41,6 +42,7 @@ The analytical equation for temperature distribution is [1]:
 $$
 T = \dfrac{(T_i - T_o)}{\ln\dfrac{r_o}{r_i}}\ln\dfrac{r_o}{r}.
 $$
+
 The `hotCylinderAnalyticalSolution` function object in `system/controlDict` is used to generate analytical solution fields (`analyticalT`, `analyticalRadialStress` and `analyticalHoopStress`):
 
 ```c++
