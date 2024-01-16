@@ -74,9 +74,6 @@ class linearElasticMisesPlastic
     public mechanicalLaw
 {
     // Private data
-    
-        //- Point mesh
-        const pointMesh& pMesh_;
 
         //- Point mesh
         const pointMesh& pMesh_;
@@ -101,7 +98,7 @@ class linearElasticMisesPlastic
 
         //- Yield stress surface field
         surfaceScalarField sigmaYf_;
-        
+
         //- Yield stress point field
         pointScalarField pSigmaY_;
 
@@ -110,7 +107,7 @@ class linearElasticMisesPlastic
 
         //- Incremental change in sigmaY surface field
         surfaceScalarField DSigmaYf_;
-        
+
         //- Incremental change in sigmaY point field
         pointScalarField pDSigmaY_;
 
@@ -119,7 +116,7 @@ class linearElasticMisesPlastic
 
         //- Total plastic strain surface field
         surfaceSymmTensorField epsilonPf_;
-        
+
         //- Total plastic strain point field
         pointSymmTensorField pEpsilonP_;
 
@@ -140,7 +137,7 @@ class linearElasticMisesPlastic
 
         //- Plastic multiplier increment - surface field
         surfaceScalarField DLambdaf_;
-        
+
         //- Plastic multiplier increment - point field
         pointScalarField pDLambda_;
 
@@ -160,7 +157,7 @@ class linearElasticMisesPlastic
 
         //- plasticN surface field
         surfaceSymmTensorField plasticNf_;
-        
+
         //- plasticN point field
         pointSymmTensorField pPlasticN_;
 
@@ -265,7 +262,7 @@ public:
     TypeName("linearElasticMisesPlastic");
 
     // Static data members
-    
+
 
     // Constructors
 
@@ -277,13 +274,13 @@ public:
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom
         );
-        
+
         //- Calculate stress at the points
-		void calculatePStress
-		(
-			pointSymmTensorField& pSigma,
-			const pointTensorField& pGradD
-		) const;
+                void calculatePStress
+                (
+                        pointSymmTensorField& pSigma,
+                        const pointTensorField& pGradD
+                ) const;
 
 
     // Destructor

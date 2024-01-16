@@ -42,6 +42,7 @@ SourceFiles
 #include "polyPatch.H"
 #include "Tuple2.H"
 #include "labelPair.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
