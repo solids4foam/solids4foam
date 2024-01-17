@@ -1229,7 +1229,7 @@ void Foam::fluidSolidInterface::updateViscousForceAndPressure()
         (
             fluid().faceZonePressureForce(interfaceI)
         );
-        
+
         // Initialise the solid zone traction and pressure fields
         // that is to be interpolated from the fluid zone
         vectorField solidZoneTraction(solidZone.size(), vector::zero);
@@ -1263,7 +1263,7 @@ void Foam::fluidSolidInterface::updateViscousForceAndPressure()
                 solidPatchIndices()[interfaceI],
                 solidZoneTraction
             );
-            
+
             solid().setPressure
             (
                 interfaceI,

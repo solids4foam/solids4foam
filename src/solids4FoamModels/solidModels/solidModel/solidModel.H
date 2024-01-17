@@ -711,7 +711,7 @@ public:
                 const label patchID,
                 const scalarField& faceZonePressure
             );
-    
+
             //- Set temperature and heat flux at specified patch
             virtual void setTemperatureAndHeatFlux
             (
