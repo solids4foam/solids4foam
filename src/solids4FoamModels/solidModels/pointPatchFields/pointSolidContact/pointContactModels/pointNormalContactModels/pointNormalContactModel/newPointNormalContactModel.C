@@ -44,6 +44,20 @@ autoPtr<pointNormalContactModel> pointNormalContactModel::New
 {
     Info<< "    Normal contact model: " << name << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(name);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            dict,
+            "pointNormalContactModel",
+            name,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
+    }
+#else
     dictionaryConstructorTable::iterator cstrIter =
         dictionaryConstructorTablePtr_->find(name);
 
@@ -68,9 +82,12 @@ autoPtr<pointNormalContactModel> pointNormalContactModel::New
             << exit(FatalIOError);
     }
 
+    auto* ctorPtr = cstrIter();
+#endif
+
     return autoPtr<pointNormalContactModel>
     (
-        cstrIter()
+        ctorPtr
         (
             name,
             mesh,

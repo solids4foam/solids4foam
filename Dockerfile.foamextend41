@@ -15,6 +15,12 @@ SHELL ["/bin/bash", "-c"]
 # Add solids4Foam 
 COPY . /home/dockeruser/solids4foam
 
+# Change ownership to dockeruser
+RUN chown -R dockeruser:dockeruser /home/dockeruser/solids4foam
+
+# Change user to dockeruser
+USER dockeruser
+
 # Compile solids4Foam
 RUN source /home/dockeruser/foam/foam-extend-4.1/etc/bashrc && \
     cd /home/dockeruser/solids4foam && \

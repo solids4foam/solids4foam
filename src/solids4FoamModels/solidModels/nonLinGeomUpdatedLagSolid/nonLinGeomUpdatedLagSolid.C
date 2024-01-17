@@ -196,11 +196,6 @@ bool nonLinGeomUpdatedLagSolid::evolve()
         // Enforce any cell displacements
         solidModel::setCellDisps(DDEqn);
 
-        // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAM_COM
-        const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
-#endif
-
         // Solve the linear system
         solverPerfDD = DDEqn.solve();
 
