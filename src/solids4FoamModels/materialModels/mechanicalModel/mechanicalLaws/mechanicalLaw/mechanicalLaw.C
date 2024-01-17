@@ -180,7 +180,39 @@ void Foam::mechanicalLaw::makeSigma0() const
             )
         );
     }
-    else // multi-material case
+    else if
+    (
+        baseMesh().lookupObject<mechanicalModel>
+        (
+            "mechanicalProperties"
+        ).PtrList::size() == 1
+     || !baseMesh().foundObject<volSymmTensorField>("sigma0")
+    )
+    {
+        // Only one material, but the material mesh is not the same as the
+        // base mesh: it must be a dualMesh or similar
+        // For now, give a warning
+        Warning
+            << "Creating sigma0 but baseMesh is not equal to the material mesh!"
+            << "\nsigma0 may not be correct" << endl;
+        sigma0Ptr_.set
+        (
+            new volSymmTensorField
+            (
+                IOobject
+                (
+                    "sigma0",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+            )
+        );
+    }
+    else
     {
         // Read sigma0 from the baseMesh
         const volSymmTensorField sigma0BaseMesh
