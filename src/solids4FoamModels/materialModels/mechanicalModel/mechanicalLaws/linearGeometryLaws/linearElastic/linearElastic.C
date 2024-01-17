@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -40,49 +34,6 @@ namespace Foam
 }
 
 
-// * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
-
-void Foam::linearElastic::makeSigma0f() const
-{
-    if (sigma0fPtr_.valid())
-    {
-        FatalErrorIn("void Foam::linearElastic::makeSigma0f() const")
-            << "pointer already set" << abort(FatalError);
-    }
-
-    sigma0fPtr_.set
-    (
-        new surfaceSymmTensorField
-        (
-            "sigma0f",
-            linearInterpolate(sigma0())
-        )
-    );
-}
-
-
-const Foam::surfaceSymmTensorField& Foam::linearElastic::sigma0f() const
-{
-    if (sigma0fPtr_.empty())
-    {
-        makeSigma0f();
-    }
-
-    return sigma0fPtr_();
-}
-
-
-Foam::surfaceSymmTensorField& Foam::linearElastic::sigma0f()
-{
-    if (sigma0fPtr_.empty())
-    {
-        makeSigma0f();
-    }
-
-    return sigma0fPtr_();
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -99,8 +50,7 @@ Foam::linearElastic::linearElastic
     K_("K", dimPressure, 0.0),
     E_("E", dimPressure, 0.0),
     nu_("nu", dimless, 0.0),
-    lambda_("lambda", dimPressure, 0.0),
-    sigma0fPtr_()
+    lambda_("lambda", dimPressure, 0.0)
 {
     // Store old times
     epsilon().storeOldTime();
@@ -187,7 +137,7 @@ Foam::linearElastic::linearElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Unphysical Poisson's ratio: nu should be >= -1.0 and <= 0.5"
             << abort(FatalError);
@@ -202,15 +152,15 @@ Foam::linearElastic::linearElastic
     }
 
     // Read the initial stress
-    if (dict.found("sigma0"))
-    {
-        Info<< "Reading sigma0 from the dict" << endl;
-        sigma0() = dimensionedSymmTensor(dict.lookup("sigma0"));
-    }
-    else if (gMax(mag(sigma0())()) > SMALL)
-    {
-        Info<< "Reading sigma0 stress field" << endl;
-    }
+    // if (dict.found("sigma0"))
+    // {
+    //     Info<< "Reading sigma0 from the dict" << endl;
+    //     sigma0() = dimensionedSymmTensor(dict.lookup("sigma0"));
+    // }
+    // else if (gMax(mag(sigma0())()) > SMALL)
+    // {
+    //     Info<< "Reading sigma0 stress field" << endl;
+    // }
 }
 
 
@@ -237,7 +187,7 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::bulkModulus() const
         )
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     tresult.ref().correctBoundaryConditions();
 #else
     tresult().correctBoundaryConditions();
@@ -291,24 +241,26 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 }
 
 
+#ifdef OPENFOAM_NOT_EXTEND
 Foam::RectangularMatrix<Foam::scalar> Foam::linearElastic::materialTangent() const
 {
-    RectangularMatrix<scalar> matTang(6,6,0); 
+    RectangularMatrix<scalar> matTang(6,6,0);
     matTang(0,0) = 2*mu_.value() + lambda().value();
     matTang(0,1) = lambda().value();
-    matTang(0,2) = lambda().value(); 
-    matTang(1,0) = lambda().value(); 
+    matTang(0,2) = lambda().value();
+    matTang(1,0) = lambda().value();
     matTang(1,1) = 2*mu_.value() + lambda().value();
-    matTang(1,2) = lambda().value(); 
-    matTang(2,0) = lambda().value(); 
+    matTang(1,2) = lambda().value();
+    matTang(2,0) = lambda().value();
     matTang(2,1) = lambda().value();
-    matTang(2,2) = 2*mu_.value() + lambda().value(); 
-    matTang(3,3) = mu_.value(); 
+    matTang(2,2) = 2*mu_.value() + lambda().value();
+    matTang(3,3) = mu_.value();
     matTang(4,4) = mu_.value();
-    matTang(5,5) = mu_.value();      
+    matTang(5,5) = mu_.value();
 
     return matTang;
 }
+#endif
 
 
 const Foam::dimensionedScalar& Foam::linearElastic::mu() const
@@ -352,12 +304,12 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
         updateSigmaHyd(K_*tr(epsilon()), 2*mu_ + lambda_);
 
         // Hooke's law: partitioned deviatoric and dilation form
-        sigma = 2.0*mu_*dev(epsilon()) + sigmaHyd()*I + sigma0();
+        sigma = 2.0*mu_*dev(epsilon()) + sigmaHyd()*I; // + sigma0();
     }
     else
     {
         // Hooke's law: standard form
-        sigma = 2.0*mu_*epsilon() + lambda_*tr(epsilon())*I + sigma0();
+        sigma = 2.0*mu_*epsilon() + lambda_*tr(epsilon())*I; // + sigma0();
 
         // Update sigmaHyd variable
         sigmaHyd() = -K_*tr(epsilon());
@@ -381,12 +333,12 @@ void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
         const surfaceScalarField sigmaHydf(fvc::interpolate(sigmaHyd()));
 
         // Add deviatoric and initial stresses
-        sigma = 2.0*mu_*dev(epsilonf()) + sigmaHydf*I + sigma0f();
+        sigma = 2.0*mu_*dev(epsilonf()) + sigmaHydf*I; // + sigma0f();
     }
     else
     {
         // Hooke's law : standard form
-        sigma = 2.0*mu_*epsilonf() + lambda_*tr(epsilonf())*I + sigma0f();
+        sigma = 2.0*mu_*epsilonf() + lambda_*tr(epsilonf())*I; // + sigma0f();
     }
 }
 

@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -28,6 +22,7 @@ License
 #include "transformField.H"
 #include "transformGeometricField.H"
 #include "fvc.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -244,7 +239,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
                 vector(1,0,0)
                *vector
                 (
-                    dict.lookupOrDefault<vector>
+                    mechanicalLaw::dict().lookupOrAddDefault<vector>
                     (
                         "materialDirection1", vector(1,0,0)
                     )
@@ -252,7 +247,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
               + vector(0,1,0)
                *vector
                 (
-                    dict.lookupOrDefault<vector>
+                    mechanicalLaw::dict().lookupOrAddDefault<vector>
                     (
                         "materialDirection2", vector(0,1,0)
                     )
@@ -260,7 +255,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
               + vector(0,0,1)
                *vector
                 (
-                    dict.lookupOrDefault<vector>
+                    mechanicalLaw::dict().lookupOrAddDefault<vector>
                     (
                         "materialDirection2", vector(0,0,1)
                     )
@@ -278,7 +273,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Material law not implemented for planeStress!"
             << abort(FatalError);
@@ -302,7 +297,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "E1, E2, E3, G12, G23, G31 should all be greater than zero!"
             << abort(FatalError);
@@ -323,7 +318,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Unphysical Poisson's ratio!"
             << " mag(nu_ij) should be less sqrt(E_i/E_j)"
@@ -345,7 +340,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Unphysical Poisson's ratio!"
             << " (1 - nu12*nu21 - nu23*nu32 "
@@ -363,7 +358,7 @@ Foam::StVenantKirchhoffOrthotropicElastic::StVenantKirchhoffOrthotropicElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "The direction vectors must not have zero length!"
             << abort(FatalError);

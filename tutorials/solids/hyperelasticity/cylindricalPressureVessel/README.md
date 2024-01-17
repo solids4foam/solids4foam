@@ -4,6 +4,8 @@ sort: 2
 
 # Tutorial: `cylindricalPressureVessel`
 
+Prepared by Iago Lessa de Oliveira
+
 ---
 
 ## Tutorial Aims

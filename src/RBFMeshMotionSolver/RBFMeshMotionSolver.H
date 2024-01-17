@@ -76,9 +76,9 @@ namespace Foam
             RBFMeshMotionSolver
             (
                 const polyMesh & mesh,
-#if defined(OPENFOAMFOUNDATION)
+#if defined(OPENFOAM_ORG)
                 const dictionary& msData
-#elif defined(OPENFOAMESI)
+#elif defined(OPENFOAM_COM)
                 const IOdictionary& msData
 #else
                 Istream & msData

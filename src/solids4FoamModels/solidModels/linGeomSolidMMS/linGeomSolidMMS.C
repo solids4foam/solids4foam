@@ -83,7 +83,7 @@ linGeomSolidMMS::linGeomSolidMMS
 bool linGeomSolidMMS::evolve()
 {
     Info<< "Evolving solid solver" << endl;
-    
+
     const scalar lambda_ = 1.1538e11;
     const scalar mu_ = 7.6923e10;
     const scalar ax_ = 2;
@@ -94,7 +94,7 @@ bool linGeomSolidMMS::evolve()
     do
     {
         int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         SolverPerformance<vector> solverPerfDD;
         SolverPerformance<vector>::debug = 0;
 #else
@@ -103,7 +103,7 @@ bool linGeomSolidMMS::evolve()
 #endif
 
 		// Initialise the body force field to zero
-		// This length of this list is equal to the number of cells (mesh.size) 
+		// This length of this list is equal to the number of cells (mesh.size)
 		DimensionedField<vector, volMesh> bodyForces
 		(
 		    IOobject
@@ -117,28 +117,28 @@ bool linGeomSolidMMS::evolve()
 		    mesh(),
 		    dimensionedVector("zero", dimForce/dimVolume, vector::zero)
 		);
-		
+
 		// Body force field
 		//volVectorField bodyForces(mesh().nCells(), vector::zero);
-		
+
 		// List of primary cells
-		const cellList& cells = mesh().cells();
-		
+		//const cellList& cells = mesh().cells();
+
 		// Cell-centre position vectors
 		const vectorField& C = mesh().C().internalField();
-		
+
 		//pi
-		const scalar pi = constant::mathematical::pi; 
-	 
+		const scalar pi = constant::mathematical::pi;
+
 		// List of primary points
 		//const pointField& points = mesh().points();
 
 		// List of primary faces
 		//const faceList& faces = mesh().faces();
-		
+
 		// List of dual cells
 		//const cellList& dualCells = dualMesh().cells();
-		
+
 		// List of dual points
 		//const pointField& dualPoints = dualMesh().points();
 
@@ -147,73 +147,73 @@ bool linGeomSolidMMS::evolve()
 
 		// List of dual cell volumes
 		//const scalarField& dualV = dualMesh().V();
-		
+
 		// List of cell volumes
-		const scalarField& V = mesh().V();  
-		
+		//const scalarField& V = mesh().V();
+
 		// Body forces field (list of values)
-		vectorField& bodyForcesI = bodyForces.field();  
-		
+		vectorField& bodyForcesI = bodyForces.field();
+
 		forAll(bodyForcesI, cellI)
 		{
 
 	//	    // Take a reference to the current primary volume
 	//	    const scalar curDualV = dualV[vertexI];
-	//	    
+	//
 	//	    //Take a reference to the current dual cell
 	//	    const cell& curDualCell = dualCells[vertexI];
-	//	    
+	//
 	//	    //Create a bounding box around the current dual cell
 	//	    const boundBox bb(curDualCell.points(dualFaces, dualPoints), false);
-	//	    
+	//
 	//	    //Get the most negative x and y coordinates of the dual cell
 	//	    const scalar x1 = bb.min().x();
 	//	    const scalar y1 = bb.min().y();
 	//	    const scalar z1 = bb.min().z();
-	//	   
+	//
 	//	    //Get the most negative x and y coordinates of the dual cell
 	//	    const scalar x2 = bb.max().x();
 	//	    const scalar y2 = bb.max().y();
 	//	    const scalar z2 = bb.max().z();
-			
+
 			// Take a reference to the current primary volume
-			const scalar curV = V[cellI]; 
-			
+                        //const scalar curV = V[cellI];
+
 			const scalar x = C[cellI].x();
 			const scalar y = C[cellI].y();
 			const scalar z = C[cellI].z();
-			                                                                                                                                         
-			//Set vector in dualCellI for x-equation     	
+
+			//Set vector in dualCellI for x-equation
 			bodyForcesI[cellI].x() =
-			lambda_*(8*ay_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-			+ 4*az_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
-			- 16*ax_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-			+ mu_*(8*ay_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-			+ 4*az_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
-			- 5*ax_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+			lambda_*(8*ay_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+			+ 4*az_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+			- 16*ax_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
+			+ mu_*(8*ay_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+			+ 4*az_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+			- 5*ax_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
 			- 32*ax_*mu_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
-	 
 
 
-			//Set vector in dualCellI for y-equation  
+
+			//Set vector in dualCellI for y-equation
 			bodyForcesI[cellI].y() =
-			lambda_*(8*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-			+ 2*az_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-			- 4*ay_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-			+ mu_*(8*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-			+ 2*az_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-			- 17*ay_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+			lambda_*(8*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+			+ 2*az_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+			- 4*ay_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
+			+ mu_*(8*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+			+ 2*az_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+			- 17*ay_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
 			- 8*ay_*mu_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
-	 
-	 
-			//Set vector in dualCellI for -equation  
+
+
+			//Set vector in dualCellI for -equation
 			bodyForcesI[cellI].z() =
-			lambda_*(4*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
-			+ 2*ay_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-			- az_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-			+ mu_*(4*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
-			+ 2*ay_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-			- 20*az_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
+			lambda_*(4*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+			+ 2*ay_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+			- az_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
+			+ mu_*(4*ax_*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+			+ 2*ay_*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+			- 20*az_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
 			- 2*az_*mu_*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
 		}
 
@@ -244,11 +244,6 @@ bool linGeomSolidMMS::evolve()
             // Enforce any cell displacements
             solidModel::setCellDisps(DDEqn);
 
-            // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
-            const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
-#endif
-
             // Solve the linear system
             solverPerfDD = DDEqn.solve();
 
@@ -273,7 +268,7 @@ bool linGeomSolidMMS::evolve()
             !converged
             (
                 iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 mag(solverPerfDD.initialResidual()),
                 cmptMax(solverPerfDD.nIterations()),
 #else
@@ -298,7 +293,7 @@ bool linGeomSolidMMS::evolve()
     // Store ddt old term
     rhoDdtD_0_ = rho()*fvc::d2dt2(D());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

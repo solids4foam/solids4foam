@@ -9,6 +9,8 @@ source solids4FoamScripts.sh
 cleanCase
 cleanCase fluid
 cleanCase solid
+(cd constant/solid/polyMesh && find . ! -name 'blockMeshDict' -type f -exec rm -f {} +)
+(cd constant/fluid/polyMesh && find . ! -name 'blockMeshDict' -type f -exec rm -f {} +)
 rm -rf case.foam residuals force.pdf deflection.pdf postProcessing
 
 # Convert case version to FOAM EXTEND

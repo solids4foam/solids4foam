@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -59,7 +53,7 @@ Author
 #define neoHookeanElastic_H
 
 #include "mechanicalLaw.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "surfaceFields.H"
 #endif
 
@@ -88,7 +82,7 @@ class neoHookeanElastic
 
         //- Disallow default bitwise copy construct
         neoHookeanElastic(const neoHookeanElastic&);
-        
+
         //- Calculate stress
         void calculateStress
         (
@@ -129,10 +123,13 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
-        
+
         //- Return material tangent
         Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 		materialTangentField() const;
+
+        //- Return the bulk modulus field
+        virtual tmp<volScalarField> bulkModulus() const;
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);

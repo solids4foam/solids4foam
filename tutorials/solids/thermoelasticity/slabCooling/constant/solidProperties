@@ -42,8 +42,20 @@ solidModel     thermalLinearGeometry;
         // block
         cellDisp1
         {
+            // The cell with the cloest centroid to thi point will be selected
             approximateCoordinate    (3 1 0.5);
+
+            // The prescribed displacement can be constant or time-varying
+
+            // Constant displacement
             displacement             (0 0 0);
+
+            // Time-varying displacement
+            // timeVaryingDisplacement
+            // {
+            //     "file|fileName" "$FOAM_CASE/constant/timeVsCellDisp3";
+            //     outOfBounds clamp;
+            // }
         }
     }
 }

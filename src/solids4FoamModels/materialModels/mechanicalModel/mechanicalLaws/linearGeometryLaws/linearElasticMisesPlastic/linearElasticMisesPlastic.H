@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -74,9 +68,6 @@ class linearElasticMisesPlastic
     public mechanicalLaw
 {
     // Private data
-    
-        //- Point mesh
-        const pointMesh& pMesh_;
 
         //- Point mesh
         const pointMesh& pMesh_;
@@ -93,7 +84,7 @@ class linearElasticMisesPlastic
         //- Poisson's ratio
         dimensionedScalar nu_;
 
-        //- Table of post-yield stress versus plastic strain
+        //- Table of plastic strain versus post-yield stress
         interpolationTable<scalar> stressPlasticStrainSeries_;
 
         //- Yield stress
@@ -101,7 +92,7 @@ class linearElasticMisesPlastic
 
         //- Yield stress surface field
         surfaceScalarField sigmaYf_;
-        
+
         //- Yield stress point field
         pointScalarField pSigmaY_;
 
@@ -110,7 +101,7 @@ class linearElasticMisesPlastic
 
         //- Incremental change in sigmaY surface field
         surfaceScalarField DSigmaYf_;
-        
+
         //- Incremental change in sigmaY point field
         pointScalarField pDSigmaY_;
 
@@ -119,7 +110,7 @@ class linearElasticMisesPlastic
 
         //- Total plastic strain surface field
         surfaceSymmTensorField epsilonPf_;
-        
+
         //- Total plastic strain point field
         pointSymmTensorField pEpsilonP_;
 
@@ -140,7 +131,7 @@ class linearElasticMisesPlastic
 
         //- Plastic multiplier increment - surface field
         surfaceScalarField DLambdaf_;
-        
+
         //- Plastic multiplier increment - point field
         pointScalarField pDLambda_;
 
@@ -160,7 +151,7 @@ class linearElasticMisesPlastic
 
         //- plasticN surface field
         surfaceSymmTensorField plasticNf_;
-        
+
         //- plasticN point field
         pointSymmTensorField pPlasticN_;
 
@@ -259,13 +250,14 @@ class linearElasticMisesPlastic
             const surfaceTensorField& gradD
         ) const;
 
+
 public:
 
     //- Runtime type information
     TypeName("linearElasticMisesPlastic");
 
     // Static data members
-    
+
 
     // Constructors
 
@@ -277,13 +269,13 @@ public:
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom
         );
-        
+
         //- Calculate stress at the points
-		void calculatePStress
-		(
-			pointSymmTensorField& pSigma,
-			const pointTensorField& pGradD
-		) const;
+                void calculatePStress
+                (
+                        pointSymmTensorField& pSigma,
+                        const pointTensorField& pGradD
+                ) const;
 
 
     // Destructor
@@ -293,15 +285,20 @@ public:
 
     // Member Functions
 
+        //- Return bulk modulus
+        // virtual tmp<volScalarField> bulkModulus() const;
+
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
         virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
+#endif
 
         //- Return the implicit stiffness as a diagTensor
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
         virtual tmp<volDiagTensorField> impKdiagTensor() const;
 #endif
 

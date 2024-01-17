@@ -24,16 +24,16 @@ addToRunTimeSelectionTable
 RBFMeshMotionSolver::RBFMeshMotionSolver
 (
     const polyMesh& mesh,
-#if defined(OPENFOAMFOUNDATION)
+#if defined(OPENFOAM_ORG)
     const dictionary& msData
-#elif defined(OPENFOAMESI)
+#elif defined(OPENFOAM_COM)
     const IOdictionary& msData
 #else
     Istream & msData
 #endif
 )
     :
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     motionSolver(mesh, msData, typeName),
 #else
     motionSolver(mesh),
@@ -52,7 +52,7 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
         mesh.parent().lookupObject<fvMesh>(mesh.name()),
         dimensionedVector("0", dimLength, vector::zero)
     ),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     staticPatches(msData.subDict("RBFMeshMotionSolverCoeffs").lookup("staticPatches")),
     staticPatchIDs(staticPatches.size()),
     movingPatches(msData.subDict("RBFMeshMotionSolverCoeffs").lookup("movingPatches")),
@@ -81,7 +81,7 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
     corrector(false),
     k(0)
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const dictionary& coeffDict = msData.subDict("RBFMeshMotionSolverCoeffs");
 #else
     const dictionary& coeffDict = *this;
@@ -294,7 +294,7 @@ tmp<pointField> RBFMeshMotionSolver::curPoints() const
         new vectorField(mesh().nPoints(), vector::zero)
    );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     pointField & newPoints = tnewPoints.ref();
 #else
     pointField & newPoints = tnewPoints();
@@ -342,7 +342,7 @@ void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
             assert(mpatch.size() == mesh().boundaryMesh()[ipatch].meshPoints().size());
 
         // Set values on motionCentersField boundary
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         accumulatedMotionCentersField_.boundaryFieldRef()[ipatch] = motion[ipatch];
 #else
         accumulatedMotionCentersField_.boundaryField()[ipatch] = motion[ipatch];
@@ -526,7 +526,7 @@ void RBFMeshMotionSolver::solve()
                 IOobject::MUST_READ
            );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             assert(addrHeader.typeHeaderOk<labelIOList>(true));
 #else
             assert(addrHeader.headerOk());

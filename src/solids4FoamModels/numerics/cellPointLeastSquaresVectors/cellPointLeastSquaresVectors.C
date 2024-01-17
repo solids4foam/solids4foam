@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -39,7 +33,7 @@ namespace Foam
 
 Foam::cellPointLeastSquaresVectors::cellPointLeastSquaresVectors(const fvMesh& mesh)
 :
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     MeshObject<fvMesh, MoveableMeshObject, cellPointLeastSquaresVectors>(mesh),
 #else
     MeshObject<fvMesh, cellPointLeastSquaresVectors>(mesh),
@@ -67,7 +61,7 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
             << endl;
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = mesh_;
 #else
     const fvMesh& mesh = this->mesh();
@@ -94,7 +88,7 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
         }
 
         cellAvPoint[cellI] /= curCellPoints.size();
-        
+
     }
 
     // Set up temporary storage for the dd tensor (before inversion)
@@ -121,12 +115,12 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
 
             dd[cellI] += w*sqr(d);
 		}
- 
+
     }
 
     // Invert least squares matrix using Householder transformations to avoid
     // badly posed cells
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const symmTensorField invDd(inv(dd));
 #else
     const symmTensorField invDd(hinv(dd));
@@ -176,13 +170,13 @@ void Foam::cellPointLeastSquaresVectors::makeLeastSquaresVectors() const
         {
             curLs[cpI] -= cellAvLsVec;
         }
-        
+
     }
 
     if (debug)
     {
         Info<< "cellPointLeastSquaresVectors::makeLeastSquaresVectors() :"
-            << "Finished constructing least square gradient vectors" 
+            << "Finished constructing least square gradient vectors"
             << endl;
     }
 }
@@ -200,7 +194,7 @@ Foam::cellPointLeastSquaresVectors::vectors() const
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     bool Foam::cellPointLeastSquaresVectors::movePoints()
 #else
     bool Foam::cellPointLeastSquaresVectors::movePoints() const

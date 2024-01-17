@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -42,7 +36,7 @@ Foam::pointPointLeastSquaresVectors::pointPointLeastSquaresVectors
     const fvMesh& mesh
 )
 :
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     MeshObject<fvMesh, MoveableMeshObject, pointPointLeastSquaresVectors>(mesh),
 #else
     MeshObject<fvMesh, pointPointLeastSquaresVectors>(mesh),
@@ -72,7 +66,8 @@ void Foam::pointPointLeastSquaresVectors::makeLeastSquaresVectors() const
 
     if (Pstream::parRun())
     {
-        notImplemented
+        WarningIn
+        //notImplemented
         (
             "Not yet implemented for parallel runs:"
             " actually it will work, but the results at parallel boundary "
@@ -80,7 +75,7 @@ void Foam::pointPointLeastSquaresVectors::makeLeastSquaresVectors() const
         );
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = mesh_;
 #else
     const fvMesh& mesh = this->mesh();
@@ -121,7 +116,7 @@ void Foam::pointPointLeastSquaresVectors::makeLeastSquaresVectors() const
 
     // Invert least squares matrix using Householder transformations to avoid
     // badly posed cells
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const symmTensorField invDd(inv(dd));
 #else
     const symmTensorField invDd(hinv(dd));
@@ -172,7 +167,7 @@ Foam::pointPointLeastSquaresVectors::vectors() const
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     bool Foam::pointPointLeastSquaresVectors::movePoints()
 #else
     bool Foam::pointPointLeastSquaresVectors::movePoints() const

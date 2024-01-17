@@ -1,0 +1,75 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    bricksSides
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+    bottom
+    {
+        type            fixedDisplacement;
+        value           uniform (0 0 0);
+    }
+    top
+    {
+        type            fixedDisplacement;
+        value           uniform (0 -0.01 0);
+    }
+    lowerBlockContact
+    {
+        type            solidContact;
+        master          yes;
+        rigidMaster     no;
+        shadowPatch     upperBlockContact;
+        useNewPointDistanceMethod no;
+        usePrevCandidateMasterNeighbors no;
+        writePointDistanceFields false;
+        normalContactModel standardPenalty;
+        standardPenaltyNormalModelDict
+        {
+            penaltyScale    5;
+            relaxationFactor 0.01;
+        }
+        frictionContactModel frictionless;
+        value           uniform (0 0 0);
+    }
+    upperBlockContact
+    {
+        type            solidContact;
+        shadowPatch     lowerBlockContact;
+        master          no;
+        value           uniform (0 0 0);
+    }
+}
+
+
+// ************************************************************************* //

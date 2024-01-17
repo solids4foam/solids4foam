@@ -4,6 +4,8 @@ sort: 1
 
 # Tutorial: `longWall`
 
+Prepared by Iago Lessa de Oliveira
+
 ---
 
 ## Tutorial Aims

@@ -72,16 +72,16 @@ class MMSCubeAnalyticalSolution
 
         //- Poisson's ratio
         const scalar nu_;
-        
+
         //- Calculate point displacement fields
         const Switch pointDisplacement_;
 
         //- Calculate point stress fields
         const Switch pointStress_;
-        
+
         //- Calculate point epsilon fields
         const Switch pointEpsilon_;
-        
+
         //-Parameters for analytical equation
         const scalar ax_;
         const scalar ay_;
@@ -92,8 +92,8 @@ class MMSCubeAnalyticalSolution
 
         //- Analytical stress solution
         symmTensor MMSCubeStress(const vector& point);
-        
-        //- Analytical point strain solution  
+
+        //- Analytical point strain solution
         symmTensor MMSCubeEpsilon(const vector& point);
 
         //- Analytical displacement solution
@@ -150,7 +150,7 @@ public:
         //- Read and set the function object if its data has changed
         virtual bool read(const dictionary& dict);
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         //- Write
         virtual bool write();
 #else

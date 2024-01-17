@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -93,7 +87,7 @@ paraboloidInletVelocityFvPatchVectorField
 {}
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 paraboloidInletVelocityFvPatchVectorField::
 paraboloidInletVelocityFvPatchVectorField
 (
@@ -169,7 +163,7 @@ paraboloidInletVelocityFvPatchVectorField::snGrad() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const word& UName = internalField().name();
 #else
     const word& UName = dimensionedInternalField().name();
@@ -197,7 +191,7 @@ paraboloidInletVelocityFvPatchVectorField::snGrad() const
             const vectorField dUP(k & gradU.patchInternalField());
             const vectorField nGradUP(n & gradU.patchInternalField());
 
-            #ifdef OPENFOAMESIORFOUNDATION
+            #ifdef OPENFOAM_NOT_EXTEND
             tnGradU.ref() =
             #else
             tnGradU() =
@@ -215,7 +209,7 @@ paraboloidInletVelocityFvPatchVectorField::snGrad() const
         // First order
         const vectorField dUP(k & gradU.patchInternalField());
 
-        #ifdef OPENFOAMESIORFOUNDATION
+        #ifdef OPENFOAM_NOT_EXTEND
         tnGradU.ref() =
         #else
         tnGradU() =
@@ -239,7 +233,7 @@ gradientBoundaryCoeffs() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const word& UName = internalField().name();
 #else
     const word& UName = dimensionedInternalField().name();

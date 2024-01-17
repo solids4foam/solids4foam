@@ -72,7 +72,7 @@ Foam::symmTensor Foam::plateHoleAnalyticalSolution::plateHoleStress
 
 
     // Transformation to Cartesian coordinate system
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     sigma = ((cs.R().R() & sigma) & cs.R().R().T());
 #else
     sigma = ((cs.R() & sigma) & cs.R().T());
@@ -207,7 +207,7 @@ bool Foam::plateHoleAnalyticalSolution::writeData()
         {
             if (mesh.boundary()[patchI].type() != "empty")
             {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
                 vectorField& aDP = analyticalD.boundaryFieldRef()[patchI];
 #else
@@ -466,10 +466,10 @@ bool Foam::plateHoleAnalyticalSolution::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::plateHoleAnalyticalSolution::write()
 {
-    return true;
+    return false;
 }
 #endif
 

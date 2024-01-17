@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------* \
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -93,7 +87,7 @@ public:
         movingWallPressureFvPatchScalarField
         (
             const movingWallPressureFvPatchScalarField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );
@@ -130,8 +124,8 @@ public:
 
     // Member functions
 
-//         //- Update the coefficients associated with the patch field
-//         virtual void updateCoeffs();
+        //- Update the coefficients associated with the patch field
+        virtual void updateCoeffs();
 
         //- Get previous pressure patch field
         const vectorField& prevAcceleration() const
@@ -145,15 +139,15 @@ public:
             return prevAcceleration_;
         }
 
-        //- Evaluate the patch field
-        virtual void evaluate
-        (
-#ifdef OPENFOAMESIORFOUNDATION
-            const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
-#else
-            const Pstream::commsTypes commsType = Pstream::blocking
-#endif
-        );
+//         //- Evaluate the patch field
+//         virtual void evaluate
+//         (
+// #ifdef OPENFOAM_NOT_EXTEND
+//             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
+// #else
+//             const Pstream::commsTypes commsType = Pstream::blocking
+// #endif
+//         );
 
         //- Write
         virtual void write(Ostream&) const;

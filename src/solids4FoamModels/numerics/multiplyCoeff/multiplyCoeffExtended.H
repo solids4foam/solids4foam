@@ -20,7 +20,7 @@ Function
 
 Description
     Helper function used when assembling finite volume solid mechanics block
-    coupled stiffness matrices. Extended to include sensitivity term for 
+    coupled stiffness matrices. Extended to include sensitivity term for
     large deformations.
 
 SourceFile
@@ -54,7 +54,7 @@ namespace Foam
         const symmTensor& sigma,
         const vector& g
     );
-    
+
     // The multiplication evaluates the following in index notation:
     //     coeff_i = Sf_m P_mi where P = d(s - pI)/dp
     void multiplyCoeffPressure

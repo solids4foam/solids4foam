@@ -125,6 +125,9 @@ function solids4Foam::convertCaseFormat()
         then
            echo "OpenFOAM.org specific: replacing 'uniform' with 'lineUniform' in system/sample"
            sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
+
+           echo "OpenFOAM.org specific: replacing 'face' with 'lineFace' in system/sample"
+           sed -i "s/type.*face;/type lineFace;/g" "${CASE_DIR}"/system/sample
         fi
     fi
 
@@ -154,6 +157,46 @@ function solids4Foam::convertCaseFormat()
         mv "${CASE_DIR}/system/createPatchDict" "system/createPatchDict.foamextend"
         echo "Moving ${CASE_DIR}/system/createPatchDict.openfoam to system/createPatchDict"
         mv "${CASE_DIR}/system/createPatchDict.openfoam" "system/createPatchDict"
+    fi
+
+    # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
+    #    the gradScheme for the solid in OpenFOAM.com, as these are the only
+    #    schemes consistent with boundary non-orthogonal correction
+    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    then
+        if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/fvSchemes"
+            sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/fvSchemes
+        elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/solid/fvSchemes"
+            sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
+        fi
+    fi
+
+    # 10. Resolve force post-processing path from foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
+    then
+        if [[ $WM_PROJECT_VERSION == *"v"* ]]
+        then
+            echo "Modifying force.gnuplot in consistent with ESI version"
+            sed -i "s|forces.dat|force.dat|g" force.gnuplot
+        fi
+    fi
+
+    # 11. Resolve sample post-processing path from foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        sed -i "s|postProcessing/sets/|postProcessing/sample/|g" plot.gnuplot
+    fi
+
+    # 12. Resolve sampleDict post-processing path from foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        sed -i  "s|postProcessing/surfaces/|postProcessing/sample.surfaces/|g" plot.gnuplot
     fi
 
     echo
@@ -265,6 +308,9 @@ function solids4Foam::convertCaseFormatFoamExtend()
         then
            echo "OpenFOAM.org specific: replacing 'lineUniform' with 'uniform' in system/sample"
            sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
+
+           echo "OpenFOAM.org specific: replacing 'lineFace' with 'face' in system/sample"
+           sed -i "s/type.*lineFace;/type face;/g" "${CASE_DIR}"/system/sample
         fi
     fi
 
@@ -297,6 +343,46 @@ function solids4Foam::convertCaseFormatFoamExtend()
         mv "${CASE_DIR}/system/createPatchDict" "system/createPatchDict.openfoam"
         echo "Moving ${CASE_DIR}/system/createPatchDict.foamextend to system/createPatchDict"
         mv "${CASE_DIR}/system/createPatchDict.foamextend" "system/createPatchDict"
+    fi
+
+    # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
+    #    the gradScheme for the solid in OpenFOAM.com, as these are the only
+    #    schemes consistent with boundary non-orthogonal correction
+    if [[ "${WM_PROJECT_VERSION}" == *"v"* ]]
+    then
+        if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/fvSchemes"
+            sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/fvSchemes
+        elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
+        then
+            echo "OpenFOAM.com specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/solid/fvSchemes"
+            sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
+        fi
+    fi
+
+    # 10. Resolve force post-processing path for foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
+    then
+        if [[ $WM_PROJECT_VERSION == *"v"* ]]
+        then
+            echo "Reverting force.gnuplot from ESI version to foam-extend or .org "
+            sed -i "s|force.dat|forces.dat|g" force.gnuplot
+        fi
+    fi
+
+    # 11. Resolve sample post-processing path for foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        sed -i "s|postProcessing/sample/|postProcessing/sets/|g" plot.gnuplot
+    fi
+
+    # 12. Resolve sampleDict post-processing path for foam-extend
+    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
+    then
+        echo "Updating plot.gnuplot"
+        sed -i "s|postProcessing/sample.surfaces/|postProcessing/surfaces/|g" plot.gnuplot
     fi
 
     echo
@@ -355,6 +441,22 @@ function solids4Foam::caseOnlyRunsWithFoamExtend()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# caseOnlyRunsWithOpenFOAM
+#     Give error if OpenFOAM version is foam-extend
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::caseDoesNotRunWithFoamExtend()
+{
+    if [[ $WM_PROJECT == "foam" ]]
+    then
+        echo; echo "This case currently does not run with foam-extend"; echo
+        exit 0
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # removeEmptyDirs
 #     Ported from preCICE toolbox
 #     Remove empty time directories that are generated when running FSI cases
@@ -365,25 +467,25 @@ function solids4Foam::caseOnlyRunsWithFoamExtend()
 function solids4Foam::removeEmptyDirs()
 {
     (
-	set -e -u
-	echo "Removing time directories without results"
+        set -e -u
+        echo "Removing time directories without results"
 
-	for f in [0-9]* [0-9]*.[0-9]*; do
-	    if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
-		rm -rfv "${f}"
-	    fi
-	done
-	if [ -d processor0 ]; then
-	    for d in processor*; do
-		cd "${d}"
-		for f in [0-9]* [0-9]*.[0-9]*; do
-		    if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
-			rm -rfv "${f}"
-		    fi
-		done
-		cd ..
-	    done
-	fi
+        for f in [0-9]* [0-9]*.[0-9]*; do
+            if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
+                rm -rfv "${f}"
+            fi
+        done
+        if [ -d processor0 ]; then
+            for d in processor*; do
+                cd "${d}"
+                for f in [0-9]* [0-9]*.[0-9]*; do
+                    if ! [ -f "${f}/U" ] && ! [ -f "${f}/T" ] && ! [ -f "${f}/U.gz" ] && ! [ -f "${f}/T.gz" ] && ! [ -f "${f}/D" ] && ! [ -f "${f}/pointD" ] && ! [ -f "${f}/DD" ] && ! [ -f "${f}/pointDD" ] && ! [ -f "${f}/D.gz" ] && ! [ -f "${f}/pointD.gz" ] && ! [ -f "${f}/DD.gz" ] && ! [ -f "${f}/pointDD.gz" ]; then
+                        rm -rfv "${f}"
+                    fi
+                done
+                cd ..
+            done
+        fi
     )
 }
 

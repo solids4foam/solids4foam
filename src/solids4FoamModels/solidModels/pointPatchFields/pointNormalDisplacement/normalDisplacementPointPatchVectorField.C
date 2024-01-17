@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -29,7 +23,7 @@ License
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "Time.H"
 #endif
 
@@ -48,8 +42,7 @@ normalDisplacementPointPatchVectorField
 )
 :
     fixedValuePointPatchVectorField(p, iF),
-    dispSeries_(),
-    curTimeIndex_(-1)
+    dispSeries_()
 {}
 
 
@@ -62,8 +55,7 @@ normalDisplacementPointPatchVectorField
 )
 :
     fixedValuePointPatchVectorField(p, iF),
-    dispSeries_(dict.subDict("displacementSeries")),
-    curTimeIndex_(-1)
+    dispSeries_(dict.subDict("displacementSeries"))
 {}
 
 
@@ -77,12 +69,11 @@ normalDisplacementPointPatchVectorField
 )
 :
     fixedValuePointPatchVectorField(p, iF),
-    dispSeries_(),
-    curTimeIndex_(-1)
+    dispSeries_()
 {}
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 normalDisplacementPointPatchVectorField::
 normalDisplacementPointPatchVectorField
 (
@@ -90,8 +81,7 @@ normalDisplacementPointPatchVectorField
 )
 :
     fixedValuePointPatchVectorField(ptf),
-    dispSeries_(),
-    curTimeIndex_(-1)
+    dispSeries_()
 {}
 #endif
 
@@ -104,8 +94,7 @@ normalDisplacementPointPatchVectorField
 )
 :
     fixedValuePointPatchVectorField(ptf, iF),
-    dispSeries_(),
-    curTimeIndex_(-1)
+    dispSeries_()
 {}
 
 
@@ -151,7 +140,7 @@ void normalDisplacementPointPatchVectorField::write(Ostream& os) const
     os << token::BEGIN_BLOCK << nl;
     dispSeries_.write(os);
     os << token::END_BLOCK << nl;
-    
+
 }
 
 

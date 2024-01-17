@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -44,12 +38,27 @@ autoPtr<crackPathLimiter> crackPathLimiter::New
     const dictionary& dict
 )
 {
-    word lawTypeName = dict.lookup("type");
+    const word modelType(dict.lookup("type"));
 
-    Info<< "Selecting crack path limiter: " << lawTypeName << endl;
+    Info<< "Selecting crack path limiter: " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            dict,
+            "crackPathLimiter",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(lawTypeName);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -62,13 +71,16 @@ autoPtr<crackPathLimiter> crackPathLimiter::New
             ")",
             dict
         )   << "Unknown crackPathLimiter type "
-            << lawTypeName << endl << endl
+            << modelType << endl << endl
             << "Valid  crackPathLimiters are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
-    return autoPtr<crackPathLimiter>(cstrIter()(name, mesh, dict));
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<crackPathLimiter>(ctorPtr(name, mesh, dict));
 }
 
 

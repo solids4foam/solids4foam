@@ -21,9 +21,8 @@ License
 #include "volFields.H"
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrector.H"
-#include "RectangularMatrix.H"
 #include "solidTractionFvPatchVectorField.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
     #include "polyTopoChange.H"
 #else
@@ -44,7 +43,7 @@ namespace Foam
     defineRunTimeSelectionTable(solidModel, dictionary);
     addToRunTimeSelectionTable(physicsModel, solidModel, physicsModel);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     typedef meshFaceZones faceZoneMesh;
 #endif
 }
@@ -78,7 +77,7 @@ void Foam::solidModel::makeDualMesh() const
                 runTime(),
                 Foam::IOobject::READ_IF_PRESENT
             ),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             pointField(mesh().points()),
             faceList(mesh().faces()),
             labelList(mesh().faceOwner()),
@@ -113,9 +112,14 @@ void Foam::solidModel::makeDualMesh() const
     const bool splitAllFaces = true;
 
     // Hard-coded settings
+    // Find a way to add this default value to 'solidProperties' dict in the
+    // future
     const scalar featureAngle
     (
-        solidModelDict().lookupOrDefault<scalar>("featureAngle", 30)
+        solidModelDict().lookupOrDefault<scalar>
+        (
+            word("featureAngle"), scalar(30)
+        )
     );
     const bool doNotPreserveFaceZones
     (
@@ -181,7 +185,7 @@ void Foam::solidModel::makeDualMesh() const
     }
 
     // Topo change container
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     polyTopoChange meshMod(dualMesh.boundaryMesh().size());
 #else
     directTopoChange meshMod(dualMesh.boundaryMesh().size());
@@ -213,7 +217,7 @@ void Foam::solidModel::makeDualMesh() const
         dualMesh.movePoints(map().preMotionPoints());
     }
 
-    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false))
+    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false)) //Find a way to add this default value to 'solidProperties' dict in the future
     {
         dualMesh.setInstance(runTime().constant());
         Info<< "Writing dualMesh to " << dualMesh.polyMesh::instance() << endl;
@@ -225,7 +229,7 @@ void Foam::solidModel::makeDualMesh() const
             IOobject
             (
                 "cellFeaturePoints",
-		runTime().timeName(),
+                runTime().timeName(),
                 runTime(),
                 IOobject::NO_READ,
                 IOobject::AUTO_WRITE
@@ -268,7 +272,7 @@ void Foam::solidModel::simpleMarkFeatures
     labelList& multiCellFeaturePoints
 ) const
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     scalar minCos = Foam::cos(featureAngle*constant::mathematical::pi/180.0);
 #else
     scalar minCos = Foam::cos(featureAngle*mathematicalConstant::pi/180.0);
@@ -805,6 +809,18 @@ void Foam::solidModel::setCellDisps(fvVectorMatrix& DEqn)
 
 void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 {
+    // Hack to avoid expensive copy of residuals
+#ifdef OPENFOAM_COM
+    #if (OPENFOAM >= 2312)
+        const_cast<dictionary&>
+        (
+            D.mesh().data().solverPerformanceDict()
+        ).clear();
+    #else
+        const_cast<dictionary&>(D.mesh().solverPerformanceDict()).clear();
+    #endif
+#endif
+
     if (relaxationMethod_ == "fixed")
     {
         // Fixed under-relaxation
@@ -829,7 +845,7 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
             // Fixed under-relaxation is applied on the first iteration
             aitkenAlpha_ = 1.0;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             if (mesh().relaxField(D.name()))
             {
                 aitkenAlpha_ =
@@ -866,223 +882,13 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
         // Relax the field
         D -= aitkenAlpha_*aitkenResidual_;
     }
-    else if (relaxationMethod_ == "QuasiNewton")
-    {
-        // This method is a modified form of the IQNILS by Degroote et al.
-
-        // J. Degroote, K.-J. Bathe and J. Vierendeels.
-        // A fluid solid interaction solver with IQN-ILS coupling algorithm.
-        // Performance of a new partitioned procedure versus a monolithic
-        // procedure in fluid-solid interaction. Computers & Solids
-
-        if (iCorr == 0 || iCorr % QuasiNewtonRestartFreq_ == 0)
-        {
-            // Clean up data from old time steps
-
-            if (debug)
-            {
-                Info<< "Modes before clean-up : " << QuasiNewtonT_.size();
-            }
-
-            while (true)
-            {
-                if (QuasiNewtonT_.size())
-                {
-                    if
-                    (
-                        runTime().timeIndex() > QuasiNewtonT_[0]
-                     || iCorr % QuasiNewtonRestartFreq_ == 0
-                    )
-                    {
-                        for (label i = 0; i < QuasiNewtonT_.size() - 1; i++)
-                        {
-                            QuasiNewtonT_[i] = QuasiNewtonT_[i + 1];
-                            QuasiNewtonV_[i] = QuasiNewtonV_[i + 1];
-                            QuasiNewtonW_[i] = QuasiNewtonW_[i + 1];
-                        }
-
-                        QuasiNewtonT_.remove();
-                        QuasiNewtonV_.remove();
-                        QuasiNewtonW_.remove();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            if (debug)
-            {
-                Info<< ", modes after clean-up : " << QuasiNewtonT_.size()
-                    << endl;
-            }
-        }
-        else if (iCorr == 1 || iCorr % QuasiNewtonRestartFreq_ == 1)
-        {
-            // Set reference in the first coupling iteration
-            unrelaxedDRef_ = D;
-            DRef_ = D.prevIter();
-        }
-        else
-        {
-            // Store the input vector field, defined as the previous iteration
-            // D field (after relaxation) minus the Dp previous iteration field
-            // in the first iteration (after relaxation)
-            QuasiNewtonV_.append
-            (
-                (D - D.prevIter()) - (unrelaxedDRef_ - DRef_)
-            );
-
-            // V should be (from FSI paper):
-            // DeltaR^{k-1} = R^{k-1} - R^k = DPrevIt.PrevIt - DPrevIter
-            // DeltaR^{k-2} = R^{k-2} - R^k = D.PI.PI.PI - D.PI
-            // ...
-            // DeltaR^{0} =  R^0 - R^k = DRef - D.prevIter
-            // Or in the general paper:
-            // V_i = p_k - p_i    for i = 0, 1, ..., k - 1
-            // V_{k-1} = p_k - p_{k-1} = D.PI - D.PI.PI
-            // V_{k-2} = p_k - p_{k-2} = D.PI - D.PI.PI.PI
-            // ...
-            // V_{0} = p_k - p_{0} = D.PI - DRef
-            // BUT, the implemented code does this:
-            // V_i = p_{i+1} - p_0    for i = 0, 1, ..., k - 1
-            // V_{k-1} = p_{k} - p_0 = D.PI - DRef
-            // V_{k-2} = p_{k-1} - p_0 = D.PI{k-1} - DRef
-            // ...
-            // V_{0} = p_{1} - p_{0} = D.PI_1 - DRef
-            // This means that we just append  the following line each
-            // iteration:
-            // V_{k-1} = p_{k} - p_0 = D.PI - DRef
-            // It this equivalent?
-            // We could try implementing it as described in the paper, but this
-            // will require D and D.prevIter and their history
-
-            // Store the output vector field, defined as the current iteration
-            // D field (before relaxation) minus the D field in the first
-            // iteration (before relaxation)
-            QuasiNewtonW_.append(D - unrelaxedDRef_);
-
-            // Store the time index
-            QuasiNewtonT_.append(runTime().timeIndex());
-        }
-
-        if (QuasiNewtonT_.size() > 1)
-        {
-            // Consider QuasiNewtonV as a matrix V
-            // with as columns the items
-            // in the DynamicList and calculate the QR-decomposition of V
-            // with modified Gram-Schmidt
-            label cols = QuasiNewtonV_.size();
-            RectangularMatrix<scalar> R(cols, cols, 0.0);
-            RectangularMatrix<scalar> C(cols, 1);
-            RectangularMatrix<scalar> Rcolsum(1, cols);
-            // philipc: do need for dynamic list for Q
-            //DynamicList<vectorField> Q(cols);
-            List<vectorField> Q(cols);
-
-            for (label i = 0; i < cols; i++)
-            {
-                //Q.append(QuasiNewtonV_[cols - 1 - i]);
-                Q[i] = QuasiNewtonV_[cols - 1 - i];
-            }
-
-            for (label i = 0; i < cols; i++)
-            {
-                // Normalize column i
-                R[i][i] = Foam::sqrt(sum(Q[i] & Q[i]));
-                Q[i] /= R[i][i];
-
-                // Orthogonalize columns to the right of column i
-                for (label j = i+1; j < cols; j++)
-                {
-                    R[i][j] = sum(Q[i] & Q[j]);
-                    Q[j] -= R[i][j]*Q[i];
-                }
-
-                // Project minus the residual vector on the Q
-                C[i][0] =
-                    sum
-                    (
-                        Q[i]
-                      & (
-#ifdef OPENFOAMESIORFOUNDATION
-                          D.prevIter().primitiveField()
-                        - D.primitiveField()
-#else
-                          D.prevIter().internalField()
-                        - D.internalField()
-#endif
-                        )
-                    );
-            }
-
-            // Solve the upper triangular system
-            for (label j = 0; j < cols; j++)
-            {
-                Rcolsum[0][j] = 0.0;
-                for (label i = 0; i < (j + 1); i++)
-                {
-                    Rcolsum[0][j] += cmptMag(R[i][j]);
-                }
-            }
-            scalar epsilon = 1.0E-10*max(Rcolsum);
-            for (label i = 0; i < cols; i++)
-            {
-                if (cmptMag(R[i][i]) > epsilon)
-                {
-                    for (label j = i + 1; j < cols; j++)
-                    {
-                        R[i][j] /= R[i][i];
-                    }
-                    C[i][0] /= R[i][i];
-                    R[i][i] = 1.0;
-                }
-            }
-            for (label j = (cols - 1); j >= 0; j--)
-            {
-                if (cmptMag(R[j][j]) > epsilon)
-                {
-                    for (label i = 0; i < j; i++)
-                    {
-                        C[i][0] -= C[j][0]*R[i][j];
-                    }
-                }
-                else
-                {
-                    C[j][0] = 0.0;
-                }
-            }
-
-            // Update D
-            for (label i = 0; i < cols; i++)
-            {
-#ifdef OPENFOAMESIORFOUNDATION
-                D.primitiveFieldRef() += QuasiNewtonW_[i]*C[cols - 1 - i][0];
-#else
-                D.internalField() += QuasiNewtonW_[i]*C[cols - 1 - i][0];
-#endif
-            }
-
-            D.correctBoundaryConditions();
-        }
-        else
-        {
-            // Fixed under-relaxation during startup
-            D.relax();
-        }
-    }
     else
     {
         FatalErrorIn
         (
             "void Foam::solidModel::relaxField(volVectorField& D, int iCorr)"
         )   << "relaxationMethod '" << relaxationMethod_ << "' unknown!"
-            << " Options are fixed, Aitken or QuasiNewton" << abort(FatalError);
+            << " Options are fixed or Aitken" << abort(FatalError);
     }
 }
 
@@ -1092,6 +898,43 @@ Foam::dictionary& Foam::solidModel::solidModelDict()
     return solidProperties_.subDict(type_ + "Coeffs");
 }
 
+
+void Foam::solidModel::makeRhoD2dt2D() const
+{
+    if (rhoD2dt2DPtr_.valid())
+    {
+        FatalErrorIn("void Foam::solidModel::makeRhoD2dt2D() const")
+            << "Pointer already set" << abort(FatalError);
+    }
+
+    rhoD2dt2DPtr_.set
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "rhoD2dt2D",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            mesh(),
+            dimensionedVector("zero", dimForce/dimVolume, vector::zero)
+        )
+    );
+}
+
+
+Foam::volVectorField& Foam::solidModel::rhoD2dt2D() const
+{
+    if (rhoD2dt2DPtr_.empty())
+    {
+        makeRhoD2dt2D();
+    }
+
+    return rhoD2dt2DPtr_();
+}
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -1133,15 +976,23 @@ Foam::solidModel::solidModel
     dualMeshToMeshMapPtr_(),
     solidProperties_
     (
-        IOobject
+        // If region == "region0" then read from the main case
+        // Otherwise, read from the region/sub-mesh directory e.g.
+        // constant/fluid or constant/solid
+        bool(region == dynamicFvMesh::defaultRegion)
+      ? IOobject
         (
             "solidProperties",
-            // If region == "region0" then read from the main case
-            // Otherwise, read from the region/sub-mesh directory e.g.
-            // constant/fluid or constant/solid
-            bool(region == dynamicFvMesh::defaultRegion)
-          ? fileName(runTime.caseConstant())
-          : fileName(runTime.caseConstant()/region),
+            runTime.caseConstant(),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE
+        )
+      : IOobject
+        (
+            "solidProperties",
+            runTime.caseConstant(),
+            region, // using 'local' property of IOobject
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
@@ -1270,35 +1121,46 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
+    dampingCoeff_
+    (
+        solidModelDict().lookupOrAddDefault<dimensionedScalar>
+        (
+            "dampingCoeff",
+            dimensionedScalar("dampingCoeff", dimless/dimTime, 0)
+        )
+    ),
     stabilisationPtr_(),
     solutionTol_
     (
-        solidModelDict().lookupOrDefault<scalar>("solutionTolerance", 1e-06)
+        solidModelDict().lookupOrAddDefault<scalar>("solutionTolerance", 1e-06)
     ),
     alternativeTol_
     (
-        solidModelDict().lookupOrDefault<scalar>("alternativeTolerance", 1e-07)
+        solidModelDict().lookupOrAddDefault<scalar>
+        (
+            "alternativeTolerance", 1e-07
+        )
     ),
     materialTol_
     (
-        solidModelDict().lookupOrDefault<scalar>("materialTolerance", 1e-05)
+        solidModelDict().lookupOrAddDefault<scalar>("materialTolerance", 1e-05)
     ),
     infoFrequency_
     (
-        solidModelDict().lookupOrDefault<int>("infoFrequency", 100)
+        solidModelDict().lookupOrAddDefault<int>("infoFrequency", 100)
     ),
-    nCorr_(solidModelDict().lookupOrDefault<int>("nCorrectors", 10000)),
-    minCorr_(solidModelDict().lookupOrDefault<int>("minCorrectors", 1)),
+    nCorr_(solidModelDict().lookupOrAddDefault<int>("nCorrectors", 10000)),
+    minCorr_(solidModelDict().lookupOrAddDefault<int>("minCorrectors", 1)),
     maxIterReached_(0),
     residualFilePtr_(),
     writeResidualField_
     (
-        solidModelDict().lookupOrDefault<Switch>("writeResidualField", false)
+        solidModelDict().lookupOrAddDefault<Switch>("writeResidualField", false)
     ),
     enforceLinear_(false),
     relaxationMethod_
     (
-        solidModelDict().lookupOrDefault<word>("relaxationMethod", "fixed")
+        solidModelDict().lookupOrAddDefault<word>("relaxationMethod", "fixed")
     ),
     aitkenAlpha_
     (
@@ -1328,7 +1190,7 @@ Foam::solidModel::solidModel
     ),
     QuasiNewtonRestartFreq_
     (
-        solidModelDict().lookupOrDefault<int>("QuasiNewtonRestartFrequency", 25)
+        solidModelDict().lookupOrAddDefault<int>("QuasiNewtonRestartFrequency", 25)
     ),
     QuasiNewtonV_(QuasiNewtonRestartFreq_ + 2),
     QuasiNewtonW_(QuasiNewtonRestartFreq_ + 2),
@@ -1363,8 +1225,9 @@ Foam::solidModel::solidModel
     setCellDispsPtr_(),
     restart_
     (
-        solidModelDict().lookupOrDefault<Switch>("restart", false)
-    )
+        solidModelDict().lookupOrAddDefault<Switch>("restart", false)
+    ),
+    rhoD2dt2DPtr_()
 {
     // Force old time fields to be stored
     D_.oldTime().oldTime();
@@ -1413,7 +1276,7 @@ Foam::solidModel::solidModel
     }
 
     // If requested, create the residual file
-    if (solidModelDict().lookupOrDefault<Switch>("residualFile", false))
+    if (solidModelDict().lookupOrAddDefault<Switch>("residualFile", false))
     {
         if (Pstream::master())
         {
@@ -1498,7 +1361,7 @@ const Foam::mechanicalModel& Foam::solidModel::mechanical() const
 
 void Foam::solidModel::DisRequired()
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (!Dheader_.typeHeaderOk<volVectorField>(true))
 #else
     if (!Dheader_.headerOk())
@@ -1513,7 +1376,7 @@ void Foam::solidModel::DisRequired()
 
 void Foam::solidModel::DDisRequired()
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (!DDheader_.typeHeaderOk<volVectorField>(true))
 #else
     if (!DDheader_.headerOk())
@@ -1528,7 +1391,7 @@ void Foam::solidModel::DDisRequired()
 
 void Foam::solidModel::pointDisRequired()
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (!pointDheader_.typeHeaderOk<pointVectorField>(true))
 #else
     if (!pointDheader_.headerOk())
@@ -1597,11 +1460,22 @@ void Foam::solidModel::makeGlobalPatches
             mesh().V();
             const_cast<dynamicFvMesh&>(mesh()).movePoints(newPoints);
             const_cast<dynamicFvMesh&>(mesh()).moving(false);
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
             const_cast<dynamicFvMesh&>(mesh()).changing(false);
 #endif
+
+#if (OPENFOAM >= 2206)
+            {
+                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
+                if (tmeshPhi)
+                {
+                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
+                }
+            }
+#else
             const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
                 IOobject::NO_WRITE;
+#endif
 
             // Create global patch based on deformed mesh
             globalPatchesPtrList_.set
@@ -1617,11 +1491,21 @@ void Foam::solidModel::makeGlobalPatches
             const_cast<dynamicFvMesh&>(mesh()).movePoints(pointsBackup);
             mesh().V();
             const_cast<dynamicFvMesh&>(mesh()).moving(false);
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
             const_cast<dynamicFvMesh&>(mesh()).changing(false);
 #endif
+#if (OPENFOAM >= 2206)
+            {
+                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
+                if (tmeshPhi)
+                {
+                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
+                }
+            }
+#else
             const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
                 IOobject::NO_WRITE;
+#endif
         }
         else
         {
@@ -1736,6 +1620,26 @@ void Foam::solidModel::updateTotalFields()
 
 void Foam::solidModel::end()
 {
+    solidProperties_.IOobject::rename
+    (
+        solidProperties().IOobject::name() + ".withDefaultValues"
+    );
+    solidProperties_.regIOobject::write();
+
+    if (!mechanicalPtr_.empty())
+    {
+        mechanical().writeDict();
+    }
+
+    if (!thermalPtr_.empty())
+    {
+        thermal().IOobject::rename
+        (
+            thermal().IOobject::name() + ".withDefaultValues"
+        );
+        static_cast<const IOdictionary>(thermal()).regIOobject::write();
+    }
+
     if (maxIterReached_ > 0)
     {
         WarningIn(type() + "::end()")
@@ -1747,6 +1651,8 @@ void Foam::solidModel::end()
         Info<< "The momentum equation converged in all time-steps"
             << nl << endl;
     }
+
+    physicsModel::end();
 }
 
 
@@ -1756,48 +1662,76 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     const word& region
 )
 {
-    word solidModelTypeName;
 
-    // Enclose the creation of the dictionary to ensure it is
-    // deleted before the fluid model is created, otherwise the dictionary
-    // is entered in the database twice
-    {
-        IOdictionary solidProperties
+    // It is possible to run a single region of a multi-region case (e.g., to
+    // check the convergence of that single region) by setting it in
+    // physicsProperties and in the controlDict under the subDict 'solid'.
+    // This also allows the region name not to be 'region0'
+    // or 'solid' but user defined.
+    // See https://github.com/solids4foam/solids4foam/pull/83
+    const word runRegion
+    (
+        runTime.controlDict().subOrEmptyDict("solid").lookupOrDefault<word>
         (
-            IOobject
-            (
-                "solidProperties",
-                bool(region == dynamicFvMesh::defaultRegion)
-              ? fileName(runTime.caseConstant())
-              : fileName(runTime.caseConstant()/region),
-                runTime,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        );
+            "region", region
+        )
+    );
 
-        solidProperties.lookup("solidModel")
-            >> solidModelTypeName;
+    // NB: dictionary must be unregistered to avoid adding to the database
+
+    IOdictionary props
+    (
+        IOobject
+        (
+            "solidProperties",
+            bool(runRegion == dynamicFvMesh::defaultRegion)
+          ? fileName(runTime.caseConstant())
+          : fileName(runTime.caseConstant()/runRegion),
+            runTime,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false  // Do not register
+        )
+    );
+
+    const word modelType(props.lookup("solidModel"));
+
+    Info<< "Selecting solidModel " << modelType << endl;
+
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            props,
+            "solidModel",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
     }
 
-    Info<< "Selecting solidModel " << solidModelTypeName << endl;
-
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(solidModelTypeName);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
         FatalErrorIn
         (
             "solidModel::New(Time&, const word&)"
-        )   << "Unknown solidModel type " << solidModelTypeName
+        )   << "Unknown solidModel type " << modelType
             << endl << endl
             << "Valid solidModel types are :" << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalError);
     }
 
-    return autoPtr<solidModel>(cstrIter()(runTime, region));
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<solidModel>(ctorPtr(runTime, runRegion));
 }
 
 
@@ -1814,7 +1748,7 @@ void Foam::solidModel::setTraction
 
         patchD.traction() = traction;
     }
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
     else if
     (
         tractionPatch.type() == blockSolidTractionFvPatchVectorField::typeName
@@ -1840,7 +1774,7 @@ void Foam::solidModel::setTraction
             << " for patch " << tractionPatch.patch().name()
             << " should instead be type "
             << solidTractionFvPatchVectorField::typeName
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
             << " or "
             << blockSolidTractionFvPatchVectorField::typeName
 #endif
@@ -1861,13 +1795,18 @@ void Foam::solidModel::setTraction
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     setTraction(solutionD().boundaryFieldRef()[patchID], patchTraction);
 #else
     setTraction(solutionD().boundaryField()[patchID], patchTraction);
 #endif
 }
 
+void Foam::solidModel::recalculateRho()
+{
+    rhoPtr_.clear();
+    makeRho();
+}
 
 Foam::Switch& Foam::solidModel::checkEnforceLinear(const volScalarField& J)
 {
@@ -1944,7 +1883,7 @@ void Foam::solidModel::writeFields(const Time& runTime)
     if (writeResidualField_)
     {
         const volVectorField& D = solutionD();
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         scalar denom =
             gMax(mag(D.primitiveField() - D.oldTime().primitiveField()));
         if (denom < SMALL)
@@ -2003,7 +1942,7 @@ void Foam::solidModel::moveMesh
     // not match neighbour..."
     //pointDD.correctBoundaryConditions();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     vectorField& pointDDI = pointDD.primitiveFieldRef();
 #else
     vectorField& pointDDI = pointDD.internalField();
@@ -2101,12 +2040,23 @@ void Foam::solidModel::moveMesh
     mesh().movePoints(newPoints);
     mesh().V00();
     mesh().moving(false);
-#ifndef OPENFOAMESIORFOUNDATION
+#ifdef FOAMEXTEND
     mesh().changing(false);
 #endif
+#if (OPENFOAM >= 2206)
+    {
+        auto tmeshPhi(mesh().setPhi());
+        if (tmeshPhi)
+        {
+            tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
+        }
+    }
+#else
     mesh().setPhi().writeOpt() = IOobject::NO_WRITE;
+#endif
 
-#ifndef OPENFOAMESIORFOUNDATION
+
+#ifdef FOAMEXTEND
     // Tell the mechanical model to move the subMeshes, if they exist
     mechanical().moveSubMeshes();
 #endif
