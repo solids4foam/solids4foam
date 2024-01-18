@@ -1243,3 +1243,56 @@ This function object is currently only implemented for serial run!
 
 ---
 
+## `transformStressToCylindrical`
+
+- **Function object purpose**  
+  Transform stress tensor to cylindrical coordinate system:
+  $$
+  \sigma_{transformed} =   \mathbf{R} \cdot \sigma \cdot \mathbf{R}^{T},
+  $$
+
+  
+
+  where $$\mathbf{R}$$ is rotation tensor.
+
+- __Example of usage__
+
+  ```c++
+  functions
+  {
+      transformStressToCylindrical
+      {
+          type        transformStressToCylindrical;
+  
+          origin      (0 0 0);
+          axis        (0 0 1);
+      }
+  }
+  ```
+
+- __Arguments__
+
+  -  `origin` - origin point;
+  -  `axis` - axis vector, does not require to be normalised;
+
+- __Optional arguments__
+
+  - None.
+
+- __Outputs__
+
+  - Transformed sigma stress field named  `sigma:Transformed` in time directories;
+
+    When visualizing in Paraview, keep in mind that the stress components in the cylindrical coordinate system will have the same names as the ones from the Cartesian coordinate system.
+
+    $$\boldsymbol{\sigma}  = \left[\begin{array}{ccc}\sigma_{xx} & \sigma_{xy} & \sigma_{xz} \\  & \sigma_{yy} & \sigma_{yx} \\  &  & \sigma_{zz}\end{array}\right]\equiv\left[\begin{array}{ccc}\sigma_{R R} & \sigma_{R \theta} & \sigma_{R \phi} \\  & \sigma_{\theta \theta} & \sigma_{\theta \phi} \\  &  & \sigma_{\phi \phi}\end{array}\right]$$
+
+    
+
+- __Tutorial case in which it is used:__    
+  `solids/linearElasticity/pressurisedCylinder`    
+  `solids/thermoelasticity/hotCylinder/hotCylinder`  
+  `solids/multiMaterial/layeredPipe`    
+
+---
+
