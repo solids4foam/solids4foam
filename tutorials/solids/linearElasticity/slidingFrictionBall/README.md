@@ -1,3 +1,7 @@
+---
+sort: 9
+---
+
 # Frictional sliding of an elastic cylinder segment: `slidingFrictionBall`
 
 ---
@@ -8,17 +12,17 @@ Prepared by Philip Cardiff and Ivan Batistić
 
 ## Tutorial Aims
 
-- Demonstrate the analysis of a dynamic contact problem.
+- Demonstrate the analysis of a transient frictional contact problem.
 
 ---
 
 ## Case Overview
 
-This case consists of an elastic cylindrical segment (“ball”) that is pressed into the top of an elastic block  (see Figure 1). Cylindrical segment is slid in one direction, and then the sliding direction is reserved. Both bodies have the same material properties: density $$\rho=7854 $$ kg/m$$^3$$, Young modulus $$E=200$$ GPa and Poisson's radio $$\nu=0.3$$.  The bottom surface of the elastic block is fixed, whereas the top surface of the cylindrical segment has a prescribed displacement as follows:
+This case consists of an elastic cylindrical segment (the “ball”) that is pressed into the top of an elastic block  (Figure 1). The ball initially slides over the block in the positive $$x$$ direction before switching direction and sliding in the negative $$x$$ direction. Both bodies have the same material properties: density $$\rho=7854 $$ kg/m$$^3$$, Young modulus $$E=200$$ GPa and Poisson's radio $$\nu=0.3$$.  The bottom surface of the elastic block is fixed (zero displacement), whereas the top surface of the cylindrical segment has a prescribed time-varying displacement:
 $$
 d_y = -0.1 \mathrm{~mm}, \qquad d_x = \begin{cases}2 t / 50 \mathrm{~cm}, & \text { if } t \leq 50 \mathrm{~s} \\ 2(100-t) / 50 \mathrm{~cm}, & \text { if } 50<t \leq 100 \mathrm{~s}\end{cases}
 $$
-The case is solved using a 2D model under the plane strain assumption and without gravitational effects. Time is discretised using 100 equally spaced increments. At the contact interface, the frictional response is considered and the Coulomb coefficient of friction is set to 0.1.
+where $$t$$ is the time. The case is solved using a 2-D model under the plane strain assumption and without gravitational effects. Time is discretised using 100 equally spaced increments. At the contact interface, a frictional response is considered, and the Coulomb coefficient of friction is set to 0.1.
 
 <div style="text-align: center;">
   <img src="./images/slidingFrictionBall-geometry.png" alt="Image" width="500">
@@ -32,7 +36,7 @@ The case is solved using a 2D model under the plane strain assumption and withou
 
 ## Expected Results
 
-The evolution of the $$\sigma_{xy}$$ and $$\sigma_{eq}$$ fields is shown in Video 1. The same is shown in Figure 2 for the time $$t=30$$ and $$t=60$$ s.
+The $$\sigma_{xy}$$ and $$\sigma_{eq}$$ fields at time $$t=30$$ and $$t=60$$ s are shown in Figure 2, demonstrating the shear stress  $$\sigma_{xy}$$ flips sign after the sliding direction changes. The evolution of the $$\sigma_{xy}$$ and $$\sigma_{eq}$$ fields in time are shown in Video 1.
 
 <div style="text-align: center;">
   <img src="./images/slidingFrictionBall-results.png" alt="Image" width="900">
