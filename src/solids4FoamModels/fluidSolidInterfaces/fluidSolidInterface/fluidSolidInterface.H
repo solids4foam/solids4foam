@@ -495,6 +495,9 @@ public:
             //- Update interface force
             virtual void updateForce();
 
+            //- Update separately interface viscous force and pressure
+            virtual void updateViscousForceAndPressure();
+
             //- Update interface force
             virtual scalar updateResidual();
 

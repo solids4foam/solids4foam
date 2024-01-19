@@ -809,6 +809,18 @@ void Foam::solidModel::setCellDisps(fvVectorMatrix& DEqn)
 
 void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 {
+    // Hack to avoid expensive copy of residuals
+#ifdef OPENFOAM_COM
+    #if (OPENFOAM >= 2312)
+        const_cast<dictionary&>
+        (
+            D.mesh().data().solverPerformanceDict()
+        ).clear();
+    #else
+        const_cast<dictionary&>(D.mesh().solverPerformanceDict()).clear();
+    #endif
+#endif
+
     if (relaxationMethod_ == "fixed")
     {
         // Fixed under-relaxation
@@ -1789,6 +1801,75 @@ void Foam::solidModel::setTraction
     setTraction(solutionD().boundaryField()[patchID], patchTraction);
 #endif
 }
+
+
+void Foam::solidModel::setPressure
+(
+    fvPatchVectorField& tractionPatch,
+    const scalarField& pressure
+)
+{
+    if (tractionPatch.type() == solidTractionFvPatchVectorField::typeName)
+    {
+        solidTractionFvPatchVectorField& patchD =
+            refCast<solidTractionFvPatchVectorField>(tractionPatch);
+
+        patchD.pressure() = pressure;
+    }
+#ifdef FOAMEXTEND
+    else if
+    (
+        tractionPatch.type() == blockSolidTractionFvPatchVectorField::typeName
+    )
+    {
+        blockSolidTractionFvPatchVectorField& patchD =
+            refCast<blockSolidTractionFvPatchVectorField>(tractionPatch);
+
+        patchD.pressure() = pressure;
+    }
+#endif
+    else
+    {
+        FatalErrorIn
+        (
+            "void Foam::solidModel::setTraction\n"
+            "(\n"
+            "    fvPatchVectorField& tractionPatch,\n"
+            "    const vectorField& traction\n"
+            ")"
+        )   << "Boundary condition "
+            << tractionPatch.type()
+            << " for patch " << tractionPatch.patch().name()
+            << " should instead be type "
+            << solidTractionFvPatchVectorField::typeName
+#ifdef FOAMEXTEND
+            << " or "
+            << blockSolidTractionFvPatchVectorField::typeName
+#endif
+            << abort(FatalError);
+    }
+}
+
+
+void Foam::solidModel::setPressure
+(
+    const label interfaceI,
+    const label patchID,
+    const scalarField& faceZonePressure
+)
+{
+    const scalarField patchPressure
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZonePressure)
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    setPressure(solutionD().boundaryFieldRef()[patchID], patchPressure);
+#else
+    setPressure(solutionD().boundaryField()[patchID], patchPressure);
+#endif
+}
+
 
 void Foam::solidModel::recalculateRho()
 {

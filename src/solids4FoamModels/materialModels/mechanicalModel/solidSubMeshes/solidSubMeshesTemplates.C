@@ -593,17 +593,17 @@ Foam::solidSubMeshes::lookupBaseMeshVolField
         if (curSubMeshID == -1)
         {
             FatalErrorIn
-                (
-                    "template<class Type>\n"
-                    "Foam::tmp< Foam::GeometricField"
-                    "<Type, Foam::fvPatchField, Foam::volMesh> >\n"
-                    "Foam::solidSubMeshes::lookupBaseMeshVolField\n"
-                    "(\n"
-                    "    const word& fieldName,\n"
-                    "    const fvMesh& subMesh\n"
-                    ") const"
-                )   << "SubMesh not found when looking for a field in the base "
-                    << "mesh" << abort(FatalError);
+            (
+                "template<class Type>\n"
+                "Foam::tmp< Foam::GeometricField"
+                "<Type, Foam::fvPatchField, Foam::volMesh> >\n"
+                "Foam::solidSubMeshes::lookupBaseMeshVolField\n"
+                "(\n"
+                "    const word& fieldName,\n"
+                "    const fvMesh& subMesh\n"
+                ") const"
+            )   << "SubMesh not found when looking for a field in the base "
+                << "mesh" << abort(FatalError);
         }
 
         // Return the baseField interpolated to the subMesh

@@ -42,8 +42,7 @@ normalDisplacementPointPatchVectorField
 )
 :
     fixedValuePointPatchVectorField(p, iF),
-    dispSeries_(),
-    curTimeIndex_(-1)
+    dispSeries_()
 {}
 
 
@@ -56,8 +55,7 @@ normalDisplacementPointPatchVectorField
 )
 :
     fixedValuePointPatchVectorField(p, iF),
-    dispSeries_(dict.subDict("displacementSeries")),
-    curTimeIndex_(-1)
+    dispSeries_(dict.subDict("displacementSeries"))
 {}
 
 
@@ -71,8 +69,7 @@ normalDisplacementPointPatchVectorField
 )
 :
     fixedValuePointPatchVectorField(p, iF),
-    dispSeries_(),
-    curTimeIndex_(-1)
+    dispSeries_()
 {}
 
 
@@ -84,8 +81,7 @@ normalDisplacementPointPatchVectorField
 )
 :
     fixedValuePointPatchVectorField(ptf),
-    dispSeries_(),
-    curTimeIndex_(-1)
+    dispSeries_()
 {}
 #endif
 
@@ -98,8 +94,7 @@ normalDisplacementPointPatchVectorField
 )
 :
     fixedValuePointPatchVectorField(ptf, iF),
-    dispSeries_(),
-    curTimeIndex_(-1)
+    dispSeries_()
 {}
 
 

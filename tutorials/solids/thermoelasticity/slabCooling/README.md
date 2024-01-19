@@ -1,3 +1,7 @@
+---
+sort: 2
+---
+
 # The cooling of a solid slab: `slabCooling`
 
 ---

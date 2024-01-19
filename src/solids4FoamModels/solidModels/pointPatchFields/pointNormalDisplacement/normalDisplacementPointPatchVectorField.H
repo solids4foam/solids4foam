@@ -72,9 +72,6 @@ class normalDisplacementPointPatchVectorField
         //- Normal displacment time series
         interpolationTable<scalar> dispSeries_;
 
-        //- Current time index
-        label curTimeIndex_;
-
 
 public:
 

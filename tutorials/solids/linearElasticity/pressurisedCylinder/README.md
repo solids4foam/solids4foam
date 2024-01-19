@@ -1,3 +1,7 @@
+---
+sort: 8
+---
+
 # Internally pressurised thick-walled cylinder: `pressurisedCylinder`
 
 ---

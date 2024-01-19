@@ -1200,6 +1200,87 @@ void Foam::fluidSolidInterface::updateForce()
     }
 }
 
+void Foam::fluidSolidInterface::updateViscousForceAndPressure()
+{
+    // Check if coupling switch needs to be updated
+    if (!coupled_)
+    {
+        updateCoupled();
+    }
+
+    Info<< "Setting traction and pressure on solid interfaces" << endl;
+
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
+    {
+        // Take references to zones
+        const standAlonePatch& fluidZone =
+            fluid().globalPatches()[interfaceI].globalPatch();
+        const standAlonePatch& solidZone =
+            solid().globalPatches()[interfaceI].globalPatch();
+
+        // Calculate total traction of fluid zone
+        vectorField fluidZoneTraction
+        (
+            fluid().faceZoneViscousForce(interfaceI)
+        );
+
+        // Calculate pressure of fluid zone
+        scalarField fluidZonePressure
+        (
+            fluid().faceZonePressureForce(interfaceI)
+        );
+
+        // Initialise the solid zone traction and pressure fields
+        // that is to be interpolated from the fluid zone
+        vectorField solidZoneTraction(solidZone.size(), vector::zero);
+        scalarField solidZonePressure(solidZone.size(), 0);
+
+        // Transfer the field frm the fluid interface to the solid interface
+        interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
+        (
+            fluidZone,                 // from zone
+            solidZone,                 // to zone
+            fluidZoneTraction,         // from field
+            solidZoneTraction          // to field
+        );
+        interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
+        (
+            fluidZone,                 // from zone
+            solidZone,                 // to zone
+            fluidZonePressure,         // from field
+            solidZonePressure          // to field
+        );
+
+        // Flip traction sign after transferring from fluid to solid
+        solidZoneTraction = -solidZoneTraction;
+
+        // Set traction on solid
+        if (coupled())
+        {
+            solid().setTraction
+            (
+                interfaceI,
+                solidPatchIndices()[interfaceI],
+                solidZoneTraction
+            );
+
+            solid().setPressure
+            (
+                interfaceI,
+                solidPatchIndices()[interfaceI],
+                solidZonePressure
+            );
+        }
+
+        // Print total viscous force on solid and fluid interfaces
+        Info<< "Total viscous force on fluid interface " << interfaceI << ": "
+            << totalForceOnInterface(fluidZone, fluidZoneTraction) << nl
+            << "Total force on solid interface " << interfaceI << ": "
+            << totalForceOnInterface(solidZone, solidZoneTraction) << nl
+            << endl;
+    }
+}
+
 
 Foam::scalar Foam::fluidSolidInterface::updateResidual()
 {
