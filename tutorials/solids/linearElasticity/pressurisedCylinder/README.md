@@ -34,7 +34,8 @@ In this case, a homogeneous thick-wall cylindrical pressure vessel with an inner
 
 ## Results
 
-The analytical solution for the stress field is [1]:  
+The analytical solution for the stress field is [1]:
+
 $$
 \sigma_r = p \dfrac{r_i^2}{r_o^2-r_i^2}\left(1-\dfrac{r_o^2}{r^2}\right),
 $$
@@ -48,6 +49,7 @@ $$
 $$
 
 and for radial displacement:
+
 $$
 u_r = \dfrac{p}{E}\dfrac{r_i^2}{r_o^2-r_i^2}\left[(1-\nu)r+(1+\nu)\dfrac{r_o^2}{r}\right].
 $$
