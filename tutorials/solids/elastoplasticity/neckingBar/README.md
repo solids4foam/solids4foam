@@ -69,6 +69,10 @@ Once the ultimate strength is surpassed and necking begins, the material's abili
      <strong>Figure 3: Force-elongation curve</strong>
     </figcaption>
 </div>
+{% include youtube.html id="pvKP8VBdEUc" %}
+
+**Video 1: Video animation of the bar necking**
+
 
 ---
 
