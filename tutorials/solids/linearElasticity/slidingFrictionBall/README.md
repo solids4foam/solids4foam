@@ -37,9 +37,10 @@ The evolution of the $$\sigma_{xy}$$ and $$\sigma_{eq}$$ fields is shown in Vide
 <div style="text-align: center;">
   <img src="./images/slidingFrictionBall-results.png" alt="Image" width="900">
     <figcaption>
-     <strong>Figure 2: Sigma XY and sigma equivalent stress fields at 30 s and 60 s.</strong>
+     <strong>Figure 2: Sigma XY and sigma equivalent stress fields at 30 s and 60 s [1].</strong>
     </figcaption>
 </div>
+
 
 
 
