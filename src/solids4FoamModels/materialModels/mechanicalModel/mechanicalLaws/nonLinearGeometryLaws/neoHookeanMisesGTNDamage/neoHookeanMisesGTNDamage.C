@@ -22,73 +22,78 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 \*---------------------------------------------------------------------------*/
-
-#include "neoHookeanMisesPhaseFieldDamage.H"
+#include <iostream>
+#include<stdio.h>
+#include "neoHookeanMisesGTNDamage.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformGeometricField.H"
 #include "logVolFields.H"
 #include "fvc.H"
 #include "fvm.H"
-#include "Eigen/Dense"
+#include <Eigen/Dense>
 #include "zeroGradientFvPatchFields.H"
+
+using namespace Eigen;
+using namespace std;
+
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(neoHookeanMisesPhaseFieldDamage, 0);
+    defineTypeNameAndDebug(neoHookeanMisesGTNDamage, 0);
     addToRunTimeSelectionTable
     (
-        mechanicalLaw, neoHookeanMisesPhaseFieldDamage, nonLinGeomMechLaw
+        mechanicalLaw, neoHookeanMisesGTNDamage, nonLinGeomMechLaw
     );
 
 // * * * * * * * * * * * * * * Static Members  * * * * * * * * * * * * * * * //
 
     // Tolerance for Newton loop
-    scalar neoHookeanMisesPhaseFieldDamage::LoopTol_ = 1e-4;
+    scalar neoHookeanMisesGTNDamage::LoopTol_ = 1e-4;
 
     // Maximum number of iterations for Newton loop
-    label neoHookeanMisesPhaseFieldDamage::MaxNewtonIter_ = 200;
+    label neoHookeanMisesGTNDamage::MaxNewtonIter_ = 200;
 
     // finiteDiff is the delta for finite difference differentiation
-    scalar neoHookeanMisesPhaseFieldDamage::finiteDiff_ = 0.25e-6;
+    scalar neoHookeanMisesGTNDamage::finiteDiff_ = 0.25e-6;
 
     // Store sqrt(2/3) as we use it often
-    scalar neoHookeanMisesPhaseFieldDamage::sqrtTwoOverThree_ = ::sqrt(2.0/3.0);
+    scalar neoHookeanMisesGTNDamage::sqrtTwoOverThree_ = ::sqrt(2.0/3.0);
 
 } // End of namespace Foam
 
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-Foam::symmTensor Foam::neoHookeanMisesPhaseFieldDamage::logm(const symmTensor& T)
+Foam::symmTensor Foam::neoHookeanMisesGTNDamage::logm(const symmTensor& T)
 {
     // Finds the matrix log of the tensor T
 
     // Convert T to a MatrixXd
-    Eigen::Matrix3d TM(3,3);
+    Matrix3d TM(3,3);
     TM  <<
         T.xx(), T.xy(), T.xz(),
         T.xy(), T.yy(), T.yz(),
         T.xz(), T.yz(), T.zz();
 
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> es;
+    SelfAdjointEigenSolver<Eigen::Matrix3d> es;
     es.compute(TM);
 
-    Eigen::Vector3d EVals;
+    Vector3d EVals;
     EVals = es.eigenvalues();
 
-    Eigen::Vector3d LogEVals;
+    Vector3d LogEVals;
     LogEVals(0) = Foam::log(EVals(0));
     LogEVals(1) = Foam::log(EVals(1));
     LogEVals(2) = Foam::log(EVals(2));
 
-    Eigen::Matrix3d D = LogEVals.asDiagonal();
+    Matrix3d D = LogEVals.asDiagonal();
 
-    Eigen::Matrix3d EVecs;
+    Matrix3d EVecs;
     EVecs = es.eigenvectors();
 
-    Eigen::Matrix3d resultM = EVecs*D*EVecs.inverse();
+    Matrix3d resultM = EVecs*D*EVecs.inverse();
 
     return
         symmTensor
@@ -98,34 +103,34 @@ Foam::symmTensor Foam::neoHookeanMisesPhaseFieldDamage::logm(const symmTensor& T
                                         resultM(2,2)
         );
 }
-Foam::symmTensor Foam::neoHookeanMisesPhaseFieldDamage::expm(const symmTensor& T)
+Foam::symmTensor Foam::neoHookeanMisesGTNDamage::expm(const symmTensor& T)
 {
-    // Calculate exponential of a tensor
+    // Calculate exponetial of a tensor
 
     // Convert T to a MatrixXd
-    Eigen::Matrix3d TM(3,3);
+    Matrix3d TM(3,3);
     TM  <<
         T.xx(), T.xy(), T.xz(),
         T.xy(), T.yy(), T.yz(),
         T.xz(), T.yz(), T.zz();
 
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> es;
+    SelfAdjointEigenSolver<Eigen::Matrix3d> es;
     es.compute(TM);
 
-    Eigen::Vector3d EVals;
+    Vector3d EVals;
     EVals = es.eigenvalues();
 
-    Eigen::Vector3d ExpEVals;
+    Vector3d ExpEVals;
     ExpEVals(0) = Foam::exp(EVals(0));
     ExpEVals(1) = Foam::exp(EVals(1));
     ExpEVals(2) = Foam::exp(EVals(2));
 
-    Eigen::Matrix3d D = ExpEVals.asDiagonal();
+    Matrix3d D = ExpEVals.asDiagonal();
 
-    Eigen::Matrix3d EVecs;
+    Matrix3d EVecs;
     EVecs = es.eigenvectors();
 
-    Eigen::Matrix3d resultM = EVecs*D*EVecs.inverse();
+    Matrix3d resultM = EVecs*D*EVecs.inverse();
 
     return
         symmTensor
@@ -135,11 +140,11 @@ Foam::symmTensor Foam::neoHookeanMisesPhaseFieldDamage::expm(const symmTensor& T
                                         resultM(2,2)
         );
 }
-void Foam::neoHookeanMisesPhaseFieldDamage::makeRelF()
+void Foam::neoHookeanMisesGTNDamage::makeRelF()
 {
     if (relFPtr_)
     {
-        FatalErrorIn("void Foam::neoHookeanMisesPhaseFieldDamage::makeRelF()")
+        FatalErrorIn("void Foam::neoHookeanMisesGTNDamage::makeRelF()")
             << "pointer already set" << abort(FatalError);
     }
 
@@ -160,7 +165,7 @@ void Foam::neoHookeanMisesPhaseFieldDamage::makeRelF()
 }
 
 
-Foam::volTensorField& Foam::neoHookeanMisesPhaseFieldDamage::relF()
+Foam::volTensorField& Foam::neoHookeanMisesGTNDamage::relF()
 {
     if (!relFPtr_)
     {
@@ -170,11 +175,11 @@ Foam::volTensorField& Foam::neoHookeanMisesPhaseFieldDamage::relF()
     return *relFPtr_;
 }
 
-void Foam::neoHookeanMisesPhaseFieldDamage::makeJ()
+void Foam::neoHookeanMisesGTNDamage::makeJ()
 {
     if (JPtr_)
     {
-        FatalErrorIn("void Foam::neoHookeanMisesPhaseFieldDamage::makeJ()")
+        FatalErrorIn("void Foam::neoHookeanMisesGTNDamage::makeJ()")
             << "pointer already set" << abort(FatalError);
     }
 
@@ -198,7 +203,7 @@ void Foam::neoHookeanMisesPhaseFieldDamage::makeJ()
 }
 
 
-Foam::volScalarField& Foam::neoHookeanMisesPhaseFieldDamage::J()
+Foam::volScalarField& Foam::neoHookeanMisesGTNDamage::J()
 {
     if (!JPtr_)
     {
@@ -208,11 +213,11 @@ Foam::volScalarField& Foam::neoHookeanMisesPhaseFieldDamage::J()
     return *JPtr_;
 }
 
-void Foam::neoHookeanMisesPhaseFieldDamage::makeF()
+void Foam::neoHookeanMisesGTNDamage::makeF()
 {
     if (FPtr_)
     {
-        FatalErrorIn("void Foam::neoHookeanMisesPhaseFieldDamage::makeF()")
+        FatalErrorIn("void Foam::neoHookeanMisesGTNDamage::makeF()")
             << "pointer already set" << abort(FatalError);
     }
 
@@ -236,7 +241,7 @@ void Foam::neoHookeanMisesPhaseFieldDamage::makeF()
 }
 
 
-Foam::volTensorField& Foam::neoHookeanMisesPhaseFieldDamage::F()
+Foam::volTensorField& Foam::neoHookeanMisesGTNDamage::F1()
 {
     if (!FPtr_)
     {
@@ -246,59 +251,232 @@ Foam::volTensorField& Foam::neoHookeanMisesPhaseFieldDamage::F()
     return *FPtr_;
 }
 
-void Foam::neoHookeanMisesPhaseFieldDamage::smallStrainReturnMap
+void Foam::neoHookeanMisesGTNDamage::calculatef
 (
-    const symmTensor& Ee,  //elastic strain
-    scalar& sigmaY,  //yield stress
-    scalar& DSigmaY, // increment of yield stress
-    scalar& DLambda, //plastic strain increment
-    const scalar& epsilonPEqOld,  //old value of the equivalent plastic strain
-    scalar& activeYield, //defined if cell is undergoing active yielding
-    const scalar& gc //degredation fucntion
+    const scalar& DHyd, //specherical plastic strain increment
+    const scalar& DqEpsilonP, //deviatroic plastic strain increment
+    scalar& f, //porosity
+    scalar& fStar, //effective porosity
+    const scalar& fOld, //old prosity value
+    const scalar& fNonLocal, //non-local porosity from previous iteration
+    const scalar& epsilonPEqOld, //old equivalent plastic strain value
+    const scalar& DEpsilonPEq, //equivalent plastic strain increment
+    const symmTensor& DEpsilonP, //icnrement of plastic strain
+    const symmTensor& devT,  //deviatoric stress tensor
+    const scalar& p //pressure
+)
+{
+
+    scalar A=0;
+
+    //calaculate void growth due to nucleation if pressure is positive
+    if (p>0)
+    {
+        A = (fN_.value()/(sN_.value()*sqrt(2*3.14)))*
+             pow(2.71828,-0.5*pow((epsilonPEqOld+DEpsilonPEq-epsilonN_.value())/sN_.value(), 2.0));
+    }
+
+    scalar fShear=0;
+
+    //option to calculate shear effects
+    if (includeShear_)
+    {
+        scalar detS=det(devT);
+        scalar q1=sqrt(3.0/2.0)*mag(devT);
+        fShear=fStar*(1-pow(27*detS/(2.0*pow(q1,3.0)),2.0))*(devT && DEpsilonP)/q1;
+    }
+
+    if (fShear<0)
+    {
+        fShear=0;
+    }
+
+    f=fOld+(1-f)*DHyd+A*DEpsilonPEq+kw_.value()*fShear;
+
+    fStar=fNonLocal;
+
+    if (fNonLocal >= fC_.value() && includeCoalescence_)
+    {
+        fStar=fC_.value()+(f-fC_.value())*(1/q1_.value()-fC_.value())/(fF_.value()-fC_.value());
+    }
+}
+
+void Foam::neoHookeanMisesGTNDamage::smallStrainReturnMap
+(
+    const scalar& pTrial, //trial pressure
+    const symmTensor& sTrial, //trial deviatoric sress
+    const scalar& qTrial, //trial equivalent plastic stress
+    scalar& DHyd, //specherical plastic strain increment
+    scalar& DqEpsilonP, //deviatoric plastic strain increment
+    const scalar& fNonLocal, //non-local porosity
+    const scalar& fStar,  //effective porosity
+    const scalar& epsilonPEqOld, //old equivalent plastic strain value
+    scalar& DEpsilonPEq, //equivalent plastic strain increment
+    symmTensor& plasticN //normal to the yield surface
 ) const
 {
-    sigmaY = stressPlasticStrainSeries_(epsilonPEqOld);
-    scalar qTrial=sqrt(3.0/2.0)*mag(gc*2*mu_.value()*(dev(Ee)));
-    scalar fTrial=qTrial-gc*sigmaY;
-    DLambda=0;
 
-    int i=0;
-    if (fTrial>0.0)
+    //initialise pressure and equivalent stress
+    scalar p,q;
+
+    //set yield stress
+    scalar sigmaY = stressPlasticStrainSeries_(epsilonPEqOld);
+
+    if (qTrial>0)
     {
-        //newton loop to calculate plastic strain increment
-        do
+        plasticN=(3.0/2.0)*(sTrial/qTrial);
+    }
+
+    //GTN yield condition
+    scalar fTrial =  pow(qTrial/sigmaY, 2.0)
+                    +2*q1_.value()*fStar*cosh((3*pTrial*q2_.value())/(2*sigmaY))
+                    -(1+q3_.value()*pow(fStar,2.0));
+    if (debug)
+    {
+        Info<< "pTrial: " << pTrial << nl
+            << "qTrial: "<< qTrial << nl
+            << "epsilonPEqOld1: "<< epsilonPEqOld << nl
+            << "fNonLocal: " << fNonLocal << nl
+            << "fTrial: " << fTrial << endl;
+    }
+
+    if (fTrial > 0.0)
+    {
+
+        //set deviatoric, speherical and equivalent plastic strain increments
+        DqEpsilonP = 0;
+        DHyd = 0;
+        DEpsilonPEq = 0;
+
+        //Newton loop to solve for speherical, deviatoric and equivalent plastic strain increments
+        for (int j=0; j<=1000; j++)
         {
-            fTrial = qTrial - gc*3*mu_.value()*DLambda
-                            - gc*(stressPlasticStrainSeries_(epsilonPEqOld+DLambda));
 
-            scalar dSigmaY = (stressPlasticStrainSeries_(epsilonPEqOld+DLambda+1e-8)
-                             -stressPlasticStrainSeries_(epsilonPEqOld+DLambda))/1e-8;
+            //update pressure and equivalent stress
+            p = pTrial - K_.value()*DHyd;
+            q = qTrial - 3*mu_.value()*DqEpsilonP;
 
-            scalar dfTrial = -gc*3*mu_.value() - gc*dSigmaY;
-            DLambda -= fTrial/dfTrial;
+            //update yield stress
+            sigmaY = stressPlasticStrainSeries_(epsilonPEqOld+DEpsilonPEq);
 
-        if (i == MaxNewtonIter_)
-        {
-            WarningIn("neoHookeanElasticMisesPlasticDamage::newtonLoop()")
-                << "Plasticity Newton loop not converging" << endl;
+            // initialse fcosh and fsinh - these are components of the GTN yield equation
+            scalar fCosh = cosh(3*q2_.value()*p/(2*sigmaY));
+            scalar fSinh = sinh(3*q2_.value()*p/(2*sigmaY));
+
+            //derivaitive of the yield stress
+            scalar dSigmaY = (stressPlasticStrainSeries_(epsilonPEqOld+DEpsilonPEq+1e-8)
+                            -stressPlasticStrainSeries_(epsilonPEqOld+DEpsilonPEq))/1e-8;
+
+
+            //these derivatives are components of the derivatives which fill the Jacobian matrix
+            scalar df1dq = 2.0*(q/pow(sigmaY,2.0));
+            scalar df1dp = 3*fStar*q1_.value()*q2_.value()*fSinh/sigmaY;
+            scalar df1dSigmaY =- 2.0*pow(q,2.0)/pow(sigmaY,3.0) - df1dp*p/sigmaY;
+            scalar df1dpdp = 9.0*q1_.value()*pow(q2_.value(),2.0)*fStar*fCosh/(2.0*pow(sigmaY,2.0));
+            scalar df1dpdSigmaY = -9.0*q1_.value()*pow(q2_.value(),2.0)*
+                                   fStar*p*fCosh/(2.0*pow(sigmaY,3.0))
+                                  -3*fStar*q1_.value()*q2_.value()*fSinh/pow(sigmaY,2.0);
+            scalar df1dqdSigmaY = -4.0*(q/pow(sigmaY,3.0));
+
+            //Calcualte derivatives which constitute the Jacobian matrix
+            scalar a1 = -3.0*mu_.value()*df1dq;
+            scalar a2 = -K_.value()*df1dp;
+            scalar a3 = df1dSigmaY*dSigmaY;
+
+            scalar b1 = df1dp+3.0*DqEpsilonP*mu_.value()*2.0/pow(sigmaY,2.0);
+            scalar b2 = -DqEpsilonP*df1dpdp*K_.value() - df1dq;
+            scalar b3 = DqEpsilonP*df1dpdSigmaY*dSigmaY - DHyd*df1dqdSigmaY*dSigmaY;
+
+            scalar c1 = -q+3.0*mu_.value()*DqEpsilonP;
+            scalar c2 = -p+K_.value()*DHyd;
+            scalar c3 = (1-fNonLocal)*(sigmaY+dSigmaY*DEpsilonPEq);
+
+            if (debug)
+            {
+                Info<< "a1= " << a1 << nl
+                    << "a2= " << a2 << nl
+                    << "a3= " << a3 << nl
+                    << "b1= " << b1 << nl
+                    << "b2= " << b2 << nl
+                    << "b3= " << b3 << nl
+                    << "c1= " << c1 << nl
+                    << "c2= " << c2 << nl
+                    << "c3= " << c3 << endl;
+           }
+
+            //calculate values of fucnctions f1, f2 and f3
+            scalar f1val = pow(q/sigmaY, 2.0) + 2*q1_.value()*fStar*fCosh - (1+q3_.value()*pow(fStar,2.0));
+            scalar f2val = DqEpsilonP*df1dp-DHyd*df1dq;
+            scalar f3val = (1-fNonLocal)*sigmaY*DEpsilonPEq - q*DqEpsilonP-p*DHyd;
+
+            //create 3x3 Jacobian matrix
+            Matrix3d J;
+            J << a1, a2, a3,
+                 b1, b2, b3,
+                 c1, c2, c3;
+
+            if (debug)
+            {
+                cout<< "The inverse of J is:" << J.inverse() << nl
+                    << "J test:" << J.inverse()*J << nl << nl;
+            }
+
+            //create 3 dimensional vector
+            Vector3d fx(f1val,f2val,f3val);
+
+            //find inverse of matrix
+            Matrix3d Jinv = J.inverse();
+
+            //Gauss-newton step
+            Vector3d hgn = -Jinv*fx;
+
+            // update values of deviatoric, spherical and equivalent plastic strain increments
+            DqEpsilonP = DqEpsilonP + (hgn(0));
+            DHyd = DHyd + (hgn(1));
+            DEpsilonPEq = DEpsilonPEq + (hgn(2));
+
+            if (debug)
+            {
+
+                Info<< "f1val= " << f1val << nl
+                    << "f2val= " << f2val << nl
+                    << "f3val= " << f3val << nl
+                    << "h0: " << hgn(0) << nl
+                    << "h1: " << hgn(1) << nl
+                    << "h2: " << hgn(2)<< nl
+                    << "DqEpsilonP: " << DqEpsilonP << nl
+                    << "DHyd: " << DHyd << nl
+                    << "DEpsilonPEq: " << DEpsilonPEq<< endl;
+            }
+
+            if (j == 1000)
+            {
+                WarningIn("neoHookeanMisesGTNDamage::newtonLoop()")
+                    << "Plasticity Newton loop not converging" << endl;
+            }
+
+            if
+            (
+                mag(f1val) < LoopTol_
+             && mag(f2val) < LoopTol_
+             && mag(f3val) < LoopTol_
+            )
+            {
+                break;
+            }
         }
     }
-    while ((mag(fTrial) > LoopTol_) && ++i < MaxNewtonIter_);
 
-    activeYield = 1.0;
-
-    }
     else
     {
-        DLambda = 0;
-        activeYield = 0.0;
+        DqEpsilonP = 0;
+        DHyd = 0;
+        DEpsilonPEq = 0;
     }
-
-    sigmaY = stressPlasticStrainSeries_(epsilonPEqOld+DLambda);
 }
 
 
-Foam::tmp<Foam::volScalarField> Foam::neoHookeanMisesPhaseFieldDamage::Ibar
+Foam::tmp<Foam::volScalarField> Foam::neoHookeanMisesGTNDamage::Ibar
 (
     const volSymmTensorField& devBEbar
 )
@@ -442,7 +620,7 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanMisesPhaseFieldDamage::Ibar
 }
 
 
-Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanMisesPhaseFieldDamage::Ibar
+Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanMisesGTNDamage::Ibar
 (
     const surfaceSymmTensorField& devBEbar
 )
@@ -592,7 +770,7 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanMisesPhaseFieldDamage::Ibar
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
-Foam::neoHookeanMisesPhaseFieldDamage::neoHookeanMisesPhaseFieldDamage
+Foam::neoHookeanMisesGTNDamage::neoHookeanMisesGTNDamage
 (
     const word& name,
     const fvMesh& mesh,
@@ -601,63 +779,41 @@ Foam::neoHookeanMisesPhaseFieldDamage::neoHookeanMisesPhaseFieldDamage
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
+    relaxationFactor_(dict.lookupOrDefault<scalar>("relaxationFactor", 1.0)),
+    includeShear_
+    (
+        dict.lookupOrDefault<Switch>("includeShear", false)
+    ),
+    includeCoalescence_
+    (
+        dict.lookupOrDefault<Switch>("includeCoalescence", false)
+    ),
     charLength_("zero", dimLength, 0.0),
-    Gc_("zero", dimPressure, 0.0),
-    d1_("zero", dimless, 0.0),
-    d2_("zero", dimless, 0.0),
-    d3_("zero", dimless, 0.0),
-    betaE_(dict.lookupOrDefault<scalar>("betaE", 1.0)),
-    betaP_(dict.lookupOrDefault<scalar>("betaP", 1.0)),
-    w0_("zero", dimPressure, 0.0),
-    monolithic_
-    (
-        dict.lookupOrDefault<Switch>("monolithic", true)
-    ),
-    triaxiality_
-    (
-        dict.lookupOrDefault<Switch>("triaxiality", false)
-    ),
     rho_(dict.lookup("rho")),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
-    debug_(dict.lookup("debug")),
     E_("zero", dimPressure, 0.0),
     nu_("zero", dimless, 0.0),
+    q1_("zero", dimless, 0.0),
+    q2_("zero", dimless, 0.0),
+    q3_("zero", dimless, 0.0),
+    f0_("zero", dimless, 0.0),
+    fN_("zero", dimless, 0.0),
+    epsilonN_("zero", dimless, 0.0),
+    sN_("zero", dimless, 0.0),
+    fC_("zero", dimless, 0.0),
+    fU_("zero", dimless, 0.0),
+    fF_("zero", dimless, 0.0),
+    kw_("zero", dimless, 0.0),
     relFPtr_(NULL),
     JPtr_(NULL),
     FPtr_(NULL),
     stressPlasticStrainSeries_(dict),
-    Dpf_
+    f_
     (
         IOobject
         (
-            "Dpf",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("1", dimless, 1)
-    ),
-    one_
-    (
-        IOobject
-        (
-            "one",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("one", dimless, 1)
-    ),
-    zero_
-    (
-        IOobject
-        (
-            "zero",
+            "f",
             mesh.time().timeName(),
             mesh,
             IOobject::READ_IF_PRESENT,
@@ -666,11 +822,36 @@ Foam::neoHookeanMisesPhaseFieldDamage::neoHookeanMisesPhaseFieldDamage
         mesh,
         dimensionedScalar("zero", dimless, 0.0)
     ),
-    gradDpf_
+    fStar_
     (
         IOobject
         (
-            "grad(Dpf)",
+            "fStar",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedScalar("zero", dimless, 0.0)
+    ),
+    fNonLocal_
+    (
+        IOobject
+        (
+            "fNonLocal",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh
+    ),
+    gradfNonLocal_
+    (
+        IOobject
+        (
+            "grad(fNonLocal)",
             mesh.time().timeName(),
             mesh,
             IOobject::NO_READ,
@@ -678,71 +859,6 @@ Foam::neoHookeanMisesPhaseFieldDamage::neoHookeanMisesPhaseFieldDamage
         ),
         mesh,
         dimensionedVector("0", dimless/dimLength, vector::zero)
-    ),
-    strainEnergy_
-    (
-        IOobject
-        (
-            "strainEnergy",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0)
-    ),
-    HStrainEnergy_
-    (
-        IOobject
-        (
-            "HStrainEnergy",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0)
-    ),
-    plasticStrainEnergy_
-    (
-        IOobject
-        (
-            "plasticStrainEnergy",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0)
-    ),
-    devStrainEnergy_
-    (
-        IOobject
-        (
-            "devStrainEnergy",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0)
-    ),
-    volStrainEnergy_
-    (
-        IOobject
-        (
-            "volStrainEnergy",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0)
     ),
     sigmaHyd_
     (
@@ -950,21 +1066,28 @@ Foam::neoHookeanMisesPhaseFieldDamage::neoHookeanMisesPhaseFieldDamage
     plasticN_.oldTime();
     bEbar_.oldTime();
     epsilonEl_.oldTime();
-    HStrainEnergy_.oldTime();
-    plasticStrainEnergy_.oldTime();
+    f_.oldTime();
+    fStar_.oldTime();
 
-    if (triaxiality_)
-    {
-        d1_ = dimensionedScalar(dict.lookup("d1"));
-        d2_ = dimensionedScalar(dict.lookup("d2"));
-        d3_ = dimensionedScalar(dict.lookup("d3"));
-    }
-
+    //read the caracteristic length
     charLength_ = dimensionedScalar(dict.lookup("charLength"));
-    Gc_ = dimensionedScalar(dict.lookup("Gc"));
-    w0_ = dimensionedScalar(dict.lookup("w0"));
 
-    Dpf_=1.0;
+    //read GTN parameters
+    q1_ = dimensionedScalar(dict.lookup("q1"));
+    q2_ = dimensionedScalar(dict.lookup("q2"));
+    q3_ = dimensionedScalar(dict.lookup("q3"));
+    fN_ = dimensionedScalar(dict.lookup("fN"));
+    epsilonN_ = dimensionedScalar(dict.lookup("epsilonN"));
+    sN_ = dimensionedScalar(dict.lookup("sN"));
+    fC_ = dimensionedScalar(dict.lookup("fC"));
+    f0_ = dimensionedScalar(dict.lookup("f0"));
+    fU_ = dimensionedScalar(dict.lookup("fU"));
+    fF_ = dimensionedScalar(dict.lookup("fF"));
+    kw_ = dimensionedScalar(dict.lookup("kw"));
+
+    //intial porosity
+    f_=f0_;
+
 
     Info<< "    smoothPressure: " << smoothPressure_ << nl
         << "    updateBEbarConsistent: " << updateBEbarConsistent_ << endl;
@@ -1001,7 +1124,7 @@ Foam::neoHookeanMisesPhaseFieldDamage::neoHookeanMisesPhaseFieldDamage
     {
         FatalErrorIn
         (
-            "neoHookeanMisesPhaseFieldDamage::neoHookeanMisesPhaseFieldDamage::()"
+            "neoHookeanMisesGTNDamage::neoHookeanMisesGTNDamage::()"
         )   << "Either E and nu or mu and K elastic parameters should be "
             << "specified" << abort(FatalError);
     }
@@ -1017,7 +1140,7 @@ Foam::neoHookeanMisesPhaseFieldDamage::neoHookeanMisesPhaseFieldDamage
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
-Foam::neoHookeanMisesPhaseFieldDamage::~neoHookeanMisesPhaseFieldDamage()
+Foam::neoHookeanMisesGTNDamage::~neoHookeanMisesGTNDamage()
 {
     deleteDemandDrivenData(relFPtr_);
     deleteDemandDrivenData(JPtr_);
@@ -1027,7 +1150,7 @@ Foam::neoHookeanMisesPhaseFieldDamage::~neoHookeanMisesPhaseFieldDamage()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::tmp<Foam::volScalarField> Foam::neoHookeanMisesPhaseFieldDamage::rho() const
+Foam::tmp<Foam::volScalarField> Foam::neoHookeanMisesGTNDamage::rho() const
 {
     return tmp<volScalarField>
     (
@@ -1050,7 +1173,7 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanMisesPhaseFieldDamage::rho() con
 
 
 Foam::tmp<Foam::volScalarField>
-Foam::neoHookeanMisesPhaseFieldDamage::impK() const
+Foam::neoHookeanMisesGTNDamage::impK() const
 {
     // Calculate scaling factor to ensure optimal convergence
     // This is similar to the tangent matrix in FE procedures
@@ -1090,152 +1213,8 @@ Foam::neoHookeanMisesPhaseFieldDamage::impK() const
     );
 }
 
-void Foam::neoHookeanMisesPhaseFieldDamage::calcPhase()
-{
 
-    if (!monolithic_)
-    {
-        Info << "Updating Phase Field" << endl;
-    }
-
-    //set deviatoric elastic strain
-    volSymmTensorField devEpsilonEl(dev(epsilonEl_));
-
-    //calculate plastic strain energy
-    plasticStrainEnergy_ = plasticStrainEnergy_.oldTime() + sigmaY_*DLambda_;
-
-    //initialise effective plastic strain energy
-    volScalarField effPlasticStrainEnergy(plasticStrainEnergy_);
-
-    //loop to incorporate triaxiality effects
-    if (triaxiality_)
-    {
-        volScalarField magS(mag(pow(one_-Dpf_, 2.0)*2.0*mu_*devEpsilonEl));
-        volScalarField triaxParam(d1_ + d2_*pow(2.71828, d3_*sigmaHyd_/magS));
-        plasticStrainEnergy_ = plasticStrainEnergy_.oldTime() + sigmaY_*DLambda_/triaxParam;
-    }
-
-    //set devatoric and volumetric elastic strain energy
-    volStrainEnergy_ = 0.5*K_*pow(tr(epsilonEl_),2.0);
-    devStrainEnergy_ = mu_*(devEpsilonEl && devEpsilonEl);
-
-    //initialise internal fields
-    symmTensorField& epsilonElI = epsilonEl_;
-    scalarField& strainEnergyI = strainEnergy_;
-    scalarField volStrainEnergyI = volStrainEnergy_;
-    scalarField devStrainEnergyI = devStrainEnergy_;
-    scalarField& HStrainEnergyI = HStrainEnergy_;
-    scalarField& plasticStrainEnergyI = plasticStrainEnergy_;
-    scalarField& effPlasticStrainEnergyI = effPlasticStrainEnergy;
-    scalarField& HStrainEnergyOldI = HStrainEnergy_.oldTime();
-
-    //set history strain energy field and effective plastic strain energy
-    forAll(HStrainEnergyI, cellI)
-    {
-        if (tr(epsilonElI[cellI]) >= 0.0)
-        {
-            strainEnergyI[cellI] = volStrainEnergyI[cellI] + devStrainEnergyI[cellI];
-        }
-        else
-        {
-            strainEnergyI[cellI] = devStrainEnergyI[cellI];
-        }
-
-        effPlasticStrainEnergyI[cellI] = effPlasticStrainEnergyI[cellI] - w0_.value();
-
-        if (plasticStrainEnergyI[cellI] < w0_.value())
-        {
-            effPlasticStrainEnergyI[cellI] = 0;
-        }
-
-        HStrainEnergyI[cellI] = max(strainEnergyI[cellI],HStrainEnergyOldI[cellI]);
-    }
-
-    //set history strain energy field and effective plastic strain energy
-    forAll(HStrainEnergy_.boundaryField(), patchI)
-    {
-        // Take references to the boundary fields
-#ifdef OPENFOAM_NOT_EXTEND
-        symmTensorField& epsilonElP = epsilonEl_.boundaryFieldRef()[patchI];
-        scalarField& strainEnergyP = strainEnergy_.boundaryFieldRef()[patchI];
-        scalarField volStrainEnergyP = volStrainEnergy_.boundaryFieldRef()[patchI];
-        scalarField devStrainEnergyP = devStrainEnergy_.boundaryFieldRef()[patchI];
-        scalarField& HStrainEnergyP = HStrainEnergy_.boundaryFieldRef()[patchI];
-        scalarField& plasticStrainEnergyP = plasticStrainEnergy_.boundaryFieldRef()[patchI];
-        scalarField& effPlasticStrainEnergyP = effPlasticStrainEnergy.boundaryFieldRef()[patchI];
-        scalarField& HStrainEnergyOldP = HStrainEnergy_.oldTime().boundaryFieldRef()[patchI];
-#else
-        symmTensorField& epsilonElP = epsilonEl_.boundaryField()[patchI];
-        scalarField& strainEnergyP = strainEnergy_.boundaryField()[patchI];
-        scalarField volStrainEnergyP = volStrainEnergy_.boundaryField()[patchI];
-        scalarField devStrainEnergyP = devStrainEnergy_.boundaryField()[patchI];
-        scalarField& HStrainEnergyP = HStrainEnergy_.boundaryField()[patchI];
-        scalarField& plasticStrainEnergyP = plasticStrainEnergy_.boundaryField()[patchI];
-        scalarField& effPlasticStrainEnergyP = effPlasticStrainEnergy.boundaryField()[patchI];
-        scalarField& HStrainEnergyOldP = HStrainEnergy_.oldTime().boundaryField()[patchI];
-#endif
-
-        forAll(HStrainEnergyP, faceI)
-        {
-
-            if (tr(epsilonElP[faceI]) >= 0.0)
-            {
-                strainEnergyP[faceI] = volStrainEnergyP[faceI] + devStrainEnergyP[faceI];
-            }
-            else
-            {
-                strainEnergyP[faceI] = devStrainEnergyP[faceI];
-            }
-
-            effPlasticStrainEnergyP[faceI] = effPlasticStrainEnergyP[faceI] - w0_.value();
-
-            if (plasticStrainEnergyP[faceI] < w0_.value())
-            {
-                effPlasticStrainEnergyP[faceI] = 0;
-            }
-
-            HStrainEnergyP[faceI] = max(strainEnergyP[faceI],HStrainEnergyOldP[faceI]);
-        }
-    }
-
-    const volScalarField elasticCoeff(4.0*charLength_*HStrainEnergy_/Gc_);
-    const volScalarField plasticCoeff
-    (
-        4.0*charLength_*effPlasticStrainEnergy/Gc_
-    );
-    const volScalarField coeff(elasticCoeff + plasticCoeff);
-
-    // This is used to ensure OpenFOAM doesn't give a dimension error
-    const dimensionedScalar diml = charLength_/charLength_.value();
-
-    // Calculate phase field variable
-    fvScalarMatrix DpfEqn
-    (
-      - fvm::laplacian(4.0*pow(charLength_,2.0), Dpf_)
-      + fvm::Sp(1.0, Dpf_)
-      + fvm::Sp(coeff/diml, Dpf_)
-     ==
-        one_
-    );
-
-#ifdef OPENFOAM_NOT_EXTEND
-    SolverPerformance<scalar>::debug = 0;
-#else
-    blockLduMatrix::debug = 0;
-#endif
-
-    DpfEqn.solve();
-
-#ifdef OPENFOAM_NOT_EXTEND
-    SolverPerformance<scalar>::debug = 1;
-#else
-    blockLduMatrix::debug = 1;
-#endif
-
-    gradDpf_ = fvc::grad(Dpf_);
-}
-
-void Foam::neoHookeanMisesPhaseFieldDamage::correct(volSymmTensorField& sigma)
+void Foam::neoHookeanMisesGTNDamage::correct(volSymmTensorField& sigma)
 {
     // Check if the mathematical model is in total or updated Lagrangian form
     if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
@@ -1255,7 +1234,7 @@ void Foam::neoHookeanMisesPhaseFieldDamage::correct(volSymmTensorField& sigma)
         relF() = I + gradDD.T();
 
         // Update the total deformation gradient
-        F() = relF() & F().oldTime();
+        F1() = relF() & F1().oldTime();
     }
     else if (nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
@@ -1267,10 +1246,10 @@ void Foam::neoHookeanMisesPhaseFieldDamage::correct(volSymmTensorField& sigma)
 
             // Update the total deformation gradient
             // Note: grad is wrt reference configuration
-            F() = F().oldTime() + gradDD.T();
+            F1() = F1().oldTime() + gradDD.T();
 
             // Update the relative deformation gradient
-            relF() = F() & inv(F().oldTime());
+            relF() = F1() & inv(F1().oldTime());
         }
         else
         {
@@ -1279,10 +1258,10 @@ void Foam::neoHookeanMisesPhaseFieldDamage::correct(volSymmTensorField& sigma)
                 mesh().lookupObject<volTensorField>("grad(D)");
 
             // Update the total deformation gradient
-            F() = I + gradD.T();
+            F1() = I + gradD.T();
 
             // Update the relative deformation gradient
-            relF() = F() & inv(F().oldTime());
+            relF() = F1() & inv(F1().oldTime());
         }
     }
     else
@@ -1294,178 +1273,249 @@ void Foam::neoHookeanMisesPhaseFieldDamage::correct(volSymmTensorField& sigma)
     }
     DEpsilonP_.storePrevIter();
 
-    // Set crack degredation function
-    const volScalarField gc_(pow(Dpf_, 2.0));
+    // These fields are useful for information and debugging purposes but are not
+    // used in this version of the class
+    volScalarField dHydField(epsilonPEq_);
+    volScalarField dqField(epsilonPEq_);
+    scalarField& dHydFieldI = dHydField;
+    scalarField& dqFieldI = dqField;
 
-    // Take references to the internal fields
-    const tensorField& FI = F();
-    symmTensorField epsilonElOldI = epsilonEl_.oldTime();
+    // Take references to the internal fields for efficiency
+    const tensorField& FI = F1();
+    symmTensorField epsilonElOldI(epsilonEl_.oldTime());
     symmTensorField& epsilonElI = epsilonEl_;
     symmTensorField& DEpsilonPI = DEpsilonP_;
     symmTensorField& tauI = tau_;
     symmTensorField& sigmaI = sigma;
     tensorField  relFI = relF();
-    scalarField& DSigmaYI = DSigmaY_;
-    scalarField& pI = sigmaHyd_;
-    scalarField& epsilonPEqOldI = epsilonPEq_.oldTime();
-    scalarField& DEpsilonPEqI = DEpsilonPEq_;
-    scalarField& DLambdaI = DLambda_;
-    scalarField& sigmaYI = sigmaY_;
-    scalarField& activeYieldI = activeYield_;
-    const scalarField& gcI = gc_;
 
-    //initialise variables for plasticity model
+    scalarField epsilonPEqOldI(epsilonPEq_.oldTime());
+    scalarField& DEpsilonPEqI = DEpsilonPEq_;
+    scalarField fOldI(f_.oldTime());
+    scalarField& fI = f_;
+    scalarField& fStarI = fStar_;
+    scalarField& fStarOldI = fStar_.oldTime();
+    scalarField& fNonLocalI = fNonLocal_;
+
     symmTensor BeOld = I; // old value of the left Cachy-Green tensor
     symmTensor Be = I; // left Cachy-Green tensor
-    symmTensor Ee = symmTensor::zero;  // elastic strain tensor
+    symmTensor Ee = symmTensor::zero; // elastic strain tensor
     tensor relf = I; // relative deformation gradient
     symmTensor plasticN = symmTensor::zero; // normal to the plastic yielding
 
-    // Calculate DLambda and plasticN
+    symmTensor sTrial = I; // initialise deviatoric stress
+    scalar DHyd, DqEpsilonP = 0.0; // initialise spherical and deviatoric plastic strain
+    scalar pTrial, p = 0.0; // initialise trial pressure and pressure
+    scalar q, qTrial = 0.0; // initialise equivalent stress and trial equivalent stress
+
+    // Calculate DHyd, DqEpsilonP, DEpsilonPEq and plasticN
     forAll(relFI, cellI)
     {
+
         //pre-processing step
         relf = relFI[cellI];
         BeOld = expm(2.0*epsilonElOldI[cellI]);
         Be = symm(relf & BeOld & relf.T());
         Ee = 0.5*logm(Be);
 
+        pTrial = K_.value()*tr(Ee);
+        sTrial = 2*mu_.value()*dev(Ee);
+        qTrial = sqrt(3.0/2.0)*mag(sTrial);
+
         smallStrainReturnMap
         (
-            Ee,
-            sigmaYI[cellI],
-            DSigmaYI[cellI],
-            DLambdaI[cellI],
+            pTrial,
+            sTrial,
+            qTrial,
+            DHyd,
+            DqEpsilonP,
+            fNonLocalI[cellI],
+            fStarI[cellI],
             epsilonPEqOldI[cellI],
-            activeYieldI[cellI],
-            gcI[cellI]
+            DEpsilonPEqI[cellI],
+            plasticN
         );
 
-        if (mag(Ee) > 0)
-        {
-            plasticN = dev(Ee)/(mag(dev(Ee)));
-        }
+        //post-processing step
+        DEpsilonPI[cellI] = (1.0/3.0)*DHyd*I + DqEpsilonP*plasticN;
+        epsilonElI[cellI] = Ee - DEpsilonPI[cellI];
+        p = pTrial - K_.value()*DHyd;
+        q = qTrial - 3*mu_.value()*DqEpsilonP;
 
-        DEpsilonPI[cellI] = sqrt(3.0/2.0)*DLambdaI[cellI]*plasticN ;
-        epsilonElI[cellI] = Ee-DEpsilonPI[cellI];
-
-        if (tr(epsilonElI[cellI]) >= 0)
-        {
-            pI[cellI] = gcI[cellI]*K_.value()*tr(epsilonElI[cellI]);
-            tauI[cellI] = gcI[cellI]*2*mu_.value()*dev(epsilonElI[cellI]) + pI[cellI]*I;
-        }
-        else
-        {
-            pI[cellI] = K_.value()*tr(epsilonElI[cellI]);
-            tauI[cellI] = gcI[cellI]*2*mu_.value()*dev(epsilonElI[cellI]) + pI[cellI]*I;
-        }
-
+        tauI[cellI] = p*I + (sTrial - 2*mu_.value()*dev(DEpsilonPI[cellI]));
         sigmaI[cellI] = (1/det(FI[cellI]))*tauI[cellI];
-        DEpsilonPEqI[cellI] = DLambdaI[cellI];
+        dHydFieldI[cellI] = DHyd;
+        dqFieldI[cellI] = DqEpsilonP;
 
 
+        //update porosity if cell is undergoing plastic yielding
+        if (DEpsilonPEqI[cellI] > 0)
+        {
+            symmTensor tDev = (q/qTrial)*sTrial;
+            calculatef
+            (
+                DHyd,
+                DqEpsilonP,
+                fI[cellI],
+                fStarI[cellI],
+                fOldI[cellI],
+                fNonLocalI[cellI],
+                epsilonPEqOldI[cellI],
+                DEpsilonPEqI[cellI],
+                DEpsilonPI[cellI],
+                tDev,
+                p
+            );
+         }
+         else
+         {
+             fStarI[cellI] = fStarOldI[cellI];
+             fI[cellI] = fOldI[cellI];
+         }
     }
 
-    forAll(F().boundaryField(), patchI)
+    forAll(F1().boundaryField(), patchI)
     {
-        // Take references to boundary fields
 #ifdef OPENFOAM_NOT_EXTEND
-        const tensorField& FP = F().boundaryFieldRef()[patchI];
+        scalarField& dHydFieldP = dHydField.boundaryFieldRef()[patchI];
+        scalarField& dqFieldP = dqField.boundaryFieldRef()[patchI];
+
+        const tensorField& FP = F1().boundaryFieldRef()[patchI];
         symmTensorField epsilonElOldP = epsilonEl_.oldTime().boundaryFieldRef()[patchI];
         symmTensorField& epsilonElP = epsilonEl_.boundaryFieldRef()[patchI];
         symmTensorField& DEpsilonPP = DEpsilonP_.boundaryFieldRef()[patchI];
-        symmTensorField& tauP = tau_.boundaryFieldRef()[patchI];
+        symmTensorField tauP = tau_.boundaryFieldRef()[patchI];
         symmTensorField& sigmaP = sigma.boundaryFieldRef()[patchI];
         tensorField  relFP = relF().boundaryFieldRef()[patchI];
-        scalarField& DSigmaYP = DSigmaY_.boundaryFieldRef()[patchI];
-        scalarField& pP = sigmaHyd_.boundaryFieldRef()[patchI];
-        scalarField& epsilonPEqOldP = epsilonPEq_.oldTime().boundaryFieldRef()[patchI];
+
+        scalarField epsilonPEqOldP = epsilonPEq_.oldTime().boundaryFieldRef()[patchI];
         scalarField& DEpsilonPEqP = DEpsilonPEq_.boundaryFieldRef()[patchI];
-        scalarField& DLambdaP = DLambda_.boundaryFieldRef()[patchI];
-        scalarField& sigmaYP = sigmaY_.boundaryFieldRef()[patchI];
-        scalarField& activeYieldP = activeYield_.boundaryFieldRef()[patchI];
-        const scalarField& gcP = gc_.boundaryField()[patchI];
+        scalarField fOldP = f_.oldTime().boundaryFieldRef()[patchI];
+        scalarField& fP = f_.boundaryFieldRef()[patchI];
+        scalarField& fStarP = fStar_.boundaryFieldRef()[patchI];
+        scalarField& fStarOldP = fStar_.oldTime().boundaryFieldRef()[patchI];
+        scalarField& fNonLocalP = fNonLocal_.boundaryFieldRef()[patchI];
 #else
-        const tensorField& FP = F().boundaryField()[patchI];
+        scalarField& dHydFieldP = dHydField.boundaryField()[patchI];
+        scalarField& dqFieldP = dqField.boundaryField()[patchI];
+
+        const tensorField& FP = F1().boundaryField()[patchI];
         symmTensorField epsilonElOldP = epsilonEl_.oldTime().boundaryField()[patchI];
         symmTensorField& epsilonElP = epsilonEl_.boundaryField()[patchI];
         symmTensorField& DEpsilonPP = DEpsilonP_.boundaryField()[patchI];
-        symmTensorField& tauP = tau_.boundaryField()[patchI];
+        symmTensorField tauP = tau_.boundaryField()[patchI];
         symmTensorField& sigmaP = sigma.boundaryField()[patchI];
         tensorField  relFP = relF().boundaryField()[patchI];
-        scalarField& DSigmaYP = DSigmaY_.boundaryField()[patchI];
-        scalarField& pP = sigmaHyd_.boundaryField()[patchI];
-        scalarField& epsilonPEqOldP = epsilonPEq_.oldTime().boundaryField()[patchI];
+
+        scalarField epsilonPEqOldP = epsilonPEq_.oldTime().boundaryField()[patchI];
         scalarField& DEpsilonPEqP = DEpsilonPEq_.boundaryField()[patchI];
-        scalarField& DLambdaP = DLambda_.boundaryField()[patchI];
-        scalarField& sigmaYP = sigmaY_.boundaryField()[patchI];
-        scalarField& activeYieldP = activeYield_.boundaryField()[patchI];
-        const scalarField& gcP = gc_.boundaryField()[patchI];
+        scalarField fOldP = f_.oldTime().boundaryField()[patchI];
+        scalarField& fP = f_.boundaryField()[patchI];
+        scalarField& fStarP = fStar_.boundaryField()[patchI];
+        scalarField& fStarOldP = fStar_.oldTime().boundaryField()[patchI];
+        scalarField& fNonLocalP = fNonLocal_.boundaryField()[patchI];
 #endif
 
-        // Calculate DLambda and plasticN
+        // Calculate DHyd, DqEpsilonP, DEpsilonPEq and plasticN
         forAll(FP, faceI)
         {
-            //pre-processing step
+            // pre-processing step
             relf = relFP[faceI];
             BeOld = expm(2.0*epsilonElOldP[faceI]);
             Be = symm(relf & BeOld & relf.T());
             Ee = 0.5*logm(Be);
 
+            pTrial = K_.value()*tr(Ee);
+            sTrial = 2*mu_.value()*dev(Ee);
+            qTrial = sqrt(3.0/2.0)*mag(sTrial);
+
             smallStrainReturnMap
             (
-                Ee,
-                sigmaYP[faceI],
-                DSigmaYP[faceI],
-                DLambdaP[faceI],
+                pTrial,
+                sTrial,
+                qTrial,
+                DHyd,
+                DqEpsilonP,
+                fNonLocalP[faceI],
+                fStarP[faceI],
                 epsilonPEqOldP[faceI],
-                activeYieldP[faceI],
-                gcP[faceI]
+                DEpsilonPEqP[faceI],
+                plasticN
             );
 
-            //post processing step
-            if (mag(Ee)>0)
-            {
-                plasticN = dev(Ee)/(mag(dev(Ee)));
-            }
+            //post-processing step
+            DEpsilonPP[faceI] = (1.0/3.0)*DHyd*I + DqEpsilonP*plasticN;
+            epsilonElP[faceI] = Ee - (1.0/3.0)*DHyd*I - DqEpsilonP*plasticN;
+            p = pTrial - K_.value()*DHyd;
+            q = qTrial - 3*mu_.value()*DqEpsilonP;
 
-            DEpsilonPP[faceI] = sqrt(3.0/2.0)*DLambdaP[faceI]*plasticN ;
-            epsilonElP[faceI] = Ee-DEpsilonPP[faceI];
+            tauP[faceI] = p*I + (sTrial-2*mu_.value()*dev(DEpsilonPP[faceI]));
+            sigmaP[faceI] = p*I + (sTrial-2*mu_.value()*dev(DEpsilonPP[faceI]));
 
-            if (tr(epsilonElP[faceI]) >= 0)
+            dHydFieldP[faceI] = DHyd;
+            dqFieldP[faceI] = DqEpsilonP;
+
+            //update porosity if cell is undergoing plastic yielding
+            if (DEpsilonPEqP[faceI]>0)
             {
-                pP[faceI] = gcP[faceI]*K_.value()*tr(epsilonElP[faceI]);
-                tauP[faceI] = gcP[faceI]*2*mu_.value()*dev(epsilonElP[faceI]) + pP[faceI]*I;
+                symmTensor tDev = (q/qTrial)*sTrial;
+                calculatef
+                (
+                    DHyd,
+                    DqEpsilonP,
+                    fP[faceI],
+                    fStarP[faceI],
+                    fOldP[faceI],
+                    fNonLocalP[faceI],
+                    epsilonPEqOldP[faceI],
+                    DEpsilonPEqP[faceI],
+                    DEpsilonPP[faceI],
+                    tDev,
+                    p
+                );
             }
             else
             {
-                pP[faceI] = K_.value()*tr(epsilonElP[faceI]);
-                tauP[faceI] = gcP[faceI]*2*mu_.value()*dev(epsilonElP[faceI]) + pP[faceI]*I;
+                fStarP[faceI] = fStarOldP[faceI];
+                fP[faceI] = fOldP[faceI];
             }
-
-            sigmaP[faceI] = (1/det(FP[faceI]))* tauP[faceI];
-            DEpsilonPEqP[faceI] = DLambdaP[faceI];
 
         }
     }
 
-    if (monolithic_)
-    {
-        calcPhase();
-    }
 
+    // Calcualte non-local porosity
+    fvScalarMatrix fEqn
+    (
+        fvm::Sp(1.0, fNonLocal_)
+      - fvm::laplacian(pow(charLength_, 2.0), fNonLocal_)
+     == f_
+    );
 
+#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<scalar>::debug = 0;
+#else
+    blockLduMatrix::debug = 0;
+#endif
+    fEqn.solve();
+
+#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<scalar>::debug = 1;
+#else
+    blockLduMatrix::debug = 1;
+#endif
+
+    gradfNonLocal_ = fvc::grad(fNonLocal_);
 }
 
 
-void Foam::neoHookeanMisesPhaseFieldDamage::correct(surfaceSymmTensorField& sigma)
+void Foam::neoHookeanMisesGTNDamage::correct(surfaceSymmTensorField& sigma)
 {
-
-   notImplemented("wip");
+   notImplemented("Surface field version of correct not yet implemented");
 }
 
 
-Foam::scalar Foam::neoHookeanMisesPhaseFieldDamage::residual()
+Foam::scalar Foam::neoHookeanMisesGTNDamage::residual()
 {
     // Calculate residual based on change in plastic strain increment
     return
@@ -1493,18 +1543,14 @@ Foam::scalar Foam::neoHookeanMisesPhaseFieldDamage::residual()
 }
 
 
-void Foam::neoHookeanMisesPhaseFieldDamage::updateTotalFields()
+void Foam::neoHookeanMisesGTNDamage::updateTotalFields()
 {
-    if (!monolithic_)
-    {
-        calcPhase();
-    }
-
     Info<< nl << "Updating total accumulated fields" << endl;
+    sigmaY_ += DSigmaY_;
+
     Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq_) << endl;
     epsilonPEq_ += DEpsilonPEq_;
     epsilonP_ += DEpsilonP_;
-
     // Count cells actively yielding
     int numCellsYielding = 0;
 
@@ -1564,7 +1610,7 @@ void Foam::neoHookeanMisesPhaseFieldDamage::updateTotalFields()
 }
 
 
-Foam::scalar Foam::neoHookeanMisesPhaseFieldDamage::newDeltaT()
+Foam::scalar Foam::neoHookeanMisesGTNDamage::newDeltaT()
 {
     // In the calculation of the plastic strain increment, the return direction
     // is kept constant for the time-step; we can approximate the error based on
@@ -1577,11 +1623,10 @@ Foam::scalar Foam::neoHookeanMisesPhaseFieldDamage::newDeltaT()
     // in large deformation finite element analysis, Finite Elements in
     // Analysis and Design 16 (1994) 99-139.
 
-    // Update the total deformatio gradient
-    F() = relF() & F().oldTime();
+    F1() = relF() & F1().oldTime();
 
     // Calculate the total true (Hencky) strain
-    const volSymmTensorField epsilon(0.5*log(symm(F().T() & F())));
+    const volSymmTensorField epsilon(0.5*log(symm(F1().T() & F1())));
 
     // Calculate equivalent strain, for normalisation of the error
     const volScalarField epsilonEq(sqrt((2.0/3.0)*magSqr(dev(epsilon))));
@@ -1612,7 +1657,7 @@ Foam::scalar Foam::neoHookeanMisesPhaseFieldDamage::newDeltaT()
         {
             WarningIn
             (
-                "Foam::scalar Foam::neoHookeanMisesPhaseFieldDamage::newDeltaT()"
+                "Foam::scalar Foam::neoHookeanMisesGTNDamage::newDeltaT()"
                 " const"
             )   << "The error in the plastic strain is lover 50 times larger "
                 << "than the desired value!\n    Consider starting the "
