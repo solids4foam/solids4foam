@@ -61,7 +61,7 @@ namespace Foam
 	(
 		vector& coeff,
 		const vector& Sf,
-		const symmTensor& P
+		const symmTensor& pressureSensitivity
 	);
 
 } // End namespace Foam

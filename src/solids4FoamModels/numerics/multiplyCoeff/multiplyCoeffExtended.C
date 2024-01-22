@@ -370,7 +370,7 @@ void Foam::multiplyCoeffPressure
 (
     vector& coeff,
     const vector& Sf,
-    const symmTensor& P
+    const symmTensor& pressureSensitivity
 )
 {
 	// Index notation
@@ -383,9 +383,9 @@ void Foam::multiplyCoeffPressure
 	//		     + Sf_3 P_31 
 	
 	coeff[vector::X] =
-        Sf[vector::X]*P[symmTensor::XX]
-      + Sf[vector::Y]*P[symmTensor::XY]
-      + Sf[vector::Z]*P[symmTensor::XZ];	
+        Sf[vector::X]*pressureSensitivity[symmTensor::XX]
+      + Sf[vector::Y]*pressureSensitivity[symmTensor::XY]
+      + Sf[vector::Z]*pressureSensitivity[symmTensor::XZ];	
       
 	// coeff_2 = Sf_m P_m2 
 	//		
@@ -394,9 +394,9 @@ void Foam::multiplyCoeffPressure
 	//		     + Sf_3 P_32 
 	
 	coeff[vector::Y] =
-        Sf[vector::X]*P[symmTensor::XY]
-      + Sf[vector::Y]*P[symmTensor::YY]
-      + Sf[vector::Z]*P[symmTensor::YZ];
+        Sf[vector::X]*pressureSensitivity[symmTensor::XY]
+      + Sf[vector::Y]*pressureSensitivity[symmTensor::YY]
+      + Sf[vector::Z]*pressureSensitivity[symmTensor::YZ];
       
 	// coeff_3 = Sf_m P_m3 
 	//		
@@ -405,9 +405,9 @@ void Foam::multiplyCoeffPressure
 	//		     + Sf_3 P_33 
 	
 	coeff[vector::Z] =
-        Sf[vector::X]*P[symmTensor::XZ]
-      + Sf[vector::Y]*P[symmTensor::YZ]
-      + Sf[vector::Z]*P[symmTensor::ZZ];    
+        Sf[vector::X]*pressureSensitivity[symmTensor::XZ]
+      + Sf[vector::Y]*pressureSensitivity[symmTensor::YZ]
+      + Sf[vector::Z]*pressureSensitivity[symmTensor::ZZ];    
 
 }
 
