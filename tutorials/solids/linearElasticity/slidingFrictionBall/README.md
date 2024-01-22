@@ -48,7 +48,7 @@ The $$\sigma_{xy}$$ and $$\sigma_{eq}$$ fields at time $$t=30$$ and $$t=60$$ s a
 
 
 
-{% include youtube.html id="---------" %}
+{% include youtube.html id="p3JDdk90M0Q" %}
 
 **Video 1: Evolution of the $$\sigma_{xy}$$ and $$\sigma_{eq}$$ fields during sliding**
 
