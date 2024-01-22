@@ -83,6 +83,7 @@ Foam::tensor& Foam::sparseMatrix::operator()
     }
 }
 
+
 void Foam::sparseMatrix::print() const
 {
     Info << "Print out sparseMatrix coefficients: " << endl;
@@ -101,18 +102,18 @@ void Foam::sparseMatrix::print() const
     //Define custom sorting criteria
     auto cmp = [](const FixedList<label, 2>& a, const FixedList<label, 2>& b)
     {
-                if (a[0] < b[0])
-                {
-                        return true;
-                }
-                else if (a[0] == b[0])
-                {
-                        return a[1] < b[1];
-                }
-                else
-                {
-                        return false;
-                }
+        if (a[0] < b[0])
+        {
+                return true;
+        }
+        else if (a[0] == b[0])
+        {
+                return a[1] < b[1];
+        }
+        else
+        {
+                return false;
+        }
     };
 
     //Sort keys by row and column

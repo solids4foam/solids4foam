@@ -1400,6 +1400,19 @@ Foam::mechanicalLaw::sensitivityTermTotalLagField() const
     return tresult;
 }
 
+Foam::tmp<Foam::symmTensorField>
+Foam::mechanicalLaw::pressureSensitivityField() const
+{
+    // Default to uniform field
+    // This function can be overwritten in specific mechanical laws
+    tmp<symmTensorField> tresult
+    (
+        new symmTensorField(mesh().nFaces(), symmTensor::zero)
+    );
+
+    return tresult;
+}
+
 
 void Foam::mechanicalLaw::correct(surfaceSymmTensorField&)
 {

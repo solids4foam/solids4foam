@@ -502,6 +502,9 @@ public:
 
 		//- Sensitivity term for Newton Raphson loop in total Lagrangian formulation
 		virtual tmp<Field<RectangularMatrix<scalar>>> sensitivityTermTotalLagField() const;
+		
+		//- Pressure sensitivity for momentum equation in total Lagrangian formulation
+		virtual tmp<symmTensorField> pressureSensitivityField() const;
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const

@@ -294,6 +294,9 @@ public:
 
         //- Material tangent for Newton Raphson loop
         virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
+        
+        //- Pressure sensitivity for momentum equation, equal to d(sigma)/dp
+        virtual tmp<symmTensorField> pressureSensitivityField() const;
 
         //- Update the stress
         virtual void correct(volSymmTensorField& sigma);

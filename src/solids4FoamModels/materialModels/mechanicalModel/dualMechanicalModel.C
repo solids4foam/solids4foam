@@ -390,6 +390,61 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
     return tresult;
 }
 
+Foam::tmp<Foam::symmTensorField>
+Foam::dualMechanicalModel::pressureSensitivityFaceField() const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    // Prepare the field
+    tmp< Foam::symmTensorField > tresult
+    (
+        new Foam::symmTensorField(mesh().nFaces(), Foam::symmTensor::zero)
+    );
+#ifdef OPENFOAMESIORFOUNDATION
+    Foam::symmTensorField& result = tresult.ref();
+#else
+    Foam::symmTensorField& result = tresult();
+#endif
+
+    if (laws.size() == 1)
+    {
+        result = laws[0].pressureSensitivityField();
+
+        if (result.size() != mesh().nFaces())
+        {
+            FatalErrorIn("dualMechanicalModel::pressureSensitivityField()")
+                << "The pressureSensitivity field for law 0 is the wrong size!"
+                << abort(FatalError);
+        }
+    }
+    else
+    {
+/*        // Accumulate data for all materials
+        // Note: the value on each dual face is uniquely set by one material law
+        forAll(laws, lawI)
+        {
+            const Field<RectangularMatrix<scalar>> matTanI
+            (
+                laws[lawI].pressureSensitivityField()
+            );
+
+            if (matTanI.size() != mesh().nFaces())
+            {
+                FatalErrorIn("dualMechanicalModel::pressureSensitivityField()")
+                    << "The pressureSensitivityField field for law " << lawI
+                    << " is the wrong size!" << abort(FatalError);
+            }
+
+            // Insert values from actual material region into main sigma field
+            result += dualFaceInThisMaterialList()[lawI]*matTanI;
+        }  */
+        
+        notImplemented("Not implemented for more than one material");
+    }
+
+    return tresult;
+}
+
 void Foam::dualMechanicalModel::correct(surfaceSymmTensorField& sigma)
 {
     PtrList<mechanicalLaw>& laws = *this;
