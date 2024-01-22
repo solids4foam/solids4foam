@@ -266,40 +266,56 @@ void Foam::neoHookeanMisesGTNDamage::calculatef
     const scalar& p //pressure
 )
 {
+    scalar A = 0;
 
-    scalar A=0;
-
-    //calaculate void growth due to nucleation if pressure is positive
-    if (p>0)
+    // Calaculate void growth due to nucleation if pressure is positive
+    if (p > 0)
     {
-        A = (fN_.value()/(sN_.value()*sqrt(2*3.14)))*
-             pow(2.71828,-0.5*pow((epsilonPEqOld+DEpsilonPEq-epsilonN_.value())/sN_.value(), 2.0));
+        A =
+            (fN_.value()/(sN_.value()*sqrt(2*3.14)))
+           *pow
+            (
+                2.7182818285,
+               -0.5*pow
+                (
+                    (
+                        epsilonPEqOld + DEpsilonPEq - epsilonN_.value()
+                    )/sN_.value(),
+                    2.0
+                )
+            );
     }
 
-    scalar fShear=0;
+    scalar fShear = 0;
 
     //option to calculate shear effects
     if (includeShear_)
     {
-        scalar detS=det(devT);
-        scalar q1=sqrt(3.0/2.0)*mag(devT);
-        fShear=fStar*(1-pow(27*detS/(2.0*pow(q1,3.0)),2.0))*(devT && DEpsilonP)/q1;
+        scalar detS = det(devT);
+        scalar q1 = sqrt(3.0/2.0)*mag(devT);
+        fShear =
+            fStar*(1 - pow(27*detS/(2.0*pow(q1,3.0)), 2.0))
+           *(devT && DEpsilonP)/q1;
     }
 
-    if (fShear<0)
+    if (fShear < 0)
     {
-        fShear=0;
+        fShear = 0;
     }
 
-    f=fOld+(1-f)*DHyd+A*DEpsilonPEq+kw_.value()*fShear;
+    f = fOld + (1 - f)*DHyd + A*DEpsilonPEq + kw_.value()*fShear;
 
-    fStar=fNonLocal;
+    fStar = fNonLocal;
 
     if (fNonLocal >= fC_.value() && includeCoalescence_)
     {
-        fStar=fC_.value()+(f-fC_.value())*(1/q1_.value()-fC_.value())/(fF_.value()-fC_.value());
+        fStar =
+            fC_.value()
+          + (f - fC_.value())
+           *(1/q1_.value() - fC_.value())/(fF_.value() - fC_.value());
     }
 }
+
 
 void Foam::neoHookeanMisesGTNDamage::smallStrainReturnMap
 (
@@ -315,22 +331,24 @@ void Foam::neoHookeanMisesGTNDamage::smallStrainReturnMap
     symmTensor& plasticN //normal to the yield surface
 ) const
 {
+    // Initialise pressure and equivalent stress
+    scalar p = 0.0;
+    scalar q = 0.0;
 
-    //initialise pressure and equivalent stress
-    scalar p,q;
-
-    //set yield stress
+    // Set yield stress
     scalar sigmaY = stressPlasticStrainSeries_(epsilonPEqOld);
 
-    if (qTrial>0)
+    if (qTrial > 0)
     {
-        plasticN=(3.0/2.0)*(sTrial/qTrial);
+        plasticN = (3.0/2.0)*(sTrial/qTrial);
     }
 
-    //GTN yield condition
-    scalar fTrial =  pow(qTrial/sigmaY, 2.0)
-                    +2*q1_.value()*fStar*cosh((3*pTrial*q2_.value())/(2*sigmaY))
-                    -(1+q3_.value()*pow(fStar,2.0));
+    // GTN yield condition
+    scalar fTrial =
+        pow(qTrial/sigmaY, 2.0)
+      + 2*q1_.value()*fStar*cosh((3*pTrial*q2_.value())/(2*sigmaY))
+      - (1 + q3_.value()*pow(fStar,2.0));
+
     if (debug)
     {
         Info<< "pTrial: " << pTrial << nl
@@ -342,33 +360,34 @@ void Foam::neoHookeanMisesGTNDamage::smallStrainReturnMap
 
     if (fTrial > 0.0)
     {
-
-        //set deviatoric, speherical and equivalent plastic strain increments
+        // Set deviatoric, speherical and equivalent plastic strain increments
         DqEpsilonP = 0;
         DHyd = 0;
         DEpsilonPEq = 0;
 
-        //Newton loop to solve for speherical, deviatoric and equivalent plastic strain increments
-        for (int j=0; j<=1000; j++)
+        // Newton loop to solve for speherical, deviatoric and equivalent plastic strain increments
+        for (int j = 0; j <= 1000; j++)
         {
-
-            //update pressure and equivalent stress
+            // Update pressure and equivalent stress
             p = pTrial - K_.value()*DHyd;
             q = qTrial - 3*mu_.value()*DqEpsilonP;
 
-            //update yield stress
+            // Update yield stress
             sigmaY = stressPlasticStrainSeries_(epsilonPEqOld+DEpsilonPEq);
 
-            // initialse fcosh and fsinh - these are components of the GTN yield equation
+            // Initialse fcosh and fsinh - these are components of the GTN yield equation
             scalar fCosh = cosh(3*q2_.value()*p/(2*sigmaY));
             scalar fSinh = sinh(3*q2_.value()*p/(2*sigmaY));
 
-            //derivaitive of the yield stress
-            scalar dSigmaY = (stressPlasticStrainSeries_(epsilonPEqOld+DEpsilonPEq+1e-8)
-                            -stressPlasticStrainSeries_(epsilonPEqOld+DEpsilonPEq))/1e-8;
+            // Derivaitive of the yield stress
+            scalar dSigmaY =
+                (
+                    stressPlasticStrainSeries_(epsilonPEqOld+DEpsilonPEq + 1e-8)
+                  - stressPlasticStrainSeries_(epsilonPEqOld+DEpsilonPEq)
+                )/1e-8;
 
-
-            //these derivatives are components of the derivatives which fill the Jacobian matrix
+            // These derivatives are components of the derivatives which fill
+            // the Jacobian matrix
             scalar df1dq = 2.0*(q/pow(sigmaY,2.0));
             scalar df1dp = 3*fStar*q1_.value()*q2_.value()*fSinh/sigmaY;
             scalar df1dSigmaY =- 2.0*pow(q,2.0)/pow(sigmaY,3.0) - df1dp*p/sigmaY;
@@ -378,7 +397,7 @@ void Foam::neoHookeanMisesGTNDamage::smallStrainReturnMap
                                   -3*fStar*q1_.value()*q2_.value()*fSinh/pow(sigmaY,2.0);
             scalar df1dqdSigmaY = -4.0*(q/pow(sigmaY,3.0));
 
-            //Calcualte derivatives which constitute the Jacobian matrix
+            // Calcualte derivatives which constitute the Jacobian matrix
             scalar a1 = -3.0*mu_.value()*df1dq;
             scalar a2 = -K_.value()*df1dp;
             scalar a3 = df1dSigmaY*dSigmaY;
@@ -404,16 +423,16 @@ void Foam::neoHookeanMisesGTNDamage::smallStrainReturnMap
                     << "c3= " << c3 << endl;
            }
 
-            //calculate values of fucnctions f1, f2 and f3
+            // Calculate values of fucnctions f1, f2 and f3
             scalar f1val = pow(q/sigmaY, 2.0) + 2*q1_.value()*fStar*fCosh - (1+q3_.value()*pow(fStar,2.0));
             scalar f2val = DqEpsilonP*df1dp-DHyd*df1dq;
             scalar f3val = (1-fNonLocal)*sigmaY*DEpsilonPEq - q*DqEpsilonP-p*DHyd;
 
             //create 3x3 Jacobian matrix
             Matrix3d J;
-            J << a1, a2, a3,
-                 b1, b2, b3,
-                 c1, c2, c3;
+            J   << a1, a2, a3,
+                   b1, b2, b3,
+                   c1, c2, c3;
 
             if (debug)
             {
@@ -421,23 +440,23 @@ void Foam::neoHookeanMisesGTNDamage::smallStrainReturnMap
                     << "J test:" << J.inverse()*J << nl << nl;
             }
 
-            //create 3 dimensional vector
+            // Create 3 dimensional vector
             Vector3d fx(f1val,f2val,f3val);
 
-            //find inverse of matrix
+            // Find inverse of matrix
             Matrix3d Jinv = J.inverse();
 
-            //Gauss-newton step
+            // Gauss-newton step
             Vector3d hgn = -Jinv*fx;
 
-            // update values of deviatoric, spherical and equivalent plastic strain increments
+            // Update values of deviatoric, spherical and equivalent plastic
+            // strain increments
             DqEpsilonP = DqEpsilonP + (hgn(0));
             DHyd = DHyd + (hgn(1));
             DEpsilonPEq = DEpsilonPEq + (hgn(2));
 
             if (debug)
             {
-
                 Info<< "f1val= " << f1val << nl
                     << "f2val= " << f2val << nl
                     << "f3val= " << f3val << nl
@@ -466,7 +485,6 @@ void Foam::neoHookeanMisesGTNDamage::smallStrainReturnMap
             }
         }
     }
-
     else
     {
         DqEpsilonP = 0;
@@ -842,10 +860,12 @@ Foam::neoHookeanMisesGTNDamage::neoHookeanMisesGTNDamage
             "fNonLocal",
             mesh.time().timeName(),
             mesh,
-            IOobject::MUST_READ,
+            IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mesh
+        mesh,
+        dimensionedScalar("0", dimless, 0),
+        "zeroGradient"
     ),
     gradfNonLocal_
     (
@@ -1497,6 +1517,7 @@ void Foam::neoHookeanMisesGTNDamage::correct(volSymmTensorField& sigma)
 #else
     blockLduMatrix::debug = 0;
 #endif
+
     fEqn.solve();
 
 #ifdef OPENFOAM_NOT_EXTEND
@@ -1551,6 +1572,7 @@ void Foam::neoHookeanMisesGTNDamage::updateTotalFields()
     Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq_) << endl;
     epsilonPEq_ += DEpsilonPEq_;
     epsilonP_ += DEpsilonP_;
+
     // Count cells actively yielding
     int numCellsYielding = 0;
 

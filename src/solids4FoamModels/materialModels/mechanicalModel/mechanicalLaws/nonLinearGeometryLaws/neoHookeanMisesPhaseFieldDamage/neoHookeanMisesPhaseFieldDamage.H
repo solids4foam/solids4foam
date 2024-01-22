@@ -46,7 +46,7 @@ Description
     The plastic hardening law is defined in a XY interpolate file, e.g.
     see "plasticStrainVsYieldStress" in tutorial case. 
 
-    For tge phase-field fracture model, the user can specify:
+    For the phase-field fracture model, the user can specify:
         - Critical fracture energy (Gc), characteristic length (lc), plastic
           work threshold threshold (w0)
         - Triaxiality Parameters (d1, d2, d3)
@@ -82,28 +82,30 @@ class neoHookeanMisesPhaseFieldDamage
 {
     // Private data
 
-        //characteristic length for non-local gradient damage equation
+        //- Characteristic length for non-local gradient damage equation
         dimensionedScalar charLength_;
 
-        //critical fracture energy
+        //- Critical fracture energy
         dimensionedScalar Gc_;
 
-        //Triaxiality parameters
+        //- Triaxiality parameters
         dimensionedScalar d1_;
         dimensionedScalar d2_;
         dimensionedScalar d3_;
 
-        //parameters for weighting elastic and plastic energy contributions, generally not used
+        //- Parameters for weighting elastic and plastic energy contributions,
+        //  generally not used
         const scalar betaE_;
         const scalar betaP_;
 
-        //Plastic work threshold
+        //- Plastic work threshold
         dimensionedScalar w0_;
 
-        //Solve the phase field equation monilithically (as opposed to the staggered approach)
+        //- Solve the phase field equation monolithically, as opposed to the
+        //  staggered approach
         Switch monolithic_;
 
-        //Incorporate triaxiality effects into the phase field fracture field
+        //- Incorporate triaxiality effects into the phase field fracture field
         Switch triaxiality_;
 
         //- Initial density
@@ -114,8 +116,6 @@ class neoHookeanMisesPhaseFieldDamage
 
         //- Bulk modulus
         dimensionedScalar K_;
-
-        const Switch debug_;
 
         //- Young's modulus
         dimensionedScalar E_;

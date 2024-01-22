@@ -22,50 +22,59 @@ License
     along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    neoHookeanMisesGTNDamage
+    neoHookeanMisesLemaitreDamage
 
 Description
     This law is ported from https://github.com/awhelanUCD/solids4foam where it
     is called logStrainLemaitreDamage.
 
-    Large strain elasto-plastic model with Gurson-Tveergard-Needleman (GTN)
-    micro-mechanical damage model. This class also provides users the option to
-    include shear effects and the non-local porosity f.
+    Lemaitre damage model coupled with elasto-plastic model. This class also give
+    users the option to incorporate non-local gradient damage and to use the
+    Malcher variant of the Lemaitre damage law.
 
-    Large strain elasto-plastic model with GTN yield equation uses algorithmic
-    approach similar to those outined in Achouri et al., DOI:
-    10.1016/j.commatsci.2013.01.035, and Leclerc et al., DOI:
-    10.1016/j.ijplas.2019.11.010.
+    Chacteristics
+     - Neo-Hookean elasticity with Mises/J2 plasticity, Etrovic & Bathe,
+       DOI: 10.1002/nme.162030060.
+     - Lemaitre damage model with crack closure effects, Lemaitre,
+       ISBN: 978-3-540- 21503-5.
+     - non local gradient damage, Peerlings et al.,
+       DOI: 10.1016/S0020-7683(01)00087-7
 
     For elastic parameters, the user can specify:
         - Young's modulus (E) and Poisson's ratio (nu), or
         - Shear modulus (mu) and bulk modulus (K)
 
     The plastic hardening law is defined in a XY interpolate file, e.g.
-    see "plasticStrainVsYieldStress" in tutorial case.
+    see "plasticStrainVsYieldStress" in tutorial case. 
 
-    For GTN parameters, the user can specify:
-        - The yield equation paramters q1 q2 and q3
-        - Void nucleation paramters epsilonN, sN, fN
-        - Void coalescence parameters f0, fC, fU and fF
-        - Shear parameter kW
+    For Lemaitre damage parameters, the user can specify:
+        - Damage denominator (s0)
+        - Damage exponent (b),
+        - Plastic strain threshold (epsilonD)
 
+    For non-local gradient damage model, the user can specify:
+        - The characteristic length (lc) (for local damage model lc=0)
+
+    For the Malcher variant the user can specify:
+        - Damage denominators s00 and s33
+
+  
 SourceFiles
-    neoHookeanMisesGTNDamage.C
+    neoHookeanMisesLemaitreDamage.C
 
 Author
     Andrew Whelan, UCD.
-    Philip Cardiff, UCD.
+    Philip Cardiff, UCD. 
     All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef neoHookeanMisesGTNDamage_H
-#define neoHookeanMisesGTNDamage_H
+#ifndef neoHookeanMisesLemaitreDamage_H
+#define neoHookeanMisesLemaitreDamage_H
 
 #include "mechanicalLaw.H"
 #include "interpolationTable.H"
-
+#include "Eigen/Dense"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -73,10 +82,10 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                  Class neoHookeanMisesGTNDamage Declaration
+               Class neoHookeanMisesLemaitreDamage Declaration
 \*---------------------------------------------------------------------------*/
 
-class neoHookeanMisesGTNDamage
+class neoHookeanMisesLemaitreDamage
 :
     public mechanicalLaw
 {
@@ -84,14 +93,18 @@ class neoHookeanMisesGTNDamage
 
         const scalar relaxationFactor_;
 
-        //- Switch to include shear effects in the evolution of the porosity
-        Switch includeShear_;
+        const string lemaitreType_;
 
-        //- Switch to include coalescene of voids effects
-        Switch includeCoalescence_;
+        //- Table of post-yield stress versus plastic strain
+        //  For large strain total Lagrangian models, it expects
+        //  the true stress and true plastic strain.
+        interpolationTable<scalar> stressPlasticStrainSeries_;
 
-        //- characteristic length for non-local porosity
+        //- Characteristic length for non-local damage
         dimensionedScalar charLength_;
+
+        //- Plastic strain threshold
+        dimensionedScalar epsilonD_;
 
         //- Initial density
         const dimensionedScalar rho_;
@@ -101,33 +114,27 @@ class neoHookeanMisesGTNDamage
 
         //- Bulk modulus
         dimensionedScalar K_;
+      
+        //- Lemaitre exponent
+        dimensionedScalar b_;
+
+        //- Lemaitre denominator
+        dimensionedScalar s0_;
+
+        //- Lemaitre denominator for Malcher variant
+        dimensionedScalar s00_;
+
+        //- Lemaitre denominator for Malcher variant
+        dimensionedScalar s33_;
+
+        //- Critical damage parameter
+        scalar damageC_;
 
         //- Young's modulus
         dimensionedScalar E_;
 
         //- Poisson's ratio
         dimensionedScalar nu_;
-
-        //- GTN yield equaiton parameters
-        dimensionedScalar q1_;
-        dimensionedScalar q2_;
-        dimensionedScalar q3_;
-
-        //- Initial porosity
-        dimensionedScalar f0_;
-
-        //- Parameters for the nucleation of voids
-        dimensionedScalar fN_;
-        dimensionedScalar epsilonN_;
-        dimensionedScalar sN_;
-
-        //- Coalescence of voids parameters
-        dimensionedScalar fC_;
-        dimensionedScalar fU_;
-        dimensionedScalar fF_;
-
-        //- Shear parameter
-        dimensionedScalar kw_;
 
         //- Relative deformation gradient volField
         volTensorField* relFPtr_;
@@ -138,20 +145,14 @@ class neoHookeanMisesGTNDamage
         //- Total deformation gradient volField
         volTensorField* FPtr_;
 
-        //- Table of yield (Cauchy) stress versus true plastic strain
-        interpolationTable<scalar> stressPlasticStrainSeries_;
+        //damage
+        volScalarField damage_;
 
-        //porosity
-        volScalarField f_;
+        //non-local damage
+        volScalarField damageNonLocal_;
 
-        //effective porosity
-        volScalarField fStar_;
-
-        //non-local porosity
-        volScalarField fNonLocal_;
-
-        //gradient of the non-local porosity
-        volVectorField gradfNonLocal_;
+        //gradient of the non-local damage
+        volVectorField gradDamageNonLocal_;
 
         //- Hydrostatic stress
         //  Note: sigmaHyd_ == tr(sigma)/3.0 == -p,
@@ -179,6 +180,10 @@ class neoHookeanMisesGTNDamage
         //- Incremental change of plastic strain
         volSymmTensorField DEpsilonP_;
 
+        volSymmTensorField sigmaPositive_;
+
+        volSymmTensorField sigmaNegative_;
+
         //- Elastic left Cauchy-Green trial strain tensor with volumetric term
         //  removed. Trial means that plasticity is neglected.
         volSymmTensorField bEbarTrial_;
@@ -195,13 +200,17 @@ class neoHookeanMisesGTNDamage
         //- Equivalent plastic strain
         volScalarField epsilonPEq_;
 
+
         //- Active yielding flag
         //     1.0 for active yielding
         //     0.0 otherwise
         volScalarField activeYield_;
 
+        volScalarField triaxiality_;
+
         //- plasticN is the return direction to the yield surface
         volSymmTensorField plasticN_;
+
 
         //- An iterative procedure is used when the yield stress is a nonlinear
         //  function of plastic strain
@@ -230,15 +239,31 @@ class neoHookeanMisesGTNDamage
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        neoHookeanMisesGTNDamage(const neoHookeanMisesGTNDamage&);
+        neoHookeanMisesLemaitreDamage(const neoHookeanMisesLemaitreDamage&);
 
         //- Disallow default bitwise assignment
-        void operator=(const neoHookeanMisesGTNDamage&);
+        void operator=(const neoHookeanMisesLemaitreDamage&);
 
+        //log of a symmTensor
         symmTensor logm(const symmTensor& T);
 
         //- Exponential of a symmTensor
         symmTensor expm(const symmTensor& T);
+
+
+        //decompose SymmTensor into it's postive and negative components
+        void decompose
+        (
+            const symmTensor& sigma,
+            symmTensor& sigmaPositive,
+            symmTensor& sigmaNegative
+        );
+
+        //macauley bracket
+        scalar macauley
+        (
+            scalar x
+        );
 
         //- Make the relF field
         void makeRelF();
@@ -256,37 +281,35 @@ class neoHookeanMisesGTNDamage
         void makeF();
 
         //- Return a reference to the F field
-        volTensorField& F1();
+        volTensorField& F();
 
-        //calculate porosity
-        void calculatef
+        //calculate the normalized third invariant of the deviatoric stress
+        scalar calcZheta(const symmTensor& S);
+
+        // calculate the damage
+        void damage
         (
-            const scalar& DHyd,
-            const scalar& DqEpsilonP,
-            scalar& f,
-            scalar& fStar,
-            const scalar& fOld,
-            const scalar& fNonLocal,
-            const scalar& epsilonPEqOld,
-            const scalar& DEpsilonPEq,
-            const symmTensor& DEpsilonP,
-            const symmTensor& devT,
-            const scalar& p
+            const scalar& DLambda,
+            const scalar& DEpsilonPEq,              
+            const scalar& epsilonPEqOld,  
+            const scalar& triaxiality,                  
+            scalar& damage, 
+            scalar& damageOld,
+            const scalar&  damageNonLocal,            
+            const symmTensor& tau
         );
 
-        //- Iteratively calculate deviatoric, spherical and equivalent plastic strain
+        // small strain return-map to calculate plastic increment
         void smallStrainReturnMap
         (
-            const scalar& pTrial,
-            const symmTensor& sTrial,
-            const scalar& qTrial,
-            scalar& DHyd,
-            scalar& DqEpsilonP,
-            const scalar& fNonLocal,
-            const scalar& fStar,
+            const symmTensor& Ee,  
+            scalar& sigmaY,                      
+            scalar& DLambda, 
+            scalar& damage, 
+            const scalar& damageOld,       
+            const scalar& damageNonLocal,                           
             const scalar& epsilonPEqOld,
-            scalar& DEpsilonPEq,
-            symmTensor& plasticN
+            scalar& activeYield
         ) const;
 
         //- Calcualte Ibar such that det(bEbar) == 1
@@ -304,7 +327,7 @@ class neoHookeanMisesGTNDamage
 public:
 
     //- Runtime type information
-    TypeName("neoHookeanMisesGTNDamage");
+    TypeName("neoHookeanMisesLemaitreDamage");
 
     // Static data members
 
@@ -312,7 +335,7 @@ public:
     // Constructors
 
         //- Construct from dictionary
-        neoHookeanMisesGTNDamage
+        neoHookeanMisesLemaitreDamage
         (
             const word& name,
             const fvMesh& mesh,
@@ -323,7 +346,7 @@ public:
 
     // Destructor
 
-        virtual ~neoHookeanMisesGTNDamage();
+        virtual ~neoHookeanMisesLemaitreDamage();
 
 
     // Member Functions
