@@ -142,6 +142,9 @@ class vertexCentredNonLinGeomTotalLagSolid
         
         //- Pressure at the dual mesh faces
         surfaceScalarField dualPf_;
+        
+        //- Cell pressure
+        volScalarField volP_;
 
         //- Local-to-global point map and owner list
         globalPointIndices globalPointIndices_;

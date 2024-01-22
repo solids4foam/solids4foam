@@ -1050,6 +1050,20 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
         dimensionedScalar("zero", dimPressure, 0.0),
         "calculated"
     ),
+	volP_
+	(
+		IOobject
+		(
+		    "volP",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+		),
+		mesh(),
+        dimensionedScalar("zero", dimPressure, 0.0),
+        "calculated"
+	),
     globalPointIndices_(mesh())
 {
     // Create dual mesh and set write option
@@ -1154,21 +1168,21 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
         // Assemble matrix once per time-step
         Info<< "    Assembling the matrix" << endl;
 
-                //Obtain undeformed surface vector field
-                surfaceVectorField SfUndef = dualMesh().Sf();
+        //Obtain undeformed surface vector field
+        surfaceVectorField SfUndef = dualMesh().Sf();
 
-                // Store gradD at dual mesh faces
-                surfaceTensorField gradDRef = dualGradDf_;
+        // Store gradD at dual mesh faces
+        surfaceTensorField gradDRef = dualGradDf_;
 
-                // Calculate geometric stiffness field for dual mesh faces
-                Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
-                (
-                        geometricStiffnessField
-                        (
-                                SfUndef,
-                                gradDRef
-                        )
-                );
+        // Calculate geometric stiffness field for dual mesh faces
+        Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
+        (
+            geometricStiffnessField
+            (
+                SfUndef,
+                gradDRef
+            )
+        );
 
         // Add div(sigma) coefficients
         vfvm::divSigmaExtended
@@ -1261,20 +1275,20 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
             materialTangent = dualMechanicalPtr_().materialTangentFaceField();
 
             //Obtain undeformed surface vector field
-                        surfaceVectorField SfUndef = dualMesh().Sf();
+            surfaceVectorField SfUndef = dualMesh().Sf();
 
             // Update geometricStiffness
-                        surfaceTensorField gradDRef = dualGradDf_;
+            surfaceTensorField gradDRef = dualGradDf_;
 
-                        // Calculate geometric stiffness field for dual mesh faces
-                        Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
-                        (
-                                geometricStiffnessField
-                                (
-                                        SfUndef,
-                                        gradDRef
-                                )
-                        );
+            // Calculate geometric stiffness field for dual mesh faces
+            Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
+            (
+                geometricStiffnessField
+                (
+                    SfUndef,
+                    gradDRef
+                )
+            );
 
                         //Info << geometricStiffness[0] << endl;
 
