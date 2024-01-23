@@ -137,29 +137,28 @@ class neoHookeanMisesPhaseFieldDamage
         //  the true stress and true plastic strain.
         interpolationTable<scalar> stressPlasticStrainSeries_;
 
-        //phase field variable d
+        //- Phase field variable d
         volScalarField Dpf_;
 
-        volScalarField one_;
+        //- Dimensionless unity field
+        const volScalarField one_;
 
-        volScalarField zero_;
-
-        //gradient of the phase field variable
+        //- Gradient of the phase field variable
         volVectorField gradDpf_;
 
-        //elastic strain energy
+        //- Elastic strain energy
         volScalarField strainEnergy_;
 
-        //history variable for the elastic strain energy
+        //- History variable for the elastic strain energy
         volScalarField HStrainEnergy_;
 
-        //plastic strain energy
+        //- Plastic strain energy
         volScalarField plasticStrainEnergy_;
 
-        //deviatoric elastic strain energy
+        //- Deviatoric elastic strain energy
         volScalarField devStrainEnergy_;
 
-        //volumetric elastic strain energy
+        //- Volumetric elastic strain energy
         volScalarField volStrainEnergy_;
 
         //- Hydrostatic stress

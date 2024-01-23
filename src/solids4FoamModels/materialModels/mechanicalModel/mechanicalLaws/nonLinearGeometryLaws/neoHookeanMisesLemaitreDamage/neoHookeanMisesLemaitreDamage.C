@@ -1117,25 +1117,33 @@ Foam::neoHookeanMisesLemaitreDamage::neoHookeanMisesLemaitreDamage
     {
         FatalErrorIn
         (
-            "neoHookeanMisesLemaitreDamage::neoHookeanMisesLemaitreDamage::()"
+            "neoHookeanMisesLemaitreDamage::neoHookeanMisesLemaitreDamage()"
         )   << "Either E and nu or mu and K elastic parameters should be "
             << "specified" << abort(FatalError);
     }
 
-    if (lemaitreType_=="classic")
+    if (lemaitreType_ == "classic")
     {
         s0_ = dimensionedScalar(dict.lookup("s0"));
         b_ = dimensionedScalar(dict.lookup("b"));
         epsilonD_ = dimensionedScalar(dict.lookup("epsilonD"));
         charLength_ = dimensionedScalar(dict.lookup("charLength"));
     }
-    else if (lemaitreType_=="Malcher")
+    else if (lemaitreType_ == "Malcher")
     {
         s00_ = dimensionedScalar(dict.lookup("s00"));
         s33_ = dimensionedScalar(dict.lookup("s33"));
         b_ = dimensionedScalar(dict.lookup("b"));
         epsilonD_ = dimensionedScalar(dict.lookup("epsilonD"));
         charLength_ = dimensionedScalar(dict.lookup("charLength"));
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "neoHookeanMisesLemaitreDamage::neoHookeanMisesLemaitreDamage()"
+        )   << "lemaitreType should be 'classic' or 'Malcher'"
+            << abort(FatalError);
     }
 
     if (updateBEbarConsistent_)
