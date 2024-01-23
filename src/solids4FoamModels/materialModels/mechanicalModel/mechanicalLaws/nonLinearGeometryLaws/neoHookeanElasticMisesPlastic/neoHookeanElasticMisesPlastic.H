@@ -253,13 +253,20 @@ class neoHookeanElasticMisesPlastic
             const surfaceSymmTensorField& devBEbar
         );
 
-        //- Calculate stress given gradD
+        //- Calculate stress given gradD and pressure
         void calculateStress
         (
             surfaceSymmTensorField& sigma,
             const surfaceTensorField& gradD,
             const surfaceScalarField& p
         );
+        
+        //-Calculate hydrostatic stress given gradD
+        void calculateSigmaHyd
+		(
+			 surfaceScalarField& sigmaHyd,
+			 const surfaceTensorField& gradD
+		);
 
 public:
 

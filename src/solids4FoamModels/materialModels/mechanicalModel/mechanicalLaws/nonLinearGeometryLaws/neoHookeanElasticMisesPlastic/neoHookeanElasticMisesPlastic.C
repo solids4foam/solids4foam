@@ -550,11 +550,12 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
     return tIbar;
 }
 
+
 void Foam::neoHookeanElasticMisesPlastic::calculateStress
 (
- surfaceSymmTensorField& sigma,
- const surfaceTensorField& gradD,
- const surfaceScalarField& p
+	surfaceSymmTensorField& sigma,
+	const surfaceTensorField& gradD,
+	const surfaceScalarField& p
 )
 {
     // Calculate F
@@ -801,6 +802,22 @@ void Foam::neoHookeanElasticMisesPlastic::calculateStress
     {
         sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
     }
+}
+
+void Foam::neoHookeanElasticMisesPlastic::calculateSigmaHyd
+(
+	surfaceScalarField& sigmaHyd,
+	const surfaceTensorField& gradD
+)
+{
+    // Calculate F
+    Ff() = I + gradD.T();
+
+    // Calculate the Jacobian of the total deformation gradient
+    Jf() = det(Ff());
+    
+    // Calculate the hydrostatic stress
+    sigmaHyd = 0.5*K_*(pow(Jf(), 2.0) - 1.0);
 }
 
 
