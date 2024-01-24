@@ -106,6 +106,80 @@ Foam::tmp<Foam::volTensorField> Foam::vfvc::grad
     return tresult;
 }
 
+
+Foam::tmp<Foam::volVectorField> Foam::vfvc::gradP
+(
+    const pointScalarField& pointP,
+    const fvMesh& mesh
+)
+{
+    // Prepare the result field
+    tmp<volVectorField> tresult
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "grad("+ pointP.name() +")",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedVector
+            (
+                "zero", pointP.dimensions()/dimLength, 0
+            ),
+            "zeroGradient"
+        )
+    );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    volVectorField& result = tresult.ref();
+#else
+    volVectorField& result = tresult();
+#endif
+
+    // Take references for clarity and efficiency
+
+    vectorField& resultI = result;
+    const labelListList& cellPoints = mesh.cellPoints();
+    const scalarField& pointPI = pointP.internalField();
+    const cellPointLeastSquaresVectors& cellPointLeastSquaresVecs =
+        cellPointLeastSquaresVectors::New(mesh);
+    const List<vectorList>& leastSquaresVecs =
+        cellPointLeastSquaresVecs.vectors();
+
+    // Calculate the gradient for each cell
+    forAll(resultI, cellI)
+    {
+        // Points in the current cell
+        const labelList& curCellPoints = cellPoints[cellI];
+
+        // Least squares vectors for cellI
+        const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellI];
+
+        // Accumulate contribution to the cell gradient from each point
+        vector& cellGrad = resultI[cellI];
+        forAll(curCellPoints, cpI)
+        {
+            // Least squares vector from the centre of cellID to pointI
+            const vector& lsVec = curLeastSquaresVecs[cpI];
+
+            // Primary point index
+            const label pointID = curCellPoints[cpI];
+
+            // Add least squares contribution to the cell gradient
+            cellGrad += lsVec*pointPI[pointID];
+        }
+    }
+
+    result.correctBoundaryConditions();
+
+    return tresult;
+}
+
 Foam::tmp<Foam::pointTensorField> Foam::vfvc::pGrad
 (
     const pointVectorField& pointD,
@@ -292,6 +366,115 @@ Foam::tmp<Foam::surfaceTensorField> Foam::vfvc::fGrad
     if (debug)
     {
         Info<< "surfaceTensorField Foam::vfvc::fGrad(...): end" << endl;
+    }
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::surfaceVectorField> Foam::vfvc::fGradP
+(
+    const pointScalarField& pointP,
+    const fvMesh& mesh,
+    const fvMesh& dualMesh,
+    const labelList& dualFaceToCell,
+    const labelList& dualCellToPoint,
+    const scalar zeta,
+    const bool debug
+)
+{
+    if (debug)
+    {
+        Info<< "surfaceVectorField Foam::vfvc::fGradP(...): start" << endl;
+    }
+
+    // Prepare the result field
+    tmp<surfaceVectorField> tresult
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "fGrad("+ pointP.name() +")",
+                dualMesh.time().timeName(),
+                dualMesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            dualMesh,
+            dimensionedVector
+            (
+                "zero", pointP.dimensions()/dimLength, 0
+            )
+        )
+    );
+#ifdef OPENFOAMESIORFOUNDATION
+    surfaceVectorField& result = tresult.ref();
+#else
+    surfaceVectorField& result = tresult();
+#endif
+
+    // Take references for clarity and efficiency
+    vectorField& resultI = result;
+    const scalarField& pointPI = pointP.internalField();
+    const pointField& points = mesh.points();
+    const labelList& dualOwn = dualMesh.faceOwner();
+    const labelList& dualNei = dualMesh.faceNeighbour();
+
+    // Approach
+    // Step 1: Calculate constant gradient in each primary mesh cell
+    // Step 2: Set dual face gradient to primary mesh constant cell gradient and
+    //         replace the component in the edge direction
+
+    // Calculate constant gradient in each primary mesh cell
+    const volVectorField gradP(vfvc::gradP(pointP, mesh));
+    const vectorField& gradPI = gradP.internalField();
+    
+    // Set dual face gradient to primary mesh constant cell gradient and
+    // replace the component in the edge direction
+    // We only replace the edge component for internal dual faces
+
+    // For all faces - internal and boundary
+    forAll(dualOwn, dualFaceI)
+    {
+        // Only calculate the gradient for internal faces
+        if (dualMesh.isInternalFace(dualFaceI))
+        {
+            // Primary mesh cell in which dualFaceI resides
+            const label cellID = dualFaceToCell[dualFaceI];
+
+            // Dual cell owner of dualFaceI
+            const label dualOwnCellID = dualOwn[dualFaceI];
+
+            // Dual cell neighbour of dualFaceI
+            const label dualNeiCellID = dualNei[dualFaceI];
+
+            // Primary mesh point at the centre of dualOwnCellID
+            const label ownPointID = dualCellToPoint[dualOwnCellID];
+
+            // Primary mesh point at the centre of dualNeiCellID
+            const label neiPointID = dualCellToPoint[dualNeiCellID];
+
+            // Unit edge vector from the own point to the nei point
+            vector edgeDir = points[neiPointID] - points[ownPointID];
+            const scalar edgeLength = mag(edgeDir);
+            edgeDir /= edgeLength;
+
+            // Calculate the gradient component in the edge direction using
+            // central-differencing and use the primary mesh cell value for the
+            // tangential directions
+            resultI[dualFaceI] =
+                zeta*edgeDir
+               *(
+                   pointPI[neiPointID] - pointPI[ownPointID]
+               )/edgeLength
+              + ((I - zeta*sqr(edgeDir)) & gradPI[cellID]);
+        }
+    }
+
+    if (debug)
+    {
+        Info<< "surfaceVectorField Foam::vfvc::fGradP(...): end" << endl;
     }
 
     return tresult;

@@ -62,6 +62,14 @@ namespace vfvc
     );
     
     // Gradient field
+    // Returns volVectorField on primary mesh
+    tmp<volVectorField> gradP
+	(
+		const pointScalarField& pointP, // primary mesh point pressure
+		const fvMesh& mesh // primary mesh
+	);
+    
+    // Gradient field
     // Returns pointTensorField on primary mesh
     tmp<pointTensorField> pGrad
     (
@@ -75,6 +83,20 @@ namespace vfvc
     tmp<surfaceTensorField> fGrad
     (
         const pointVectorField& pointD, // primary mesh point displacement
+        const fvMesh& mesh,             // primary mesh
+        const fvMesh& dualMesh,         // dual mesh
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const scalar zeta, // fraction of compact edge direction component used
+        const bool debug = false
+    );
+    
+    // Gradient field of pressure
+    // Returns surfaceScalarField on dual mesh
+    // Only calculates the gradient for internal faces
+    tmp<surfaceVectorField> fGradP
+    (
+        const pointScalarField& pointP, // primary mesh point pressure
         const fvMesh& mesh,             // primary mesh
         const fvMesh& dualMesh,         // dual mesh
         const labelList& dualFaceToCell,
