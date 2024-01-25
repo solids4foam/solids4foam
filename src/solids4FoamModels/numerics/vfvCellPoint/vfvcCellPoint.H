@@ -124,16 +124,18 @@ namespace vfvc
         ITstream& d2dt2Scheme,
         const pointVectorField& pointP // displacement
     );
-
-    // <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
-    // Returns laplacian of (gamma & pf) field on the dual mesh
-    // tmp<pointVectorField> laplacian
-    // (
-    //     const tensor& gamma,
-    //     const pointVectorField& pf,
-    //     const fvMesh& dualMesh,
-    //     const labelList& dualCellToPoint
-    // );
+    
+    // Returns the laplacian of the pressure field on the dual mesh
+    tmp<pointScalarField> laplacianP
+    (
+		pointScalarField& pointP,
+		const fvMesh& mesh,
+		const fvMesh& dualMesh,
+		const labelList& dualFaceToCell,
+		const labelList& dualCellToPoint,
+		const scalar& zeta,
+		const bool debug
+    );
 
 } // End namespace vfvc
 

@@ -688,84 +688,100 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
 }
 
 
-// Foam::tmp<Foam::pointVectorField> Foam::vfvc::laplacian
-// (
-//     const tensor& gamma,
-//     const pointVectorField& pf,
-//     const fvMesh& dualMesh,
-//     const labelList& dualCellToPoint
-// )
-// {
-//     // Take references to the meshes
-//     const pointMesh& pMesh = pf.mesh();
+Foam::tmp<Foam::pointScalarField> Foam::vfvc::laplacianP
+(
+	pointScalarField& pointP,
+	const fvMesh& mesh,
+	const fvMesh& dualMesh,
+	const labelList& dualFaceToCell,
+	const labelList& dualCellToPoint,
+	const scalar& zeta,
+	const bool debug
+)
+{
 
-//     // Prepare the result field
-//     tmp<pointVectorField> tresult
-//     (
-//         new pointVectorField
-//         (
-//             IOobject
-//             (
-//                 "laplacian(gamma," + pf.name() + ")",
-//                 pMesh.time().timeName(),
-//                 pMesh.db(),
-//                 IOobject::NO_READ,
-//                 IOobject::NO_WRITE
-//             ),
-//             pMesh,
-//             dimensionedVector("zero", dimForce, vector::zero),
-//             "calculated"
-//         )
-//     );
-// #ifdef OPENFOAMESIORFOUNDATION
-//     pointVectorField& result = tresult.ref();
-// #else
-//     pointVectorField& result = tresult();
-// #endif
+    // Get a reference to the pointMesh
+    const pointMesh& pMesh = pointP.mesh();
 
-//     // Take references
-//     vectorField& resultI = result.internalField();
-//     const vectorField& dualSfI = dualMesh.Sf();
-//     const labelList& dualOwn = dualMesh.owner();
-//     const labelList& dualNei = dualMesh.neighbour();
-//     const vectorField& pfI = pf.internalField();
-//     const pointField& points = pMesh.mesh().points();
+    // Prepare the result field
+    tmp<pointScalarField> tresult
+    (
+        new pointScalarField
+        (
+            IOobject
+            (
+                "laplacian("+ pointP.name() +")",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            pMesh,
+            dimensionedScalar
+            (
+                "zero", pointP.dimensions()/dimLength, 0
+            ),
+            "calculated"
+        )
+    );
+#ifdef OPENFOAMESIORFOUNDATION
+    pointScalarField& result = tresult.ref();
+#else
+    pointScalarField& result = tresult();
+#endif    
+	    
+	// Take reference for clarity and efficiency
+    const labelListList& cellPoints = mesh.cellPoints();
+    const pointField& points = mesh.points();
+    const labelList& dualOwn = dualMesh.owner();
+    const labelList& dualNei = dualMesh.neighbour();
+    const vectorField& dualSf = dualMesh.faceAreas();
+    
+    //Calculate the gradient of P for each dual face
+    const surfaceVectorField dualGradPField = fGradP
+    (
+		pointP,
+		mesh,
+		dualMesh,
+		dualFaceToCell,
+		dualCellToPoint,
+		zeta,
+		debug
+	);
+	
+    // Loop over all internal faces of the dual mesh
+    forAll(dualOwn, dualFaceI)
+    {
+        // Primary mesh cell in which dualFaceI resides
+        const label cellID = dualFaceToCell[dualFaceI];
 
-//     // Loop over all dual faces in the dual mesh and add contributions to the
-//     // primary mesh own and nei points associated with that dual face
-//     forAll(dualOwn, dualFaceI)
-//     {
-//         // Dual cell owner of dualFaceI
-//         const label dualOwnCellID = dualOwn[dualFaceI];
+        // Dual cell owner of dualFaceI
+        const label dualOwnCellID = dualOwn[dualFaceI];
 
-//         // Dual cell neighbour of dualFaceI
-//         const label dualNeiCellID = dualNei[dualFaceI];
+        // Dual cell neighbour of dualFaceI
+        const label dualNeiCellID = dualNei[dualFaceI];
 
-//         // Primary mesh point at the centre of dualOwnCellID
-//         const label ownPointID = dualCellToPoint[dualOwnCellID];
+        // Primary mesh point at the centre of dualOwnCellID
+        const label ownPointID = dualCellToPoint[dualOwnCellID];
 
-//         // Primary mesh point at the centre of dualNeiCellID
-//         const label neiPointID = dualCellToPoint[dualNeiCellID];
+        // Primary mesh point at the centre of dualNeiCellID
+        const label neiPointID = dualCellToPoint[dualNeiCellID];
 
-//         // dualFaceI area vector
-//         const vector& curDualSf = dualSfI[dualFaceI];
-//         const scalar curMagDualSf = mag(curDualSf);
-
-//         // Calculate contribute from the dual face to the own and nei cells
-//         const scalar deltaCoeff =
-//             curMagDualSf
-//            /(curDualSf & (points[neiPointID] - points[ownPointID]));
-//         const vector contrib
-//         (
-//             gamma & curMagDualSf*(pfI[neiPointID] - pfI[ownPointID])*deltaCoeff
-//         );
-
-//         // Add contribution to own and nei cells i.e. to own and nei points
-//         resultI[ownPointID] += contrib;
-//         resultI[neiPointID] -= contrib;
-//     }
-
-//     return tresult;
-// }
+        // dualFaceI area vector
+        const vector& curDualSf = dualSf[dualFaceI];
+        
+        // gradP at the dual face
+        const vector& dualGradP = dualGradPField[dualFaceI];
+        
+        // Calculate the flux at the dual face
+        const scalar& dualFluxP = dualGradP & curDualSf;
+        
+        // Add the fluxes
+        result[ownPointID] += dualFluxP; 
+        result[neiPointID] -= dualFluxP;
+    }
+    
+    return tresult;
+}
 
 // ************************************************************************* //
