@@ -140,8 +140,13 @@ public:
             //- Material tangent field defined at dual mesh faces
             tmp< Field< RectangularMatrix<scalar>>> materialTangentFaceField() const;
             
-            //- Pressure sensitivity field at dual mesh faces, equal to d(sigma)/dp
+            //- Pressure sensitivity field of the momentum equation at dual mesh faces 
+            //- d(s - pI)/dp
             tmp<symmTensorField> pressureSensitivityFaceField() const;
+            
+            //- Displacement sensitivity field of the pressure equation at the dual mesh faces 
+            //- d(pBar)/dG.
+            tmp<tensorField> pressEqnDispSensitivityFaceField() const;
 
         // Edit
 

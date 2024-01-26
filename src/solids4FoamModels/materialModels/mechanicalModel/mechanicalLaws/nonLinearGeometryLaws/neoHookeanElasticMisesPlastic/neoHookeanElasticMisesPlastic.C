@@ -1599,6 +1599,158 @@ Foam::neoHookeanElasticMisesPlastic::pressureSensitivityField() const
 }
 
 
+Foam::tmp<Foam::tensorField>
+Foam::neoHookeanElasticMisesPlastic::pressEqnDispSensitivityField() const
+{
+    // Prepare tmp field
+    tmp<Foam::tensorField> tresult
+    (
+        new Foam::tensorField(mesh().nFaces(), Foam::tensor::zero)
+    );
+
+#ifdef OPENFOAMESIORFOUNDATION
+    tensorField& result = tresult.ref();
+#else
+    tensorField& result = tresult();
+#endif
+        
+    // Lookup gradient of displacement
+    const surfaceTensorField& gradDRef =
+        mesh().lookupObject<surfaceTensorField>("grad(D)f");
+        
+    // Create sigmaHyd reference field
+    surfaceScalarField sigmaHydRef("sigmaHydRef", 0);
+        
+    // Calculate the hydrostatic stress (pBar)
+    //const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateSigmaHyd(pBarRef, gradDRef);
+    const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateSigmaHyd(sigmaHydRef, gradDRef);
+    
+    // Define pBarRef field
+    surfaceScalarField pBarRef("pBarRef", -sigmaHydRef);
+
+    // Create fields to be used for perturbations
+    surfaceScalarField sigmaHydPerturb("sigmaHydPerturb", sigmaHydRef);
+    surfaceScalarField pBarPerturb("pBarPerturb", pBarRef);
+    surfaceTensorField gradDPerturb("gradDPerturb", gradDRef);
+
+    // Small number used for perturbations
+    const scalar eps(readScalar(dict().lookup("tangentEps")));
+    
+    for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
+    {
+        // Reset gradDPerturb and multiply by 1.0 to avoid it being removed
+        // from the object registry
+        gradDPerturb = 1.0*gradDRef;
+
+        // Perturb this component of gradD
+        gradDPerturb.replace(cmptI, gradDRef.component(cmptI) + eps); 
+
+        // Calculate perturbed stress
+        const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateSigmaHyd(sigmaHydPerturb, gradDPerturb);
+        
+        // Define pBar perturbed
+        pBarPerturb = -sigmaHydPerturb;
+        
+        // Calculate component
+        const surfaceScalarField tangCmpt((pBarPerturb - pBarRef)/eps);
+        const scalarField& tangCmptI = tangCmpt.internalField();
+
+        // Insert component
+        forAll(tangCmptI, faceI)
+        {
+            if (cmptI == tensor::XX)
+            {
+                result[faceI][tensor::XX] = tangCmptI[faceI];
+            }
+            else if (cmptI == tensor::XY)
+            {
+				result[faceI][tensor::XY] = tangCmptI[faceI];
+            }
+            else if (cmptI == tensor::XZ)
+            {
+				result[faceI][tensor::XZ] = tangCmptI[faceI];
+            }
+            else if (cmptI == tensor::YX)
+            {
+				result[faceI][tensor::YX] = tangCmptI[faceI];
+            }
+            else if (cmptI == tensor::YY)
+            {
+				result[faceI][tensor::YY] = tangCmptI[faceI];
+            }
+            else if (cmptI == tensor::YZ)
+            {
+				result[faceI][tensor::YZ] = tangCmptI[faceI];
+            }
+            else if (cmptI == tensor::ZX)
+            {
+				result[faceI][tensor::ZX] = tangCmptI[faceI];
+            }
+            else if (cmptI == tensor::ZY)
+            {
+				result[faceI][tensor::ZY] = tangCmptI[faceI];
+            }
+            else // if (cmptI == tensor::ZZ)
+            {
+				result[faceI][tensor::ZZ] = tangCmptI[faceI];
+            }
+        }
+
+        forAll(tangCmpt.boundaryField(), patchI)
+        {
+            const scalarField& tangCmptP =
+                tangCmpt.boundaryField()[patchI];
+            const label start = mesh().boundaryMesh()[patchI].start();
+
+            forAll(tangCmptP, fI)
+            {
+                const label faceID = start + fI;
+
+                if (cmptI == tensor::XX)
+                {
+                    result[faceID][tensor::XX] = tangCmptI[fI];
+                }
+                else if (cmptI == tensor::XY)
+                {
+                    result[faceID][tensor::XY] = tangCmptI[fI];
+                }
+                else if (cmptI == tensor::XZ)
+                {
+                    result[faceID][tensor::XZ] = tangCmptI[fI];
+                }
+                else if (cmptI == tensor::YX)
+                {
+                    result[faceID][tensor::YX] = tangCmptI[fI];
+                }
+                else if (cmptI == tensor::YY)
+                {
+                    result[faceID][tensor::YY] = tangCmptI[fI];
+                }
+                else if (cmptI == tensor::YZ)
+                {
+                    result[faceID][tensor::YZ] = tangCmptI[fI];
+                }
+                else if (cmptI == tensor::ZX)
+                {
+                    result[faceID][tensor::ZX] = tangCmptI[fI];
+                }
+                else if (cmptI == tensor::ZY)
+                {
+                    result[faceID][tensor::ZY] = tangCmptI[fI];
+                }
+                else // if (cmptI == tensor::ZZ)
+
+                {
+                    result[faceID][tensor::ZZ] = tangCmptI[fI];
+                }
+            }
+        }
+    }
+
+	return tresult;
+}
+
+
 //void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 //{
 //    // Update the deformation gradient field
