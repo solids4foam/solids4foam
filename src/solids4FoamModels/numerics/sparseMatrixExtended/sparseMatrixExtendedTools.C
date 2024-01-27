@@ -786,147 +786,225 @@ void Foam::sparseMatrixExtendedTools::checkErr(const int ierr)
 }
 
 
-//void Foam::sparseMatrixExtendedTools::enforceFixedDof
-//(
-//    sparseMatrixExtended& matrix,
-//    Field<RectangularMatrix<scalar>>& source,
-//    const bool twoD,
-//    const boolList& fixedDofs,
-//    const symmTensorField& fixedDofDirections,
-//    const pointField& fixedDofValues,
-//    const scalar fixedDofScale
-//)
-//{
-//	const bool debug = 0;
-//	
-//    // Loop though the matrix and overwrite the coefficients for fixed DOFs
-//    // To enforce the value we will set the diagonal to the identity and set
-//    // the source to zero. The reason the source is zero is that we are solving
-//    // for the correction and the correction is zero for fixed values.
-//    // Rather than setting the identity on the diagonal, we will scale it by
-//    // fixedDofScale to improve the condition number, although the
-//    // preconditioner should not care.
-//    // Secondly, for any non-fixed-DOF equations which refer to fixed DOFs, we
-//    // will eliminate these coeffs and add their contribution (which is known)
-//    // to the source.
-//    sparseMatrixExtendedData& data = matrix.data();
-//    for (auto iter = data.begin(); iter != data.end(); ++iter)
-//    {
-//        const label blockRowI = iter.key()[0];
-//        const label blockColI = iter.key()[1];
+void Foam::sparseMatrixExtendedTools::enforceFixedDof
+(
+    sparseMatrixExtended& matrix,
+    Field<RectangularMatrix<scalar>>& source,
+    const bool twoD,
+    const boolList& fixedDofs,
+    const symmTensorField& fixedDofDirections,
+    const pointField& fixedDofValues,
+    const scalar fixedDofScale
+)
+{
+	const bool debug = 0;
+	
+    // Loop though the matrix and overwrite the coefficients for fixed DOFs
+    // To enforce the value we will set the diagonal to the identity and set
+    // the source to zero. The reason the source is zero is that we are solving
+    // for the correction and the correction is zero for fixed values.
+    // Rather than setting the identity on the diagonal, we will scale it by
+    // fixedDofScale to improve the condition number, although the
+    // preconditioner should not care.
+    // Secondly, for any non-fixed-DOF equations which refer to fixed DOFs, we
+    // will eliminate these coeffs and add their contribution (which is known)
+    // to the source.
+    // This is only done for the displacement coefficients and source terms
+    // of the momentum equation.
+    sparseMatrixExtendedData& data = matrix.data();
+    for (auto iter = data.begin(); iter != data.end(); ++iter)
+    {
+        const label blockRowI = iter.key()[0];
+        const label blockColI = iter.key()[1];
 
-//        if (fixedDofs[blockRowI])
-//        {
-//            RectangularMatrix<scalar>& coeff = iter();
-//            
-//            // Extract the displacement and pressure coefficients of
-//            // the momentum equation
-//            tensor& momDispCoeff(tensor::zero);
-//            
-//            if (twoD)
-//            {
-//		        momDispCoeff.XX() = coeff(1,1);
-//		        momDispCoeff.XY() = coeff(1,2);
-//		        momDispCoeff.YX() = coeff(2,1);
-//		        momDispCoeff.YY() = coeff(2,2);
-//            }
-//            else
-//            {
-//                momDispCoeff.XX() = coeff(1,1);
-//		        momDispCoeff.XY() = coeff(1,2);
-//		        momDispCoeff.XZ() = coeff(1,3);
-//		        momDispCoeff.YX() = coeff(2,1);
-//		        momDispCoeff.YY() = coeff(2,2);
-//		        momDispCoeff.YZ() = coeff(2,3);
-//		        momDispCoeff.ZX() = coeff(3,1);
-//		        momDispCoeff.ZY() = coeff(3,2);
-//		        momDispCoeff.ZZ() = coeff(3,3);
-//		    }
-//            
-//            vector& momPressureCoeff(vector::zero);
-//            
-//            if (twoD)
-//            {
-//            	momPressureCoeff.X() = coeff(1,3);
-//            	momPressureCoeff.Y() = coeff(2,3);
-//            	momPressureCoeff.Z() = coeff(3,3);
-//            }
-//            else
-//            {
-//                momPressureCoeff.X() = coeff(1,4);
-//            	momPressureCoeff.Y() = coeff(2,4);
-//            	momPressureCoeff.Z() = coeff(3,4);
-//            }
+        if (fixedDofs[blockRowI])
+        {
+            RectangularMatrix<scalar>& coeff = iter();
+            
+            // Extract the displacement coefficients of the momentum equation
+            // on the left-hand side
+            tensor momDispCoeff(tensor::zero);
+            
+            if (twoD)
+            {
+		        momDispCoeff.xx() = coeff(1,1);
+		        momDispCoeff.xy() = coeff(1,2);
+		        momDispCoeff.yx() = coeff(2,1);
+		        momDispCoeff.yy() = coeff(2,2);
+            }
+            else
+            {
+                momDispCoeff.xx() = coeff(1,1);
+		        momDispCoeff.xy() = coeff(1,2);
+		        momDispCoeff.xz() = coeff(1,3);
+		        momDispCoeff.yx() = coeff(2,1);
+		        momDispCoeff.yy() = coeff(2,2);
+		        momDispCoeff.yz() = coeff(2,3);
+		        momDispCoeff.zx() = coeff(3,1);
+		        momDispCoeff.zy() = coeff(3,2);
+		        momDispCoeff.zz() = coeff(3,3);
+		    }
+		
+            // Extract the source terms of the momentum equation
+            vector sourceTerms(vector::zero);
+            
+            if (twoD)
+            {
+		        sourceTerms.x() = source[blockRowI](1,1); 
+		        sourceTerms.y() = source[blockRowI](2,1);
+            }
+            else
+            {
+		        sourceTerms.x() = source[blockRowI](1,1); 
+		        sourceTerms.y() = source[blockRowI](2,1);
+		        sourceTerms.z() = source[blockRowI](3,1);
+		    }     
+            
+            if (debug)
+            {
+                Info<< "blockRow fixed: " << blockRowI << nl
+                    << "    row,col: " << blockRowI << "," << blockColI << nl
+                    << "    fixedDir: " << fixedDofDirections[blockRowI] << nl
+                    << "    coeff before: " << momDispCoeff << endl;
+            }
 
-//            // Extract the displacement and pressure coefficients of
-//            // the pressure equation     
-//            vector& momPressureCoeff(vector::zero);       
-//            
-//            if (debug)
-//            {
-//                Info<< "blockRow fixed: " << blockRowI << nl
-//                    << "    row,col: " << blockRowI << "," << blockColI << nl
-//                    << "    fixedDir: " << fixedDofDirections[blockRowI] << nl
-//                    << "    coeff before: " << coeff << endl;
-//            }
+            // Free direction
+            const tensor freeDir(I - fixedDofDirections[blockRowI]);
 
-//            // Free direction
-//            const tensor freeDir(I - fixedDofDirections[blockRowI]);
+            // Set the source to zero as the correction to the displacement
+            // is zero
+            //source[blockRowI] = (freeDir & source[blockRowI]);
+            sourceTerms = (freeDir & sourceTerms); 
 
-//            // Set the source to zero as the correction to the displacement
-//            // is zero
-//            source[blockRowI] = (freeDir & source[blockRowI]);
+            // Eliminate the fixed directions from the coeff
+            momDispCoeff = (freeDir & momDispCoeff);
 
-//            // Eliminate the fixed directions from the coeff
-//            coeff = (freeDir & coeff);
+            if (blockRowI == blockColI)
+            {
+                // Remove the fixed component from the free component equation
+                momDispCoeff = (freeDir & momDispCoeff & freeDir);
 
-//            if (blockRowI == blockColI)
-//            {
-//                // Remove the fixed component from the free component equation
-//                coeff = (freeDir & coeff & freeDir);
+                // Fixed direction
+                const tensor& fixedDir = fixedDofDirections[blockRowI];
 
-//                // Fixed direction
-//                const tensor& fixedDir = fixedDofDirections[blockRowI];
+                // Set the fixed direction diagonal to enforce a zero correction
+                momDispCoeff -= tensor(fixedDofScale*fixedDir);
+            }
+            
+            //Insert the changed coefficients back into the matrix
+            if (twoD)
+            {
+            	coeff(1,1) = momDispCoeff.xx();
+            	coeff(1,2) = momDispCoeff.xy();
+            	coeff(2,1) = momDispCoeff.yx();
+            	coeff(2,2) = momDispCoeff.yy();
+            }
+            else
+            {
+            	coeff(1,1) = momDispCoeff.xx();
+            	coeff(1,2) = momDispCoeff.xy();
+            	coeff(1,3) = momDispCoeff.xz();
+            	coeff(2,1) = momDispCoeff.yx();
+            	coeff(2,2) = momDispCoeff.yy();
+            	coeff(2,3) = momDispCoeff.yz();
+            	coeff(3,1) = momDispCoeff.zx();
+            	coeff(3,2) = momDispCoeff.zy();
+            	coeff(3,3) = momDispCoeff.zz();
+            }  
+            
+            //Insert the changed source terms back into the source
+            if (twoD)
+            {
+            	source[blockRowI](1,1) = sourceTerms.x(); 
+            	source[blockRowI](2,1) = sourceTerms.y(); 
+            }
+            else
+            {
+            	source[blockRowI](1,1) = sourceTerms.x(); 
+            	source[blockRowI](2,1) = sourceTerms.y(); 
+            	source[blockRowI](3,1) = sourceTerms.z(); 
+            } 
 
-//                // Set the fixed direction diagonal to enforce a zero correction
-//                coeff -= tensor(fixedDofScale*fixedDir);
-//            }
+            if (debug)
+            {
+                Info<< "    coeff after: " << momDispCoeff << nl << endl;
+            }
+             
+        }
+        else if (fixedDofs[blockColI])
+        {
+            // This equation refers to a fixed direction
+            // We will eliminate the coeff and add the contribution to the
+            // source
+            RectangularMatrix<scalar>& coeff = iter();
+            
+            if (debug)
+            {
+                Info<< "blockCol fixed: " << blockColI << nl
+                    << "    row,col: " << blockRowI << "," << blockColI << nl
+                    << "    fixedDir: " << fixedDofDirections[blockColI] << nl
+                    << "    coeff before: " << coeff << endl;
+            }
+            
+            // Extract the displacement coefficients of the momentum equation
+            // on the left-hand side
+            tensor momDispCoeff(tensor::zero);
+            
+            if (twoD)
+            {
+		        momDispCoeff.xx() = coeff(1,1);
+		        momDispCoeff.xy() = coeff(1,2);
+		        momDispCoeff.yx() = coeff(2,1);
+		        momDispCoeff.yy() = coeff(2,2);
+            }
+            else
+            {
+                momDispCoeff.xx() = coeff(1,1);
+		        momDispCoeff.xy() = coeff(1,2);
+		        momDispCoeff.xz() = coeff(1,3);
+		        momDispCoeff.yx() = coeff(2,1);
+		        momDispCoeff.yy() = coeff(2,2);
+		        momDispCoeff.yz() = coeff(2,3);
+		        momDispCoeff.zx() = coeff(3,1);
+		        momDispCoeff.zy() = coeff(3,2);
+		        momDispCoeff.zz() = coeff(3,3);
+		    }
 
-//            if (debug)
-//            {
-//                Info<< "    coeff after: " << coeff << nl << endl;
-//            }
-//             
-//        }
-//        else if (fixedDofs[blockColI])
-//        {
-//            // This equation refers to a fixed direction
-//            // We will eliminate the coeff and add the contribution to the
-//            // source
-//            RectangularMatrix<scalar>& coeff = iter();
-//            
-//            if (debug)
-//            {
-//                Info<< "blockCol fixed: " << blockColI << nl
-//                    << "    row,col: " << blockRowI << "," << blockColI << nl
-//                    << "    fixedDir: " << fixedDofDirections[blockColI] << nl
-//                    << "    coeff before: " << coeff << endl;
-//            }
+            // Directions where the DOFs are unknown
+            const tensor freeDir(I - fixedDofDirections[blockColI]);
 
-//            // Directions where the DOFs are unknown
-//            const tensor freeDir(I - fixedDofDirections[blockColI]);
+            // Eliminate the fixed directions    
+            momDispCoeff = (momDispCoeff & freeDir);
+            
+            //Insert the changed coefficients back into the matrix
+            if (twoD)
+            {
+            	coeff(1,1) = momDispCoeff.xx();
+            	coeff(1,2) = momDispCoeff.xy();
+            	coeff(2,1) = momDispCoeff.yx();
+            	coeff(2,2) = momDispCoeff.yy();
+            }
+            else
+            {
+            	coeff(1,1) = momDispCoeff.xx();
+            	coeff(1,2) = momDispCoeff.xy();
+            	coeff(1,3) = momDispCoeff.xz();
+            	coeff(2,1) = momDispCoeff.yx();
+            	coeff(2,2) = momDispCoeff.yy();
+            	coeff(2,3) = momDispCoeff.yz();
+            	coeff(3,1) = momDispCoeff.zx();
+            	coeff(3,2) = momDispCoeff.zy();
+            	coeff(3,3) = momDispCoeff.zz();
+            }
 
-//            // Eliminate the fixed directions    
-//            coeff = (coeff & freeDir);
+            if (debug)
+            {
+                Info<< "    coeff after: " << momDispCoeff << nl << endl;
+            }            
 
-//            if (debug)
-//            {
-//                Info<< "    coeff after: " << coeff << nl << endl;
-//            }            
-
-//        }
-//    }
-//}
+        }
+    }
+}
 
 
 // void Foam::sparseMatrixExtendedTools::addFixedDofToSource
