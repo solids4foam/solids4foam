@@ -851,9 +851,6 @@ bool vertexCentredLinGeomSolid::evolve()
             dualMeshMap().dualFaceToCell(),
             dualMeshMap().dualCellToPoint(),
             materialTangent,
-            fixedDofs_,
-            fixedDofDirections_,
-            fixedDofScale_,
             zeta,
             debug
         );
@@ -925,9 +922,6 @@ bool vertexCentredLinGeomSolid::evolve()
                 dualMeshMap().dualFaceToCell(),
                 dualMeshMap().dualCellToPoint(),
                 materialTangent,
-                fixedDofs_,
-                fixedDofDirections_,
-                fixedDofScale_,
                 zeta
             );
 
