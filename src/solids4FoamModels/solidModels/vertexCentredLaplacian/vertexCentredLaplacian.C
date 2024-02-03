@@ -53,7 +53,7 @@ void vertexCentredLaplacian::updateSource
     scalarField& source,
     const pointScalarField& pointT,
     const surfaceVectorField& dualGradTf,
-    const scalar diffusivity,
+    const dimensionedScalar& diffusivity,
     const labelList& dualCellToPoint
 )
 {
@@ -217,7 +217,7 @@ vertexCentredLaplacian::vertexCentredLaplacian
         pMesh(),
         dimensionedScalar("0", dimTemperature, 0.0)
     ),
-    diffusivity_(readScalar(solidModelDict().lookup("diffusivity"))),
+    diffusivity_(solidModelDict().lookup("diffusivity")),
     twoD_(sparseMatrixTools::checkTwoD(mesh())),
     fixedDofs_(mesh().nPoints(), false),
     fixedDofValues_(fixedDofs_.size(), 0.0),
@@ -226,7 +226,7 @@ vertexCentredLaplacian::vertexCentredLaplacian
         solidModelDict().lookupOrDefault<scalar>
         (
             "fixedDofScale",
-             diffusivity_*Foam::sqrt(gAverage(mesh().magSf()))
+            diffusivity_.value()*Foam::sqrt(gAverage(mesh().magSf()))
         )
     ),
     pointVol_
@@ -242,6 +242,20 @@ vertexCentredLaplacian::vertexCentredLaplacian
         pMesh(),
         dimensionedScalar("0", dimVolume, 0.0)
     ),
+    gradT_
+    (
+        IOobject
+        (
+            "grad(T)",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedVector("zero", pointT_.dimensions()/dimLength, vector::zero) //,
+        //"zeroGradient"
+    ),
     dualGradTf_
     (
         IOobject
@@ -253,7 +267,7 @@ vertexCentredLaplacian::vertexCentredLaplacian
             IOobject::NO_WRITE
         ),
         dualMesh(),
-        dimensionedVector("zero", dimless, vector::zero),
+        dimensionedVector("zero", pointT_.dimensions()/dimLength, vector::zero),
         "calculated"
     ),
     globalPointIndices_(mesh())
@@ -325,6 +339,13 @@ bool vertexCentredLaplacian::evolve()
     // const labelList& localToGlobalPointMap =
     //     globalPointIndices_.localToGlobalPointMap();
 
+    // Lookup compact edge gradient factor
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
+    if (debug)
+    {
+        Info<< "zeta: " << zeta << endl;
+    }
+
     // Assemble matrix once per time-step
     Info<< "    Assembling the matrix" << endl;
 
@@ -336,25 +357,24 @@ bool vertexCentredLaplacian::evolve()
         dualMesh(),
         dualMeshMap().dualFaceToCell(),
         dualMeshMap().dualCellToPoint(),
-        scalarField(mesh().nCells(), diffusivity_),
+        scalarField(mesh().nCells(), diffusivity_.value()),
         debug
     );
 
     // Solution field: pointT correction
     scalarField pointTcorr(pointT_.internalField().size(), 0.0);
 
-    // Calculate gradD at dual faces
-    notImplemented("vfvc::fGrad(pointT, ...) to be implemented!");
-    // dualGradTf_ = vfvc::fGrad
-    // (
-    //     pointT_,
-    //     mesh(),
-    //     dualMesh(),
-    //     dualMeshMap().dualFaceToCell(),
-    //     dualMeshMap().dualCellToPoint(),
-    //     zeta,
-    //     debug
-    // );
+    // Calculate grad at dual faces
+    dualGradTf_ = vfvc::fGrad
+    (
+        pointT_,
+        mesh(),
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        zeta,
+        debug
+    );
 
     // Update the source vector
     scalarField source(mesh().nPoints(), 0.0);
@@ -375,15 +395,14 @@ bool vertexCentredLaplacian::evolve()
     }
 
     // Enforce fixed DOF on the linear system
-    notImplemented("sparseMatrixTools::enforceFixedDof(...scalar...) to be implemented!");
-    // sparseMatrixTools::enforceFixedDof
-    // (
-    //     matrix,
-    //     source,
-    //     fixedDofs_,
-    //     fixedDofValues_,
-    //     fixedDofScale_
-    // );
+    sparseMatrixTools::enforceFixedDof
+    (
+        matrix,
+        source,
+        fixedDofs_,
+        fixedDofValues_,
+        fixedDofScale_
+    );
 
     if (debug > 1)
     {
@@ -433,16 +452,17 @@ bool vertexCentredLaplacian::evolve()
     }
     else
     {
-        notImplemented
+        // Lookup exportToMatlab flag
+        const Switch writeMatlabMatrix
         (
-            "sparseMatrixTools::solveLinearSystemEigen(...scalar...) "
-            "to be implemented!"
+            solidModelDict().lookup("writeMatlabMatrix")
         );
+
         // Use Eigen SparseLU direct solver
-        // sparseMatrixTools::solveLinearSystemEigen
-        // (
-        //     matrix, source, pointDcorr, twoD_, false, debug
-        // );
+        sparseMatrixTools::solveLinearSystemEigen
+        (
+            matrix, source, pointTcorr, writeMatlabMatrix, debug
+        );
     }
 
     if (debug)
@@ -459,24 +479,22 @@ bool vertexCentredLaplacian::evolve()
     pointT_.internalField() += pointTcorr;
 #endif
 
-    // Calculate gradT at dual faces
-    notImplemented("vfvc::fGrad(pointT, ...) to be implemented!");
-    // dualGradDf_ = vfvc::fGrad
-    // (
-    //     pointT_,
-    //     mesh(),
-    //     dualMesh(),
-    //     dualMeshMap().dualFaceToCell(),
-    //     dualMeshMap().dualCellToPoint(),
-    //     zeta,
-    //     debug
-    // );
+    // Calculate grad at dual faces
+    dualGradTf_ = vfvc::fGrad
+    (
+        pointT_,
+        mesh(),
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        zeta,
+        debug
+    );
 
     // Calculate cell gradient
     // This assumes a constant gradient within each primary mesh cell
     // This is a first-order approximation
-    // Not implemented
-    //gradD() = vfvc::grad(pointD(), mesh());
+    gradT_ = vfvc::grad(pointT_, mesh());
 
     return true;
 }

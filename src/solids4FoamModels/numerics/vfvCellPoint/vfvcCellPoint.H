@@ -49,6 +49,14 @@ namespace Foam
 namespace vfvc
 {
     // Gradient field
+    // Returns volVectorField on primary mesh
+    tmp<volVectorField> grad
+    (
+        const pointScalarField& pointT, // primary mesh point field
+        const fvMesh& mesh              // primary mesh
+    );
+
+    // Gradient field
     // Returns volTensorField on primary mesh
     tmp<volTensorField> grad
     (
@@ -62,6 +70,20 @@ namespace vfvc
     (
         const pointVectorField& pointD, // primary mesh point displacement
         const fvMesh& mesh              // primary mesh
+    );
+
+    // Gradient field
+    // Returns surfaceVectorField on dual mesh
+    // Only calculates the gradient for internal faces
+    tmp<surfaceVectorField> fGrad
+    (
+        const pointScalarField& pointT, // primary mesh point field
+        const fvMesh& mesh,             // primary mesh
+        const fvMesh& dualMesh,         // dual mesh
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const scalar zeta, // fraction of compact edge direction component used
+        const bool debug = false
     );
 
     // Gradient field

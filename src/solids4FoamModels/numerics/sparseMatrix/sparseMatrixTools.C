@@ -67,6 +67,120 @@ bool Foam::sparseMatrixTools::checkTwoD(const polyMesh& mesh)
 
 void Foam::sparseMatrixTools::solveLinearSystemEigen
 (
+    const sparseScalarMatrix& matrix,
+    const scalarField& source,
+    scalarField& solution,
+    const bool exportToMatlab,
+    const bool debug
+)
+{
+#ifdef S4F_NO_USE_EIGEN
+    FatalErrorIn("void Foam::sparseMatrixTools::solveLinearSystemEigen(...)")
+        << "This function cannot be called as the S4F_NO_USE_EIGEN variable "
+        << " is set.  If you would like to use this option then unset the "
+        << "S4F_NO_USE_EIGEN variable and re-run the top-level Allwmake script"
+        << abort(FatalError);
+#else
+    // For now, we can directly use the Eigen direct solver to solve the
+    // linear system
+
+    // Define the number of degrees of freedom
+    const label nDof = solution.size();
+
+    // Create Eigen matrix triplets to store coefficients
+    std::vector< Eigen::Triplet<scalar> > coefficients;
+    coefficients.reserve(nDof);
+
+    const HashTable
+    <
+     	scalar, FixedList<label, 2>, FixedList<label, 2>::Hash<>
+    >& data = matrix.data();
+
+    for (auto iter = data.begin(); iter != data.end(); ++iter)
+    {
+        const scalar& coeff = iter();
+
+        const label rowI = iter.key()[0];
+        const label colI = iter.key()[1];
+
+        coefficients.push_back(Eigen::Triplet<scalar>(rowI, colI, coeff));
+    }
+
+    // Create Eigen sparse matrix
+    Eigen::SparseMatrix<scalar> A(nDof, nDof);
+
+    // Insert triplets into the matrix
+    A.setFromTriplets(coefficients.begin(), coefficients.end());
+
+    // Compressing matrix is meant to help performance
+    A.makeCompressed();
+
+    // Create source vector
+    Eigen::Matrix<scalar, Eigen::Dynamic, 1> b(nDof);
+    {
+        label index = 0;
+        forAll(source, i)
+        {
+            b(index++) = source[i];
+        }
+    }
+
+    if (exportToMatlab)
+    {
+        Info<< "Exporting linear system to matlabSparseMatrix.txt and "
+            << "matlabSource.txt" << endl;
+
+        // Write matrix
+        Eigen::saveMarket(A, "matlabSparseMatrix.txt");
+
+        // Write source
+        OFstream sourceFile("matlabSource.txt");
+        for (int rowI = 0; rowI < A.rows(); rowI++)
+        {
+            sourceFile
+                << b(rowI) << endl;
+        }
+    }
+
+    // Construct the solver
+    Eigen::SparseLU
+    <
+        Eigen::SparseMatrix<scalar>, Eigen::COLAMDOrdering<int>
+    > solver(A);
+
+    // Initialise the solution vector to zero
+    Eigen::Matrix<scalar, Eigen::Dynamic, 1> x(nDof);
+    x.setZero();
+
+    // Check initial residual
+    const Eigen::Matrix<scalar, Eigen::Dynamic, 1> initResidual = A*x - b;
+
+    // Exit early if the initial residual is small
+    if (initResidual.squaredNorm() < 1e-12)
+    {
+        Info<< "    Linear solver initial residual is "
+            << initResidual.squaredNorm() << ": exiting" << endl;
+    }
+    else
+    {
+        // Solve system
+        x = solver.solve(b);
+    }
+
+    // Copy  to solution field
+    {
+        label index = 0;
+        forAll(solution, i)
+        {
+            solution[i] = x(index++);
+        }
+    }
+#endif
+}
+
+
+void Foam::sparseMatrixTools::solveLinearSystemEigen
+(
     const sparseMatrix& matrix,
     const vectorField& source,
     vectorField& solution,
@@ -926,6 +1040,89 @@ void Foam::sparseMatrixTools::checkErr(const int ierr)
         FatalError
             << "PETSc returned the error code "<< ierr
             << abort(FatalError);
+    }
+}
+
+
+void Foam::sparseMatrixTools::enforceFixedDof
+(
+    sparseScalarMatrix& matrix,
+    scalarField& source,
+    const boolList& fixedDofs,
+    const scalarField& fixedDofValues,
+    const scalar fixedDofScale
+)
+{
+    const bool debug = 1;
+
+    // Loop though the matrix and overwrite the coefficients for fixed DOFs
+    // To enforce the value we will set the diagonal to the identity and set
+    // the source to zero. The reason the source is zero is that we are solving
+    // for the correction and the correction is zero for fixed values.
+    // Rather than setting the identity on the diagonal, we will scale it by
+    // fixedDofScale to improve the condition number, although the
+    // preconditioner should not care.
+    // Secondly, for any non-fixed-DOF equations which refer to fixed DOFs, we
+    // will eliminate these coeffs and add their contribution (which is known)
+    // to the source.
+    HashTable
+    <
+        scalar, FixedList<label, 2>, FixedList<label, 2>::Hash<>
+    >& data = matrix.data();
+    for (auto iter = data.begin(); iter != data.end(); ++iter)
+    {
+        const label blockRowI = iter.key()[0];
+        const label blockColI = iter.key()[1];
+
+        if (fixedDofs[blockRowI])
+        {
+            scalar& coeff = iter();
+
+            if (debug)
+            {
+                Info<< "blockRow fixed: " << blockRowI << nl
+                    << "    row,col: " << blockRowI << "," << blockColI << nl
+                    << "    coeff before: " << coeff << endl;
+            }
+
+            // Set the source to zero as the correction is zero
+            source[blockRowI] = 0.0;
+
+            // Eliminate the fixed directions from the coeff
+            coeff = 0.0;
+
+            if (blockRowI == blockColI)
+            {
+                // Set the diagonal to enforce a zero correction
+                coeff = -fixedDofScale;
+            }
+
+            if (debug)
+            {
+                Info<< "    coeff after: " << coeff << nl << endl;
+            }
+        }
+        else if (fixedDofs[blockColI])
+        {
+            // This equation refers to a fixed DOF
+            // We will eliminate the coeff
+            scalar& coeff = iter();
+
+            if (debug)
+            {
+                Info<< "blockCol fixed: " << blockColI << nl
+                    << "    row,col: " << blockRowI << "," << blockColI << nl
+                    << "    coeff before: " << coeff << endl;
+            }
+
+            // Eliminate the fixed directions
+            coeff = 0.0;
+
+            if (debug)
+            {
+                Info<< "    coeff after: " << coeff << nl << endl;
+            }
+        }
     }
 }
 

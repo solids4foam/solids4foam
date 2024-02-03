@@ -19,12 +19,6 @@ License
 
 #include "SparseMatrixTemplate.H"
 
-// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
-
-// namespace Foam
-// {
-//     defineTypeNameAndDebug(SparseMatrixTemplate, 0);
-// }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -81,8 +75,6 @@ Type& Foam::SparseMatrixTemplate<Type>::operator()
     key[0] = rowI;
     key[1] = colI;
 
-    FatalError
-        << "stop" << abort(FatalError);
     // Return a reference to the entry
     // If it does not exist then it will be initialised to zero first
     typename SparseMatrixTemplateData::iterator iter = data_.find(key);

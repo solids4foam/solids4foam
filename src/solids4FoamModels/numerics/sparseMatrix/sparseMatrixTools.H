@@ -33,6 +33,7 @@ SourceFiles
 #define sparseMatrixTools_H
 
 #include "sparseMatrix.H"
+#include "SparseMatrixTemplate.H"
 #include "vectorField.H"
 #include "polyMesh.H"
 #ifdef OPENFOAM_NOT_EXTEND
@@ -53,6 +54,16 @@ namespace sparseMatrixTools
 
     //- Check if the case is 2-D
     bool checkTwoD(const polyMesh& mesh);
+
+    //- Solve the linear system using Eigen's SparseLU direct solver
+    void solveLinearSystemEigen
+    (
+        const sparseScalarMatrix& matrix,
+        const scalarField& source,
+        scalarField& solution,
+        const bool exportToMatlab = false,
+        const bool debug = false
+    );
 
     //- Solve the linear system using Eigen's SparseLU direct solver
     void solveLinearSystemEigen
@@ -105,6 +116,16 @@ namespace sparseMatrixTools
     //- Check the PETSc error
     //  Exit with a FatalError if it is greater than 0
     void checkErr(const int ierr);
+
+    //- Enforce fixed DOF contributions on the linear system
+    void enforceFixedDof
+    (
+        sparseScalarMatrix& matrix,
+        scalarField& source,
+        const boolList& fixedDofs,
+        const scalarField& fixedDofValues,
+        const scalar fixedDofScale
+    );
 
     //- Enforce fixed DOF contributions on the linear system
     void enforceFixedDof

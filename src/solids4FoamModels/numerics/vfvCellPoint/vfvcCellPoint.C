@@ -34,6 +34,79 @@ namespace vfvc
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+tmp<volVectorField> grad
+(
+    const pointScalarField& pointT,
+    const fvMesh& mesh
+)
+{
+    // Prepare the result field
+    tmp<volVectorField> tresult
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "grad(" + pointT.name() + ")",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedVector
+            (
+                "zero", pointT.dimensions()/dimLength, vector::zero
+            ),
+            "zeroGradient"
+        )
+    );
+#ifdef OPENFOAM_NOT_EXTEND
+    volVectorField& result = tresult.ref();
+#else
+    volVectorField& result = tresult();
+#endif
+
+    // Take references for clarity and efficiency
+
+    vectorField& resultI = result;
+    const labelListList& cellPoints = mesh.cellPoints();
+    const scalarField& pointTI = pointT.internalField();
+    const cellPointLeastSquaresVectors& cellPointLeastSquaresVecs =
+        cellPointLeastSquaresVectors::New(mesh);
+    const List<vectorList>& leastSquaresVecs =
+        cellPointLeastSquaresVecs.vectors();
+
+    // Calculate the gradient for each cell
+    forAll(resultI, cellI)
+    {
+        // Points in the current cell
+        const labelList& curCellPoints = cellPoints[cellI];
+
+        // Least squares vectors for cellI
+        const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellI];
+
+        // Accumulate contribution to the cell gradient from each point
+        vector& cellGrad = resultI[cellI];
+        forAll(curCellPoints, cpI)
+        {
+            // Least squares vector from the centre of cellID to pointI
+            const vector& lsVec = curLeastSquaresVecs[cpI];
+
+            // Primary point index
+            const label pointID = curCellPoints[cpI];
+
+            // Add least squares contribution to the cell gradient
+            cellGrad += lsVec*pointTI[pointID];
+        }
+    }
+
+    result.correctBoundaryConditions();
+
+    return tresult;
+}
+
+
 tmp<volTensorField> grad
 (
     const pointVectorField& pointD,
@@ -47,7 +120,7 @@ tmp<volTensorField> grad
         (
             IOobject
             (
-                "grad("+ pointD.name() +")",
+                "grad(" + pointD.name() + ")",
                 mesh.time().timeName(),
                 mesh,
                 IOobject::NO_READ,
@@ -123,7 +196,7 @@ tmp<pointTensorField> pGrad
         (
             IOobject
             (
-                "pGrad("+ pointD.name() +")",
+                "pGrad(" + pointD.name() + ")",
                 mesh.time().timeName(),
                 mesh,
                 IOobject::NO_READ,
@@ -188,6 +261,142 @@ tmp<pointTensorField> pGrad
 }
 
 
+tmp<surfaceVectorField> fGrad
+(
+    const pointScalarField& pointT,
+    const fvMesh& mesh,
+    const fvMesh& dualMesh,
+    const labelList& dualFaceToCell,
+    const labelList& dualCellToPoint,
+    const scalar zeta,
+    const bool debug
+)
+{
+    if (debug)
+    {
+        Info<< "surfaceVectorField fGrad(...): start" << endl;
+    }
+
+    // Prepare the result field
+    tmp<surfaceVectorField> tresult
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "fGrad(" + pointT.name() + ")",
+                dualMesh.time().timeName(),
+                dualMesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            dualMesh,
+            dimensionedVector
+            (
+                "zero", pointT.dimensions()/dimLength, vector::zero
+            )
+        )
+    );
+#ifdef OPENFOAM_NOT_EXTEND
+    surfaceVectorField& result = tresult.ref();
+#else
+    surfaceVectorField& result = tresult();
+#endif
+
+    // Take references for clarity and efficiency
+    vectorField& resultI = result;
+    const scalarField& pointTI = pointT.internalField();
+    const pointField& points = mesh.points();
+    const labelList& dualOwn = dualMesh.faceOwner();
+    const labelList& dualNei = dualMesh.faceNeighbour();
+
+    // Approach
+    // Step 1: Calculate constant gradient in each primary mesh cell
+    // Step 2: Set dual face gradient to primary mesh constant cell gradient and
+    //         replace the component in the edge direction
+
+    // Calculate constant gradient in each primary mesh cell
+    const volVectorField gradT(vfvc::grad(pointT, mesh));
+    const vectorField& gradTI = gradT.internalField();
+
+    // Set dual face gradient to primary mesh constant cell gradient and
+    // replace the component in the edge direction
+    // We only replace the edge component for internal dual faces
+
+    // For all faces - internal and boundary
+    forAll(dualOwn, dualFaceI)
+    {
+        // Only calculate the gradient for internal faces
+        if (dualMesh.isInternalFace(dualFaceI))
+        {
+            // Primary mesh cell in which dualFaceI resides
+            const label cellID = dualFaceToCell[dualFaceI];
+
+            // Dual cell owner of dualFaceI
+            const label dualOwnCellID = dualOwn[dualFaceI];
+
+            // Dual cell neighbour of dualFaceI
+            const label dualNeiCellID = dualNei[dualFaceI];
+
+            // Primary mesh point at the centre of dualOwnCellID
+            const label ownPointID = dualCellToPoint[dualOwnCellID];
+
+            // Primary mesh point at the centre of dualNeiCellID
+            const label neiPointID = dualCellToPoint[dualNeiCellID];
+
+            // Unit edge vector from the own point to the nei point
+            vector edgeDir = points[neiPointID] - points[ownPointID];
+            const scalar edgeLength = mag(edgeDir);
+            edgeDir /= edgeLength;
+
+            // Calculate the gradient component in the edge direction using
+            // central-differencing and use the primary mesh cell value for the
+            // tangential directions
+            resultI[dualFaceI] =
+                zeta*edgeDir
+               *(
+                   pointTI[neiPointID] - pointTI[ownPointID]
+               )/edgeLength
+              + ((I - zeta*sqr(edgeDir)) & gradTI[cellID]);
+        }
+        else // boundary face
+        {
+            // Dual patch which this dual face resides on
+            const label dualPatchID =
+                dualMesh.boundaryMesh().whichPatch(dualFaceI);
+
+            if (dualMesh.boundaryMesh()[dualPatchID].type() != "empty")
+            {
+                // Find local face index
+                const label localDualFaceID =
+                    dualFaceI - dualMesh.boundaryMesh()[dualPatchID].start();
+
+                // Primary mesh cell in which dualFaceI resides
+                const label cellID = dualFaceToCell[dualFaceI];
+
+                // Use the gradient in the adjacent primary cell-centre
+                // This will result in inconsistent values at processor patches
+                // Is this an issue?
+#ifdef OPENFOAM_NOT_EXTEND
+                result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
+                    gradTI[cellID];
+#else
+                result.boundaryField()[dualPatchID][localDualFaceID] =
+                    gradTI[cellID];
+#endif
+            }
+        }
+    }
+
+    if (debug)
+    {
+        Info<< "surfaceVectorField fGrad(...): end" << endl;
+    }
+
+    return tresult;
+}
+
+
 tmp<surfaceTensorField> fGrad
 (
     const pointVectorField& pointD,
@@ -211,7 +420,7 @@ tmp<surfaceTensorField> fGrad
         (
             IOobject
             (
-                "fGrad("+ pointD.name() +")",
+                "fGrad(" + pointD.name() + ")",
                 dualMesh.time().timeName(),
                 dualMesh,
                 IOobject::NO_READ,

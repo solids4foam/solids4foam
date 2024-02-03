@@ -73,7 +73,7 @@ class vertexCentredLaplacian
         pointScalarField pointT_;
 
         //- Diffusivity
-        const scalar diffusivity_;
+        const dimensionedScalar diffusivity_;
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
@@ -95,6 +95,9 @@ class vertexCentredLaplacian
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
 
+        //- Solution gradient field in the primary cells
+        volVectorField gradT_;
+
         //- Solution gradient field at the dual mesh faces
         surfaceVectorField dualGradTf_;
 
@@ -115,7 +118,7 @@ class vertexCentredLaplacian
             scalarField& source,
             const pointScalarField& pointT,
             const surfaceVectorField& dualGradTf,
-            const scalar diffusivity,
+            const dimensionedScalar& diffusivity,
             const labelList& dualCellToPoint
         );
 
