@@ -637,7 +637,8 @@ Foam::neoHookeanMisesPhaseFieldDamage::neoHookeanMisesPhaseFieldDamage
             IOobject::AUTO_WRITE
         ),
         mesh,
-        dimensionedScalar("1", dimless, 1)
+        dimensionedScalar("1", dimless, 1),
+        "zeroGradient"
     ),
     one_
     (
@@ -646,24 +647,11 @@ Foam::neoHookeanMisesPhaseFieldDamage::neoHookeanMisesPhaseFieldDamage
             "one",
             mesh.time().timeName(),
             mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
         ),
         mesh,
         dimensionedScalar("one", dimless, 1)
-    ),
-    zero_
-    (
-        IOobject
-        (
-            "zero",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimless, 0.0)
     ),
     gradDpf_
     (
