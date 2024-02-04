@@ -1055,7 +1055,8 @@ bool vertexCentredLinGeomSolidMMS::evolve()
                 fixedDofs_,
                 fixedDofDirections_,
                 fixedDofScale_,
-                zeta
+                zeta,
+                debug
             );
 
             // Add d2dt2 coefficients

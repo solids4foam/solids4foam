@@ -848,6 +848,157 @@ vertexCentredNonLinGeomTotalLagSolid::geometricStiffnessField
 }
 
 
+//Foam::tmp<tensorField>
+//vertexCentredNonLinGeomTotalLagSolid::pBarSensitivityField
+//(
+//        const volTensorField gradDRef //Reference gradD
+//) const
+//{
+//    // Prepare tmp field
+//    tmp<tensorField> tresult
+//    (
+//        new tensorField(mesh().nPoints(), Foam::tensor::zero)
+//    );
+//#ifdef OPENFOAMESIORFOUNDATION
+//    tensorField& result = tresult.ref();
+//#else
+//    tensorField& result = tresult();
+//#endif
+
+//	//d(pBar)/d(gradD) = 0.5*K*d(J^2)/d(gradD)
+
+//    // Calculate unperturbed F
+//    const surfaceTensorField FRef(I + gradDRef.T());
+
+//    // Calculate unperturbed J squared
+//    const surfaceScalarField JSqrRef(pow(det(FRef),2.0));
+
+//    // Create field to be used for perturbations
+//    surfaceTensorField gradDPerturb("gradDPerturb", gradDRef);
+
+//    // Small number used for perturbations
+//    const scalar eps(solidModelDict().lookupOrDefault<scalar>("tangentEps", 1e-10));
+
+//    // For each component of gradD, sequentially apply a perturbation and
+//    // then calculate the resulting sigma
+//    for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
+//    {
+
+//        // Reset gradDPerturb and multiply by 1.0 to avoid it being removed
+//        // from the object registry
+//        gradDPerturb = 1.0*gradDRef;
+
+//        // Perturb this component of gradD
+//        gradDPerturb.replace(cmptI, gradDRef.component(cmptI) + eps);
+
+//        //Info << gradDPerturb[0] - gradDRef[0] << endl;
+
+//        const surfaceTensorField FPerturb(I + gradDPerturb.T());
+//        const surfaceScalarField JPerturb(det(FPerturb));
+//        const surfaceScalarField JSqrPerturb(pow(det(FPerturb),2.0));
+
+
+//        // Calculate each component
+//        const surfaceScalarField tangCmpt((JSqrPerturb - JSqrRef)/eps);
+//        const scalarField& tangCmptI = tangCmpt.internalField();
+//        
+//        // Insert components
+//        forAll(tangCmptI, pointI)
+//        {
+//            if (cmptI == tensor::XX)
+//            {
+//                result[faceI][tensor::XX] = tangCmptI[faceI];
+//            }
+//            else if (cmptI == tensor::XY)
+//            {
+//				result[faceI][tensor::XY] = tangCmptI[faceI];
+//            }
+//            else if (cmptI == tensor::XZ)
+//            {
+//				result[faceI][tensor::XZ] = tangCmptI[faceI];
+//            }
+//            else if (cmptI == tensor::YX)
+//            {
+//				result[faceI][tensor::YX] = tangCmptI[faceI];
+//            }
+//            else if (cmptI == tensor::YY)
+//            {
+//				result[faceI][tensor::YY] = tangCmptI[faceI];
+//            }
+//            else if (cmptI == tensor::YZ)
+//            {
+//				result[faceI][tensor::YZ] = tangCmptI[faceI];
+//            }
+//            else if (cmptI == tensor::ZX)
+//            {
+//				result[faceI][tensor::ZX] = tangCmptI[faceI];
+//            }
+//            else if (cmptI == tensor::ZY)
+//            {
+//				result[faceI][tensor::ZY] = tangCmptI[faceI];
+//            }
+//            else // if (cmptI == tensor::ZZ)
+//            {
+//				result[faceI][tensor::ZZ] = tangCmptI[faceI];
+//            }
+//        }
+
+//        forAll(tangCmpt.boundaryField(), patchI)
+//        {
+//            const scalarField& tangCmptP =
+//                tangCmpt.boundaryField()[patchI];
+//            const label start = mesh().boundaryMesh()[patchI].start();
+
+//            forAll(tangCmptP, fI)
+//            {
+//                const label faceID = start + fI;
+
+//                if (cmptI == tensor::XX)
+//                {
+//                    result[faceID][tensor::XX] = tangCmptI[fI];
+//                }
+//                else if (cmptI == tensor::XY)
+//                {
+//                    result[faceID][tensor::XY] = tangCmptI[fI];
+//                }
+//                else if (cmptI == tensor::XZ)
+//                {
+//                    result[faceID][tensor::XZ] = tangCmptI[fI];
+//                }
+//                else if (cmptI == tensor::YX)
+//                {
+//                    result[faceID][tensor::YX] = tangCmptI[fI];
+//                }
+//                else if (cmptI == tensor::YY)
+//                {
+//                    result[faceID][tensor::YY] = tangCmptI[fI];
+//                }
+//                else if (cmptI == tensor::YZ)
+//                {
+//                    result[faceID][tensor::YZ] = tangCmptI[fI];
+//                }
+//                else if (cmptI == tensor::ZX)
+//                {
+//                    result[faceID][tensor::ZX] = tangCmptI[fI];
+//                }
+//                else if (cmptI == tensor::ZY)
+//                {
+//                    result[faceID][tensor::ZY] = tangCmptI[fI];
+//                }
+//                else // if (cmptI == tensor::ZZ)
+
+//                {
+//                    result[faceID][tensor::ZZ] = tangCmptI[fI];
+//                }
+//            }
+//        }
+//    }
+
+//	return result;
+//	
+//}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
@@ -869,7 +1020,7 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
         )
     ),
     fullNewton_(solidModelDict().lookup("fullNewton")),
-    geometricStiffness_(solidModelDict().lookup("largeStrain")),
+    geometricStiffness_(solidModelDict().lookup("geometricStiffness")),
     steadyState_(false),
     solvePressureEquation_
     (
@@ -883,7 +1034,7 @@ vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid
     (
         solidModelDict().lookupOrDefault<scalar>
         (
-            "pressureFactor", 0.5
+            "pressureSmoothingFactor", 0.5
         )
     ),
     twoD_(sparseMatrixTools::checkTwoD(mesh())),
@@ -1144,10 +1295,10 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
     );
 
     // Calculate stress field at dual faces
-        dualMechanicalPtr_().correct(dualSigmaf_);
+    dualMechanicalPtr_().correct(dualSigmaf_);
 
-        // Calculate stress for primary cells
-        mechanical().correct(sigma());
+    // Calculate stress for primary cells
+    mechanical().correct(sigma());
 
     // Lookup compact edge gradient factor
     const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
@@ -1185,7 +1336,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
         );
 
         // Add div(sigma) coefficients
-        vfvm::divSigmaExtended
+        vfvm::divSigmaNoPressure
         (
             matrix,
             mesh(),
@@ -1327,7 +1478,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 //		    }
 //		    Info << endl;
 
-            vfvm::divSigmaExtended
+            vfvm::divSigmaNoPressure
             (
                 matrix,
                 mesh(),

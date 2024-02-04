@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    vertexCentredLinGeomSolid
+    vertexCentredNonLinGeomTotalLagSolid
 
 Description
     Mathematical model where linear geometry is assumed i.e. small strains and
@@ -59,7 +59,7 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class vertexCentredLinGeomSolid Declaration
+             Class vertexCentredNonLinGeomTotalLagSolid Declaration
 \*---------------------------------------------------------------------------*/
 
 class vertexCentredNonLinGeomTotalLagSolid
@@ -214,6 +214,12 @@ class vertexCentredNonLinGeomTotalLagSolid
 			const surfaceVectorField SfUndef, //Undeformed surface area vector field
 			const surfaceTensorField gradDRef //Reference gradD 
 		) const; 
+	
+		Foam::tmp<tensorField>
+		pBarSensitivityField
+		(
+			const volTensorField gradDRef //Reference gradD
+		) const;
 
         //- Disallow default bitwise copy construct
         vertexCentredNonLinGeomTotalLagSolid(const vertexCentredNonLinGeomTotalLagSolid&);

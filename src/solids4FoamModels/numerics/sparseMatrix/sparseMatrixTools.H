@@ -39,6 +39,7 @@ SourceFiles
 #define sparseMatrixTools_H
 
 #include "sparseMatrix.H"
+#include "SparseMatrixTemplate.H"
 #include "vectorField.H"
 #include "polyMesh.H"
 #ifdef OPENFOAMESIORFOUNDATION
@@ -73,7 +74,7 @@ namespace sparseMatrixTools
 
 #ifdef USE_PETSC
 
-    //- Solve the linear system using PETSc
+    //- Solve the linear system using PETSc 
 #ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector> solveLinearSystemPETSc
 #else
@@ -94,6 +95,31 @@ namespace sparseMatrixTools
     );
 
 #endif
+
+#ifdef USE_PETSC
+
+    //- Solve the linear system using PETSc (sparseScalarMatrix)
+#ifdef OPENFOAMESIORFOUNDATION
+    SolverPerformance<vector> solveLinearSystemPETSc
+#else
+    BlockSolverPerformance<vector> solveLinearSystemPETSc
+#endif
+    (
+        const sparseScalarMatrix& matrix,
+        const scalarField& source,
+        scalarField& solution,
+        const bool twoD,
+        fileName& optionsFile,
+        const pointField& points,
+        const boolList& ownedByThisProc,
+        const labelList& localToGlobalPointMap,
+        const labelList& stencilSizeOwned,
+        const labelList& stencilSizeNotOwned,
+        const bool debug = false
+    );
+
+#endif
+
 
     //- Set the number of non-zeros in per row in the given array
     void setNonZerosPerRow

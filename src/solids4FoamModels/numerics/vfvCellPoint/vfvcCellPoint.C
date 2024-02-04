@@ -107,7 +107,7 @@ Foam::tmp<Foam::volTensorField> Foam::vfvc::grad
 }
 
 
-Foam::tmp<Foam::volVectorField> Foam::vfvc::gradP
+Foam::tmp<Foam::volVectorField> Foam::vfvc::grad
 (
     const pointScalarField& pointP,
     const fvMesh& mesh
@@ -372,7 +372,7 @@ Foam::tmp<Foam::surfaceTensorField> Foam::vfvc::fGrad
 }
 
 
-Foam::tmp<Foam::surfaceVectorField> Foam::vfvc::fGradP
+Foam::tmp<Foam::surfaceVectorField> Foam::vfvc::fGrad
 (
     const pointScalarField& pointP,
     const fvMesh& mesh,
@@ -427,7 +427,7 @@ Foam::tmp<Foam::surfaceVectorField> Foam::vfvc::fGradP
     //         replace the component in the edge direction
 
     // Calculate constant gradient in each primary mesh cell
-    const volVectorField gradP(vfvc::gradP(pointP, mesh));
+    const volVectorField gradP(vfvc::grad(pointP, mesh));
     const vectorField& gradPI = gradP.internalField();
     
     // Set dual face gradient to primary mesh constant cell gradient and
@@ -688,7 +688,7 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
 }
 
 
-Foam::tmp<Foam::pointScalarField> Foam::vfvc::laplacianP
+Foam::tmp<Foam::pointScalarField> Foam::vfvc::laplacian
 (
 	pointScalarField& pointP,
 	const fvMesh& mesh,
@@ -738,7 +738,7 @@ Foam::tmp<Foam::pointScalarField> Foam::vfvc::laplacianP
     const vectorField& dualSf = dualMesh.faceAreas();
     
     //Calculate the gradient of P for each dual face
-    const surfaceVectorField dualGradPField = fGradP
+    const surfaceVectorField dualGradPField = fGrad
     (
 		pointP,
 		mesh,
