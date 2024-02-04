@@ -1050,10 +1050,10 @@ void Foam::sparseMatrixTools::enforceFixedDof
     scalarField& source,
     const boolList& fixedDofs,
     const scalarField& fixedDofValues,
-    const scalar fixedDofScale
+    const scalar fixedDofScale,
+    const bool debug
 )
 {
-    const bool debug = 0;
 
     // Loop though the matrix and overwrite the coefficients for fixed DOFs
     // To enforce the value we will set the diagonal to the identity and set

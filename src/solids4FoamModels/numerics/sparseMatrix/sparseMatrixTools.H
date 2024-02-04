@@ -124,7 +124,8 @@ namespace sparseMatrixTools
         scalarField& source,
         const boolList& fixedDofs,
         const scalarField& fixedDofValues,
-        const scalar fixedDofScale
+        const scalar fixedDofScale,
+        const bool debug
     );
 
     //- Enforce fixed DOF contributions on the linear system

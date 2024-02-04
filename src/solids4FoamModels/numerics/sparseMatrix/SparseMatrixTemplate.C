@@ -29,6 +29,17 @@ Foam::SparseMatrixTemplate<Type>::SparseMatrixTemplate(const label size)
     data_(size)
 {}
 
+
+template<class Type>
+Foam::SparseMatrixTemplate<Type>::SparseMatrixTemplate
+(
+    const SparseMatrixTemplate& mat
+)
+:
+    refCount(),
+    data_(mat.data())
+{}
+
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 template<class Type>

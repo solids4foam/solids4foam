@@ -77,9 +77,6 @@ class SparseMatrixTemplate
 
     // Private Member Functions
 
-        //- Disallow default bitwise copy construct
-        SparseMatrixTemplate(const SparseMatrixTemplate&);
-
         //- Disallow default bitwise assignment
         void operator=(const SparseMatrixTemplate&);
 
@@ -93,6 +90,9 @@ public:
 
         //- Construct given approximate size
         SparseMatrixTemplate(const label size = 128);
+
+        //- Copy constructer
+        SparseMatrixTemplate(const SparseMatrixTemplate& mat);
 
 
     // Destructor

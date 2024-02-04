@@ -388,6 +388,61 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
 #endif
 
 Foam::tmp<Foam::surfaceScalarField>
+Foam::dualMechanicalModel::impKf() const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    // Prepare the field
+    tmp< surfaceScalarField > tresult
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "dualImpKf",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimPressure, 0.0)
+        )
+    );
+#ifdef OPENFOAM_NOT_EXTEND
+    surfaceScalarField& result = tresult.ref();
+#else
+    surfaceScalarField& result = tresult();
+#endif
+
+    if (laws.size() == 1)
+    {
+        result = fvc::interpolate(laws[0].impK());
+    }
+    else
+    {
+        // Accumulate data for all fields
+        // Each face in the dualMesh lies in one cell (and hence one material)
+        // in the primary mesh
+        forAll(laws, lawI)
+        {
+            // Insert values from actual material region into main sigma field
+            result +=
+                dualFaceInThisMaterialList()[lawI]*fvc::interpolate
+                (
+                    laws[lawI].impK()
+                );
+        }
+    }
+
+    Info<< "Writing " << result.name() << endl;
+    result.write();
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::surfaceScalarField>
 Foam::dualMechanicalModel::bulkModulus() const
 {
     const PtrList<mechanicalLaw>& laws = *this;
@@ -435,6 +490,7 @@ Foam::dualMechanicalModel::bulkModulus() const
         }
     }
 
+    Info<< "Writing " << result.name() << endl;
     result.write();
 
     return tresult;

@@ -429,7 +429,8 @@ bool vertexCentredLaplacian::evolve()
         source,
         fixedDofs_,
         fixedDofValues_,
-        fixedDofScale_
+        fixedDofScale_,
+        debug
     );
 
     if (debug > 1)
