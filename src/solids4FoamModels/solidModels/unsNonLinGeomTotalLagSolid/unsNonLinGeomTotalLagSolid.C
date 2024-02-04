@@ -46,6 +46,43 @@ addToRunTimeSelectionTable
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 
+void unsNonLinGeomTotalLagSolid::predict()
+{
+    Info<< "Applying linear predictor to D" << endl;
+
+    // Predict D using previous time steps
+    D() = D().oldTime() + U()*runTime().deltaT();
+
+    // Interpolate D to pointD
+    mechanical().interpolate(D(), pointD(), false);
+
+    // Update gradient of displacement
+    mechanical().grad(D(), pointD(), gradD());
+    mechanical().grad(D(), pointD(), gradDf_);
+
+    // Update gradient of displacement increment
+    gradDD() = gradD() - gradD().oldTime();
+
+    // Total deformation gradient
+    Ff_ = I + gradDf_.T();
+
+    // Inverse of the deformation gradient
+    Finvf_ = inv(Ff_);
+
+    // Jacobian of the deformation gradient
+    Jf_ = det(Ff_);
+
+    // Check if outer loops are diverging
+    if (nonLinear_ && !enforceLinear())
+    {
+        checkEnforceLinear(Jf_);
+    }
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigmaf_);
+}
+
+
 scalar unsNonLinGeomTotalLagSolid::residual(const volVectorField& D) const
 {
     return
@@ -198,7 +235,8 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
             "solutionTolerance",
             solutionTol()
         )
-    )
+    ),
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
 {
     DisRequired();
 
@@ -218,6 +256,26 @@ unsNonLinGeomTotalLagSolid::unsNonLinGeomTotalLagSolid
 
         // Let the mechanical law know
         mechanical().setRestart();
+    }
+
+    if (predictor_)
+    {
+        // Check ddt scheme for D is not steadyState
+        const word ddtDScheme
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh().ddtScheme("ddt(" + D().name() +')')
+#else
+            mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
+#endif
+        );
+
+        if (ddtDScheme == "steadyState")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "If predictor is turned on, then the ddt(" << D().name()
+                << ") scheme should not be 'steadyState'!" << abort(FatalError);
+        }
     }
 }
 
@@ -241,6 +299,11 @@ bool unsNonLinGeomTotalLagSolid::evolve()
     scalar res = 1.0;
     scalar maxRes = 0;
     scalar curConvergenceTolerance = solutionTol();
+
+    if (predictor_)
+    {
+        predict();
+    }
 
     // Reset enforceLinear switch
     enforceLinear() = false;
