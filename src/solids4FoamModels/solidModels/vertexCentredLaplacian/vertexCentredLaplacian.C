@@ -155,9 +155,37 @@ void vertexCentredLaplacian::setFixedDofs
                 // Check if this point has already been fixed
                 if (fixedDofs[pointID])
                 {
+                    // Check if the new value is consistent with the previous
+                    // fixed value
+                    if (mag(fixedDofValues[pointID] - val) > SMALL)
+                    {
+                        WarningIn
+                        (
+                            "void vertexCentredLaplacian::setFixedDofs(...)"
+                        )   << "Point " << pointID << " "
+                            << pointT.mesh().mesh().points()[pointID]
+                            << " has a prescribed value from more than one "
+                            << "patch: the value from the patch with the lowest"
+                            << " index will be used." << endl;
+                    }
+                }
+                else
+                {
                     fixedDofs[pointID] = true;
                     fixedDofValues[pointID] = val;
                 }
+            }
+        }
+    }
+
+    if (debug > 1)
+    {
+        Info<< "fixedDofs:" << endl;
+        forAll(fixedDofs, pI)
+        {
+            if (fixedDofs[pI])
+            {
+                Info<< pI << ": " << fixedDofValues[pI] << endl;
             }
         }
     }
