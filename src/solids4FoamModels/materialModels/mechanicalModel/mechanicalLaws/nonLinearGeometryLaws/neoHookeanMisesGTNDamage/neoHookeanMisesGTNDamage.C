@@ -1520,12 +1520,6 @@ void Foam::neoHookeanMisesGTNDamage::correct(volSymmTensorField& sigma)
 
     fEqn.solve();
 
-#ifdef OPENFOAM_NOT_EXTEND
-    SolverPerformance<scalar>::debug = 1;
-#else
-    blockLduMatrix::debug = 1;
-#endif
-
     gradfNonLocal_ = fvc::grad(fNonLocal_);
 }
 

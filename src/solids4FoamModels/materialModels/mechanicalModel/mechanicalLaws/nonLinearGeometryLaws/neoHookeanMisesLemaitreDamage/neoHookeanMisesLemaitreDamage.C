@@ -1501,12 +1501,6 @@ void Foam::neoHookeanMisesLemaitreDamage::correct(volSymmTensorField& sigma)
 
     damageEqn.solve();
 
-#ifdef OPENFOAM_NOT_EXTEND
-    SolverPerformance<scalar>::debug = 1;
-#else
-    blockLduMatrix::debug = 1;
-#endif
-
     gradDamageNonLocal_ = fvc::grad(damageNonLocal_);
 }
 
