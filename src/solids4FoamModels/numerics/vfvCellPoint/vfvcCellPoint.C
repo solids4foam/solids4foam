@@ -96,8 +96,8 @@ Foam::tmp<Foam::volTensorField> Foam::vfvc::grad
 
             // Add least squares contribution to the cell gradient
             cellGrad += lsVec*pointDI[pointID];
-            
-            //Info << "GradD for cell " << cellI << " and point " << pointID << ": " << cellGrad << endl; 
+
+            //Info << "GradD for cell " << cellI << " and point " << pointID << ": " << cellGrad << endl;
         }
     }
 
@@ -318,7 +318,7 @@ Foam::tmp<Foam::surfaceTensorField> Foam::vfvc::fGrad
     // Calculate constant gradient in each primary mesh cell
     const volTensorField gradD(vfvc::grad(pointD, mesh));
     const tensorField& gradDI = gradD.internalField();
-    
+
     // Set dual face gradient to primary mesh constant cell gradient and
     // replace the component in the edge direction
     // We only replace the edge component for internal dual faces
@@ -429,7 +429,7 @@ Foam::tmp<Foam::surfaceVectorField> Foam::vfvc::fGrad
     // Calculate constant gradient in each primary mesh cell
     const volVectorField gradP(vfvc::grad(pointP, mesh));
     const vectorField& gradPI = gradP.internalField();
-    
+
     // Set dual face gradient to primary mesh constant cell gradient and
     // replace the component in the edge direction
     // We only replace the edge component for internal dual faces
@@ -690,13 +690,13 @@ Foam::tmp<Foam::vectorField> Foam::vfvc::ddt
 
 Foam::tmp<Foam::pointScalarField> Foam::vfvc::laplacian
 (
-	pointScalarField& pointP,
-	const fvMesh& mesh,
-	const fvMesh& dualMesh,
-	const labelList& dualFaceToCell,
-	const labelList& dualCellToPoint,
-	const scalar& zeta,
-	const bool debug
+    pointScalarField& pointP,
+    const fvMesh& mesh,
+    const fvMesh& dualMesh,
+    const labelList& dualFaceToCell,
+    const labelList& dualCellToPoint,
+    const scalar& zeta,
+    const bool debug
 )
 {
 
@@ -728,27 +728,30 @@ Foam::tmp<Foam::pointScalarField> Foam::vfvc::laplacian
     pointScalarField& result = tresult.ref();
 #else
     pointScalarField& result = tresult();
-#endif    
-	    
-	// Take reference for clarity and efficiency
+#endif
+
+        // Take reference for clarity and efficiency
     const labelListList& cellPoints = mesh.cellPoints();
     const pointField& points = mesh.points();
     const labelList& dualOwn = dualMesh.owner();
     const labelList& dualNei = dualMesh.neighbour();
     const vectorField& dualSf = dualMesh.faceAreas();
-    
+
     //Calculate the gradient of P for each dual face
-    const surfaceVectorField dualGradPField = fGrad
+    const surfaceVectorField dualGradPField
     (
-		pointP,
-		mesh,
-		dualMesh,
-		dualFaceToCell,
-		dualCellToPoint,
-		zeta,
-		debug
-	);
-	
+        fGrad
+        (
+            pointP,
+            mesh,
+            dualMesh,
+            dualFaceToCell,
+            dualCellToPoint,
+            zeta,
+            debug
+        )
+    );
+
     // Loop over all internal faces of the dual mesh
     forAll(dualOwn, dualFaceI)
     {
@@ -769,18 +772,18 @@ Foam::tmp<Foam::pointScalarField> Foam::vfvc::laplacian
 
         // dualFaceI area vector
         const vector& curDualSf = dualSf[dualFaceI];
-        
+
         // gradP at the dual face
         const vector& dualGradP = dualGradPField[dualFaceI];
-        
+
         // Calculate the flux at the dual face
         const scalar& dualFluxP = dualGradP & curDualSf;
-        
+
         // Add the fluxes
-        result[ownPointID] += dualFluxP; 
+        result[ownPointID] += dualFluxP;
         result[neiPointID] -= dualFluxP;
     }
-    
+
     return tresult;
 }
 

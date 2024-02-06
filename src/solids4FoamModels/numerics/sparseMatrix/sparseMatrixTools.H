@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -64,6 +58,16 @@ namespace sparseMatrixTools
     //- Solve the linear system using Eigen's SparseLU direct solver
     void solveLinearSystemEigen
     (
+        const sparseScalarMatrix& matrix,
+        const scalarField& source,
+        scalarField& solution,
+        const bool exportToMatlab = false,
+        const bool debug = false
+    );
+
+    //- Solve the linear system using Eigen's SparseLU direct solver
+    void solveLinearSystemEigen
+    (
         const sparseMatrix& matrix,
         const vectorField& source,
         vectorField& solution,
@@ -74,7 +78,7 @@ namespace sparseMatrixTools
 
 #ifdef USE_PETSC
 
-    //- Solve the linear system using PETSc 
+    //- Solve the linear system using PETSc
 #ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector> solveLinearSystemPETSc
 #else
@@ -95,31 +99,6 @@ namespace sparseMatrixTools
     );
 
 #endif
-
-#ifdef USE_PETSC
-
-    //- Solve the linear system using PETSc (sparseScalarMatrix)
-#ifdef OPENFOAMESIORFOUNDATION
-    SolverPerformance<vector> solveLinearSystemPETSc
-#else
-    BlockSolverPerformance<vector> solveLinearSystemPETSc
-#endif
-    (
-        const sparseScalarMatrix& matrix,
-        const scalarField& source,
-        scalarField& solution,
-        const bool twoD,
-        fileName& optionsFile,
-        const pointField& points,
-        const boolList& ownedByThisProc,
-        const labelList& localToGlobalPointMap,
-        const labelList& stencilSizeOwned,
-        const labelList& stencilSizeNotOwned,
-        const bool debug = false
-    );
-
-#endif
-
 
     //- Set the number of non-zeros in per row in the given array
     void setNonZerosPerRow
@@ -137,6 +116,17 @@ namespace sparseMatrixTools
     //- Check the PETSc error
     //  Exit with a FatalError if it is greater than 0
     void checkErr(const int ierr);
+
+    //- Enforce fixed DOF contributions on the linear system
+    void enforceFixedDof
+    (
+        sparseScalarMatrix& matrix,
+        scalarField& source,
+        const boolList& fixedDofs,
+        const scalarField& fixedDofValues,
+        const scalar fixedDofScale,
+        const bool debug
+    );
 
     //- Enforce fixed DOF contributions on the linear system
     void enforceFixedDof

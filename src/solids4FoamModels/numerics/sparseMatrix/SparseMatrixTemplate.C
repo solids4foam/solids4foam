@@ -19,12 +19,6 @@ License
 
 #include "SparseMatrixTemplate.H"
 
-// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
-
-// namespace Foam
-// {
-//     defineTypeNameAndDebug(SparseMatrixTemplate, 0);
-// }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -33,6 +27,17 @@ Foam::SparseMatrixTemplate<Type>::SparseMatrixTemplate(const label size)
 :
     refCount(),
     data_(size)
+{}
+
+
+template<class Type>
+Foam::SparseMatrixTemplate<Type>::SparseMatrixTemplate
+(
+    const SparseMatrixTemplate& mat
+)
+:
+    refCount(),
+    data_(mat.data())
 {}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -81,8 +86,6 @@ Type& Foam::SparseMatrixTemplate<Type>::operator()
     key[0] = rowI;
     key[1] = colI;
 
-    FatalError
-        << "stop" << abort(FatalError);
     // Return a reference to the entry
     // If it does not exist then it will be initialised to zero first
     typename SparseMatrixTemplateData::iterator iter = data_.find(key);

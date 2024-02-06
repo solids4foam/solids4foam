@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -86,12 +80,12 @@ Foam::tensor& Foam::sparseMatrix::operator()
 
 void Foam::sparseMatrix::print() const
 {
-    Info << "Print out sparseMatrix coefficients: " << endl;
+    Info<< "void Foam::sparseMatrix::print() const" << endl;
 
-    //Create a vector to store the matrix indices
+    // Create a vector to store the matrix indices
     std::vector<FixedList<label, 2>> keys(data_.size());
 
-    //Insert the matrix indices into the vector for all data
+    // Insert the matrix indices into the vector for all data
     int i = 0;
     for (auto iter = data_.begin(); iter != data_.end(); ++iter)
     {
@@ -99,27 +93,27 @@ void Foam::sparseMatrix::print() const
         i++;
     }
 
-    //Define custom sorting criteria
+    // Define custom sorting criteria
     auto cmp = [](const FixedList<label, 2>& a, const FixedList<label, 2>& b)
     {
         if (a[0] < b[0])
         {
-                return true;
+            return true;
         }
         else if (a[0] == b[0])
         {
-                return a[1] < b[1];
+            return a[1] < b[1];
         }
         else
         {
-                return false;
+            return false;
         }
     };
 
-    //Sort keys by row and column
+    // Sort keys by row and column
     std::sort(keys.begin(), keys.end(), cmp);
 
-    //Print out sorted values
+    // Print out sorted values
     for (unsigned long k = 0; k < keys.size(); ++k)
     {
         const label rowI = keys[k][0];
