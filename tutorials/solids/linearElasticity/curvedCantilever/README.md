@@ -102,7 +102,7 @@ Figures 2 and 3 show $$\sigma_{xx}$$, $$\sigma_{xy}$$ and $$\sigma_{yy}$$ stress
 
 ## Running the Case
 
-The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/cooksMembrane`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the `Allrun` consists of creating the mesh using `blockMesh` (`> ./blockMesh`) followed by running the `solids4foam` solver (`> ./solids4Foam`) and `> ./sample` utility. Optionally, if `gnuplot` is installed, the stress distribution is plotted in the `sigmaAtTheta45deg.png` file.
+The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/curvedCantilever`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the `Allrun` consists of creating the mesh using `blockMesh` (`> ./blockMesh`) followed by running the `solids4foam` solver (`> ./solids4Foam`) and `> ./sample` utility. Optionally, if `gnuplot` is installed, the stress distribution is plotted in the `sigmaAtTheta45deg.png` file.
 
 ```warning
 The coupled version of this case, which uses the `coupledUnsLinearGeometryLinearElastic`, can currently only be run using solids4foam built on foam-extend. To modify the case to run with the segregated `linearGeometryTotalDisplacement` solid model, follow the instructions in `tutorials/solids/linearElasticity/narrowTmember/README.md` file. 
