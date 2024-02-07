@@ -722,6 +722,9 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
     // Vector field version of pointDcorr
     vectorField pointDcorrVec(pointD().internalField().size(), vector::zero);
 
+    // Initialise the source
+    vectorField source(mesh().nPoints(), vector::zero);
+
     // Outer loop over momentum equation
     int iCorr = 0;
     scalar initResidual = 0.0;
@@ -751,7 +754,7 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
         dualMechanicalPtr_().correct(dualSigmaf_);
 
         // Update the source vector
-        vectorField source(mesh().nPoints(), vector::zero);
+        source = vector::zero;
         pointD().correctBoundaryConditions();
         updateSource(source, dualMeshMap().dualCellToPoint());
 
@@ -783,16 +786,7 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
                 debug
             );
 
-            // Solve linear system for displacement correction
-            if (debug)
-            {
-                Info<< "bool vertexCentredSegregatedLinGeomSolid::evolve(): "
-                    << " solving linear system: start" << endl;
-            }
-            else
-            {
-                Info<< "    Solving" << endl;
-            }
+            // Solve linear system for displacement component correction
 
             // For now, use Eigen as linesr solver
             // We can add PETSc or other aproaches later
@@ -810,12 +804,6 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
                 );
             }
 
-            if (debug)
-            {
-                Info<< "bool vertexCentredSegregatedLinGeomSolid::evolve(): "
-                    << " solving linear system: end" << endl;
-            }
-
 #ifdef OPENFOAM_NOT_EXTEND
             pointD().primitiveFieldRef().replace
             (
@@ -831,7 +819,7 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
             pointD().correctBoundaryConditions();
         }
 
-        //         // Update point accelerations
+//         // Update point accelerations
 //         // Note: for NewmarkBeta, this needs to come before the pointU update
 // #ifdef OPENFOAM_NOT_EXTEND
 //         pointA_.primitiveFieldRef() =
