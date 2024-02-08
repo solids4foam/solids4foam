@@ -48,12 +48,20 @@ namespace Foam
 
 namespace vfvc
 {
-    // Gradient field
+    // Gradient field of a vector field
     // Returns volTensorField on primary mesh
     tmp<volTensorField> grad
     (
         const pointVectorField& pointD, // primary mesh point displacement
         const fvMesh& mesh              // primary mesh
+    );
+    
+    // Gradient field of a scalar field
+    // Returns volVectorField on primary mesh
+    tmp<volVectorField> grad
+    (
+      const pointScalarField& pointP, // primary mesh point pressure
+      const fvMesh& mesh // primary mesh
     );
 
     // Gradient field
@@ -70,6 +78,20 @@ namespace vfvc
     tmp<surfaceTensorField> fGrad
     (
         const pointVectorField& pointD, // primary mesh point displacement
+        const fvMesh& mesh,             // primary mesh
+        const fvMesh& dualMesh,         // dual mesh
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const scalar zeta, // fraction of compact edge direction component used
+        const bool debug = false
+    );
+    
+    // Gradient field of pressure
+    // Returns surfaceScalarField on dual mesh
+    // Only calculates the gradient for internal faces
+    tmp<surfaceVectorField> fGrad
+    (
+        const pointScalarField& pointP, // primary mesh point pressure
         const fvMesh& mesh,             // primary mesh
         const fvMesh& dualMesh,         // dual mesh
         const labelList& dualFaceToCell,
@@ -97,16 +119,18 @@ namespace vfvc
         ITstream& d2dt2Scheme,
         const pointVectorField& pointP // displacement
     );
-
-    // <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
-    // Returns laplacian of (gamma & pf) field on the dual mesh
-    // tmp<pointVectorField> laplacian
-    // (
-    //     const tensor& gamma,
-    //     const pointVectorField& pf,
-    //     const fvMesh& dualMesh,
-    //     const labelList& dualCellToPoint
-    // );
+    
+    // Returns the laplacian of a scalar field on the dual mesh
+    tmp<pointScalarField> laplacian
+    (
+		pointScalarField& pointP,
+		const fvMesh& mesh,
+		const fvMesh& dualMesh,
+		const labelList& dualFaceToCell,
+		const labelList& dualCellToPoint,
+		const scalar& zeta,
+		const bool debug
+    );
 
 } // End namespace vfvc
 

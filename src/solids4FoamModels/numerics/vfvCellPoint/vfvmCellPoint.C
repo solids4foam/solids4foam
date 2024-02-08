@@ -155,6 +155,95 @@ void Foam::vfvm::divSigma
 }
 
 
+void Foam::vfvm::laplacian
+(
+    sparseScalarMatrix& matrix,
+    const fvMesh& mesh,
+    const fvMesh& dualMesh,
+    const labelList& dualFaceToCell,
+    const labelList& dualCellToPoint,
+    const scalarField& diffusivity,
+    const bool debug
+)
+{
+    if (debug)
+    {
+        Info<< "void Foam::vfvm::laplacian(...): start" << endl;
+    }
+
+    // Take references for clarity and efficiency
+    const labelListList& cellPoints = mesh.cellPoints();
+    const labelList& dualOwn = dualMesh.owner();
+    const labelList& dualNei = dualMesh.neighbour();
+    const vectorField& dualSf = dualMesh.faceAreas();
+    const cellPointLeastSquaresVectors& cellPointLeastSquaresVecs =
+        cellPointLeastSquaresVectors::New(mesh);
+    const List<vectorList>& leastSquaresVecs =
+        cellPointLeastSquaresVecs.vectors();
+
+    // Loop over all internal faces of the dual mesh
+    forAll(dualOwn, dualFaceI)
+    {
+        // Primary mesh cell in which dualFaceI resides
+        const label cellID = dualFaceToCell[dualFaceI];
+
+        // Diffusivity in the primary cells
+        const scalar diffCellID = diffusivity[cellID];
+
+        // Points in cellID
+        const labelList& curCellPoints = cellPoints[cellID];
+
+        // Dual cell owner of dualFaceI
+        const label dualOwnCellID = dualOwn[dualFaceI];
+
+        // Dual cell neighbour of dualFaceI
+        const label dualNeiCellID = dualNei[dualFaceI];
+
+        // Primary mesh point at the centre of dualOwnCellID
+        const label ownPointID = dualCellToPoint[dualOwnCellID];
+
+        // Primary mesh point at the centre of dualNeiCellID
+        const label neiPointID = dualCellToPoint[dualNeiCellID];
+
+        // dualFaceI area vector
+        const vector& curDualSf = dualSf[dualFaceI];
+
+        // Least squares vectors for cellID
+        const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
+
+        // dualFaceI will contribute coefficients to the equation for each
+        // primary mesh point in the dual own cell, and, if an internal
+        // face, the dual neighbour cell
+
+        forAll(curCellPoints, cpI)
+        {
+            // Primary point index
+            const label pointID = curCellPoints[cpI];
+
+            // Take a copy of the least squares vector from the centre of
+            // cellID to pointI
+            const vector lsVec = curLeastSquaresVecs[cpI];
+
+            // Calculate the coefficient for this point coming from dualFaceI
+            const scalar coeff = diffCellID*curDualSf & lsVec;
+
+            // Add the coefficient to the ownPointID equation coming from
+            // pointID
+            matrix(ownPointID, pointID) += coeff;
+
+            // Add the coefficient to the neiPointID equation coming from
+            // pointID
+            matrix(neiPointID, pointID) -= coeff;
+        }
+    }
+
+    if (debug)
+    {
+        Info<< "void Foam::vfvm::laplacian(...): end" << endl;
+    }
+}
+
+
 void Foam::vfvm::d2dt2
 (
     ITstream& d2dt2Scheme,

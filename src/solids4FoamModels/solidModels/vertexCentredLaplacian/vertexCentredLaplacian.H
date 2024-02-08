@@ -16,12 +16,10 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    vertexCentredNonLinGeomTotalLagSolid
+    vertexCentredLaplacian
 
 Description
-    Mathematical model where linear geometry is assumed i.e. small strains and
-    small rotations are assumed, and the total displacement is the primary
-    unknown.
+    Vertex-centred solver for the Laplace equation.
 
     Discretisation is performed using a vertex-centred finite volume approach
     where the governing equations are integrated over a dual mesh. The dual mesh
@@ -29,14 +27,15 @@ Description
 
 Author
     Philip Cardiff, UCD.  All rights reserved.
+    Federico Mazzanti, UCD. All rights reserved.
 
 SourceFiles
-    vertexCentredNonLinGeomTotalLagSolid.C
+    vertexCentredLaplacian.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef vertexCentredNonLinGeomTotalLagSolid_H
-#define vertexCentredNonLinGeomTotalLagSolid_H
+#ifndef vertexCentredLaplacian_H
+#define vertexCentredLaplacian_H
 
 #include "solidModel.H"
 #include "volFields.H"
@@ -47,6 +46,9 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
+#ifdef OPENFOAM_COM
+    #include "pointVolInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -59,34 +61,20 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-             Class vertexCentredNonLinGeomTotalLagSolid Declaration
+                   Class vertexCentredLaplacian Declaration
 \*---------------------------------------------------------------------------*/
 
-class vertexCentredNonLinGeomTotalLagSolid
+class vertexCentredLaplacian
 :
     public solidModel
 {
     // Private Data
 
-        //- Mechanical model for dual mesh
-        autoPtr<dualMechanicalModel> dualMechanicalPtr_;
+        //- Point solution field, e.g. temperature
+        pointScalarField pointT_;
 
-        //- Flag to enable full Newton-Raphson approach, where the stiffness
-        //  matrix is updated once per outer iteration. Alternatively, the
-        //  stiffness matrix is only updated once per time-step
-        const Switch fullNewton_;
-
-        //- Flag to include geometric stiffness
-        const Switch geometricStiffness_;
-
-        //- Flag to enable steadyState
-        Switch steadyState_;
-
-        //- Flag to enable resolution of the pressure equation
-        const Switch solvePressureEquation_;
-
-        //- Pressure smoothing factor
-        const scalar pressureFactor_;
+        //- Diffusivity
+        const scalar diffusivity_;
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
@@ -97,57 +85,27 @@ class vertexCentredNonLinGeomTotalLagSolid
         boolList fixedDofs_;
 
         //- Values for fixed degrees of freedom
-        //  Currently the size of this list is equal to the number of points
-        pointField fixedDofValues_;
-
-        //- Fixed directions for fixed degrees of freedom
-        //  Calculated as sqr(n) where n is a fixed direction, e.g. I for fully
-        //  fixed
-        symmTensorField fixedDofDirections_;
+        //  The size of this list is equal to the number of points
+        scalarField fixedDofValues_;
 
         //- Scale factor for the fixed degree of freedom equations to improve the
         //  matrix conditioning
         const scalar fixedDofScale_;
 
-        //- Point pressure
-        pointScalarField pointP_;
-
-        //- Point velocity
-        pointVectorField pointU_;
-
-        //- Point acceleration field
-        pointVectorField pointA_;
-
-        //- Point density field
-        pointScalarField pointRho_;
-
         //- Point volume field
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
 
-        //- Displacement gradient field at the dual mesh faces
-        surfaceTensorField dualGradDf_;
-
-        //- Stress field at the dual mesh faces
-        surfaceSymmTensorField dualSigmaf_;
-
-        //- Deformation gradient field at the dual mesh faces
-        surfaceTensorField dualFf_;
-
-        //- Inverse of the deformation gradient field at the dual mesh faces
-        surfaceTensorField dualFinvf_;
-
-        //- Jacobian of the deformation gradient field at the dual mesh faces
-        surfaceScalarField dualJf_;
-
-        //- Pressure at the dual mesh faces
-        surfaceScalarField dualPf_;
-        
-        //- Cell pressure
-        volScalarField volP_;
+        //- Solution gradient field at the dual mesh faces
+        surfaceVectorField dualGradTf_;
 
         //- Local-to-global point map and owner list
         globalPointIndices globalPointIndices_;
+
+#ifdef OPENFOAM_COM
+        //- Interpolator from points to cells
+        pointVolInterpolation pointVolInterp_;
+#endif
 
 
     // Private Member Functions
@@ -155,77 +113,36 @@ class vertexCentredNonLinGeomTotalLagSolid
         //- Update the source vector for the linear system
         void updateSource
         (
-            vectorField& source,
+            scalarField& source,
+            const pointScalarField& pointT,
+            const surfaceVectorField& dualGradTf,
+            const scalar diffusivity,
             const labelList& dualCellToPoint
         );
 
         //- Set fixed degree of freedom lists
         void setFixedDofs
         (
-            const pointVectorField& pointD,
+            const pointScalarField& pointT,
             boolList& fixedDofs,
-            pointField& fixedDofValues,
-            symmTensorField& fixedDofDirections
+            scalarField& fixedDofValues
         ) const;
 
-        //- Enforce extact tractions on traction boundaries
-        void enforceTractionBoundaries
+        //- Enforce specified gradient boundary conditions on the flux, i.e.
+        //  Neumann/natural boundary condition
+        void enforceGradientBoundaries
         (
-            const pointVectorField& pointD,
-            surfaceVectorField& dualTraction,
-            const fvMesh& mesh, // corresponding to pointD mesh
+            const pointScalarField& pointT,
+            surfaceScalarField& dualFlux,
+            const fvMesh& mesh, // corresponding to pointT mesh
             const labelListList& pointToDualFaces
         ) const;
 
-        //- Check convergence of Newton-Raphson loop
-        bool converged
-        (
-            const label iCorr,
-            scalar& initResidual,
-            const scalar res,
-            const label nInterations,
-            const pointVectorField& pointD,
-            const vectorField& pointDcorr
-        ) const;
-
-        //- Calculate line search slope for the given eta parameter
-        scalar calculateLineSearchSlope
-        (
-            const scalar eta,
-            const vectorField& pointDcorr,
-            pointVectorField& pointD,
-            surfaceTensorField& dualGradDf,
-            surfaceSymmTensorField& dualSigmaf,
-            const scalar zeta
-        );
-
-        scalar calculateLineSearchFactor
-        (
-            const scalar rTol, // Slope reduction tolerance
-            const int maxIter, // Maximum number of line search iterations
-            const vectorField& pointDcorr, // Point displacement correction
-            const vectorField& source, // Linear system source
-            const scalar zeta // Discretisation parameter
-        );
-
-        Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
-		geometricStiffnessField
-		(
-			const surfaceVectorField SfUndef, //Undeformed surface area vector field
-			const surfaceTensorField gradDRef //Reference gradD 
-		) const; 
-	
-		Foam::tmp<tensorField>
-		pBarSensitivityField
-		(
-			const volTensorField gradDRef //Reference gradD
-		) const;
-
         //- Disallow default bitwise copy construct
-        vertexCentredNonLinGeomTotalLagSolid(const vertexCentredNonLinGeomTotalLagSolid&);
+        vertexCentredLaplacian(const vertexCentredLaplacian&);
 
         //- Disallow default bitwise assignment
-        void operator=(const vertexCentredNonLinGeomTotalLagSolid&);
+        void operator=(const vertexCentredLaplacian&);
 
 
 protected:
@@ -235,19 +152,20 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            return nonLinearGeometry::TOTAL_LAGRANGIAN;
+            // Not used but required by solidModel base class
+            return nonLinearGeometry::LINEAR_GEOMETRY;
         }
 
 
 public:
 
     //- Runtime type information
-    TypeName("vertexCentredNonLinTotalLagGeometry");
+    TypeName("vertexCentredLaplacian");
 
     // Constructors
 
         //- Construct from components
-        vertexCentredNonLinGeomTotalLagSolid
+        vertexCentredLaplacian
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -255,7 +173,7 @@ public:
 
     // Destructor
 
-        virtual ~vertexCentredNonLinGeomTotalLagSolid();
+        virtual ~vertexCentredLaplacian();
 
 
     // Member Functions
@@ -268,7 +186,7 @@ public:
             {
                 notImplemented("For vertex-centred approach");
 
-                // This model solves for D
+                // Keep compiler happy
                 return D();
             }
 
@@ -290,14 +208,6 @@ public:
                 // Keep compiler happy
                 return tmp<vectorField>(new vectorField());
             }
-
-            //- Set traction at specified patch
-            virtual void setTraction
-            (
-                const label interfaceI,
-                const label patchID,
-                const vectorField& faceZoneTraction
-            );
 
         // Write
 

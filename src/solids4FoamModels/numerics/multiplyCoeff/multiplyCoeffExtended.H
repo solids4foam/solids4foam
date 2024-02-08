@@ -57,11 +57,21 @@ namespace Foam
 
     // The multiplication evaluates the following in index notation:
     //     coeff_i = Sf_m P_mi where P = d(s - pI)/dp
-    void multiplyCoeffPressure
+    void momEqnMultiplyPressureCoeff
 	(
 		vector& coeff,
 		const vector& Sf,
-		const symmTensor& P
+		const symmTensor& pressureSensitivity
+	);
+	
+    // The multiplication evaluates the following in index notation:
+    //     coeff =  d(Pbar)/dG * g where G is the gradient of displacement
+    //     and g is a vector.
+	void pressEqnMultiplyDispCoeff
+	(
+		vector& coeff,
+		const tensor& dispResidualSensitivity, 
+		const vector& g
 	);
 
 } // End namespace Foam

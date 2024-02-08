@@ -505,14 +505,17 @@ public:
             return RectangularMatrix<scalar>(0);
         }
 
-#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent field for Newton Raphson loop
         //  The size of this field should be mesh.nFaces()
         virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
-
-		//- Sensitivity term for Newton Raphson loop in total Lagrangian formulation
-		virtual tmp<Field<RectangularMatrix<scalar>>> sensitivityTermTotalLagField() const;
-#endif
+		
+		    //- Pressure sensitivity for the momentum equation in total Lagrangian formulation
+		    //- d(s - pI)/dp.
+		    virtual tmp<symmTensorField> pressureSensitivityField() const;
+		
+        //- Displacement sensitivity of the pressure equation in total Lagrangian formulation
+        //- d(pBar)/dG.
+        tmp<tensorField> pressEqnDispSensitivityField() const;
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const

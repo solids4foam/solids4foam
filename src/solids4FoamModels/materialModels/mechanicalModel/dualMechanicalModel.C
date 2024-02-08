@@ -440,6 +440,77 @@ Foam::dualMechanicalModel::bulkModulus() const
     return tresult;
 }
 
+Foam::tmp<Foam::symmTensorField>
+Foam::dualMechanicalModel::pressureSensitivityFaceField() const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    // Prepare the field
+    tmp< Foam::symmTensorField > tresult
+    (
+        new Foam::symmTensorField(mesh().nFaces(), Foam::symmTensor::zero)
+    );
+#ifdef OPENFOAMESIORFOUNDATION
+    Foam::symmTensorField& result = tresult.ref();
+#else
+    Foam::symmTensorField& result = tresult();
+#endif
+
+    if (laws.size() == 1)
+    {
+        result = laws[0].pressureSensitivityField();
+
+        if (result.size() != mesh().nFaces())
+        {
+            FatalErrorIn("dualMechanicalModel::pressureSensitivityField()")
+                << "The pressureSensitivity field for law 0 is the wrong size!"
+                << abort(FatalError);
+        }
+    }
+    else
+    {  
+        notImplemented("Not implemented for more than one material");
+    }
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::tensorField>
+Foam::dualMechanicalModel::pressEqnDispSensitivityFaceField() const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    // Prepare the field
+    tmp< Foam::tensorField > tresult
+    (
+        new Foam::tensorField(mesh().nFaces(), Foam::tensor::zero)
+    );
+#ifdef OPENFOAMESIORFOUNDATION
+    Foam::tensorField& result = tresult.ref();
+#else
+    Foam::tensorField& result = tresult();
+#endif
+
+    if (laws.size() == 1)
+    {
+        result = laws[0].pressEqnDispSensitivityField();
+
+        if (result.size() != mesh().nFaces())
+        {
+            FatalErrorIn("dualMechanicalModel::pressureSensitivityField()")
+                << "The pressureSensitivity field for law 0 is the wrong size!"
+                << abort(FatalError);
+        }
+    }
+    else
+    {
+        notImplemented("Not implemented for more than one material");
+    }
+
+    return tresult;
+}
+
 void Foam::dualMechanicalModel::correct(surfaceSymmTensorField& sigma)
 {
     PtrList<mechanicalLaw>& laws = *this;

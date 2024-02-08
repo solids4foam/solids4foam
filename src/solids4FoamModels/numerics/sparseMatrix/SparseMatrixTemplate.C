@@ -17,26 +17,33 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "sparseMatrix.H"
+#include "SparseMatrixTemplate.H"
 
-// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
-
-namespace Foam
-{
-    defineTypeNameAndDebug(sparseMatrix, 0);
-}
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::sparseMatrix::sparseMatrix(const label size)
+template<class Type>
+Foam::SparseMatrixTemplate<Type>::SparseMatrixTemplate(const label size)
 :
     refCount(),
     data_(size)
 {}
 
+
+template<class Type>
+Foam::SparseMatrixTemplate<Type>::SparseMatrixTemplate
+(
+    const SparseMatrixTemplate& mat
+)
+:
+    refCount(),
+    data_(mat.data())
+{}
+
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::label Foam::sparseMatrix::nBlockRows() const
+template<class Type>
+Foam::label Foam::SparseMatrixTemplate<Type>::nBlockRows() const
 {
     label nBlockRows = 0;
 
@@ -51,7 +58,24 @@ Foam::label Foam::sparseMatrix::nBlockRows() const
 }
 
 
-Foam::tensor& Foam::sparseMatrix::operator()
+template<class Type>
+void Foam::SparseMatrixTemplate<Type>::print() const
+{
+    Info<< "void Foam::SparseMatrixTemplate::print() const" << endl;
+
+    for (auto iter = data_.begin(); iter != data_.end(); ++iter)
+    {
+        const label rowI = iter.key()[0];
+        const label colI = iter.key()[1];
+        const Type& val = *iter;
+
+        Info<< "(" << rowI << ", " << colI << "): " << val << endl;
+    }
+}
+
+
+template<class Type>
+Type& Foam::SparseMatrixTemplate<Type>::operator()
 (
     const label rowI,
     const label colI
@@ -64,63 +88,16 @@ Foam::tensor& Foam::sparseMatrix::operator()
 
     // Return a reference to the entry
     // If it does not exist then it will be initialised to zero first
-    sparseMatrixData::iterator iter = data_.find(key);
+    typename SparseMatrixTemplateData::iterator iter = data_.find(key);
 
     if (iter == data_.end())
     {
-        data_.insert(key, tensor::zero);
+        data_.insert(key, pTraits<Type>::zero);
         return *(data_.find(key));
     }
     else
     {
         return *iter;
-    }
-}
-
-
-void Foam::sparseMatrix::print() const
-{
-    Info<< "Print out sparseMatrix coefficients: " << endl;
-
-    // Create a vector to store the matrix indices
-    std::vector<FixedList<label, 2>> keys(data_.size());
-
-    // Insert the matrix indices into the vector for all data
-    int i = 0;
-    for (auto iter = data_.begin(); iter != data_.end(); ++iter)
-    {
-        keys[i] = iter.key();
-        i++;
-    }
-
-    // Define custom sorting criteria
-    auto cmp = [](const FixedList<label, 2>& a, const FixedList<label, 2>& b)
-    {
-        if (a[0] < b[0])
-        {
-            return true;
-        }
-        else if (a[0] == b[0])
-        {
-            return a[1] < b[1];
-        }
-        else
-        {
-            return false;
-        }
-    };
-
-    // Sort keys by row and column
-    std::sort(keys.begin(), keys.end(), cmp);
-
-    // Print out sorted values
-    for (unsigned long k = 0; k < keys.size(); ++k)
-    {
-        const label rowI = keys[k][0];
-        const label colI = keys[k][1];
-        const tensor& coeff = data_[keys[k]];
-
-        Info<< "(" << rowI << ", " << colI << ") : " << coeff << endl;
     }
 }
 

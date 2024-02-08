@@ -1,4 +1,10 @@
 /*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | foam-extend: Open Source CFD
+   \\    /   O peration     | Version:     3.2
+    \\  /    A nd           | Web:         http://www.foam-extend.org
+     \\/     M anipulation  | For copyright notice see file Copyright
+-------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -17,19 +23,15 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "sparseMatrixTools.H"
+#include "sparseMatrixExtendedTools.H"
 #include "OFstream.H"
-#ifndef S4F_NO_USE_EIGEN
-    #include <Eigen/Sparse>
-    #include <unsupported/Eigen/SparseExtra>
-#endif
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif
 
 // * * * * * * * * * * * * * * * * * Functions  * * * * * * * * * * * * * * * //
 
-bool Foam::sparseMatrixTools::checkTwoD(const polyMesh& mesh)
+bool Foam::sparseMatrixExtendedTools::checkTwoD(const polyMesh& mesh)
 {
     const Vector<label>& geomD = mesh.geometricD();
 
@@ -64,293 +66,19 @@ bool Foam::sparseMatrixTools::checkTwoD(const polyMesh& mesh)
     return twoD;
 }
 
-
-void Foam::sparseMatrixTools::solveLinearSystemEigen
-(
-    const sparseScalarMatrix& matrix,
-    const scalarField& source,
-    scalarField& solution,
-    const bool exportToMatlab,
-    const bool debug
-)
-{
-#ifdef S4F_NO_USE_EIGEN
-    FatalErrorIn("void Foam::sparseMatrixTools::solveLinearSystemEigen(...)")
-        << "This function cannot be called as the S4F_NO_USE_EIGEN variable "
-        << " is set.  If you would like to use this option then unset the "
-        << "S4F_NO_USE_EIGEN variable and re-run the top-level Allwmake script"
-        << abort(FatalError);
-#else
-    // For now, we can directly use the Eigen direct solver to solve the
-    // linear system
-
-    // Define the number of degrees of freedom
-    const label nDof = solution.size();
-
-    // Create Eigen matrix triplets to store coefficients
-    std::vector< Eigen::Triplet<scalar> > coefficients;
-    coefficients.reserve(nDof);
-
-    const HashTable
-    <
-     	scalar, FixedList<label, 2>, FixedList<label, 2>::Hash<>
-    >& data = matrix.data();
-
-    for (auto iter = data.begin(); iter != data.end(); ++iter)
-    {
-        const scalar& coeff = iter();
-
-        const label rowI = iter.key()[0];
-        const label colI = iter.key()[1];
-
-        coefficients.push_back(Eigen::Triplet<scalar>(rowI, colI, coeff));
-    }
-
-    // Create Eigen sparse matrix
-    Eigen::SparseMatrix<scalar> A(nDof, nDof);
-
-    // Insert triplets into the matrix
-    A.setFromTriplets(coefficients.begin(), coefficients.end());
-
-    // Compressing matrix is meant to help performance
-    A.makeCompressed();
-
-    // Create source vector
-    Eigen::Matrix<scalar, Eigen::Dynamic, 1> b(nDof);
-    {
-        label index = 0;
-        forAll(source, i)
-        {
-            b(index++) = source[i];
-        }
-    }
-
-    if (exportToMatlab)
-    {
-        Info<< "Exporting linear system to matlabSparseMatrix.txt and "
-            << "matlabSource.txt" << endl;
-
-        // Write matrix
-        Eigen::saveMarket(A, "matlabSparseMatrix.txt");
-
-        // Write source
-        OFstream sourceFile("matlabSource.txt");
-        for (int rowI = 0; rowI < A.rows(); rowI++)
-        {
-            sourceFile
-                << b(rowI) << endl;
-        }
-    }
-
-    // Construct the solver
-    Eigen::SparseLU
-    <
-        Eigen::SparseMatrix<scalar>, Eigen::COLAMDOrdering<int>
-    > solver(A);
-
-    // Initialise the solution vector to zero
-    Eigen::Matrix<scalar, Eigen::Dynamic, 1> x(nDof);
-    x.setZero();
-
-    // Check initial residual
-    const Eigen::Matrix<scalar, Eigen::Dynamic, 1> initResidual = A*x - b;
-
-    // Exit early if the initial residual is small
-    if (initResidual.squaredNorm() < 1e-12)
-    {
-        Info<< "    Linear solver initial residual is "
-            << initResidual.squaredNorm() << ": exiting" << endl;
-    }
-    else
-    {
-        // Solve system
-        x = solver.solve(b);
-    }
-
-    // Copy  to solution field
-    {
-        label index = 0;
-        forAll(solution, i)
-        {
-            solution[i] = x(index++);
-        }
-    }
-#endif
-}
-
-
-void Foam::sparseMatrixTools::solveLinearSystemEigen
-(
-    const sparseMatrix& matrix,
-    const vectorField& source,
-    vectorField& solution,
-    const bool twoD,
-    const bool exportToMatlab,
-    const bool debug
-)
-{
-#ifdef S4F_NO_USE_EIGEN
-    FatalErrorIn("void Foam::sparseMatrixTools::solveLinearSystemEigen(...)")
-        << "This function cannot be called as the S4F_NO_USE_EIGEN variable "
-        << " is set.  If you would like to use this option then unset the "
-        << "S4F_NO_USE_EIGEN variable and re-run the top-level Allwmake script"
-        << abort(FatalError);
-#else
-    // For now, we can directly use the Eigen direct solver to solve the
-    // linear system
-
-    // Define the number of degrees of freedom
-    label nDof;
-    if (twoD)
-    {
-        nDof = 2*solution.size();
-    }
-    else
-    {
-        nDof = 3*solution.size();
-    }
-
-    // Create Eigen matrix triplets to store coefficients
-    std::vector< Eigen::Triplet<scalar> > coefficients;
-    coefficients.reserve(nDof);
-
-    const sparseMatrixData& data = matrix.data();
-    for
-    (
-        sparseMatrixData::const_iterator iter = data.begin();
-        iter != data.end();
-        ++iter
-    )
-    {
-        const tensor& coeff = iter();
-
-        if (twoD)
-        {
-            const label rowI = 2*iter.key()[0];
-            const label colI = 2*iter.key()[1];
-
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI, colI, coeff.xx()));
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI, colI+1, coeff.xy()));
-
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI+1, colI, coeff.yx()));
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI+1, colI+1, coeff.yy()));
-        }
-        else // 3-D
-        {
-            const label rowI = 3*iter.key()[0];
-            const label colI = 3*iter.key()[1];
-
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI, colI, coeff.xx()));
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI, colI+1, coeff.xy()));
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI, colI+2, coeff.xz()));
-
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI+1, colI, coeff.yx()));
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI+1, colI+1, coeff.yy()));
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI+1, colI+2, coeff.yz()));
-
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI+2, colI, coeff.zx()));
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI+2, colI+1, coeff.zy()));
-            coefficients.push_back(Eigen::Triplet<scalar>(rowI+2, colI+2, coeff.zz()));
-        }
-    }
-
-    // Create Eigen sparse matrix
-    Eigen::SparseMatrix<scalar> A(nDof, nDof);
-
-    // Insert triplets into the matrix
-    A.setFromTriplets(coefficients.begin(), coefficients.end());
-
-    // Compressing matrix is meant to help performance
-    A.makeCompressed();
-
-    // Create source vector
-    Eigen::Matrix<scalar, Eigen::Dynamic, 1> b(nDof);
-    {
-        label index = 0;
-        forAll(source, i)
-        {
-            b(index++) = source[i].x();
-            b(index++) = source[i].y();
-
-            if (!twoD)
-            {
-                b(index++) = source[i].z();
-            }
-        }
-    }
-
-    if (exportToMatlab)
-    {
-        Info<< "Exporting linear system to matlabSparseMatrix.txt and "
-            << "matlabSource.txt" << endl;
-
-        // Write matrix
-        Eigen::saveMarket(A, "matlabSparseMatrix.txt");
-
-        // Write source
-        OFstream sourceFile("matlabSource.txt");
-        for (int rowI = 0; rowI < A.rows(); rowI++)
-        {
-            sourceFile
-                << b(rowI) << endl;
-        }
-    }
-
-    // Construct the solver
-    Eigen::SparseLU
-    <
-        Eigen::SparseMatrix<scalar>, Eigen::COLAMDOrdering<int>
-    > solver(A);
-
-    // Initialise the solution vector to zero
-    Eigen::Matrix<scalar, Eigen::Dynamic, 1> x(nDof);
-    x.setZero();
-
-    // Check initial residual
-    const Eigen::Matrix<scalar, Eigen::Dynamic, 1> initResidual = A*x - b;
-
-    // Exit early if the initial residual is small
-    if (initResidual.squaredNorm() < 1e-12)
-    {
-        Info<< "    Linear solver initial residual is "
-            << initResidual.squaredNorm() << ": exiting" << endl;
-    }
-    else
-    {
-        // Solve system
-        x = solver.solve(b);
-    }
-
-    // Copy  to solution field
-    {
-        label index = 0;
-        forAll(solution, i)
-        {
-            solution[i].x() = x(index++);
-            solution[i].y() = x(index++);
-
-            if (!twoD)
-            {
-                solution[i].z() = x(index++);
-            }
-        }
-    }
-#endif
-}
-
-
 #ifdef USE_PETSC
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     Foam::SolverPerformance<Foam::vector>
 #else
     Foam::BlockSolverPerformance<Foam::vector>
 #endif
-Foam::sparseMatrixTools::solveLinearSystemPETSc
+
+Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
 (
-    const sparseMatrix& matrix,
-    const vectorField& source,
-    vectorField& solution,
+    const sparseMatrixExtended& matrix,
+    const Field<RectangularMatrix<scalar>>& source,
+    Field<RectangularMatrix<scalar>>& solution,
     const bool twoD,
     fileName& optionsFile,
     const pointField& points,
@@ -364,14 +92,14 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     if (debug)
     {
         Info<< "BlockSolverPerformance<vector> "
-            << "sparseMatrixTools::solveLinearSystemPETSc: start" << endl;
+            << "sparseMatrixExtendedTools::solveLinearSystemPETSc: start" << endl;
     }
 
-    // Set the block coefficient size (2 for 2-D, 3 for 3-D)
-    label blockSize = 3;
+    // Set the block coefficient size (3 for 2-D, 4 for 3-D)
+    label blockSize = 4;
     if (twoD)
     {
-        blockSize = 2;
+        blockSize = 3;
     }
 
     // Find size of global system, i.e. the highest global point index + 1
@@ -528,25 +256,26 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         Pout<< "    Inserting PETSc matrix coefficients: start" << endl;
     }
 
-    const sparseMatrixData& data = matrix.data();
+    const sparseMatrixExtendedData& data = matrix.data();
     for
     (
-        sparseMatrixData::const_iterator iter = data.begin();
+        sparseMatrixExtendedData::const_iterator iter = data.begin();
         iter != data.end();
         ++iter
     )
     {
-        const tensor& coeff = iter();
+        const RectangularMatrix<scalar>& coeff = iter();
         const label blockRowI = localToGlobalPointMap[iter.key()[0]];
         const label blockColI = localToGlobalPointMap[iter.key()[1]];
 
         if (twoD)
         {
             // Prepare values
-            const PetscScalar values[4] =
+            const PetscScalar values[9] =
             {
-                coeff.xx(), coeff.xy(),
-                coeff.yx(), coeff.yy()
+                coeff(1,1), coeff(1,2), coeff(1,3),
+                coeff(2,1), coeff(2,2), coeff(2,3),
+                coeff(3,1), coeff(3,2), coeff(3,3)
             };
 
             // Insert tensor coefficient
@@ -559,11 +288,13 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         {
             // Prepare values
             // Maybe I can use coeff.cdata() here?
-            const PetscScalar values[9] =
+            const PetscScalar values[16] =
             {
-                coeff.xx(), coeff.xy(), coeff.xz(),
-                coeff.yx(), coeff.yy(), coeff.yz(),
-                coeff.zx(), coeff.zy(), coeff.zz()
+                coeff(1,1), coeff(1,2), coeff(1,3), coeff(1,4),
+                coeff(2,1), coeff(2,2), coeff(2,3), coeff(2,4),
+                coeff(3,1), coeff(3,2), coeff(3,3), coeff(3,4),
+                coeff(4,1), coeff(4,2), coeff(4,3), coeff(4,4)
+                
             };
 
             // Insert tensor coefficient
@@ -646,13 +377,13 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     {
         forAll(source, localBlockRowI)
         {
-            const vector& sourceI = source[localBlockRowI];
+            const RectangularMatrix<scalar>& sourceI = source[localBlockRowI];
             const label blockRowI = localToGlobalPointMap[localBlockRowI];
 
             if (twoD)
             {
                 // Prepare values
-                const PetscScalar values[2] = {sourceI.x(), sourceI.y()};
+                const PetscScalar values[3] = {sourceI(1,1), sourceI(2,1), sourceI(3,1)};
 
                 // Insert values
                 ierr = VecSetValuesBlocked
@@ -663,9 +394,9 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
             else
             {
                 // Prepare values
-                const PetscScalar values[3] =
+                const PetscScalar values[4] =
                 {
-                    sourceI.x(), sourceI.y(), sourceI.z()
+                    sourceI(1,1), sourceI(2,1), sourceI(3,1), sourceI(4,1)
                 };
 
                 // Insert values
@@ -772,7 +503,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     {
         Pout<< "        Solving the linear solver: start" << endl;
     }
-
+	
     ierr = KSPSolve(ksp, b, x); checkErr(ierr);
 
     if (debug)
@@ -797,13 +528,19 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         {
             if (ownedByThisProc[i])
             {
-                solution[i].x() = xArr[index++];
-                solution[i].y() = xArr[index++];
-
-                if (!twoD)
+            	if (twoD)
                 {
-                    solution[i].z() = xArr[index++];
+		            solution[i](1,1) = xArr[index++];
+		            solution[i](2,1) = xArr[index++];
+		            solution[i](3,1) = xArr[index++];
                 }
+                else
+                {
+		            solution[i](1,1) = xArr[index++];
+		            solution[i](2,1) = xArr[index++];
+		            solution[i](3,1) = xArr[index++];
+		            solution[i](4,1) = xArr[index++];
+		        }
             }
         }
     }
@@ -876,13 +613,19 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
             {
                 if (!ownedByThisProc[i])
                 {
-                    solution[i].x() = xNotOwnedArr[index++];
-                    solution[i].y() = xNotOwnedArr[index++];
-
-                    if (!twoD)
-                    {
-                        solution[i].z() = xNotOwnedArr[index++];
-                    }
+		        	if (twoD)
+		            {
+				        solution[i](1,1) = xNotOwnedArr[index++];
+				        solution[i](2,1) = xNotOwnedArr[index++];
+				        solution[i](3,1) = xNotOwnedArr[index++];
+		            }
+		            else
+		            {
+				        solution[i](1,1) = xNotOwnedArr[index++];
+				        solution[i](2,1) = xNotOwnedArr[index++];
+				        solution[i](3,1) = xNotOwnedArr[index++];
+				        solution[i](4,1) = xNotOwnedArr[index++];
+				    }
                 }
             }
         }
@@ -936,7 +679,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     if (debug)
     {
         Pout<< "BlockSolverPerformance<vector> "
-            << "sparseMatrixTools::solveLinearSystemPETSc: end" << endl;
+            << "sparseMatrixExtendedTools::solveLinearSystemPETSc: end" << endl;
     }
 
     vector initRes(vector::one);
@@ -948,7 +691,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         finalRes.z() = 0;
     }
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     return SolverPerformance<vector>
     (
         "PETSc", // solver name
@@ -975,7 +718,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
 #endif
 
 
-void Foam::sparseMatrixTools::setNonZerosPerRow
+void Foam::sparseMatrixExtendedTools::setNonZerosPerRow
 (
     label d_nnz[],
     label o_nnz[],
@@ -1023,7 +766,7 @@ void Foam::sparseMatrixTools::setNonZerosPerRow
             {
                 FatalErrorIn
                 (
-                    "void Foam::sparseMatrixTools::setNonZerosPerRow(...)"
+                    "void Foam::sparseMatrixExtendedTools::setNonZerosPerRow(...)"
                 )   << "Not implemented for blockSize = " << blockSize
                     << abort(FatalError);
             }
@@ -1032,7 +775,7 @@ void Foam::sparseMatrixTools::setNonZerosPerRow
 }
 
 
-void Foam::sparseMatrixTools::checkErr(const int ierr)
+void Foam::sparseMatrixExtendedTools::checkErr(const int ierr)
 {
     if (ierr > 0)
     {
@@ -1043,101 +786,19 @@ void Foam::sparseMatrixTools::checkErr(const int ierr)
 }
 
 
-void Foam::sparseMatrixTools::enforceFixedDof
+void Foam::sparseMatrixExtendedTools::enforceFixedDof
 (
-    sparseScalarMatrix& matrix,
-    scalarField& source,
-    const boolList& fixedDofs,
-    const scalarField& fixedDofValues,
-    const scalar fixedDofScale,
-    const bool debug
-)
-{
-
-    // Loop though the matrix and overwrite the coefficients for fixed DOFs
-    // To enforce the value we will set the diagonal to the identity and set
-    // the source to zero. The reason the source is zero is that we are solving
-    // for the correction and the correction is zero for fixed values.
-    // Rather than setting the identity on the diagonal, we will scale it by
-    // fixedDofScale to improve the condition number, although the
-    // preconditioner should not care.
-    // Secondly, for any non-fixed-DOF equations which refer to fixed DOFs, we
-    // will eliminate these coeffs and add their contribution (which is known)
-    // to the source.
-    HashTable
-    <
-        scalar, FixedList<label, 2>, FixedList<label, 2>::Hash<>
-    >& data = matrix.data();
-    for (auto iter = data.begin(); iter != data.end(); ++iter)
-    {
-        const label blockRowI = iter.key()[0];
-        const label blockColI = iter.key()[1];
-
-        if (fixedDofs[blockRowI])
-        {
-            scalar& coeff = iter();
-
-            if (debug)
-            {
-                Info<< "blockRow fixed: " << blockRowI << nl
-                    << "    row,col: " << blockRowI << "," << blockColI << nl
-                    << "    coeff before: " << coeff << endl;
-            }
-
-            // Set the source to zero as the correction is zero
-            source[blockRowI] = 0.0;
-
-            // Eliminate the fixed directions from the coeff
-            coeff = 0.0;
-
-            if (blockRowI == blockColI)
-            {
-                // Set the diagonal to enforce a zero correction
-                coeff = -fixedDofScale;
-            }
-
-            if (debug)
-            {
-                Info<< "    coeff after: " << coeff << nl << endl;
-            }
-        }
-        else if (fixedDofs[blockColI])
-        {
-            // This equation refers to a fixed DOF
-            // We will eliminate the coeff
-            scalar& coeff = iter();
-
-            if (debug)
-            {
-                Info<< "blockCol fixed: " << blockColI << nl
-                    << "    row,col: " << blockRowI << "," << blockColI << nl
-                    << "    coeff before: " << coeff << endl;
-            }
-
-            // Eliminate the fixed directions
-            coeff = 0.0;
-
-            if (debug)
-            {
-                Info<< "    coeff after: " << coeff << nl << endl;
-            }
-        }
-    }
-}
-
-
-void Foam::sparseMatrixTools::enforceFixedDof
-(
-    sparseMatrix& matrix,
-    vectorField& source,
+    sparseMatrixExtended& matrix,
+    Field<RectangularMatrix<scalar>>& source,
+    const bool twoD,
     const boolList& fixedDofs,
     const symmTensorField& fixedDofDirections,
     const pointField& fixedDofValues,
     const scalar fixedDofScale
 )
 {
-    const bool debug = 0;
-
+	const bool debug = 0;
+	
     // Loop though the matrix and overwrite the coefficients for fixed DOFs
     // To enforce the value we will set the diagonal to the identity and set
     // the source to zero. The reason the source is zero is that we are solving
@@ -1148,7 +809,9 @@ void Foam::sparseMatrixTools::enforceFixedDof
     // Secondly, for any non-fixed-DOF equations which refer to fixed DOFs, we
     // will eliminate these coeffs and add their contribution (which is known)
     // to the source.
-    sparseMatrixData& data = matrix.data();
+    // This is only done for the displacement coefficients and source terms
+    // of the momentum equation.
+    sparseMatrixExtendedData& data = matrix.data();
     for (auto iter = data.begin(); iter != data.end(); ++iter)
     {
         const label blockRowI = iter.key()[0];
@@ -1156,14 +819,53 @@ void Foam::sparseMatrixTools::enforceFixedDof
 
         if (fixedDofs[blockRowI])
         {
-            tensor& coeff = iter();
-
+            RectangularMatrix<scalar>& coeff = iter();
+            
+            // Extract the displacement coefficients of the momentum equation
+            // on the left-hand side
+            tensor momDispCoeff(tensor::zero);
+            
+            if (twoD)
+            {
+		        momDispCoeff.xx() = coeff(1,1);
+		        momDispCoeff.xy() = coeff(1,2);
+		        momDispCoeff.yx() = coeff(2,1);
+		        momDispCoeff.yy() = coeff(2,2);
+            }
+            else
+            {
+                momDispCoeff.xx() = coeff(1,1);
+		        momDispCoeff.xy() = coeff(1,2);
+		        momDispCoeff.xz() = coeff(1,3);
+		        momDispCoeff.yx() = coeff(2,1);
+		        momDispCoeff.yy() = coeff(2,2);
+		        momDispCoeff.yz() = coeff(2,3);
+		        momDispCoeff.zx() = coeff(3,1);
+		        momDispCoeff.zy() = coeff(3,2);
+		        momDispCoeff.zz() = coeff(3,3);
+		    }
+		
+            // Extract the source terms of the momentum equation
+            vector sourceTerms(vector::zero);
+            
+            if (twoD)
+            {
+		        sourceTerms.x() = source[blockRowI](1,1); 
+		        sourceTerms.y() = source[blockRowI](2,1);
+            }
+            else
+            {
+		        sourceTerms.x() = source[blockRowI](1,1); 
+		        sourceTerms.y() = source[blockRowI](2,1);
+		        sourceTerms.z() = source[blockRowI](3,1);
+		    }     
+            
             if (debug)
             {
                 Info<< "blockRow fixed: " << blockRowI << nl
                     << "    row,col: " << blockRowI << "," << blockColI << nl
                     << "    fixedDir: " << fixedDofDirections[blockRowI] << nl
-                    << "    coeff before: " << coeff << endl;
+                    << "    coeff before: " << momDispCoeff << endl;
             }
 
             // Free direction
@@ -1171,35 +873,71 @@ void Foam::sparseMatrixTools::enforceFixedDof
 
             // Set the source to zero as the correction to the displacement
             // is zero
-            source[blockRowI] = (freeDir & source[blockRowI]);
+            //source[blockRowI] = (freeDir & source[blockRowI]);
+            sourceTerms = (freeDir & sourceTerms); 
 
             // Eliminate the fixed directions from the coeff
-            coeff = (freeDir & coeff);
+            momDispCoeff = (freeDir & momDispCoeff);
 
             if (blockRowI == blockColI)
             {
                 // Remove the fixed component from the free component equation
-                coeff = (freeDir & coeff & freeDir);
+                momDispCoeff = (freeDir & momDispCoeff & freeDir);
 
                 // Fixed direction
                 const tensor& fixedDir = fixedDofDirections[blockRowI];
 
                 // Set the fixed direction diagonal to enforce a zero correction
-                coeff -= tensor(fixedDofScale*fixedDir);
+                momDispCoeff -= tensor(fixedDofScale*fixedDir);
             }
+            
+            //Insert the changed coefficients back into the matrix
+            if (twoD)
+            {
+            	coeff(1,1) = momDispCoeff.xx();
+            	coeff(1,2) = momDispCoeff.xy();
+            	coeff(2,1) = momDispCoeff.yx();
+            	coeff(2,2) = momDispCoeff.yy();
+            }
+            else
+            {
+            	coeff(1,1) = momDispCoeff.xx();
+            	coeff(1,2) = momDispCoeff.xy();
+            	coeff(1,3) = momDispCoeff.xz();
+            	coeff(2,1) = momDispCoeff.yx();
+            	coeff(2,2) = momDispCoeff.yy();
+            	coeff(2,3) = momDispCoeff.yz();
+            	coeff(3,1) = momDispCoeff.zx();
+            	coeff(3,2) = momDispCoeff.zy();
+            	coeff(3,3) = momDispCoeff.zz();
+            }  
+            
+            //Insert the changed source terms back into the source
+            if (twoD)
+            {
+            	source[blockRowI](1,1) = sourceTerms.x(); 
+            	source[blockRowI](2,1) = sourceTerms.y(); 
+            }
+            else
+            {
+            	source[blockRowI](1,1) = sourceTerms.x(); 
+            	source[blockRowI](2,1) = sourceTerms.y(); 
+            	source[blockRowI](3,1) = sourceTerms.z(); 
+            } 
 
             if (debug)
             {
-                Info<< "    coeff after: " << coeff << nl << endl;
+                Info<< "    coeff after: " << momDispCoeff << nl << endl;
             }
+             
         }
         else if (fixedDofs[blockColI])
         {
             // This equation refers to a fixed direction
             // We will eliminate the coeff and add the contribution to the
             // source
-            tensor& coeff = iter();
-
+            RectangularMatrix<scalar>& coeff = iter();
+            
             if (debug)
             {
                 Info<< "blockCol fixed: " << blockColI << nl
@@ -1207,23 +945,69 @@ void Foam::sparseMatrixTools::enforceFixedDof
                     << "    fixedDir: " << fixedDofDirections[blockColI] << nl
                     << "    coeff before: " << coeff << endl;
             }
+            
+            // Extract the displacement coefficients of the momentum equation
+            // on the left-hand side
+            tensor momDispCoeff(tensor::zero);
+            
+            if (twoD)
+            {
+		        momDispCoeff.xx() = coeff(1,1);
+		        momDispCoeff.xy() = coeff(1,2);
+		        momDispCoeff.yx() = coeff(2,1);
+		        momDispCoeff.yy() = coeff(2,2);
+            }
+            else
+            {
+                momDispCoeff.xx() = coeff(1,1);
+		        momDispCoeff.xy() = coeff(1,2);
+		        momDispCoeff.xz() = coeff(1,3);
+		        momDispCoeff.yx() = coeff(2,1);
+		        momDispCoeff.yy() = coeff(2,2);
+		        momDispCoeff.yz() = coeff(2,3);
+		        momDispCoeff.zx() = coeff(3,1);
+		        momDispCoeff.zy() = coeff(3,2);
+		        momDispCoeff.zz() = coeff(3,3);
+		    }
 
             // Directions where the DOFs are unknown
             const tensor freeDir(I - fixedDofDirections[blockColI]);
 
-            // Eliminate the fixed directions
-            coeff = (coeff & freeDir);
+            // Eliminate the fixed directions    
+            momDispCoeff = (momDispCoeff & freeDir);
+            
+            //Insert the changed coefficients back into the matrix
+            if (twoD)
+            {
+            	coeff(1,1) = momDispCoeff.xx();
+            	coeff(1,2) = momDispCoeff.xy();
+            	coeff(2,1) = momDispCoeff.yx();
+            	coeff(2,2) = momDispCoeff.yy();
+            }
+            else
+            {
+            	coeff(1,1) = momDispCoeff.xx();
+            	coeff(1,2) = momDispCoeff.xy();
+            	coeff(1,3) = momDispCoeff.xz();
+            	coeff(2,1) = momDispCoeff.yx();
+            	coeff(2,2) = momDispCoeff.yy();
+            	coeff(2,3) = momDispCoeff.yz();
+            	coeff(3,1) = momDispCoeff.zx();
+            	coeff(3,2) = momDispCoeff.zy();
+            	coeff(3,3) = momDispCoeff.zz();
+            }
 
             if (debug)
             {
-                Info<< "    coeff after: " << coeff << nl << endl;
-            }
+                Info<< "    coeff after: " << momDispCoeff << nl << endl;
+            }            
+
         }
     }
 }
 
 
-// void Foam::sparseMatrixTools::addFixedDofToSource
+// void Foam::sparseMatrixExtendedTools::addFixedDofToSource
 // (
 //     vectorField& source,
 //     const boolList& fixedDofs,
@@ -1245,7 +1029,7 @@ void Foam::sparseMatrixTools::enforceFixedDof
 // }
 
 
-// void Foam::sparseMatrixTools::addFixedDofToMatrix
+// void Foam::sparseMatrixExtendedTools::addFixedDofToMatrix
 // (
 //     sparseMatrix& matrix,
 //     const boolList& fixedDofs,
@@ -1257,7 +1041,7 @@ void Foam::sparseMatrixTools::enforceFixedDof
 //     // To enforce the value we will set the diagonal to the identity
 //     // The preconditioner will be able to improve the conditioning for
 //     // iterative solvers
-//     sparseMatrixData& data = matrix.data();
+//     sparseMatrixExtendedData& data = matrix.data();
 
 //     for (auto iter = data.begin(); iter != data.end(); ++iter)
 //     {

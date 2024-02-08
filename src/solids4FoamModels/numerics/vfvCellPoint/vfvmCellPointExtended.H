@@ -42,6 +42,7 @@ Author
 #include "volFields.H"
 #include "pointFields.H"
 #include "sparseMatrix.H"
+#include "sparseMatrixExtended.H"
 #include "RectangularMatrix.H"
 #include "cellPointLeastSquaresVectors.H"
 
@@ -54,9 +55,11 @@ namespace vfvm
 {
 
     // Add coefficients to the matrix for the divergence of stress
+    // in the displacement formulation. Each coefficient in the matrix is a
+    //3x3 tensor.
     // Note: this function does not calculate contributions to the right-hand
     // side
-    void divSigmaExtended
+    void divSigmaNoPressure
     (
         sparseMatrix& matrix,
         const fvMesh& mesh,
@@ -73,6 +76,68 @@ namespace vfvm
         const scalar zeta, // fraction of compact edge direction component used
         const bool debug = false
     );
+    
+    
+    // Add coefficients to the matrix for the divergence of stress
+    // in the pressure formulation. Each coefficient in the matrix is a
+    //4x4 tensor.
+    // Note: this function does not calculate contributions to the right-hand
+    // side
+    void divSigmaExtended
+    (
+        sparseMatrixExtended& matrix,
+        const fvMesh& mesh,
+        const fvMesh& dualMesh,
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const Field<RectangularMatrix<scalar>>& materialTangentField,
+		const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+		const symmTensorField& sigma,
+		const tensorField& dualGradDField,
+        const boolList& fixedDofs,
+        const symmTensorField& fixedDofDirections,
+        const scalar fixedDofScale,
+        const scalar zeta, // fraction of compact edge direction component used
+        const bool debug = false
+    );
+    
+    
+    // Add coefficients to the matrix for the pressure approach
+	void assembleMatrixExtended
+	(
+		sparseMatrixExtended& matrix,
+		const fvMesh& mesh,
+		const fvMesh& dualMesh,
+		const labelList& dualFaceToCell,
+		const labelList& dualCellToPoint,
+		const Field<RectangularMatrix<scalar>>& materialTangentField,
+		const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+		const scalarField& pressureField,
+		const symmTensorField& pressureSensitivityField, 
+		const tensorField& dispResidualSensitivityField,
+		const symmTensorField& sigmaField,
+		const tensorField& dualGradDField,
+		const boolList& fixedDofs,
+		const symmTensorField& fixedDofDirections,
+		const scalar fixedDofScale,
+		const scalar zeta,
+		const scalar gamma,
+		const bool debug
+	);
+	
+	
+    // Add coefficients to the matrix for the Laplacian of a scalar field with
+    // a scalar diffusivity field
+    void laplacian
+    (
+        sparseMatrixExtended& matrix,
+        const fvMesh& mesh,
+        const fvMesh& dualMesh,
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const scalarField& diffusivity, // diffusivity in the primary cells
+        const bool debug = false
+    );	
 
 
     // Add coefficients to the matrix for the second time derivative
@@ -88,7 +153,19 @@ namespace vfvm
         const scalarField& pointVolI,
         const int debug  // debug switch
     );
-
+    
+    // Add source coefficients to the matrix
+    // Note: this function does not calculate contributions to the right-hand
+    // side    
+    void Sp
+    (
+        sparseMatrixExtended& matrix,
+        const fvMesh& mesh,
+        const fvMesh& dualMesh,
+        const scalarField& pointVolI,
+        const int debug // debug switch 
+    );
+    
 } // End namespace vfvm
 
 } // End namespace Foam

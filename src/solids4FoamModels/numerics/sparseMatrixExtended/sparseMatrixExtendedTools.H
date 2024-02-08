@@ -1,4 +1,10 @@
 /*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | foam-extend: Open Source CFD
+   \\    /   O peration     | Version:     3.2
+    \\  /    A nd           | Web:         http://www.foam-extend.org
+     \\/     M anipulation  | For copyright notice see file Copyright
+-------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -16,7 +22,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    sparseMatrixTools
+    sparseMatrixExtendedTools
 
 Description
     Helper functions for sparseMatrix
@@ -25,18 +31,18 @@ Author
     Philip Cardiff, UCD.
 
 SourceFiles
-    sparseMatrixTools.C
+    sparseMatrixExtendedTools.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef sparseMatrixTools_H
-#define sparseMatrixTools_H
+#ifndef sparseMatrixExtendedTools_H
+#define sparseMatrixExtendedTools_H
 
-#include "sparseMatrix.H"
-#include "SparseMatrixTemplate.H"
+#include "sparseMatrixExtended.H"
+#include "RectangularMatrix.H"
 #include "vectorField.H"
 #include "polyMesh.H"
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     #include "SolverPerformance.H"
 #else
     #include "BlockSolverPerformance.H"
@@ -49,45 +55,24 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-namespace sparseMatrixTools
+namespace sparseMatrixExtendedTools
 {
 
     //- Check if the case is 2-D
     bool checkTwoD(const polyMesh& mesh);
 
-    //- Solve the linear system using Eigen's SparseLU direct solver
-    void solveLinearSystemEigen
-    (
-        const sparseScalarMatrix& matrix,
-        const scalarField& source,
-        scalarField& solution,
-        const bool exportToMatlab = false,
-        const bool debug = false
-    );
-
-    //- Solve the linear system using Eigen's SparseLU direct solver
-    void solveLinearSystemEigen
-    (
-        const sparseMatrix& matrix,
-        const vectorField& source,
-        vectorField& solution,
-        const bool twoD,
-        const bool exportToMatlab = false,
-        const bool debug = false
-    );
-
 #ifdef USE_PETSC
 
     //- Solve the linear system using PETSc
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAMESIORFOUNDATION
     SolverPerformance<vector> solveLinearSystemPETSc
 #else
     BlockSolverPerformance<vector> solveLinearSystemPETSc
 #endif
     (
-        const sparseMatrix& matrix,
-        const vectorField& source,
-        vectorField& solution,
+        const sparseMatrixExtended& matrix,
+        const Field<RectangularMatrix<scalar>>& source,
+        Field<RectangularMatrix<scalar>>& solution,
         const bool twoD,
         fileName& optionsFile,
         const pointField& points,
@@ -120,19 +105,9 @@ namespace sparseMatrixTools
     //- Enforce fixed DOF contributions on the linear system
     void enforceFixedDof
     (
-        sparseScalarMatrix& matrix,
-        scalarField& source,
-        const boolList& fixedDofs,
-        const scalarField& fixedDofValues,
-        const scalar fixedDofScale,
-        const bool debug
-    );
-
-    //- Enforce fixed DOF contributions on the linear system
-    void enforceFixedDof
-    (
-        sparseMatrix& matrix,
-        vectorField& source,
+		sparseMatrixExtended& matrix,
+		Field<RectangularMatrix<scalar>>& source,
+		const bool twoD,
         const boolList& fixedDofs,
         const symmTensorField& fixedDofDirections,
         const pointField& fixedDofValues,
@@ -157,7 +132,7 @@ namespace sparseMatrixTools
     //     const scalar fixedDofScale
     // );
 
-} // End namespace sparseMatrixTools
+} // End namespace sparseMatrixExtendedTools
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
