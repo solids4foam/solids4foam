@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -48,7 +42,11 @@ Author
 #include "tmp.H"
 #include "autoPtr.H"
 #include "nonLinearGeometry.H"
-#include "symmTensor4thOrder.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "scalarMatrices.H"
+#else
+    #include "scalarSquareMatrix.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -70,7 +68,7 @@ class mechanicalLaw
         const fvMesh& mesh_;
 
         //- Mechanical law dictionary
-        const dictionary dict_;
+        mutable dictionary dict_;
 
         //- Name of the baseMesh region
         word baseMeshRegionName_;
@@ -98,6 +96,9 @@ class mechanicalLaw
         //  is the Cauchy stress or 2nd Piola-Kirchhoff or some other stress
         //  measure
         mutable autoPtr<volSymmTensorField> sigma0Ptr_;
+
+        //- Initial (residual) stress surface field
+        mutable autoPtr<surfaceSymmTensorField> sigma0fPtr_;
 
         // Small strain tensor
         mutable autoPtr<volSymmTensorField> epsilonPtr_;
@@ -131,13 +132,6 @@ class mechanicalLaw
         // Gradient of the hydrostatic stress field
         autoPtr<volVectorField> gradSigmaHydPtr_;
 
-        //- Effective stress (sigmaEff = sigma + p*I)
-        //  Where:
-        //      sigmaEff is the effective stress
-        //      sigma is the total stress
-        //      p is the pore pressure
-        autoPtr<volSymmTensorField> sigmaEffPtr_;
-
         //- Current time index
         label curTimeIndex_;
 
@@ -162,6 +156,9 @@ class mechanicalLaw
         //- Make the sigma0 field
         void makeSigma0() const;
 
+        //- Make the sigma0f field
+        void makeSigma0f() const;
+
         //- Make the epsilon field
         void makeEpsilon() const;
 
@@ -182,9 +179,6 @@ class mechanicalLaw
 
         //- Make the sigmaHyd field
         void makeSigmaHyd();
-
-        //- Make the sigmaEff field
-        void makeSigmaEff();
 
         //- Disallow copy construct
         mechanicalLaw(const mechanicalLaw&);
@@ -240,8 +234,14 @@ protected:
         //- Assign a constant mu field and return a reference to it
         const volScalarField& mu(const dimensionedScalar& mu);
 
+        //- Assign a variable mu field and return a reference to it
+        const volScalarField& mu(const volScalarField& mu);
+
         //- Assign a constant muf field and return a reference to it
         const surfaceScalarField& muf(const dimensionedScalar& mu);
+
+        //- Assign a variable muf field and return a reference to it
+        const surfaceScalarField& muf(const surfaceScalarField& mu);
 
         //- Return a const reference to the K field
         const volScalarField& K() const;
@@ -258,8 +258,14 @@ protected:
         //- Assign a constant Ku field and return a reference to it
         const volScalarField& K(const dimensionedScalar& K);
 
+        //- Assign a variable Ku field and return a reference to it
+        const volScalarField& K(const volScalarField& K);
+
         //- Assign a constant Kuf field and return a reference to it
         const surfaceScalarField& Kf(const dimensionedScalar& K);
+
+        //- Assign a variable Kuf field and return a reference to it
+        const surfaceScalarField& Kf(const surfaceScalarField& K);
 
         //- Assign a constant impK field and return a reference to it
         const volScalarField& impK(const dimensionedScalar& impK);
@@ -269,6 +275,12 @@ protected:
 
         //- Return a non-const reference to the sigma0 field
         volSymmTensorField& sigma0();
+
+        //- Return a const reference to the sigma0 surface field
+        const surfaceSymmTensorField& sigma0f() const;
+
+        //- Return a non-const reference to the sigma0 surface field
+        surfaceSymmTensorField& sigma0f();
 
         //- Return a const reference to the epsilon field
         const volSymmTensorField& epsilon() const;
@@ -299,9 +311,6 @@ protected:
 
         //- Return a reference to the gradSigmaHyd field
         volVectorField& gradSigmaHyd();
-
-        //- Return a reference to the sigmaEff field
-        volSymmTensorField& sigmaEff();
 
         //- Update epsilon
         void updateEpsilon();
@@ -467,7 +476,7 @@ public:
         }
 
         //- Return const reference to dict
-        const dictionary& dict() const
+        dictionary& dict() const
         {
             return dict_;
         }
@@ -500,18 +509,18 @@ public:
         //  The size of this field should be mesh.nFaces()
         virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
 		
-		//- Pressure sensitivity for the momentum equation in total Lagrangian formulation
-		//- d(s - pI)/dp.
-		virtual tmp<symmTensorField> pressureSensitivityField() const;
+		    //- Pressure sensitivity for the momentum equation in total Lagrangian formulation
+		    //- d(s - pI)/dp.
+		    virtual tmp<symmTensorField> pressureSensitivityField() const;
 		
-		//- Displacement sensitivity of the pressure equation in total Lagrangian formulation
-		//- d(pBar)/dG.
-		tmp<tensorField> pressEqnDispSensitivityField() const;
+        //- Displacement sensitivity of the pressure equation in total Lagrangian formulation
+        //- d(pBar)/dG.
+        tmp<tensorField> pressEqnDispSensitivityField() const;
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const
         {
-            notImplemented("Not yet implemented for this mechanical law");
+            notImplemented("bulkModulus() const");
 
             // Keep compiler happy
             return rho();

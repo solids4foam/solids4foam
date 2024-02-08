@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -70,7 +64,7 @@ outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 {
 //     fvPatchScalarField::operator=(scalarField("value", dict, p.size()));
 
-// #ifdef OPENFOAMESIORFOUNDATION
+// #ifdef OPENFOAM_NOT_EXTEND
 //     const fvMesh& mesh = internalField().mesh();
 //     const pointField& points = mesh.points();
 // #else
@@ -88,7 +82,7 @@ outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 outflowPressureFvPatchScalarField::outflowPressureFvPatchScalarField
 (
     const outflowPressureFvPatchScalarField& pivpvf
@@ -121,7 +115,7 @@ void outflowPressureFvPatchScalarField::updateCoeffs()
 
     scalarField pp(this->patch().size(), 0);
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();
 #else
     const fvMesh& mesh = dimensionedInternalField().mesh();
@@ -135,7 +129,8 @@ void outflowPressureFvPatchScalarField::updateCoeffs()
             mesh.time().constant(),
             mesh,
             IOobject::MUST_READ,
-            IOobject::NO_WRITE
+            IOobject::NO_WRITE,
+            false  // Do not register
         )
     );
     dimensionedScalar nu(transportProperties.lookup("nu"));

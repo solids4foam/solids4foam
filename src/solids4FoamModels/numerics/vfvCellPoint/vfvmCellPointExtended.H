@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -164,13 +158,13 @@ namespace vfvm
     // Note: this function does not calculate contributions to the right-hand
     // side    
     void Sp
-	(
-		sparseMatrixExtended& matrix,
-		const fvMesh& mesh,
-    	const fvMesh& dualMesh,
-		const scalarField& pointVolI,
-		const int debug // debug switch 
-	);
+    (
+        sparseMatrixExtended& matrix,
+        const fvMesh& mesh,
+        const fvMesh& dualMesh,
+        const scalarField& pointVolI,
+        const int debug // debug switch 
+    );
     
 } // End namespace vfvm
 

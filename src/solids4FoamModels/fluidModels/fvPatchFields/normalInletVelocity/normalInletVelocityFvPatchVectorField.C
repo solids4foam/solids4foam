@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -70,7 +64,7 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 {
 //     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
-// #ifdef OPENFOAMESIORFOUNDATION
+// #ifdef OPENFOAM_NOT_EXTEND
 //     const fvMesh& mesh = internalField().mesh();
 //     const pointField& points = mesh.points();
 // #else
@@ -88,7 +82,7 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 (
     const normalInletVelocityFvPatchVectorField& pivpvf
@@ -118,7 +112,7 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 //         return;
 //     }
 
-// #ifdef OPENFOAMESIORFOUNDATION
+// #ifdef OPENFOAM_NOT_EXTEND
 //     const fvMesh& mesh = internalField().mesh();
 //     const pointField& points = mesh.points();
 // #else
@@ -233,7 +227,7 @@ snGrad() const
 
     bool secondOrder_ = false;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     word UName = this->internalField().name();
 #else
     word UName = this->dimensionedInternalField().name();
@@ -259,7 +253,7 @@ snGrad() const
             new vectorField(this->patch().size(), vector::zero)
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         tnGradU.ref() =
 #else
         tnGradU() =
@@ -298,7 +292,7 @@ snGrad() const
         new vectorField(this->patch().size(), vector::zero)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     tnGradU.ref() =
 #else
     tnGradU() =
@@ -329,7 +323,7 @@ gradientBoundaryCoeffs() const
 
     bool secondOrder_ = false;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     word UName = this->internalField().name();
 #else
     word UName = this->dimensionedInternalField().name();

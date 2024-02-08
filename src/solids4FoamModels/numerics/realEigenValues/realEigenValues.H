@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -30,7 +24,7 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
 
 #ifndef realEigenValues_H
 #define realEigenValues_H
@@ -54,6 +48,6 @@ namespace Foam
 
 #endif
 
-#endif // OPENFOAMESI
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //

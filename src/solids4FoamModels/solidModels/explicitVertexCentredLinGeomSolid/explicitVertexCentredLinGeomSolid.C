@@ -96,7 +96,7 @@ void explicitVertexCentredLinGeomSolid::updatePointDivSigma
     {
         if (dualTraction.boundaryField()[patchI].coupled())
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             dualTraction.boundaryFieldRef()[patchI] = vector::zero;
 #else
             dualTraction.boundaryField()[patchI] = vector::zero;
@@ -110,7 +110,7 @@ void explicitVertexCentredLinGeomSolid::updatePointDivSigma
     // Calculate absolute divergence of stress (force)
     // We do this to allow syncing of forces at points on processor boundaries
     const vectorField dualDivSigmaAbs(dualDivSigma*dualMesh().V());
-    
+
     // Map dual cell field to primary mesh point field
     // We temporarily use the pointDivSigma field to hold absolute forces
     // but convert them back to force per unit volume below
@@ -245,7 +245,7 @@ void explicitVertexCentredLinGeomSolid::enforceTractionBoundaries
             dualFaceTraction /= nPointsPerDualFace;
 
             // Overwrite the dual patch face traction
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             dualTraction.boundaryFieldRef()[patchI] = dualFaceTraction;
 #else
             dualTraction.boundaryField()[patchI] = dualFaceTraction;
@@ -262,7 +262,7 @@ void explicitVertexCentredLinGeomSolid::enforceTractionBoundaries
         {
             // Set the dual patch face shear traction to zero
             const vectorField n(dualMesh.boundary()[patchI].nf());
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             dualTraction.boundaryFieldRef()[patchI] =
                 (sqr(n) & dualTraction.boundaryField()[patchI]);
 #else
@@ -473,7 +473,7 @@ void explicitVertexCentredLinGeomSolid::setDeltaT(Time& runTime)
         1.0/
         gMax
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             DimensionedField<scalar, Foam::surfaceMesh>
 #else
             Field<scalar>
@@ -502,7 +502,7 @@ void explicitVertexCentredLinGeomSolid::setDeltaT(Time& runTime)
     if (time().timeIndex() == 1)
     {
         Info<< nl << "Setting deltaT = " << newDeltaT
-            << ", maxCo = " << maxCo << endl << endl;
+            << ", maxCo = " << maxCo << endl;
     }
 
     runTime.setDeltaT(newDeltaT);
@@ -512,10 +512,10 @@ void explicitVertexCentredLinGeomSolid::setDeltaT(Time& runTime)
 bool explicitVertexCentredLinGeomSolid::evolve()
 {
     if (time().timeIndex() == 1)
-    {	
-    	Info << "Solving the solid momentum equation for pointD" << nl;	
-    	Info << "Simulation Time, Clock Time, Max Stress" << endl;
-  	}
+    {
+        Info<< "Solving the solid momentum equation for pointD" << nl
+            << "Simulation Time, Clock Time, Max Stress" << endl;
+    }
 
     physicsModel::printInfo() = bool
     (
@@ -525,8 +525,8 @@ bool explicitVertexCentredLinGeomSolid::evolve()
 
     if (physicsModel::printInfo())
     {
-		Info<< time().value() << " " << time().elapsedClockTime()
-		    << " " << max(mag(dualSigmaf_)).value() << endl;
+        Info<< time().value() << " " << time().elapsedClockTime()
+            << " " << max(mag(dualSigmaf_)).value() << endl;
 
         physicsModel::printInfo() = false;
     }
@@ -595,7 +595,7 @@ void explicitVertexCentredLinGeomSolid::setTraction
     );
 
     // Lookup point patch field
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     pointPatchVectorField& ptPatch = pointD().boundaryFieldRef()[patchID];
 #else
     pointPatchVectorField& ptPatch = pointD().boundaryField()[patchID];

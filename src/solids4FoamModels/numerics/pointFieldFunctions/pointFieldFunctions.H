@@ -47,10 +47,10 @@ namespace Foam
 
     // Return the symmetric components of a pointTensorField
     tmp<pointSymmTensorField> symm(const pointTensorField& ptr);
-    
+
     // Return the deviatoric components of a pointSymmTensorField
     tmp<pointSymmTensorField> dev(const pointSymmTensorField& ptr);
-    
+
     // Return the trace of a pointSymmTensorField
     tmp<pointScalarField> tr(const pointSymmTensorField& ptr);
 

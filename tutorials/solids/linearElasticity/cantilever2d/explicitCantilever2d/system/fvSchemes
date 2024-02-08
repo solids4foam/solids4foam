@@ -30,7 +30,7 @@ gradSchemes
 {
     default            cellLimited extendedLeastSquares 0 1;
     //default            faceLimited extendedLeastSquares 0 1;
-    //default            extendedLeastSquares 0;
+    //default            leastSquares;
 }
 
 divSchemes

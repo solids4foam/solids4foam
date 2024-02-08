@@ -75,18 +75,18 @@ class vertexCentredNonLinGeomTotalLagSolid
         //  matrix is updated once per outer iteration. Alternatively, the
         //  stiffness matrix is only updated once per time-step
         const Switch fullNewton_;
-        
+
         //- Flag to include geometric stiffness
         const Switch geometricStiffness_;
 
         //- Flag to enable steadyState
         Switch steadyState_;
-        
+
         //- Flag to enable resolution of the pressure equation
         const Switch solvePressureEquation_;
-        
+
         //- Pressure smoothing factor
-        const scalar pressureFactor_;        
+        const scalar pressureFactor_;
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
@@ -108,7 +108,7 @@ class vertexCentredNonLinGeomTotalLagSolid
         //- Scale factor for the fixed degree of freedom equations to improve the
         //  matrix conditioning
         const scalar fixedDofScale_;
-        
+
         //- Point pressure
         pointScalarField pointP_;
 
@@ -139,7 +139,7 @@ class vertexCentredNonLinGeomTotalLagSolid
 
         //- Jacobian of the deformation gradient field at the dual mesh faces
         surfaceScalarField dualJf_;
-        
+
         //- Pressure at the dual mesh faces
         surfaceScalarField dualPf_;
         
@@ -207,7 +207,7 @@ class vertexCentredNonLinGeomTotalLagSolid
             const vectorField& source, // Linear system source
             const scalar zeta // Discretisation parameter
         );
-        
+
         Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 		geometricStiffnessField
 		(
@@ -298,7 +298,7 @@ public:
                 const label patchID,
                 const vectorField& faceZoneTraction
             );
-        
+
         // Write
 
             //- Write fields

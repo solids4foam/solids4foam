@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -29,7 +23,7 @@ License
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "Time.H"
 #endif
 
@@ -80,11 +74,11 @@ linearSpatialDisplacementPointPatchVectorField
 :
     fixedValuePointPatchVectorField(p, iF),
     a_(vector::zero),
-    b_(tensor::zero) 
+    b_(tensor::zero)
 {}
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 linearSpatialDisplacementPointPatchVectorField::
 linearSpatialDisplacementPointPatchVectorField
 (
@@ -141,8 +135,19 @@ void linearSpatialDisplacementPointPatchVectorField::updateCoeffs()
     }
 
     this->operator==(a_ + (b_ & patch().localPoints()));
-    
+
     fixedValuePointPatchField<vector>::updateCoeffs();
+}
+
+
+void linearSpatialDisplacementPointPatchVectorField::initEvaluate
+(
+    const Pstream::commsTypes commsType
+)
+{
+    updateCoeffs();
+
+    fixedValuePointPatchField::initEvaluate(commsType);
 }
 
 
@@ -154,7 +159,6 @@ void linearSpatialDisplacementPointPatchVectorField::write(Ostream& os) const
         << a_ << token::END_STATEMENT << nl;
     os.writeKeyword("b")
         << b_ << token::END_STATEMENT << nl;
-    
 }
 
 

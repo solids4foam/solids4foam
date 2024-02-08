@@ -62,7 +62,7 @@ solidWedgeFvPatchVectorField::solidWedgeFvPatchVectorField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
 #else
@@ -97,7 +97,7 @@ solidWedgeFvPatchVectorField::solidWedgeFvPatchVectorField
         )   << "\n    patch type '" << p.type()
             << "' not constraint type '" << typeName << "'"
             << "\n    for patch " << p.name()
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             << " of field " << internalField().name()
             << " in file " << internalField().objectPath()
 #else
@@ -122,7 +122,7 @@ solidWedgeFvPatchVectorField::solidWedgeFvPatchVectorField
     );
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 solidWedgeFvPatchVectorField::solidWedgeFvPatchVectorField
 (
     const solidWedgeFvPatchVectorField& ptf
@@ -173,7 +173,7 @@ tmp<Field<vector> > solidWedgeFvPatchVectorField::snGrad() const
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"
@@ -230,7 +230,7 @@ void solidWedgeFvPatchVectorField::evaluate(const Pstream::commsTypes)
     const fvPatchField<tensor>& gradU =
         patch().lookupPatchField<volTensorField, tensor>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "grad(" + internalField().name() + ")"
 #else
             "grad(" + dimensionedInternalField().name() + ")"
@@ -251,7 +251,7 @@ void solidWedgeFvPatchVectorField::write(Ostream& os) const
 {
     wedgeFvPatchVectorField::write(os);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

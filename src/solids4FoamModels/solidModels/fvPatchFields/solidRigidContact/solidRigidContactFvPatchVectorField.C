@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -35,6 +29,7 @@ InClass
 #include "polyPatchID.H"
 #include "ZoneIDs.H"
 #include "lookupSolidModel.H"
+#include "demandDrivenData.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -352,7 +347,7 @@ Foam::solidRigidContactFvPatchVectorField::solidRigidContactFvPatchVectorField
     // Do not copy pointer objects: they will be re-created.
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 Foam::solidRigidContactFvPatchVectorField::solidRigidContactFvPatchVectorField
 (
     const solidRigidContactFvPatchVectorField& ptf

@@ -341,7 +341,7 @@ void Foam::sparseMatrixTools::solveLinearSystemEigen
 
 #ifdef USE_PETSC
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Foam::SolverPerformance<Foam::vector>
 #else
     Foam::BlockSolverPerformance<Foam::vector>
@@ -948,7 +948,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         finalRes.z() = 0;
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     return SolverPerformance<vector>
     (
         "PETSc", // solver name

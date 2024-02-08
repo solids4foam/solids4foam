@@ -55,6 +55,9 @@ class fixedRotationFvPatchVectorField
 
     // Private Data
 
+        //- Enable non-orthogonal corrections
+        const Switch nonOrthogonalCorrections_;
+
         //- Rotation in degrees
         scalar rotationAngle_;
 
@@ -117,7 +120,7 @@ public:
         fixedRotationFvPatchVectorField
         (
             const fixedRotationFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );

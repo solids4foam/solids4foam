@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -35,13 +29,14 @@ SourceFiles
 
 Author
     Philip Cardiff, UCD.
+    Federico Mazzanti, UCD.
 
 \*---------------------------------------------------------------------------*/
 
 #ifndef normalDisplacementPointPatchVectorField_H
 #define normalDisplacementPointPatchVectorField_H
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "fixedValuePointPatchField.H"
     #include "pointPatchFieldMapper.H"
 #else
@@ -55,10 +50,10 @@ Author
 namespace Foam
 {
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     typedef fixedValuePointPatchField<vector> fixedValuePointPatchVectorField;
 
-    #ifdef OPENFOAMESIORFOUNDATION
+    #ifdef OPENFOAM_NOT_EXTEND
         typedef pointPatchFieldMapper PointPatchFieldMapper;
     #endif
 #endif
@@ -76,9 +71,6 @@ class normalDisplacementPointPatchVectorField
 
         //- Normal displacment time series
         interpolationTable<scalar> dispSeries_;
-
-        //- Current time index
-        label curTimeIndex_;
 
 
 public:
@@ -113,7 +105,7 @@ public:
             const PointPatchFieldMapper&
         );
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
         //- Construct as copy
         normalDisplacementPointPatchVectorField
         (

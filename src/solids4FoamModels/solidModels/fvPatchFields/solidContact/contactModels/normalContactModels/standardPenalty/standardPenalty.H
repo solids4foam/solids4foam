@@ -164,7 +164,7 @@ public:
         //- Return slave pressure
         virtual vectorField& slavePressure()
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             return slavePressureVolField_.boundaryFieldRef()[slavePatchID()];
 #else
             return slavePressureVolField_.boundaryField()[slavePatchID()];
@@ -183,7 +183,7 @@ public:
         //- Return area in contact of slave patch
         virtual scalarField& areaInContact()
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             return areaInContactVolField_.boundaryFieldRef()[slavePatchID()];
 #else
             return areaInContactVolField_.boundaryField()[slavePatchID()];

@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -74,7 +68,7 @@ extrapolatedPressureFvPatchScalarField
 {}
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 extrapolatedPressureFvPatchScalarField::
 extrapolatedPressureFvPatchScalarField
 (
@@ -101,7 +95,7 @@ extrapolatedPressureFvPatchScalarField
 
 void extrapolatedPressureFvPatchScalarField::evaluate
 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const Pstream::commsTypes commsType
 #else
     const Pstream::commsTypes commsType
@@ -145,7 +139,7 @@ void extrapolatedPressureFvPatchScalarField::evaluate
 //     // Otherwise assume the variable is the static pressure.
 //     if
 //     (
-// #ifdef OPENFOAMESIORFOUNDATION
+// #ifdef OPENFOAM_NOT_EXTEND
 //         internalField().name() == "p_rgh"
 //      || internalField().name() == "pd"
 // #else
@@ -168,7 +162,7 @@ void extrapolatedPressureFvPatchScalarField::evaluate
 void extrapolatedPressureFvPatchScalarField::write(Ostream& os) const
 {
     zeroGradientFvPatchScalarField::write(os);
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

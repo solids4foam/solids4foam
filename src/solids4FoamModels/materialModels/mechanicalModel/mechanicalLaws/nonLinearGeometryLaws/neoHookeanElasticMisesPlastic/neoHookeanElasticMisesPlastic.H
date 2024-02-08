@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -56,7 +50,7 @@ Author
 
 #include "mechanicalLaw.H"
 #include "interpolationTable.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "surfaceFields.H"
 #endif
 
@@ -87,7 +81,7 @@ class neoHookeanElasticMisesPlastic
         //- Jacobian of the toal deformation gradient surfaceField
         autoPtr<surfaceScalarField> JfPtr_;
 
-        //- Table of post-yield stress versus plastic strain
+        //- Table of plastic strain versus post-yield stress
         //  For large strain total Lagrangian models, it expects
         //  the true stress and true plastic strain.
         interpolationTable<scalar> stressPlasticStrainSeries_;

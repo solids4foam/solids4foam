@@ -77,16 +77,16 @@ void vertexCentredLinGeomSolidMMS::updateSource
 
     // Point density field
     //const scalarField& pointRhoI = pointRho_.internalField();
-    
+
     //Coefficients for expression
     const scalar ax = 2;
     const scalar ay = 4;
     const scalar az = 6;
-    
+
     //pi
-    const scalar pi = constant::mathematical::pi; 
-    
-	// Young's modulus
+    const scalar pi = constant::mathematical::pi;
+
+        // Young's modulus
     const scalar E = 200e9;
 
     // Poisson's ratio
@@ -117,7 +117,7 @@ void vertexCentredLinGeomSolidMMS::updateSource
     {
         if (dualTraction.boundaryField()[patchI].coupled())
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             dualTraction.boundaryFieldRef()[patchI] = vector::zero;
 #else
             dualTraction.boundaryField()[patchI] = vector::zero;
@@ -127,109 +127,105 @@ void vertexCentredLinGeomSolidMMS::updateSource
 
     // Calculate divergence of stress for the dual cells
     // const vectorField dualDivSigma = fvc::div(dualMesh().Sf() & dualSigmaf_);
-    
+
     const vectorField dualDivSigma = fvc::div(dualTraction*dualMesh().magSf());
-    
-	// Map dual cell field to primary mesh point field
+
+        // Map dual cell field to primary mesh point field
     vectorField pointDivSigma(mesh().nPoints(), vector::zero);
-    
+
     // Body force field
     vectorField bodyForcesI(mesh().nPoints(), vector::zero);
-    
+
     // List of primary cells
-    const cellList& cells = mesh().cells();
- 
+    // const cellList& cells = mesh().cells();
+
     // List of primary points
     const pointField& points = mesh().points();
 
     // List of primary faces
-    const faceList& faces = mesh().faces();
-    
+    // const faceList& faces = mesh().faces();
+
     // List of dual cells
-    const cellList& dualCells = dualMesh().cells();
-    
+    // const cellList& dualCells = dualMesh().cells();
+
     // List of dual points
-    const pointField& dualPoints = dualMesh().points();
+    // const pointField& dualPoints = dualMesh().points();
 
     // List of dual faces
-    const faceList& dualFaces = dualMesh().faces();
+    // const faceList& dualFaces = dualMesh().faces();
 
     // List of dual cell volumes
-    const scalarField& dualV = dualMesh().V();
-    
+    // const scalarField& dualV = dualMesh().V();
+
     // List of cell volumes
-    const scalarField& V = mesh().V();    
-    
-	forAll(bodyForcesI, vertexI)
-	{
+    // const scalarField& V = mesh().V();
+
+    forAll(bodyForcesI, vertexI)
+    {
 
 //	    // Take a reference to the current primary volume
 //	    const scalar curDualV = dualV[vertexI];
-//	    
+//
 //	    //Take a reference to the current dual cell
 //	    const cell& curDualCell = dualCells[vertexI];
-//	    
+//
 //	    //Create a bounding box around the current dual cell
 //	    const boundBox bb(curDualCell.points(dualFaces, dualPoints), false);
-//	    
+//
 //	    //Get the most negative x and y coordinates of the dual cell
 //	    const scalar x1 = bb.min().x();
 //	    const scalar y1 = bb.min().y();
 //	    const scalar z1 = bb.min().z();
-//	   
+//
 //	    //Get the most negative x and y coordinates of the dual cell
 //	    const scalar x2 = bb.max().x();
 //	    const scalar y2 = bb.max().y();
 //	    const scalar z2 = bb.max().z();
-	    
-	    // Take a reference to the current primary volume
-	    const scalar curV = V[vertexI]; 
-	    
-	    const scalar x = points[vertexI].x();
-	    const scalar y = points[vertexI].y();
-	    const scalar z = points[vertexI].z();
-	                                                                                                                                             
-		//Set vector in dualCellI for x-equation     	
-    	bodyForcesI[vertexI].x() =
-    	lambda*(8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-    	+ 4*az*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
-    	- 16*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-    	+ mu*(8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-    	+ 4*az*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
-    	- 5*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-    	- 32*ax*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
- 
+
+            // Take a reference to the current primary volume
+            // const scalar curV = V[vertexI];
+
+        const scalar x = points[vertexI].x();
+        const scalar y = points[vertexI].y();
+        const scalar z = points[vertexI].z();
+
+        // Set vector in dualCellI for x-equation
+        bodyForcesI[vertexI].x() =
+            lambda*(8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+            + 4*az*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+            - 16*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
+            + mu*(8*ay*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+            + 4*az*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+            - 5*ax*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
+            - 32*ax*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
+
+        // Set vector in dualCellI for y-equation
+        bodyForcesI[vertexI].y() =
+                lambda*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+                + 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+                - 4*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
+                + mu*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z)
+                + 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+                - 17*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
+                - 8*ay*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
 
 
-		//Set vector in dualCellI for y-equation  
-    	bodyForcesI[vertexI].y() =
-		lambda*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-		+ 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-		- 4*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-		+ mu*(8*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(2*pi*y)*Foam::sin(pi*z) 
-		+ 2*az*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-		- 17*ay*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-		- 8*ay*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
- 
- 
-    	//Set vector in dualCellI for -equation  
-    	bodyForcesI[vertexI].z() =
-    	lambda*(4*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
-    	+ 2*ay*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-    	- az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-    	+ mu*(4*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y) 
-    	+ 2*ay*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x) 
-    	- 20*az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z)) 
-    	- 2*az*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
-
-
+        // Set vector in dualCellI for -equation
+        bodyForcesI[vertexI].z() =
+            lambda*(4*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+            + 2*ay*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+            - az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
+            + mu*(4*ax*pi*pi*Foam::cos(4*pi*x)*Foam::cos(pi*z)*Foam::sin(2*pi*y)
+            + 2*ay*pi*pi*Foam::cos(2*pi*y)*Foam::cos(pi*z)*Foam::sin(4*pi*x)
+            - 20*az*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z))
+            - 2*az*mu*pi*pi*Foam::sin(4*pi*x)*Foam::sin(2*pi*y)*Foam::sin(pi*z);
     }
-    
+
     // Add body force field to source
     //source -= bodyForcesI;
-    
+
     //Info << "source: " << source;
-    
+
     forAll(dualDivSigma, dualCellI)
     {
         const label pointID = dualCellToPoint[dualCellI];
@@ -245,7 +241,7 @@ void vertexCentredLinGeomSolidMMS::updateSource
 //    // Add transient term
 //    source += vfvc::d2dt2
 //    (
-//#ifdef OPENFOAMESIORFOUNDATION
+//#ifdef OPENFOAM_NOT_EXTEND
 //        mesh().d2dt2Scheme("d2dt2(pointD)"),
 //#else
 //        mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
@@ -277,7 +273,7 @@ void vertexCentredLinGeomSolidMMS::setFixedDofs
     // Flag all fixed DOFs
 
     forAll(pointD.boundaryField(), patchI)
-    {        
+    {
         if
         (
             // isA<uniformFixedValuePointPatchVectorField>
@@ -335,9 +331,9 @@ void vertexCentredLinGeomSolidMMS::setFixedDofs
                 {
                     fixedDofs[pointID] = true;
                     fixedDofValues[pointID] = disp;
-                    fixedDofDirections[pointID] = symmTensor(I);  
-                          
-                }     
+                    fixedDofDirections[pointID] = symmTensor(I);
+
+                }
             }
         }
         else if
@@ -365,13 +361,13 @@ void vertexCentredLinGeomSolidMMS::setFixedDofs
                     pointD.boundaryField()[patchI]
                 )
             )
-            {          
+            {
                 normalDisp =
                 (
                     pointNormals
                   & pointD.boundaryField()[patchI].patchInternalField()
                 );
-                
+
                 if (debug)
                 {
                     Info<< "normalDisp = " << normalDisp << endl;
@@ -533,7 +529,7 @@ void vertexCentredLinGeomSolidMMS::enforceTractionBoundaries
             // Take the average
             dualFaceTraction /= nPointsPerDualFace;
             // Overwrite the dual patch face traction
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             dualTraction.boundaryFieldRef()[patchI] = dualFaceTraction;
 #else
             dualTraction.boundaryField()[patchI] = dualFaceTraction;
@@ -549,9 +545,9 @@ void vertexCentredLinGeomSolidMMS::enforceTractionBoundaries
         )
         {
             // Set the dual patch face shear traction to zero
-            const vectorField n(dualMesh.boundary()[patchI].nf()); 
-            
-#ifdef OPENFOAMESIORFOUNDATION            
+            const vectorField n(dualMesh.boundary()[patchI].nf());
+
+#ifdef OPENFOAM_NOT_EXTEND
             dualTraction.boundaryFieldRef()[patchI] =
                 (sqr(n) & dualTraction.boundaryField()[patchI]);
 #else
@@ -594,7 +590,7 @@ bool vertexCentredLinGeomSolidMMS::vertexCentredLinGeomSolidMMS::converged
     const scalar residualNorm = residualAbs/initResidual;
 
     // Calculate the maximum displacement
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const scalar maxMagD = gMax(mag(pointD.primitiveField()));
 #else
     const scalar maxMagD = gMax(mag(pointD.internalField()));
@@ -645,7 +641,7 @@ scalar vertexCentredLinGeomSolidMMS::calculateLineSearchSlope
     pointD.storePrevIter();
 
     // Update pointD
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     pointD.primitiveFieldRef() += eta*pointDcorr;
 #else
     pointD.internalField() += eta*pointDcorr;
@@ -883,7 +879,7 @@ vertexCentredLinGeomSolidMMS::vertexCentredLinGeomSolidMMS
 
     // Set the pointVol field
     // Map dualMesh cell volumes to the primary mesh points
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     scalarField& pointVolI = pointVol_.primitiveFieldRef();
 #else
     scalarField& pointVolI = pointVol_.internalField();
@@ -934,12 +930,12 @@ vertexCentredLinGeomSolidMMS::~vertexCentredLinGeomSolidMMS()
 bool vertexCentredLinGeomSolidMMS::evolve()
 {
     Info<< "Evolving solid solver" << endl;
-    
+
     //Update boundary conditions
     pointD().correctBoundaryConditions();
 
     // Initialise matrix
-    sparseMatrix matrix(sum(globalPointIndices_.stencilSize())); 
+    sparseMatrix matrix(sum(globalPointIndices_.stencilSize()));
     //sparseMatrix is created given the size sum(globalPointIndices_.stencilSize())
 
     // Store material tangent field for dual mesh faces
@@ -947,7 +943,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
     (
         dualMechanicalPtr_().materialTangentFaceField()
     );
-    
+
     // Lookup compact edge gradient factor
     const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
     if (debug)
@@ -955,12 +951,12 @@ bool vertexCentredLinGeomSolidMMS::evolve()
         Info<< "zeta: " << zeta << endl;
     }
 
+#ifdef USE_PETSC
     // Global point index lists
-    //List showing which points are on a specific processor?
     const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
-    //Mapping local points to global?
     const labelList& localToGlobalPointMap =
         globalPointIndices_.localToGlobalPointMap();
+#endif
 
     if (!fullNewton_) //if not using full Newton-Raphson approach
     {
@@ -968,7 +964,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
         Info<< "    Assembling the matrix" << endl;
 
         // Add div(sigma) coefficients
-        vfvm::divSigma 
+        vfvm::divSigma
         (
             matrix,
             mesh(),
@@ -984,9 +980,9 @@ bool vertexCentredLinGeomSolidMMS::evolve()
         );
 
         // Add d2dt2 coefficients
-        vfvm::d2dt2 
+        vfvm::d2dt2
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
             mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
@@ -1006,7 +1002,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
     // Newton-Raphson loop over momentum equation
     int iCorr = 0;
     scalar initResidual = 0.0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solverPerf;
 #else
     BlockSolverPerformance<vector> solverPerf; //Class containing performance statistics
@@ -1031,7 +1027,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
         // Update the source vector
         vectorField source(mesh().nPoints(), vector::zero);
         pointD().correctBoundaryConditions();
-        updateSource(source, dualMeshMap().dualCellToPoint()); 
+        updateSource(source, dualMeshMap().dualCellToPoint());
 
         if (fullNewton_)
         {
@@ -1062,7 +1058,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
             // Add d2dt2 coefficients
             vfvm::d2dt2
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
                 mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
@@ -1075,16 +1071,16 @@ bool vertexCentredLinGeomSolidMMS::evolve()
                 int(bool(debug))
             );
         }
-        
+
 //        Info << endl << "Before enforcing DOFs: " << endl << endl;
 //        matrix.print();
 //        Info << endl << "Print out the source: " << endl << endl;
-//        
+//
 //        for (int i = 0; i < source.size(); i++)
 //        {
 //            Info << "(" << i << ", 0) : " << source[i] << endl;
-//            
-//        } 
+//
+//        }
 //        Info << endl;
 
         // Enforce fixed DOF on the linear system
@@ -1101,12 +1097,12 @@ bool vertexCentredLinGeomSolidMMS::evolve()
 //        Info << endl << "After enforcing DOFs " << endl << endl;
 //        matrix.print();
 //        Info << endl << "Print out the source: " << endl << endl;
-//        
+//
 //        for (int i = 0; i < source.size(); i++)
 //        {
 //            Info << "(" << i << ", 0) : " << source[i] << endl;
-//            
-//        } 
+//
+//        }
 
         // Solve linear system for displacement correction
         if (debug)
@@ -1187,13 +1183,13 @@ bool vertexCentredLinGeomSolidMMS::evolve()
             );
 
             // Update displacement field
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             pointD().primitiveFieldRef() += eta*pointDcorr;
 #else
             pointD().internalField() += eta*pointDcorr;
 #endif
         }
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         else if (mesh().relaxField(pointD().name()))
 #else
         else if (mesh().solutionDict().relaxField(pointD().name()))
@@ -1203,7 +1199,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
             // This is like a simple line search
             // Of course, an actual line search would be better: to-do!
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const scalar rf
             (
                 mesh().fieldRelaxationFactor(pointD().name())
@@ -1221,7 +1217,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
         }
         else
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             pointD().primitiveFieldRef() += pointDcorr;
 #else
             pointD().internalField() += pointDcorr;
@@ -1231,7 +1227,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
 
         // Update point accelerations
         // Note: for NewmarkBeta, this needs to come before the pointU update
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         pointA_.primitiveFieldRef() =
             vfvc::ddt
             (
@@ -1274,7 +1270,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
             iCorr,
             initResidual,
             solverPerf.finalResidual()[vector::X],
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             cmptMax(solverPerf.nIterations()),
 #else
             solverPerf.nIterations(),
@@ -1298,7 +1294,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
 
     // Update the increment of displacement
     pointDD() = pointD() - pointD().oldTime();
-    
+
     //Info << pointD().internalField() << endl;
 
     // Calculate cell gradient
@@ -1308,7 +1304,7 @@ bool vertexCentredLinGeomSolidMMS::evolve()
     // Map primary cell gradD field to sub-meshes for multi-material cases
     if (mechanical().PtrList<mechanicalLaw>::size() > 1) //Meaning??
     {
-        mechanical().mapGradToSubMeshes(gradD()); 
+        mechanical().mapGradToSubMeshes(gradD());
     }
 
     // Update dual face stress field
@@ -1341,7 +1337,7 @@ void vertexCentredLinGeomSolidMMS::setTraction
     );
 
     // Lookup point patch field
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     pointPatchVectorField& ptPatch = pointD().boundaryFieldRef()[patchID];
 #else
     pointPatchVectorField& ptPatch = pointD().boundaryField()[patchID];
@@ -1428,7 +1424,7 @@ void vertexCentredLinGeomSolidMMS::writeFields(const Time& runTime)
     pEpsilonEq.write();
 
     Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;
-    
+
     // Stress at the points
     pointSymmTensorField pSigma
     (
@@ -1443,17 +1439,17 @@ void vertexCentredLinGeomSolidMMS::writeFields(const Time& runTime)
         pMesh(),
         dimensionedSymmTensor("0", dimless, symmTensor::zero)
     );
-    
-	scalar lambda = 1.15e11;
-	scalar mu = 7.69e10;
-  
+
+        scalar lambda = 1.15e11;
+        scalar mu = 7.69e10;
+
 #ifdef FOAMEXTEND
     pSigma.internalField() = 2*mu*(pEpsilon.internalField()) + lambda*tr(pEpsilon.internalField())*I;
 #else
     pSigma.primitiveFieldRef() = 2*mu*(pEpsilon.internalField()) + lambda*tr(pEpsilon.internalField())*I;
 #endif
-    pSigma.write();    
-    
+    pSigma.write();
+
 //    // Equivalent stress at the points
 //    pointScalarField pSigmaEq
 //    (
@@ -1471,15 +1467,15 @@ void vertexCentredLinGeomSolidMMS::writeFields(const Time& runTime)
 
 //#ifdef FOAMEXTEND
 //    pSigmaEq.internalField() =
-//        sqrt(0.5*((pSigma.XX().internalField() - pSigma.YY().internalField())^2 
+//        sqrt(0.5*((pSigma.XX().internalField() - pSigma.YY().internalField())^2
 //        + (pSigma.YY().internalField() - pSigma.ZZ().internalField())^2 +
-//        (pSigma.ZZ().internalField() - pSigma.XX().internalField())^2) + 
+//        (pSigma.ZZ().internalField() - pSigma.XX().internalField())^2) +
 //        3*(pSigma.XY().internalField() + pSigma.YZ().internalField() + pSigma.ZX().internalField()));
 //#else
 //    pSigmaEq.primitiveFieldRef() =
-//        sqrt(0.5*((pSigma.XX().internalField() - pSigma.YY().internalField())^2 
+//        sqrt(0.5*((pSigma.XX().internalField() - pSigma.YY().internalField())^2
 //        + (pSigma.YY().internalField() - pSigma.ZZ().internalField())^2 +
-//        (pSigma.ZZ().internalField() - pSigma.XX().internalField())^2) + 
+//        (pSigma.ZZ().internalField() - pSigma.XX().internalField())^2) +
 //        3*(pSigma.XY().internalField() + pSigma.YZ().internalField() + pSigma.ZX().internalField()));
 //#endif
 //    pSigmaEq.write();

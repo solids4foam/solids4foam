@@ -81,7 +81,7 @@ class linGeomSolidMMS
 
         //- Disallow default bitwise assignment
         void operator=(const linGeomSolidMMS&);
-        
+
         //volVectorField calculateBodyForce();
 
 
