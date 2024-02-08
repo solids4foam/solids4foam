@@ -100,30 +100,6 @@ namespace vfvm
         const scalar zeta, // fraction of compact edge direction component used
         const bool debug = false
     );
-    
-    
-    // Add coefficients to the matrix for the pressure approach
-	void assembleMatrixExtended
-	(
-		sparseMatrixExtended& matrix,
-		const fvMesh& mesh,
-		const fvMesh& dualMesh,
-		const labelList& dualFaceToCell,
-		const labelList& dualCellToPoint,
-		const Field<RectangularMatrix<scalar>>& materialTangentField,
-		const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
-		const scalarField& pressureField,
-		const symmTensorField& pressureSensitivityField, 
-		const tensorField& dispResidualSensitivityField,
-		const symmTensorField& sigmaField,
-		const tensorField& dualGradDField,
-		const boolList& fixedDofs,
-		const symmTensorField& fixedDofDirections,
-		const scalar fixedDofScale,
-		const scalar zeta,
-		const scalar gamma,
-		const bool debug
-	);
 	
 	
     // Add coefficients to the matrix for the Laplacian of a scalar field with

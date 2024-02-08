@@ -29,7 +29,7 @@ License
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "Time.H"
 #endif
 
@@ -65,7 +65,7 @@ linearSpatialDisplacementCantileverPointPatchVectorField
     fixedValuePointPatchVectorField(p, iF),
     v0_(2),
     L_(20),
-    t_(10)
+    t_(1)
 {
     Info<< "Creating " << type() << " boundary condition" << endl;
 }
@@ -87,7 +87,7 @@ linearSpatialDisplacementCantileverPointPatchVectorField
 {}
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
 linearSpatialDisplacementCantileverPointPatchVectorField::
 linearSpatialDisplacementCantileverPointPatchVectorField
 (
@@ -145,9 +145,9 @@ void linearSpatialDisplacementCantileverPointPatchVectorField::updateCoeffs()
         return;
     }
 
-    this->operator==((v0_* patch().localPoints()/L_)*t_);
+    this->operator==(-patch().pointNormals() * ((v0_*patch().localPoints().component(vector::X)/L_)*t_)); 
     
-    fixedValuePointPatchField<vector>::updateCoeffs();
+    fixedValuePointPatchField<vector>::updateCoeffs(); 
 }
 
 

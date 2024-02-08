@@ -450,7 +450,7 @@ Foam::dualMechanicalModel::pressureSensitivityFaceField() const
     (
         new Foam::symmTensorField(mesh().nFaces(), Foam::symmTensor::zero)
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Foam::symmTensorField& result = tresult.ref();
 #else
     Foam::symmTensorField& result = tresult();
@@ -486,7 +486,7 @@ Foam::dualMechanicalModel::pressEqnDispSensitivityFaceField() const
     (
         new Foam::tensorField(mesh().nFaces(), Foam::tensor::zero)
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Foam::tensorField& result = tresult.ref();
 #else
     Foam::tensorField& result = tresult();

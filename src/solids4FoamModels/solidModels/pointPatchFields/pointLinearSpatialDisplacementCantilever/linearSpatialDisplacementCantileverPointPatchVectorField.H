@@ -44,7 +44,7 @@ Author
 #ifndef linearSpatialDisplacementCantileverPointPatchVectorField_H
 #define linearSpatialDisplacementCantileverPointPatchVectorField_H
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "fixedValuePointPatchField.H"
     #include "pointPatchFieldMapper.H"
 #else
@@ -58,10 +58,10 @@ Author
 namespace Foam
 {
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     typedef fixedValuePointPatchField<vector> fixedValuePointPatchVectorField;
 
-    #ifdef OPENFOAMESIORFOUNDATION
+    #ifdef OPENFOAM_NOT_EXTEND
         typedef pointPatchFieldMapper PointPatchFieldMapper;
     #endif
 #endif

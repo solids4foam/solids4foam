@@ -120,6 +120,7 @@ $(pointPatchFields)/pointSolidForce/solidForcePointPatchVectorField.C
 $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
 $(pointPatchFields)/pointNormalDisplacement/normalDisplacementPointPatchVectorField.C
+$(pointPatchFields)/pointLinearSpatialDisplacementCantilever/linearSpatialDisplacementCantileverPointPatchVectorField.C
 
 contactModels = $(solidFvPatchFields)/solidContact/contactModels
 normalContactModels = $(contactModels)/normalContactModels

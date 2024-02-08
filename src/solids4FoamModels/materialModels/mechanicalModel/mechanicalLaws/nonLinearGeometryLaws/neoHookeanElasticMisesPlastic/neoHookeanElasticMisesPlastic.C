@@ -1522,7 +1522,7 @@ Foam::neoHookeanElasticMisesPlastic::pressureSensitivityField() const
         new Foam::symmTensorField(mesh().nFaces(), Foam::symmTensor::zero)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     symmTensorField& result = tresult.ref();
 #else
     symmTensorField& result = tresult();
@@ -1602,7 +1602,7 @@ Foam::neoHookeanElasticMisesPlastic::pressEqnDispSensitivityField() const
         new Foam::tensorField(mesh().nFaces(), Foam::tensor::zero)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     tensorField& result = tresult.ref();
 #else
     tensorField& result = tresult();

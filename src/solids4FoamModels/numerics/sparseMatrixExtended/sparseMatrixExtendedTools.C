@@ -68,7 +68,7 @@ bool Foam::sparseMatrixExtendedTools::checkTwoD(const polyMesh& mesh)
 
 #ifdef USE_PETSC
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Foam::SolverPerformance<Foam::vector>
 #else
     Foam::BlockSolverPerformance<Foam::vector>
@@ -691,7 +691,7 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
         finalRes.z() = 0;
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     return SolverPerformance<vector>
     (
         "PETSc", // solver name
