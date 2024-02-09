@@ -26,6 +26,12 @@
 #     Alternatively version can be specified with -v option.
 #     Also removes consecutive blank lines from file.
 #
+#     To run the script on multiple files, use the following command:
+#
+#     $ find . -name "*" -type f | xargs -n 1 "./solids4FoamUpdateCaseFileHeader.sh"
+#
+#     where the address of this script is updated as appropriate.
+#
 #------------------------------------------------------------------------------
 solids4foamVersion=v2.0
 
