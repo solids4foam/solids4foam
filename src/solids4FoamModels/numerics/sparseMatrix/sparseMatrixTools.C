@@ -1049,6 +1049,7 @@ void Foam::sparseMatrixTools::enforceFixedDof
     sparseScalarMatrix& matrix,
     scalarField& source,
     const boolList& fixedDofs,
+    const scalarField& fixedDofDirections,
     const scalarField& fixedDofValues,
     const scalar fixedDofScale,
     const bool debug
@@ -1074,7 +1075,7 @@ void Foam::sparseMatrixTools::enforceFixedDof
         const label blockRowI = iter.key()[0];
         const label blockColI = iter.key()[1];
 
-        if (fixedDofs[blockRowI])
+        if (fixedDofs[blockRowI] && mag(fixedDofDirections[blockRowI]) > 0)
         {
             scalar& coeff = iter();
 
@@ -1102,7 +1103,7 @@ void Foam::sparseMatrixTools::enforceFixedDof
                 Info<< "    coeff after: " << coeff << nl << endl;
             }
         }
-        else if (fixedDofs[blockColI])
+        else if (fixedDofs[blockColI] && mag(fixedDofDirections[blockRowI]) > 0)
         {
             // This equation refers to a fixed DOF
             // We will eliminate the coeff

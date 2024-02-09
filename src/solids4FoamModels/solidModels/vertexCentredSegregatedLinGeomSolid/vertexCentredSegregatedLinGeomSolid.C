@@ -476,34 +476,36 @@ vertexCentredSegregatedLinGeomSolid::converged
     const scalar maxMagD = gMax(mag(pointD.internalField()));
 #endif
 
-    // Print information
-    Info<< "    Iter = " << iCorr
-        << ", relRef = " << residualNorm
-        << ", res = " << res
-        << ", resAbs = " << residualAbs
-        << ", nIters = " << nInterations
-        << ", maxD = " << maxMagD << endl;
-
     // Check for convergence
+    bool converged = false;
     if (residualNorm < solutionTol())
     {
         Info<< "    Converged" << endl;
-        return true;
+        converged = true;
     }
-    else if (iCorr >= nCorr() - 1)
+
+    if (iCorr == 0)
     {
-        if (nCorr() > 1)
+        Info<< "    Corr, res, relRes, resAbs, iters, maxMagD" << endl;
+    }
+    else if (iCorr % infoFrequency() == 0 || converged || iCorr >= nCorr() - 1)
+    {
+        Info<< "    " << iCorr
+            << ", " << res
+            << ", " << residualNorm
+            << ", " << residualAbs
+            << ", " << nInterations
+            << ", " << maxMagD << endl;
+
+        if (iCorr >= nCorr() - 1)
         {
             Warning
-                << "Max iterations reached within the momentum Newton-Raphson "
-                "loop" << endl;
+                << "Max iterations reached within the momentum loop"
+                << endl;
         }
-
-        return true;
     }
 
-    // Convergence has not been reached
-    return false;
+    return converged;
 }
 
 
@@ -767,6 +769,20 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
                 continue;
             }
 
+            vector dir = vector::zero;
+            if (dirI == 0)
+            {
+                dir = vector(1, 0, 0);
+            }
+            else if (dirI == 1)
+            {
+                dir = vector(0, 1, 0);
+            }
+            else
+            {
+                dir = vector(0, 0, 1);
+            }
+
             // Take a copy of matrixNoBCs and enforce the boundary conditions
             // for this direction
             sparseScalarMatrix matrixDirI(matrixNoBCs);
@@ -781,6 +797,7 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
                 matrixDirI,
                 sourceDirI,
                 fixedDofs_,
+                dir & (dir & fixedDofDirections_),
                 fixedDofValues_.component(dirI),
                 fixedDofScale_,
                 debug
@@ -874,7 +891,8 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
 #endif
             pointD(),
             pointDcorrVec
-        ) && ++iCorr
+        )
+     && ++iCorr < nCorr()
     );
 
     // Calculate gradD at dual faces

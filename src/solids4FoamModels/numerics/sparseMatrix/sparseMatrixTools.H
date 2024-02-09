@@ -123,6 +123,7 @@ namespace sparseMatrixTools
         sparseScalarMatrix& matrix,
         scalarField& source,
         const boolList& fixedDofs,
+        const scalarField& fixedDofDirections,
         const scalarField& fixedDofValues,
         const scalar fixedDofScale,
         const bool debug
