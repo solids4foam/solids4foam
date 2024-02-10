@@ -367,6 +367,16 @@ bool vertexCentredLaplacian::evolve()
     // const labelList& localToGlobalPointMap =
     //     globalPointIndices_.localToGlobalPointMap();
 
+    // Lookup flag to indicate compact or large Laplacian stencil
+    const Switch compactImplicitStencil
+    (
+        solidModelDict().lookupOrDefault<Switch>("compactImplicitStencil", true)
+    );
+    if (debug)
+    {
+        Info<< "compactImplicitStencil: " << compactImplicitStencil << endl;
+    }
+
     // Lookup compact edge gradient factor
     const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
     if (debug)
@@ -381,6 +391,7 @@ bool vertexCentredLaplacian::evolve()
     vfvm::laplacian
     (
         matrix,
+        compactImplicitStencil,
         mesh(),
         dualMesh(),
         dualMeshMap().dualFaceToCell(),

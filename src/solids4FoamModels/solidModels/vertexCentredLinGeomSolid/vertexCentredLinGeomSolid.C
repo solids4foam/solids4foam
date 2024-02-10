@@ -824,10 +824,15 @@ bool vertexCentredLinGeomSolid::evolve()
     );
 
     // Lookup compact edge gradient factor
-    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
-    if (debug)
+    const scalar zetaImplicit
+    (
+        solidModelDict().lookupOrDefault<scalar>("zetaImplicit", 1e-6)
+    );
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
+    //if (debug)
     {
-        Info<< "zeta: " << zeta << endl;
+        Info<< "zetaImplicit: " << zetaImplicit << nl
+            << "zeta: " << zeta << endl;
     }
 
     // Global point index lists
@@ -851,7 +856,7 @@ bool vertexCentredLinGeomSolid::evolve()
             dualMeshMap().dualFaceToCell(),
             dualMeshMap().dualCellToPoint(),
             materialTangent,
-            zeta,
+            zetaImplicit,
             debug
         );
 
@@ -922,7 +927,7 @@ bool vertexCentredLinGeomSolid::evolve()
                 dualMeshMap().dualFaceToCell(),
                 dualMeshMap().dualCellToPoint(),
                 materialTangent,
-                zeta
+                zetaImplicit
             );
 
             // Add d2dt2 coefficients

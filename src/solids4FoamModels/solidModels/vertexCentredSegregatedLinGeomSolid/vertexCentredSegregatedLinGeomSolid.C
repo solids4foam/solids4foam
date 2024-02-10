@@ -58,7 +58,7 @@ void vertexCentredSegregatedLinGeomSolid::updateSource
 {
     if (debug)
     {
-        Info<< "void vertexCentredSegregatedLinGeomSolid::updateSource(...): start"
+        Info<< "void vertexCentredSegregatedLinGeomSolid::updateSource(...)"
             << endl;
     }
 
@@ -133,12 +133,6 @@ void vertexCentredSegregatedLinGeomSolid::updateSource
 //         pointVol_,
 //         int(bool(debug))
 //     );
-
-    if (debug)
-    {
-        Info<< "void vertexCentredSegregatedLinGeomSolid::updateSource(...): end"
-            << endl;
-    }
 }
 
 
@@ -532,6 +526,7 @@ vertexCentredSegregatedLinGeomSolid::vertexCentredSegregatedLinGeomSolid
     impKf_(dualMechanicalPtr_().impKf()),
     steadyState_(false),
     twoD_(sparseMatrixTools::checkTwoD(mesh())),
+    twoDCorrector_(mesh()),
     fixedDofs_(mesh().nPoints(), false),
     fixedDofValues_(fixedDofs_.size(), vector::zero),
     fixedDofDirections_(fixedDofs_.size(), symmTensor::zero),
@@ -694,10 +689,18 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
     // Initialise matrix
     sparseScalarMatrix matrixNoBCs(sum(globalPointIndices_.stencilSize()));
 
+    // Lookup flag to indicate compact or large Laplacian stencil
+    const Switch compactImplicitStencil
+    (
+        solidModelDict().lookupOrDefault<Switch>("compactImplicitStencil", true)
+    );
+    Info<< "compactImplicitStencil: " << compactImplicitStencil << endl;
+
     // Create scalar Laplacian discretisation matrix without boundary conditions
     vfvm::laplacian
     (
         matrixNoBCs,
+        compactImplicitStencil,
         mesh(),
         dualMesh(),
         dualMeshMap().dualFaceToCell(),
@@ -707,11 +710,8 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
     );
 
     // Lookup compact edge gradient factor
-    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
-    if (debug)
-    {
-        Info<< "zeta: " << zeta << endl;
-    }
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
+    Info<< "zeta: " << zeta << endl;
 
     // // Global point index lists
     // const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
@@ -873,6 +873,26 @@ bool vertexCentredSegregatedLinGeomSolid::evolve()
 //                 pointD()
 //             );
 // #endif
+
+        if (twoD_)
+        {
+            twoDCorrector_.correctPoints(pointD());
+
+            // Remove displacement in the empty directions
+            forAll(mesh().geometricD(), dirI)
+            {
+                if (mesh().geometricD()[dirI] < 0)
+                {
+                    pointD().primitiveFieldRef().replace(dirI, 0.0);
+                }
+            }
+        }
+
+        // Relax pointD
+        if (mesh().relaxField(pointD().name()))
+        {
+            pointD().relax(mesh().fieldRelaxationFactor(pointD().name()));
+        }
 
         // Update correction vector field
         pointDcorrVec = pointD() - pointD().prevIter();

@@ -50,6 +50,7 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
+#include "twoDPointCorrector.H"
 #ifdef OPENFOAM_COM
     #include "pointVolInterpolation.H"
 #endif
@@ -87,6 +88,10 @@ class vertexCentredSegregatedLinGeomSolid
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
+
+        //- Object for correcting the displacement field in 2-D
+        //  This ensures the front and back planes have the same displacements
+        twoDPointCorrector twoDCorrector_;
 
         //- Field of flags indicating the degrees of freedom where the value is
         //  set
