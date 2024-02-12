@@ -624,20 +624,20 @@ void newLeastSquaresVolPointInterpolation::interpolate
     // ZT: Correct only patches which are not coupled
     // (for example, processor patches should already be sinchronized)
     // pf.correctBoundaryConditions();
-    forAll(pf.boundaryField(), patchI)
-    {
-        if (!pf.boundaryField()[patchI].coupled())
-        {
-            pf.boundaryField()[patchI].initEvaluate();
-        }
-    }
-    forAll(pf.boundaryField(), patchI)
-    {
-        if (!pf.boundaryField()[patchI].coupled())
-        {
-            pf.boundaryField()[patchI].evaluate();
-        }
-    }
+    // forAll(pf.boundaryField(), patchI)
+    // {
+    //     if (!pf.boundaryField()[patchI].coupled())
+    //     {
+    //         pf.boundaryField()[patchI].initEvaluate();
+    //     }
+    // }
+    // forAll(pf.boundaryField(), patchI)
+    // {
+    //     if (!pf.boundaryField()[patchI].coupled())
+    //     {
+    //         pf.boundaryField()[patchI].evaluate();
+    //     }
+    // }
 
     // Correct axis point values
     forAll(mesh().boundaryMesh(), patchI)
