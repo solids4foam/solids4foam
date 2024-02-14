@@ -162,9 +162,6 @@ class fluidSolidInterface
 
     // Private Member Functions
 
-        //- Update the coupled switch based on the couplingStartTime
-        bool updateCoupled();
-
         //- Calculate interface-to-interface list
         void calcInterfaceToInterfaceList() const;
 
@@ -182,6 +179,9 @@ class fluidSolidInterface
 
 protected:
     // Protected Member Functions
+
+        //- Update the coupled switch based on the couplingStartTime
+        bool updateCoupled();
 
         //- Return sub-dictionary
         dictionary& fsiProperties()

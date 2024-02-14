@@ -71,6 +71,9 @@ fluidSolidInterface    IQNILS;
     // 10 means the interpolator will be updated every 10 time-steps
     // Defaults to 0
     // interpolatorUpdateFrequency 0;
+    
+    // Write fsi residuals to file
+    writeResidualsToFile yes;
 }
 
 // ************************************************************************* //
