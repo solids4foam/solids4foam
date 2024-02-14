@@ -186,7 +186,7 @@ void Foam::mechanicalLaw::makeSigma0() const
         (
             "mechanicalProperties"
         ).PtrList::size() == 1
-     || !baseMesh().foundObject<volSymmTensorField>("sigma0")
+        //|| !baseMesh().foundObject<volSymmTensorField>("sigma0")
     )
     {
         // Only one material, but the material mesh is not the same as the
