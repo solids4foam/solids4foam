@@ -28,6 +28,7 @@ solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
 solidModels/vertexCentredLinGeomSolidMMS/vertexCentredLinGeomSolidMMS.C
 solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
+solidModels/vertexCentredNonLinGeomTotalLagDisplacementSolid/vertexCentredNonLinGeomTotalLagDisplacementSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
@@ -121,6 +122,7 @@ $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
 $(pointPatchFields)/pointNormalDisplacement/normalDisplacementPointPatchVectorField.C
 $(pointPatchFields)/pointLinearSpatialDisplacementCantilever/linearSpatialDisplacementCantileverPointPatchVectorField.C
+$(pointPatchFields)/pointFixedRotation/fixedRotationPointPatchVectorField.C
 
 contactModels = $(solidFvPatchFields)/solidContact/contactModels
 normalContactModels = $(contactModels)/normalContactModels
