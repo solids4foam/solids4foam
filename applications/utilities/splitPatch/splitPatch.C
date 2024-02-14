@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 
     runTime.functionObjects().off();
 
-    const bool overwrite = args.optionFound("overwrite");
+    const bool overwrite = args.found("overwrite");
 
     const word oldInstance = mesh.pointsInstance();
 

@@ -25,7 +25,7 @@ solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsLinGeomSolidMMS/unsLinGeomSolidMMS.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
-solidModels/vertexCentredLaplacian/vertexCentredLaplacian.C
+/*solidModels/vertexCentredLaplacian/vertexCentredLaplacian.C*/
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
 solidModels/vertexCentredLinGeomSolidMMS/vertexCentredLinGeomSolidMMS.C
 solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
@@ -123,7 +123,7 @@ $(pointPatchFields)/pointSolidForce/solidForcePointPatchVectorField.C
 $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
 $(pointPatchFields)/pointNormalDisplacement/normalDisplacementPointPatchVectorField.C
-$(pointPatchFields)/pointLinearSpatialDisplacementCantilever/linearSpatialDisplacementCantileverPointPatchVectorField.C
+/*$(pointPatchFields)/pointLinearSpatialDisplacementCantilever/linearSpatialDisplacementCantileverPointPatchVectorField.C*/
 $(pointPatchFields)/pointFixedRotation/fixedRotationPointPatchVectorField.C
 
 contactModels = $(solidFvPatchFields)/solidContact/contactModels

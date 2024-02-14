@@ -147,12 +147,6 @@ void Foam::sparseMatrixTools::solveLinearSystemEigen
     <
         Eigen::SparseMatrix<scalar>, Eigen::COLAMDOrdering<int>
     > solver(A);
-    // Eigen::ConjugateGradient
-    // <
-    //     Eigen::SparseMatrix<scalar>,
-    //     Eigen::Lower|Eigen::Upper,
-    //     Eigen::IncompleteLUT<scalar>
-    // > solver(A);
 
     // Initialise the solution vector to zero
     Eigen::Matrix<scalar, Eigen::Dynamic, 1> x(nDof);
