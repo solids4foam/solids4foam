@@ -76,6 +76,7 @@ namespace vfvm
     void laplacian
     (
         sparseScalarMatrix& matrix,
+        const Switch compactStencil,
         const fvMesh& mesh,
         const fvMesh& dualMesh,
         const labelList& dualFaceToCell,

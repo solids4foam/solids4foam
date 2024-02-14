@@ -120,12 +120,13 @@ namespace sparseMatrixTools
     //- Enforce fixed DOF contributions on the linear system
     void enforceFixedDof
     (
-        sparseScalarMatrix& matrix,
-        scalarField& source,
-        const boolList& fixedDofs,
-        const scalarField& fixedDofValues,
-        const scalar fixedDofScale,
-        const bool debug
+		sparseScalarMatrix& matrix,
+		scalarField& source,
+		const boolList& fixedDofs,
+		const scalarField& fixedDofDirections,
+		const scalarField& fixedDofValues,
+		const scalar fixedDofScale,
+		const bool debug
     );
 
     //- Enforce fixed DOF contributions on the linear system
