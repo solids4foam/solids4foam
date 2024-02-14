@@ -57,7 +57,7 @@ The results in Figures 3 and 4 and Table 2 were generated with the mesh and time
 </div>
 
 
-{% include youtube.html id="TO_BE_ADDED" %}
+{% include youtube.html id="GCwZ3tC-Iig" %}
 
 **Video 1: Time evolution of the pressure field in the fluid and the displacement magnitude field in the solid.**
 
