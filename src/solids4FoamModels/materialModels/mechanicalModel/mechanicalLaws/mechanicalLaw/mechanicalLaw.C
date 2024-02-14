@@ -1554,33 +1554,6 @@ Foam::mechanicalLaw::materialTangentField() const
 
     return tresult;
 }
-
-
-Foam::tmp<Foam::symmTensorField>
-Foam::mechanicalLaw::pressureSensitivityField() const
-{
-    // Default to uniform field
-    // This function can be overwritten in specific mechanical laws
-    tmp<symmTensorField> tresult
-    (
-        new symmTensorField(mesh().nFaces(), symmTensor::zero)
-    );
-
-    return tresult;
-}
-
-Foam::tmp<Foam::tensorField>
-Foam::mechanicalLaw::pressEqnDispSensitivityField() const
-{
-    // Default to uniform field
-    // This function can be overwritten in specific mechanical laws
-    tmp<tensorField> tresult
-    (
-        new tensorField(mesh().nFaces(), tensor::zero)
-    );
-
-    return tresult;
-}
 #endif
 
 

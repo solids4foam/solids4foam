@@ -59,7 +59,7 @@ namespace vfvm
     //3x3 tensor.
     // Note: this function does not calculate contributions to the right-hand
     // side
-    void divSigmaNoPressure
+    void divSigma
     (
         sparseMatrix& matrix,
         const fvMesh& mesh,
@@ -83,7 +83,7 @@ namespace vfvm
     //4x4 tensor.
     // Note: this function does not calculate contributions to the right-hand
     // side
-    void divSigmaExtended
+    void divSigma
     (
         sparseMatrixExtended& matrix,
         const fvMesh& mesh,
@@ -111,7 +111,7 @@ namespace vfvm
         const fvMesh& dualMesh,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const scalarField& diffusivity, // diffusivity in the primary cells
+        const scalar& diffusivity, // diffusivity in the primary cells
         const bool debug = false
     );	
 
@@ -136,9 +136,10 @@ namespace vfvm
     void Sp
     (
         sparseMatrixExtended& matrix,
-        const fvMesh& mesh,
         const fvMesh& dualMesh,
+        const labelList& dualCellToPoint,
         const scalarField& pointVolI,
+        const tensorField& pBarSensitivity,
         const int debug // debug switch 
     );
     

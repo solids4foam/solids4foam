@@ -25,7 +25,7 @@ License
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-void Foam::vfvm::divSigmaNoPressure
+void Foam::vfvm::divSigma
 (
     sparseMatrix& matrix,
     const fvMesh& mesh,
@@ -45,7 +45,7 @@ void Foam::vfvm::divSigmaNoPressure
 {
     if (debug)
     {
-        Info<< "void Foam::vfvm::divSigmaNoPressure(...): start" << endl;
+        Info<< "void Foam::vfvm::divSigma(...): start" << endl;
     }
 
 //    Info << "sigmaField = " << sigmaField << endl;
@@ -213,12 +213,12 @@ void Foam::vfvm::divSigmaNoPressure
 
     if (debug)
     {
-        Info<< "void Foam::vfvm::divSigmaNoPressure(...): end" << endl;
+        Info<< "void Foam::vfvm::divSigma(...): end" << endl;
     }
 }
 
 
-void Foam::vfvm::divSigmaExtended
+void Foam::vfvm::divSigma
 (
     sparseMatrixExtended& matrix,
     const fvMesh& mesh,
@@ -427,7 +427,7 @@ void Foam::vfvm::laplacian
     const fvMesh& dualMesh,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const scalarField& diffusivity,
+    const scalar& diffusivity,
     const bool debug
 )
 {
@@ -451,9 +451,6 @@ void Foam::vfvm::laplacian
     {
         // Primary mesh cell in which dualFaceI resides
         const label cellID = dualFaceToCell[dualFaceI];
-
-        // Diffusivity in the primary cells
-        const scalar diffCellID = diffusivity[cellID];
 
         // Points in cellID
         const labelList& curCellPoints = cellPoints[cellID];
@@ -490,7 +487,7 @@ void Foam::vfvm::laplacian
             const vector lsVec = curLeastSquaresVecs[cpI];
 
             // Calculate the coefficient for this point coming from dualFaceI
-            const scalar coeff = diffCellID*curDualSf & lsVec;
+            const scalar coeff = diffusivity*curDualSf & lsVec;
 
             // Add the coefficient to the ownPointID equation coming from
             // pointID
@@ -572,9 +569,10 @@ void Foam::vfvm::d2dt2Extended
 void Foam::vfvm::Sp
 (
     sparseMatrixExtended& matrix,
-    const fvMesh& mesh,
     const fvMesh& dualMesh,
+    const labelList& dualCellToPoint,
     const scalarField& pointVolI,
+    const tensorField& pBarSensitivity,
     const int debug
 )
 {
@@ -583,19 +581,52 @@ void Foam::vfvm::Sp
         Info<< "void Foam::vfvm::Sp(...): start" << endl;
     }
     
-	forAll(pointVolI, pointI)
-	{
-	    // Insert the source of the displacement coefficient
-	    // of the pressure equation
-	    //matrix(pointI, pointI) -=  
+	// Take references for clarity and efficiency
+	const cellList& dualCells = dualMesh.cells();
+	const labelListList& dualCellPoints = dualMesh.cellPoints();
+	const cellPointLeastSquaresVectors& cellPointLeastSquaresVecs =
+	    cellPointLeastSquaresVectors::New(dualMesh);
+	const List<vectorList>& leastSquaresVecs =
+	    cellPointLeastSquaresVecs.vectors();
 	    
-	    // Insert source of the pressure coefficient of
-	    // pressure equation
+	forAll(dualCells, dualCellID)
+	{
+		// Least squares vectors for dualCellID
+	    const vectorList& curLeastSquaresVecs = leastSquaresVecs[dualCellID];
+	    
+	    // Dual mesh points of dualCellID
+	    const labelList& curDualCellPoints = dualCellPoints[dualCellID];
+	    
+	    // Primary mesh point at the centre of dualCellID
+	    const label pointID = dualCellToPoint[dualCellID];
+	    
+	    // pBarSensitivity for dualCellID
+	    const tensor pBarSensitivityI = pBarSensitivity[pointID];
+	    
+	    forAll(curDualCellPoints, cpI)
+	    {
+		    // Take a copy of the least squares vector from pointID to
+		    // cpI
+		    const vector lsVec = curLeastSquaresVecs[cpI];
+		    
+	        // Calculate the coefficient for this point
+	        const vector coeff = pBarSensitivityI & lsVec;		    	    	
+	    
+			// Insert the source of the displacement coefficient
+			// of the pressure equation
+	    	matrix(pointID, pointID)(3,0) += coeff[vector::X];
+	    	matrix(pointID, pointID)(3,1) += coeff[vector::Y];
+	    	matrix(pointID, pointID)(3,2) += coeff[vector::Z];
+	    }
+	}
+	
+    // Insert source of the pressure coefficient of
+    // pressure equation
+	forAll(pointVolI, pointI)
+	{				      	    
 	    matrix(pointI, pointI)(3,3) += pointVolI[pointI];
 	}    
 	
-	
-
     if (debug)
     {
         Info<< "void Foam::vfvm::Sp(...): end" << endl;

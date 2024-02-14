@@ -1513,312 +1513,6 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
     return tresult;
 }
 
-Foam::tmp<Foam::symmTensorField>
-Foam::neoHookeanElasticMisesPlastic::pressureSensitivityField() const
-{
-    // Prepare tmp field
-    tmp<Foam::symmTensorField> tresult
-    (
-        new Foam::symmTensorField(mesh().nFaces(), Foam::symmTensor::zero)
-    );
-
-#ifdef OPENFOAM_NOT_EXTEND
-    symmTensorField& result = tresult.ref();
-#else
-    symmTensorField& result = tresult();
-#endif
-
-    // Look up current pressure and store it as the reference
-    const surfaceScalarField& pRef =
-    mesh().lookupObject<surfaceScalarField>("pf");
-
-    // Lookup current stress and store it as the reference
-    const surfaceSymmTensorField& sigmaRef =
-        mesh().lookupObject<surfaceSymmTensorField>("sigmaf");
-        
-    // Lookup gradient of displacement
-    const surfaceTensorField& gradDRef =
-        mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-    // Create fields to be used for perturbations
-    surfaceSymmTensorField sigmaPerturb("sigmaPerturb", sigmaRef);
-    surfaceScalarField pPerturb("pPerturb", pRef);
-
-    // Small number used for perturbations
-    const scalar eps(readScalar(dict().lookup("pressureEps")));
-
-    // Apply perturbation to the pressure
-    pPerturb = pRef + eps;
-    
-    // Calculate perturbed stress
-    const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateStress(sigmaPerturb, gradDRef, pPerturb);
-
-    // Calculate pressureSensitivity components
-    const surfaceSymmTensorField tangCmpt((sigmaPerturb - sigmaRef)/eps);
-    const symmTensorField& tangCmptI = tangCmpt.internalField();
-
-
-	// Insert components for each internal face
-	forAll(tangCmptI, faceI)
-	{
-		result[faceI][symmTensor::XX] = tangCmptI[faceI][symmTensor::XX];
-		result[faceI][symmTensor::YY] = tangCmptI[faceI][symmTensor::YY];
-		result[faceI][symmTensor::ZZ] = tangCmptI[faceI][symmTensor::ZZ];
-		result[faceI][symmTensor::XY] = tangCmptI[faceI][symmTensor::XY];
-		result[faceI][symmTensor::YZ] = tangCmptI[faceI][symmTensor::YZ];
-		result[faceI][symmTensor::XZ] = tangCmptI[faceI][symmTensor::XZ];
-	}
-
-	// Insert components for each boundary face
-    forAll(tangCmpt.boundaryField(), patchI)
-    {
-        const symmTensorField& tangCmptP =
-                    tangCmpt.boundaryField()[patchI];
-        const label start = mesh().boundaryMesh()[patchI].start();
-
-        forAll(tangCmptP, fI)
-        {
-            const label faceID = start + fI;
-            
-    		result[faceID][symmTensor::XX] = tangCmptI[fI][symmTensor::XX];
-			result[faceID][symmTensor::YY] = tangCmptI[fI][symmTensor::YY];
-			result[faceID][symmTensor::ZZ] = tangCmptI[fI][symmTensor::ZZ];
-			result[faceID][symmTensor::XY] = tangCmptI[fI][symmTensor::XY];
-			result[faceID][symmTensor::YZ] = tangCmptI[fI][symmTensor::YZ];
-			result[faceID][symmTensor::XZ] = tangCmptI[fI][symmTensor::XZ];
-		}
-	}
-
-    return tresult;
-}
-
-
-Foam::tmp<Foam::tensorField>
-Foam::neoHookeanElasticMisesPlastic::pressEqnDispSensitivityField() const
-{
-    // Prepare tmp field
-    tmp<Foam::tensorField> tresult
-    (
-        new Foam::tensorField(mesh().nFaces(), Foam::tensor::zero)
-    );
-
-#ifdef OPENFOAM_NOT_EXTEND
-    tensorField& result = tresult.ref();
-#else
-    tensorField& result = tresult();
-#endif
-        
-    // Lookup gradient of displacement
-    const surfaceTensorField& gradDRef =
-        mesh().lookupObject<surfaceTensorField>("grad(D)f");
-        
-    // Create sigmaHyd reference field
-    surfaceScalarField sigmaHydRef("sigmaHydRef", 0);
-        
-    // Calculate the hydrostatic stress (pBar)
-    //const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateSigmaHyd(pBarRef, gradDRef);
-    const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateSigmaHyd(sigmaHydRef, gradDRef);
-    
-    // Define pBarRef field
-    surfaceScalarField pBarRef("pBarRef", -sigmaHydRef);
-
-    // Create fields to be used for perturbations
-    surfaceScalarField sigmaHydPerturb("sigmaHydPerturb", sigmaHydRef);
-    surfaceScalarField pBarPerturb("pBarPerturb", pBarRef);
-    surfaceTensorField gradDPerturb("gradDPerturb", gradDRef);
-
-    // Small number used for perturbations
-    const scalar eps(readScalar(dict().lookup("tangentEps")));
-    
-    for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
-    {
-        // Reset gradDPerturb and multiply by 1.0 to avoid it being removed
-        // from the object registry
-        gradDPerturb = 1.0*gradDRef;
-
-        // Perturb this component of gradD
-        gradDPerturb.replace(cmptI, gradDRef.component(cmptI) + eps); 
-
-        // Calculate perturbed stress
-        const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateSigmaHyd(sigmaHydPerturb, gradDPerturb);
-        
-        // Define pBar perturbed
-        pBarPerturb = -sigmaHydPerturb;
-        
-        // Calculate component
-        const surfaceScalarField tangCmpt((pBarPerturb - pBarRef)/eps);
-        const scalarField& tangCmptI = tangCmpt.internalField();
-
-        // Insert component
-        forAll(tangCmptI, faceI)
-        {
-            if (cmptI == tensor::XX)
-            {
-                result[faceI][tensor::XX] = tangCmptI[faceI];
-            }
-            else if (cmptI == tensor::XY)
-            {
-				result[faceI][tensor::XY] = tangCmptI[faceI];
-            }
-            else if (cmptI == tensor::XZ)
-            {
-				result[faceI][tensor::XZ] = tangCmptI[faceI];
-            }
-            else if (cmptI == tensor::YX)
-            {
-				result[faceI][tensor::YX] = tangCmptI[faceI];
-            }
-            else if (cmptI == tensor::YY)
-            {
-				result[faceI][tensor::YY] = tangCmptI[faceI];
-            }
-            else if (cmptI == tensor::YZ)
-            {
-				result[faceI][tensor::YZ] = tangCmptI[faceI];
-            }
-            else if (cmptI == tensor::ZX)
-            {
-				result[faceI][tensor::ZX] = tangCmptI[faceI];
-            }
-            else if (cmptI == tensor::ZY)
-            {
-				result[faceI][tensor::ZY] = tangCmptI[faceI];
-            }
-            else // if (cmptI == tensor::ZZ)
-            {
-				result[faceI][tensor::ZZ] = tangCmptI[faceI];
-            }
-        }
-
-        forAll(tangCmpt.boundaryField(), patchI)
-        {
-            const scalarField& tangCmptP =
-                tangCmpt.boundaryField()[patchI];
-            const label start = mesh().boundaryMesh()[patchI].start();
-
-            forAll(tangCmptP, fI)
-            {
-                const label faceID = start + fI;
-
-                if (cmptI == tensor::XX)
-                {
-                    result[faceID][tensor::XX] = tangCmptI[fI];
-                }
-                else if (cmptI == tensor::XY)
-                {
-                    result[faceID][tensor::XY] = tangCmptI[fI];
-                }
-                else if (cmptI == tensor::XZ)
-                {
-                    result[faceID][tensor::XZ] = tangCmptI[fI];
-                }
-                else if (cmptI == tensor::YX)
-                {
-                    result[faceID][tensor::YX] = tangCmptI[fI];
-                }
-                else if (cmptI == tensor::YY)
-                {
-                    result[faceID][tensor::YY] = tangCmptI[fI];
-                }
-                else if (cmptI == tensor::YZ)
-                {
-                    result[faceID][tensor::YZ] = tangCmptI[fI];
-                }
-                else if (cmptI == tensor::ZX)
-                {
-                    result[faceID][tensor::ZX] = tangCmptI[fI];
-                }
-                else if (cmptI == tensor::ZY)
-                {
-                    result[faceID][tensor::ZY] = tangCmptI[fI];
-                }
-                else // if (cmptI == tensor::ZZ)
-
-                {
-                    result[faceID][tensor::ZZ] = tangCmptI[fI];
-                }
-            }
-        }
-    }
-
-	return tresult;
-}
-
-
-//void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
-//{
-//    // Update the deformation gradient field
-//    // Note: if true is returned, it means that linearised elasticity was
-//    // enforced by the solver via the enforceLinear switch
-//    if (updateF(sigma, mu_, K_))
-//    {
-//        return;
-//    }
-//
-//    // Update the Jacobian of the total deformation gradient
-//    J() = det(F());
-//
-//    Info << "F after: " << F()[0] << endl;
-////    Info <<" J: " << J()[0] << endl;
-//
-//    // Calculate the relative Jacobian
-//    const volScalarField relJ(J()/J().oldTime());
-//
-////    Info << "relJ: " << relJ << endl;
-
-//    // Calculate the relative deformation gradient with the volumetric term
-//    // removed
-//    const volTensorField relFbar(pow(relJ, -1.0/3.0)*relF());
-//
-//    Info << "relF after: " << relF()[0] << endl;
-////    Info << "relFbar: " << relFbar[0] << endl;
-////    Info << "bEbar_.oldTime(): " << bEbar_.oldTime() << endl;
-//
-//    // Update bE trial
-//    bEbarTrial_ = transform(relFbar, bEbar_.oldTime());
-//
-//    Info << "bEbarTrial: " << bEbarTrial_[0] << endl;
-////    Info << "dev(bEbarTrial): " << dev(bEbarTrial_[0]) << endl;
-
-//    // Calculate the deviatoric stress
-//    const volSymmTensorField s(mu_*dev(bEbarTrial_));
-//
-////    Info << "Jf: " << J()[0] << endl;
-////    Info << "K: " << K_ << endl;
-////    Info << "s: " << s[0] << endl;
-
-//    // Calculate the Cauchy stress
-//    sigma = (1.0/J())*(0.5*K_*(pow(J(), 2) - 1)*I + s);
-//
-////    Info << "sigma " << sigma[0] << endl;
-//}
-
-
-//void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
-//{
-//    //Update the deformation gradient field
-//    //Note: if true is returned, it means that linearised elasticity was
-//    //enforced by the solver via the enforceLinear switch
-//    if (updateF(sigma, mu_, K_))
-//    {
-//        return;
-//    }
-
-//    //Calculate the Jacobian of the deformation gradient
-//    const surfaceScalarField J(det(Ff()));
-
-//    //Calculate left Cauchy Green strain tensor with volumetric term removed
-//    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(Ff() & Ff().T()));
-
-//    //Calculate deviatoric stress
-//    const surfaceSymmTensorField s(mu_*dev(bEbar));
-
-//    //Calculate the Cauchy stress
-//    sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
-//
-//    //Info << "J: " << J << endl;
-//}
-
 
 void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
 {
@@ -1829,11 +1523,10 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     {
         return;
     }
-    
-    // Look up the pressure field
-    const volScalarField& p =
-    mesh().lookupObject<volScalarField>("volP");
-
+	
+	// Look up the pressure field
+	const volScalarField& p =	mesh().lookupObject<volScalarField>("volP");
+   
     // Update the Jacobian of the total deformation gradient
     J() = det(F());
 
@@ -2057,11 +1750,11 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     // Update the Cauchy stress
     if (solvePressureEquation_)
     {
-      sigma = dev( (1.0/J())*(sigmaHyd()*I + s) ) - p*I;
+      	sigma = dev( (1.0/J())*(sigmaHyd()*I + s) ) - p*I;
     }
     else
     {
-      sigma = (1.0/J())*(sigmaHyd()*I + s);
+      	sigma = (1.0/J())*(sigmaHyd()*I + s);
     }
 }
 
@@ -2317,11 +2010,11 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 
     if (solvePressureEquation_)
     {
-      sigma = dev( (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s) ) - p*I;
+      	sigma = dev( (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s) ) - p*I;
     }
     else
-    {
-      sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
+    {		
+      	sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
     }
 }
 
