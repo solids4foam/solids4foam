@@ -190,7 +190,9 @@ public:
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
-            const nonLinearGeometry::nonLinearType& nonLinGeom
+            const nonLinearGeometry::nonLinearType& nonLinGeom,
+            const label lawI = -1,
+            solidSubMeshes* solidSubMeshes = NULL
         );
 
 
@@ -223,6 +225,9 @@ public:
 
         //- Update the yield stress: called at end of time-step
         virtual void updateTotalFields();
+
+        //- Write fields
+        virtual void writeFields(const Time& runTime);
 };
 
 

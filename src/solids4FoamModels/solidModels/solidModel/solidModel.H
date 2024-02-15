@@ -128,7 +128,7 @@ class solidModel
         //  This is the engineering stress for linear geometry approaches, and
         //  true (Cauchy) stress for nonlinear geometry (large strain)
         //  approaches
-        volSymmTensorField sigma_;
+        //volSymmTensorField sigma_;
 
         //- Density
         mutable autoPtr<volScalarField> rhoPtr_;
@@ -550,13 +550,13 @@ public:
             //- Return non-const reference to sigma
             virtual volSymmTensorField& sigma()
             {
-                return sigma_;
+                return mechanical().sigma();
             }
 
             //- Return const reference to sigma
             virtual const volSymmTensorField& sigma() const
             {
-                return sigma_;
+                return mechanical().sigma();
             }
 
             //- Return nonlinear geometry enumerator

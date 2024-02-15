@@ -47,6 +47,7 @@ Author
 #else
     #include "scalarSquareMatrix.H"
 #endif
+#include "solidSubMeshes.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -66,6 +67,12 @@ class mechanicalLaw
 
         //- Const reference to mesh
         const fvMesh& mesh_;
+
+        //- submesh label (-1 if baseMesh)
+        const label lawI_;
+
+        //- Const reference to solidSubMeshes
+        const solidSubMeshes& solidSubMeshes_;
 
         //- Mechanical law dictionary
         mutable dictionary dict_;
@@ -406,9 +413,11 @@ public:
                 const word name,
                 const fvMesh& mesh,
                 const dictionary& dict,
-                const nonLinearGeometry::nonLinearType& nonLinGeom
+                const nonLinearGeometry::nonLinearType& nonLinGeom,
+                const label lawI,
+                solidSubMeshes* solidSubMeshes
             ),
-            (name, mesh, dict, nonLinGeom)
+            (name, mesh, dict, nonLinGeom, lawI, solidSubMeshes)
         );
 
         //- Mechanical law for nonlinear geometry i.e. finite strains and
@@ -422,9 +431,11 @@ public:
                 const word name,
                 const fvMesh& mesh,
                 const dictionary& dict,
-                const nonLinearGeometry::nonLinearType& nonLinGeom
+                const nonLinearGeometry::nonLinearType& nonLinGeom,
+                const label lawI,
+                solidSubMeshes* solidSubMeshes
             ),
-            (name, mesh, dict, nonLinGeom)
+            (name, mesh, dict, nonLinGeom, lawI, solidSubMeshes)
         );
 
 
@@ -436,7 +447,9 @@ public:
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
-            const nonLinearGeometry::nonLinearType& nonLinGeom
+            const nonLinearGeometry::nonLinearType& nonLinGeom,
+            const label lawI = -1,
+            solidSubMeshes* solidSubMeshes = NULL
         );
 
         //- Create a nonlinear geometry mechanical law
@@ -445,7 +458,9 @@ public:
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
-            const nonLinearGeometry::nonLinearType& nonLinGeom
+            const nonLinearGeometry::nonLinearType& nonLinGeom,
+            const label lawI = -1,
+            solidSubMeshes* solidSubMeshes = NULL
         );
 
 
@@ -457,7 +472,9 @@ public:
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
-            const nonLinearGeometry::nonLinearType& nonLinGeom
+            const nonLinearGeometry::nonLinearType& nonLinGeom,
+            const label lawI = -1,
+            solidSubMeshes* solidSubMeshes = NULL
         );
 
 
@@ -473,6 +490,18 @@ public:
         const word& name() const
         {
             return name_;
+        }
+
+        //- Return label of solid submesh (-1 if baseMesh)
+        label lawI() const
+        {
+            return lawI_;
+        }
+
+        //- Return label of solid submesh (-1 if baseMesh)
+        const solidSubMeshes& subMeshes() const
+        {
+            return solidSubMeshes_;
         }
 
         //- Return const reference to dict
@@ -540,6 +569,10 @@ public:
         //- Set restart: some mechanical laws may change the writeOpt of fields
         //  accordingly
         virtual void setRestart()
+        {}
+
+        //- Write fields
+        virtual void writeFields(const Time& runTime)
         {}
 };
 

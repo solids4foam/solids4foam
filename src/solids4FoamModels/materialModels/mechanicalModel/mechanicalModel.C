@@ -223,6 +223,19 @@ Foam::mechanicalModel::mechanicalModel
     ),
     PtrList<mechanicalLaw>(),
     mesh_(mesh),
+    sigma_
+    (
+        IOobject
+        (
+            "sigma",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
+    ),
     planeStress_(lookup("planeStress")),
     incremental_(incremental),
     cellZoneNames_(),
@@ -230,6 +243,8 @@ Foam::mechanicalModel::mechanicalModel
     impKfcorrPtr_()
 {
     Info<< "Creating the mechanicalModel" << endl;
+    // Forcing oldTime field to be stored
+    sigma().oldTime();
 
     // Read the mechanical laws
     const PtrList<entry> lawEntries(lookup("mechanical"));
@@ -308,7 +323,9 @@ Foam::mechanicalModel::mechanicalModel
                         lawEntries[lawI].keyword(),
                         solSubMeshes().subMeshes()[lawI].subMesh(),
                         lawEntries[lawI].dict(),
-                        nonLinGeom
+                        nonLinGeom,
+                        lawI,
+                        &solSubMeshes()
                     )
                 );
             }
@@ -326,7 +343,9 @@ Foam::mechanicalModel::mechanicalModel
                         lawEntries[lawI].keyword(),
                         solSubMeshes().subMeshes()[lawI].subMesh(),
                         lawEntries[lawI].dict(),
-                        nonLinGeom
+                        nonLinGeom,
+                        lawI,
+                        &solSubMeshes()
                     )
                 );
             }
@@ -376,6 +395,15 @@ const Foam::fvMesh& Foam::mechanicalModel::mesh() const
     return mesh_;
 }
 
+Foam::volSymmTensorField& Foam::mechanicalModel::sigma()
+{
+    return sigma_;
+}
+
+const Foam::volSymmTensorField& Foam::mechanicalModel::sigma() const
+{
+    return sigma_;
+}
 
 #ifdef OPENFOAM_NOT_EXTEND
 const Foam::volPointInterpolation& Foam::mechanicalModel::volToPoint() const
@@ -1024,6 +1052,15 @@ void Foam::mechanicalModel::setRestart()
     forAll(laws, lawI)
     {
         laws[lawI].setRestart();
+    }
+}
+
+void Foam::mechanicalModel::writeFields(const Time& runTime)
+{
+    PtrList<mechanicalLaw>& laws = *this;
+    forAll(laws,lawI)
+    {
+        laws[lawI].writeFields(runTime);
     }
 }
 

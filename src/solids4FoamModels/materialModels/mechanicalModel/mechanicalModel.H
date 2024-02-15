@@ -71,6 +71,9 @@ class mechanicalModel
         //- Const reference to the mesh
         const fvMesh& mesh_;
 
+        //- Stress field
+        volSymmTensorField sigma_;
+
         //- Is the current case plane stress or plain strain/3-D
         //  Todo: this should be moved to actual mechanical law
         const Switch planeStress_;
@@ -134,6 +137,12 @@ public:
 
             //- Return const access to the mesh
             const fvMesh& mesh() const;
+
+            //- Return reference to the stress field
+            volSymmTensorField& sigma();
+
+            //- Return const reference to the stress field
+            const volSymmTensorField& sigma() const;
 
             //- Return a const reference to the vol-to-point base mesh
             //  interpolator
@@ -246,6 +255,9 @@ public:
             //- Set restart: some mechanical laws may change the writeOpt of
             //  fields accordingly
             void setRestart();
+
+            //- Write fields
+            virtual void writeFields(const Time& runTime);
 
             //- Write current state of 'materialProperties' dictionary to disk
             void writeDict();

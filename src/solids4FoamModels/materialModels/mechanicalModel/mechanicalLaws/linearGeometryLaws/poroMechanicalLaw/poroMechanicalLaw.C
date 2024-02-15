@@ -133,21 +133,11 @@ const Foam::volScalarField& Foam::poroMechanicalLaw::lookupPressureField() const
             pRegion_
         ).lookupObject<volScalarField>(pName_);
     }
-    else if
-    (
-        mesh().thisDb().parent().foundObject<objectRegistry>("solid")
-    )
-    {
-        return mesh().thisDb().parent().subRegistry
-        (
-            "solid"
-        ).lookupObject<volScalarField>(pName_);
-    }
     else
     {
-        FatalErrorIn("Foam::poroMechanicalLaw::lookupPressureField()")
-            << "Cannot find " << pName_ << " field in " << pRegion_
-            << " or in 'solid'" << abort(FatalError);
+        return
+            subMeshes().lookupBaseMeshVolField<scalar>
+            (pName_,mesh());
     }
 
     // Keep compiler happy
@@ -163,10 +153,12 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom
+    const nonLinearGeometry::nonLinearType& nonLinGeom,
+    const label lawI,
+    solidSubMeshes* solidSubMeshes
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
     effectiveStressMechLawPtr_
     (
         mechanicalLaw::NewLinGeomMechLaw
@@ -297,5 +289,58 @@ void Foam::poroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
     sigma = sigmaEfff_() - b_*(pf + p0f())*symmTensor(I);
 }
 
+void Foam::poroMechanicalLaw::writeFields(const Time& runTime)
+{
+    if(mesh()!=baseMesh()) // possible: lawI < 0, not sure about dualMesh
+    {
+        PtrList<volSymmTensorField> subMeshSigmaEffs(subMeshes().subMeshes().size());
+        IOobject defaultIO
+        (
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false
+        );
+        dimensionedSymmTensor zero("",dimless,symmTensor::zero);
+        forAll(subMeshes().subMeshes(),iLaw)
+        {
+            if (iLaw!=lawI())
+            {
+                subMeshSigmaEffs.set
+                (
+                    iLaw,
+                    new volSymmTensorField
+                    (
+                        defaultIO,subMeshes().subMeshes()[iLaw].subMesh(),zero
+                    )
+                );
+            }
+            else
+            {
+                subMeshSigmaEffs.set
+                (
+                    iLaw,
+                    sigmaEff_
+                );
+            }
+        }
+        volSymmTensorField baseMeshSigmaEff
+        (
+            IOobject(
+                "sigmaEff."+name(),
+                runTime.timeName(),
+                baseMesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE,
+                false
+            ),
+            baseMesh(),
+            zero
+        );
+        subMeshes().mapSubMeshVolFields<symmTensor>(subMeshSigmaEffs, baseMeshSigmaEff);
+        baseMeshSigmaEff.write();
+    }
+}
 
 // ************************************************************************* //

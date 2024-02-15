@@ -415,10 +415,12 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom
+    const nonLinearGeometry::nonLinearType& nonLinGeom,
+    const label lawI,
+    solidSubMeshes* solidSubMeshes
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
     lambda_
@@ -940,6 +942,60 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
         << "    Max epsilonPEq is " << gMax(epsilonPEq_) << nl
         << "    " << numCellsYielding << " cells are actively yielding"
         << nl << endl;
+}
+
+void Foam::linearElasticMohrCoulombPlastic::writeFields(const Time& runTime)
+{
+    if(mesh()!=baseMesh()) // possible: lawI < 0, not sure about dualMesh
+    {
+        PtrList<volScalarField> subMeshYields(subMeshes().subMeshes().size());
+        IOobject defaultIO
+        (
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false
+        );
+        dimensionedScalar zero("",dimless,0.0);
+        forAll(subMeshes().subMeshes(),iLaw)
+        {
+            if (iLaw!=lawI())
+            {
+                subMeshYields.set
+                (
+                    iLaw,
+                    new volScalarField
+                    (
+                        defaultIO,subMeshes().subMeshes()[iLaw].subMesh(),zero
+                    )
+                );
+            }
+            else
+            {
+                subMeshYields.set
+                (
+                    iLaw,
+                    &activeYield_
+                );
+            }
+        }
+        volScalarField baseMeshYield
+        (
+            IOobject(
+                "yieldMarker."+name(),
+                runTime.timeName(),
+                baseMesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE,
+                false
+            ),
+            baseMesh(),
+            zero
+        );
+        subMeshes().mapSubMeshVolFields<scalar>(subMeshYields, baseMeshYield);
+        baseMeshYield.write();
+    }
 }
 
 
