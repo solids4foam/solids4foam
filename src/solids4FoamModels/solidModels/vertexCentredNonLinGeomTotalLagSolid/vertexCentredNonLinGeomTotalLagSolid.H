@@ -194,7 +194,8 @@ class vertexCentredNonLinGeomTotalLagSolid
             const labelListList& pointToDualFaces
         ) const;
 
-        //- Check convergence of Newton-Raphson loop
+        //- Check convergence of Newton-Raphson loop for displacement
+        //  implementation
         bool converged
         (
             const label iCorr,
@@ -204,6 +205,20 @@ class vertexCentredNonLinGeomTotalLagSolid
             const pointVectorField& pointD,
             const vectorField& pointDcorr
         ) const;
+        
+        
+        //- Check convergence of Newton-Raphson loop for pressure-
+        //  displacement implementation
+        bool converged
+		(
+			const label iCorr,
+			scalar& initResidualD,
+			scalar& initResidualP,
+			const label nInterations,
+			const pointVectorField& pointD,
+			const pointScalarField& pointP,
+			const Field<RectangularMatrix<scalar>>& pointDPcorr
+		) const;
 
         //- Calculate line search slope for the given eta parameter
         scalar calculateLineSearchSlope

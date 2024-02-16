@@ -638,9 +638,114 @@ bool vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid:
         << ", resAbs = " << residualAbs
         << ", nIters = " << nInterations
         << ", maxD = " << maxMagD << endl;
-
+    
     // Check for convergence
     if (residualNorm < solutionTol())
+    {
+        Info<< "    Converged" << endl;
+        return true;
+    }
+    else if (iCorr >= nCorr() - 1)
+    {
+        if (nCorr() > 1)
+        {
+            Warning
+                << "Max iterations reached within the momentum Newton-Raphson "
+                "loop" << endl;
+        }
+
+        return true;
+    }
+
+    // Convergence has not been reached
+    return false;
+}
+
+
+bool vertexCentredNonLinGeomTotalLagSolid::vertexCentredNonLinGeomTotalLagSolid::converged
+(
+    const label iCorr,
+    scalar& initResidualD,
+    scalar& initResidualP,
+    const label nInterations,
+    const pointVectorField& pointD,
+    const pointScalarField& pointP,    
+    const Field<RectangularMatrix<scalar>>& pointDPcorr
+) const
+{
+	scalar residualDAbs = 0;
+	scalar residualPAbs = 0;
+    // Calculate the residuals as the root mean square of the correction
+    // Displacement residual
+    forAll(pointDPcorr, pointI)
+    {
+    	// Displacement residual
+    	residualDAbs += sqr(pointDPcorr[pointI](0,0)) + sqr(pointDPcorr[pointI](1,0)) +
+			sqr(pointDPcorr[pointI](2,0));
+			
+		// Pressure residual
+		residualPAbs += sqr(pointDPcorr[pointI](3,0));
+    }
+
+    // Store initial residual
+    if (iCorr == 0)
+    {
+        initResidualD = residualDAbs;
+        initResidualP = residualPAbs;
+
+        // If the initial residual is small then convergence has been achieved
+        if (initResidualD < SMALL && initResidualP < SMALL) 
+        {
+            Info<< "    Both displacement and pressure residuals are less than 1e-15"
+                << "    Converged" << endl;
+            return true;
+        }
+        Info<< "    Initial displacment residual = " << initResidualD << endl;
+        Info<< "    Initial pressure residual = " << initResidualP << endl;
+    }
+
+    // Define a normalised residual wrt the initial residual
+    const scalar residualDNorm = residualDAbs/initResidualD;
+    const scalar residualPNorm = residualPAbs/initResidualP;
+
+    // Calculate the maximum displacement
+#ifdef OPENFOAM_NOT_EXTEND
+    const scalar maxMagD = gMax(mag(pointD.primitiveField()));
+#else
+    const scalar maxMagD = gMax(mag(pointD.internalField()));
+#endif
+
+    // Calculate the maximum pressure
+#ifdef OPENFOAM_NOT_EXTEND
+    const scalar maxMagP = gMax(mag(pointP.primitiveField()));
+#else
+    const scalar maxMagP = gMax(mag(pointP.internalField()));
+#endif
+
+    // Print information for the displacement
+    Info<< "    Momentum equation: " << endl
+    	<< "    Iter = " << iCorr
+        << ", relRef = " << residualDNorm
+        << ", resAbs = " << residualDAbs
+        << ", nIters = " << nInterations
+        << ", maxD = " << maxMagD << endl << endl;
+        
+    // Print information for the pressure
+    Info<< "    Momentum equation: " << endl
+    	<< "    Iter = " << iCorr
+        << ", relRef = " << residualPNorm
+        << ", resAbs = " << residualPAbs
+        << ", nIters = " << nInterations
+        << ", maxP = " << maxMagP << endl;
+        
+    // Displacement tolerance
+    const scalar DTol = solidModelDict().lookupOrDefault<scalar>("solutionDTolerance", 1e-11);
+    
+    // Pressure tolerance
+    const scalar PTol = solidModelDict().lookupOrDefault<scalar>("solutionPTolerance", 1e-6);
+
+    // Check for convergence
+    if (residualDNorm < DTol && residualPNorm < PTol)
     {
         Info<< "    Converged" << endl;
         return true;
@@ -1558,14 +1663,19 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 
     // Newton-Raphson loop over momentum equation
     int iCorr = 0;
-    scalar initResidual = 0.0;
+    scalar initResidualD = 0.0;
+    scalar initResidualP = 0.0;
 #ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solverPerf;
 #else
     BlockSolverPerformance<vector> solverPerf;
 #endif
+	bool stopLoop = false;
     do
     {
+    	// Reset loop condition
+    	stopLoop = false;
+    	
         // Calculate gradD at dual faces
         dualGradDf_ = vfvc::fGrad
         (
@@ -1598,6 +1708,12 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
         dualMechanicalPtr_().correct(dualSigmaf_);
 
 		// Create the source vector for displacement implementation
+		//vectorField* sourcePtr = nullptr;
+		//if (presure)
+		//{
+		//	sourcePtr = new vectorField(mesh().nPoints(), vector::zero);
+		//}
+		//vectorField& source = *sourcePtr;
 		vectorField source(mesh().nPoints(), vector::zero);
 		
 		pointD().correctBoundaryConditions();		
@@ -2006,23 +2122,43 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 #endif
 			
 		}
-	}
-	while
-	(
-	    !converged
-	    (
-	        iCorr,
-	        initResidual,
-	        solverPerf.finalResidual()[vector::X],
+		
+		if (solvePressureEquation_)
+	    {
+			stopLoop = converged
+			(
+			    iCorr,
+			    initResidualD,
+			    initResidualP,
 #ifdef OPENFOAM_NOT_EXTEND
-	        cmptMax(solverPerf.nIterations()),
+			    cmptMax(solverPerf.nIterations()),
 #else
-	        solverPerf.nIterations(),
+			    solverPerf.nIterations(),
 #endif
-	        pointD(),
-	        pointDcorr
-	    ) && ++iCorr
-	);
+			    pointD(),
+			    pointP_,
+			    pointDPcorr
+			);
+	    }
+	    else
+	    {
+			stopLoop = converged
+			(
+			    iCorr,
+			    initResidualD,
+			    solverPerf.finalResidual()[vector::X],
+#ifdef OPENFOAM_NOT_EXTEND
+			    cmptMax(solverPerf.nIterations()),
+#else
+			    solverPerf.nIterations(),
+#endif
+			    pointD(),
+			    pointDcorr
+			);
+		}
+		
+	}
+	while (stopLoop == false && iCorr++);
 
     // Calculate gradD at dual faces
     dualGradDf_ = vfvc::fGrad
