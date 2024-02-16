@@ -86,7 +86,7 @@ class vertexCentredNonLinGeomTotalLagSolid
         const Switch solvePressureEquation_;
 
         //- Pressure smoothing factor
-        const scalar pressureFactor_;
+        const scalar pressureSmoothing_;
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
@@ -124,6 +124,10 @@ class vertexCentredNonLinGeomTotalLagSolid
         //- Point volume field
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
+        
+ 		//- Point gradD field
+        //  gradD associated with the primary mesh points
+        pointTensorField pointGradD_;       
 
         //- Displacement gradient field at the dual mesh faces
         surfaceTensorField dualGradDf_;
@@ -153,11 +157,24 @@ class vertexCentredNonLinGeomTotalLagSolid
     // Private Member Functions
 
         //- Update the source vector for the linear system
+        //  for the displacement implementation 
         void updateSource
         (
             vectorField& source,
             const labelList& dualCellToPoint
         );
+        
+        //- Update the source vector for the linear system
+        //  for the displacement-pressure implementation        
+        void updateSource
+		(
+			Field<RectangularMatrix<scalar>>& source,
+			const labelList& dualFaceToCell,
+			const labelList& dualCellToPoint,
+			const scalar& pressureSmoothing,
+			const scalar& zeta,
+			const bool debug
+		);
 
         //- Set fixed degree of freedom lists
         void setFixedDofs
@@ -218,7 +235,7 @@ class vertexCentredNonLinGeomTotalLagSolid
 		Foam::tmp<tensorField>
 		pBarSensitivityField
 		(
-			const volTensorField gradDRef //Reference gradD
+			const pointTensorField pGradDRef //Reference pointGradD
 		) const;
 
         //- Disallow default bitwise copy construct

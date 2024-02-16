@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -22,27 +16,25 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-	linearSpatialDisplacementCantileverPointPatchVectorField
+    Foam::fixedRotationPointPatchVectorField
 
 Description
-    Displacement varying linearly in space as:
+    Fixed rotation boundary condition with boundary non-orthogonal
+    correction for stress solvers.
 
-        u(x) = (v0*x/L)*t
-
-    where v0 is the initial velocity, L is the length of the cantilever, x are the
-    patch face centre positions, and t is the time of the simulation
+    Optional: time-varying angle series.
 
 SourceFiles
-	linearSpatialDisplacementCantileverPointPatchVectorField.C
+    fixedRotationPointPatchVectorField.C
 
 Author
-    Federico Mazzanti, UCD.
-    Philip Cardiff, UCD.
+    Philip Cardiff, UCD. All rights reserved.
+    Federico Mazzanti, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef linearSpatialDisplacementCantileverPointPatchVectorField_H
-#define linearSpatialDisplacementCantileverPointPatchVectorField_H
+#ifndef fixedRotationPointPatchVectorField_H
+#define fixedRotationPointPatchVectorField_H
 
 #ifdef OPENFOAM_NOT_EXTEND
     #include "fixedValuePointPatchField.H"
@@ -66,115 +58,133 @@ namespace Foam
     #endif
 #endif
 
-/*---------------------------------------------------------------------------* \
-  Class linearSpatialDisplacementCantileverPointPatchVectorField Declaration
+/*---------------------------------------------------------------------------*\
+                      Class fixedRotationFvPatch Declaration
 \*---------------------------------------------------------------------------*/
 
-class linearSpatialDisplacementCantileverPointPatchVectorField
+class fixedRotationPointPatchVectorField
 :
     public fixedValuePointPatchVectorField
 {
+
     // Private Data
 
-        //- Initial velocity in m/s
-        const scalar v0_;
+        //- Enable non-orthogonal corrections
+        const Switch nonOrthogonalCorrections_;
 
-        //- Length of cantilever in m
-        const scalar L_;
-        
-        //- time of the simulation
-        const scalar t_;
+        //- Rotation in degrees
+        scalar rotationAngle_;
+
+        //- Rotation axis
+        const vector rotationAxis_;
+
+        //- Origin of rotation
+        vector rotationOrigin_;
+
+        //- Initial face centres
+        //const vectorField origFaceCentres_;
+
+        //- Initial patch points
+        const vectorField origPatchPoints_;
+
+        //- Optional angle time series
+        interpolationTable<scalar> angleSeries_;
+
+        //- Optional translation series
+        interpolationTable<vector> dispSeries_;
+
+        //- Optional origin series
+        interpolationTable<vector> originSeries_;
 
 
 public:
 
     //- Runtime type information
-    TypeName("pointLinearSpatialDisplacementCantilever");
+    TypeName("pointFixedRotation");
 
 
     // Constructors
 
         //- Construct from patch and internal field
-        linearSpatialDisplacementCantileverPointPatchVectorField
+        fixedRotationPointPatchVectorField
         (
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&
         );
 
         //- Construct from patch, internal field and dictionary
-        linearSpatialDisplacementCantileverPointPatchVectorField
+        fixedRotationPointPatchVectorField
         (
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&,
             const dictionary&
         );
 
-        //- Construct by mapping given patchField<vector> onto a new patch
-        linearSpatialDisplacementCantileverPointPatchVectorField
+        //- Construct by mapping given fixedRotationPointPatchVectorField
+        //  onto a new patch
+        fixedRotationPointPatchVectorField
         (
-            const linearSpatialDisplacementCantileverPointPatchVectorField&,
+            const fixedRotationPointPatchVectorField&,
             const pointPatch&,
             const DimensionedField<vector, pointMesh>&,
             const PointPatchFieldMapper&
         );
 
-#ifndef OPENFOAMFOUNDATION
         //- Construct as copy
-        linearSpatialDisplacementCantileverPointPatchVectorField
+        fixedRotationPointPatchVectorField
         (
-            const linearSpatialDisplacementCantileverPointPatchVectorField&
+            const fixedRotationPointPatchVectorField&
+#ifdef OPENFOAM_ORG
+        ) = delete;
+#else
         );
 
         //- Construct and return a clone
-        virtual autoPtr<pointPatchField<vector> > clone() const
+        virtual autoPtr<pointPatchField<vector>> clone() const
         {
             return autoPtr<pointPatchField<vector> >
             (
-                new linearSpatialDisplacementCantileverPointPatchVectorField(*this)
+                new fixedRotationPointPatchVectorField(*this)
             );
         }
 #endif
 
         //- Construct as copy setting internal field reference
-        linearSpatialDisplacementCantileverPointPatchVectorField
+        fixedRotationPointPatchVectorField
         (
-            const linearSpatialDisplacementCantileverPointPatchVectorField&,
+            const fixedRotationPointPatchVectorField&,
             const DimensionedField<vector, pointMesh>&
         );
 
         //- Construct and return a clone setting internal field reference
-        virtual autoPtr<pointPatchField<vector> > clone
+        virtual autoPtr<pointPatchField<vector>> clone
         (
             const DimensionedField<vector, pointMesh>& iF
         ) const
         {
-            return autoPtr<pointPatchField<vector> >
+            return autoPtr<pointPatchField<vector>>
             (
-                new linearSpatialDisplacementCantileverPointPatchVectorField(*this, iF)
+                new fixedRotationPointPatchVectorField(*this, iF)
             );
         }
 
 
+
     // Member functions
 
-        // Mapping functions
+        // Evaluation functions
 
-            //- Map (and resize as needed) from self given a mapping object
-            virtual void autoMap
-            (
-                const PointPatchFieldMapper&
-            );
+            //- Return patch-normal gradient
+            //- with non-orthogonal correction regardless of whether snGrad
+            //- is corrected or not
+/*            virtual tmp<Field<vector> > snGrad() const;*/
 
-            //- Reverse map the given pointPatchField onto
-            //  this pointPatchField
-            virtual void rmap
-            (
-                const pointPatchField<vector>&,
-                const labelList&
-            );
+            //- Update the coefficients associated with the patch field
+            virtual void updateCoeffs();
 
-        //- Update the coefficients associated with the patch field
-        virtual void updateCoeffs();
+            //- Return the matrix source coefficients corresponding to the
+            //  evaluation of the gradient of this patchField
+/*            virtual tmp<Field<vector> > gradientBoundaryCoeffs() const;*/
 
         //- Write
         virtual void write(Ostream&) const;
@@ -184,7 +194,6 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

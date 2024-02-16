@@ -80,7 +80,7 @@ Foam::tensor& Foam::sparseMatrix::operator()
 
 void Foam::sparseMatrix::print() const
 {
-    Info<< "Print out sparseMatrix coefficients: " << endl;
+    Info<< "void Foam::sparseMatrix::print() const" << endl;
 
     // Create a vector to store the matrix indices
     std::vector<FixedList<label, 2>> keys(data_.size());
@@ -120,7 +120,7 @@ void Foam::sparseMatrix::print() const
         const label colI = keys[k][1];
         const tensor& coeff = data_[keys[k]];
 
-        Info<< "(" << rowI << ", " << colI << ") : " << coeff << endl;
+        Info << "(" << rowI << ", " << colI << ") : " << coeff << endl;
     }
 }
 

@@ -136,16 +136,11 @@ public:
             tmp< Field< RectangularMatrix<scalar>>> materialTangentFaceField() const;
 #endif
 
+            //- Implicit modulus field at the faces
+            tmp<surfaceScalarField> impKf() const;
+
             //- Bulk modulus field at the faces
             tmp<surfaceScalarField> bulkModulus() const;
-            
-            //- Pressure sensitivity field of the momentum equation at dual mesh faces 
-            //- d(s - pI)/dp
-            tmp<symmTensorField> pressureSensitivityFaceField() const;
-            
-            //- Displacement sensitivity field of the pressure equation at the dual mesh faces 
-            //- d(pBar)/dG.
-            tmp<tensorField> pressEqnDispSensitivityFaceField() const;
 
         // Edit
 

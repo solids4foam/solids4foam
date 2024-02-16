@@ -42,7 +42,7 @@ SourceFiles
 #include "RectangularMatrix.H"
 #include "vectorField.H"
 #include "polyMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "SolverPerformance.H"
 #else
     #include "BlockSolverPerformance.H"
@@ -64,7 +64,7 @@ namespace sparseMatrixExtendedTools
 #ifdef USE_PETSC
 
     //- Solve the linear system using PETSc
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solveLinearSystemPETSc
 #else
     BlockSolverPerformance<vector> solveLinearSystemPETSc

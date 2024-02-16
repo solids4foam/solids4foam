@@ -158,6 +158,7 @@ void Foam::vfvm::divSigma
 void Foam::vfvm::laplacian
 (
     sparseScalarMatrix& matrix,
+    const Switch compactStencil,
     const fvMesh& mesh,
     const fvMesh& dualMesh,
     const labelList& dualFaceToCell,
@@ -173,6 +174,7 @@ void Foam::vfvm::laplacian
 
     // Take references for clarity and efficiency
     const labelListList& cellPoints = mesh.cellPoints();
+    const pointField& points = mesh.points();
     const labelList& dualOwn = dualMesh.owner();
     const labelList& dualNei = dualMesh.neighbour();
     const vectorField& dualSf = dualMesh.faceAreas();
@@ -208,32 +210,58 @@ void Foam::vfvm::laplacian
         // dualFaceI area vector
         const vector& curDualSf = dualSf[dualFaceI];
 
-        // Least squares vectors for cellID
-        const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
-
-        // dualFaceI will contribute coefficients to the equation for each
-        // primary mesh point in the dual own cell, and, if an internal
-        // face, the dual neighbour cell
-
-        forAll(curCellPoints, cpI)
+        if (compactStencil)
         {
-            // Primary point index
-            const label pointID = curCellPoints[cpI];
+            // Compact central-differencing Laplacian
 
-            // Take a copy of the least squares vector from the centre of
-            // cellID to pointI
-            const vector lsVec = curLeastSquaresVecs[cpI];
+            // Dual face unit normal
+            const scalar curDualMagSf = mag(curDualSf);
+            const vector curDualN = curDualSf/curDualMagSf;
 
-            // Calculate the coefficient for this point coming from dualFaceI
-            const scalar coeff = diffCellID*curDualSf & lsVec;
+            // Delta coefficient
+            const scalar deltaCoeff =
+                1.0/(curDualN & (points[neiPointID] - points[ownPointID]));
 
-            // Add the coefficient to the ownPointID equation coming from
-            // pointID
-            matrix(ownPointID, pointID) += coeff;
+            // Compact edge direction coefficient
+            const scalar coeff = diffCellID*curDualMagSf*deltaCoeff;
 
-            // Add the coefficient to the neiPointID equation coming from
-            // pointID
-            matrix(neiPointID, pointID) -= coeff;
+            // Insert coefficients for the ownPoint
+            matrix(ownPointID, ownPointID) -= coeff;
+            matrix(ownPointID, neiPointID) += coeff;
+
+            // Insert coefficients for the neiPoint
+            matrix(neiPointID, neiPointID) -= coeff;
+            matrix(neiPointID, ownPointID) += coeff;
+        }
+        else
+        {
+            // dualFaceI will contribute coefficients to the equation for each
+            // primary mesh point in the dual own cell, and, if an internal
+            // face, the dual neighbour cell
+
+            // Least squares vectors for cellID
+            const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
+
+            forAll(curCellPoints, cpI)
+            {
+                // Primary point index
+                const label pointID = curCellPoints[cpI];
+
+                // Take a copy of the least squares vector from the centre of
+                // cellID to pointI
+                const vector lsVec = curLeastSquaresVecs[cpI];
+
+                // Calculate the coefficient for this point coming from dualFaceI
+                const scalar coeff = diffCellID*curDualSf & lsVec;
+
+                // Add the coefficient to the ownPointID equation coming from
+                // pointID
+                matrix(ownPointID, pointID) += coeff;
+
+                // Add the coefficient to the neiPointID equation coming from
+                // pointID
+                matrix(neiPointID, pointID) -= coeff;
+            }
         }
     }
 

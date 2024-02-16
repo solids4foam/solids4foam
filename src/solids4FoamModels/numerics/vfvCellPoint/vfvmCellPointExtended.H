@@ -59,7 +59,7 @@ namespace vfvm
     //3x3 tensor.
     // Note: this function does not calculate contributions to the right-hand
     // side
-    void divSigmaNoPressure
+    void divSigma
     (
         sparseMatrix& matrix,
         const fvMesh& mesh,
@@ -83,7 +83,7 @@ namespace vfvm
     //4x4 tensor.
     // Note: this function does not calculate contributions to the right-hand
     // side
-    void divSigmaExtended
+    void divSigma
     (
         sparseMatrixExtended& matrix,
         const fvMesh& mesh,
@@ -100,30 +100,6 @@ namespace vfvm
         const scalar zeta, // fraction of compact edge direction component used
         const bool debug = false
     );
-    
-    
-    // Add coefficients to the matrix for the pressure approach
-	void assembleMatrixExtended
-	(
-		sparseMatrixExtended& matrix,
-		const fvMesh& mesh,
-		const fvMesh& dualMesh,
-		const labelList& dualFaceToCell,
-		const labelList& dualCellToPoint,
-		const Field<RectangularMatrix<scalar>>& materialTangentField,
-		const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
-		const scalarField& pressureField,
-		const symmTensorField& pressureSensitivityField, 
-		const tensorField& dispResidualSensitivityField,
-		const symmTensorField& sigmaField,
-		const tensorField& dualGradDField,
-		const boolList& fixedDofs,
-		const symmTensorField& fixedDofDirections,
-		const scalar fixedDofScale,
-		const scalar zeta,
-		const scalar gamma,
-		const bool debug
-	);
 	
 	
     // Add coefficients to the matrix for the Laplacian of a scalar field with
@@ -135,7 +111,7 @@ namespace vfvm
         const fvMesh& dualMesh,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const scalarField& diffusivity, // diffusivity in the primary cells
+        const scalar& diffusivity, // diffusivity in the primary cells
         const bool debug = false
     );	
 
@@ -160,9 +136,10 @@ namespace vfvm
     void Sp
     (
         sparseMatrixExtended& matrix,
-        const fvMesh& mesh,
         const fvMesh& dualMesh,
+        const labelList& dualCellToPoint,
         const scalarField& pointVolI,
+        const tensorField& pBarSensitivity,
         const int debug // debug switch 
     );
     
