@@ -38,7 +38,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewLinGeomMechLaw
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
     const label lawI,
-    solidSubMeshes* solidSubMeshes
+    const solidSubMeshes* solidSubMeshes
 )
 {
     const word modelType(dict.lookup("type"));
@@ -136,7 +136,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
     const label lawI,
-    solidSubMeshes* solidSubMeshes
+    const solidSubMeshes* solidSubMeshes
 )
 {
     const word modelType(dict.lookup("type"));

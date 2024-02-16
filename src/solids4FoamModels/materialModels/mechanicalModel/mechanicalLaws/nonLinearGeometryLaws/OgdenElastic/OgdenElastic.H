@@ -122,7 +122,7 @@ public:
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom,
             const label lawI = -1,
-            solidSubMeshes* solidSubMeshes = NULL
+            const solidSubMeshes* solidSubMeshes = NULL
         );
 
 

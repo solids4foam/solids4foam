@@ -475,6 +475,11 @@ void Foam::mechanicalLaw::makeSigmaHyd()
 
 // * * * * * * * * * * * * * * Protected Members * * * * * * * * * * * * * * //
 
+const Foam::solidSubMeshes& Foam::mechanicalLaw::subMeshes() const
+{
+    return solidSubMeshes_;
+}
+
 bool Foam::mechanicalLaw::planeStress() const
 {
     if (mesh_.foundObject<IOdictionary>("mechanicalProperties"))
@@ -1462,7 +1467,7 @@ Foam::mechanicalLaw::mechanicalLaw
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
     const label lawI,
-    solidSubMeshes* solidSubMeshes
+    const solidSubMeshes* solidSubMeshes
 )
 :
     name_(name),

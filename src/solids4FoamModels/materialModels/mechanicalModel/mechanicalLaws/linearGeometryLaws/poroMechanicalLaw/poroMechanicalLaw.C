@@ -133,12 +133,13 @@ const Foam::volScalarField& Foam::poroMechanicalLaw::lookupPressureField() const
             pRegion_
         ).lookupObject<volScalarField>(pName_);
     }
-    else
+    else if(lawI()!=-1)
     {
         return
             subMeshes().lookupBaseMeshVolField<scalar>
             (pName_,mesh());
     }
+    else
 
     // Keep compiler happy
     return mesh().lookupObject<volScalarField>("null");
@@ -155,7 +156,7 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
     const label lawI,
-    solidSubMeshes* solidSubMeshes
+    const solidSubMeshes* solidSubMeshes
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
@@ -163,10 +164,12 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
     (
         mechanicalLaw::NewLinGeomMechLaw
         (
-            word(dict.subDict("effectiveStressMechanicalLaw").lookup("type")),
+            name,
             mesh,
             dict.subDict("effectiveStressMechanicalLaw"),
-            nonLinGeom
+            nonLinGeom,
+            lawI,
+            solidSubMeshes
         )
     ),
     sigmaEff_(),
@@ -296,6 +299,7 @@ void Foam::poroMechanicalLaw::writeFields(const Time& runTime)
         PtrList<volSymmTensorField> subMeshSigmaEffs(subMeshes().subMeshes().size());
         IOobject defaultIO
         (
+            "subMeshSigmaEff",
             runTime.timeName(),
             mesh(),
             IOobject::NO_READ,
@@ -307,12 +311,13 @@ void Foam::poroMechanicalLaw::writeFields(const Time& runTime)
         {
             if (iLaw!=lawI())
             {
+                const fvMesh& lawMesh(subMeshes().subMeshes()[iLaw].subMesh());
                 subMeshSigmaEffs.set
                 (
                     iLaw,
                     new volSymmTensorField
                     (
-                        defaultIO,subMeshes().subMeshes()[iLaw].subMesh(),zero
+                        IOobject(defaultIO,"subMeshSigmaEff"+lawMesh.name()),lawMesh,zero
                     )
                 );
             }
@@ -338,9 +343,13 @@ void Foam::poroMechanicalLaw::writeFields(const Time& runTime)
             baseMesh(),
             zero
         );
+
         subMeshes().mapSubMeshVolFields<symmTensor>(subMeshSigmaEffs, baseMeshSigmaEff);
+
         baseMeshSigmaEff.write();
+
     }
+    effectiveStressMechLawPtr_->writeFields(runTime);
 }
 
 // ************************************************************************* //

@@ -202,6 +202,15 @@ protected:
             return mesh_;
         }
 
+        //- Return label of solid submesh (-1 if baseMesh)
+        label lawI() const
+        {
+            return lawI_;
+        }
+
+        //- Return solid submeshes (error when single material)
+        const solidSubMeshes& subMeshes() const;
+
         //- If the case is plane stress
         bool planeStress() const;
 
@@ -415,7 +424,7 @@ public:
                 const dictionary& dict,
                 const nonLinearGeometry::nonLinearType& nonLinGeom,
                 const label lawI,
-                solidSubMeshes* solidSubMeshes
+                const solidSubMeshes* solidSubMeshes
             ),
             (name, mesh, dict, nonLinGeom, lawI, solidSubMeshes)
         );
@@ -433,7 +442,7 @@ public:
                 const dictionary& dict,
                 const nonLinearGeometry::nonLinearType& nonLinGeom,
                 const label lawI,
-                solidSubMeshes* solidSubMeshes
+                const solidSubMeshes* solidSubMeshes
             ),
             (name, mesh, dict, nonLinGeom, lawI, solidSubMeshes)
         );
@@ -449,7 +458,7 @@ public:
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom,
             const label lawI = -1,
-            solidSubMeshes* solidSubMeshes = NULL
+            const solidSubMeshes* solidSubMeshes = NULL
         );
 
         //- Create a nonlinear geometry mechanical law
@@ -460,7 +469,7 @@ public:
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom,
             const label lawI = -1,
-            solidSubMeshes* solidSubMeshes = NULL
+            const solidSubMeshes* solidSubMeshes = NULL
         );
 
 
@@ -474,7 +483,7 @@ public:
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom,
             const label lawI = -1,
-            solidSubMeshes* solidSubMeshes = NULL
+            const solidSubMeshes* solidSubMeshes = NULL
         );
 
 
@@ -490,18 +499,6 @@ public:
         const word& name() const
         {
             return name_;
-        }
-
-        //- Return label of solid submesh (-1 if baseMesh)
-        label lawI() const
-        {
-            return lawI_;
-        }
-
-        //- Return label of solid submesh (-1 if baseMesh)
-        const solidSubMeshes& subMeshes() const
-        {
-            return solidSubMeshes_;
         }
 
         //- Return const reference to dict
