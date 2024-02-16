@@ -1358,7 +1358,10 @@ void Foam::mechanicalLaw::updateSigmaHyd
                 ADPtr =
                     new volScalarField
                     (
-                        solSubMeshes().lookupBaseMeshVolField<scalar>
+                        baseMesh().lookupObject<mechanicalModel>
+                        (
+                        "mechanicalProperties"
+                        ).solSubMeshes().lookupBaseMeshVolField<scalar>
                         (
                             "DEqnA", mesh()
                         )
