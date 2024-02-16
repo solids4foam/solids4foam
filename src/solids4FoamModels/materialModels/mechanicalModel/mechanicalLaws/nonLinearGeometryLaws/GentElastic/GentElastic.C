@@ -41,11 +41,10 @@ Foam::GentElastic::GentElastic
     const fvMesh& mesh,
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI,
-    const solidSubMeshes* solidSubMeshes
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
     mu_(E_/(2.0*(1.0 + nu_))),

@@ -386,11 +386,10 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
     const fvMesh& mesh,
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI,
-    const solidSubMeshes* solidSubMeshes
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
     E_("zero", dimPressure, 0.0),

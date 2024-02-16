@@ -41,11 +41,10 @@ Foam::rotationInvariantLinearElastic::rotationInvariantLinearElastic
     const fvMesh& mesh,
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI,
-    const solidSubMeshes* solidSubMeshes
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     biotStrain_
     (
         IOobject

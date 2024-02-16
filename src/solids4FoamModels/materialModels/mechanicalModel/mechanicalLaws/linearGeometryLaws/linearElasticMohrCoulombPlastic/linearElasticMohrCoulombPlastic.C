@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "mathematicalConstants.H"
 #include "zeroGradientFvPatchFields.H"
+#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -416,11 +417,10 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     const fvMesh& mesh,
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI,
-    const solidSubMeshes* solidSubMeshes
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
     lambda_
@@ -948,9 +948,14 @@ void Foam::linearElasticMohrCoulombPlastic::writeFields(const Time& runTime)
 {
     if(mesh()!=baseMesh()) // possible: lawI < 0, not sure about dualMesh
     {
-        PtrList<volScalarField> subMeshYields(subMeshes().subMeshes().size());
+        const solidSubMeshes& solSubMeshesRef = baseMesh().lookupObject<mechanicalModel>
+                (
+                   "mechanicalProperties"
+                ).solSubMeshes();
+        PtrList<volScalarField> subMeshYields(solSubMeshesRef.subMeshes().size());
         IOobject defaultIO
         (
+            "subMeshYield",
             runTime.timeName(),
             mesh(),
             IOobject::NO_READ,
@@ -958,16 +963,17 @@ void Foam::linearElasticMohrCoulombPlastic::writeFields(const Time& runTime)
             false
         );
         dimensionedScalar zero("",dimless,0.0);
-        forAll(subMeshes().subMeshes(),iLaw)
+        forAll(solSubMeshesRef.subMeshes(),iLaw)
         {
             if (iLaw!=lawI())
             {
+                const fvMesh& lawMesh(solSubMeshesRef.subMeshes()[iLaw].subMesh());
                 subMeshYields.set
                 (
                     iLaw,
                     new volScalarField
                     (
-                        defaultIO,subMeshes().subMeshes()[iLaw].subMesh(),zero
+                        defaultIO,lawMesh,zero
                     )
                 );
             }
@@ -976,14 +982,14 @@ void Foam::linearElasticMohrCoulombPlastic::writeFields(const Time& runTime)
                 subMeshYields.set
                 (
                     iLaw,
-                    &activeYield_
+                    activeYield()
                 );
             }
         }
         volScalarField baseMeshYield
         (
             IOobject(
-                "yieldMarker."+name(),
+                "Yield."+name(),
                 runTime.timeName(),
                 baseMesh(),
                 IOobject::NO_READ,
@@ -993,8 +999,11 @@ void Foam::linearElasticMohrCoulombPlastic::writeFields(const Time& runTime)
             baseMesh(),
             zero
         );
-        subMeshes().mapSubMeshVolFields<scalar>(subMeshYields, baseMeshYield);
+
+        solSubMeshesRef.mapSubMeshVolFields<scalar>(subMeshYields, baseMeshYield);
+
         baseMeshYield.write();
+
     }
 }
 

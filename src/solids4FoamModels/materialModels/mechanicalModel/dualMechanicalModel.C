@@ -280,9 +280,7 @@ Foam::dualMechanicalModel::dualMechanicalModel
                     lawEntries[lawI].keyword(),
                     mesh,
                     lawEntries[lawI].dict(),
-                    nonLinGeom,
-                    -1,
-                    &mechModel.solSubMeshes()
+                    nonLinGeom
                 )
             );
         }
@@ -300,9 +298,7 @@ Foam::dualMechanicalModel::dualMechanicalModel
                     lawEntries[lawI].keyword(),
                     mesh,
                     lawEntries[lawI].dict(),
-                    nonLinGeom,
-                    -1,
-                    &mechModel.solSubMeshes()
+                    nonLinGeom
                 )
             );
         }

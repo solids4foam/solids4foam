@@ -108,8 +108,7 @@ public:
             const fvMesh& mesh,
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom,
-            const label lawI = -1,
-            const solidSubMeshes* solidSubMeshes = NULL
+            const label lawI = -1
         );
 
 

@@ -317,11 +317,10 @@ Foam::thermoMechanicalLaw::thermoMechanicalLaw
     const fvMesh& mesh,
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI,
-    const solidSubMeshes* solidSubMeshes
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     mechLawPtr_
     (
         mechanicalLaw::NewLinGeomMechLaw
@@ -330,8 +329,7 @@ Foam::thermoMechanicalLaw::thermoMechanicalLaw
             mesh,
             dict.subDict("mechanicalLaw"),
             nonLinGeom,
-            lawI,
-            solidSubMeshes
+            lawI
         )
     ),
     alpha_(dict.lookup("alpha")),

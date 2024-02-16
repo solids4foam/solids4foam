@@ -126,21 +126,33 @@ const Foam::surfaceScalarField& Foam::poroMechanicalLaw::p0f() const
 
 const Foam::volScalarField& Foam::poroMechanicalLaw::lookupPressureField() const
 {
-    if (mesh().thisDb().parent().foundObject<objectRegistry>(pRegion_))
+    if (mesh().thisDb().parent().foundObject<objectRegistry>(pRegion_) && lawI()==-1)
     {
         return mesh().thisDb().parent().subRegistry
         (
             pRegion_
         ).lookupObject<volScalarField>(pName_);
     }
+    else if (mesh().thisDb().parent().foundObject<objectRegistry>("solid") && lawI()==-1)
+    {
+        return mesh().thisDb().parent().subRegistry
+                (
+                    "solid"
+                ).lookupObject<volScalarField>(pName_);
+    }
     else if(lawI()!=-1)
     {
-        return
-            subMeshes().lookupBaseMeshVolField<scalar>
-            (pName_,mesh());
+        return baseMesh().lookupObject<mechanicalModel>
+                (
+                   "mechanicalProperties"
+                ).solSubMeshes().lookupBaseMeshVolField<scalar>(pName_,mesh());
     }
     else
-
+    {
+        FatalErrorIn("Foam::poroMechanicalLaw::lookupPressureField()")
+            << "Cannot find " << pName_ << " field in " << pRegion_
+            << " or in 'solid'" << abort(FatalError);
+    }
     // Keep compiler happy
     return mesh().lookupObject<volScalarField>("null");
 }
@@ -155,11 +167,10 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
     const fvMesh& mesh,
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI,
-    const solidSubMeshes* solidSubMeshes
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     effectiveStressMechLawPtr_
     (
         mechanicalLaw::NewLinGeomMechLaw
@@ -168,8 +179,7 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
             mesh,
             dict.subDict("effectiveStressMechanicalLaw"),
             nonLinGeom,
-            lawI,
-            solidSubMeshes
+            lawI
         )
     ),
     sigmaEff_(),
@@ -296,7 +306,11 @@ void Foam::poroMechanicalLaw::writeFields(const Time& runTime)
 {
     if(mesh()!=baseMesh()) // possible: lawI < 0, not sure about dualMesh
     {
-        PtrList<volSymmTensorField> subMeshSigmaEffs(subMeshes().subMeshes().size());
+        const solidSubMeshes& solSubMeshesRef = baseMesh().lookupObject<mechanicalModel>
+                (
+                   "mechanicalProperties"
+                ).solSubMeshes();
+        PtrList<volSymmTensorField> subMeshSigmaEffs(solSubMeshesRef.subMeshes().size());
         IOobject defaultIO
         (
             "subMeshSigmaEff",
@@ -307,17 +321,17 @@ void Foam::poroMechanicalLaw::writeFields(const Time& runTime)
             false
         );
         dimensionedSymmTensor zero("",dimless,symmTensor::zero);
-        forAll(subMeshes().subMeshes(),iLaw)
+        forAll(solSubMeshesRef.subMeshes(),iLaw)
         {
             if (iLaw!=lawI())
             {
-                const fvMesh& lawMesh(subMeshes().subMeshes()[iLaw].subMesh());
+                const fvMesh& lawMesh(solSubMeshesRef.subMeshes()[iLaw].subMesh());
                 subMeshSigmaEffs.set
                 (
                     iLaw,
                     new volSymmTensorField
                     (
-                        IOobject(defaultIO,"subMeshSigmaEff"+lawMesh.name()),lawMesh,zero
+                        defaultIO,lawMesh,zero
                     )
                 );
             }
@@ -344,7 +358,7 @@ void Foam::poroMechanicalLaw::writeFields(const Time& runTime)
             zero
         );
 
-        subMeshes().mapSubMeshVolFields<symmTensor>(subMeshSigmaEffs, baseMeshSigmaEff);
+        solSubMeshesRef.mapSubMeshVolFields<symmTensor>(subMeshSigmaEffs, baseMeshSigmaEff);
 
         baseMeshSigmaEff.write();
 

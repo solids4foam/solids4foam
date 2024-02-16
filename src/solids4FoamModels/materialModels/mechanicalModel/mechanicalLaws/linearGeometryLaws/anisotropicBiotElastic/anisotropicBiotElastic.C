@@ -43,11 +43,10 @@ Foam::anisotropicBiotElastic::anisotropicBiotElastic
     const fvMesh& mesh,
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI,
-    const solidSubMeshes* solidSubMeshes
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     model2d_(bool(mesh.solutionD()[vector::Z] > 0)),
     A11_(0.0),
     A22_(0.0),

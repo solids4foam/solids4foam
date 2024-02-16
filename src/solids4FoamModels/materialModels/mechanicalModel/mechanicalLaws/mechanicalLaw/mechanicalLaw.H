@@ -47,7 +47,6 @@ Author
 #else
     #include "scalarSquareMatrix.H"
 #endif
-#include "solidSubMeshes.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -70,9 +69,6 @@ class mechanicalLaw
 
         //- submesh label (-1 if baseMesh)
         const label lawI_;
-
-        //- Const reference to solidSubMeshes
-        const solidSubMeshes& solidSubMeshes_;
 
         //- Mechanical law dictionary
         mutable dictionary dict_;
@@ -207,9 +203,6 @@ protected:
         {
             return lawI_;
         }
-
-        //- Return solid submeshes (error when single material)
-        const solidSubMeshes& subMeshes() const;
 
         //- If the case is plane stress
         bool planeStress() const;
@@ -423,10 +416,9 @@ public:
                 const fvMesh& mesh,
                 const dictionary& dict,
                 const nonLinearGeometry::nonLinearType& nonLinGeom,
-                const label lawI,
-                const solidSubMeshes* solidSubMeshes
+                const label lawI
             ),
-            (name, mesh, dict, nonLinGeom, lawI, solidSubMeshes)
+            (name, mesh, dict, nonLinGeom, lawI)
         );
 
         //- Mechanical law for nonlinear geometry i.e. finite strains and
@@ -441,10 +433,9 @@ public:
                 const fvMesh& mesh,
                 const dictionary& dict,
                 const nonLinearGeometry::nonLinearType& nonLinGeom,
-                const label lawI,
-                const solidSubMeshes* solidSubMeshes
+                const label lawI
             ),
-            (name, mesh, dict, nonLinGeom, lawI, solidSubMeshes)
+            (name, mesh, dict, nonLinGeom, lawI)
         );
 
 
@@ -457,8 +448,7 @@ public:
             const fvMesh& mesh,
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom,
-            const label lawI = -1,
-            const solidSubMeshes* solidSubMeshes = NULL
+            const label lawI = -1
         );
 
         //- Create a nonlinear geometry mechanical law
@@ -468,8 +458,7 @@ public:
             const fvMesh& mesh,
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom,
-            const label lawI = -1,
-            const solidSubMeshes* solidSubMeshes = NULL
+            const label lawI = -1
         );
 
 
@@ -482,8 +471,7 @@ public:
             const fvMesh& mesh,
             const dictionary& dict,
             const nonLinearGeometry::nonLinearType& nonLinGeom,
-            const label lawI = -1,
-            const solidSubMeshes* solidSubMeshes = NULL
+            const label lawI = -1
         );
 
 

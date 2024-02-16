@@ -236,7 +236,7 @@ void Foam::mechanicalLaw::makeSigma0() const
             (
                 baseMesh().lookupObject<mechanicalModel>
                 (
-                    "mechanicalProperties"
+                   "mechanicalProperties"
                 ).solSubMeshes().lookupBaseMeshVolField<symmTensor>
                 (
                     "sigma0", mesh()
@@ -474,11 +474,6 @@ void Foam::mechanicalLaw::makeSigmaHyd()
 
 
 // * * * * * * * * * * * * * * Protected Members * * * * * * * * * * * * * * //
-
-const Foam::solidSubMeshes& Foam::mechanicalLaw::subMeshes() const
-{
-    return solidSubMeshes_;
-}
 
 bool Foam::mechanicalLaw::planeStress() const
 {
@@ -1363,10 +1358,7 @@ void Foam::mechanicalLaw::updateSigmaHyd
                 ADPtr =
                     new volScalarField
                     (
-                        baseMesh().lookupObject<mechanicalModel>
-                        (
-                            "mechanicalProperties"
-                        ).solSubMeshes().lookupBaseMeshVolField<scalar>
+                        solSubMeshes().lookupBaseMeshVolField<scalar>
                         (
                             "DEqnA", mesh()
                         )
@@ -1466,14 +1458,12 @@ Foam::mechanicalLaw::mechanicalLaw
     const fvMesh& mesh,
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI,
-    const solidSubMeshes* solidSubMeshes
+    const label lawI
 )
 :
     name_(name),
     mesh_(mesh),
     lawI_(lawI),
-    solidSubMeshes_(*solidSubMeshes),
     dict_(dict),
     baseMeshRegionName_(),
     nonLinGeom_(nonLinGeom),

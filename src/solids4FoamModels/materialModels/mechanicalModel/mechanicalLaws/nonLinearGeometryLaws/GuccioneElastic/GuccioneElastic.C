@@ -40,11 +40,10 @@ Foam::GuccioneElastic::GuccioneElastic
     const fvMesh& mesh,
     const dictionary& dict,
     const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI,
-    const solidSubMeshes* solidSubMeshes
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI, solidSubMeshes),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     bulkModulus_(dict.lookup("bulkModulus")),
     k_(dict.lookup("k")),
     cf_(readScalar(dict.lookup("cf"))),
