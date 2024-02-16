@@ -34,17 +34,19 @@ The curved cantilever beam is fixed on the left side, and the right side has pre
 
 * Stress is dependent on the angular coordinate $$\theta$$;
 
-* The analytical solution for the stress field is [[1]](https://www.sciencedirect.com/book/9780123744463/elasticity):  
-  $$
-  N = {a}^2 - {b}^2 + ({a}^2+{b}^2)\;\text{ln}\left(\frac{b}{a}\right),
-  $$
+* The analytical solution for the stress field is [[1]](https://www.sciencedirect.com/book/9780123744463/elasticity):
+
+$$
+N = {a}^2 - {b}^2 + ({a}^2+{b}^2)\;\text{ln}\left(\frac{b}{a}\right),
+$$
+
 $$
 \sigma_{r} = \frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta),
 $$
 
 $$
 \sigma_{\theta} = \frac{P}{N}\left(3r-\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\sin (\theta),
-$$ {,}
+$$
 
 $$
 \tau_{r\theta} = \tau_{\theta r} =-\frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\cos (\theta).
@@ -100,7 +102,7 @@ Figures 2 and 3 show $$\sigma_{xx}$$, $$\sigma_{xy}$$ and $$\sigma_{yy}$$ stress
 
 ## Running the Case
 
-The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/cooksMembrane`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the `Allrun` consists of creating the mesh using `blockMesh` (`> ./blockMesh`) followed by running the `solids4foam` solver (`> ./solids4Foam`) and `> ./sample` utility. Optionally, if `gnuplot` is installed, the stress distribution is plotted in the `sigmaAtTheta45deg.png` file.
+The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/curvedCantilever`. The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In this case, the `Allrun` consists of creating the mesh using `blockMesh` (`> ./blockMesh`) followed by running the `solids4foam` solver (`> ./solids4Foam`) and `> ./sample` utility. Optionally, if `gnuplot` is installed, the stress distribution is plotted in the `sigmaAtTheta45deg.png` file.
 
 ```warning
 The coupled version of this case, which uses the `coupledUnsLinearGeometryLinearElastic`, can currently only be run using solids4foam built on foam-extend. To modify the case to run with the segregated `linearGeometryTotalDisplacement` solid model, follow the instructions in `tutorials/solids/linearElasticity/narrowTmember/README.md` file. 

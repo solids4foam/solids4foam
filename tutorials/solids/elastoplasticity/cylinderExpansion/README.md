@@ -42,9 +42,11 @@ In this case, which has been analysed in Cardiff et al. [1], a thick-walled cyli
 ## Expected Results
 
 Assuming rigid plasticity, the radial (Cauchy) stress, $$\sigma_{rr}$$ , at the inner surface is given analytically as [2, 3]:
+
 $$
 \sigma_{rr}=\left(\dfrac{\sigma_Y}{\sqrt{3}}\right) \ln \left( \dfrac{\left(\dfrac{r_0}{a_0}\right)^2+\left(\dfrac{a}{a_0}\right)^2-1}{\left(\dfrac{b_0}{a_0}\right)^2 + \left(\dfrac{a}{a_0}\right)^2 -1}  \right)
 $$
+
 where $$a_0$$ is the initial inner radius, $$b_0$$ is the initial outer radius, $$r_0$$ is the radius in the initial configuration of the material point at which the stresses are being calculated, and $$a$$ is the current value of the inside radius. The hoop and axial stresses are offset from the radial stress by a constant value; consequently, only the radial stress is examined.
 
 A comparison between numerical and analytical solutions is shown in Figure 2, where one can see the plot of the radial (Cauchy) stress at the inner boundary versus the current inner radius. The plot is automatically generated using `plot.gnuplot` script when running the case using the `Allrun` script.

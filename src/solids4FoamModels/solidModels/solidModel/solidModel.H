@@ -697,6 +697,21 @@ public:
                 const vectorField& faceZoneTraction
             );
 
+            //- Set pressure at specified patch
+            virtual void setPressure
+            (
+                fvPatchVectorField& tractionPatch,
+                const scalarField& pressure
+            );
+
+            //- Set pressure at specified patch
+            virtual void setPressure
+            (
+                const label interfaceI,
+                const label patchID,
+                const scalarField& faceZonePressure
+            );
+
             //- Set temperature and heat flux at specified patch
             virtual void setTemperatureAndHeatFlux
             (

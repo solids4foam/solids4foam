@@ -66,6 +66,13 @@ then
         "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/EulerDdtScheme" \
         "$FOAM_SRC/finiteVolume"
     if [ $? -ne 0 ]; then result=1; fi
+
+    # Fix time index storage in the storeOldTimes function
+    checkAndReport \
+        "GeometricField.C" \
+        "$FOAM_SRC/foam/fields/GeometricFields/GeometricField" \
+        "$FOAM_SRC/foam"
+    if [ $? -ne 0 ]; then result=1; fi
 else
     echo "No fixes needed for this version of OpenFOAM"; echo
     exit 0;

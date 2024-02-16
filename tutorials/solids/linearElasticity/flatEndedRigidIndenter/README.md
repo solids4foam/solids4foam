@@ -33,6 +33,7 @@ This case consists of a rigid flat-ended indenter pressed onto an elastic-half s
 ## Expected Results
 
 The analytical solution for the pressure distribution (plane stress) is [[2]](https://www.cambridge.org/core/books/contact-mechanics/E3707F77C2EBCE727C3911AFBD2E4AC2):
+
 $$
 p_n(x) = \frac{F}{\pi\sqrt{a^2-x^2}} \qquad \text{for } |x| \leq a,
 $$
