@@ -30,10 +30,12 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_ORG
-    #include "backwardDdtScheme.foundation.H"
-#elif OPENFOAM_COM
-    #include "backwardDdtScheme.esi.H"
-#else
-    #include "backwardDdtScheme.foamextend.H"
-#endif
+#include "backwardDdtScheme.esi.H"
+
+/*#ifdef OPENFOAM_ORG*/
+/*    #include "backwardDdtScheme.foundation.H"*/
+/*#elif OPENFOAM_COM*/
+/*    #include "backwardDdtScheme.esi.H"*/
+/*#else*/
+/*    #include "backwardDdtScheme.foamextend.H"*/
+/*#endif*/
