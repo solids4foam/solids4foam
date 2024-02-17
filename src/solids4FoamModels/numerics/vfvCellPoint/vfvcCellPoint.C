@@ -763,8 +763,8 @@ tmp<pointScalarField> laplacian
 #endif
 
         // Take reference for clarity and efficiency
-    const labelListList& cellPoints = mesh.cellPoints();
-    const pointField& points = mesh.points();
+    //const labelListList& cellPoints = mesh.cellPoints();
+    //const pointField& points = mesh.points();
     const labelList& dualOwn = dualMesh.owner();
     const labelList& dualNei = dualMesh.neighbour();
     const vectorField& dualSf = dualMesh.faceAreas();
@@ -788,7 +788,7 @@ tmp<pointScalarField> laplacian
     forAll(dualOwn, dualFaceI)
     {
         // Primary mesh cell in which dualFaceI resides
-        const label cellID = dualFaceToCell[dualFaceI];
+        //const label cellID = dualFaceToCell[dualFaceI];
 
         // Dual cell owner of dualFaceI
         const label dualOwnCellID = dualOwn[dualFaceI];
