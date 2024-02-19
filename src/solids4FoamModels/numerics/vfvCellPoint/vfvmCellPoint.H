@@ -63,11 +63,8 @@ namespace vfvm
 		const labelList& dualFaceToCell,
 		const labelList& dualCellToPoint,
 		const Field<RectangularMatrix<scalar>>& materialTangentField,
-		const boolList& fixedDofs,
-		const symmTensorField& fixedDofDirections,
-		const scalar fixedDofScale,
 		const scalar zeta,
-		const bool debug
+		const bool debug = false
     );
 
 

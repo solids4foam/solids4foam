@@ -48,20 +48,20 @@ namespace Foam
 
 namespace vfvc
 {
-    // Gradient field of a vector field
+    // Gradient field
+    // Returns volVectorField on primary mesh
+    tmp<volVectorField> grad
+    (
+        const pointScalarField& pointT, // primary mesh point field
+        const fvMesh& mesh              // primary mesh
+    );
+
+    // Gradient field
     // Returns volTensorField on primary mesh
     tmp<volTensorField> grad
     (
         const pointVectorField& pointD, // primary mesh point displacement
         const fvMesh& mesh              // primary mesh
-    );
-    
-    // Gradient field of a scalar field
-    // Returns volVectorField on primary mesh
-    tmp<volVectorField> grad
-    (
-      const pointScalarField& pointP, // primary mesh point pressure
-      const fvMesh& mesh // primary mesh
     );
 
     // Gradient field
@@ -73,11 +73,11 @@ namespace vfvc
     );
 
     // Gradient field
-    // Returns surfaceTensorField on dual mesh
+    // Returns surfaceVectorField on dual mesh
     // Only calculates the gradient for internal faces
-    tmp<surfaceTensorField> fGrad
+    tmp<surfaceVectorField> fGrad
     (
-        const pointVectorField& pointD, // primary mesh point displacement
+        const pointScalarField& pointT, // primary mesh point field
         const fvMesh& mesh,             // primary mesh
         const fvMesh& dualMesh,         // dual mesh
         const labelList& dualFaceToCell,
@@ -85,13 +85,13 @@ namespace vfvc
         const scalar zeta, // fraction of compact edge direction component used
         const bool debug = false
     );
-    
-    // Gradient field of pressure
-    // Returns surfaceScalarField on dual mesh
+
+    // Gradient field
+    // Returns surfaceTensorField on dual mesh
     // Only calculates the gradient for internal faces
-    tmp<surfaceVectorField> fGrad
+    tmp<surfaceTensorField> fGrad
     (
-        const pointScalarField& pointP, // primary mesh point pressure
+        const pointVectorField& pointD, // primary mesh point displacement
         const fvMesh& mesh,             // primary mesh
         const fvMesh& dualMesh,         // dual mesh
         const labelList& dualFaceToCell,

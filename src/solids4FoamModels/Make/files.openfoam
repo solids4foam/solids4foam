@@ -79,6 +79,9 @@ $(nonLinGeomLaws)/OgdenElastic/OgdenElastic.C
 $(nonLinGeomLaws)/MooneyRivlinElastic/MooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
+$(nonLinGeomLaws)/neoHookeanMisesGTNDamage/neoHookeanMisesGTNDamage.C
+$(nonLinGeomLaws)/neoHookeanMisesLemaitreDamage/neoHookeanMisesLemaitreDamage.C
+$(nonLinGeomLaws)/neoHookeanMisesPhaseFieldDamage/neoHookeanMisesPhaseFieldDamage.C
 $(nonLinGeomLaws)/rotationInvariantLinearElastic/rotationInvariantLinearElastic.C
 $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 $(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
@@ -234,6 +237,7 @@ numerics/multiplyCoeff/multiplyCoeffRectMat.C
 numerics/multiplyCoeff/multiplyCoeffExtended.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/sparseMatrix/sparseMatrix.C
+numerics/sparseMatrix/SparseMatrixTemplates.C
 numerics/sparseMatrix/sparseMatrixTools.C
 numerics/sparseMatrix/SparseMatrixTemplates.C
 numerics/sparseMatrixExtended/sparseMatrixExtended.C

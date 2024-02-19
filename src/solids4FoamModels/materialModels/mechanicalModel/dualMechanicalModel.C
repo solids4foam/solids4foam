@@ -387,7 +387,6 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
 }
 #endif
 
-
 Foam::tmp<Foam::surfaceScalarField>
 Foam::dualMechanicalModel::impKf() const
 {
@@ -436,11 +435,15 @@ Foam::dualMechanicalModel::impKf() const
         }
     }
 
-    Info<< "Writing " << result.name() << endl;
-    result.write();
+    if (debug)
+    {
+        Info<< "Writing " << result.name() << endl;
+        result.write();
+    }
 
     return tresult;
 }
+
 
 Foam::tmp<Foam::surfaceScalarField>
 Foam::dualMechanicalModel::bulkModulus() const
@@ -490,10 +493,15 @@ Foam::dualMechanicalModel::bulkModulus() const
         }
     }
 
-    //result.write();
+    if (debug)
+    {
+        Info<< "Writing " << result.name() << endl;
+        result.write();
+    }
 
     return tresult;
 }
+
 
 void Foam::dualMechanicalModel::correct(surfaceSymmTensorField& sigma)
 {

@@ -32,9 +32,6 @@ void Foam::vfvm::divSigma
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
     const Field<RectangularMatrix<scalar>>& materialTangentField,
-    const boolList& fixedDofs,
-    const symmTensorField& fixedDofDirections,
-    const scalar fixedDofScale,
     const scalar zeta,
     const bool debug
 )
@@ -44,7 +41,7 @@ void Foam::vfvm::divSigma
         Info<< "void Foam::vfvm::divSigma(...): start" << endl;
     }
 
-    // Take reference for clarity and efficiency
+    // Take references for clarity and efficiency
     const labelListList& cellPoints = mesh.cellPoints();
     const pointField& points = mesh.points();
     const labelList& dualOwn = dualMesh.owner();
