@@ -239,7 +239,6 @@ numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/SparseMatrixTemplates.C
 numerics/sparseMatrix/sparseMatrixTools.C
-numerics/sparseMatrix/SparseMatrixTemplates.C
 numerics/sparseMatrixExtended/sparseMatrixExtended.C
 numerics/sparseMatrixExtended/sparseMatrixExtendedTools.C
 

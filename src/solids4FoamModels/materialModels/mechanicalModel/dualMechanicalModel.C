@@ -435,11 +435,8 @@ Foam::dualMechanicalModel::impKf() const
         }
     }
 
-    if (debug)
-    {
-        Info<< "Writing " << result.name() << endl;
-        result.write();
-    }
+    // Info<< "Writing " << result.name() << endl;
+    // result.write();
 
     return tresult;
 }
@@ -493,11 +490,8 @@ Foam::dualMechanicalModel::bulkModulus() const
         }
     }
 
-    if (debug)
-    {
-        Info<< "Writing " << result.name() << endl;
-        result.write();
-    }
+    // Info<< "Writing " << result.name() << endl;
+    // result.write();
 
     return tresult;
 }
