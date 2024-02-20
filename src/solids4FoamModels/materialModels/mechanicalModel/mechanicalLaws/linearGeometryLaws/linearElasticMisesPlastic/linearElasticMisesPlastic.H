@@ -141,6 +141,9 @@ class linearElasticMisesPlastic
         //- Equivalent plastic strain surface field
         surfaceScalarField epsilonPEqf_;
 
+        //- Equivalent plastic strain point field
+        pointScalarField pEpsilonPEq_;
+
         //- Active yielding flag
         //     1.0 for active yielding
         //     0.0 otherwise
