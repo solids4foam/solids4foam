@@ -127,7 +127,7 @@ $(pointPatchFields)/componentMixed/componentMixedPointPatchFields.C
 $(pointPatchFields)/pointAnalyticalPlateHoleTraction/analyticalPlateHoleTractionPointPatchVectorField.C
 $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
-$(pointPatchFields)/pointLinearSpatialDisplacement/pointLinearSpatialDisplacement.C
+/*$(pointPatchFields)/pointLinearSpatialDisplacement/pointLinearSpatialDisplacement.C*/
 
 contactModels = $(solidFvPatchFields)/solidContact/contactModels
 normalContactModels = $(contactModels)/normalContactModels
