@@ -516,16 +516,19 @@ tmp<surfaceTensorField> fGrad
                 // Primary mesh cell in which dualFaceI resides
                 const label cellID = dualFaceToCell[dualFaceI];
 
-                // Use the gradient in the adjacent primary cell-centre
-                // This will result in inconsistent values at processor patches
-                // Is this an issue?
+                if (cellID > -1)
+                {
+                    // Use the gradient in the adjacent primary cell-centre
+                    // This will result in inconsistent values at processor patches
+                    // Is this an issue?
 #ifdef OPENFOAM_NOT_EXTEND
-                result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
-                    gradDI[cellID];
+                    result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
+                        gradDI[cellID];
 #else
-                result.boundaryField()[dualPatchID][localDualFaceID] =
-                    gradDI[cellID];
+                    result.boundaryField()[dualPatchID][localDualFaceID] =
+                        gradDI[cellID];
 #endif
+                }
             }
         }
     }
