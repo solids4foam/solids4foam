@@ -19,7 +19,7 @@ Class
     vertexCentredNonLinGeomTotalLagDisplacementSolid
 
 Description
-    Mathematical model where where non linear geometry is modelled i.e. large strains 
+    Mathematical model where where non linear geometry is modelled i.e. large strains
     and the total displacement is the primary unknown.
 
     Discretisation is performed using a vertex-centred finite volume approach
@@ -129,10 +129,10 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
 
         //- Jacobian of the deformation gradient field at the dual mesh faces
         surfaceScalarField dualJf_;
-        
+
         //- Pressure at the dual mesh faces
         surfaceScalarField dualPf_;
-        
+
         //- Cell pressure
         volScalarField volP_;
 
@@ -202,8 +202,8 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
 		geometricStiffnessField
 		(
 			const surfaceVectorField SfUndef, //Undeformed surface area vector field
-			const surfaceTensorField gradDRef //Reference gradD 
-		) const; 
+			const surfaceTensorField gradDRef //Reference gradD
+		) const;
 
         //- Disallow default bitwise copy construct
         vertexCentredNonLinGeomTotalLagDisplacementSolid(const vertexCentredNonLinGeomTotalLagDisplacementSolid&);

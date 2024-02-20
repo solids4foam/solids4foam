@@ -844,7 +844,7 @@ vertexCentredNonLinGeomTotalLagDisplacementSolid::geometricStiffnessField
     }
 
     return tresult;
-    
+
 }
 
 
@@ -1204,7 +1204,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
 #endif
     do
     {
-    
+
     	Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
         // Calculate gradD at dual faces
         dualGradDf_ = vfvc::fGrad
@@ -1217,26 +1217,26 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
             zeta,
             debug
         );
-        
+
         Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
 
         // Update F
         dualFf_ = I + dualGradDf_.T();
-        
+
         Info << "dualF = " << dualFf_ << endl;
-        
+
         Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
 
         Info << "inv(dualF): " << inv(dualFf_) << endl;
-        
+
         Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
-        
+
         // Update Finv
         dualFinvf_ = inv(dualFf_);
 
         // Update J
         dualJf_ = det(dualFf_);
-        
+
         Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
 
         // Calculate stress at dual faces
@@ -1246,7 +1246,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
         vectorField source(mesh().nPoints(), vector::zero);
         pointD().correctBoundaryConditions();
         updateSource(source, dualMeshMap().dualCellToPoint());
-        
+
         Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
 
         if (fullNewton_)
@@ -1258,7 +1258,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
 
             // Update material tangent
             materialTangent = dualMechanicalPtr_().materialTangentFaceField();
-            
+
             Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
 
             //Obtain undeformed surface vector field
@@ -1276,7 +1276,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
                     gradDRef
                 )
             );
-            
+
             Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
 
             vfvm::divSigma
@@ -1313,7 +1313,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
                 int(bool(debug))
             );
         }
-        
+
         Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
 
 //        Info << endl << "Before enforcing DOFs: " << endl << endl;
@@ -1337,7 +1337,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
             fixedDofValues_,
             fixedDofScale_
         );
-        
+
         Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
 
 //        Info << endl << "After enforcing DOFs " << endl << endl;
@@ -1393,9 +1393,9 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
                 matrix, source, pointDcorr, twoD_, false, debug
             );
         }
-        
+
         Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
-        
+
         if (debug)
         {
             Info<< "bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve(): "
@@ -1469,7 +1469,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
 #endif
         }
         pointD().correctBoundaryConditions();
-        
+
         Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
 
         // Update point accelerations
@@ -1527,7 +1527,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
             pointDcorr
         ) && ++iCorr
     );
-    
+
     Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
 
     // Calculate gradD at dual faces

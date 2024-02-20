@@ -254,7 +254,7 @@ class neoHookeanElasticMisesPlastic
             const surfaceTensorField& gradD,
             const surfaceScalarField& p
         );
-        
+
         //-Calculate hydrostatic stress given gradD
         void calculateSigmaHyd
 		(

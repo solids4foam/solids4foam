@@ -420,7 +420,7 @@ bool vertexCentredLaplacian::evolve()
     pointT_.correctBoundaryConditions();
     updateSource
     (
-        source, 
+        source,
         pointT_,
         dualGradTf_,
         diffusivity_,

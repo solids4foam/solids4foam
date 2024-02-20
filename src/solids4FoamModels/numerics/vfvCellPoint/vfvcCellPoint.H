@@ -119,7 +119,7 @@ namespace vfvc
         ITstream& d2dt2Scheme,
         const pointVectorField& pointP // displacement
     );
-    
+
     // Returns the laplacian of a scalar field on the dual mesh
     tmp<pointScalarField> laplacian
     (

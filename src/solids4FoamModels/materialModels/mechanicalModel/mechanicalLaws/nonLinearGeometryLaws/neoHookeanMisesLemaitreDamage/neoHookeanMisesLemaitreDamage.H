@@ -1,25 +1,19 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
-    This file is part of foam-extend.
+    This file is part of solids4foam.
 
-    foam-extend is free software: you can redistribute it and/or modify it
+    solids4foam is free software: you can redistribute it and/or modify it
     under the terms of the GNU General Public License as published by the
     Free Software Foundation, either version 3 of the License, or (at your
     option) any later version.
 
-    foam-extend is distributed in the hope that it will be useful, but
+    solids4foam is distributed in the hope that it will be useful, but
     WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
     General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with foam-extend.  If not, see <http://www.gnu.org/licenses/>.
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     neoHookeanMisesLemaitreDamage
@@ -45,7 +39,7 @@ Description
         - Shear modulus (mu) and bulk modulus (K)
 
     The plastic hardening law is defined in a XY interpolate file, e.g.
-    see "plasticStrainVsYieldStress" in tutorial case. 
+    see "plasticStrainVsYieldStress" in tutorial case.
 
     For Lemaitre damage parameters, the user can specify:
         - Damage denominator (s0)
@@ -58,13 +52,13 @@ Description
     For the Malcher variant the user can specify:
         - Damage denominators s00 and s33
 
-  
+
 SourceFiles
     neoHookeanMisesLemaitreDamage.C
 
 Author
     Andrew Whelan, UCD.
-    Philip Cardiff, UCD. 
+    Philip Cardiff, UCD.
     All rights reserved.
 
 \*---------------------------------------------------------------------------*/
@@ -114,7 +108,7 @@ class neoHookeanMisesLemaitreDamage
 
         //- Bulk modulus
         dimensionedScalar K_;
-      
+
         //- Lemaitre exponent
         dimensionedScalar b_;
 
@@ -290,24 +284,24 @@ class neoHookeanMisesLemaitreDamage
         void damage
         (
             const scalar& DLambda,
-            const scalar& DEpsilonPEq,              
-            const scalar& epsilonPEqOld,  
-            const scalar& triaxiality,                  
-            scalar& damage, 
+            const scalar& DEpsilonPEq,
+            const scalar& epsilonPEqOld,
+            const scalar& triaxiality,
+            scalar& damage,
             scalar& damageOld,
-            const scalar&  damageNonLocal,            
+            const scalar&  damageNonLocal,
             const symmTensor& tau
         );
 
         // small strain return-map to calculate plastic increment
         void smallStrainReturnMap
         (
-            const symmTensor& Ee,  
-            scalar& sigmaY,                      
-            scalar& DLambda, 
-            scalar& damage, 
-            const scalar& damageOld,       
-            const scalar& damageNonLocal,                           
+            const symmTensor& Ee,
+            scalar& sigmaY,
+            scalar& DLambda,
+            scalar& damage,
+            const scalar& damageOld,
+            const scalar& damageNonLocal,
             const scalar& epsilonPEqOld,
             scalar& activeYield
         ) const;

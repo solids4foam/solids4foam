@@ -124,10 +124,10 @@ class vertexCentredNonLinGeomTotalLagSolid
         //- Point volume field
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
-        
+
  		//- Point gradD field
         //  gradD associated with the primary mesh points
-        pointTensorField pointGradD_;       
+        pointTensorField pointGradD_;
 
         //- Displacement gradient field at the dual mesh faces
         surfaceTensorField dualGradDf_;
@@ -146,7 +146,7 @@ class vertexCentredNonLinGeomTotalLagSolid
 
         //- Pressure at the dual mesh faces
         surfaceScalarField dualPf_;
-        
+
         //- Cell pressure
         volScalarField volP_;
 
@@ -157,15 +157,15 @@ class vertexCentredNonLinGeomTotalLagSolid
     // Private Member Functions
 
         //- Update the source vector for the linear system
-        //  for the displacement implementation 
+        //  for the displacement implementation
         void updateSource
         (
             vectorField& source,
             const labelList& dualCellToPoint
         );
-        
+
         //- Update the source vector for the linear system
-        //  for the displacement-pressure implementation        
+        //  for the displacement-pressure implementation
         void updateSource
 		(
 			Field<RectangularMatrix<scalar>>& source,
@@ -205,8 +205,8 @@ class vertexCentredNonLinGeomTotalLagSolid
             const pointVectorField& pointD,
             const vectorField& pointDcorr
         ) const;
-        
-        
+
+
         //- Check convergence of Newton-Raphson loop for pressure-
         //  displacement implementation
         bool converged
@@ -244,9 +244,9 @@ class vertexCentredNonLinGeomTotalLagSolid
 		geometricStiffnessField
 		(
 			const surfaceVectorField SfUndef, //Undeformed surface area vector field
-			const surfaceTensorField gradDRef //Reference gradD 
-		) const; 
-	
+			const surfaceTensorField gradDRef //Reference gradD
+		) const;
+
 		Foam::tmp<tensorField>
 		pBarSensitivityField
 		(

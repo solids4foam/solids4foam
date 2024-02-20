@@ -121,10 +121,10 @@ class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
         //- Point volume field
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
-        
+
  		//- Point gradD field
         //  gradD associated with the primary mesh points
-        pointTensorField pointGradD_;       
+        pointTensorField pointGradD_;
 
         //- Displacement gradient field at the dual mesh faces
         surfaceTensorField dualGradDf_;
@@ -143,7 +143,7 @@ class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
 
         //- Pressure at the dual mesh faces
         surfaceScalarField dualPf_;
-        
+
         //- Cell pressure
         volScalarField volP_;
 
@@ -152,8 +152,8 @@ class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
 
 
     // Private Member Functions
-        
-        //- Update the source vector for the linear system       
+
+        //- Update the source vector for the linear system
         void updateSource
 		(
 			Field<RectangularMatrix<scalar>>& source,
@@ -181,8 +181,8 @@ class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
             const fvMesh& mesh, // corresponding to pointD mesh
             const labelListList& pointToDualFaces
         ) const;
-                
-        //- Check convergence of Newton-Raphson loop 
+
+        //- Check convergence of Newton-Raphson loop
         bool converged
 		(
 			const label iCorr,
@@ -218,9 +218,9 @@ class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
 		geometricStiffnessField
 		(
 			const surfaceVectorField SfUndef, //Undeformed surface area vector field
-			const surfaceTensorField gradDRef //Reference gradD 
-		) const; 
-	
+			const surfaceTensorField gradDRef //Reference gradD
+		) const;
+
 		Foam::tmp<tensorField>
 		pBarSensitivityField
 		(

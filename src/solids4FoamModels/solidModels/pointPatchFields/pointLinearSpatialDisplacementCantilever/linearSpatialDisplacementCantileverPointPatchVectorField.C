@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -83,7 +77,7 @@ linearSpatialDisplacementCantileverPointPatchVectorField
     fixedValuePointPatchVectorField(p, iF),
     v0_(0),
     L_(0),
-    t_(0) 
+    t_(0)
 {}
 
 
@@ -145,9 +139,9 @@ void linearSpatialDisplacementCantileverPointPatchVectorField::updateCoeffs()
         return;
     }
 
-    this->operator==(-patch().pointNormals() * ((v0_*patch().localPoints().component(vector::X)/L_)*t_)); 
-    
-    fixedValuePointPatchField<vector>::updateCoeffs(); 
+    this->operator==(-patch().pointNormals() * ((v0_*patch().localPoints().component(vector::X)/L_)*t_));
+
+    fixedValuePointPatchField<vector>::updateCoeffs();
 }
 
 
@@ -161,7 +155,7 @@ void linearSpatialDisplacementCantileverPointPatchVectorField::write(Ostream& os
         << L_ << token::END_STATEMENT << nl;
     os.writeKeyword("t")
         << t_ << token::END_STATEMENT << nl;
-    
+
 }
 
 

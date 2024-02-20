@@ -280,8 +280,8 @@ void fixedRotationPointPatchVectorField::updateCoeffs()
     (
         pointDisp
     );
-      
-//    
+
+//
 //    vectorField newFaceCentres
 //    (
 //        (rotMat & (origFaceCentres_ - rotationOrigin_)) + rotationOrigin_

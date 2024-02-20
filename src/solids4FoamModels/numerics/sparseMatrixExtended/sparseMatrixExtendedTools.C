@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -294,7 +288,7 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
                 coeff(2,1), coeff(2,2), coeff(2,3), coeff(2,4),
                 coeff(3,1), coeff(3,2), coeff(3,3), coeff(3,4),
                 coeff(4,1), coeff(4,2), coeff(4,3), coeff(4,4)
-                
+
             };
 
             // Insert tensor coefficient
@@ -503,7 +497,7 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
     {
         Pout<< "        Solving the linear solver: start" << endl;
     }
-	
+
     ierr = KSPSolve(ksp, b, x); checkErr(ierr);
 
     if (debug)
@@ -528,19 +522,19 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
         {
             if (ownedByThisProc[i])
             {
-            	if (twoD)
+                if (twoD)
                 {
-		            solution[i](1,1) = xArr[index++];
-		            solution[i](2,1) = xArr[index++];
-		            solution[i](3,1) = xArr[index++];
+                            solution[i](1,1) = xArr[index++];
+                            solution[i](2,1) = xArr[index++];
+                            solution[i](3,1) = xArr[index++];
                 }
                 else
                 {
-		            solution[i](1,1) = xArr[index++];
-		            solution[i](2,1) = xArr[index++];
-		            solution[i](3,1) = xArr[index++];
-		            solution[i](4,1) = xArr[index++];
-		        }
+                            solution[i](1,1) = xArr[index++];
+                            solution[i](2,1) = xArr[index++];
+                            solution[i](3,1) = xArr[index++];
+                            solution[i](4,1) = xArr[index++];
+                        }
             }
         }
     }
@@ -613,19 +607,19 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
             {
                 if (!ownedByThisProc[i])
                 {
-		        	if (twoD)
-		            {
-				        solution[i](1,1) = xNotOwnedArr[index++];
-				        solution[i](2,1) = xNotOwnedArr[index++];
-				        solution[i](3,1) = xNotOwnedArr[index++];
-		            }
-		            else
-		            {
-				        solution[i](1,1) = xNotOwnedArr[index++];
-				        solution[i](2,1) = xNotOwnedArr[index++];
-				        solution[i](3,1) = xNotOwnedArr[index++];
-				        solution[i](4,1) = xNotOwnedArr[index++];
-				    }
+                                if (twoD)
+                            {
+                                        solution[i](1,1) = xNotOwnedArr[index++];
+                                        solution[i](2,1) = xNotOwnedArr[index++];
+                                        solution[i](3,1) = xNotOwnedArr[index++];
+                            }
+                            else
+                            {
+                                        solution[i](1,1) = xNotOwnedArr[index++];
+                                        solution[i](2,1) = xNotOwnedArr[index++];
+                                        solution[i](3,1) = xNotOwnedArr[index++];
+                                        solution[i](4,1) = xNotOwnedArr[index++];
+                                    }
                 }
             }
         }
@@ -797,8 +791,8 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
     const scalar fixedDofScale
 )
 {
-	const bool debug = 0;
-	
+        const bool debug = 0;
+
     // Loop though the matrix and overwrite the coefficients for fixed DOFs
     // To enforce the value we will set the diagonal to the identity and set
     // the source to zero. The reason the source is zero is that we are solving
@@ -820,46 +814,46 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
         if (fixedDofs[blockRowI])
         {
             RectangularMatrix<scalar>& coeff = iter();
-            
+
             // Extract the displacement coefficients of the momentum equation
             // on the left-hand side
             tensor momDispCoeff(tensor::zero);
-            
+
             if (twoD)
             {
-		        momDispCoeff.xx() = coeff(1,1);
-		        momDispCoeff.xy() = coeff(1,2);
-		        momDispCoeff.yx() = coeff(2,1);
-		        momDispCoeff.yy() = coeff(2,2);
+                        momDispCoeff.xx() = coeff(1,1);
+                        momDispCoeff.xy() = coeff(1,2);
+                        momDispCoeff.yx() = coeff(2,1);
+                        momDispCoeff.yy() = coeff(2,2);
             }
             else
             {
                 momDispCoeff.xx() = coeff(1,1);
-		        momDispCoeff.xy() = coeff(1,2);
-		        momDispCoeff.xz() = coeff(1,3);
-		        momDispCoeff.yx() = coeff(2,1);
-		        momDispCoeff.yy() = coeff(2,2);
-		        momDispCoeff.yz() = coeff(2,3);
-		        momDispCoeff.zx() = coeff(3,1);
-		        momDispCoeff.zy() = coeff(3,2);
-		        momDispCoeff.zz() = coeff(3,3);
-		    }
-		
+                        momDispCoeff.xy() = coeff(1,2);
+                        momDispCoeff.xz() = coeff(1,3);
+                        momDispCoeff.yx() = coeff(2,1);
+                        momDispCoeff.yy() = coeff(2,2);
+                        momDispCoeff.yz() = coeff(2,3);
+                        momDispCoeff.zx() = coeff(3,1);
+                        momDispCoeff.zy() = coeff(3,2);
+                        momDispCoeff.zz() = coeff(3,3);
+                    }
+
             // Extract the source terms of the momentum equation
             vector sourceTerms(vector::zero);
-            
+
             if (twoD)
             {
-		        sourceTerms.x() = source[blockRowI](1,1); 
-		        sourceTerms.y() = source[blockRowI](2,1);
+                        sourceTerms.x() = source[blockRowI](1,1);
+                        sourceTerms.y() = source[blockRowI](2,1);
             }
             else
             {
-		        sourceTerms.x() = source[blockRowI](1,1); 
-		        sourceTerms.y() = source[blockRowI](2,1);
-		        sourceTerms.z() = source[blockRowI](3,1);
-		    }     
-            
+                        sourceTerms.x() = source[blockRowI](1,1);
+                        sourceTerms.y() = source[blockRowI](2,1);
+                        sourceTerms.z() = source[blockRowI](3,1);
+                    }
+
             if (debug)
             {
                 Info<< "blockRow fixed: " << blockRowI << nl
@@ -874,7 +868,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
             // Set the source to zero as the correction to the displacement
             // is zero
             //source[blockRowI] = (freeDir & source[blockRowI]);
-            sourceTerms = (freeDir & sourceTerms); 
+            sourceTerms = (freeDir & sourceTerms);
 
             // Eliminate the fixed directions from the coeff
             momDispCoeff = (freeDir & momDispCoeff);
@@ -890,46 +884,46 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
                 // Set the fixed direction diagonal to enforce a zero correction
                 momDispCoeff -= tensor(fixedDofScale*fixedDir);
             }
-            
+
             //Insert the changed coefficients back into the matrix
             if (twoD)
             {
-            	coeff(1,1) = momDispCoeff.xx();
-            	coeff(1,2) = momDispCoeff.xy();
-            	coeff(2,1) = momDispCoeff.yx();
-            	coeff(2,2) = momDispCoeff.yy();
+                coeff(1,1) = momDispCoeff.xx();
+                coeff(1,2) = momDispCoeff.xy();
+                coeff(2,1) = momDispCoeff.yx();
+                coeff(2,2) = momDispCoeff.yy();
             }
             else
             {
-            	coeff(1,1) = momDispCoeff.xx();
-            	coeff(1,2) = momDispCoeff.xy();
-            	coeff(1,3) = momDispCoeff.xz();
-            	coeff(2,1) = momDispCoeff.yx();
-            	coeff(2,2) = momDispCoeff.yy();
-            	coeff(2,3) = momDispCoeff.yz();
-            	coeff(3,1) = momDispCoeff.zx();
-            	coeff(3,2) = momDispCoeff.zy();
-            	coeff(3,3) = momDispCoeff.zz();
-            }  
-            
+                coeff(1,1) = momDispCoeff.xx();
+                coeff(1,2) = momDispCoeff.xy();
+                coeff(1,3) = momDispCoeff.xz();
+                coeff(2,1) = momDispCoeff.yx();
+                coeff(2,2) = momDispCoeff.yy();
+                coeff(2,3) = momDispCoeff.yz();
+                coeff(3,1) = momDispCoeff.zx();
+                coeff(3,2) = momDispCoeff.zy();
+                coeff(3,3) = momDispCoeff.zz();
+            }
+
             //Insert the changed source terms back into the source
             if (twoD)
             {
-            	source[blockRowI](1,1) = sourceTerms.x(); 
-            	source[blockRowI](2,1) = sourceTerms.y(); 
+                source[blockRowI](1,1) = sourceTerms.x();
+                source[blockRowI](2,1) = sourceTerms.y();
             }
             else
             {
-            	source[blockRowI](1,1) = sourceTerms.x(); 
-            	source[blockRowI](2,1) = sourceTerms.y(); 
-            	source[blockRowI](3,1) = sourceTerms.z(); 
-            } 
+                source[blockRowI](1,1) = sourceTerms.x();
+                source[blockRowI](2,1) = sourceTerms.y();
+                source[blockRowI](3,1) = sourceTerms.z();
+            }
 
             if (debug)
             {
                 Info<< "    coeff after: " << momDispCoeff << nl << endl;
             }
-             
+
         }
         else if (fixedDofs[blockColI])
         {
@@ -937,7 +931,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
             // We will eliminate the coeff and add the contribution to the
             // source
             RectangularMatrix<scalar>& coeff = iter();
-            
+
             if (debug)
             {
                 Info<< "blockCol fixed: " << blockColI << nl
@@ -945,62 +939,62 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
                     << "    fixedDir: " << fixedDofDirections[blockColI] << nl
                     << "    coeff before: " << coeff << endl;
             }
-            
+
             // Extract the displacement coefficients of the momentum equation
             // on the left-hand side
             tensor momDispCoeff(tensor::zero);
-            
+
             if (twoD)
             {
-		        momDispCoeff.xx() = coeff(1,1);
-		        momDispCoeff.xy() = coeff(1,2);
-		        momDispCoeff.yx() = coeff(2,1);
-		        momDispCoeff.yy() = coeff(2,2);
+                        momDispCoeff.xx() = coeff(1,1);
+                        momDispCoeff.xy() = coeff(1,2);
+                        momDispCoeff.yx() = coeff(2,1);
+                        momDispCoeff.yy() = coeff(2,2);
             }
             else
             {
                 momDispCoeff.xx() = coeff(1,1);
-		        momDispCoeff.xy() = coeff(1,2);
-		        momDispCoeff.xz() = coeff(1,3);
-		        momDispCoeff.yx() = coeff(2,1);
-		        momDispCoeff.yy() = coeff(2,2);
-		        momDispCoeff.yz() = coeff(2,3);
-		        momDispCoeff.zx() = coeff(3,1);
-		        momDispCoeff.zy() = coeff(3,2);
-		        momDispCoeff.zz() = coeff(3,3);
-		    }
+                        momDispCoeff.xy() = coeff(1,2);
+                        momDispCoeff.xz() = coeff(1,3);
+                        momDispCoeff.yx() = coeff(2,1);
+                        momDispCoeff.yy() = coeff(2,2);
+                        momDispCoeff.yz() = coeff(2,3);
+                        momDispCoeff.zx() = coeff(3,1);
+                        momDispCoeff.zy() = coeff(3,2);
+                        momDispCoeff.zz() = coeff(3,3);
+                    }
 
             // Directions where the DOFs are unknown
             const tensor freeDir(I - fixedDofDirections[blockColI]);
 
-            // Eliminate the fixed directions    
+            // Eliminate the fixed directions
             momDispCoeff = (momDispCoeff & freeDir);
-            
+
             //Insert the changed coefficients back into the matrix
             if (twoD)
             {
-            	coeff(1,1) = momDispCoeff.xx();
-            	coeff(1,2) = momDispCoeff.xy();
-            	coeff(2,1) = momDispCoeff.yx();
-            	coeff(2,2) = momDispCoeff.yy();
+                coeff(1,1) = momDispCoeff.xx();
+                coeff(1,2) = momDispCoeff.xy();
+                coeff(2,1) = momDispCoeff.yx();
+                coeff(2,2) = momDispCoeff.yy();
             }
             else
             {
-            	coeff(1,1) = momDispCoeff.xx();
-            	coeff(1,2) = momDispCoeff.xy();
-            	coeff(1,3) = momDispCoeff.xz();
-            	coeff(2,1) = momDispCoeff.yx();
-            	coeff(2,2) = momDispCoeff.yy();
-            	coeff(2,3) = momDispCoeff.yz();
-            	coeff(3,1) = momDispCoeff.zx();
-            	coeff(3,2) = momDispCoeff.zy();
-            	coeff(3,3) = momDispCoeff.zz();
+                coeff(1,1) = momDispCoeff.xx();
+                coeff(1,2) = momDispCoeff.xy();
+                coeff(1,3) = momDispCoeff.xz();
+                coeff(2,1) = momDispCoeff.yx();
+                coeff(2,2) = momDispCoeff.yy();
+                coeff(2,3) = momDispCoeff.yz();
+                coeff(3,1) = momDispCoeff.zx();
+                coeff(3,2) = momDispCoeff.zy();
+                coeff(3,3) = momDispCoeff.zz();
             }
 
             if (debug)
             {
                 Info<< "    coeff after: " << momDispCoeff << nl << endl;
-            }            
+            }
 
         }
     }

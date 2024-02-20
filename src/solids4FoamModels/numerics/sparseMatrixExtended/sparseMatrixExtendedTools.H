@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -105,9 +99,9 @@ namespace sparseMatrixExtendedTools
     //- Enforce fixed DOF contributions on the linear system
     void enforceFixedDof
     (
-		sparseMatrixExtended& matrix,
-		Field<RectangularMatrix<scalar>>& source,
-		const bool twoD,
+                sparseMatrixExtended& matrix,
+                Field<RectangularMatrix<scalar>>& source,
+                const bool twoD,
         const boolList& fixedDofs,
         const symmTensorField& fixedDofDirections,
         const pointField& fixedDofValues,

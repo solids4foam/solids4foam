@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -81,7 +75,7 @@ class linearSpatialDisplacementCantileverPointPatchVectorField
 
         //- Length of cantilever in m
         const scalar L_;
-        
+
         //- time of the simulation
         const scalar t_;
 

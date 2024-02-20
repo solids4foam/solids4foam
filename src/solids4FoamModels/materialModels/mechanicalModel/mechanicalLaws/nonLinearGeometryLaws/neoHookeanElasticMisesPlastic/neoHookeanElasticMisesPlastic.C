@@ -809,7 +809,7 @@ void Foam::neoHookeanElasticMisesPlastic::calculateSigmaHyd
 
     // Calculate the Jacobian of the total deformation gradient
     Jf() = det(Ff());
-    
+
     // Calculate the hydrostatic stress
     sigmaHyd = 0.5*K_*(pow(Jf(), 2.0) - 1.0);
 }
@@ -1523,10 +1523,10 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     {
         return;
     }
-	
+
 	// Look up the pressure field
 	const volScalarField& p =	mesh().lookupObject<volScalarField>("volP");
-   
+
     // Update the Jacobian of the total deformation gradient
     J() = det(F());
 
@@ -1769,7 +1769,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     {
         return;
     }
-    
+
     // Look up the pressure field
     const surfaceScalarField& p =
     mesh().lookupObject<surfaceScalarField>("pf");
@@ -2013,7 +2013,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
       	sigma = dev( (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s) ) - p*I;
     }
     else
-    {		
+    {
       	sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
     }
 }
