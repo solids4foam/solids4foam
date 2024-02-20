@@ -16,11 +16,12 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    vertexCentredNonLinGeomTotalLagDisplacementSolid
+    vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
 
 Description
-    Mathematical model where where non linear geometry is modelled i.e. large strains 
-    and the total displacement is the primary unknown.
+    Mathematical model where linear geometry is assumed i.e. small strains and
+    small rotations are assumed, and the total displacement is the primary
+    unknown.
 
     Discretisation is performed using a vertex-centred finite volume approach
     where the governing equations are integrated over a dual mesh. The dual mesh
@@ -30,12 +31,12 @@ Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
-    vertexCentredNonLinGeomTotalLagDisplacementSolid.C
+    vertexCentredNonLinGeomTotalLagPressureDisplacementSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef vertexCentredNonLinGeomTotalLagDisplacementSolid_H
-#define vertexCentredNonLinGeomTotalLagDisplacementSolid_H
+#ifndef vertexCentredNonLinGeomTotalLagPressureDisplacementSolid_H
+#define vertexCentredNonLinGeomTotalLagPressureDisplacementSolid_H
 
 #include "solidModel.H"
 #include "volFields.H"
@@ -58,10 +59,10 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-       Class vertexCentredNonLinGeomTotalLagDisplacementSolid Declaration
+   Class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class vertexCentredNonLinGeomTotalLagDisplacementSolid
+class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
 :
     public solidModel
 {
@@ -80,6 +81,9 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
 
         //- Flag to enable steadyState
         Switch steadyState_;
+
+        //- Pressure smoothing factor
+        const scalar pressureSmoothing_;
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
@@ -102,6 +106,9 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
         //  matrix conditioning
         const scalar fixedDofScale_;
 
+        //- Point pressure
+        pointScalarField pointP_;
+
         //- Point velocity
         pointVectorField pointU_;
 
@@ -114,6 +121,10 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
         //- Point volume field
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
+        
+ 		//- Point gradD field
+        //  gradD associated with the primary mesh points
+        pointTensorField pointGradD_;       
 
         //- Displacement gradient field at the dual mesh faces
         surfaceTensorField dualGradDf_;
@@ -129,7 +140,7 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
 
         //- Jacobian of the deformation gradient field at the dual mesh faces
         surfaceScalarField dualJf_;
-        
+
         //- Pressure at the dual mesh faces
         surfaceScalarField dualPf_;
         
@@ -141,13 +152,17 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
 
 
     // Private Member Functions
-
-        //- Update the source vector for the linear system
+        
+        //- Update the source vector for the linear system       
         void updateSource
-        (
-            vectorField& source,
-            const labelList& dualCellToPoint
-        );
+		(
+			Field<RectangularMatrix<scalar>>& source,
+			const labelList& dualFaceToCell,
+			const labelList& dualCellToPoint,
+			const scalar& pressureSmoothing,
+			const scalar& zeta,
+			const bool debug
+		);
 
         //- Set fixed degree of freedom lists
         void setFixedDofs
@@ -166,37 +181,38 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
             const fvMesh& mesh, // corresponding to pointD mesh
             const labelListList& pointToDualFaces
         ) const;
-
-        //- Check convergence of Newton-Raphson loop
+                
+        //- Check convergence of Newton-Raphson loop 
         bool converged
-        (
-            const label iCorr,
-            scalar& initResidual,
-            const scalar res,
-            const label nInterations,
-            const pointVectorField& pointD,
-            const vectorField& pointDcorr
-        ) const;
+		(
+			const label iCorr,
+			scalar& initResidualD,
+			scalar& initResidualP,
+			const label nInterations,
+			const pointVectorField& pointD,
+			const pointScalarField& pointP,
+			const Field<RectangularMatrix<scalar>>& pointDPcorr
+		) const;
 
-        //- Calculate line search slope for the given eta parameter
-        scalar calculateLineSearchSlope
-        (
-            const scalar eta,
-            const vectorField& pointDcorr,
-            pointVectorField& pointD,
-            surfaceTensorField& dualGradDf,
-            surfaceSymmTensorField& dualSigmaf,
-            const scalar zeta
-        );
+/*        //- Calculate line search slope for the given eta parameter*/
+/*        scalar calculateLineSearchSlope*/
+/*        (*/
+/*            const scalar eta,*/
+/*            const vectorField& pointDcorr,*/
+/*            pointVectorField& pointD,*/
+/*            surfaceTensorField& dualGradDf,*/
+/*            surfaceSymmTensorField& dualSigmaf,*/
+/*            const scalar zeta*/
+/*        );*/
 
-        scalar calculateLineSearchFactor
-        (
-            const scalar rTol, // Slope reduction tolerance
-            const int maxIter, // Maximum number of line search iterations
-            const vectorField& pointDcorr, // Point displacement correction
-            const vectorField& source, // Linear system source
-            const scalar zeta // Discretisation parameter
-        );
+/*        scalar calculateLineSearchFactor*/
+/*        (*/
+/*            const scalar rTol, // Slope reduction tolerance*/
+/*            const int maxIter, // Maximum number of line search iterations*/
+/*            const vectorField& pointDcorr, // Point displacement correction*/
+/*            const vectorField& source, // Linear system source*/
+/*            const scalar zeta // Discretisation parameter*/
+/*        );*/
 
         Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 		geometricStiffnessField
@@ -204,12 +220,18 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
 			const surfaceVectorField SfUndef, //Undeformed surface area vector field
 			const surfaceTensorField gradDRef //Reference gradD 
 		) const; 
+	
+		Foam::tmp<tensorField>
+		pBarSensitivityField
+		(
+			const pointTensorField pGradDRef //Reference pointGradD
+		) const;
 
         //- Disallow default bitwise copy construct
-        vertexCentredNonLinGeomTotalLagDisplacementSolid(const vertexCentredNonLinGeomTotalLagDisplacementSolid&);
+        vertexCentredNonLinGeomTotalLagPressureDisplacementSolid(const vertexCentredNonLinGeomTotalLagPressureDisplacementSolid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const vertexCentredNonLinGeomTotalLagDisplacementSolid&);
+        void operator=(const vertexCentredNonLinGeomTotalLagPressureDisplacementSolid&);
 
 
 protected:
@@ -226,12 +248,12 @@ protected:
 public:
 
     //- Runtime type information
-    TypeName("vertexCentredNonLinTotalLagDisplacementGeometry");
+    TypeName("vertexCentredNonLinTotalLagPressureDisplacementGeometry");
 
     // Constructors
 
         //- Construct from components
-        vertexCentredNonLinGeomTotalLagDisplacementSolid
+        vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -239,7 +261,7 @@ public:
 
     // Destructor
 
-        virtual ~vertexCentredNonLinGeomTotalLagDisplacementSolid();
+        virtual ~vertexCentredNonLinGeomTotalLagPressureDisplacementSolid();
 
 
     // Member Functions

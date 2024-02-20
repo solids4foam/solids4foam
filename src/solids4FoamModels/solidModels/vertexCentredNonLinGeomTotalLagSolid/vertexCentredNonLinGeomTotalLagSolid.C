@@ -1670,12 +1670,9 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 #else
     BlockSolverPerformance<vector> solverPerf;
 #endif
-	bool stopLoop = false;
+	bool isConverged = false;
     do
-    {
-    	// Reset loop condition
-    	stopLoop = false;
-    	
+    {	
         // Calculate gradD at dual faces
         dualGradDf_ = vfvc::fGrad
         (
@@ -2125,7 +2122,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 		
 		if (solvePressureEquation_)
 	    {
-			stopLoop = converged
+			isConverged = converged
 			(
 			    iCorr,
 			    initResidualD,
@@ -2142,7 +2139,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 	    }
 	    else
 	    {
-			stopLoop = converged
+			isConverged = converged
 			(
 			    iCorr,
 			    initResidualD,
@@ -2156,9 +2153,10 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolve()
 			    pointDcorr
 			);
 		}
-		
+	
+		Info << isConverged << ", icorr " << iCorr << endl;	
 	}
-	while (stopLoop == false && iCorr++);
+	while (isConverged == 0 && ++iCorr);
 
     // Calculate gradD at dual faces
     dualGradDf_ = vfvc::fGrad
