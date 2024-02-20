@@ -969,8 +969,6 @@ void Foam::linearElasticMisesPlastic::calculatePStress
     const scalarField& sigmaYOldI = pSigmaY_.oldTime().primitiveField();
     const scalarField& epsilonPEqOldI = pEpsilonPEq_.oldTime().primitiveField();
 
-    Info<< "fTrialI.size = " << fTrialI.size() << nl
-        << "sigmaYOldI.size = " << sigmaYOldI.size() << endl;
     // Calculate DLambdaf_ and plasticNf_
     // int numYield = 0;
     forAll(fTrialI, faceI)
