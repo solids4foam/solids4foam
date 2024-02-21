@@ -340,10 +340,10 @@ void vertexCentredNonLinGeomTotalLagDisplacementSolid::enforceTractionBoundaries
         )
         {
             const solidTractionPointPatchVectorField& tracPatch =
-                refCast<const solidTractionPointPatchVectorField>
-                (
-                    pointD.boundaryField()[patchI]
-                );
+            refCast<const solidTractionPointPatchVectorField>
+            (
+                pointD.boundaryField()[patchI]
+            );
 
             const labelList& meshPoints =
                 mesh.boundaryMesh()[patchI].meshPoints();
@@ -651,8 +651,8 @@ scalar vertexCentredNonLinGeomTotalLagDisplacementSolid::calculateLineSearchFact
 Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 vertexCentredNonLinGeomTotalLagDisplacementSolid::geometricStiffnessField
 (
-        const surfaceVectorField SfUndef, //Undeformed surface area vector field
-        const surfaceTensorField gradDRef //Reference gradD
+    const surfaceVectorField SfUndef, //Undeformed surface area vector field
+    const surfaceTensorField gradDRef //Reference gradD
 ) const
 {
     // Prepare tmp field
