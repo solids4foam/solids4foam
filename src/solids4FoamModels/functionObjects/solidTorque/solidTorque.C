@@ -262,7 +262,8 @@ Foam::solidTorque::solidTorque
             // Add headers to output data
             if (historyFilePtr_.valid())
             {
-                historyFilePtr_() << "# Time" << " " << "torque" << endl;
+                historyFilePtr_()
+                    << "# Time torque" << endl;
             }
         }
     }
