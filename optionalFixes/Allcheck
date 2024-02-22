@@ -31,7 +31,7 @@ checkAndReport()
         echo
         echo "You can do it by running the following commands:"
         echo "    cp optionalFixes/${1}/${2} ${3}/"
-        echo "    wmake libso ${3}"
+        echo "    wmake libso ${4}"
         echo "************************************"
         echo
         return 1

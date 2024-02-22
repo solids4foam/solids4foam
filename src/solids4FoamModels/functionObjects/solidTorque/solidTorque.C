@@ -263,9 +263,7 @@ Foam::solidTorque::solidTorque
             if (historyFilePtr_.valid())
             {
                 historyFilePtr_()
-                    << "# Time" << " "
-                    << "torqueX" << " " << "torqueY" << " " << "torqueZ"
-                    << endl;
+                    << "# Time torque" << endl;
             }
         }
     }
