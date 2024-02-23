@@ -26,7 +26,7 @@ Class
 
 Description
     This law is ported from https://github.com/awhelanUCD/solids4foam where it
-    is called logStrainLemaitreDamage.
+    is called logStrainGTN.
 
     Large strain elasto-plastic model with Gurson-Tveergard-Needleman (GTN)
     micro-mechanical damage model. This class also provides users the option to
