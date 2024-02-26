@@ -47,34 +47,31 @@ bool Foam::solidModel::converged
     {
         // Incremental approach
         denom = gMax
-            (
+        (
 #ifdef OPENFOAM_NOT_EXTEND
-                DimensionedField<scalar, volMesh>
+            DimensionedField<scalar, volMesh>
 #else
-                Field<scalar>
+            Field<scalar>
 #endif
-                (
+            (
                     mag(vf.internalField())
-                )
-            );
-
-        Info<< "Taking incremental approach" << denom << endl;
+            )
+        );
     }
     else
     {
         // Total appraoch
         denom = gMax
-            (
+        (
 #ifdef OPENFOAM_NOT_EXTEND
-                DimensionedField<scalar, volMesh>
+            DimensionedField<scalar, volMesh>
 #else
-                Field<scalar>
+            Field<scalar>
 #endif
-                (
-                    mag(vf.internalField() - vf.oldTime().internalField())
-                )
-            );
-        Info << "taking total appriach" << endl;
+            (
+                mag(vf.internalField() - vf.oldTime().internalField())
+            )
+        );
     }
 
     if (denom < SMALL)
@@ -92,7 +89,6 @@ bool Foam::solidModel::converged
             SMALL
         );
     }
-Info<<denom<<endl;
     const scalar residualvf =
         gMax
         (
