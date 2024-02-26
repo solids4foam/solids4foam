@@ -304,65 +304,6 @@ void Foam::poroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
 
 void Foam::poroMechanicalLaw::writeFields(const Time& runTime)
 {
-    if(mesh()!=baseMesh()) // possible: lawI < 0, not sure about dualMesh
-    {
-        const solidSubMeshes& solSubMeshesRef = baseMesh().lookupObject<mechanicalModel>
-                (
-                   "mechanicalProperties"
-                ).solSubMeshes();
-        PtrList<volSymmTensorField> subMeshSigmaEffs(solSubMeshesRef.subMeshes().size());
-        IOobject defaultIO
-        (
-            "subMeshSigmaEff",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE,
-            false
-        );
-        dimensionedSymmTensor zero("",dimless,symmTensor::zero);
-        forAll(solSubMeshesRef.subMeshes(),iLaw)
-        {
-            if (iLaw!=lawI())
-            {
-                const fvMesh& lawMesh(solSubMeshesRef.subMeshes()[iLaw].subMesh());
-                subMeshSigmaEffs.set
-                (
-                    iLaw,
-                    new volSymmTensorField
-                    (
-                        defaultIO,lawMesh,zero
-                    )
-                );
-            }
-            else
-            {
-                subMeshSigmaEffs.set
-                (
-                    iLaw,
-                    sigmaEff_
-                );
-            }
-        }
-        volSymmTensorField baseMeshSigmaEff
-        (
-            IOobject(
-                "sigmaEff."+name(),
-                runTime.timeName(),
-                baseMesh(),
-                IOobject::NO_READ,
-                IOobject::AUTO_WRITE,
-                false
-            ),
-            baseMesh(),
-            zero
-        );
-
-        solSubMeshesRef.mapSubMeshVolFields<symmTensor>(subMeshSigmaEffs, baseMeshSigmaEff);
-
-        baseMeshSigmaEff.write();
-
-    }
     effectiveStressMechLawPtr_->writeFields(runTime);
 }
 

@@ -229,9 +229,6 @@ public:
 
         //- Update the yield stress: called at end of time-step
         virtual void updateTotalFields();
-
-        //- Write fields
-        virtual void writeFields(const Time& runTime);
 };
 
 

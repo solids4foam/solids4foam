@@ -82,6 +82,9 @@ class poroMechanicalLaw
         //- Initial (residual) stress surface field
         mutable surfaceScalarField* p0fPtr_;
 
+        //- Flag if sigmaEff has already been initialized
+        bool sigmaEffInizialized_;
+
     // Private Member Functions
 
         //- check if sigmaEff has been initalized already
