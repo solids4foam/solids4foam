@@ -11,8 +11,8 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      U;
+    class       pointVectorField;
+    object      pointMotionU;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -32,21 +32,18 @@ boundaryField
     }
     outlet
     {
-        type         fluxCorrectedVelocity;
+        type         fixedValue;
+        value        uniform (0 0 0);
     }
     inlet
     {
-        type         fluxCorrectedVelocity;
+        type         fixedValue;
+        value        uniform (0 0 0);
     }
     wall
     {
-        // Dirichlet-Neumann approach
-        type         newMovingWallVelocity;
+        type         fixedValue;
         value        uniform (0 0 0);
-
-        // Robin-Neumann condition approach
-        // type         elasticWallVelocity;
-        // value        uniform (0 0 0);
     }
 }
 

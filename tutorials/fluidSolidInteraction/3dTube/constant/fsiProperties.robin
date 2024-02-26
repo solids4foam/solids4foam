@@ -11,43 +11,41 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      U;
+    class       dictionary;
+    object      fsiProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 -1 0 0 0 0];
+// If using the Dirichlet-Neumann formulation (i.e. pimpleFluid + zeroGradient
+// BCs for the wall FSI interface), the convergence is better with IQN-ILS.
+// The Aitken accelerator can also be used in this case, but a tunning of the
+// parameters may be required
+//
+// If the Robin-Neumann formulation is employed (i.e. pimpleFluid + Robin BCs
+// for the wall FSI interface), then the Aitken parameters in this template
+// lead to convergence in all time-steps
 
-internalField   uniform (0 0 0);
+fluidSolidInterface    fixedRelaxation;
 
-boundaryField
+fixedRelaxationCoeffs
 {
-    symmetry-x
-    {
-        type         symmetryPlane;
-    }
-    symmetry-y
-    {
-        type         symmetryPlane;
-    }
-    outlet
-    {
-        type         fluxCorrectedVelocity;
-    }
-    inlet
-    {
-        type         fluxCorrectedVelocity;
-    }
-    wall
-    {
-        // Dirichlet-Neumann approach
-        type         newMovingWallVelocity;
-        value        uniform (0 0 0);
+    solidPatch          inner-wall;
+    fluidPatch          wall;
 
-        // Robin-Neumann condition approach
-        // type         elasticWallVelocity;
-        // value        uniform (0 0 0);
-    }
+    // Initial relaxation factor
+    relaxationFactor    1;
+
+    outerCorrTolerance  1e-6;
+    nOuterCorr          100;
+
+    interpolatorUpdateFrequency 0;
+    interfaceDeformationLimit   0;
+
+    coupled yes;
+    
+    // Write fsi residuals to file
+    writeResidualsToFile yes;
 }
+
 
 // ************************************************************************* //
