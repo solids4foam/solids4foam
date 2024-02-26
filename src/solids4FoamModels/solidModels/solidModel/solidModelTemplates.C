@@ -43,7 +43,7 @@ bool Foam::solidModel::converged
     scalar denom = 0.0;
 
     // Denom is displacement increment
-    if(incremental())
+    if (incremental())
     {
         // Incremental approach
         denom = gMax
@@ -54,7 +54,7 @@ bool Foam::solidModel::converged
             Field<scalar>
 #endif
             (
-                    mag(vf.internalField())
+                mag(vf.internalField())
             )
         );
     }
