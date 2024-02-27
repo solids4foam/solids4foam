@@ -2031,6 +2031,7 @@ void Foam::solidModel::moveMesh
             if
             (
                 returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
+             == 0
             )
             {
                 continue;
