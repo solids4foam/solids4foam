@@ -304,13 +304,20 @@ void Foam::solidSubMeshes::calcSubMeshD() const
         subMeshD_.set
         (
             matI,
-            lookupBaseMeshVolField<vector>
+            new volVectorField
             (
-                Dname, subMeshes[matI].subMesh()
+                IOobject
+                (
+                    Dname,
+                    subMeshes[matI].subMesh().time().timeName(),
+                    subMeshes[matI].subMesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                subMeshes[matI].subMesh(),
+                dimensionedVector("zero", dimLength, vector::zero)
             )
         );
-        subMeshD_[matI].rename(Dname);
-        subMeshD_[matI].writeOpt()=IOobject::NO_WRITE;
     }
 }
 
@@ -346,13 +353,20 @@ void Foam::solidSubMeshes::calcSubMeshGradD() const
         subMeshGradD_.set
         (
             matI,
-            lookupBaseMeshVolField<tensor>
+            new volTensorField
             (
-                gradDname, subMeshes[matI].subMesh()
+                IOobject
+                (
+                    gradDname,
+                    subMeshes[matI].subMesh().time().timeName(),
+                    subMeshes[matI].subMesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                subMeshes[matI].subMesh(),
+                dimensionedTensor("zero", dimless, tensor::zero)
             )
         );
-        subMeshGradD_[matI].rename(gradDname);
-        subMeshGradD_[matI].writeOpt()=IOobject::NO_WRITE;
     }
 }
 
@@ -388,13 +402,20 @@ void Foam::solidSubMeshes::calcSubMeshGradDf() const
         subMeshGradDf_.set
         (
             matI,
-            lookupBaseMeshSurfaceField<tensor>
+            new surfaceTensorField
             (
-                gradDname, subMeshes[matI].subMesh()
+                IOobject
+                (
+                    gradDname,
+                    subMeshes[matI].subMesh().time().timeName(),
+                    subMeshes[matI].subMesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                subMeshes[matI].subMesh(),
+                dimensionedTensor("zero", dimless, tensor::zero)
             )
         );
-        subMeshGradDf_[matI].rename(gradDname);
-        subMeshGradDf_[matI].writeOpt()=IOobject::NO_WRITE;
     }
 }
 
