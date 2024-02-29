@@ -848,6 +848,214 @@ tmp<pointScalarField> laplacian
     return tresult;
 }
 
+
+tmp<volScalarField> cellP
+(
+    const pointScalarField& pointP,
+    const fvMesh& mesh
+)
+{
+    // Prepare the result field
+    tmp<volScalarField> tresult
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "vol" + pointP.name() + ")",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar
+            (
+                "zero", pointP.dimensions(), 0
+            ),
+            "calculated"
+        )
+    );
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& result = tresult.ref();
+#else
+    volScalarField& result = tresult();
+#endif
+
+    // Take references for clarity and efficiency
+    scalarField& resultI = result;
+    const labelListList& cellPoints = mesh.cellPoints();
+    const scalarField& pointPI = pointP.internalField();
+
+    // Calculate the pressure for each cell
+    forAll(resultI, cellI)
+    {
+        // Points in the current cell
+        const labelList& curCellPoints = cellPoints[cellI];
+
+        // Calculate the pointP average for each cell
+        scalar pointPAvg = 0;
+        forAll(curCellPoints, cpI)
+        {
+            // Primary point index
+            const label pointID = curCellPoints[cpI];
+            
+            // Sum pointP for curCellPoints
+            pointPAvg += pointPI[pointID];
+        }
+        
+        pointPAvg /= curCellPoints.size();
+        
+        result[cellI] = pointPAvg;
+    }
+    
+    result.correctBoundaryConditions();
+
+    return tresult;
+}
+
+
+tmp<surfaceScalarField> dualPf
+(
+    const pointScalarField& pointP,
+    const fvMesh& mesh,
+    const fvMesh& dualMesh,
+    const labelList& dualFaceToCell,
+    const labelList& dualCellToPoint,
+    const scalar zeta,
+    const bool debug
+)
+{
+    if (debug)
+    {
+        Info<< "surfaceScalarField dualPf(...): start" << endl;
+    }
+
+    // Prepare the result field
+    tmp<surfaceScalarField> tresult
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                "dualPf",
+                dualMesh.time().timeName(),
+                dualMesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            dualMesh,
+            dimensionedScalar
+            (
+                "zero", pointP.dimensions(), 0
+            )
+        )
+    );
+#ifdef OPENFOAM_NOT_EXTEND
+    surfaceScalarField& result = tresult.ref();
+#else
+    surfaceScalarField& result = tresult();
+#endif
+
+    // Take references for clarity and efficiency
+    scalarField& resultI = result;
+    const scalarField& pointPI = pointP.internalField();
+    const pointField& points = mesh.points();
+    const labelList& dualOwn = dualMesh.faceOwner();
+    const labelList& dualNei = dualMesh.faceNeighbour();
+
+    // Approach
+    // Step 1: Calculate the pressure in each primary mesh cell
+    // Step 2: Set dual face pressure to primary mesh pressure and
+    //         replace the component in the edge direction
+
+    // Calculate constant gradient in each primary mesh cell
+    const volScalarField volP(vfvc::cellP(pointP, mesh));
+    const scalarField& volPI = volP.internalField();
+
+    // Set dual face pressure to primary mesh pressure and
+    // replace the component in the edge direction
+    // We only replace the edge component for internal dual faces
+
+    // For all faces - internal and boundary
+    forAll(dualOwn, dualFaceI)
+    {
+        // Only calculate the pressure for internal faces
+        if (dualMesh.isInternalFace(dualFaceI))
+        {
+            // Primary mesh cell in which dualFaceI resides
+            const label cellID = dualFaceToCell[dualFaceI];
+
+            // Dual cell owner of dualFaceI
+            const label dualOwnCellID = dualOwn[dualFaceI];
+
+            // Dual cell neighbour of dualFaceI
+            const label dualNeiCellID = dualNei[dualFaceI];
+
+            // Primary mesh point at the centre of dualOwnCellID
+            const label ownPointID = dualCellToPoint[dualOwnCellID];
+
+            // Primary mesh point at the centre of dualNeiCellID
+            const label neiPointID = dualCellToPoint[dualNeiCellID];
+
+            // Unit edge vector from the own point to the nei point
+            vector edgeDir = points[neiPointID] - points[ownPointID];
+            const scalar edgeLength = mag(edgeDir);
+            edgeDir /= edgeLength;
+
+            // Calculate the gradient component in the edge direction using
+            // central-differencing and use the primary mesh cell value for the
+            // tangential directions
+            resultI[dualFaceI] = volPI[cellID]; 
+//                zeta*edgeDir
+//               *(
+//                   pointPI[neiPointID] - pointPI[ownPointID]
+//               )/edgeLength
+//              + ((I - zeta*sqr(edgeDir)) & volPI[cellID]);
+
+        }
+        else // boundary face
+        {
+            // Dual patch which this dual face resides on
+            const label dualPatchID =
+                dualMesh.boundaryMesh().whichPatch(dualFaceI);
+
+            if (dualMesh.boundaryMesh()[dualPatchID].type() != "empty")
+            {
+                // Find local face index
+                const label localDualFaceID =
+                    dualFaceI - dualMesh.boundaryMesh()[dualPatchID].start();
+
+                // Primary mesh cell in which dualFaceI resides
+                const label cellID = dualFaceToCell[dualFaceI];
+
+				if (cellID > -1)
+				{
+				
+		            // Use the gradient in the adjacent primary cell-centre
+		            // This will result in inconsistent values at processor patches
+		            // Is this an issue?
+#ifdef OPENFOAM_NOT_EXTEND
+		            result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
+		                volPI[cellID];
+#else
+		            result.boundaryField()[dualPatchID][localDualFaceID] =
+		                volPI[cellID];
+#endif			
+				}
+            }
+        }
+    }
+
+    if (debug)
+    {
+        Info<< "surfaceScalarField dualPf(...): end" << endl;
+    }
+
+    return tresult;
+}
+
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace vfvc

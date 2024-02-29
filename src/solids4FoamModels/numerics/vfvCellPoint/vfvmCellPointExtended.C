@@ -33,9 +33,9 @@ void Foam::vfvm::divSigma
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
     const Field<RectangularMatrix<scalar>>& materialTangentField,
-        const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
-        const symmTensorField& sigmaField,
-        const tensorField& dualGradDField,
+    const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+    const symmTensorField& sigmaField,
+    const tensorField& dualGradDField,
     const boolList& fixedDofs,
     const symmTensorField& fixedDofDirections,
     const scalar fixedDofScale,
@@ -111,17 +111,17 @@ void Foam::vfvm::divSigma
         // gradD at the dual mesh face
         const tensor& dualGradD = dualGradDField[dualFaceI];
 
-                // Calculate F for dual faces
-                const tensor& dualF = I + dualGradD.T();
+        // Calculate F for dual faces
+        const tensor& dualF = I + dualGradD.T();
 
-                // Calculate invF for dual faces
-                const tensor& dualInvF = inv(dualF);
+        // Calculate invF for dual faces
+        const tensor& dualInvF = inv(dualF);
 
-                // Calculate J for dual faces
-                const scalar& dualJ = det(dualF);
+        // Calculate J for dual faces
+        const scalar& dualJ = det(dualF);
 
-                // Calculate deformed Sf
-                const vector& curDualSfDef = (dualJ*dualInvF.T()) & curDualSf;
+        // Calculate deformed Sf
+        const vector& curDualSfDef = (dualJ*dualInvF.T()) & curDualSf;
 
         // Least squares vectors for cellID
         const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
@@ -166,10 +166,15 @@ void Foam::vfvm::divSigma
             // Add the coefficient to the ownPointID equation coming from
             // pointID
             matrix(ownPointID, pointID) += coeff;
+//			Info << "dualFaceI: " << dualFaceI << endl;
+//			Info << "matrix ( " << ownPointID << ", " << pointID << " ) " << matrix(ownPointID, pointID) << endl;
+//			Info << "coeff ( " << ownPointID << ", " << pointID << " ) " << coeff << endl; 
 
             // Add the coefficient to the neiPointID equation coming from
             // pointID
             matrix(neiPointID, pointID) -= coeff;
+//			Info << "matrix ( " << neiPointID << ", " << pointID << " ) " << matrix(neiPointID, pointID) << endl;
+//			Info << "coeff ( " << neiPointID << ", " << pointID << " ) " << coeff << endl; 
         }
 
         // Add compact central-differencing component in the edge direction
@@ -183,22 +188,31 @@ void Foam::vfvm::divSigma
         tensor edgeDirCoeff;
         multiplyCoeffExtended
         (
-                edgeDirCoeff,
-                curDualSfDef,
-                materialTangent,
-                geometricStiffness,
-                sigma,
-                eOverLength
+            edgeDirCoeff,
+            curDualSfDef,
+            materialTangent,
+            geometricStiffness,
+            sigma,
+            eOverLength
         );
         edgeDirCoeff *= zeta;
 
         // Insert coefficients for the ownPoint
         matrix(ownPointID, ownPointID) -= edgeDirCoeff;
         matrix(ownPointID, neiPointID) += edgeDirCoeff;
+//		Info << "dualFaceI: " << dualFaceI << endl;
+//		Info << "matrix ( " << ownPointID << ", " << ownPointID << " ) " << matrix(ownPointID, ownPointID) << endl;
+//		Info << "coeff ( " << ownPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl; 
+//		Info << "matrix ( " << ownPointID << ", " << neiPointID << " ) " << matrix(ownPointID, neiPointID) << endl;
+//		Info << "coeff ( " << ownPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl; 
 
         // Insert coefficients for the neiPoint
         matrix(neiPointID, neiPointID) -= edgeDirCoeff;
         matrix(neiPointID, ownPointID) += edgeDirCoeff;
+//		Info << "matrix ( " << neiPointID << ", " << neiPointID << " ) " << matrix(neiPointID, neiPointID) << endl;
+//		Info << "coeff ( " << neiPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl; 
+//		Info << "matrix ( " << neiPointID << ", " << ownPointID << " ) " << matrix(neiPointID, ownPointID) << endl;
+//		Info << "coeff ( " << neiPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl; 
 
     }
 
@@ -226,9 +240,9 @@ void Foam::vfvm::divSigma
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
     const Field<RectangularMatrix<scalar>>& materialTangentField,
-        const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
-        const symmTensorField& sigmaField,
-        const tensorField& dualGradDField,
+    const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+    const symmTensorField& sigmaField,
+    const tensorField& dualGradDField,
     const boolList& fixedDofs,
     const symmTensorField& fixedDofDirections,
     const scalar fixedDofScale,
@@ -290,17 +304,17 @@ void Foam::vfvm::divSigma
         // gradD at the dual mesh face
         const tensor& dualGradD = dualGradDField[dualFaceI];
 
-                // Calculate F for dual faces
-                const tensor& dualF = I + dualGradD.T();
+        // Calculate F for dual faces
+        const tensor& dualF = I + dualGradD.T();
 
-                // Calculate invF for dual faces
-                const tensor& dualInvF = inv(dualF);
+        // Calculate invF for dual faces
+        const tensor& dualInvF = inv(dualF);
 
-                // Calculate J for dual faces
-                const scalar& dualJ = det(dualF);
+        // Calculate J for dual faces
+        const scalar& dualJ = det(dualF);
 
-                // Calculate deformed Sf
-                const vector& curDualSfDef = (dualJ*dualInvF.T()) & curDualSf;
+        // Calculate deformed Sf
+        const vector& curDualSfDef = (dualJ*dualInvF.T()) & curDualSf;
 
         // Least squares vectors for cellID
         const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
@@ -315,18 +329,19 @@ void Foam::vfvm::divSigma
         // face, the dual neighbour cell
 
         // Insert pressure coefficients
-        for (label cmptI = 0; cmptI < vector::nComponents; cmptI++)
-        {
-                for (int i = 0; i < 3; i++)
-                {
-                        // Add the coefficient to the ownPointID equation coming from
-                        // pointID
-                        matrix(ownPointID, ownPointID)(i,3) += -curDualSfDef.component(cmptI);
-                                // Add the coefficient to the neiPointID equation coming from
-                                // pointID
-                        matrix(neiPointID, ownPointID)(i,3) -= -curDualSfDef.component(cmptI);
-                }
-        }
+	    for (int i = 0; i < 3; i++)
+	    {
+	        // Add the coefficient to the ownPointID equation 
+	        matrix(ownPointID, ownPointID)(i,3) += -curDualSfDef.component(i);
+//	        Info << "dualFaceI: " << dualFaceI << endl;
+//            Info << "matrix ( " << ownPointID << ", " << ownPointID << " ) " << matrix(ownPointID, ownPointID) << endl;
+//        	Info << "-curDualSfDef ( " << ownPointID << ", " << ownPointID << " ) " << -curDualSfDef << endl; 
+	        
+	        // Add the coefficient to the neiPointID equation 
+	        matrix(neiPointID, ownPointID)(i,3) -= -curDualSfDef.component(i);
+//            Info << "matrix ( " << neiPointID << ", " << ownPointID << " ) " << matrix(neiPointID, ownPointID) << endl;
+//        	Info << "curDualSfDef ( " << ownPointID << ", " << ownPointID << " ) " << curDualSfDef << endl; 
+	    }
 
         forAll(curCellPoints, cpI)
         {
@@ -358,21 +373,25 @@ void Foam::vfvm::divSigma
             );
 
             // Insert displacement coefficients
-            for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
+            label cmptI = 0;
+            for (int i = 0; i < 3; i++)
             {
-                for (int i = 0; i < 3; i++)
+                for (int k = 0; k < 3; k++)
                 {
-                        for (int k = 0; k < 3; k++)
-                        {
-                                // Add the coefficient to the ownPointID equation coming from
-                                // pointID
-                                matrix(ownPointID, pointID)(i,k) += coeff.component(cmptI);
-                                                // Add the coefficient to the neiPointID equation coming from
-                                                // pointID
-                                matrix(neiPointID, pointID)(i,k) -= coeff.component(cmptI);
-                        }
+                    // Add the coefficient to the ownPointID equation coming from
+                    // pointID
+                    matrix(ownPointID, pointID)(i,k) += coeff.component(cmptI);
+//					Info << "dualFaceI: " << dualFaceI << endl;
+//				    Info << "matrix ( " << ownPointID << ", " << pointID << " ) " << matrix(ownPointID, pointID) << endl;
+//					Info << "coeff ( " << ownPointID << ", " << pointID << " ) " << coeff << endl; 
+                    // Add the coefficient to the neiPointID equation coming from
+                    // pointID
+                    matrix(neiPointID, pointID)(i,k) -= coeff.component(cmptI);
+//				    Info << "matrix ( " << neiPointID << ", " << pointID << " ) " << matrix(neiPointID, pointID) << endl;
+//					Info << "coeff ( " << neiPointID << ", " << pointID << " ) " << coeff << endl; 
+                    cmptI++;
                 }
-            }
+            }           
         }
 
         // Add compact central-differencing component in the edge direction
@@ -386,31 +405,41 @@ void Foam::vfvm::divSigma
         tensor edgeDirCoeff;
         multiplyCoeffExtended
         (
-                edgeDirCoeff,
-                curDualSfDef,
-                materialTangent,
-                geometricStiffness,
-                sigma,
-                eOverLength
+            edgeDirCoeff,
+            curDualSfDef,
+            materialTangent,
+            geometricStiffness,
+            sigma,
+            eOverLength
         );
         edgeDirCoeff *= zeta;
 
         // Insert displacement edgeDir coefficients
-        for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
+        label cmptI = 0;
+        for (int i = 0; i < 3; i++)
         {
-                for (int i = 0; i < 3; i++)
-                {
-                        for (int k = 0; k < 3; k++)
-                        {
-                                // Insert coefficients for the ownPoint
-                                        matrix(ownPointID, ownPointID)(i,k) -= edgeDirCoeff.component(cmptI);
-                                        matrix(ownPointID, neiPointID)(i,k) += edgeDirCoeff.component(cmptI);
-                                        // Insert coefficients for the neiPoint
-                                        matrix(neiPointID, neiPointID)(i,k) -= edgeDirCoeff.component(cmptI);
-                                        matrix(neiPointID, ownPointID)(i,k) += edgeDirCoeff.component(cmptI);
-                        }
-                }
+            for (int k = 0; k < 3; k++)
+            {
+                // Insert coefficients for the ownPoint
+                matrix(ownPointID, ownPointID)(i,k) -= edgeDirCoeff.component(cmptI);
+                matrix(ownPointID, neiPointID)(i,k) += edgeDirCoeff.component(cmptI);
+//				Info << "dualFaceI: " << dualFaceI << endl;
+//			    Info << "matrix ( " << ownPointID << ", " << ownPointID << " ) " << matrix(ownPointID, ownPointID) << endl;
+//				Info << "coeff ( " << ownPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl; 
+//			    Info << "matrix ( " << ownPointID << ", " << neiPointID << " ) " << matrix(ownPointID, neiPointID) << endl;
+//				Info << "coeff ( " << ownPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl; 
+				
+                // Insert coefficients for the neiPoint
+                matrix(neiPointID, neiPointID)(i,k) -= edgeDirCoeff.component(cmptI);
+                matrix(neiPointID, ownPointID)(i,k) += edgeDirCoeff.component(cmptI);
+//			    Info << "matrix ( " << neiPointID << ", " << neiPointID << " ) " << matrix(neiPointID, neiPointID) << endl;
+//				Info << "coeff ( " << neiPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl; 
+//			    Info << "matrix ( " << neiPointID << ", " << ownPointID << " ) " << matrix(neiPointID, ownPointID) << endl;
+//				Info << "coeff ( " << neiPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl; 
+                cmptI++;
+            }
         }
+        
     }
 
     if (debug)
@@ -423,6 +452,7 @@ void Foam::vfvm::divSigma
 void Foam::vfvm::laplacian
 (
     sparseMatrixExtended& matrix,
+    const Switch compactStencil,
     const fvMesh& mesh,
     const fvMesh& dualMesh,
     const labelList& dualFaceToCell,
@@ -438,6 +468,7 @@ void Foam::vfvm::laplacian
 
     // Take references for clarity and efficiency
     const labelListList& cellPoints = mesh.cellPoints();
+    const pointField& points = mesh.points();
     const labelList& dualOwn = dualMesh.owner();
     const labelList& dualNei = dualMesh.neighbour();
     const vectorField& dualSf = dualMesh.faceAreas();
@@ -470,32 +501,58 @@ void Foam::vfvm::laplacian
         // dualFaceI area vector
         const vector& curDualSf = dualSf[dualFaceI];
 
-        // Least squares vectors for cellID
-        const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
-
-        // dualFaceI will contribute coefficients to the equation for each
-        // primary mesh point in the dual own cell, and, if an internal
-        // face, the dual neighbour cell
-
-        forAll(curCellPoints, cpI)
+        if (compactStencil)
         {
-            // Primary point index
-            const label pointID = curCellPoints[cpI];
+            // Compact central-differencing Laplacian
 
-            // Take a copy of the least squares vector from the centre of
-            // cellID to pointI
-            const vector lsVec = curLeastSquaresVecs[cpI];
+            // Dual face unit normal
+            const scalar curDualMagSf = mag(curDualSf);
+            const vector curDualN = curDualSf/curDualMagSf;
 
-            // Calculate the coefficient for this point coming from dualFaceI
-            const scalar coeff = diffusivity*curDualSf & lsVec;
+            // Delta coefficient
+            const scalar deltaCoeff =
+                1.0/(curDualN & (points[neiPointID] - points[ownPointID]));
 
-            // Add the coefficient to the ownPointID equation coming from
-            // pointID
-            matrix(ownPointID, pointID)(3,3) += -coeff;
+            // Compact edge direction coefficient
+            const scalar coeff = diffusivity*curDualMagSf*deltaCoeff;
 
-            // Add the coefficient to the neiPointID equation coming from
-            // pointID
-            matrix(neiPointID, pointID)(3,3) -= -coeff;
+            // Insert coefficients for the ownPoint
+            matrix(ownPointID, ownPointID)(3,3) -= coeff;
+            matrix(ownPointID, neiPointID)(3,3) += coeff;
+
+            // Insert coefficients for the neiPoint
+            matrix(neiPointID, neiPointID)(3,3) -= coeff;
+            matrix(neiPointID, ownPointID)(3,3) += coeff;
+        }
+        else
+        {
+            // dualFaceI will contribute coefficients to the equation for each
+            // primary mesh point in the dual own cell, and, if an internal
+            // face, the dual neighbour cell
+
+            // Least squares vectors for cellID
+            const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
+
+            forAll(curCellPoints, cpI)
+            {
+                // Primary point index
+                const label pointID = curCellPoints[cpI];
+
+                // Take a copy of the least squares vector from the centre of
+                // cellID to pointI
+                const vector lsVec = curLeastSquaresVecs[cpI];
+
+                // Calculate the coefficient for this point coming from dualFaceI
+                const scalar coeff = diffusivity*curDualSf & lsVec;
+
+                // Add the coefficient to the ownPointID equation coming from
+                // pointID
+                matrix(ownPointID, pointID)(3,3) += coeff;
+
+                // Add the coefficient to the neiPointID equation coming from
+                // pointID
+                matrix(neiPointID, pointID)(3,3) -= coeff;
+            }
         }
     }
 
@@ -581,51 +638,75 @@ void Foam::vfvm::Sp
         Info<< "void Foam::vfvm::Sp(...): start" << endl;
     }
 
-        // Take references for clarity and efficiency
-        const cellList& dualCells = dualMesh.cells();
-        const labelListList& dualCellPoints = dualMesh.cellPoints();
-        const cellPointLeastSquaresVectors& cellPointLeastSquaresVecs =
-            cellPointLeastSquaresVectors::New(dualMesh);
-        const List<vectorList>& leastSquaresVecs =
-            cellPointLeastSquaresVecs.vectors();
+    // Take references for clarity and efficiency
+    const cellList& dualCells = dualMesh.cells();
+    const labelListList& dualCellPoints = dualMesh.cellPoints();
+    const cellPointLeastSquaresVectors& cellPointLeastSquaresVecs =
+        cellPointLeastSquaresVectors::New(dualMesh);
+    const List<vectorList>& leastSquaresVecs =
+        cellPointLeastSquaresVecs.vectors();
 
-        forAll(dualCells, dualCellID)
+    forAll(dualCells, dualCellID)
+    {
+        // Least squares vectors for dualCellID
+        const vectorList& curLeastSquaresVecs = leastSquaresVecs[dualCellID];
+        
+//        Info << "dualCellID: " << dualCellID << endl;
+//        Info << "curLeastSquaresVecs: " << curLeastSquaresVecs << endl;
+
+        // Dual mesh points of dualCellID
+        const labelList& curDualCellPoints = dualCellPoints[dualCellID];
+        
+//        Info << "curDualCellPoints: " << curDualCellPoints << endl;
+
+        // Primary mesh point at the centre of dualCellID
+        const label pointID = dualCellToPoint[dualCellID];
+
+        // pBarSensitivity for dualCellID
+        const tensor pBarSensitivityI = pBarSensitivity[pointID];
+
+        forAll(curDualCellPoints, cpI)
         {
-                // Least squares vectors for dualCellID
-            const vectorList& curLeastSquaresVecs = leastSquaresVecs[dualCellID];
+            // Take a copy of the least squares vector from pointID to
+            // cpI
+            const vector lsVec = curLeastSquaresVecs[cpI];
 
-            // Dual mesh points of dualCellID
-            const labelList& curDualCellPoints = dualCellPoints[dualCellID];
+            // Calculate the coefficient for this point
+            const vector coeff = pBarSensitivityI & lsVec;
+            
+//            Info << "lsVec: "<< lsVec << endl;
+//            Info << "pBarSensitivity: "<< pBarSensitivityI << endl;
 
-            // Primary mesh point at the centre of dualCellID
-            const label pointID = dualCellToPoint[dualCellID];
-
-            // pBarSensitivity for dualCellID
-            const tensor pBarSensitivityI = pBarSensitivity[pointID];
-
-            forAll(curDualCellPoints, cpI)
+            // Insert the source of the displacement coefficient
+            // of the pressure equation
+            for (int i = 0; i < 3; i++)
             {
-                    // Take a copy of the least squares vector from pointID to
-                    // cpI
-                    const vector lsVec = curLeastSquaresVecs[cpI];
-
-                // Calculate the coefficient for this point
-                const vector coeff = pBarSensitivityI & lsVec;
-
-                        // Insert the source of the displacement coefficient
-                        // of the pressure equation
-                matrix(pointID, pointID)(3,0) += coeff[vector::X];
-                matrix(pointID, pointID)(3,1) += coeff[vector::Y];
-                matrix(pointID, pointID)(3,2) += coeff[vector::Z];
+            	matrix(pointID, pointID)(3,i) += coeff.component(i);
+//            	Info << "Before multiplying: " << endl;
+//			    Info << "matrix ( " << pointID << ", " << pointID << " ) " << matrix(pointID, pointID) << endl;
+//				Info << "coeff ( " << pointID << ", " << pointID << " ) " << coeff << endl;
             }
         }
+        
+        // Multiply coefficient by the dual volumes
+        for (int i = 0; i < 3; i++)
+        {
+        	matrix(pointID, pointID)(3,i) *= pointVolI[pointID];
+//        	Info << "After multiplying: " << endl;
+//		    Info << "matrix ( " << pointID << ", " << pointID << " ) " << matrix(pointID, pointID) << endl;
+//		    Info << "pointVolI [ "<< pointID << " ]: " << pointVolI[pointID] << endl;
+//			Info << "coeff ( " << pointID << ", " << pointID << " ) " << matrix(pointID, pointID)(3,i)*pointVolI[pointID] << endl;
+        }
+    }
 
     // Insert source of the pressure coefficient of
     // pressure equation
-        forAll(pointVolI, pointI)
-        {
-            matrix(pointI, pointI)(3,3) += pointVolI[pointI];
-        }
+    forAll(pointVolI, pointI)
+    {
+        matrix(pointI, pointI)(3,3) += pointVolI[pointI];
+//        Info << "matrix ( " << pointI << ", " << pointI << " ) " << matrix(pointI, pointI) << endl;
+//        Info << "pointVolI ( " << pointI << " ) " << pointVolI[pointI] << endl; 
+    }
 
     if (debug)
     {
