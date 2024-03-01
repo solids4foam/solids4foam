@@ -57,106 +57,97 @@ bool Foam::solidTorque::writeData()
         }
         const fvMesh& mesh = *meshPtr;
 
-        // Check if the stress tensor field is found
-        if (mesh.foundObject<volSymmTensorField>(stressName_))
+       // Lookup the patch stress field
+        const volSymmTensorField& sigma =
+            mesh.lookupObject<volSymmTensorField>
+            (
+                "sigma"
+            ).boundaryField()[historyPatchID_];
+
+        // Patch area vectors
+        const vectorField& patchSf =
+            mesh.Sf().boundaryField()[historyPatchID_];
+
+        // Lookup solid model
+        const solidModel& solMod = lookupSolidModel(mesh);
+
+        scalar torque = 0.0;
+
+        // Check if it is a linear or nonlinear geometry case
+        if
+        (
+            solMod.nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY
+         || solMod.nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN
+        )
         {
-            // Cauchy stress tensor
-            const symmTensorField& sigma =
-                mesh.lookupObject<volSymmTensorField>
+            // Calculate moment arms
+            const vectorField patchC
+            (
+                mesh.C().boundaryField()[historyPatchID_]
+            );
+            vectorField r(patchC - pointOnAxis_);
+            r -= axis_*(axis_ & r);
+
+            // Calculate force
+            const vectorField force(patchSf & sigma);
+
+            // Calculate torque
+            torque = gSum(axis_ & (r ^ force));
+        }
+        else if (solMod.nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
+        {
+            // Lookup the total displacement field
+            const vectorField& D =
+                mesh.lookupObject<volVectorField>
                 (
-                    stressName_
+                    "D"
                 ).boundaryField()[historyPatchID_];
 
-            // Patch area vectors
-            const vectorField& patchSf =
-                mesh.Sf().boundaryField()[historyPatchID_];
-
-            // Lookup solid model
-            const solidModel& solMod = lookupSolidModel(mesh);
-
-            scalar torque = 0.0;
-
-            // Check if it is a linear or nonlinear geometry case
-            if
+            // Calculate deformed patch face centres
+            const vectorField patchDeformC
             (
-                solMod.nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY
-             || solMod.nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN
-            )
-            {
-                // Calculate moment arms
-                const vectorField patchC
+                mesh.C().boundaryField()[historyPatchID_] + D
+            );
+
+            // Calculate moment arms
+            vectorField r(patchDeformC - pointOnAxis_);
+            r -= axis_*(axis_ & r);
+
+            // Lookup the inverse of the deformation gradient
+            const tensorField& Finv =
+                mesh.lookupObject<volTensorField>
                 (
-                    mesh.C().boundaryField()[historyPatchID_]
-                );
-                vectorField r(patchC - pointOnAxis_);
-                r -= axis_*(axis_ & r);
+                    "Finv"
+                ).boundaryField()[historyPatchID_];
 
-                // Calculate force
-                const vectorField force(patchSf & sigma);
-
-                // Calculate torque
-                torque = gSum(axis_ & (r ^ force));
-            }
-            else if (solMod.nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
-            {
-                // Lookup the total displacement field
-                const vectorField& D =
-                    mesh.lookupObject<volVectorField>
-                    (
-                        "D"
-                    ).boundaryField()[historyPatchID_];
-
-                // Calculate deformed patch face centres
-                const vectorField patchDeformC
+            // Lookup the Jacobian
+            const scalarField& J =
+                mesh.lookupObject<volScalarField>
                 (
-                    mesh.C().boundaryField()[historyPatchID_] + D
-                );
+                    "J"
+                ).boundaryField()[historyPatchID_];
 
-                // Calculate moment arms
-                vectorField r(patchDeformC - pointOnAxis_);
-                r -= axis_*(axis_ & r);
+            // Calculate area vectors in the deformed configuration
+            const vectorField patchDeformSf(J*Finv.T() & patchSf);
 
-                // Lookup the inverse of the deformation gradient
-                const tensorField& Finv =
-                    mesh.lookupObject<volTensorField>
-                    (
-                        "Finv"
-                    ).boundaryField()[historyPatchID_];
+            // Calculate force
+            const vectorField force(patchDeformSf & sigma);
 
-                // Lookup the Jacobian
-                const scalarField& J =
-                    mesh.lookupObject<volScalarField>
-                    (
-                        "J"
-                    ).boundaryField()[historyPatchID_];
-
-                // Calculate area vectors in the deformed configuration
-                const vectorField patchDeformSf(J*Finv.T() & patchSf);
-
-                // Calculate force
-                const vectorField force(patchDeformSf & sigma);
-
-                // Calculate torque
-                torque = gSum(axis_ & (r ^ force));
-            }
-            else
-            {
-                FatalErrorIn("bool Foam::solidForces::writeData()")
-                    << "Unknown solidModel nonLinGeom type = "
-                    << solMod.nonLinGeom() << abort(FatalError);
-            }
-
-            // Write to file
-            if (Pstream::master())
-            {
-                historyFilePtr_()
-                    << time_.time().value() << " " << torque << endl;
-            }
+            // Calculate torque
+            torque = gSum(axis_ & (r ^ force));
         }
         else
         {
-            InfoIn(this->name() + " function object constructor")
-                << stressName_ << " not found" << endl;
+            FatalErrorIn("bool Foam::solidForces::writeData()")
+                << "Unknown solidModel nonLinGeom type = "
+                << solMod.nonLinGeom() << abort(FatalError);
+        }
+
+        // Write to file
+        if (Pstream::master())
+        {
+            historyFilePtr_()
+                << time_.time().value() << " " << torque << endl;
         }
     }
 
