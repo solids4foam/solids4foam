@@ -235,7 +235,7 @@ void Foam::linearElasticMisesPlastic::newtonLoop
 void Foam::linearElasticMisesPlastic::calculateStress
 (
     surfaceSymmTensorField& sigma,
-    const surfaceTensorField& gradD
+    const surfaceTensorField& gradD  
 ) const
 {
     // Calculate strain
@@ -379,7 +379,7 @@ void Foam::linearElasticMisesPlastic::calculateStress
     // calculateHydrostaticStress(sigmaHydf_, trEpsilon);
 
     // Update the stress
-    sigma = K_*tr(epsilon)*I + s;
+	sigma = K_*tr(epsilon)*I + s;
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -709,6 +709,14 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     nonLinearPlasticity_(stressPlasticStrainSeries_.size() > 2),
+    solvePressureEquation_
+    (
+        dict.lookupOrDefault<Switch>
+        (
+            "solvePressureEquation",
+            false
+        )
+    ),
     Hp_(0.0),
     maxDeltaErr_
     (
@@ -1072,7 +1080,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
     // Calculate tangent field
     const Switch numericalTangent(dict().lookup("numericalTangent"));
     if (numericalTangent)
-    {
+    {        
         // Lookup current stress and store it as the reference
         const surfaceSymmTensorField& sigmaRef =
             mesh().lookupObject<surfaceSymmTensorField>("sigmaf");
@@ -1569,7 +1577,7 @@ void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
         const surfaceScalarField sigmaHydf(K_*tr(epsilonf()));
 
         // Update the stress
-        sigma = sigmaHydf*I + s;
+		sigma = sigmaHydf*I + s;		
     }
 }
 

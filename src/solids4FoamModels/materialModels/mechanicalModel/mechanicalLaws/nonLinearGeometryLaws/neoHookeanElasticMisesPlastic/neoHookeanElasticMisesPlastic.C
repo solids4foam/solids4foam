@@ -785,15 +785,17 @@ void Foam::neoHookeanElasticMisesPlastic::calculateStress
     }
 
     // Update the Cauchy stress
-    // Note: updayeSigmaHyd is not implemented for surface fields
+    // Note: updateSigmaHyd is not implemented for surface fields
 
     if (solvePressureEquation_)
-    {
-        sigma = dev( (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s) ) - p*I;
-
+    {        
+        sigma = (1.0/Jf())*s;
+//        sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
     }
     else
     {
+//    	surfaceScalarField pf(0.5*K_*(pow(Jf(), 2) - 1));
+//    	Info << pf << endl;
         sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
     }
 }
@@ -813,7 +815,6 @@ void Foam::neoHookeanElasticMisesPlastic::calculateSigmaHyd
     // Calculate the hydrostatic stress
     sigmaHyd = 0.5*K_*(pow(Jf(), 2.0) - 1.0);
 }
-
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -1316,6 +1317,10 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
 
             // Calculate perturbed stress
             const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateStress(sigmaPerturb, gradDPerturb, pRef);
+            
+//            Info << "sigmaRef: " << sigmaRef << endl;
+//            Info << "sigmaPerturb: " << sigmaPerturb << endl;
+//            Info << "sigmaPerturb - sigmaRef: " << sigmaPerturb - sigmaRef << endl;
 
             // Calculate tangent component
             const surfaceSymmTensorField tangCmpt((sigmaPerturb - sigmaRef)/eps);
@@ -1750,7 +1755,8 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     // Update the Cauchy stress
     if (solvePressureEquation_)
     {
-      	sigma = dev( (1.0/J())*(sigmaHyd()*I + s) ) - p*I;
+//      	sigma = (1.0/J())*(sigmaHyd()*I + s);
+      	sigma = (1.0/J())*(s - p*I);
     }
     else
     {
@@ -2010,7 +2016,8 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 
     if (solvePressureEquation_)
     {
-      	sigma = dev( (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s) ) - p*I;
+//      	sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
+      	sigma = (1.0/Jf())*(s - p*I);
     }
     else
     {

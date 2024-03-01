@@ -131,6 +131,25 @@ namespace vfvc
 		const scalar& zeta,
 		const bool debug
     );
+    
+    // Returns the cell pressure
+    tmp<volScalarField> cellP
+	(
+		const pointScalarField& pointP,
+		const fvMesh& mesh
+	);
+	
+	// Returns the pressure at the dual faces
+	tmp<surfaceScalarField> dualPf
+	(
+		const pointScalarField& pointP,
+		const fvMesh& mesh,
+		const fvMesh& dualMesh,
+		const labelList& dualFaceToCell,
+		const labelList& dualCellToPoint,
+		const scalar zeta,
+		const bool debug
+	);
 
 } // End namespace vfvc
 

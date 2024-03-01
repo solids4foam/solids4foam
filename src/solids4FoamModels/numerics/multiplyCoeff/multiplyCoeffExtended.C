@@ -366,59 +366,5 @@ void Foam::multiplyCoeffExtended
 
 }
 
-//void Foam::momEqnMultiplyPressureCoeff
-//(
-//    vector& coeff,
-//    const vector& Sf,
-//    const symmTensor& pressureSensitivity
-//)
-//{
-//	// Index notation
-//    // coeff_i = Sf_m P_mi
-
-//	// coeff_1 = Sf_m P_m1
-//	//
-//	//		   = Sf_1 P_11
-//	//		     + Sf_2 P_21
-//	//		     + Sf_3 P_31
-
-//	coeff[vector::X] =
-//        Sf[vector::X]*pressureSensitivity[symmTensor::XX]
-//      + Sf[vector::Y]*pressureSensitivity[symmTensor::XY]
-//      + Sf[vector::Z]*pressureSensitivity[symmTensor::XZ];
-//
-//	// coeff_2 = Sf_m P_m2
-//	//
-//	//		   = Sf_1 P_12
-//	//		     + Sf_2 P_22
-//	//		     + Sf_3 P_32
-
-//	coeff[vector::Y] =
-//        Sf[vector::X]*pressureSensitivity[symmTensor::XY]
-//      + Sf[vector::Y]*pressureSensitivity[symmTensor::YY]
-//      + Sf[vector::Z]*pressureSensitivity[symmTensor::YZ];
-//
-//	// coeff_3 = Sf_m P_m3
-//	//
-//	//		   = Sf_1 P_13
-//	//		     + Sf_2 P_23
-//	//		     + Sf_3 P_33
-
-//	coeff[vector::Z] =
-//        Sf[vector::X]*pressureSensitivity[symmTensor::XZ]
-//      + Sf[vector::Y]*pressureSensitivity[symmTensor::YZ]
-//      + Sf[vector::Z]*pressureSensitivity[symmTensor::ZZ];
-//}
-
-//void Foam::pressEqnMultiplyDispCoeff
-//(
-//	vector& coeff,
-//	const tensor& dispResidualSensitivity,
-//	const vector& g
-//)
-//{
-//	// Calculate the displacement coefficients of the pressure equation.
-//	coeff = -(dispResidualSensitivity & g);
-//}
 
 // ************************************************************************* //

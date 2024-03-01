@@ -81,6 +81,9 @@ class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
 
         //- Flag to enable steadyState
         Switch steadyState_;
+        
+        //- Compact stencil flag
+        Switch compactStencil_;
 
         //- Pressure smoothing factor
         const scalar pressureSmoothing_;

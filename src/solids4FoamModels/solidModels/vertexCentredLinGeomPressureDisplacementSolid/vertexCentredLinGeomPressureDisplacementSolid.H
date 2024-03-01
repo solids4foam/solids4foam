@@ -16,26 +16,29 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    vertexCentredNonLinGeomTotalLagDisplacementSolid
+    vertexCentredLinGeomSolid
 
 Description
-    Mathematical model where where non linear geometry is modelled i.e. large strains
-    and the total displacement is the primary unknown.
+    Mathematical model where linear geometry is assumed i.e. small strains and
+    small rotations are assumed, and the total displacement is the primary
+    unknown.
 
     Discretisation is performed using a vertex-centred finite volume approach
     where the governing equations are integrated over a dual mesh. The dual mesh
     is automatically constructed from the primary mesh using the meshDualiser.
 
+    An implicit Newton-Raphson algorithm is employed.
+
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
 SourceFiles
-    vertexCentredNonLinGeomTotalLagDisplacementSolid.C
+    vertexCentredLinGeomPressureDisplacementSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef vertexCentredNonLinGeomTotalLagDisplacementSolid_H
-#define vertexCentredNonLinGeomTotalLagDisplacementSolid_H
+#ifndef vertexCentredLinGeomPressureDisplacementSolid_H
+#define vertexCentredLinGeomPressureDisplacementSolid_H
 
 #include "solidModel.H"
 #include "volFields.H"
@@ -46,6 +49,9 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
+#ifdef OPENFOAM_COM
+    #include "pointVolInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,10 +64,10 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-       Class vertexCentredNonLinGeomTotalLagDisplacementSolid Declaration
+        Class vertexCentredLinGeomPressureDisplacementSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class vertexCentredNonLinGeomTotalLagDisplacementSolid
+class vertexCentredLinGeomPressureDisplacementSolid
 :
     public solidModel
 {
@@ -75,11 +81,11 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
         //  stiffness matrix is only updated once per time-step
         const Switch fullNewton_;
 
-        //- Flag to include geometric stiffness
-        const Switch geometricStiffness_;
-
         //- Flag to enable steadyState
         Switch steadyState_;
+        
+        //- Pressure smoothing factor
+        const scalar pressureSmoothing_;
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
@@ -123,16 +129,7 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
 
         //- Stress field at the dual mesh faces
         surfaceSymmTensorField dualSigmaf_;
-
-        //- Deformation gradient field at the dual mesh faces
-        surfaceTensorField dualFf_;
-
-        //- Inverse of the deformation gradient field at the dual mesh faces
-        surfaceTensorField dualFinvf_;
-
-        //- Jacobian of the deformation gradient field at the dual mesh faces
-        surfaceScalarField dualJf_;
-
+        
         //- Pressure at the dual mesh faces
         surfaceScalarField dualPf_;
 
@@ -141,6 +138,11 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
 
         //- Local-to-global point map and owner list
         globalPointIndices globalPointIndices_;
+
+#ifdef OPENFOAM_COM
+        //- Interpolator from points to cells
+        pointVolInterpolation pointVolInterp_;
+#endif
 
 
     // Private Member Functions
@@ -201,18 +203,11 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
             const scalar zeta // Discretisation parameter
         );
 
-        Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
-		geometricStiffnessField
-		(
-			const surfaceVectorField SfUndef, //Undeformed surface area vector field
-			const surfaceTensorField gradDRef //Reference gradD
-		) const;
-
         //- Disallow default bitwise copy construct
-        vertexCentredNonLinGeomTotalLagDisplacementSolid(const vertexCentredNonLinGeomTotalLagDisplacementSolid&);
+        vertexCentredLinGeomPressureDisplacementSolid(const vertexCentredLinGeomPressureDisplacementSolid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const vertexCentredNonLinGeomTotalLagDisplacementSolid&);
+        void operator=(const vertexCentredLinGeomPressureDisplacementSolid&);
 
 
 protected:
@@ -222,19 +217,19 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            return nonLinearGeometry::TOTAL_LAGRANGIAN;
+            return nonLinearGeometry::LINEAR_GEOMETRY;
         }
 
 
 public:
 
     //- Runtime type information
-    TypeName("vertexCentredNonLinTotalLagDisplacementGeometry");
+    TypeName("vertexCentredLinearPressureDisplacementGeometry");
 
     // Constructors
 
         //- Construct from components
-        vertexCentredNonLinGeomTotalLagDisplacementSolid
+        vertexCentredLinGeomPressureDisplacementSolid
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -242,7 +237,7 @@ public:
 
     // Destructor
 
-        virtual ~vertexCentredNonLinGeomTotalLagDisplacementSolid();
+        virtual ~vertexCentredLinGeomPressureDisplacementSolid();
 
 
     // Member Functions
