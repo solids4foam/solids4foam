@@ -25,14 +25,3 @@ else
     # Run serial
     solids4Foam::runApplication solids4Foam
 fi
-
-# Create plots
-if command -v gnuplot &> /dev/null
-then
-    echo "Generating deflection.pdf using gnuplot"
-    gnuplot deflection.gnuplot &> /dev/null
-    echo "Generating force.pdf using gnuplot"
-    gnuplot force.gnuplot &> /dev/null
-else
-    echo "Please install gnuplot if you would like to generate the plots"
-fi

@@ -14,8 +14,9 @@ FoamFile
     class       dictionary;
     object      controlDict;
 }
-application     pimpleFoam;       // latest OpenFOAM
-// application     pimpleDyMFoam; // OpenFOAM v1712, OpenFOAM 5.x, or older
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     solids4Foam;
 
 startFrom       startTime;
 
@@ -43,11 +44,4 @@ timeFormat      general;
 
 timePrecision   6;
 
-// functions
-// {
-//     preCICE_Adapter
-//     {
-//         type preciceAdapterFunctionObject;
-//         libs ("libpreciceAdapterFunctionObject.so");
-//     }
-// }
+// ************************************************************************* //
