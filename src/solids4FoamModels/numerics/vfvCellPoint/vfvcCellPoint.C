@@ -899,16 +899,16 @@ tmp<volScalarField> cellP
         {
             // Primary point index
             const label pointID = curCellPoints[cpI];
-            
+
             // Sum pointP for curCellPoints
             pointPAvg += pointPI[pointID];
         }
-        
+
         pointPAvg /= curCellPoints.size();
-        
+
         result[cellI] = pointPAvg;
     }
-    
+
     result.correctBoundaryConditions();
 
     return tresult;
@@ -959,23 +959,11 @@ tmp<surfaceScalarField> dualPf
 
     // Take references for clarity and efficiency
     scalarField& resultI = result;
-    const scalarField& pointPI = pointP.internalField();
-    const pointField& points = mesh.points();
     const labelList& dualOwn = dualMesh.faceOwner();
-    const labelList& dualNei = dualMesh.faceNeighbour();
 
-    // Approach
-    // Step 1: Calculate the pressure in each primary mesh cell
-    // Step 2: Set dual face pressure to primary mesh pressure and
-    //         replace the component in the edge direction
-
-    // Calculate constant gradient in each primary mesh cell
+    // Calculate constant value in each primary mesh cell
     const volScalarField volP(vfvc::cellP(pointP, mesh));
     const scalarField& volPI = volP.internalField();
-
-    // Set dual face pressure to primary mesh pressure and
-    // replace the component in the edge direction
-    // We only replace the edge component for internal dual faces
 
     // For all faces - internal and boundary
     forAll(dualOwn, dualFaceI)
@@ -986,33 +974,8 @@ tmp<surfaceScalarField> dualPf
             // Primary mesh cell in which dualFaceI resides
             const label cellID = dualFaceToCell[dualFaceI];
 
-            // Dual cell owner of dualFaceI
-            const label dualOwnCellID = dualOwn[dualFaceI];
-
-            // Dual cell neighbour of dualFaceI
-            const label dualNeiCellID = dualNei[dualFaceI];
-
-            // Primary mesh point at the centre of dualOwnCellID
-            const label ownPointID = dualCellToPoint[dualOwnCellID];
-
-            // Primary mesh point at the centre of dualNeiCellID
-            const label neiPointID = dualCellToPoint[dualNeiCellID];
-
-            // Unit edge vector from the own point to the nei point
-            vector edgeDir = points[neiPointID] - points[ownPointID];
-            const scalar edgeLength = mag(edgeDir);
-            edgeDir /= edgeLength;
-
-            // Calculate the gradient component in the edge direction using
-            // central-differencing and use the primary mesh cell value for the
-            // tangential directions
-            resultI[dualFaceI] = volPI[cellID]; 
-//                zeta*edgeDir
-//               *(
-//                   pointPI[neiPointID] - pointPI[ownPointID]
-//               )/edgeLength
-//              + ((I - zeta*sqr(edgeDir)) & volPI[cellID]);
-
+            // Assume constant pressure in each primary cell
+            resultI[dualFaceI] = volPI[cellID];
         }
         else // boundary face
         {
@@ -1029,20 +992,23 @@ tmp<surfaceScalarField> dualPf
                 // Primary mesh cell in which dualFaceI resides
                 const label cellID = dualFaceToCell[dualFaceI];
 
-				if (cellID > -1)
-				{
-				
-		            // Use the gradient in the adjacent primary cell-centre
-		            // This will result in inconsistent values at processor patches
-		            // Is this an issue?
-#ifdef OPENFOAM_NOT_EXTEND
-		            result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
-		                volPI[cellID];
-#else
-		            result.boundaryField()[dualPatchID][localDualFaceID] =
-		                volPI[cellID];
-#endif			
-				}
+                if (cellID > -1)
+                {
+
+                    // Set face value equal to cell value
+                #ifdef OPENFOAM_NOT_EXTEND
+                    result.boundaryFieldRef()[dualPatchID][localDualFaceID] =
+                        volPI[cellID];
+                #else
+                    result.boundaryField()[dualPatchID][localDualFaceID] =
+                        volPI[cellID];
+                #endif
+                }
+                else
+                {
+                    // If the pressure at boundary faces is needed then we
+                    // cannot skip faces like this
+                }
             }
         }
     }
