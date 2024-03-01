@@ -54,6 +54,17 @@ namespace sparseMatrixExtendedTools
 
     //- Check if the case is 2-D
     bool checkTwoD(const polyMesh& mesh);
+    
+    //- Solve the linear system using Eigen's SparseLU direct solver
+    void solveLinearSystemEigen
+    (
+        const sparseMatrixExtended& matrix,
+        const Field<RectangularMatrix<scalar>>& source,
+        Field<RectangularMatrix<scalar>>& solution,
+        const bool twoD,
+        const bool exportToMatlab = false,
+        const bool debug = false
+    );
 
 #ifdef USE_PETSC
 

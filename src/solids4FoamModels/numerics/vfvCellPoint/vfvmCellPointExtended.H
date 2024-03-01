@@ -67,9 +67,9 @@ namespace vfvm
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
         const Field<RectangularMatrix<scalar>>& materialTangentField,
-                const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
-                const symmTensorField& sigma,
-                const tensorField& dualGradDField,
+        const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+        const symmTensorField& sigma,
+        const tensorField& dualGradDField,
         const boolList& fixedDofs,
         const symmTensorField& fixedDofDirections,
         const scalar fixedDofScale,
@@ -91,9 +91,9 @@ namespace vfvm
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
         const Field<RectangularMatrix<scalar>>& materialTangentField,
-                const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
-                const symmTensorField& sigma,
-                const tensorField& dualGradDField,
+        const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+        const symmTensorField& sigma,
+        const tensorField& dualGradDField,
         const boolList& fixedDofs,
         const symmTensorField& fixedDofDirections,
         const scalar fixedDofScale,
@@ -103,17 +103,18 @@ namespace vfvm
 
 
     // Add coefficients to the matrix for the Laplacian of a scalar field with
-    // a scalar diffusivity field
-    void laplacian
-    (
-        sparseMatrixExtended& matrix,
-        const fvMesh& mesh,
-        const fvMesh& dualMesh,
-        const labelList& dualFaceToCell,
-        const labelList& dualCellToPoint,
-        const scalar& diffusivity, // diffusivity in the primary cells
-        const bool debug = false
-    );
+    // a scalar diffusivity field    
+	void laplacian
+	(
+		sparseMatrixExtended& matrix,
+		const Switch compactStencil,
+		const fvMesh& mesh,
+		const fvMesh& dualMesh,
+		const labelList& dualFaceToCell,
+		const labelList& dualCellToPoint,
+		const scalar& diffusivity,
+		const bool debug
+	);
 
 
     // Add coefficients to the matrix for the second time derivative

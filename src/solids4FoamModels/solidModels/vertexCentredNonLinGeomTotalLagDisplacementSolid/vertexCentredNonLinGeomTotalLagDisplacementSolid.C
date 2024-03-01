@@ -886,6 +886,19 @@ vertexCentredNonLinGeomTotalLagDisplacementSolid::vertexCentredNonLinGeomTotalLa
             ).value()
         )
     ),
+    pointP_
+    (
+        IOobject
+        (
+            "pointP",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedScalar("0", dimPressure, 0.0)
+    ),
     pointU_
     (
         IOobject
@@ -1005,7 +1018,7 @@ vertexCentredNonLinGeomTotalLagDisplacementSolid::vertexCentredNonLinGeomTotalLa
             IOobject::NO_WRITE
         ),
         dualMesh(),
-        dimensionedScalar("zero", dimless, 0.0),
+        dimensionedScalar("zero", dimless, 1.0),
         "calculated"
     ),
     dualPf_
@@ -1293,6 +1306,17 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
                 int(bool(debug))
             );
         }
+        
+//	    Info << endl << "Before enforcing DOFs: " << endl << endl;
+//	    matrix.print();
+//	    Info << endl << "Print out the source: " << endl << endl;
+
+//	    for (int i = 0; i < source.size(); i++)
+//	    {
+//              Info << "(" << i << ", 0) : " << source[i] << endl;
+
+//	    }
+//	    Info << endl;
 
         // Enforce fixed DOF on the linear system
         sparseMatrixTools::enforceFixedDof
@@ -1304,6 +1328,17 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
             fixedDofValues_,
             fixedDofScale_
         );
+        
+//	    Info << endl << "After enforcing DOFs: " << endl << endl;
+//	    matrix.print();
+//	    Info << endl << "Print out the source: " << endl << endl;
+
+//	    for (int i = 0; i < source.size(); i++)
+//	    {
+//                  Info << "(" << i << ", 0) : " << source[i] << endl;
+
+//	    }
+//	    Info << endl;
 
         // Solve linear system for displacement correction
         if (debug)

@@ -17,18 +17,20 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "vertexCentredNonLinGeomTotalLagPressureDisplacementSolid.H"
-#include "addToRunTimeSelectionTable.H"
+#include "vertexCentredLinGeomPressureDisplacementSolid.H"
 #include "sparseMatrixExtended.H"
+#include "linearElasticMisesPlastic.H"
+#include "addToRunTimeSelectionTable.H"
+#include "sparseMatrix.H"
+#include "symmTensor4thOrder.H"
 #include "vfvcCellPoint.H"
-#include "vfvmCellPointExtended.H"
+#include "vfvmCellPoint.H"
 #include "fvcDiv.H"
 #include "fixedValuePointPatchFields.H"
 #include "solidTractionPointPatchVectorField.H"
-#include "sparseMatrixExtendedTools.H"
+#include "sparseMatrixTools.H"
 #include "symmetryPointPatchFields.H"
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
-#include "neoHookeanElasticMisesPlastic.H"
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif
@@ -45,9 +47,8 @@ namespace solidModels
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(vertexCentredNonLinGeomTotalLagPressureDisplacementSolid, 0);
-addToRunTimeSelectionTable(solidModel, vertexCentredNonLinGeomTotalLagPressureDisplacementSolid, dictionary);
-
+defineTypeNameAndDebug(vertexCentredLinGeomPressureDisplacementSolid, 0);
+addToRunTimeSelectionTable(solidModel, vertexCentredLinGeomPressureDisplacementSolid, dictionary);
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
@@ -63,15 +64,15 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
 {
     if (debug)
     {
-        Info<< "void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource(...): start"
+        Info<< "void vertexCentredLinGeomPressureDisplacementSolid::updateSource(...): start"
             << endl;
     }
 
     // Reset to zero
     source = RectangularMatrix<scalar>(4,1,0);
 
-    // The source vector for the momentum equation is -F, where:
-    // F = div(JF^-T * sigma) + rho*g - rho*d2dt2(D)
+    // The source vector is -F, where:
+    // F = div(sigma) + rho*g - rho*d2dt2(D)
 
     // Point volume field
     const scalarField& pointVolI = pointVol_.internalField();
@@ -79,20 +80,11 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
     // Point density field
     const scalarField& pointRhoI = pointRho_.internalField();
 
-    // Dual face area vectors at deformed configuration
-    const surfaceVectorField deformedDualSf
+    // Calculate the tractions on the dual faces
+    surfaceVectorField dualTraction
     (
-        dualJf_*dualFinvf_.T() & dualMesh().Sf()
+        (dualMesh().Sf()/dualMesh().magSf()) & dualSigmaf_
     );
-
-    // Magnitude of deformedDualSf
-    const surfaceScalarField deformedDualMagSf(mag(deformedDualSf));
-
-    // Dual face unit normals at deformed configuration
-    const surfaceVectorField deformedDualN(deformedDualSf/deformedDualMagSf);
-
-    // Calculate the Cauchy tractions on the dual faces
-    surfaceVectorField dualTraction(deformedDualN & dualSigmaf_);
 
     // Enforce extract tractions on traction boundaries
     enforceTractionBoundaries
@@ -115,17 +107,15 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
     }
 
     // Calculate divergence of stress for the dual cells
+    // const vectorField dualDivSigma = fvc::div(dualMesh().Sf() & dualSigmaf_);
+    const vectorField dualDivSigma = fvc::div(dualTraction*dualMesh().magSf());
 
-    const vectorField dualDivSigma = fvc::div(dualTraction*deformedDualMagSf);
-
-    // Map dual cell fields to primary mesh point fields
-    vectorField pointDivSigmaI(mesh().nPoints(), vector::zero);
-    scalarField pointJI(mesh().nPoints(), 0.0);
+    // Map dual cell field to primary mesh point field
+    vectorField pointDivSigma(mesh().nPoints(), vector::zero);
     forAll(dualDivSigma, dualCellI)
     {
         const label pointID = dualCellToPoint[dualCellI];
-        pointDivSigmaI[pointID] = dualDivSigma[dualCellI];
-        pointJI[pointID] = dualJf_[dualCellI];
+        pointDivSigma[pointID] = dualDivSigma[dualCellI];
     }
     
     forAll (source, pointI)
@@ -133,12 +123,12 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
         for (int i = 0; i < 3; i++)
         {
             // Add surface forces to source
-            source[pointI](i,0) -= pointDivSigmaI[pointI].component(i)*pointVolI[pointI]*pointJI[pointI];
+            source[pointI](i,0) -= pointDivSigmaI[pointI].component(i)*pointVolI[pointI];
 
             // Add gravity body forces
-            source[pointI](i,0) -= pointRhoI[pointI]*g().value().component(i)*pointVolI[pointI]*pointJI[pointI];
+            source[pointI](i,0) -= pointRhoI[pointI]*g().value().component(i)*pointVolI[pointI];
         }        
-    }   
+    } 
 
     // The source vector for the momentum equation is -F, where:
     // F = p - gamma*laplacian(p) - pBar(D)
@@ -158,7 +148,7 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
         )
     );
 
-    //Calculate the bulk modulus
+    //Calculate bulk modulus
     const scalar E = 70e9;
     const scalar nu = 0.3;
 //    const dimensionedScalar E = dimensionedScalar(solidModelDict().lookup("E"));
@@ -171,24 +161,26 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
     forAll (source, pointI)
     {
         // Add pressure
-        source[pointI](3,0) -= pointP_[pointI]*pointVolI[pointI]*pointJI[pointI];
+        source[pointI](3,0) -= pointP_[pointI]*pointVolI[pointI];
 
         // Add gamma*laplacian(p)
-        source[pointI](3,0) += pressureSmoothing*laplacianP[pointI]*pointVolI[pointI]*pointJI[pointI];
+        source[pointI](3,0) += pressureSmoothing*laplacianP[pointI];
 
         // Add pBar
-        source[pointI](3,0) += pBar[pointI]*pointVolI[pointI]*pointJI[pointI];
+        source[pointI](3,0) += pBar[pointI]*pointVolI[pointI];
     }
+    
+    
 
     if (debug)
     {
-        Info<< "void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource(...): end"
+        Info<< "void vertexCentredLinGeomPressureDisplacementSolid::updateSource(...): end"
             << endl;
     }
 }
 
 
-void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::setFixedDofs
+void vertexCentredLinGeomPressureDisplacementSolid::setFixedDofs
 (
     const pointVectorField& pointD,
     boolList& fixedDofs,
@@ -243,7 +235,7 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::setFixedDofs
                     {
                         FatalErrorIn
                         (
-                            "void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::setFixedDofs(...)"
+                            "void vertexCentredLinGeomPressureDisplacementSolid::setFixedDofs(...)"
                         )   << "Inconsistent displacements prescribed at point "
                             << "= " << pointD.mesh().mesh().points()[pointID]
                             << abort(FatalError);
@@ -319,7 +311,7 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::setFixedDofs
                     {
                         FatalErrorIn
                         (
-                            "void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::setFixedDofs(...)"
+                            "void vertexCentredLinGeomPressureDisplacementSolid::setFixedDofs(...)"
                         )   << "Inconsistent displacements prescribed at point "
                             << "= " << pointD.mesh().mesh().points()[pointID]
                             << abort(FatalError);
@@ -354,7 +346,7 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::setFixedDofs
 }
 
 
-void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::enforceTractionBoundaries
+void vertexCentredLinGeomPressureDisplacementSolid::enforceTractionBoundaries
 (
     const pointVectorField& pointD,
     surfaceVectorField& dualTraction,
@@ -387,8 +379,6 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::enforceTractionBo
             // Primary mesh point normals
             const vectorField& n =
                 pMesh.boundary()[patchI].pointNormals();
-
-            // Todo: use deformedN
 
             // Primary mesh point tractions
             const vectorField totalTraction
@@ -446,7 +436,7 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::enforceTractionBo
             {
                 FatalErrorIn
                 (
-                    "void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::"
+                    "void vertexCentredLinGeomPressureDisplacementSolid::"
                     "enforceTractionBoundaries(...)"
                 )   << "Problem setting tractions: gMin(nPointsPerDualFace) < 1"
                     << nl << "nPointsPerDualFace = " << nPointsPerDualFace
@@ -473,9 +463,6 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::enforceTractionBo
         )
         {
             // Set the dual patch face shear traction to zero
-
-            // Todo: use deformedN
-
             const vectorField n(dualMesh.boundary()[patchI].nf());
 #ifdef OPENFOAM_NOT_EXTEND
             dualTraction.boundaryFieldRef()[patchI] =
@@ -488,52 +475,36 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::enforceTractionBo
     }
 }
 
-
-bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::converged
+bool vertexCentredLinGeomPressureDisplacementSolid::vertexCentredLinGeomPressureDisplacementSolid::converged
 (
     const label iCorr,
-    scalar& initResidualD,
-    scalar& initResidualP,
+    scalar& initResidual,
+    const scalar res,
     const label nInterations,
     const pointVectorField& pointD,
-    const pointScalarField& pointP,
-    const Field<RectangularMatrix<scalar>>& pointDPcorr
+    const vectorField& pointDcorr
 ) const
 {
-    scalar residualDAbs = 0;
-    scalar residualPAbs = 0;
-    // Calculate the residuals as the root mean square of the correction
-    // Displacement residual
-    forAll(pointDPcorr, pointI)
-    {
-        // Displacement residual
-        residualDAbs += sqr(pointDPcorr[pointI](0,0)) + sqr(pointDPcorr[pointI](1,0)) +
-            sqr(pointDPcorr[pointI](2,0));
-
-        // Pressure residual
-        residualPAbs += sqr(pointDPcorr[pointI](3,0));
-    }
+    // Calculate the residual as the root mean square of the correction
+    const scalar residualAbs = gSum(magSqr(pointDcorr));
 
     // Store initial residual
     if (iCorr == 0)
     {
-        initResidualD = residualDAbs;
-        initResidualP = residualPAbs;
+        initResidual = residualAbs;
 
         // If the initial residual is small then convergence has been achieved
-        if (initResidualD < SMALL && initResidualP < SMALL)
+        if (initResidual < SMALL)
         {
-            Info<< "    Both displacement and pressure residuals are less than 1e-15"
+            Info<< "    Initial residual is less than 1e-15"
                 << "    Converged" << endl;
             return true;
         }
-        Info<< "    Initial displacement residual = " << initResidualD << endl;
-        Info<< "    Initial pressure residual = " << initResidualP << endl;
+        Info<< "    Initial residual = " << initResidual << endl;
     }
 
     // Define a normalised residual wrt the initial residual
-    const scalar residualDNorm = residualDAbs/initResidualD;
-    const scalar residualPNorm = residualPAbs/initResidualP;
+    const scalar residualNorm = residualAbs/initResidual;
 
     // Calculate the maximum displacement
 #ifdef OPENFOAM_NOT_EXTEND
@@ -542,37 +513,16 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonL
     const scalar maxMagD = gMax(mag(pointD.internalField()));
 #endif
 
-    // Calculate the maximum pressure
-#ifdef OPENFOAM_NOT_EXTEND
-    const scalar maxMagP = gMax(mag(pointP.primitiveField()));
-#else
-    const scalar maxMagP = gMax(mag(pointP.internalField()));
-#endif
-
-    // Print information for the displacement
-    Info<< "    Displacement residuals: " << endl
-        << "    Iter = " << iCorr
-        << ", relRef = " << residualDNorm
-        << ", resAbs = " << residualDAbs
+    // Print information
+    Info<< "    Iter = " << iCorr
+        << ", relRef = " << residualNorm
+        << ", res = " << res
+        << ", resAbs = " << residualAbs
         << ", nIters = " << nInterations
         << ", maxD = " << maxMagD << endl;
 
-    // Print information for the pressure
-    Info<< "    Pressure residuals: " << endl
-        << "    Iter = " << iCorr
-        << ", relRef = " << residualPNorm
-        << ", resAbs = " << residualPAbs
-        << ", nIters = " << nInterations
-        << ", maxP = " << maxMagP << endl;
-
-    // Displacement tolerance
-    const scalar DTol = solidModelDict().lookupOrDefault<scalar>("solutionDTolerance", 1e-11);
-
-    // Pressure tolerance
-    const scalar PTol = solidModelDict().lookupOrDefault<scalar>("solutionPTolerance", 1e-6);
-
     // Check for convergence
-    if (residualDNorm < DTol && residualPNorm < PTol)
+    if (residualNorm < solutionTol())
     {
         Info<< "    Converged" << endl;
         return true;
@@ -594,439 +544,128 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonL
 }
 
 
-//scalar vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::calculateLineSearchSlope
-//(
-//    const scalar eta,
-//    const vectorField& pointDcorr,
-//    pointVectorField& pointD,
-//    surfaceTensorField& dualGradDf,
-//    surfaceSymmTensorField& dualSigmaf,
-//    const scalar zeta
-//)
-//{
-//    // Store pointD as we will reset it after changing it
-//    pointD.storePrevIter();
-
-//    // Update pointD
-//#ifdef OPENFOAM_NOT_EXTEND
-//    pointD.primitiveFieldRef() += eta*pointDcorr;
-//#else
-//    pointD.internalField() += eta*pointDcorr;
-//#endif
-//    pointD.correctBoundaryConditions();
-
-//    // Calculate gradD at dual faces
-//    dualGradDf = vfvc::fGrad
-//    (
-//        pointD,
-//        mesh(),
-//        dualMesh(),
-//        dualMeshMap().dualFaceToCell(),
-//        dualMeshMap().dualCellToPoint(),
-//        zeta
-//    );
-
-//    // Update F
-//    dualFf_ = I + dualGradDf.T();
-
-//    // Update Finv
-//    dualFinvf_ = inv(dualFf_);
-
-//    // Update J
-//    dualJf_ = det(dualFf_);
-
-//    // Calculate stress at dual faces
-//    dualMechanicalPtr_().correct(dualSigmaf);
-
-//    // Update the source vector
-//    vectorField source(mesh().nPoints(), vector::zero);
-//    pointD.correctBoundaryConditions();
-//    updateSource(source, dualMeshMap().dualCellToPoint());
-
-//    // Reset pointD
-//    pointD = pointD.prevIter();
-
-//    // Return the slope
-//    return gSum(pointDcorr & source);
-//}
-
-
-//scalar vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::calculateLineSearchFactor
-//(
-//    const scalar rTol, // Slope reduction tolerance
-//    const int maxIter, // Maximum number of line search iterations
-//    const vectorField& pointDcorr, // Point displacement correction
-//    const vectorField& source, // Linear system source
-//    const scalar zeta // Discretisation parameter
-//)
-//{
-//    // Calculate initial slope
-//    const scalar s0 = gSum(pointDcorr & source);
-
-//    // Set initial line search parameter
-//    scalar eta = 1.0;
-//    int lineSearchIter = 0;
-
-//    // Perform backtracking to find suitable eta
-//    do
-//    {
-//        lineSearchIter++;
-
-//        // Calculate slope at eta
-//        const scalar s1 = calculateLineSearchSlope
-//        (
-//            eta, pointDcorr, pointD(), dualGradDf_, dualSigmaf_, zeta
-//        );
-
-//        // Calculate ratio of s1 to s0
-//        const scalar r = s1/s0;
-
-//        if (mag(r) < rTol)
-//        {
-//            break;
-//        }
-//        else
-//        {
-//            // Interpolate/extrapolate to find new eta
-//            // Limit it to be less than 10
-//            //eta = min(-1/(r - 1), 10);
-
-//            if (r < 0)
-//            {
-//                // Simple back tracking
-//                eta *= 0.5;
-//            }
-//            else
-//            {
-//                // Extrapolate
-//                eta = min(-1/(r - 1), 10);
-//            }
-//        }
-
-//        if (lineSearchIter == maxIter)
-//        {
-//            Warning
-//                << "Max line search iterations reached!" << endl;
-//        }
-//    }
-//    while (lineSearchIter < maxIter);
-
-//    // Update pointD and re-calculate source, then calculate s
-//    if (mag(eta - 1) > SMALL)
-//    {
-//        Info<< "        line search parameter = " << eta
-//            << ", iter = " << lineSearchIter << endl;
-//    }
-
-//    return eta;
-//}
-
-Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
-vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::geometricStiffnessField
+scalar vertexCentredLinGeomPressureDisplacementSolid::calculateLineSearchSlope
 (
-        const surfaceVectorField SfUndef,
-        const surfaceTensorField gradDRef
-) const
+    const scalar eta,
+    const vectorField& pointDcorr,
+    pointVectorField& pointD,
+    surfaceTensorField& dualGradDf,
+    surfaceSymmTensorField& dualSigmaf,
+    const scalar zeta
+)
 {
-    // Prepare tmp field
-    tmp<Field<Foam::RectangularMatrix<Foam::scalar>>> tresult
-    (
-        new Field<Foam::RectangularMatrix<Foam::scalar>>(dualMesh().nFaces(), Foam::RectangularMatrix<scalar>(3,9,0))
-    );
+    // Store pointD as we will reset it after changing it
+    pointD.storePrevIter();
+
+    // Update pointD
 #ifdef OPENFOAM_NOT_EXTEND
-    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult.ref();
+    pointD.primitiveFieldRef() += eta*pointDcorr;
 #else
-    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult();
+    pointD.internalField() += eta*pointDcorr;
 #endif
+    pointD.correctBoundaryConditions();
 
-    //For small strain the geometric stiffness is zero
-    if (!geometricStiffness_)
-    {
-        return tresult;
-    }
+    // Calculate gradD at dual faces
+    dualGradDf = vfvc::fGrad
+    (
+        pointD,
+        mesh(),
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        zeta
+    );
 
-    // Calculate surface vector as per the total Lagrangian formulation
-    // gamma = JF^-T*Sf0
+    // Calculate stress at dual faces
+    dualMechanicalPtr_().correct(dualSigmaf);
 
-    // Calculate unperturbed F
-    const surfaceTensorField FRef(I + gradDRef.T());
+    // Update the source vector
+    vectorField source(mesh().nPoints(), vector::zero);
+    pointD.correctBoundaryConditions();
+    updateSource(source, dualMeshMap().dualCellToPoint());
 
-    // Calculate unperturbed invF
-    const surfaceTensorField invFRef(inv(FRef));
+    // Reset pointD
+    pointD = pointD.prevIter();
 
-    // Calculate unperturbed J
-    const surfaceScalarField JRef(det(FRef));
-
-    // Calculate unperturbed deformed Sf
-    const surfaceVectorField SfRef((JRef*invFRef.T()) & SfUndef);
-
-    // Create field to be used for perturbations
-    surfaceTensorField gradDPerturb("gradDPerturb", gradDRef);
-
-    // Small number used for perturbations
-    const scalar eps(solidModelDict().lookupOrDefault<scalar>("tangentEps", 1e-10));
-
-    // For each component of gradD, sequentially apply a perturbation and
-    // then calculate the resulting sigma
-    for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
-    {
-
-        // Reset gradDPerturb and multiply by 1.0 to avoid it being removed
-        // from the object registry
-        gradDPerturb = 1.0*gradDRef;
-
-        // Perturb this component of gradD and calculate SfPerturb
-        gradDPerturb.replace(cmptI, gradDRef.component(cmptI) + eps);
-
-        const surfaceTensorField FPerturb(I + gradDPerturb.T());
-        const surfaceTensorField invFPerturb(inv(FPerturb));
-        const surfaceScalarField JPerturb(det(FPerturb));
-        const surfaceVectorField SfPerturb((JPerturb*invFPerturb.T()) & SfUndef);
-
-        // Calculate each component
-        const surfaceVectorField tangCmpt((SfPerturb - SfRef)/eps);
-        const vectorField& tangCmptI = tangCmpt.internalField();
-
-        // Insert each component
-        forAll(tangCmptI, faceI)
-        {
-            if (cmptI == tensor::XX)
-            {
-                result[faceI](0,0) = tangCmptI[faceI][0];
-                result[faceI](1,0) = tangCmptI[faceI][1];
-                result[faceI](2,0) = tangCmptI[faceI][2];
-            }
-            else if (cmptI == tensor::XY)
-            {
-                result[faceI](0,1) = tangCmptI[faceI][0];
-                result[faceI](1,1) = tangCmptI[faceI][1];
-                result[faceI](2,1) = tangCmptI[faceI][2];
-            }
-            else if (cmptI == tensor::XZ)
-            {
-                result[faceI](0,2) = tangCmptI[faceI][0];
-                result[faceI](1,2) = tangCmptI[faceI][1];
-                result[faceI](2,2) = tangCmptI[faceI][2];
-            }
-            else if (cmptI == tensor::YX)
-            {
-                result[faceI](0,3) = tangCmptI[faceI][0];
-                result[faceI](1,3) = tangCmptI[faceI][1];
-                result[faceI](2,3) = tangCmptI[faceI][2];
-            }
-            else if (cmptI == tensor::YY)
-            {
-                result[faceI](0,4) = tangCmptI[faceI][0];
-                result[faceI](1,4) = tangCmptI[faceI][1];
-                result[faceI](2,4) = tangCmptI[faceI][2];
-            }
-            else if (cmptI == tensor::YZ)
-            {
-                result[faceI](0,5) = tangCmptI[faceI][0];
-                result[faceI](1,5) = tangCmptI[faceI][1];
-                result[faceI](2,5) = tangCmptI[faceI][2];
-            }
-            else if (cmptI == tensor::ZX)
-            {
-                result[faceI](0,6) = tangCmptI[faceI][0];
-                result[faceI](1,6) = tangCmptI[faceI][1];
-                result[faceI](2,6) = tangCmptI[faceI][2];
-            }
-            else if (cmptI == tensor::ZY)
-            {
-                result[faceI](0,7) = tangCmptI[faceI][0];
-                result[faceI](1,7) = tangCmptI[faceI][1];
-                result[faceI](2,7) = tangCmptI[faceI][2];
-            }
-            else if (cmptI == tensor::ZZ)
-            {
-                result[faceI](0,8) = tangCmptI[faceI][0];
-                result[faceI](1,8) = tangCmptI[faceI][1];
-                result[faceI](2,8) = tangCmptI[faceI][2];
-            }
-        }
-
-        forAll(tangCmpt.boundaryField(), patchI)
-        {
-            const vectorField& tangCmptP =
-                tangCmpt.boundaryField()[patchI];
-            const label start = mesh().boundaryMesh()[patchI].start();
-
-            forAll(tangCmptP, fI)
-            {
-                const label faceID = start + fI;
-
-                if (cmptI == tensor::XX)
-                {
-                    result[faceID](0,0) = tangCmptI[fI][0];
-                    result[faceID](1,0) = tangCmptI[fI][1];
-                    result[faceID](2,0) = tangCmptI[fI][2];
-                }
-                else if (cmptI == tensor::XY)
-                {
-                    result[faceID](0,1) = tangCmptI[fI][0];
-                    result[faceID](1,1) = tangCmptI[fI][1];
-                    result[faceID](2,1) = tangCmptI[fI][2];
-                }
-                else if (cmptI == tensor::XZ)
-                {
-                    result[faceID](0,2) = tangCmptI[fI][0];
-                    result[faceID](1,2) = tangCmptI[fI][1];
-                    result[faceID](2,2) = tangCmptI[fI][2];
-                }
-                else if (cmptI == tensor::YX)
-                {
-                    result[faceID](0,3) = tangCmptI[fI][0];
-                    result[faceID](1,3) = tangCmptI[fI][1];
-                    result[faceID](2,3) = tangCmptI[fI][2];
-                }
-                else if (cmptI == tensor::YY)
-                {
-                    result[faceID](0,4) = tangCmptI[fI][0];
-                    result[faceID](1,4) = tangCmptI[fI][1];
-                    result[faceID](2,4) = tangCmptI[fI][2];
-                }
-                else if (cmptI == tensor::YZ)
-                {
-                    result[faceID](0,5) = tangCmptI[fI][0];
-                    result[faceID](1,5) = tangCmptI[fI][1];
-                    result[faceID](2,5) = tangCmptI[fI][2];
-                }
-                else if (cmptI == tensor::ZX)
-                {
-                    result[faceID](0,6) = tangCmptI[fI][0];
-                    result[faceID](1,6) = tangCmptI[fI][1];
-                    result[faceID](2,6) = tangCmptI[fI][2];
-                }
-                else if (cmptI == tensor::ZY)
-                {
-                    result[faceID](0,7) = tangCmptI[fI][0];
-                    result[faceID](1,7) = tangCmptI[fI][1];
-                    result[faceID](2,7) = tangCmptI[fI][2];
-                }
-                else if (cmptI == tensor::ZZ)
-                {
-                    result[faceID](0,8) = tangCmptI[fI][0];
-                    result[faceID](1,8) = tangCmptI[fI][1];
-                    result[faceID](2,8) = tangCmptI[fI][2];
-                }
-            }
-        }
-    }
-
-    return tresult;
+    // Return the slope
+    return gSum(pointDcorr & source);
 }
 
 
-Foam::tmp<tensorField>
-vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::pBarSensitivityField
+scalar vertexCentredLinGeomPressureDisplacementSolid::calculateLineSearchFactor
 (
-    const pointTensorField pGradDRef
-) const
+    const scalar rTol, // Slope reduction tolerance
+    const int maxIter, // Maximum number of line search iterations
+    const vectorField& pointDcorr, // Point displacement correction
+    const vectorField& source, // Linear system source
+    const scalar zeta // Discretisation parameter
+)
 {
-    // Prepare tmp field
-    tmp<tensorField> tresult
-    (
-        new tensorField(mesh().nPoints(), Foam::tensor::zero)
-    );
-#ifdef OPENFOAM_NOT_EXTEND
-    tensorField& result = tresult.ref();
-#else
-    tensorField& result = tresult();
-#endif
+    // Calculate initial slope
+    const scalar s0 = gSum(pointDcorr & source);
 
-    //d(pBar)/d(gradD) = -0.5*K*d(J^2)/d(gradD)
+    // Set initial line search parameter
+    scalar eta = 1.0;
+    int lineSearchIter = 0;
 
-    // Calculate unperturbed F
-    const tensorField FRef(I + pGradDRef.T());
-
-    // Calculate unperturbed J
-    const scalarField JRef(det(FRef));
-
-    // Calculate unperturbed J
-    const scalarField JSqrRef(sqr(JRef));
-
-    // Create field to be used for perturbations
-    pointTensorField pGradDPerturb("pGradDPerturb", pGradDRef);
-
-    // Small number used for perturbations
-    const scalar eps(solidModelDict().lookupOrDefault<scalar>("tangentEps", 1e-10));
-
-    //Calculate the bulk modulus
-    const scalar E = 70e9;
-    const scalar nu = 0.3;
-    const scalar K( (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*(E/(2.0*(1.0 + nu))) );
-
-    // For each component of gradD, sequentially apply a perturbation and
-    // then calculate the resulting sigma
-    for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
+    // Perform backtracking to find suitable eta
+    do
     {
-        // Reset gradDPerturb and multiply by 1.0 to avoid it being removed
-        // from the object registry
-        pGradDPerturb = 1.0*pGradDRef;
+        lineSearchIter++;
 
-        // Perturb this component of pGradD field
-        forAll(pGradDPerturb, pointI)
+        // Calculate slope at eta
+        const scalar s1 = calculateLineSearchSlope
+        (
+            eta, pointDcorr, pointD(), dualGradDf_, dualSigmaf_, zeta
+        );
+
+        // Calculate ratio of s1 to s0
+        const scalar r = s1/s0;
+
+        if (mag(r) < rTol)
         {
-            pGradDPerturb[pointI].component(cmptI) = pGradDRef[pointI].component(cmptI) + eps;
+            break;
+        }
+        else
+        {
+            // Interpolate/extrapolate to find new eta
+            // Limit it to be less than 10
+            //eta = min(-1/(r - 1), 10);
+
+            if (r < 0)
+            {
+                // Simple back tracking
+                eta *= 0.5;
+            }
+            else
+            {
+                // Extrapolate
+                eta = min(-1/(r - 1), 10);
+            }
         }
 
-        const tensorField FPerturb(I + pGradDPerturb.T());
-        const scalarField JPerturb(det(FPerturb));
-        const scalarField JSqrPerturb(sqr(JPerturb));
-
-        // Calculate each component
-        const scalarField tangCmpt((JSqrPerturb - JSqrRef)/eps);
-
-        // Insert components
-        forAll(tangCmpt, pointI)
+        if (lineSearchIter == maxIter)
         {
-            if (cmptI == tensor::XX)
-            {
-                result[pointI][tensor::XX] = tangCmpt[pointI];
-            }
-            else if (cmptI == tensor::XY)
-            {
-                result[pointI][tensor::XY] = tangCmpt[pointI];
-            }
-            else if (cmptI == tensor::XZ)
-            {
-                result[pointI][tensor::XZ] = tangCmpt[pointI];
-            }
-            else if (cmptI == tensor::YX)
-            {
-                result[pointI][tensor::YX] = tangCmpt[pointI];
-            }
-            else if (cmptI == tensor::YY)
-            {
-                result[pointI][tensor::YY] = tangCmpt[pointI];
-            }
-            else if (cmptI == tensor::YZ)
-            {
-                result[pointI][tensor::YZ] = tangCmpt[pointI];
-            }
-            else if (cmptI == tensor::ZX)
-            {
-                result[pointI][tensor::ZX] = tangCmpt[pointI];
-            }
-            else if (cmptI == tensor::ZY)
-            {
-                result[pointI][tensor::ZY] = tangCmpt[pointI];
-            }
-            else // if (cmptI == tensor::ZZ)
-            {
-                result[pointI][tensor::ZZ] = tangCmpt[pointI];
-            }
+            Warning
+                << "Max line search iterations reached!" << endl;
         }
     }
-    	
-    return -0.5*K*result;
+    while (lineSearchIter < maxIter);
+
+    // Update pointD and re-calculate source, then calculate s
+    if (mag(eta - 1) > SMALL)
+    {
+        Info<< "        line search parameter = " << eta
+            << ", iter = " << lineSearchIter << endl;
+    }
+
+    return eta;
 }
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
+vertexCentredLinGeomPressureDisplacementSolid::vertexCentredLinGeomPressureDisplacementSolid
 (
     Time& runTime,
     const word& region
@@ -1045,9 +684,7 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
         )
     ),
     fullNewton_(solidModelDict().lookup("fullNewton")),
-    geometricStiffness_(solidModelDict().lookup("geometricStiffness")),
     steadyState_(false),
-    compactStencil_(false),
     pressureSmoothing_
     (
         solidModelDict().lookupOrDefault<scalar>
@@ -1055,9 +692,7 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
             "pressureSmoothing", 0.5
         )
     ),
-//    K_(mechanical().bulkModulus()),
-//    Kf_(dualMechanicalPtr_().bulkModulus()),
-    twoD_(sparseMatrixExtendedTools::checkTwoD(mesh())),
+    twoD_(sparseMatrixTools::checkTwoD(mesh())),
     fixedDofs_(mesh().nPoints(), false),
     fixedDofValues_(fixedDofs_.size(), vector::zero),
     fixedDofDirections_(fixedDofs_.size(), symmTensor::zero),
@@ -1084,7 +719,7 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
         ),
         pMesh(),
         dimensionedScalar("0", dimPressure, 0.0)
-    ),
+    ),    
     pointU_
     (
         IOobject
@@ -1137,20 +772,6 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
         pMesh(),
         dimensionedScalar("0", dimVolume, 0.0)
     ),
-    pointGradD_
-    (
-        IOobject
-        (
-            "pGrad(D)",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        pMesh(),
-        dimensionedTensor("zero", dimless, tensor::zero),
-        "calculated"
-    ),
     dualGradDf_
     (
         IOobject
@@ -1158,7 +779,7 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
             "grad(D)f",
             runTime.timeName(),
             dualMesh(),
-            IOobject::READ_IF_PRESENT,
+            IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
         dualMesh(),
@@ -1177,48 +798,6 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
         ),
         dualMesh(),
         dimensionedSymmTensor("zero", dimPressure, symmTensor::zero),
-        "calculated"
-    ),
-    dualFf_
-    (
-        IOobject
-        (
-            "Ff",
-            runTime.timeName(),
-            dualMesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        dualMesh(),
-        dimensionedTensor("zero", dimless, tensor::zero),
-        "calculated"
-    ),
-    dualFinvf_
-    (
-        IOobject
-        (
-            "Finvf",
-            runTime.timeName(),
-            dualMesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        dualMesh(),
-        dimensionedTensor("zero", dimless, tensor::zero),
-        "calculated"
-    ),
-    dualJf_
-    (
-        IOobject
-        (
-            "Jf",
-            runTime.timeName(),
-            dualMesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        dualMesh(),
-        dimensionedScalar("one", dimless, 1.0),
         "calculated"
     ),
     dualPf_
@@ -1250,6 +829,10 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
         "calculated"
     ),
     globalPointIndices_(mesh())
+#ifdef OPENFOAM_COM
+    ,
+    pointVolInterp_(pMesh(), mesh())
+#endif
 {
     // Create dual mesh and set write option
     dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
@@ -1266,8 +849,7 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
     // Set the pointVol field
     // Map dualMesh cell volumes to the primary mesh points
 #ifdef OPENFOAM_NOT_EXTEND
-    scalarField& pointVolI = pointVol_;
-    // scalarField& pointVolI = pointVol_.primitiveFieldRef();
+    scalarField& pointVolI = pointVol_.primitiveFieldRef();
 #else
     scalarField& pointVolI = pointVol_.internalField();
 #endif
@@ -1303,7 +885,7 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
 
 // * * * * * * * * * * * * * * * *  Destructors  * * * * * * * * * * * * * * //
 
-vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::~vertexCentredNonLinGeomTotalLagPressureDisplacementSolid()
+vertexCentredLinGeomPressureDisplacementSolid::~vertexCentredLinGeomPressureDisplacementSolid()
 {
 #ifdef USE_PETSC
     if (Switch(solidModelDict().lookup("usePETSc")))
@@ -1315,29 +897,16 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::~vertexCentredNonLinGe
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
+bool vertexCentredLinGeomPressureDisplacementSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
-    
-    // Lookup compact edge gradient factor
-    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
-    if (debug)
-    {
-        Info<< "zeta: " << zeta << endl;
-    }
+
+    //Update boundary conditions
+    pointD().correctBoundaryConditions();
+    pointP_.correctBoundaryConditions();
 
     // Initialise matrix where each coefficient is a 4x4 tensor
     sparseMatrixExtended matrixExtended(sum(globalPointIndices_.stencilSize()));
-
-//    // Calculate P at the dual faces
-//    // Calculate F
-//    dualFf_ = I + dualGradDf_.T();
-
-//    // Calculate Finv
-//    dualFinvf_ = inv(dualFf_);
-
-//    // Calculate J
-//    dualJf_ = det(dualFf_);
     
     dualPf_ = vfvc::dualPf
     (
@@ -1348,99 +917,65 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
         dualMeshMap().dualCellToPoint(),
         zeta,
         debug
-    );  
-    
+    ); 
+
     // Store material tangent field for dual mesh faces
     Field<RectangularMatrix<scalar>> materialTangent
     (
         dualMechanicalPtr_().materialTangentFaceField()
     );
 
-    // Calculate stress field at dual faces
-    dualMechanicalPtr_().correct(dualSigmaf_);
+    // Lookup compact edge gradient factor
+    const scalar zetaImplicit
+    (
+        solidModelDict().lookupOrDefault<scalar>("zetaImplicit", 1e-6)
+    );
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
+    //if (debug)
+    {
+        Info<< "zetaImplicit: " << zetaImplicit << nl
+            << "zeta: " << zeta << endl;
+    }
 
-    // Calculate stress for primary cells
-    mechanical().correct(sigma());
-
+#ifdef USE_PETSC
     // Global point index lists
     const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
     const labelList& localToGlobalPointMap =
         globalPointIndices_.localToGlobalPointMap();
+#endif
 
     if (!fullNewton_)
     {
         // Assemble matrix once per time-step
         Info<< "    Assembling the matrix" << endl;
 
-        //Obtain undeformed surface vector field
-        surfaceVectorField SfUndef = dualMesh().Sf();
-
-        // Store gradD at dual mesh faces
-        surfaceTensorField gradDRef = dualGradDf_;
-
-        // Store gradD at the primary mesh points
-        pointTensorField pGradDRef = pointGradD_;
-
-        // Calculate geometric stiffness field for dual mesh faces
-        Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
-        (
-            geometricStiffnessField
-            (
-                SfUndef,
-                gradDRef
-            )
-        );
-
-        //Calculate pBarSensitivity
-        tmp<tensorField> pBarSensitivity
-        (
-            pBarSensitivityField
-            (
-                pGradDRef
-            )
-        );
-
-        // Add div(sigma) pressure and displacement coefficients
+        // Add div(sigma) coefficients
         vfvm::divSigma
         (
-		    matrixExtended,
-		    mesh(),
-		    dualMesh(),
-		    dualMeshMap().dualFaceToCell(),
-		    dualMeshMap().dualCellToPoint(),
-		    materialTangent,
-		    geometricStiffness,
-		    dev(dualSigmaf_),
-		    dualGradDf_,
-		    fixedDofs_,
-		    fixedDofDirections_,
-		    fixedDofScale_,
-		    zeta,
-		    debug
-        );
-
-        // Add laplacian coefficient to the pressure equation
-        vfvm::laplacian
-        (
-            matrixExtended,
-            compactStencil_,
-		    mesh(),
-		    dualMesh(),
-		    dualMeshMap().dualFaceToCell(),
-		    dualMeshMap().dualCellToPoint(),
-            pressureSmoothing_,
+            matrix,
+            mesh(),
+            dualMesh(),
+            dualMeshMap().dualFaceToCell(),
+            dualMeshMap().dualCellToPoint(),
+            materialTangent,
+            zetaImplicit,
             debug
         );
 
-        // Add source coefficients of pressure equation
-        vfvm::Sp
+        // Add d2dt2 coefficients
+        vfvm::d2dt2
         (
-            matrixExtended,
-		    dualMesh(),
-		    dualMeshMap().dualCellToPoint(),
-            pointVol_,
-            pBarSensitivity,
-            debug
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh().d2dt2Scheme("d2dt2(pointD)"),
+#else
+            mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
+#endif
+            runTime().deltaTValue(),
+            pointD().name(),
+            matrix,
+            pointRho_.internalField(),
+            pointVol_.internalField(),
+            int(bool(debug))
         );
     }
 
@@ -1488,22 +1023,6 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
             pointD(),
             mesh()
         );
-        
-        // Update F
-        dualFf_ = I + dualGradDf_.T();
-
-        // Update Finv
-        dualFinvf_ = inv(dualFf_);
-
-        // Update J
-        dualJf_ = det(dualFf_);
-        
-		//Calculate the bulk modulus
-//		const scalar E = 70e9;
-//		const scalar nu = 0.3;
-//		const scalar K( (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*(E/(2.0*(1.0 + nu))) );
-//        
-//        dualPf_ = (1.0/dualJf_)*(0.5*neoHookeanElasticMisesPlastic::K_*(pow(dualJf_, 2) - 1));
 
         // Calculate stress at dual faces
         dualMechanicalPtr_().correct(dualSigmaf_);
@@ -1513,7 +1032,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
 
         pointP_.correctBoundaryConditions();
         pointD().correctBoundaryConditions();
-
+        
         updateSource
         (
             sourceExtended,
@@ -1526,123 +1045,68 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
 
         if (fullNewton_)
         {
-            // Info<< "    Assembling the matrix" << endl;
-
             // Assemble the matrix once per outer iteration
-            matrixExtended.clear();
+            matrix.clear();
 
             // Update material tangent
             materialTangent = dualMechanicalPtr_().materialTangentFaceField();
 
-            //Obtain undeformed surface vector field
-            surfaceVectorField SfUndef = dualMesh().Sf();
-
-            // Store gradD at dual mesh faces
-            surfaceTensorField gradDRef = dualGradDf_;
-
-            // Store gradD at the primary mesh points
-            pointTensorField pGradDRef = pointGradD_;
-
-            // Calculate geometric stiffness field for dual mesh faces
-            Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
-            (
-                geometricStiffnessField
-                (
-                    SfUndef,
-                    gradDRef
-                )
-            );
-
-            //Calculate pBarSensitivity
-            tmp<tensorField> pBarSensitivity
-            (
-                pBarSensitivityField
-                (
-                    pGradDRef
-                )
-            );
-
-            // Add div(sigma) pressure and displacement coefficients
+            // Add div(sigma) coefficients
             vfvm::divSigma
             (
-                matrixExtended,
+                matrix,
                 mesh(),
                 dualMesh(),
                 dualMeshMap().dualFaceToCell(),
                 dualMeshMap().dualCellToPoint(),
                 materialTangent,
-                geometricStiffness,
-                dev(dualSigmaf_),
-                dualGradDf_,
-                fixedDofs_,
-                fixedDofDirections_,
-                fixedDofScale_,
-                zeta,
-                debug
+                zetaImplicit
             );
 
-            // Add laplacian coefficient to the pressure equation
-            vfvm::laplacian
+            // Add d2dt2 coefficients
+            vfvm::d2dt2
             (
-                matrixExtended,
-                compactStencil_,
-                mesh(),
-                dualMesh(),
-                dualMeshMap().dualFaceToCell(),
-                dualMeshMap().dualCellToPoint(),
-                pressureSmoothing_,
-                debug
+#ifdef OPENFOAM_NOT_EXTEND
+                mesh().d2dt2Scheme("d2dt2(pointD)"),
+#else
+                mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
+#endif
+                runTime().deltaTValue(),
+                pointD().name(),
+                matrix,
+                pointRho_.internalField(),
+                pointVol_.internalField(),
+                int(bool(debug))
             );
-
-            // Add source coefficients of pressure equation
-            vfvm::Sp
-            (
-                matrixExtended,
-                dualMesh(),
-                dualMeshMap().dualCellToPoint(),
-                pointVol_,
-                pBarSensitivity,
-                debug
-            );            
         }
 
-//		    Info << endl << "Before enforcing DOFs: " << endl << endl;
-//		    matrixExtended.print();
-//		    Info << endl << "Print out the source: " << endl << endl;
+        if (debug > 1)
+        {
+            // Print the matrix
+            matrix.print();
+        }
 
-//		    for (int i = 0; i < sourceExtended.size(); i++)
-//		    {
-//                      Info << "(" << i << ", 0) : " << sourceExtended[i] << endl;
-
-//		    }
-//		    Info << endl;
-
-        // Enforce fixed DOF on the linear system for
-        // displacement pressure implementation
-        sparseMatrixExtendedTools::enforceFixedDof
+        // Enforce fixed DOF on the linear system
+        sparseMatrixTools::enforceFixedDof
         (
-            matrixExtended,
-            sourceExtended,
-            twoD_,
+            matrix,
+            source,
             fixedDofs_,
             fixedDofDirections_,
             fixedDofValues_,
             fixedDofScale_
         );
 
-//		    Info << endl << "After enforcing DOFs " << endl << endl;
-//		    matrixExtended.print();
-//		    Info << endl << "Print out the source: " << endl << endl;
+        if (debug > 1)
+        {
+            // Print the matrix
+            matrix.print();
+        }
 
-//		    for (int i = 0; i < sourceExtended.size(); i++)
-//		    {
-//                      Info << "(" << i << ", 0) : " << sourceExtended[i] << endl;
-//		    }
-
-        // Solve linear system
+        // Solve linear system for displacement correction
         if (debug)
         {
-            Info<< "bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve(): "
+            Info<< "bool vertexCentredLinGeomPressureDisplacementSolid::evolve(): "
                 << " solving linear system: start" << endl;
         }
         else
@@ -1654,14 +1118,11 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
         {
 #ifdef USE_PETSC
             fileName optionsFile(solidModelDict().lookup("optionsFile"));
-
-            // Solve for displacement and pressure correction
-
-            solverPerf = sparseMatrixExtendedTools::solveLinearSystemPETSc
+            solverPerf = sparseMatrixTools::solveLinearSystemPETSc
             (
-                matrixExtended,
-                sourceExtended,
-                pointDPcorr,
+                matrix,
+                source,
+                pointDcorr,
                 twoD_,
                 optionsFile,
                 mesh().points(),
@@ -1672,7 +1133,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
                 solidModelDict().lookupOrDefault<bool>("debugPETSc", false)
             );
 #else
-            FatalErrorIn("vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()")
+            FatalErrorIn("vertexCentredLinGeomPressureDisplacementSolid::evolve()")
                 << "PETSc not available. Please set the PETSC_DIR environment "
                 << "variable and re-compile solids4foam" << abort(FatalError);
 #endif
@@ -1680,19 +1141,51 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
         else
         {
             // Use Eigen SparseLU direct solver
-            notImplemented("Not implemented with Eigen SparseLU direct solver")
+            sparseMatrixTools::solveLinearSystemEigen
+            (
+                matrix, source, pointDcorr, twoD_, false, debug
+            );
         }
-        
+
         if (debug)
         {
-            Info<< "bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve(): "
+            Info<< "bool vertexCentredLinGeomPressureDisplacementSolid::evolve(): "
                 << " solving linear system: end" << endl;
         }
 
         // Update point displacement field
         if (Switch(solidModelDict().lookup("lineSearch")))
         {
-            notImplemented("Line search not implemented.")
+            // Lookup target tolerance for slope reduction
+            const scalar rTol
+            (
+                solidModelDict().lookupOrDefault<scalar>("lineSearchRTol", 0.8)
+            );
+
+            // Lookup the maximum number of line search iterations
+            const int maxIter
+            (
+                solidModelDict().lookupOrDefault<scalar>
+                (
+                    "lineSearchMaxIter", 10
+                )
+            );
+
+            // Calculate line search factor
+            const scalar eta
+            (
+                calculateLineSearchFactor
+                (
+                    rTol, maxIter, pointDcorr, source, zeta
+                )
+            );
+
+            // Update displacement field
+#ifdef OPENFOAM_NOT_EXTEND
+            pointD().primitiveFieldRef() += eta*pointDcorr;
+#else
+            pointD().internalField() += eta*pointDcorr;
+#endif
         }
 #ifdef OPENFOAM_NOT_EXTEND
         else if (mesh().relaxField(pointD().name()))
@@ -1700,29 +1193,34 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
         else if (mesh().solutionDict().relaxField(pointD().name()))
 #endif
         {
-            notImplemented("pointD or pointP relaxation not implemented.")
+            // Relaxing the correction can help convergence
+
+#ifdef OPENFOAM_NOT_EXTEND
+            const scalar rf
+            (
+                mesh().fieldRelaxationFactor(pointD().name())
+            );
+
+            pointD().primitiveFieldRef() += rf*pointDcorr;
+#else
+            const scalar rf
+            (
+                mesh().solutionDict().fieldRelaxationFactor(pointD().name())
+            );
+
+            pointD().internalField() += rf*pointDcorr;
+#endif
         }
         else
         {
-            forAll(pointDPcorr, pointI)
-            {
 #ifdef OPENFOAM_NOT_EXTEND
-                pointD().primitiveFieldRef()[pointI].component(0) += pointDPcorr[pointI](0,0);
-                pointD().primitiveFieldRef()[pointI].component(1) += pointDPcorr[pointI](1,0);
-                pointD().primitiveFieldRef()[pointI].component(2) += pointDPcorr[pointI](2,0);
-                pointP_.primitiveFieldRef()[pointI] += pointDPcorr[pointI](3,0);
+            pointD().primitiveFieldRef() += pointDcorr;
 #else
-                pointD().internalField()[pointI].component(0) += pointDPcorr[pointI](0,0);
-                pointD().internalField()[pointI].component(1) += pointDPcorr[pointI](1,0);
-                pointD().internalField()[pointI].component(2) += pointDPcorr[pointI](2,0);
-                pointP_.internalField()[pointI] += pointDPcorr[pointI](3,0);
+            pointD().internalField() += pointDcorr;
 #endif
-            }
         }
-
         pointD().correctBoundaryConditions();
-        pointP_.correctBoundaryConditions();
-        
+
         // Update point accelerations
         // Note: for NewmarkBeta, this needs to come before the pointU update
 #ifdef OPENFOAM_NOT_EXTEND
@@ -1759,23 +1257,22 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
                 mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
                 pointD()
             );
-#endif   
+#endif
     }
     while
     (
         !converged
         (
             iCorr,
-            initResidualD,
-            initResidualP,
+            initResidual,
+            solverPerf.finalResidual()[vector::X],
 #ifdef OPENFOAM_NOT_EXTEND
             cmptMax(solverPerf.nIterations()),
 #else
             solverPerf.nIterations(),
 #endif
             pointD(),
-            pointP_,
-            pointDPcorr
+            pointDcorr
         ) && ++iCorr
     );
 
@@ -1790,40 +1287,6 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
         zeta,
         debug
     );
-    
-    dualPf_ = vfvc::dualPf
-    (
-        pointP_,
-        mesh(),
-        dualMesh(),
-        dualMeshMap().dualFaceToCell(),
-        dualMeshMap().dualCellToPoint(),
-        zeta,
-        debug
-    ); 
-
-    // Calculate gradD at the primary mesh points
-    pointGradD_ = vfvc::pGrad
-    (
-        pointD(),
-        mesh()
-    );
-    
-    // Calculate cell P
-    volP_ = vfvc::cellP
-    (
-        pointP_,
-        mesh()
-    );
-
-    // Update F
-    dualFf_ = I + dualGradDf_.T();
-
-    // Update Finv
-    dualFinvf_ = inv(dualFf_);
-
-    // Update J
-    dualJf_ = det(dualFf_);
 
     // Update the increment of displacement
     pointDD() = pointD() - pointD().oldTime();
@@ -1845,13 +1308,18 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
     // Update primary mesh cell stress field, assuming it is constant per
     // primary mesh cell
     // This stress will be first-order accurate
-
     mechanical().correct(sigma());
+
+#ifdef OPENFOAM_COM
+    // Interpolate pointD to D
+    // This is useful for visualisation but it is also needed when using preCICE
+    pointVolInterp_.interpolate(pointD(), D());
+#endif
 
     return true;
 }
 
-void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::setTraction
+void vertexCentredLinGeomPressureDisplacementSolid::setTraction
 (
     const label interfaceI,
     const label patchID,
@@ -1888,7 +1356,7 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::setTraction
     {
         FatalErrorIn
         (
-            "void Foam::vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::setTraction\n"
+            "void Foam::vertexCentredLinGeomPressureDisplacementSolid::setTraction\n"
             "(\n"
             "    fvPatchVectorField& tractionPatch,\n"
             "    const vectorField& traction\n"
@@ -1902,7 +1370,8 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::setTraction
     }
 }
 
-void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::writeFields(const Time& runTime)
+
+void vertexCentredLinGeomPressureDisplacementSolid::writeFields(const Time& runTime)
 {
     // Calculate gradD at the primary points using least squares: this should
     // be second-order accurate (... I think).
@@ -1959,8 +1428,69 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::writeFields(const
 
     Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;
 
+    // Stress at the points
+    pointSymmTensorField pSigma
+	(
+		IOobject
+		(
+		    "pSigma",
+		    runTime.timeName(),
+		    runTime,
+		    IOobject::NO_READ,
+		    IOobject::AUTO_WRITE
+		),
+		pMesh(),
+		dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+    );
+
+    // Acces the linearElasticMisesPlastic mechanical law
+    const PtrList<mechanicalLaw>& mechLaws = mechanical();
+    const linearElasticMisesPlastic& mech = refCast<const linearElasticMisesPlastic>(mechLaws[0]);
+
+    // Calculate the stress at the points
+    mech.calculatePStress(pSigma, pGradD);
+
+    pSigma.write();
+
+//    // Equivalent stress at the points
+//    pointScalarField pSigmaEq
+//    (
+//        IOobject
+//        (
+//            "pSigmaEq",
+//            runTime.timeName(),
+//            runTime,
+//            IOobject::NO_READ,
+//            IOobject::AUTO_WRITE
+//        ),
+//        pMesh(),
+//        dimensionedScalar("0", dimPressure, 0.0)
+//    );
+
+//    pSigmaEq.primitiveFieldRef() =
+//        sqrt(0.5*((pSigma.component(symmTensor::XX) - pSigma.component(symmTensor::YY))^2 +
+//        (pSigma.component(symmTensor::YY) - pSigma.component(symmTensor::ZZ))^2 +
+//        (pSigma.component(symmTensor::ZZ) - component(symmTensor::XX))^2) +
+//        3*(pSigma.component(symmTensor::XY)^2 + pSigma.component(symmTensor::YZ)^2 + pSigma.component(symmTensor::XZ)^2));
+
+//#ifdef FOAMEXTEND
+//    pSigmaEq.internalField() =
+//        sqrt(0.5*((pSigma.XX().internalField() - pSigma.internalField().YY())^2 +
+//        (pSigma.internalField().YY() - pSigma.internalField().ZZ())^2 +
+//        (pSigma.internalField().ZZ() - pSigma.internalField().XX())^2) +
+//        3*(pSigma.internalField().XY()^2 + pSigma.internalField().YZ()^2 + pSigma.internalField().XZ()^2));
+//#else
+//    pSigmaEq.primitiveFieldRef() =
+//        sqrt(0.5*((pSigma.component(symmTensor::XX).internalField() - pSigma.internalField().YY())^2 +
+//        (pSigma.internalField().YY() - pSigma.internalField().ZZ())^2 +
+//        (pSigma.internalField().ZZ() - pSigma.internalField().XX())^2) +
+//        3*(pSigma.internalField().XY()^2 + pSigma.internalField().YZ()^2 + pSigma.internalField().XZ()^2));
+//#endif
+//    pSigmaEq.write();
+
     solidModel::writeFields(runTime);
 }
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

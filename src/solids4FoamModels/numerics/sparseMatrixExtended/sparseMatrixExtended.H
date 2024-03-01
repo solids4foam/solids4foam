@@ -121,7 +121,7 @@ public:
             label nBlockRows() const;
 
             //- Print out the matrix coefficients
-            //void print() const;
+            void print() const;
 
         // Modifiers
 

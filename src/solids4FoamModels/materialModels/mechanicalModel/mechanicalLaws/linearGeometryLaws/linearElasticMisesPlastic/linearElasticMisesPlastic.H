@@ -161,6 +161,9 @@ class linearElasticMisesPlastic
         //- An iterative procedure is used when the yield stress is a nonlinear
         //  function of plastic strain
         const bool nonLinearPlasticity_;
+        
+        //- Solve pressure equation
+        const bool solvePressureEquation_;
 
         //- Linear plastic modulus. It is only used if plasticity is linear,
         //  defined by two points on the stress-plastic strain curve
