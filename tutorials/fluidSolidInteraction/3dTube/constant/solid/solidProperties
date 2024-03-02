@@ -38,7 +38,7 @@ solidModel linearGeometryTotalDisplacement;
     infoFrequency           100;
 
     // Predict displacement field at the start of a time step using the velocity
-    predictor               off;
+    predictor               on;
 }
 
 // ************************************************************************* //

@@ -132,6 +132,9 @@ class fluidSolidInterface
         //- List of interfaces ref. point displacements
         List<vectorField> interfacesPointsDisplsPrev_;
 
+        //- Incremental or absolute residual calculation approach
+        const Switch incrementalResiduals_;
+
         //- List of current FSI residuals
         List<vectorField> residuals_;
 
