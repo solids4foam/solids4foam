@@ -332,15 +332,15 @@ void Foam::vfvm::divSigma
 	    for (int i = 0; i < 3; i++)
 	    {
 	        // Add the coefficient to the ownPointID equation 
-	        matrix(ownPointID, ownPointID)(i,3) += -curDualSfDef.component(i);
+	        matrix(ownPointID, ownPointID)(i,3) += -curDualSfDef.component(i)/curCellPoints.size();
 //	        Info << "dualFaceI: " << dualFaceI << endl;
 //            Info << "matrix ( " << ownPointID << ", " << ownPointID << " ) " << matrix(ownPointID, ownPointID) << endl;
-//        	Info << "-curDualSfDef ( " << ownPointID << ", " << ownPointID << " ) " << -curDualSfDef << endl; 
+//        	Info << "-curDualSfDef ( " << ownPointID << ", " << ownPointID << " ) " << -curDualSfDef/curCellPoints.size() << endl; 
 	        
 	        // Add the coefficient to the neiPointID equation 
-	        matrix(neiPointID, ownPointID)(i,3) -= -curDualSfDef.component(i);
+	        matrix(neiPointID, ownPointID)(i,3) -= -curDualSfDef.component(i)/curCellPoints.size();
 //            Info << "matrix ( " << neiPointID << ", " << ownPointID << " ) " << matrix(neiPointID, ownPointID) << endl;
-//        	Info << "curDualSfDef ( " << ownPointID << ", " << ownPointID << " ) " << curDualSfDef << endl; 
+//        	Info << "curDualSfDef ( " << ownPointID << ", " << ownPointID << " ) " << curDualSfDef/curCellPoints.size() << endl; 
 	    }
 
         forAll(curCellPoints, cpI)
@@ -391,8 +391,8 @@ void Foam::vfvm::divSigma
 //					Info << "coeff ( " << neiPointID << ", " << pointID << " ) " << coeff << endl; 
                     cmptI++;
                 }
-            }           
-        }
+            }         
+        }       
 
         // Add compact central-differencing component in the edge direction
         // This is the gradient in the direction of the edge

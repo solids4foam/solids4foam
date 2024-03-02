@@ -1339,14 +1339,13 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
 //    // Calculate J
 //    dualJf_ = det(dualFf_);
     
-    dualPf_ = vfvc::dualPf
+    dualPf_ = vfvc::interpolate
     (
         pointP_,
         mesh(),
         dualMesh(),
         dualMeshMap().dualFaceToCell(),
         dualMeshMap().dualCellToPoint(),
-        zeta,
         debug
     );  
     
@@ -1471,14 +1470,13 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
         );
         
         // Calculate P at the dual faces
-        dualPf_ = vfvc::dualPf
+        dualPf_ = vfvc::interpolate
         (
             pointP_,
             mesh(),
             dualMesh(),
             dualMeshMap().dualFaceToCell(),
             dualMeshMap().dualCellToPoint(),
-            zeta,
             debug
         );    
 
@@ -1791,14 +1789,13 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
         debug
     );
     
-    dualPf_ = vfvc::dualPf
+    dualPf_ = vfvc::interpolate
     (
         pointP_,
         mesh(),
         dualMesh(),
         dualMeshMap().dualFaceToCell(),
         dualMeshMap().dualCellToPoint(),
-        zeta,
         debug
     ); 
 
@@ -1810,7 +1807,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
     );
     
     // Calculate cell P
-    volP_ = vfvc::cellP
+    volP_ = vfvc::interpolate
     (
         pointP_,
         mesh()

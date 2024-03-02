@@ -789,7 +789,7 @@ void Foam::neoHookeanElasticMisesPlastic::calculateStress
 
     if (solvePressureEquation_)
     {        
-        sigma = (1.0/Jf())*s;
+        sigma = (1.0/Jf())*(s - p*I);
 //        sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
     }
     else
