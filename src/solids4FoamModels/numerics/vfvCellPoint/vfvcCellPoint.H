@@ -132,22 +132,22 @@ namespace vfvc
 		const bool debug
     );
     
-    // Returns the cell pressure
-    tmp<volScalarField> cellP
+    // Interpolate a pointScalarField to a volScalarField
+    tmp<volScalarField> interpolate
 	(
 		const pointScalarField& pointP,
 		const fvMesh& mesh
 	);
 	
-	// Returns the pressure at the dual faces
-	tmp<surfaceScalarField> dualPf
+	// Interpolate a pointScalarField to a surfaceScalarField
+	// at the dual mesh faces
+	tmp<surfaceScalarField> interpolate
 	(
 		const pointScalarField& pointP,
 		const fvMesh& mesh,
 		const fvMesh& dualMesh,
 		const labelList& dualFaceToCell,
 		const labelList& dualCellToPoint,
-		const scalar zeta,
 		const bool debug
 	);
 

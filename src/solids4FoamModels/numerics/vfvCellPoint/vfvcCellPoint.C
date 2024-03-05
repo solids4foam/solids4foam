@@ -849,7 +849,7 @@ tmp<pointScalarField> laplacian
 }
 
 
-tmp<volScalarField> cellP
+tmp<volScalarField> interpolate
 (
     const pointScalarField& pointP,
     const fvMesh& mesh
@@ -862,7 +862,7 @@ tmp<volScalarField> cellP
         (
             IOobject
             (
-                "vol" + pointP.name() + ")",
+                "interpolate" + pointP.name() + ")",
                 mesh.time().timeName(),
                 mesh,
                 IOobject::NO_READ,
@@ -887,11 +887,14 @@ tmp<volScalarField> cellP
     const labelListList& cellPoints = mesh.cellPoints();
     const scalarField& pointPI = pointP.internalField();
 
-    // Calculate the pressure for each cell
+    // Calculate the average pressure for each cell
     forAll(resultI, cellI)
     {
         // Points in the current cell
         const labelList& curCellPoints = cellPoints[cellI];
+        
+        // Number of points in current cell
+        const scalar nPoints = curCellPoints.size(); 
 
         // Calculate the pointP average for each cell
         scalar pointPAvg = 0;
@@ -904,7 +907,7 @@ tmp<volScalarField> cellP
             pointPAvg += pointPI[pointID];
         }
         
-        pointPAvg /= curCellPoints.size();
+        pointPAvg /= nPoints;
         
         result[cellI] = pointPAvg;
     }
@@ -915,20 +918,19 @@ tmp<volScalarField> cellP
 }
 
 
-tmp<surfaceScalarField> dualPf
+tmp<surfaceScalarField> interpolate
 (
     const pointScalarField& pointP,
     const fvMesh& mesh,
     const fvMesh& dualMesh,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
-    const scalar zeta,
     const bool debug
 )
 {
     if (debug)
     {
-        Info<< "surfaceScalarField dualPf(...): start" << endl;
+        Info<< "surfaceScalarField interpolate(...): start" << endl;
     }
 
     // Prepare the result field
@@ -938,7 +940,7 @@ tmp<surfaceScalarField> dualPf
         (
             IOobject
             (
-                "dualPf",
+                "interpolate" + pointP.name() + " f)",
                 dualMesh.time().timeName(),
                 dualMesh,
                 IOobject::NO_READ,
@@ -959,18 +961,18 @@ tmp<surfaceScalarField> dualPf
 
     // Take references for clarity and efficiency
     scalarField& resultI = result;
-    const scalarField& pointPI = pointP.internalField();
+    //const scalarField& pointPI = pointP.internalField();
     const pointField& points = mesh.points();
     const labelList& dualOwn = dualMesh.faceOwner();
     const labelList& dualNei = dualMesh.faceNeighbour();
 
     // Approach
-    // Step 1: Calculate the pressure in each primary mesh cell
+    // Step 1: Calculate the average pressure in each primary mesh cell
     // Step 2: Set dual face pressure to primary mesh pressure and
     //         replace the component in the edge direction
 
     // Calculate constant gradient in each primary mesh cell
-    const volScalarField volP(vfvc::cellP(pointP, mesh));
+    const volScalarField volP(vfvc::interpolate(pointP, mesh));
     const scalarField& volPI = volP.internalField();
 
     // Set dual face pressure to primary mesh pressure and
@@ -1007,12 +1009,6 @@ tmp<surfaceScalarField> dualPf
             // central-differencing and use the primary mesh cell value for the
             // tangential directions
             resultI[dualFaceI] = volPI[cellID]; 
-//                zeta*edgeDir
-//               *(
-//                   pointPI[neiPointID] - pointPI[ownPointID]
-//               )/edgeLength
-//              + ((I - zeta*sqr(edgeDir)) & volPI[cellID]);
-
         }
         else // boundary face
         {
@@ -1049,7 +1045,7 @@ tmp<surfaceScalarField> dualPf
 
     if (debug)
     {
-        Info<< "surfaceScalarField dualPf(...): end" << endl;
+        Info<< "surfaceScalarField interpolate(...): end" << endl;
     }
 
     return tresult;
