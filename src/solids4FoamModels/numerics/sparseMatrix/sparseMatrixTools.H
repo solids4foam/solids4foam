@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -41,7 +35,7 @@ SourceFiles
 #include "sparseMatrix.H"
 #include "vectorField.H"
 #include "polyMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "SolverPerformance.H"
 #else
     #include "BlockSolverPerformance.H"
@@ -74,7 +68,7 @@ namespace sparseMatrixTools
 #ifdef USE_PETSC
 
     //- Solve the linear system using PETSc
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solveLinearSystemPETSc
 #else
     BlockSolverPerformance<vector> solveLinearSystemPETSc

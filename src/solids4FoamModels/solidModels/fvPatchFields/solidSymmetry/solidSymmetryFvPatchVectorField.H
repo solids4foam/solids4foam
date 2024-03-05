@@ -92,7 +92,7 @@ public:
         solidSymmetryFvPatchVectorField
         (
             const solidSymmetryFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );

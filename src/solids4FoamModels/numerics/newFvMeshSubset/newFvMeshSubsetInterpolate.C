@@ -528,7 +528,7 @@ newFvMeshSubset::interpolate
             patchFields.set
             (
                 patchI,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 fvPatchField<Type>::New
                 (
                     calculatedFvPatchField<Type>::typeName,

@@ -47,10 +47,6 @@ boundaryField
         rotationAxis   ( 0 0 1 );
         rotationOrigin ( 0 0 0 );
         value          uniform ( 0 0 0 );
-//         type            solidTraction;
-//         traction        uniform ( 0 0 0 );
-//         pressure        uniform 0;
-//         value           uniform (0 0 0);
     }
 
     top
@@ -64,10 +60,6 @@ boundaryField
         rotationAxis   ( 0 0 1 );
         rotationOrigin ( 0 0 0 );
         value          uniform ( 0 0 0 );
-//         type            solidTraction;
-//         traction        uniform ( 0 0 0 );
-//         pressure        uniform 0;
-//         value           uniform (0 0 0);
     }
 
     bottom
@@ -81,10 +73,6 @@ boundaryField
         rotationAxis   ( 0 0 1 );
         rotationOrigin ( 0 0 0 );
         value          uniform ( 0 0 0 );
-//         type            solidTraction;
-//         traction        uniform ( 0 0 0 );
-//         pressure        uniform 0;
-//         value           uniform (0 0 0);
     }
 
     back

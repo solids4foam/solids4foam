@@ -104,9 +104,6 @@ class unsNonLinGeomTotalLagSolid
         //- Debug switch for the print-out of residuals
         const Switch debug_;
 
-        //- Viscosity/damping coefficient
-        const dimensionedScalar K_;
-
         //- Relative tolerance
         const scalar relativeTol_;
 

@@ -1,0 +1,139 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant/polyMesh";
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// M4
+
+
+
+
+
+
+
+// GEOMETRY
+// visina
+//m4_define(H, 0.010)
+// duljina
+//udaljenost stijenke od izlaza
+//m4_define(L, 0.05)
+//udaljenost stijenke od ulaza
+//m4_define(Lp, 0.025)
+// pola sirine flapa
+
+// visina flapa
+
+
+// z koordinata
+
+
+
+// MESH
+// Abaqus mesh
+//m4_define(BLOCKSIZE, 40 54 1)
+//m4_define(BLOCKSIZE, 20 51 1) // from paper
+//m4_define(BLOCKSIZE1,  calc(H*1000) calc((L-l)*2000) 1)
+
+
+
+
+
+//m4_define(r2,calc(r1+h))
+//m4_define(angle, rad(45))
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+convertToMeters 1;
+
+vertices
+(
+ //block1
+    //Plane A:
+    ( -0.04  0 -0.001) // Vertex A0 = 0 
+    (  0  0 -0.001) // Vertex A1 = 1 
+    (  0  0.04 -0.001) // Vertex A2 = 2 
+    ( -0.04  0.04 -0.001) // Vertex A3 = 3 
+    //Plane B:
+    ( -0.04  0 0.001) // Vertex B0 = 4 
+    (  0  0 0.001) // Vertex B1 = 5 
+    (  0  0.04 0.001) // Vertex B2 = 6 
+    ( -0.04  0.04 0.001) // Vertex B3 = 7 
+ );
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (60 60 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+
+);
+
+boundary
+(
+    top
+    {
+        type patch;
+        faces
+        (
+            (2 3 7 6)
+        );
+    }
+
+    left
+    {
+        type patch;
+        faces
+        (
+            (4 7 3 0)
+        );
+    }
+
+    right
+    {
+        type patch;
+        faces
+        (
+            (1 2 6 5)
+        );
+    }
+
+    bottom
+    {
+        type patch;
+        faces
+        (
+            (0 1 5 4)
+        );
+    }
+
+    frontAndBack
+    {
+        type empty;
+        faces
+        (
+            (0 3 2 1)
+            (4 5 6 7)
+        );
+    }
+);
+
+//mergePatchPairs
+//(
+//);
+
+// ************************************************************************* //

@@ -40,13 +40,13 @@ boundaryField
     }
     wall
     {
-        // Default Dirichlet-Neumann approach
+        // Dirichlet-Neumann approach
         type         newMovingWallVelocity;
         value        uniform (0 0 0);
 
         // Robin-Neumann condition approach
-        //type         elasticWallVelocity;
-        //value        uniform (0 0 0);
+        // type         elasticWallVelocity;
+        // value        uniform (0 0 0);
     }
 }
 

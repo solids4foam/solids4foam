@@ -55,7 +55,7 @@ SourceFiles
 #define poroLinGeomSolid_H
 
 #include "solidModel.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "SolverPerformance.H"
 #endif
 
@@ -124,7 +124,7 @@ class poroLinGeomSolid
         bool converged
         (
             const int iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const SolverPerformance<vector>& solverPerfD,
             const SolverPerformance<scalar>& solverPerfp,
 #else

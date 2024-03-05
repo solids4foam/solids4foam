@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -28,7 +22,7 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
     #include "ggiFvPatch.H"
 #endif
 #include "wedgeFvPatch.H"
@@ -91,7 +85,7 @@ tmp
         )
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     GeometricField<GradType, fvsPatchField, surfaceMesh>& grad = tGrad.ref();
 #else
     GeometricField<GradType, fvsPatchField, surfaceMesh>& grad = tGrad();
@@ -174,7 +168,7 @@ tmp
 
     if (!axisymmetric)
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         Field<GradType>& gradI = tGrad.ref().primitiveFieldRef();
 #else
         Field<GradType>& gradI = tGrad().internalField();
@@ -199,7 +193,7 @@ tmp
             const edgeList curFaceEdges = curFace.edges();
 
             gradI[faceI] = pTraits<GradType>::zero;
-            scalar faceArea = 0;
+            //scalar faceArea = 0;
 
             forAll(curFaceEdges, edgeI)
             {
@@ -227,17 +221,17 @@ tmp
                 // Area
                 vector Re = curEdge.centre(points) - Rf;
                 Re -= nI[faceI]*(nI[faceI]&Re);
-                faceArea += (Le&Re);
+                //faceArea += (Le&Re);
             }
 
-            faceArea /= 2.0;
+            //faceArea /= 2.0;
 
             gradI[faceI] /= mag; // faceArea; // mag
         }
 
         forAll(tGrad().boundaryField(), patchI)
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             Field<GradType>& patchGrad = tGrad.ref().boundaryFieldRef()[patchI];
 #else
             Field<GradType>& patchGrad = tGrad().boundaryField()[patchI];
@@ -259,7 +253,7 @@ tmp
                 const edgeList curFaceEdges = curFace.edges();
 
                 patchGrad[faceI] = pTraits<GradType>::zero;
-                scalar faceArea = 0;
+                //scalar faceArea = 0;
 
                 forAll(curFaceEdges, edgeI)
                 {
@@ -287,10 +281,10 @@ tmp
                     // Area
                     vector Re = curEdge.centre(points) - Rf;
                     Re -= patchN[faceI]*(patchN[faceI]&Re);
-                    faceArea += (Le&Re);
+                    //faceArea += (Le&Re);
                 }
 
-                faceArea /= 2.0;
+                //faceArea /= 2.0;
 
                 patchGrad[faceI] /= mag; //faceArea; //mag
             }
@@ -305,13 +299,13 @@ tmp
             );
         const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         tGrad.ref() = ((I - n*n) & linearInterpolate(gradVf));
 #else
         tGrad() = ((I - n*n) & linearInterpolate(gradVf));
 #endif
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
         // Correct at ggi patch
         forAll(mesh.boundary(), patchI)
         {
@@ -365,7 +359,7 @@ tmp
 template<class Type, template<class> class FaceList>
 tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         const PrimitivePatch<FaceList<face>, const pointField&>& patch,
 #else
         const PrimitivePatch<face, FaceList, const pointField&>& patch,
@@ -383,7 +377,7 @@ tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
             pTraits<GradType>::zero
         )
     );
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Field<GradType>& grad = tGrad.ref();
 #else
     Field<GradType>& grad = tGrad();
@@ -405,7 +399,7 @@ tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
 
         const edgeList curFaceEdges = curFace.edges();
 
-        scalar faceArea = 0;
+        //scalar faceArea = 0;
 
         forAll(curFaceEdges, edgeI)
         {
@@ -433,10 +427,10 @@ tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
             // Area
             vector Re = curEdge.centre(points) - Rf;
             Re -= n*(n&Re);
-            faceArea += (Le&Re);
+            //faceArea += (Le&Re);
         }
 
-        faceArea /= 2.0;
+        //faceArea /= 2.0;
 
         grad[faceI] /= mag; //faceArea;
     }
@@ -487,7 +481,7 @@ tmp
         )
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     Field<GradType>& iGrad = tGrad.ref().primitiveFieldRef();
 #else
     Field<GradType>& iGrad = tGrad().internalField();
@@ -499,7 +493,7 @@ tmp
 
     const Field<Type>& pfI = pf.internalField();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
 #else
@@ -585,7 +579,7 @@ tmp
 
     forAll(mesh.boundaryMesh(), patchI)
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         const labelUList& pFaceCells =
             mesh.boundaryMesh()[patchI].faceCells();
 #else
@@ -693,7 +687,7 @@ tmp
 //     iGrad = fv::gaussGrad<vector>(mesh).grad(vf)().internalField();
 
     // Extrapolate to boundary
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     tGrad.ref().correctBoundaryConditions();
 #else
     tGrad().correctBoundaryConditions();
@@ -714,7 +708,7 @@ tmp
                 pf.boundaryField()[patchI].patchInternalField()
             );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             tGrad.ref().boundaryFieldRef()[patchI] ==
                 fGrad(mesh.boundaryMesh()[patchI], ppf);
 #else
@@ -722,7 +716,7 @@ tmp
                 fGrad(mesh.boundaryMesh()[patchI], ppf);
 #endif
         }
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
         else if (isA<ggiFvPatch>(mesh.boundary()[patchI]))
         {
             Field<Type> ppf =
@@ -773,7 +767,7 @@ tmp
         {
             const vectorField n(vf.mesh().boundary()[patchi].nf());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             tGrad.ref().boundaryFieldRef()[patchi] +=
 #else
             tGrad().boundaryField()[patchi] +=

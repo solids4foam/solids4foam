@@ -22,7 +22,7 @@ dynamicFvMesh dynamicMotionSolverFvMesh;
 //"solver|motionSolver" laplace; // finite element solver
 //"solver|motionSolver" RBFMeshMotionSolver; // radial basis function solver
 
-diffusivity quadratic inverseDistance (interface);
+diffusivity quadratic inverseDistance (flap);
 
 // Settings for the RBF solver
 // staticPatches    (top bottom left);

@@ -1,18 +1,7 @@
-ifeq ($(WM_PROJECT), foam)
-    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
-    ifeq ($(VER), 1)
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
-    else
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
-    endif
-else
-    VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
-    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
-        VERSION_SPECIFIC_INC += -DOPENFOAMESI
-    else
-        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
-    endif
-endif
+SOLIDS4FOAM_ROOT := ../../..
+
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 
 ifdef S4F_USE_GFORTRAN
     GFORTRAN_LIBS = \
@@ -22,8 +11,8 @@ ifdef S4F_USE_GFORTRAN
 endif
 
 EXE_INC = \
-    -I../../../src/solids4FoamModels/lnInclude \
-    -I../../../src/blockCoupledSolids4FoamTools/lnInclude \
+    -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/lnInclude \
+    -I$(SOLIDS4FOAM_ROOT)/src/blockCoupledSolids4FoamTools/lnInclude \
     $(VERSION_SPECIFIC_INC) \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
@@ -33,5 +22,5 @@ EXE_INC = \
     -I$(LIB_SRC)/dynamicFvMesh/lnInclude
 
 EXE_LIBS = \
-    -L$(FOAM_USER_LIBBIN) -lsolids4FoamModels \
+    -L$(FOAM_MODULE_LIBBIN) -lsolids4FoamModels \
     $(GFORTRAN_LIBS)

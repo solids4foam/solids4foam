@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -44,7 +38,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     timeIndex_(internalField().mesh().time().timeIndex()),
 #else
     timeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
@@ -87,7 +81,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();
     const pointField& points = mesh.points();
 #else
@@ -105,7 +99,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 (
     const elasticWallVelocityFvPatchVectorField& pivpvf
@@ -143,7 +137,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
         return;
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();
 #else
     const fvMesh& mesh = dimensionedInternalField().mesh();
@@ -159,7 +153,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     const volVectorField& U =
         mesh.lookupObject<volVectorField>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             internalField().name()
 #else
             dimensionedInternalField().name()
@@ -168,7 +162,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
 
     word ddtScheme
     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         mesh.ddtScheme("ddt(" + U.name() +')')
 #else
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
@@ -229,7 +223,7 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
         Up = (Fc_ - oldFc_)/mesh.time().deltaT().value();
     }
 
-    // Compute normal velocity component (from mesh flux
+    // Compute normal velocity component from mesh flux
     const scalarField phip
     (
         p.patchField<surfaceScalarField, scalar>(fvc::meshPhi(U))
@@ -239,50 +233,50 @@ void elasticWallVelocityFvPatchVectorField::updateCoeffs()
     const scalarField& magSf = p.magSf();
     scalarField Un(phip/(magSf + VSMALL));
 
-    if (mesh.foundObject<surfaceScalarField>("phi"))
-    {
-        const surfaceScalarField& phi =
-            mesh.lookupObject<surfaceScalarField>("phi");
+    // if (mesh.foundObject<surfaceScalarField>("phi"))
+    // {
+    //     const surfaceScalarField& phi =
+    //         mesh.lookupObject<surfaceScalarField>("phi");
 
-        const scalarField phipNew
-        (
-            phi.boundaryField()[this->patch().index()]
-        );
+    //     const scalarField phipNew
+    //     (
+    //         phi.boundaryField()[this->patch().index()]
+    //     );
 
-        Un = phipNew/(magSf + VSMALL);
-    }
-    else
-    {
-        const volScalarField& pressure =
-            mesh.lookupObject<volScalarField>("p");
+    //     Un = phipNew/(magSf + VSMALL);
+    // }
+    // else
+    // {
+    //     const volScalarField& pressure =
+    //         mesh.lookupObject<volScalarField>("p");
 
-        const scalarField nGradP
-        (
-            pressure.boundaryField()[patch().index()].snGrad()
-        );
+    //     const scalarField nGradP
+    //     (
+    //         pressure.boundaryField()[patch().index()].snGrad()
+    //     );
 
-        const IOdictionary transportProperties
-        (
-            IOobject
-            (
-                "transportProperties",
-                mesh.time().constant(),
-                mesh,
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        );
+    //     const IOdictionary transportProperties
+    //     (
+    //         IOobject
+    //         (
+    //             "transportProperties",
+    //             mesh.time().constant(),
+    //             mesh,
+    //             IOobject::MUST_READ,
+    //             IOobject::NO_WRITE
+    //         )
+    //     );
 
-        const dimensionedScalar rho
-        (
-            transportProperties.lookup("rho")
-        );
+    //     const dimensionedScalar rho
+    //     (
+    //         transportProperties.lookup("rho")
+    //     );
 
-        const vectorField UOld(U.oldTime().boundaryField()[patch().index()]);
+    //     const vectorField UOld(U.oldTime().boundaryField()[patch().index()]);
 
-        Un = (n & UOld) - nGradP*mesh.time().deltaT().value();
-        //Un = (n & UOld) - nGradP*mesh.time().deltaT().value()/rho.value();
-    }
+    //     Un = (n & UOld) - nGradP*mesh.time().deltaT().value();
+    //     //Un = (n & UOld) - nGradP*mesh.time().deltaT().value()/rho.value();
+    // }
 
     // Compute tangential + normal components (from flux)
     Up += n*(Un - (n & Up));
@@ -298,7 +292,7 @@ snGrad() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const word UName = internalField().name();
 #else
     const word UName = dimensionedInternalField().name();
@@ -325,7 +319,7 @@ snGrad() const
             new vectorField(this->patch().size(), vector::zero)
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         tnGradU.ref() =
             2
            *(
@@ -367,7 +361,7 @@ snGrad() const
         new vectorField(this->patch().size(), vector::zero)
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     tnGradU.ref() =
         (
             *this
@@ -400,7 +394,7 @@ gradientBoundaryCoeffs() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const word UName = internalField().name();
 #else
     const word UName = dimensionedInternalField().name();
@@ -471,7 +465,7 @@ gradientBoundaryCoeffs() const
 void elasticWallVelocityFvPatchVectorField::write(Ostream& os) const
 {
     fvPatchVectorField::write(os);
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -27,6 +21,7 @@ License
 #include "globalMeshData.H"
 #include "pointMesh.H"
 #include "pointFields.H"
+#include "processorPolyPatch.H"
 #include "processorPointPatchFields.H"
 #include "ListMaxOp.H"
 #include "ListSumOp.H"
@@ -213,7 +208,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
                 // Send
                 OPstream::write
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -249,7 +244,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
                 // Receive
                 IPstream::read
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -458,7 +453,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
             // Send
             OPstream::write
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 Pstream::commsTypes::blocking,
 #else
                 Pstream::blocking,
@@ -484,7 +479,7 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
             // Receive
             IPstream::read
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 Pstream::commsTypes::blocking,
 #else
                 Pstream::blocking,

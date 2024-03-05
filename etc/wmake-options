@@ -1,0 +1,39 @@
+#------------------------------------------------------------------------------
+# Standard handling of different flavours of OpenFOAM
+ifeq ($(WM_PROJECT), foam)
+    # Appears to be foam-extend
+    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
+    ifeq ($(VER), 1)
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
+    else
+        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
+    endif
+else
+    # For openfoam.com: check -DOPENFOAM= in its general compiler flags
+    # or (for redundancy) version vYYMM
+    ifneq (,$(findstring -DOPENFOAM=,$(GFLAGS)))
+        VERSION_SPECIFIC_INC = -DOPENFOAM_COM
+    else ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
+        VERSION_SPECIFIC_INC = -DOPENFOAM_COM
+    else
+        VERSION_SPECIFIC_INC = -DOPENFOAM_ORG
+    endif
+    # Not foam-extend
+    VERSION_SPECIFIC_INC += -DOPENFOAM_NOT_EXTEND
+endif
+
+VERSION_SPECIFIC_LIBS =
+
+#------------------------------------------------------------------------------
+# Optional integration as an OpenFOAM module
+sinclude $(GENERAL_RULES)/module-path-user
+
+# Failsafe - user location
+ifeq (,$(strip $(FOAM_MODULE_APPBIN)))
+    FOAM_MODULE_APPBIN = $(FOAM_USER_APPBIN)
+endif
+ifeq (,$(strip $(FOAM_MODULE_LIBBIN)))
+    FOAM_MODULE_LIBBIN = $(FOAM_USER_LIBBIN)
+endif
+
+#------------------------------------------------------------------------------

@@ -1,11 +1,11 @@
 #!/bin/bash
-cd ${0%/*} || exit 1    # run from this directory
+cd "${0%/*}" || exit  # Run from this directory
 
 # Compile C++ wrapper class
 wmake libso
 
 # Check gfortran is installed before compiling fortran sub-routines
-if ! hash gfortran 2>/dev/null
+if ! command -v gfortran >/dev/null 2>&1
 then
     echo
     echo "'gfortran' command not found! Please install gfortran!"

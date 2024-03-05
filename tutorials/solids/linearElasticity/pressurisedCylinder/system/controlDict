@@ -53,6 +53,14 @@ functions
        type    solidPointDisplacement;
        point   (7.0 0 0);
     }
+
+    transformStressToCylindrical
+    {
+        type        transformStressToCylindrical;
+
+        origin      (0 0 0);
+        axis        (0 0 1);
+    }
 }
 
 // ************************************************************************* //

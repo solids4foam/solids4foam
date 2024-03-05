@@ -24,7 +24,7 @@ Description
     Note: built-in OpenFOAM functions mess-up on a number of different tensors.
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD.
 
 \*---------------------------------------------------------------------------*/
 
@@ -33,6 +33,7 @@ Author
 
 #include "eig3.H"
 #include "volFields.H"
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -49,12 +50,19 @@ void eig3Field
     const volSymmTensorField& A, volTensorField& V, volVectorField& d
 );
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
 void eig3Field
 (
     const volSymmTensorField& A, volTensorField& V, volDiagTensorField& d
 );
 #endif
+
+void eig3Field
+(
+    const surfaceSymmTensorField& A,
+    surfaceTensorField& V,
+    surfaceVectorField& d
+);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

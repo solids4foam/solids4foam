@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check version
+solids4Foam::caseOnlyRunsWithFoamExtend
+
+# Check case version is correct
+#solids4Foam::convertCaseFormat .
+
+# Create the blockMeshDict
+mkdir -p constant/polyMesh
+m4 -P system/blockMeshDict.m4 > constant/polyMesh/blockMeshDict
+#m4 -P system/blockMeshDict.m4 > system/blockMeshDict
+
+# Create mesh
+solids4Foam::runApplication blockMesh
+
+# Run solver
+solids4Foam::runApplication solids4Foam
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating reaction-x.png and reaction-y.png using gnuplot"
+    gnuplot plot.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

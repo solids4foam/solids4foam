@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -43,7 +37,7 @@ Author
 
 #include "calculatedPointPatchFields.H"
 #include "interpolationTable.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "pointPatchFieldMapper.H"
 #else
     #include "PointPatchFieldMapper.H"
@@ -53,7 +47,7 @@ Author
 
 namespace Foam
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     typedef pointPatchFieldMapper PointPatchFieldMapper;
 #endif
 
@@ -116,7 +110,7 @@ public:
             const PointPatchFieldMapper&
         );
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
         //- Construct as copy
         solidTractionPointPatchVectorField
         (
@@ -204,7 +198,7 @@ public:
         //  there's nothing to do
         virtual void initEvaluate
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
 #else
             const Pstream::commsTypes commsType = Pstream::blocking

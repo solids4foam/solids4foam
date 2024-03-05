@@ -33,7 +33,7 @@ boundaryField
     inner-wall
     {
         type            solidTraction;
-		traction		uniform (0 0 0);
+	traction	uniform (0 0 0);
         pressureSeries
         {
             "fileName|file"    "$FOAM_CASE/constant/timeVsPressure";
@@ -44,17 +44,21 @@ boundaryField
     outer-wall
     {
         type            solidTraction;
-		traction		uniform (0 0 0);
-        pressure		uniform 0;
+	traction	uniform (0 0 0);
+        pressure	uniform 0;
         value           uniform (0 0 0);
     }
     symmetry-x
     {
-        type             	symmetryPlane;	
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
     }
     symmetry-y
     {
-        type             	symmetryPlane;	
+        type            solidSymmetry;
+        patchType       symmetryPlane;
+        value           uniform (0 0 0);
     }
 }
 

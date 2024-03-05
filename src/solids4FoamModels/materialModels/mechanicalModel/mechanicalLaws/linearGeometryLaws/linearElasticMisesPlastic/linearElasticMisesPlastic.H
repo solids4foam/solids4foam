@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -86,7 +80,7 @@ class linearElasticMisesPlastic
         //- Poisson's ratio
         dimensionedScalar nu_;
 
-        //- Table of post-yield stress versus plastic strain
+        //- Table of plastic strain versus post-yield stress
         interpolationTable<scalar> stressPlasticStrainSeries_;
 
         //- Yield stress
@@ -265,15 +259,20 @@ public:
 
     // Member Functions
 
+        //- Return bulk modulus
+        virtual tmp<volScalarField> bulkModulus() const;
+
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
-        virtual tmp<Field<symmTensor4thOrder>> materialTangentField() const;
+        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
+#endif
 
         //- Return the implicit stiffness as a diagTensor
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
         virtual tmp<volDiagTensorField> impKdiagTensor() const;
 #endif
 

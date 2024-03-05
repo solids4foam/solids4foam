@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
 
 #include "newPartialFaceAreaWeightAMI.H"
 
@@ -151,6 +151,6 @@ void Foam::newPartialFaceAreaWeightAMI<SourcePatch, TargetPatch>::calculate
 }
 
 
-#endif // end of #ifdef OPENFOAMFOUNDATION
+#endif // end of #ifdef OPENFOAM_ORG
 
 // ************************************************************************* //

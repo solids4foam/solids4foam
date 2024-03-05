@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -29,7 +23,7 @@ License
 #include "pointPatchFields.H"
 #include "pointBoundaryMesh.H"
 #include "pointMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "Time.H"
 #endif
 
@@ -65,7 +59,8 @@ fixedDisplacementZeroShearPointPatchVectorField
     dispSeries_(),
     curTimeIndex_(-1)
 {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
+    // refValue is only used by foam-extend
     vectorField refValue(patch().size(), vector::zero);
 #else
     // Set value fraction to fixed normal direction
@@ -90,7 +85,8 @@ fixedDisplacementZeroShearPointPatchVectorField
     }
     else
     {
-        refValue = vectorField("refValue", dict, p.size());
+        // Use the "value" on the patch
+        refValue = this->patchInternalField();
     }
 
     //this->updateBoundaryField();
@@ -99,7 +95,7 @@ fixedDisplacementZeroShearPointPatchVectorField
 
     tmp<vectorField> internalValues = this->patchInternalField();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     this->setInInternalField
     (
         const_cast<vectorField&>(this->primitiveField()),
@@ -140,7 +136,7 @@ fixedDisplacementZeroShearPointPatchVectorField
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 fixedDisplacementZeroShearPointPatchVectorField::
 fixedDisplacementZeroShearPointPatchVectorField
 (

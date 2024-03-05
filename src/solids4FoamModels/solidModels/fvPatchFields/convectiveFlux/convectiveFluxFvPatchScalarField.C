@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -99,7 +93,7 @@ Foam::convectiveFluxFvPatchScalarField::convectiveFluxFvPatchScalarField
     // lambda_ = dimensionedScalar(transportProperties.lookup("lambda")).value();
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 Foam::convectiveFluxFvPatchScalarField::convectiveFluxFvPatchScalarField
 (
     const convectiveFluxFvPatchScalarField& wbppsf

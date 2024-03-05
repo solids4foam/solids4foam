@@ -62,7 +62,7 @@ class fluidSolidInterface
     // Private data
 
         //- FSI properties dictionary
-        mutable dictionary fsiProperties_;
+        dictionary& fsiProperties_;
 
         //- Flow solver
         autoPtr<fluidModel> fluid_;
@@ -132,6 +132,9 @@ class fluidSolidInterface
         //- List of interfaces ref. point displacements
         List<vectorField> interfacesPointsDisplsPrev_;
 
+        //- Incremental or absolute residual calculation approach
+        const Switch incrementalResiduals_;
+
         //- List of current FSI residuals
         List<vectorField> residuals_;
 
@@ -162,9 +165,6 @@ class fluidSolidInterface
 
     // Private Member Functions
 
-        //- Update the coupled switch based on the couplingStartTime
-        bool updateCoupled();
-
         //- Calculate interface-to-interface list
         void calcInterfaceToInterfaceList() const;
 
@@ -180,6 +180,17 @@ class fluidSolidInterface
         //- Disallow default bitwise assignment
         void operator=(const fluidSolidInterface&);
 
+protected:
+    // Protected Member Functions
+
+        //- Update the coupled switch based on the couplingStartTime
+        bool updateCoupled();
+
+        //- Return sub-dictionary
+        dictionary& fsiProperties()
+        {
+            return fsiProperties_;
+        }
 
 public:
 
@@ -487,6 +498,9 @@ public:
             //- Update interface force
             virtual void updateForce();
 
+            //- Update separately interface viscous force and pressure
+            virtual void updateViscousForceAndPressure();
+
             //- Update interface force
             virtual scalar updateResidual();
 
@@ -506,6 +520,9 @@ public:
 
             //- Write fields
             virtual void writeFields(const Time& runTime);
+
+            //- This function is called at the end of the simulation
+            virtual void end();
 };
 
 

@@ -18,7 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "openFoamTableReader.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "fileOperation.H"
 #else
     #include "IFstream.H"
@@ -50,7 +50,7 @@ void Foam::openFoamTableReader<Type>::operator()
 )
 {
     // Read data from file
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     fileHandler().NewIFstream(fName)()() >> data;
 #else
     IFstream(fName)() >> data;
@@ -66,7 +66,7 @@ void Foam::openFoamTableReader<Type>::operator()
 )
 {
     // Read data from file
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     fileHandler().NewIFstream(fName)()() >> data;
 #else
     IFstream(fName)() >> data;

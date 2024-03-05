@@ -59,7 +59,7 @@ Foam::interfaceToInterfaceMapping::~interfaceToInterfaceMapping()
 Foam::autoPtr<Foam::interfaceToInterfaceMapping>
 Foam::interfaceToInterfaceMapping::New
 (
-    const word& type,
+    const word& modelType,
     const dictionary& dict,
     const primitivePatch& patchA,
     const primitivePatch& patchB,
@@ -67,26 +67,44 @@ Foam::interfaceToInterfaceMapping::New
     const globalPolyPatch& zoneB
 )
 {
-    Info<< "Selecting interfaceToInterfaceMapping " << type << endl;
+    Info<< "Selecting interfaceToInterfaceMapping " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            dict,
+            "interfaceToInterfaceMapping",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(type);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
         FatalErrorIn
         (
             "interfaceToInterfaceMapping::New(Time&, const word&)"
-        )   << "Unknown interfaceToInterfaceMapping type " << type
+        )   << "Unknown interfaceToInterfaceMapping type " << modelType
             << endl << endl
             << "Valid interfaceToInterfaceMapping types are :" << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalError);
     }
 
+    auto* ctorPtr = cstrIter();
+#endif
+
     return autoPtr<interfaceToInterfaceMapping>
     (
-        cstrIter()(type, dict, patchA, patchB, zoneA, zoneB)
+        ctorPtr(modelType, dict, patchA, patchB, zoneA, zoneB)
     );
 }
 

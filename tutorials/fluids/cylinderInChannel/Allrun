@@ -19,14 +19,8 @@ solids4Foam::runApplication solids4Foam
 # Create plots
 if command -v gnuplot &> /dev/null
 then
-    if [[ -f "./postProcessing/forces/0/forces.dat" ]]
-    then
-        echo "Generating force.pdf using gnuplot"
-        gnuplot force.of9.gnuplot &> /dev/null
-    else
-        echo "Generating force.pdf using gnuplot"
-        gnuplot force.gnuplot &> /dev/null
-    fi
+    echo "Generating force.pdf using gnuplot"
+    gnuplot force.gnuplot &> /dev/null
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi

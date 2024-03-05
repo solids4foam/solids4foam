@@ -112,7 +112,7 @@ bool linGeomPressureDisplacementSolid::evolve()
     do
     {
         int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         SolverPerformance<vector> solverPerfD;
         SolverPerformance<vector>::debug = 0;
 #else
@@ -146,11 +146,6 @@ bool linGeomPressureDisplacementSolid::evolve()
             // Enforce any cell displacements
             solidModel::setCellDisps(DEqn);
 
-            // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
-            const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
-#endif
-
             // Solve the linear system
             solverPerfD = DEqn.solve();
 
@@ -173,7 +168,7 @@ bool linGeomPressureDisplacementSolid::evolve()
             if (solvePressureEquationImplicitly_)
             {
                 int iInnerCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 SolverPerformance<scalar> solverPerfP;
 #else
                 lduSolverPerformance solverPerfP;
@@ -261,7 +256,7 @@ bool linGeomPressureDisplacementSolid::evolve()
             !converged
             (
                 iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 mag(solverPerfD.initialResidual()),
                 cmptMax(solverPerfD.nIterations()),
 #else
@@ -287,7 +282,7 @@ bool linGeomPressureDisplacementSolid::evolve()
     }
     while (mesh().update());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

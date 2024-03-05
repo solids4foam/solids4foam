@@ -1,1 +1,58 @@
-Allrun.pimpleFluid
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Example usage
+# ./Allrun
+# ./Allrun sonicLiquidFluid
+# ./Allrun robin
+
+# Select approach
+if [[ "$1" == "sonicLiquidFluid" ]]; then
+    # Dirichlet-Neumann sonicLiquidFluid approach
+    echo "Using the Dirichlet-Neumann sonicLiquidFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.sonicLiquidFluid')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+elif [[ "$1" == "robin" ]]; then
+    # Robin-Neumann pimpleFluid approach
+    echo "Using the Robin-Neumann sonicLiquidFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.robin')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+else
+    # Dirichlet-Neumann pimpleFluid approach
+    echo "Using the Dirichlet-Neumann pimpleFluid approach"
+    for file in $(find ./0 ./constant ./system -name '*.pimpleFluid')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+fi
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Check fvSolution for foundation version
+if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
+then
+    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
+    then
+        echo "OpenFOAM.org specific: replacing 'residualControl' with"
+        echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
+        sed -i "s/residualControl/outerCorrectorResidualControl/g" \
+            "${CASE_DIR}"/system/fluid/fvSolution
+    fi
+fi
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run solver
+solids4Foam::runApplication solids4Foam

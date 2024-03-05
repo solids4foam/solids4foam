@@ -61,11 +61,16 @@ function logReport()
     appAndCase="Application $app - case $case"
 
     fatalError=`grep "FOAM FATAL" $1`
+    otherError=`grep "ERROR" $1`
     completed=`grep -E "^[\t ]*[eE]nd" $1`
 
     if [ "$fatalError" ]
     then
         echo "$appAndCase: ** FOAM FATAL ERROR **"
+        return
+    elif [ "$otherError" ]
+    then
+        echo "$appAndCase: ** ERROR **"
         return
     elif [ "$completed" ]
     then

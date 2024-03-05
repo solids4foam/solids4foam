@@ -20,3 +20,12 @@ solids4Foam::runApplication setFields -region fluid
 
 # Run solver
 solids4Foam::runApplication solids4Foam
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating plot"
+    gnuplot -p plot.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

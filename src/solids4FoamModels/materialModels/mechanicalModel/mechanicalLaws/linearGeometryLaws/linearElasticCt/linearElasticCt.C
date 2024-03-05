@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -50,7 +44,7 @@ namespace Foam
 void Foam::linearElasticCt::setYoungsModulusFromCt()
 {
     // Optional constant E
-    if (dict().lookupOrDefault<Switch>("constantE", false))
+    if (dict().lookupOrAddDefault<Switch>("constantE", false))
     {
         Info<< nl << "Creating constant E field\n" << endl;
 
@@ -183,7 +177,7 @@ void Foam::linearElasticCt::setYoungsModulusFromCt()
 
         // Set the E field
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         scalarField& E_I = E_.primitiveFieldRef();
         scalarField& HuI = Hu.primitiveFieldRef();
         scalarField& relRhoI = relRho.primitiveFieldRef();
@@ -342,7 +336,7 @@ void Foam::linearElasticCt::setYoungsModulusFromCt()
             {
                 Info<< "    iteration " << i << endl;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 scalarField& E_I = E_.primitiveFieldRef();
                 const vectorField& CI = mesh().C().primitiveField();
 #else
@@ -455,7 +449,7 @@ Foam::linearElasticCt::linearElasticCt
     lambdaf_(fvc::interpolate(lambda_)),
     useRotationMatrix_
     (
-        dict.lookupOrDefault<Switch>("useRotationMatrix", false)
+        dict().lookupOrAddDefault<Switch>("useRotationMatrix", false)
     ),
     rotationMatrix_(I),
     centreOfRotation_(vector::zero)

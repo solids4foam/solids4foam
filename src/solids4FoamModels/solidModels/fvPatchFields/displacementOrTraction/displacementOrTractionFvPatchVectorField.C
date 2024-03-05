@@ -59,7 +59,7 @@ displacementOrTractionFvPatchVectorField
 )
 :
     solidDirectionMixedFvPatchVectorField(ptf, p, iF, mapper),
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     constantDisplacement_(mapper(ptf.constantDisplacement_)),
     constantTraction_(mapper(ptf.constantTraction_)),
 #else
@@ -255,7 +255,7 @@ void displacementOrTractionFvPatchVectorField::autoMap
 {
     solidDirectionMixedFvPatchVectorField::autoMap(m);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     m(constantDisplacement_, constantDisplacement_);
     m(constantTraction_, constantTraction_);
 
@@ -366,7 +366,7 @@ void displacementOrTractionFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "constantDisplacement", constantDisplacement_);
 #else
         constantDisplacement_.writeEntry("constantDisplacement", os);
@@ -382,7 +382,7 @@ void displacementOrTractionFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "constantTraction", constantTraction_);
 #else
         constantTraction_.writeEntry("constantTraction", os);

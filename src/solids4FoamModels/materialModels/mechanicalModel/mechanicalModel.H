@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -50,7 +44,7 @@ Author
 #include "mechanicalLaw.H"
 #include "Switch.H"
 #include "solidSubMeshes.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "volPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
@@ -143,7 +137,7 @@ public:
 
             //- Return a const reference to the vol-to-point base mesh
             //  interpolator
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const volPointInterpolation& volToPoint() const;
 #else
             const newLeastSquaresVolPointInterpolation& volToPoint() const;
@@ -252,6 +246,9 @@ public:
             //- Set restart: some mechanical laws may change the writeOpt of
             //  fields accordingly
             void setRestart();
+
+            //- Write current state of 'materialProperties' dictionary to disk
+            void writeDict();
 };
 
 

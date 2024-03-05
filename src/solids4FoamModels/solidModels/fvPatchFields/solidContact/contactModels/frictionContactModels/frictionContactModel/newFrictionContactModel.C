@@ -33,17 +33,32 @@ namespace Foam
 
 autoPtr<frictionContactModel> frictionContactModel::New
 (
-    const word& name,
+    const word& modelType,
     const fvPatch& patch,
     const dictionary& dict,
     const label masterPatchID,
     const label slavePatchID
 )
 {
-    Info<< "    Friction contact model: " << name << endl;
+    Info<< "    Friction contact model: " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            dict,
+            "frictionContactModel",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(name);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -58,17 +73,20 @@ autoPtr<frictionContactModel> frictionContactModel::New
             ")",
             dict
         )   << "Unknown frictionContactModel type "
-            << name << endl << endl
+            << modelType << endl << endl
             << "Valid  frictionContactModels are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
+    auto* ctorPtr = cstrIter();
+#endif
+
     return autoPtr<frictionContactModel>
     (
-        cstrIter()
+        ctorPtr
         (
-            name,
+            modelType,
             patch,
             dict,
             masterPatchID,

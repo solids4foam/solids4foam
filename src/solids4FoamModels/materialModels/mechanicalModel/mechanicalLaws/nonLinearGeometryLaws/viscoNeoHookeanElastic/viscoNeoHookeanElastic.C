@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -31,7 +25,7 @@ License
 #include "fvm.H"
 #include "fixedGradientFvPatchFields.H"
 #include "zeroGradientFvPatchFields.H"
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     #include "realEigenValues.H"
 #endif
 
@@ -166,7 +160,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "Unphysical Poisson's ratio: nu should be >= -1.0 and <= 0.5"
             << abort(FatalError);
@@ -190,7 +184,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                 "(\n"
                 "    const word& name,\n"
                 "    const fvMesh& mesh,\n"
-                "    const dictionary& dict\n"
+                "    dictionary& dict\n"
                 ")"
             )   << "We cannot specify k and nu independently as well as "
                 << "Young's/shear modulii!" << abort(FatalError);
@@ -220,7 +214,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
                 "(\n"
                 "    const word& name,\n"
                 "    const fvMesh& mesh,\n"
-                "    const dictionary& dict\n"
+                "    dictionary& dict\n"
                 ")"
             )   << "k is directly looked up from the dictionary; "
                 << "it is not calculated from mu and lambda" << endl;
@@ -239,7 +233,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "The E and tau lists should have the same length!"
             << abort(FatalError);
@@ -265,7 +259,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "All relaxation times should be positive!"
             << abort(FatalError);
@@ -280,7 +274,7 @@ Foam::viscoNeoHookeanElastic::viscoNeoHookeanElastic
             "(\n"
             "    const word& name,\n"
             "    const fvMesh& mesh,\n"
-            "    const dictionary& dict\n"
+            "    dictionary& dict\n"
             ")"
         )   << "All values of stiffness E should be positive!"
             << abort(FatalError);
@@ -542,7 +536,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     const volTensorField Cbar(pow(J, -2.0/3.0)*C);
 
     // Take references to the internal fields for efficiency
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const tensorField& CI = C.primitiveField();
     const scalarField& JI = J.primitiveField();
     symmTensorField& transformNeededI = transformNeeded_.primitiveFieldRef();
@@ -560,7 +554,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
     forAll(transformNeededI, cellI)
     {
         // Calculate principal stretches: lambda^2, which are eigenvalues of C
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
         eigenValues = Foam::realEigenValues(CI[cellI]);
 #else
         eigenValues = Foam::eigenValues(CI[cellI]);
@@ -593,7 +587,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
         // Take references to the patch fields for efficiency
         const tensorField& CP = C.boundaryField()[patchI];
         const scalarField& JP = J.boundaryField()[patchI];
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         symmTensorField& transformNeededP =
             transformNeeded_.boundaryFieldRef()[patchI];
 #else
@@ -605,7 +599,7 @@ void Foam::viscoNeoHookeanElastic::correct(volSymmTensorField& sigma)
         {
              // Calculate principal stretches: lambda^2, which are eigenvalues
              // of C
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
             eigenValues = Foam::realEigenValues(CP[faceI]);
 #else
             eigenValues = Foam::eigenValues(CP[faceI]);
@@ -720,7 +714,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     const surfaceTensorField Cbar(pow(J, -2.0/3.0)*C);
 
     // Take references to the internal fields for efficiency
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const tensorField& CI = C.primitiveField();
     const scalarField& JI = J.primitiveField();
     symmTensorField& transformNeededI = transformNeededf_.primitiveFieldRef();
@@ -738,7 +732,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
     forAll(transformNeededI, faceI)
     {
         // Calculate principal stretches: lambda^2, which are eigenvalues of C
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
         eigenValues = Foam::realEigenValues(CI[faceI]);
 #else
         eigenValues = Foam::eigenValues(CI[faceI]);
@@ -771,7 +765,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         // Take references to the patch fields for efficiency
         const tensorField& CP = C.boundaryField()[patchI];
         const scalarField& JP = J.boundaryField()[patchI];
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         symmTensorField& transformNeededP =
             transformNeededf_.boundaryFieldRef()[patchI];
 #else
@@ -783,7 +777,7 @@ void Foam::viscoNeoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         {
              // Calculate principal stretches: lambda^2, which are eigenvalues
              // of C
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
             eigenValues = Foam::realEigenValues(CP[faceI]);
 #else
             eigenValues = Foam::eigenValues(CP[faceI]);

@@ -7,7 +7,7 @@
 source solids4FoamScripts.sh
 
 cleanCase
-rm -rf constant/polyMesh/boundary VTK case.foam postProcessing 0/analytical*
+rm -rf constant/polyMesh/boundary VTK case.foam postProcessing 0/analytical* *.png
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

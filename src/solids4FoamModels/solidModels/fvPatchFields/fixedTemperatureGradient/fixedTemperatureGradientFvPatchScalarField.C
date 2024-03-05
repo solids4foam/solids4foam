@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -72,7 +66,7 @@ fixedTemperatureGradientFvPatchScalarField
     fieldName_(stpvf.fieldName_)
 {}
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 fixedTemperatureGradientFvPatchScalarField::
 fixedTemperatureGradientFvPatchScalarField
 (

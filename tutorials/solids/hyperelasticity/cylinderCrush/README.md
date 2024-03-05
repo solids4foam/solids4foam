@@ -4,6 +4,8 @@ sort: 3
 
 # Tutorial: `cylinderCrush`
 
+Prepared by Iago Lessa de Oliveira
+
 ---
 
 ## Tutorial Aims

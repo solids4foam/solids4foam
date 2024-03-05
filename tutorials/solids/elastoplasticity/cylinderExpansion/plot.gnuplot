@@ -1,8 +1,8 @@
-set terminal pdfcairo enhanced font "Times-Roman,9" linewidth 4 rounded
+set terminal pdfcairo enhanced font "Times-Roman,9" linewidth 0.5 rounded
 
-set style line 80 lt 1 lw 2
+set style line 80 lt rgb "black" lw 2
 set style line 81 lt 0  lw 2 # dashed
-set style line 81 lt rgb "#808080"  # grey
+set style line 81 lt rgb "grey"  # grey
 set grid back linestyle 81
 set border 3 back linestyle 80
 set xtics nomirror
@@ -27,8 +27,8 @@ b0 = 20;
 
 plot \
     -(0.5/sqrt(3)) \
-    *log( ((r0/a0)**2 + (x/a0)**2 - 1)/((b0/a0)**2 + (x/a0)**2 - 1) ) w l \
+    *log( ((r0/a0)**2 + (x/a0)**2 - 1)/((b0/a0)**2 + (x/a0)**2 - 1) ) w l lc"red" \
     t "Analytical", \
     "postProcessing/0/solidStressesinner.dat" \
     u (1000*$1*(0.075/15) + 10):(-1e-6*$5) every 1000::2 w lp \
-    lt 1 lw 0.5 pt 6 ps 2 t "Numerical"
+    lt 1 lw 0.5 pt 6 lc"black" ps 1 t "Numerical"

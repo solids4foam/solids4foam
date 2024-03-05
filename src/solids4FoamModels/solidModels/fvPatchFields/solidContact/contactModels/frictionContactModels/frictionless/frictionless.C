@@ -82,7 +82,7 @@ void Foam::frictionless::autoMap(const fvPatchFieldMapper& m)
         )   << "autoMap" << endl;
     }
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     m(slaveTraction_, slaveTraction_);
 #else
     slaveTraction_.autoMap(m);

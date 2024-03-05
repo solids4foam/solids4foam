@@ -58,7 +58,11 @@ functions
     {
         type          solidForces;
         historyPatch  loading;
-        stressName    sigma;
+    }
+    forceDisp1
+    {
+        type          solidForcesDisplacements;
+        historyPatch  loading;
     }
 }
 

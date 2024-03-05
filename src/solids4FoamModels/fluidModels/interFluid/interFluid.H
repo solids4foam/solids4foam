@@ -33,9 +33,9 @@ SourceFiles
 // There are significant differences between OpenFOAM/FOAM versions so to
 // improve readability and maintainability, the ported versions will be given
 // in separate files
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     #include "interFluid.foundation.H"
-#elif OPENFOAMESI
+#elif OPENFOAM_COM
     #include "interFluid.esi.H"
 #else
     #include "interFluid.foamextend.H"

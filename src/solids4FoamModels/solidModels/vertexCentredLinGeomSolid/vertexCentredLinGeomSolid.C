@@ -48,7 +48,6 @@ namespace solidModels
 defineTypeNameAndDebug(vertexCentredLinGeomSolid, 0);
 addToRunTimeSelectionTable(solidModel, vertexCentredLinGeomSolid, dictionary);
 
-
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 void vertexCentredLinGeomSolid::updateSource
@@ -93,7 +92,7 @@ void vertexCentredLinGeomSolid::updateSource
     {
         if (dualTraction.boundaryField()[patchI].coupled())
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             dualTraction.boundaryFieldRef()[patchI] = vector::zero;
 #else
             dualTraction.boundaryField()[patchI] = vector::zero;
@@ -122,7 +121,7 @@ void vertexCentredLinGeomSolid::updateSource
     // Add transient term
     source += vfvc::d2dt2
     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
         mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
@@ -280,7 +279,7 @@ void vertexCentredLinGeomSolid::setFixedDofs
                             << abort(FatalError);
                     }
 
-                    // If the point is not fully fuxed then make sure the normal
+                    // If the point is not fully fixed then make sure the normal
                     // direction is fixed
                     if (mag(fixedDofDirections[pointID] - symmTensor(I)) > 0)
                     {
@@ -410,7 +409,7 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
             dualFaceTraction /= nPointsPerDualFace;
 
             // Overwrite the dual patch face traction
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             dualTraction.boundaryFieldRef()[patchI] = dualFaceTraction;
 #else
             dualTraction.boundaryField()[patchI] = dualFaceTraction;
@@ -427,7 +426,7 @@ void vertexCentredLinGeomSolid::enforceTractionBoundaries
         {
             // Set the dual patch face shear traction to zero
             const vectorField n(dualMesh.boundary()[patchI].nf());
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             dualTraction.boundaryFieldRef()[patchI] =
                 (sqr(n) & dualTraction.boundaryField()[patchI]);
 #else
@@ -470,7 +469,7 @@ bool vertexCentredLinGeomSolid::vertexCentredLinGeomSolid::converged
     const scalar residualNorm = residualAbs/initResidual;
 
     // Calculate the maximum displacement
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const scalar maxMagD = gMax(mag(pointD.primitiveField()));
 #else
     const scalar maxMagD = gMax(mag(pointD.internalField()));
@@ -521,7 +520,7 @@ scalar vertexCentredLinGeomSolid::calculateLineSearchSlope
     pointD.storePrevIter();
 
     // Update pointD
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     pointD.primitiveFieldRef() += eta*pointDcorr;
 #else
     pointD.internalField() += eta*pointDcorr;
@@ -744,6 +743,10 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         "calculated"
     ),
     globalPointIndices_(mesh())
+#ifdef OPENFOAM_COM
+    ,
+    pointVolInterp_(pMesh(), mesh())
+#endif
 {
     // Create dual mesh and set write option
     dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
@@ -759,7 +762,7 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
 
     // Set the pointVol field
     // Map dualMesh cell volumes to the primary mesh points
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     scalarField& pointVolI = pointVol_.primitiveFieldRef();
 #else
     scalarField& pointVolI = pointVol_.internalField();
@@ -815,7 +818,7 @@ bool vertexCentredLinGeomSolid::evolve()
     sparseMatrix matrix(sum(globalPointIndices_.stencilSize()));
 
     // Store material tangent field for dual mesh faces
-    Field<symmTensor4thOrder> materialTangent
+    Field<scalarSquareMatrix> materialTangent
     (
         dualMechanicalPtr_().materialTangentFaceField()
     );
@@ -828,7 +831,9 @@ bool vertexCentredLinGeomSolid::evolve()
     }
 
     // Global point index lists
+    //List showing which points are on a specific processor?
     const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
+    //Mapping local points to global?
     const labelList& localToGlobalPointMap =
         globalPointIndices_.localToGlobalPointMap();
 
@@ -856,7 +861,7 @@ bool vertexCentredLinGeomSolid::evolve()
         // Add d2dt2 coefficients
         vfvm::d2dt2
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
             mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
@@ -876,7 +881,7 @@ bool vertexCentredLinGeomSolid::evolve()
     // Newton-Raphson loop over momentum equation
     int iCorr = 0;
     scalar initResidual = 0.0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solverPerf;
 #else
     BlockSolverPerformance<vector> solverPerf;
@@ -905,8 +910,6 @@ bool vertexCentredLinGeomSolid::evolve()
 
         if (fullNewton_)
         {
-            // Info<< "    Assembling the matrix" << endl;
-
             // Assemble the matrix once per outer iteration
             matrix.clear();
 
@@ -931,7 +934,7 @@ bool vertexCentredLinGeomSolid::evolve()
             // Add d2dt2 coefficients
             vfvm::d2dt2
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 mesh().d2dt2Scheme("d2dt2(pointD)"),
 #else
                 mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
@@ -945,6 +948,12 @@ bool vertexCentredLinGeomSolid::evolve()
             );
         }
 
+        if (debug > 1)
+        {
+            // Print the matrix
+            matrix.print();
+        }
+
         // Enforce fixed DOF on the linear system
         sparseMatrixTools::enforceFixedDof
         (
@@ -955,6 +964,12 @@ bool vertexCentredLinGeomSolid::evolve()
             fixedDofValues_,
             fixedDofScale_
         );
+
+        if (debug > 1)
+        {
+            // Print the matrix
+            matrix.print();
+        }
 
         // Solve linear system for displacement correction
         if (debug)
@@ -1034,23 +1049,21 @@ bool vertexCentredLinGeomSolid::evolve()
             );
 
             // Update displacement field
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             pointD().primitiveFieldRef() += eta*pointDcorr;
 #else
             pointD().internalField() += eta*pointDcorr;
 #endif
         }
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         else if (mesh().relaxField(pointD().name()))
 #else
         else if (mesh().solutionDict().relaxField(pointD().name()))
 #endif
         {
             // Relaxing the correction can help convergence
-            // This is like a simple line search
-            // Of course, an actual line search would be better: to-do!
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             const scalar rf
             (
                 mesh().fieldRelaxationFactor(pointD().name())
@@ -1068,7 +1081,7 @@ bool vertexCentredLinGeomSolid::evolve()
         }
         else
         {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             pointD().primitiveFieldRef() += pointDcorr;
 #else
             pointD().internalField() += pointDcorr;
@@ -1078,7 +1091,7 @@ bool vertexCentredLinGeomSolid::evolve()
 
         // Update point accelerations
         // Note: for NewmarkBeta, this needs to come before the pointU update
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         pointA_.primitiveFieldRef() =
             vfvc::ddt
             (
@@ -1121,7 +1134,7 @@ bool vertexCentredLinGeomSolid::evolve()
             iCorr,
             initResidual,
             solverPerf.finalResidual()[vector::X],
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             cmptMax(solverPerf.nIterations()),
 #else
             solverPerf.nIterations(),
@@ -1148,6 +1161,7 @@ bool vertexCentredLinGeomSolid::evolve()
 
     // Calculate cell gradient
     // This assumes a constant gradient within each primary mesh cell
+    // This is a first-order approximation
     gradD() = vfvc::grad(pointD(), mesh());
 
     // Map primary cell gradD field to sub-meshes for multi-material cases
@@ -1161,11 +1175,17 @@ bool vertexCentredLinGeomSolid::evolve()
 
     // Update primary mesh cell stress field, assuming it is constant per
     // primary mesh cell
+    // This stress will be first-order accurate
     mechanical().correct(sigma());
+
+#ifdef OPENFOAM_COM
+    // Interpolate pointD to D
+    // This is useful for visualisation but it is also needed when using preCICE
+    pointVolInterp_.interpolate(pointD(), D());
+#endif
 
     return true;
 }
-
 
 void vertexCentredLinGeomSolid::setTraction
 (
@@ -1187,7 +1207,7 @@ void vertexCentredLinGeomSolid::setTraction
     );
 
     // Lookup point patch field
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     pointPatchVectorField& ptPatch = pointD().boundaryFieldRef()[patchID];
 #else
     pointPatchVectorField& ptPatch = pointD().boundaryField()[patchID];
@@ -1216,6 +1236,67 @@ void vertexCentredLinGeomSolid::setTraction
             << solidTractionPointPatchVectorField::typeName
             << abort(FatalError);
     }
+}
+
+
+void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
+{
+    // Calculate gradD at the primary points using least squares: this should
+    // be second-order accurate (... I think).
+    const pointTensorField pGradD(vfvc::pGrad(pointD(), mesh()));
+
+    // Calculate strain at the primary points based on pGradD
+    // Note: the symm operator is not defined for pointTensorFields so we will
+    // do it manually
+    // const pointSymmTensorField pEpsilon("pEpsilon", symm(pGradD));
+    pointSymmTensorField pEpsilon
+    (
+        IOobject
+        (
+            "pEpsilon",
+            runTime.timeName(),
+            runTime,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedSymmTensor("0", dimless, symmTensor::zero)
+    );
+
+#ifdef FOAMEXTEND
+    pEpsilon.internalField() = symm(pGradD.internalField());
+#else
+    pEpsilon.primitiveFieldRef() = symm(pGradD.internalField());
+#endif
+    pEpsilon.write();
+
+    // Equivalent strain at the points
+    pointScalarField pEpsilonEq
+    (
+        IOobject
+        (
+            "pEpsilonEq",
+            runTime.timeName(),
+            runTime,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedScalar("0", dimless, 0.0)
+    );
+
+#ifdef FOAMEXTEND
+    pEpsilonEq.internalField() =
+        sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
+#else
+    pEpsilonEq.primitiveFieldRef() =
+        sqrt((2.0/3.0)*magSqr(dev(pEpsilon.internalField())));
+#endif
+    pEpsilonEq.write();
+
+    Info<< "Max pEpsilonEq = " << gMax(pEpsilonEq) << endl;
+
+    solidModel::writeFields(runTime);
 }
 
 

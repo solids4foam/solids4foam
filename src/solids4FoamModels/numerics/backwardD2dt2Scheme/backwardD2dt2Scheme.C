@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.1
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -61,8 +55,10 @@ scalar backwardD2dt2Scheme<Type>::deltaT0_
 {
     if
     (
-        vf.oldTime().oldTime().timeIndex()
-     == vf.oldTime().oldTime().oldTime().timeIndex()
+        vf.oldTime().timeIndex()
+     == vf.oldTime().oldTime().timeIndex()
+     //    vf.oldTime().oldTime().timeIndex()
+     // == vf.oldTime().oldTime().oldTime().timeIndex()
     )
     {
         return GREAT;
@@ -72,7 +68,6 @@ scalar backwardD2dt2Scheme<Type>::deltaT0_
         return deltaT0_();
     }
 }
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -96,11 +91,12 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
-    // Default to 1st order Euler on the first timne step
-    if (mesh().time().timeIndex() == 1)
-    {
-        return EulerD2dt2Scheme<Type>(mesh()).fvcD2dt2(vf);
-    }
+    // Default to 1st order Euler on the first time step
+    // ZT
+    // if (mesh().time().timeIndex() == 1)
+    // {
+    //     return EulerD2dt2Scheme<Type>(mesh()).fvcD2dt2(vf);
+    // }
 
     IOobject d2dt2IOobject
     (
@@ -113,9 +109,17 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
 
     const dimensionedScalar rDeltaT = 1.0/mesh().time().deltaT();
 
-    const scalar coefft = 1.5;
-    const scalar coefft0 = 2.0;
-    const scalar coefft00 = 0.5;
+    const scalar deltaT = deltaT_();
+    const scalar deltaT0 = deltaT0_(vf);
+
+    const scalar coefft = 1 + deltaT/(deltaT + deltaT0);
+    const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
+    const scalar coefft0 = coefft + coefft00;
+
+    // ZT
+    // const scalar coefft = 1.5;
+    // const scalar coefft0 = 2.0;
+    // const scalar coefft00 = 0.5;
 
     return tmp<GeometricField<Type, fvPatchField, volMesh> >
     (
@@ -163,11 +167,12 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
-    // Default to 1st order Euler on the first timne step
-    if (mesh().time().timeIndex() == 1)
-    {
-        return EulerD2dt2Scheme<Type>(mesh()).fvcD2dt2(rho, vf);
-    }
+    // Default to 1st order Euler on the first time step
+    // ZT
+    // if (mesh().time().timeIndex() == 1)
+    // {
+    //     return EulerD2dt2Scheme<Type>(mesh()).fvcD2dt2(rho, vf);
+    // }
 
     IOobject d2dt2IOobject
     (
@@ -180,9 +185,17 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
 
     const dimensionedScalar rDeltaT = 1.0/mesh().time().deltaT();
 
-    const scalar coefft = 1.5;
-    const scalar coefft0 = 2.0;
-    const scalar coefft00 = 0.5;
+    const scalar deltaT = deltaT_();
+    const scalar deltaT0 = deltaT0_(vf);
+
+    const scalar coefft = 1 + deltaT/(deltaT + deltaT0);
+    const scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
+    const scalar coefft0 = coefft + coefft00;
+
+    // ZT
+    // const scalar coefft = 1.5;
+    // const scalar coefft0 = 2.0;
+    // const scalar coefft00 = 0.5;
 
     return tmp<GeometricField<Type, fvPatchField, volMesh> >
     (
@@ -195,11 +208,11 @@ backwardD2dt2Scheme<Type>::fvcD2dt2
                 (
                     mesh()
                 ).fvcDdt(vf)
-                - coefft0*rho.oldTime()*backwardDdtScheme<Type>
+              - coefft0*rho.oldTime()*backwardDdtScheme<Type>
                 (
                     mesh()
                 ).fvcDdt(vf.oldTime())
-                + coefft00*rho.oldTime().oldTime()*backwardDdtScheme<Type>
+              + coefft00*rho.oldTime().oldTime()*backwardDdtScheme<Type>
                 (
                     mesh()
                 ).fvcDdt(vf.oldTime().oldTime())
@@ -229,11 +242,11 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
-    // Default to 1st order Euler on the first timne step
-    if (mesh().time().timeIndex() == 1)
-    {
-        return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(vf);
-    }
+    // Default to 1st order Euler on the first time step
+    // if (mesh().time().timeIndex() == 1)
+    // {
+    //     return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(vf);
+    // }
 
     tmp<fvMatrix<Type> > tfvm
     (
@@ -312,11 +325,12 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
-    // Default to 1st order Euler on the first timne step
-    if (mesh().time().timeIndex() == 1)
-    {
-        return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(rho, vf);
-    }
+    // Default to 1st order Euler on the first time step
+    // ZT
+    // if (mesh().time().timeIndex() == 1)
+    // {
+    //     return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(rho, vf);
+    // }
 
     tmp<fvMatrix<Type> > tfvm
     (
@@ -395,11 +409,12 @@ backwardD2dt2Scheme<Type>::fvmD2dt2
         notImplemented(type() + ": not implemented for a moving mesh");
     }
 
-    // Default to 1st order Euler on the first timne step
-    if (mesh().time().timeIndex() == 1)
-    {
-        return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(rho, vf);
-    }
+    // Default to 1st order Euler on the first time step
+    // ZT
+    // if (mesh().time().timeIndex() == 1)
+    // {
+    //     return EulerD2dt2Scheme<Type>(mesh()).fvmD2dt2(rho, vf);
+    // }
 
     tmp<fvMatrix<Type> > tfvm
     (

@@ -1,0 +1,117 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.;
+    format      ascii;
+    class       dictionary;
+    location    "constant/polyMesh";
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+convertToMeters 1;
+
+vertices
+(
+    (0 0 0)   //0
+    (1 0 0)   //1
+    (1 0.5 0) //2
+    (0 0.5 0) //3
+
+    (0 0 1)   //4
+    (1 0 1)   //5
+    (1 0.5 1) //6
+    (0 0.5 1) //7
+
+    (0 0.5 0) //8
+    (1 0.5 0) //9
+    (1 1 0)   //10
+    (0 1 0)   //11
+
+    (0 0.5 1) //8
+    (1 0.5 1) //9
+    (1 1 1)   //10
+    (0 1 1)   //11
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) blockLower (5 5 1) simpleGrading (1 1 1)
+    hex (8 9 10 11 12 13 14 15) blockUpper (8 8 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+boundary
+(
+    bricksSides
+    {
+        type patch;
+        faces
+        (
+            (8 12 15 11)
+            (9 10 14 13)
+            (0 4 7 3)
+            (5 1 2 6)
+        );
+    }
+    upperBlockContact
+    {
+        type patch;
+        faces
+        (
+            (12 8 9 13)
+        );
+    }
+    lowerBlockContact
+    {
+        type patch;
+        faces
+        (
+            (7 6 2 3)
+        );
+    }
+    bottom
+    {
+        type patch;
+        faces
+        (
+            (0 1 5 4)
+        );
+    }
+
+    top
+    {
+        type patch;
+        faces
+        (
+            (15 14 10 11)
+        );
+    }
+
+    frontAndBack
+    {
+        type empty;
+        faces
+        (
+            (4 5 6 7)
+            (0 3 2 1)
+            (11 10 9 8)
+            (12 13 14 15)
+        );
+    }
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

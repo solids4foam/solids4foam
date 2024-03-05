@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -63,6 +57,12 @@ class poroMechanicalLaw
         //- Run-time selectable mechanical law to define the effective stress
         autoPtr<mechanicalLaw> effectiveStressMechLawPtr_;
 
+        //- effective stress
+        autoPtr<volSymmTensorField> sigmaEff_;
+
+        //- effective stress on surfaceMesh
+        autoPtr<surfaceSymmTensorField> sigmaEfff_;
+
         //- Biot's coefficient
         //  Optional coefficient to scalar the pressure contribution to the
         //  total stress. Defaults to 1.0.
@@ -83,6 +83,12 @@ class poroMechanicalLaw
         mutable surfaceScalarField* p0fPtr_;
 
     // Private Member Functions
+
+        //- check if sigmaEff has been initalized already
+        bool checkSigmaEffReady(const volSymmTensorField& sigma, const volScalarField& p);
+
+        //- check if sigmaEfff has been initalized already
+        bool checkSigmaEffReady(const surfaceSymmTensorField& sigma, const surfaceScalarField& p);
 
         //- Make the initial pore-pressure surface field
         void makeP0f() const;
@@ -129,6 +135,9 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
+
+        //- Return biotCoeff as a field
+        virtual tmp<volScalarField> biotCoeff() const;
 
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);

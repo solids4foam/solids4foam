@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -55,9 +49,7 @@ Author
 #define linearElasticMohrCoulombPlastic_H
 
 #include "mechanicalLaw.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "surfaceFields.H"
-#endif
+#include "surfaceFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -134,11 +126,17 @@ class linearElasticMohrCoulombPlastic
         //- Derived plasticity parameter
         const vector sigma_a_;
 
-        //- Effective stress
-        volSymmTensorField sigmaEff_;
+        //- Stress variation from initial (sigma = deltaSigma + sigma0)
+        volSymmTensorField deltaSigma_;
 
-        //- Effective stress surface field
-        surfaceSymmTensorField sigmaEfff_;
+        //- Stress variation surface field
+        surfaceSymmTensorField deltaSigmaf_;
+
+        //- Incremental of strain
+        volSymmTensorField DEpsilon_;
+
+        //- Incremental of strain surface field
+        surfaceSymmTensorField DEpsilonf_;
 
         //- Incremental change of plastic strain
         volSymmTensorField DEpsilonP_;

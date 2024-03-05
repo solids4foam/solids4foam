@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -61,7 +55,8 @@ Foam::newDynamicBodyFvMesh::newDynamicBodyFvMesh(const IOobject& io)
                 io.time().constant(),
                 *this,
                 IOobject::MUST_READ,
-                IOobject::NO_WRITE
+                IOobject::NO_WRITE,
+                false  // Do not register
             )
         ).subDict(typeName + "Coeffs")
     ),
@@ -130,6 +125,8 @@ bool Foam::newDynamicBodyFvMesh::update()
 {
     scalar curTime = time().value();
     scalar oldTime = curTime - time().deltaT().value();
+
+    //Info<< "newDynamicBodyFvMesh::update()" << endl;
 
     {
         vector trans =

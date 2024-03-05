@@ -1,0 +1,123 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "p|pFinal"
+    {
+        solver          GAMG;
+        tolerance       1e-8;
+        relTol          1e-3;
+        minIter         1;
+        maxIter         1000;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+
+    cellMotionU
+    {
+        solver          GAMG;
+        tolerance       1e-06;
+        relTol          0.001;
+        minIter         1;
+        maxIter         1000;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+
+    U
+    {
+        solver          PBiCG;
+        preconditioner  DILU;
+        tolerance       1e-08;
+        relTol          1e-3;
+        minIter         1;
+    }
+    
+    T
+    {
+        solver          PBiCG;
+        preconditioner  DILU;
+        tolerance       1e-08;
+        relTol          1e-3;
+        minIter         1;
+    }
+}
+
+PISO
+{
+    nCorrectors 3;
+    nNonOrthogonalCorrectors 1;
+}
+
+PIMPLE
+{
+    nOuterCorrectors 20;
+    nCorrectors 3;
+    nNonOrthogonalCorrectors 1;
+    
+    pRefPoint        (-0.02 0.02 0);
+    pRefValue        0;
+    
+    residualControl
+    {
+        U
+        {
+            relTol 1e-6;
+            tolerance 1e-6;
+        }
+    }
+}
+
+
+relaxationFactors
+{
+    equations
+    {
+        U    0.99;
+        UFinal 0.99;
+
+        T 0.99;
+        TFinal 0.99;
+    }
+    fields
+    {
+        p    0.9;
+        pFinal    0.9;
+        
+        T 1;
+        TFinal 1;
+    }
+}
+
+// ************************************************************************* //

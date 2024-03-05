@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
@@ -40,6 +40,20 @@ Foam::newAMIMethod<SourcePatch, TargetPatch>::New
         Info<< "Selecting newAMIMethod " << methodName << endl;
     }
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = componentsConstructorTable(methodName);
+
+    if (!ctorPtr)
+    {
+        FatalErrorInLookup
+        (
+            "newAMIMethod",
+             methodName,
+            *componentsConstructorTablePtr_
+        ) << exit(FatalError);
+    }
+
+#else
     typename componentsConstructorTable::iterator cstrIter =
         componentsConstructorTablePtr_->find(methodName);
 
@@ -52,10 +66,12 @@ Foam::newAMIMethod<SourcePatch, TargetPatch>::New
             << componentsConstructorTablePtr_->sortedToc()
             << exit(FatalError);
     }
+    auto* ctorPtr = cstrIter();
+#endif
 
     return autoPtr<newAMIMethod<SourcePatch, TargetPatch>>
     (
-        cstrIter()
+        ctorPtr
         (
             srcPatch,
             tgtPatch,
@@ -69,6 +85,6 @@ Foam::newAMIMethod<SourcePatch, TargetPatch>::New
 }
 
 
-#endif // end of #ifdef OPENFOAMFOUNDATION
+#endif // end of #ifdef OPENFOAM_ORG
 
 // ************************************************************************* //

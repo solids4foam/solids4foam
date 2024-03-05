@@ -25,7 +25,7 @@ Description
     Note: this applies the force per face, not to the entire patch.
 
     Obviously, for a uniform force field, the total force applied to the patch
-    as the mesh is refined as the force per face stays constant.
+    increases as the mesh is refined, as the force per face stays constant.
 
     The primary motivation for this condition is for use FSI cases using the
     preCICE coupling library.
@@ -108,7 +108,7 @@ public:
         solidForceFvPatchVectorField
         (
             const solidForceFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );

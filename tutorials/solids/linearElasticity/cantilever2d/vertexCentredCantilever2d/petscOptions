@@ -6,7 +6,7 @@
 # Preconditioner and settings
 #-pc_type bjacobi
 -sub_pc_type ilu
--sub_pc_factor_levels 1
+-sub_pc_factor_levels 3
 #-pc_type gamg
 #-pc_gamg_type geo
 

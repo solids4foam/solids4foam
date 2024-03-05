@@ -31,6 +31,7 @@ Description
 #include "emptyPolyPatch.H"
 #include "demandDrivenData.H"
 #include "cyclicPolyPatch.H"
+#include "processorPolyPatch.H"
 #include "dynamicFvMesh.H"
 #if FOAMEXTEND
     #include "oversetPolyPatch.H"
@@ -41,7 +42,7 @@ Description
 namespace Foam
 {
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     typedef meshPointZones pointZoneMesh;
     typedef meshFaceZones faceZoneMesh;
     typedef meshCellZones cellZoneMesh;
@@ -121,7 +122,7 @@ void Foam::newFvMeshSubset::doCoupledPatches
 
                 OPstream toNeighbour
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -147,7 +148,7 @@ void Foam::newFvMeshSubset::doCoupledPatches
 
                 IPstream fromNeighbour
                 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     Pstream::commsTypes::blocking,
 #else
                     Pstream::blocking,
@@ -788,7 +789,7 @@ void Foam::newFvMeshSubset::setCellSubset
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         std::move(newPoints),
         std::move(newFaces),
         std::move(newCells)
@@ -840,7 +841,7 @@ void Foam::newFvMeshSubset::setCellSubset
                 patchStart,
                 nNewPatches,
                 newFvMeshSubsetPtr_->boundaryMesh()
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 ,
                 word::null
 #endif
@@ -1294,7 +1295,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         std::move(newPoints),
         std::move(newFaces),
         std::move(newCells),
@@ -1425,7 +1426,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
                 patchStart,
                 nNewPatches,
                 newFvMeshSubsetPtr_->boundaryMesh()
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 ,
                 word::null
 #endif
@@ -1539,7 +1540,7 @@ pointMesh& Foam::newFvMeshSubset::subPointMesh()
 {
     if (!pointMeshSubsetPtr_)
     {
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         pointMeshSubsetPtr_ = new pointMesh(subMesh());
 #else
         pointMeshSubsetPtr_ = new pointMesh(subMesh(), true);

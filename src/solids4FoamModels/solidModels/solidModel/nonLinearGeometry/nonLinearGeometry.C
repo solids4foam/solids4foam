@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -32,6 +26,18 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+#ifdef OPENFOAM_COM
+const Foam::Enum
+<
+    Foam::nonLinearGeometry::nonLinearType
+>
+Foam::NonLinearGeometry::nonLinearNames_;
+({
+    {nonLinearType::LINEAR_GEOMETRY, "linearGeometry"},
+    {nonLinearType::UPDATED_LAGRANGIAN, "updatedLagrangian"},
+    {nonLinearType::TOTAL_LAGRANGIAN, "totalLagrangian"},
+});
+#else
 template<>
 const char*
 Foam::NamedEnum<Foam::nonLinearGeometry::nonLinearType, 3>::names[] =
@@ -43,7 +49,7 @@ Foam::NamedEnum<Foam::nonLinearGeometry::nonLinearType, 3>::names[] =
 
 const Foam::NamedEnum<Foam::nonLinearGeometry::nonLinearType, 3>
 Foam::nonLinearGeometry::nonLinearNames_;
-
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

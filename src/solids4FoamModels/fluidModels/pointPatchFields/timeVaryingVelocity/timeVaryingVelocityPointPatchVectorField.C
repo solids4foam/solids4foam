@@ -21,7 +21,7 @@ License
 #include "pointPatchFields.H"
 #include "addToRunTimeSelectionTable.H"
 #include "polyMesh.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "Time.H"
 #endif
 
@@ -70,7 +70,7 @@ timeVaryingVelocityPointPatchVectorField
     const timeVaryingVelocityPointPatchVectorField& ptf,
     const pointPatch& p,
     const DimensionedField<vector, pointMesh>& iF,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const pointPatchFieldMapper& mapper
 #else
     const PointPatchFieldMapper& mapper
@@ -100,7 +100,7 @@ timeVaryingVelocityPointPatchVectorField
 
 void timeVaryingVelocityPointPatchVectorField::autoMap
 (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const pointPatchFieldMapper& m
 #else
     const PointPatchFieldMapper& m
@@ -151,7 +151,7 @@ void timeVaryingVelocityPointPatchVectorField::write(Ostream& os) const
 {
     pointPatchField<vector>::write(os);
     timeSeries_.write(os);
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

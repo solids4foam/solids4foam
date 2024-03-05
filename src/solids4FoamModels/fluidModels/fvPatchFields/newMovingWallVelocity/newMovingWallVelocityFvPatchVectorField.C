@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -44,14 +38,15 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     myTimeIndex_(internalField().mesh().time().timeIndex()),
 #else
     myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
 #endif
-    Fc_(p.patch().size(),vector::zero),
-    oldFc_(p.patch().size(),vector::zero),
-    oldoldFc_(p.patch().size(),vector::zero)
+    Fc_(p.patch().size(), vector::zero),
+    oldFc_(p.patch().size(), vector::zero),
+    oldoldFc_(p.patch().size(), vector::zero),
+    acceleration_(p.patch().size(), vector::zero)
 {}
 
 
@@ -65,9 +60,10 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 :
     fixedValueFvPatchVectorField(ptf, p, iF, mapper),
     myTimeIndex_(ptf.myTimeIndex_),
-    Fc_(p.patch().size(),vector::zero),
-    oldFc_(p.patch().size(),vector::zero),
-    oldoldFc_(p.patch().size(),vector::zero)
+    Fc_(p.patch().size(), vector::zero),
+    oldFc_(p.patch().size(), vector::zero),
+    oldoldFc_(p.patch().size(), vector::zero),
+    acceleration_(p.patch().size(), vector::zero)
 {}
 
 
@@ -79,18 +75,19 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF),
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     myTimeIndex_(internalField().mesh().time().timeIndex()),
 #else
     myTimeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
 #endif
-    Fc_(p.patch().size(),vector::zero),
-    oldFc_(p.patch().size(),vector::zero),
-    oldoldFc_(p.patch().size(),vector::zero)
+    Fc_(p.patch().size(), vector::zero),
+    oldFc_(p.patch().size(), vector::zero),
+    oldoldFc_(p.patch().size(), vector::zero),
+    acceleration_(p.patch().size(), vector::zero)
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();
     const pointField& points = mesh.points();
 #else
@@ -108,7 +105,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 }
 
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 (
     const newMovingWallVelocityFvPatchVectorField& pivpvf
@@ -118,7 +115,8 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     myTimeIndex_(pivpvf.myTimeIndex_),
     Fc_(pivpvf.Fc_),
     oldFc_(pivpvf.oldFc_),
-    oldoldFc_(pivpvf.oldoldFc_)
+    oldoldFc_(pivpvf.oldoldFc_),
+    acceleration_(pivpvf.acceleration_)
 {}
 #endif
 
@@ -133,7 +131,8 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     myTimeIndex_(pivpvf.myTimeIndex_),
     Fc_(pivpvf.oldFc_),
     oldFc_(pivpvf.oldFc_),
-    oldoldFc_(pivpvf.oldoldFc_)
+    oldoldFc_(pivpvf.oldoldFc_),
+    acceleration_(pivpvf.acceleration_)
 {}
 
 
@@ -148,7 +147,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
         return;
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();
     const pointField& points = mesh.points();
 #else
@@ -164,7 +163,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
     const volVectorField& U =
         mesh.lookupObject<volVectorField>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             internalField().name()
 #else
             dimensionedInternalField().name()
@@ -173,7 +172,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 
     word ddtScheme
     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         mesh.ddtScheme("ddt(" + U.name() +')')
 #else
         mesh.schemesDict().ddtScheme("ddt(" + U.name() +')')
@@ -198,6 +197,7 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 
         scalar deltaT = mesh.time().deltaT().value();
         scalar deltaT0 = mesh.time().deltaT0().value();
+
         if
         (
             U.oldTime().timeIndex() == U.oldTime().oldTime().timeIndex()
@@ -256,6 +256,37 @@ void newMovingWallVelocityFvPatchVectorField::updateCoeffs()
 
 //     Info << "mwvuc " << max(mag(Up)) << ", " << average(mag(Up)) << endl;
 
+    // Update acceleration
+    if
+    (
+        (ddtScheme == fv::backwardDdtScheme<vector>::typeName)
+     && (myTimeIndex_ > 1)
+    )
+    {
+        scalar deltaT = mesh.time().deltaT().value();
+        scalar deltaT0 = mesh.time().deltaT0().value();
+
+        scalar coefft   = 1 + deltaT/(deltaT + deltaT0);
+        scalar coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
+        scalar coefft0  = coefft + coefft00;
+
+        acceleration_ =
+            (
+                coefft*Up
+              - coefft0
+               *U.oldTime().boundaryField()[this->patch().index()]
+              + coefft00
+               *U.oldTime().oldTime().boundaryField()[this->patch().index()]
+            )
+           /mesh.time().deltaT().value();
+    }
+    else
+    {
+        acceleration_ =
+            (Up - U.oldTime().boundaryField()[this->patch().index()])/
+            mesh.time().deltaT().value();
+    }
+
     fixedValueFvPatchVectorField::updateCoeffs();
 }
 
@@ -265,7 +296,7 @@ snGrad() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     word UName = internalField().name();
 #else
     word UName = dimensionedInternalField().name();
@@ -298,7 +329,7 @@ snGrad() const
                 new vectorField(this->patch().size(), vector::zero)
             );
 
-    #ifdef OPENFOAMESIORFOUNDATION
+    #ifdef OPENFOAM_NOT_EXTEND
             tnGradU.ref() =
                 2
                *(
@@ -334,7 +365,7 @@ snGrad() const
     // First order
     // vectorField dUP = (k&gradU.patchInternalField());
 
-    #ifdef OPENFOAMESIORFOUNDATION
+    #ifdef OPENFOAM_NOT_EXTEND
         tnGradU.ref() =
             (
                 *this
@@ -370,7 +401,7 @@ gradientBoundaryCoeffs() const
 {
     bool secondOrder_ = false;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     word UName = internalField().name();
 #else
     word UName = dimensionedInternalField().name();
@@ -452,7 +483,7 @@ gradientBoundaryCoeffs() const
 void newMovingWallVelocityFvPatchVectorField::write(Ostream& os) const
 {
     fvPatchVectorField::write(os);
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
 #else
     writeEntry("value", os);

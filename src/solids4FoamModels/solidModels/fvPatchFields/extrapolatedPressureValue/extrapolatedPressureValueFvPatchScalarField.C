@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -71,7 +65,7 @@ extrapolatedPressureValueFvPatchScalarField::extrapolatedPressureValueFvPatchSca
     relaxFac_(readScalar(dict.lookup("relaxFactor")))
 {}
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 extrapolatedPressureValueFvPatchScalarField::extrapolatedPressureValueFvPatchScalarField
 (
     const extrapolatedPressureValueFvPatchScalarField& pivpvf

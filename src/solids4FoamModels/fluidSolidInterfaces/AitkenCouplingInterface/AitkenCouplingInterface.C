@@ -48,16 +48,16 @@ AitkenCouplingInterface::AitkenCouplingInterface
     fluidSolidInterface(typeName, runTime, region),
     relaxationFactor_
     (
-        fsiProperties().lookupOrDefault<scalar>("relaxationFactor", 0.01)
+        fsiProperties().lookupOrAddDefault<scalar>("relaxationFactor", 0.01)
     ),
     relaxationFactorMax_
     (
-        fsiProperties().lookupOrDefault<scalar>
+        fsiProperties().lookupOrAddDefault<scalar>
         (
             "relaxationFactorMax", 1.0
         )
     ),
-    predictSolid_(fsiProperties().lookupOrDefault<Switch>("predictSolid", true)),
+    predictSolid_(fsiProperties().lookupOrAddDefault<Switch>("predictSolid", true)),
     aitkenRelaxationFactors_(nGlobalPatches(), relaxationFactor_)
 {}
 

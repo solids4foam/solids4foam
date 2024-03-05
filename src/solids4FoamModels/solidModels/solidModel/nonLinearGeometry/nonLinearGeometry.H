@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -41,7 +35,11 @@ SourceFiles
 #ifndef nonLinearGeometry_H
 #define nonLinearGeometry_H
 
+#ifdef OPENFOAM_COM
+#include "Enum.H"
+#else
 #include "NamedEnum.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -64,7 +62,11 @@ public:
             TOTAL_LAGRANGIAN
         };
 
+#ifdef OPENFOAM_COM
+        static const Enum<nonLinearType> nonLinearNames_;
+#else
         static const NamedEnum<nonLinearType, 3> nonLinearNames_;
+#endif
 };
 
 

@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -57,7 +51,7 @@ class mapPolyMesh;
 
 class cellPointLeastSquaresVectors
 :
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     public MeshObject<fvMesh, MoveableMeshObject, cellPointLeastSquaresVectors>
 #else
     public MeshObject<fvMesh, cellPointLeastSquaresVectors>
@@ -100,7 +94,7 @@ public:
 
         //- Update after mesh motion:
         //  Delete the least square vectors when the mesh moves
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         virtual bool movePoints();
 #else
         virtual bool movePoints() const;

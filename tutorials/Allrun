@@ -5,109 +5,223 @@
 #     License <http://www.gnu.org/licenses/>.
 #
 # Script
-#     Allrun
+#     Alltest
 #
 # Description
-#    Recursively run all cases in this directory and sub-directories.
-#    Adapted from foam-extend-4.0 and OpenFOAM-v2012 tutorials/Alltest scripts.
+#     Run all the tutorials.
+#     Adapted from Alltest.
 #
 #------------------------------------------------------------------------------
-cd ${0%/*} || exit 1    # Run from this directory
+cd "${0%/*}" || exit  # Run from this directory
 
 #
 # FUNCTION DEFINITIONS
 #
 
-# Source tutorial run functions
-. $WM_PROJECT_DIR/bin/tools/RunFunctions
+function usage()
+{
+    exec 1>&2
+    while [ "$#" -ge 1 ]; do echo "$1"; shift; done
+    cat<<USAGE
 
+usage: ${0##*/} [OPTION]
+
+options:
+  -help         Print the usage
+
+Run all the tutorials.
+
+USAGE
+    exit 1
+}
+
+# Report error and exit
+function die()
+{
+    exec 1>&2
+    echo
+    echo "Error encountered:"
+    while [ "$#" -ge 1 ]; do echo "    $1"; shift; done
+    echo
+    echo "See '${0##*/} -help' for usage"
+    echo
+    exit 1
+}
 
 # logReport <logfile>
-# Extracts useful info from log file
+# Extracts useful info from log file.
 function logReport()
 {
-    caseName=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
-    app=`echo $1 | sed s/"\(.*\)log\."/""/g`
-    appAndCase="Application $app - case $caseName"
+    case=`dirname $1 | sed s/"\(.*\)\.\/"/""/g`
+    app=`echo $1 | sed s/"\(.*\)\."/""/g`
+    if [[ "${app}" == "solid" || "${app}" == "fluid" ]]
+    then
+        app=`echo $1 | rev | cut -d'.' -f 2,1 | rev`
+    fi
+    appAndCase="Application $app - case $case"
 
     fatalError=`grep "FOAM FATAL" $1`
-    UxSS=`grep -E "Ux[:| ]*solution singularity" $1`
-    UySS=`grep -E "Uy[:| ]*solution singularity" $1`
-    UzSS=`grep -E "Uz[:| ]*solution singularity" $1`
     completed=`grep -E "^[\t ]*[eE]nd" $1`
 
     if [ "$fatalError" ]
     then
         echo "$appAndCase: ** FOAM FATAL ERROR **"
-        return 1
-    elif [ "$UxSS" -a "$UySS" -a "$UzSS" ]
-    then
-        echo "$appAndCase: ** Solution singularity **"
-        return 1
+        return
     elif [ "$completed" ]
     then
-        completionTime=`tail -10 $log | grep Execution | cut -d= -f2 | sed 's/^[ \t]*//'`
+        completionTime=`tail -20 $log | grep Execution | cut -d= -f2 | sed 's/^[ \t]*//'`
         if [ "$completionTime" ]
         then
             completionTime="in $completionTime"
         fi
         echo "$appAndCase: completed $completionTime"
-        return 0
+        return
     else
         echo "$appAndCase: unconfirmed completion"
-        return 1
+    fi
+}
+
+# Run cases (similar to foamRunTutorials)
+function runCases()
+{
+    thisScript=$0
+    if [ "/${thisScript#/}" != "$thisScript" ]
+    then
+        thisScript="$PWD/$thisScript"
+    fi
+
+    # If an argument is supplied do not execute ./Allrun to avoid recursion
+    if [ $# = 0 -a -f "./Allrun" ]
+    then
+        echo; echo "execute Allrun"
+        # Specialised script.
+        ./Allrun
+    else
+        # Loop over sub-directories and compile any applications
+        for case in *
+        do
+            if [ -d $case -a -d "$case/Make" ]
+            then
+                (compileApplication $case)
+            fi
+        done
+
+        # Recurse to subdirectories
+        for case in *
+        do
+            if [ -d $case ]
+            then
+                echo "cd $case and runCases"
+                (cd $case && runCases)
+            fi
+        done
     fi
 }
 
 
-# logReportDir <directory>
-# Extracts useful info from all log files in a directory
-function logReportDir()
-(
-    [ -d $1 ] || return 0
+#
+# PRELIMINARIES
+#
 
-    cd $1 || return 1
+rootDir="./"
 
-    logs=`find . -name "log.*"`
-    [ -n "$logs" ] || return 0
+# Parse options
+while [ "$#" -gt 0 ]
+do
+    case "$1" in
+    -h | -help)
+        usage
+        ;;
+    *)
+        die "Unknown option/argument: '$1'"
+        ;;
+    esac
+    shift
+done
 
-    retVal=0
+# Sets FOAM_TUTORIALS directory location, as required
+. "${WM_PROJECT_DIR:?}"/bin/tools/RunFunctions
 
-    for log in `echo $logs | xargs ls -rt`
-    do
-        logReport $log >> ../testLoopReport || retVal=1
-    done
-    echo "" >> ../testLoopReport
-
-    return $retVal
-)
+# Set run directory
+ALLRUN_DIR=../tutorialsRun
 
 
 #
 # MAIN
 #
 
-# Recursively run all cases
-if [[ $WM_PROJECT = "foam" ]]
+if [ -d "$ALLRUN_DIR" ]
 then
-    foamRunTutorials cases
-else
-    foamRunTutorials
+    echo "Directory already exists: $ALLRUN_DIR" 1>&2
+    echo "Please remove it" 1>&2
+    exit 1
 fi
 
+# Copy tutorials
+cp -a "$rootDir" "$ALLRUN_DIR"
 
-# Analyse all log files
-rm -f testLoopReport && touch testLoopReport
+# Enter test directory
+cd "$ALLRUN_DIR" || exit
 
-retVal=0
+# Source tutorial functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-for appDir in *
+# Remove high-level Allrun (the copy of this file)
+rm Allrun*
+
+# Run cases recursively
+echo "Running cases "; echo "    $PWD"; echo
+runCases
+
+# Prepare summary files
+echo; echo "Preparing AllrunReport"
+rm AllrunReport > /dev/null 2>&1 &
+touch AllrunReport
+for application in *
 do
-    logReportDir $appDir || retVal=1
+    if [ -d $application ]
+    then
+        cd $application
+        for log in `find . -name "log.*" | xargs ls -rt`
+        do
+            logReport $log >> ../AllrunReport
+        done
+        echo "" >> ../AllrunReport
+        cd ..
+    fi
 done
 
+# Create concatenated logs file
+echo; echo "Preparing logs"
 find . -name "log.*" -exec cat {} \; >> logs
 
-exit $retVal
+# Output summary statistics
+echo; echo "Summary statistics"
+N_RUN_CASES=$(grep "solids4Foam" ../tutorialsTest/AllrunReport | wc -l)
+N_FAILED_SOLVER=$(grep "ERROR" AllrunReport | grep "solids4Foam" | wc -l)
+N_FAILED_COMMANDS=$(grep "ERROR" AllrunReport | wc -l)
+N_FAILED_OTHER=$((N_FAILED_COMMANDS-N_FAILED_SOLVER))
+echo "    Number of cases where a run was attempted: ${N_RUN_CASES}"
+echo "    Number of cases where the solver failed: ${N_FAILED_SOLVER}"
+echo "    Number of cases where another command failed: ${N_FAILED_OTHER}"
+echo
 
-#------------------------------------------------------------------------------
+if [[ $N_FAILED_SOLVER -gt 0 || $N_FAILED_OTHER -gt 0 ]]
+then
+    if [[ $N_FAILED_SOLVER -gt 0 ]]
+    then
+        echo "The solids4Foam solver failed in the following cases:"
+        grep "ERROR" AllrunReport | grep "solids4Foam"
+        echo
+    fi
+    if [[ $N_FAILED_OTHER -gt 0 ]]
+    then
+        echo "The following commands failed:"
+        grep "ERROR" AllrunReport
+        echo
+    fi
+    exit 1
+else
+    echo "All cases completed without errors: enjoy solids4foam."
+fi
+echo

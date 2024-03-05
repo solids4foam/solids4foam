@@ -7,7 +7,7 @@
 source solids4FoamScripts.sh
 
 cleanCase
-rm -f postProcessing *.png constant/polyMesh/boundary
+rm -rf postProcessing *.png constant/polyMesh/boundary
 
 # Convert case version to FOAM EXTEND
 solids4Foam::convertCaseFormatFoamExtend .

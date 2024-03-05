@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     3.2
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -54,6 +48,21 @@ Foam::label Foam::sparseMatrix::nBlockRows() const
     }
 
     return nBlockRows + 1;
+}
+
+
+void Foam::sparseMatrix::print() const
+{
+    Info<< "void Foam::sparseMatrix::print() const" << endl;
+
+    for (auto iter = data_.begin(); iter != data_.end(); ++iter)
+    {
+        const label rowI = iter.key()[0];
+        const label colI = iter.key()[1];
+        const tensor& val = *iter;
+
+        Info<< "(" << rowI << ", " << colI << "): " << val << endl;
+    }
 }
 
 

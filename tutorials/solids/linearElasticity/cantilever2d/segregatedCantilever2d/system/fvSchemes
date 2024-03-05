@@ -30,7 +30,7 @@ ddtSchemes
 gradSchemes
 {
      default                none;
-     grad(D)                extendedLeastSquares 0;
+     grad(D)                leastSquares;
 }
 
 divSchemes

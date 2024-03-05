@@ -33,15 +33,30 @@ namespace Foam
 
 autoPtr<frictionLaw> frictionLaw::New
 (
-    const word& name,
+    const word& modelType,
     const frictionContactModel& fricModel,
     const dictionary& dict
 )
 {
-    Info<< "        Friction law: " << name << endl;
+    Info<< "        Friction law: " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            dict,
+            "frictionLaw",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(name);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -54,13 +69,16 @@ autoPtr<frictionLaw> frictionLaw::New
             ")",
             dict
         )   << "Unknown frictionLaw type "
-            << name << endl << endl
+            << modelType << endl << endl
             << "Valid  frictionLaws are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
-    return autoPtr<frictionLaw>(cstrIter()(name, fricModel, dict));
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<frictionLaw>(ctorPtr(modelType, fricModel, dict));
 }
 
 

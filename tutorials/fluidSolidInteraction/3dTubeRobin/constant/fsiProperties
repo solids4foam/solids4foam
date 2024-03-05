@@ -1,0 +1,51 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// If using the Dirichlet-Neumann formulation (i.e. pimpleFluid + zeroGradient
+// BCs for the wall FSI interface), the convergence is better with IQN-ILS.
+// The Aitken accelerator can also be used in this case, but a tunning of the
+// parameters may be required
+//
+// If the Robin-Neumann formulation is employed (i.e. pimpleFluid + Robin BCs
+// for the wall FSI interface), then the Aitken parameters in this template
+// lead to convergence in all time-steps
+
+fluidSolidInterface    fixedRelaxation;
+
+fixedRelaxationCoeffs
+{
+    solidPatch          inner-wall;
+    fluidPatch          wall;
+
+    // Initial relaxation factor
+    relaxationFactor    1;
+
+    outerCorrTolerance  1e-6;
+    nOuterCorr          100;
+
+    interpolatorUpdateFrequency 0;
+    interfaceDeformationLimit   0;
+
+    coupled yes;
+    
+    // Write fsi residuals to file
+    writeResidualsToFile yes;
+}
+
+
+// ************************************************************************* //

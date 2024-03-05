@@ -48,7 +48,7 @@ addToRunTimeSelectionTable(solidModel, weakThermalLinGeomSolid, dictionary);
 bool weakThermalLinGeomSolid::converged
 (
     const int iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const SolverPerformance<scalar>& solverPerfT,
 #else
     const lduSolverPerformance& solverPerfT,
@@ -63,7 +63,7 @@ bool weakThermalLinGeomSolid::converged
     const scalar absResidualT =
         gMax
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             DimensionedField<double, volMesh>
 #endif
             (
@@ -76,7 +76,7 @@ bool weakThermalLinGeomSolid::converged
         (
             gMax
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 DimensionedField<double, volMesh>
 #endif
                 (
@@ -225,7 +225,7 @@ bool weakThermalLinGeomSolid::evolve()
     Info << "Evolving thermal solid solver" << endl;
 
     int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<scalar> solverPerfT;
     SolverPerformance<vector>::debug = 0;
 #else
@@ -267,7 +267,7 @@ bool weakThermalLinGeomSolid::evolve()
     // thermal stress is to be included in the momentum equation.
     linGeomTotalDispSolid::evolve();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<scalar>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

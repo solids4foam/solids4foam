@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
 
 #include "newSweptFaceAreaWeightAMI.H"
 #include "cut.H"
@@ -396,7 +396,7 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::interArea
 
     // Triangulate the faces
     const faceAreaIntersect::triangulationMode triMode = this->triMode_;
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     triFaceList srcFaceTris, tgtFaceTris;
 #else
     faceList srcFaceTris, tgtFaceTris;
@@ -408,7 +408,7 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::interArea
     scalar areaMag = Zero;
 
     // Loop the target triangles
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     forAllConstIter(triFaceList, tgtFaceTris, tgtIter)
 #else
     forAllConstIter(faceList, tgtFaceTris, tgtIter)
@@ -423,7 +423,7 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::interArea
             };
 
         // Loop the source triangles
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         forAllConstIter(triFaceList, srcFaceTris, srcIter)
 #else
         forAllConstIter(faceList, srcFaceTris, srcIter)
@@ -612,6 +612,6 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::
 {}
 
 
-#endif // end of #ifdef OPENFOAMFOUNDATION
+#endif // end of #ifdef OPENFOAM_ORG
 
 // ************************************************************************* //

@@ -17,6 +17,8 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
+solids4Foam::caseDoesNotRunWithFoamExtend
+
 # Compile libraries
 echo "Running Allwmake on ${PWD}"
 ./Allwmake &> log.Allwmake

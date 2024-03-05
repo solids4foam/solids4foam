@@ -125,7 +125,7 @@ solidForceFvPatchVectorField
 )
 :
     solidTractionFvPatchVectorField(stpvf, p, iF, mapper),
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     force_(mapper(stpvf.force_)),
 #else
     force_(stpvf.force_, mapper),
@@ -134,7 +134,7 @@ solidForceFvPatchVectorField
     curTimeIndex_(stpvf.curTimeIndex_)
 {}
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 solidForceFvPatchVectorField::solidForceFvPatchVectorField
 (
     const solidForceFvPatchVectorField& stpvf
@@ -169,7 +169,7 @@ void solidForceFvPatchVectorField::autoMap
 {
     solidTractionFvPatchVectorField::autoMap(m);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     m(force_, force_);
 #else
     force_.autoMap(m);
@@ -295,14 +295,14 @@ void solidForceFvPatchVectorField::write(Ostream& os) const
     }
     else
     {
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         writeEntry(os, "force", force_);
 #else
         force_.writeEntry("force", os);
 #endif
     }
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
     writeEntry(os, "gradient", gradient());
 #else

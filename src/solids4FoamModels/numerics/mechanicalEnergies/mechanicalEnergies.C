@@ -116,7 +116,7 @@ const surfaceScalarField& mechanicalEnergies::viscousPressure
         rho*fvc::ddt(epsilonVol(gradD))
     )*waveSpeed/mesh_.deltaCoeffs();
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     viscousPressurePtr_().setOriented(false);
     viscousPressurePtr_().oldTime().setOriented(false);
 #endif
@@ -191,7 +191,7 @@ void mechanicalEnergies::checkEnergies
         internalEnergyOldTime_
       + gSum
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             DimensionedField<scalar, volMesh>
 #endif
             (
@@ -227,7 +227,7 @@ void mechanicalEnergies::checkEnergies
     externalWork_ +=
         gSum
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             DimensionedField<scalar, volMesh>
 #endif
             (
@@ -242,7 +242,7 @@ void mechanicalEnergies::checkEnergies
             linearBulkViscosityEnergyOldTime_
           + gSum
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 DimensionedField<scalar, volMesh>
 #endif
                 (

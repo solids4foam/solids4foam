@@ -1,35 +1,19 @@
-ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
+SOLIDS4FOAM_ROOT := ../..
+
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
+
+ifneq (,$(findstring Gcc,$(WM_COMPILER)))
     DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-deprecated-declarations
 else
     DISABLE_WARNING_FLAGS =
-endif
-
-ifeq ($(WM_PROJECT), foam)
-    VER := $(shell expr `echo $(WM_PROJECT_VERSION)` \>= 4.1)
-    ifeq ($(VER), 1)
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=41
-    else
-        VERSION_SPECIFIC_INC = -DFOAMEXTEND=40
-    endif
-else
-    VERSION_SPECIFIC_INC = \
-        -DOPENFOAMESIORFOUNDATION -I$(LIB_SRC)/dynamicFvMesh/lnInclude/
-    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
-        ifeq (v1812,$(findstring v1812,$(WM_PROJECT_VERSION)))
-            VERSION_SPECIFIC_INC += -DOPENFOAMESI=1812
-        else
-            VERSION_SPECIFIC_INC += -DOPENFOAMESI=1912
-        endif
-    else
-        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
-    endif
 endif
 
 EXE_INC = \
     -std=c++11 \
     $(DISABLE_WARNING_FLAGS) \
     $(VERSION_SPECIFIC_INC) \
-    -I../solids4FoamModels/lnInclude \
+    -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/finiteArea/lnInclude \

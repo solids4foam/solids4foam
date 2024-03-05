@@ -1,9 +1,12 @@
 #!/bin/bash
-cd ${0%/*} || exit 1    # run from this directory
+cd "${0%/*}" || exit  # Run from this directory
 
 echo
 echo "Cleaning src"
 echo
 
+wclean lib RBFMeshMotionSolver
 wclean lib blockCoupledSolids4FoamTools
 wclean lib solids4FoamModels
+
+#------------------------------------------------------------------------------

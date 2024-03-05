@@ -1,18 +1,11 @@
-ifeq ($(WM_PROJECT), foam)
-    VERSION_SPECIFIC_INC = -DFOAMEXTEND
-else
-    VERSION_SPECIFIC_INC = -DOPENFOAMESIORFOUNDATION
-    ifneq (,$(findstring v,$(WM_PROJECT_VERSION)))
-        VERSION_SPECIFIC_INC += -DOPENFOAMESI
-    else
-        VERSION_SPECIFIC_INC += -DOPENFOAMFOUNDATION
-    endif
-endif
+SOLIDS4FOAM_ROOT := ../../../../../..
+
+include $(SOLIDS4FOAM_ROOT)/etc/wmake-options
 
 EXE_INC = \
     -std=c++11 \
     $(VERSION_SPECIFIC_INC) \
-    -I../../../../../../src/solids4FoamModels/lnInclude \
+    -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/finiteArea/lnInclude \
@@ -49,4 +42,4 @@ EXE_INC = \
 
 EXE_LIBS = \
     -lfiniteVolume \
-    -L$(FOAM_USER_LIBBIN) -lsolids4FoamModels
+    -L$(FOAM_MODULE_LIBBIN) -lsolids4FoamModels

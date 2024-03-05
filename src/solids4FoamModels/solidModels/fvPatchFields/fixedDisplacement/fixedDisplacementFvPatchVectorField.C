@@ -25,6 +25,7 @@ License
 #include "pointMesh.H"
 #include "pointFields.H"
 #include "fixedValuePointPatchFields.H"
+#include "patchCorrectionVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -71,7 +72,7 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
     (
         mesh.foundObject<pointVectorField>
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             "point" + internalField().name()
 #else
             "point" + dimensionedInternalField().name()
@@ -82,7 +83,7 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
         const pointVectorField& pointD =
             mesh.lookupObject<pointVectorField>
             (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 "point" + internalField().name()
 #else
                 "point" + dimensionedInternalField().name()
@@ -103,7 +104,7 @@ void fixedDisplacementFvPatchVectorField::setPointDisplacement
                     const_cast<pointVectorField&>
                     (
                         pointD
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                     ).boundaryFieldRef()[patch().index()]
 #else
                     ).boundaryField()[patch().index()]
@@ -126,6 +127,7 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF),
+    nonOrthogonalCorrections_(true),
     totalDisp_(p.size(), vector::zero),
     dispSeries_(),
     interpPtr_()
@@ -134,19 +136,20 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 
 fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 (
-    const fixedDisplacementFvPatchVectorField& ptf,
+    const fixedDisplacementFvPatchVectorField& pvf,
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
     const fvPatchFieldMapper& mapper
 )
 :
-    fixedValueFvPatchVectorField(ptf, p, iF, mapper),
-#ifdef OPENFOAMFOUNDATION
-    totalDisp_(mapper(ptf.totalDisp_)),
+    fixedValueFvPatchVectorField(pvf, p, iF, mapper),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+#ifdef OPENFOAM_ORG
+    totalDisp_(mapper(pvf.totalDisp_)),
 #else
-    totalDisp_(ptf.totalDisp_, mapper),
+    totalDisp_(pvf.totalDisp_, mapper),
 #endif
-    dispSeries_(ptf.dispSeries_),
+    dispSeries_(pvf.dispSeries_),
     interpPtr_()
 {}
 
@@ -159,7 +162,11 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 )
 :
     fixedValueFvPatchVectorField(p, iF, dict),
-    totalDisp_("value", dict, p.size()),
+    nonOrthogonalCorrections_
+    (
+        dict.lookupOrDefault<Switch>("nonOrthogonalCorrections", true)
+    ),
+    totalDisp_(*this),
     dispSeries_(),
     interpPtr_()
 {
@@ -179,28 +186,30 @@ fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
     }
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 (
-    const fixedDisplacementFvPatchVectorField& pivpvf
+    const fixedDisplacementFvPatchVectorField& pvf
 )
 :
-    fixedValueFvPatchVectorField(pivpvf),
-    totalDisp_(pivpvf.totalDisp_),
-    dispSeries_(pivpvf.dispSeries_),
+    fixedValueFvPatchVectorField(pvf),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    totalDisp_(pvf.totalDisp_),
+    dispSeries_(pvf.dispSeries_),
     interpPtr_()
 {}
 #endif
 
 fixedDisplacementFvPatchVectorField::fixedDisplacementFvPatchVectorField
 (
-    const fixedDisplacementFvPatchVectorField& pivpvf,
+    const fixedDisplacementFvPatchVectorField& pvf,
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    fixedValueFvPatchVectorField(pivpvf, iF),
-    totalDisp_(pivpvf.totalDisp_),
-    dispSeries_(pivpvf.dispSeries_),
+    fixedValueFvPatchVectorField(pvf, iF),
+    nonOrthogonalCorrections_(pvf.nonOrthogonalCorrections_),
+    totalDisp_(pvf.totalDisp_),
+    dispSeries_(pvf.dispSeries_),
     interpPtr_()
 {}
 
@@ -222,7 +231,7 @@ void fixedDisplacementFvPatchVectorField::autoMap
 {
     fixedValueFvPatchVectorField::autoMap(m);
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     m(totalDisp_, totalDisp_);;
 #else
     totalDisp_.autoMap(m);
@@ -233,16 +242,16 @@ void fixedDisplacementFvPatchVectorField::autoMap
 // Reverse-map the given fvPatchField onto this fvPatchField
 void fixedDisplacementFvPatchVectorField::rmap
 (
-    const fvPatchField<vector>& ptf,
+    const fvPatchField<vector>& pvf,
     const labelList& addr
 )
 {
-    fixedValueFvPatchVectorField::rmap(ptf, addr);
+    fixedValueFvPatchVectorField::rmap(pvf, addr);
 
-    const fixedDisplacementFvPatchVectorField& dmptf =
-        refCast<const fixedDisplacementFvPatchVectorField>(ptf);
+    const fixedDisplacementFvPatchVectorField& rpvf =
+        refCast<const fixedDisplacementFvPatchVectorField>(pvf);
 
-    totalDisp_.rmap(dmptf.totalDisp_, addr);
+    totalDisp_.rmap(rpvf.totalDisp_, addr);
 }
 
 
@@ -260,7 +269,7 @@ void fixedDisplacementFvPatchVectorField::updateCoeffs()
         disp = dispSeries_(this->db().time().timeOutputValue());
     }
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (internalField().name() == "DD")
 #else
     if (dimensionedInternalField().name() == "DD")
@@ -288,66 +297,69 @@ void fixedDisplacementFvPatchVectorField::updateCoeffs()
 Foam::tmp<Foam::Field<vector> >
 fixedDisplacementFvPatchVectorField::snGrad() const
 {
-    //- fixedValue snGrad with no correction
-    //  return (*this - patchInternalField())*this->patch().deltaCoeffs();
+    if (nonOrthogonalCorrections_)
+    {
+        const fvPatchField<tensor>& gradField =
+            patch().lookupPatchField<volTensorField, tensor>
+            (
+            #ifdef OPENFOAM_NOT_EXTEND
+                "grad(" + internalField().name() + ")"
+            #else
+                "grad(" + dimensionedInternalField().name() + ")"
+            #endif
+            );
 
-    const fvPatchField<tensor>& gradField =
-        patch().lookupPatchField<volTensorField, tensor>
+        // Non-orthogonal correction vectors
+        const vectorField k(patchCorrectionVectors(patch()));
+
+        return
         (
-#ifdef OPENFOAMESIORFOUNDATION
-            "grad(" + internalField().name() + ")"
-#else
-            "grad(" + dimensionedInternalField().name() + ")"
-#endif
-        );
-
-    // Unit normals
-    const vectorField n(patch().nf());
-
-    // Delta vectors
-    const vectorField delta(patch().delta());
-
-    //- Non-orthogonal correction vectors
-    const vectorField k((I - sqr(n)) & delta);
-
-    return
-    (
-        *this
-        - (patchInternalField() + (k & gradField.patchInternalField()))
-    )*patch().deltaCoeffs();
+            *this
+          - (patchInternalField() + (k & gradField.patchInternalField()))
+        )*patch().deltaCoeffs();
+    }
+    else
+    {
+        // fixedValue snGrad with no correction
+        return (*this - patchInternalField())*patch().deltaCoeffs();
+    }
 }
 
 tmp<Field<vector> >
 fixedDisplacementFvPatchVectorField::gradientBoundaryCoeffs() const
 {
-    const fvPatchField<tensor>& gradField =
-        patch().lookupPatchField<volTensorField, tensor>
+    if (nonOrthogonalCorrections_)
+    {
+        const fvPatchField<tensor>& gradField =
+            patch().lookupPatchField<volTensorField, tensor>
+            (
+            #ifdef OPENFOAM_NOT_EXTEND
+                "grad(" + internalField().name() + ")"
+            #else
+                "grad(" + dimensionedInternalField().name() + ")"
+            #endif
+            );
+
+        // Non-orthogonal correction vectors
+        const vectorField k(patchCorrectionVectors(patch()));
+
+        return
         (
-#ifdef OPENFOAMESIORFOUNDATION
-            "grad(" + internalField().name() + ")"
-#else
-            "grad(" + dimensionedInternalField().name() + ")"
-#endif
+            patch().deltaCoeffs()
+           *(*this - (k & gradField.patchInternalField()))
         );
-
-    // Unit normals
-    vectorField n(patch().nf());
-
-    // Delta vectors
-    vectorField delta(patch().delta());
-
-    //- Non-orthogonal correction vectors
-    vectorField k((I - sqr(n)) & delta);
-
-    return
-    (
-        patch().deltaCoeffs()
-       *(*this - (k & gradField.patchInternalField()))
-    );
+    }
+    else
+    {
+        return (patch().deltaCoeffs()*(*this));
+    }
 }
 
 void fixedDisplacementFvPatchVectorField::write(Ostream& os) const
 {
+    os.writeKeyword("nonOrthogonalCorrections")
+        << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
+
     if (dispSeries_.size())
     {
         os.writeKeyword("displacementSeries") << nl;

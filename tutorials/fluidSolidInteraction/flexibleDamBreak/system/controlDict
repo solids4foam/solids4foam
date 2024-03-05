@@ -53,4 +53,13 @@ maxCo           0.5;
 
 maxDeltaT       1;
 
+functions
+{
+    disp
+    {
+        type    solidPointDisplacement;
+        point   (0.292 0.07999997 0);
+    }
+}
+
 // ************************************************************************* //

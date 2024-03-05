@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -30,7 +24,7 @@ License
 #include "twoDPointCorrector.H"
 #include "fixedGradientFvPatchFields.H"
 #include "wedgePolyPatch.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "ZoneIDs.H"
 #else
     #include "ZoneID.H"
@@ -123,7 +117,7 @@ void Foam::mechanicalModel::calcImpKfcorr() const
 
     if (laws.size() > 1)
     {
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
         // To disable Rhie-Chow correction on bi-material interface, we will set
         // impKfcorr to zero on bi-material interface faces
 
@@ -352,7 +346,7 @@ Foam::mechanicalModel::mechanicalModel
         }
     }
 
-#ifndef OPENFOAMESIORFOUNDATION
+#ifndef OPENFOAM_NOT_EXTEND
     // Check: currently crackerFvMesh only works with a single material
     // The challenge here is to update the subMesh and subMesh fields when a
     // topo-change (crack) occurs in the babse mesh
@@ -383,7 +377,7 @@ const Foam::fvMesh& Foam::mechanicalModel::mesh() const
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 const Foam::volPointInterpolation& Foam::mechanicalModel::volToPoint() const
 {
     return volPointInterpolation::New(mesh_);
@@ -424,7 +418,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::rho() const
             )
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         volScalarField& result = tresult.ref();
 #else
         volScalarField& result = tresult();
@@ -482,7 +476,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::impK() const
             )
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         volScalarField& result = tresult.ref();
 #else
         volScalarField& result = tresult();
@@ -549,7 +543,7 @@ Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::bulkModulus() const
             )
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         volScalarField& result = tresult.ref();
 #else
         volScalarField& result = tresult();
@@ -1031,6 +1025,61 @@ void Foam::mechanicalModel::setRestart()
     {
         laws[lawI].setRestart();
     }
+}
+
+void Foam::mechanicalModel::writeDict()
+{
+    // This has to be done, because law dicts can only be read as IStream and so
+    // they are not references to the entries in the 'mechanicalProperties' but
+    // seperate entry object and dictionary objects. Because of this they have
+    // to be added back to 'mechanicalProperties' before writing to disk.
+    PtrList<mechanicalLaw>& laws = *this;
+
+    // Adding all law dictionaries to a single pointer list
+    PtrList<primitiveEntry> lawDicts;
+    lawDicts.setSize(laws.size());
+    forAll(laws,lawI)
+    {
+        lawDicts.set
+        (
+            lawI,
+            new primitiveEntry
+            (
+                laws[lawI].name(),
+                laws[lawI].dict()
+            )
+        );
+    }
+
+    // Creating an entry from pointer list and replacing 'mechanical' entry in
+    // IOdictionary ('materialProperties') with it
+    primitiveEntry lawsEntry("mechanical",lawDicts);
+    autoPtr<IOdictionary> outputMechLawProps
+    (
+        new IOdictionary
+        (
+            IOobject
+            (
+                "mechanicalProperties.withDefaultValues",
+                mesh().time().constant(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            )
+        )
+    );
+
+#ifdef OPENFOAM_ESI
+    outputMechLawProps.ref() = *this;
+    outputMechLawProps.ref().IOdictionary::set(lawsEntry);
+#else
+    outputMechLawProps() = *this;
+    outputMechLawProps().IOdictionary::set(lawsEntry);
+#endif
+
+    // Writing to disk
+    outputMechLawProps().regIOobject::write();
+    outputMechLawProps.clear();
 }
 
 // ************************************************************************* //

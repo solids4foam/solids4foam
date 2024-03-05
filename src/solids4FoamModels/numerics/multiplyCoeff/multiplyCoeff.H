@@ -26,6 +26,7 @@ SourceFile
     multiplyCoeff.C
 
 Author
+    Federico Mazzanti, UCD. All rights reserved.
     Philip Cardiff, UCD. All rights reserved.
 
 \*---------------------------------------------------------------------------*/
@@ -34,7 +35,11 @@ Author
 #define multiplyCoeff_H
 
 #include "fieldTypes.H"
-#include "symmTensor4thOrder.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "scalarMatrices.H"
+#else
+    #include "scalarSquareMatrix.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -45,6 +50,7 @@ namespace Foam
     // order tensor as encountered in the assembling of block coefficients
     // in a finite volume solid mechanics procedure. The result is placed
     // in the coeff variable.
+    // The 4th order material tangent matrix is represented by a 6x6 matrix.
     // The multiplication evaluates the following in index notation:
     //     coeff_ij = Sf_m C_mikl g_k delta_lj
     // where delta is kronecker delta
@@ -52,7 +58,7 @@ namespace Foam
     (
         tensor& coeff,
         const vector& Sf,
-        const symmTensor4thOrder& C,
+        const scalarSquareMatrix& C,
         const vector& g
     );
 

@@ -65,7 +65,7 @@ symmTensor analyticalPlateHoleTractionFvPatchVectorField::plateHoleSolution
 
 
     // Transformation to Cartesian coordinate system
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     sigma = ((cs.R().R() & sigma) & cs.R().R().T());
 #else
     sigma = ((cs.R() & sigma) & cs.R().T());
@@ -124,7 +124,7 @@ analyticalPlateHoleTractionFvPatchVectorField
     holeR_(stpvf.holeR_)
 {}
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 analyticalPlateHoleTractionFvPatchVectorField::
 analyticalPlateHoleTractionFvPatchVectorField
 (
