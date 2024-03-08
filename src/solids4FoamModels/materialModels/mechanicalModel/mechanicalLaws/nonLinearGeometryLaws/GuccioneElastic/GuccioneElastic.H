@@ -79,6 +79,13 @@ class GuccioneElastic
 
     // Private Member Functions
 
+        //- Calculate stress given gradD and pressure
+        void calculateStress
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceTensorField& gradD
+        );
+
         //- Disallow default bitwise copy construct
         GuccioneElastic(const GuccioneElastic&);
 
@@ -115,6 +122,10 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
+
+        //- Material tangent for Newton Raphson loop
+        virtual tmp<Field<RectangularMatrix<scalar>>>
+        materialTangentField() const;
 
         //- Return the bulk modulus field
         virtual tmp<volScalarField> bulkModulus() const;

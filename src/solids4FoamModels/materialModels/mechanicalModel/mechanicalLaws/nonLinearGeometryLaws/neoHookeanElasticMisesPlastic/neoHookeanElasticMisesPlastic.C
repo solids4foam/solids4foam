@@ -547,9 +547,9 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
 
 void Foam::neoHookeanElasticMisesPlastic::calculateStress
 (
-	surfaceSymmTensorField& sigma,
-	const surfaceTensorField& gradD,
-	const surfaceScalarField& p
+    surfaceSymmTensorField& sigma,
+    const surfaceTensorField& gradD,
+    const surfaceScalarField& p
 )
 {
     // Calculate F
