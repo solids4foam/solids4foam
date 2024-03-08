@@ -68,14 +68,32 @@ class GuccioneElastic
         dimensionedScalar mu_;
 
         //- Fibre directions in the reference configuration
-        //  vol and surface fields
         volVectorField f0_;
         surfaceVectorField f0f_;
 
+        //- Sheet directions in the reference configuration
+        //  f0 & s0 == 0
+        volVectorField s0_;
+        surfaceVectorField s0f_;
+
+        //- Sheet normal directions in the reference configuration
+        //  n0 & f0 == n0 & s0 == 0
+        volVectorField n0_;
+        surfaceVectorField n0f_;
+
+        //- Rotation matrix from local fibre coordinate system to the global
+        //  coordinate system
+        volTensorField R_;
+        surfaceTensorField Rf_;
+
         //- Outer product of the fibre directions with themselves
-        //  vol and surface fields
         volSymmTensorField f0f0_;
         surfaceSymmTensorField f0f0f_;
+
+        //- 2nd Piola-Kirchhoff stress (without the hydrostatic term)
+        volSymmTensorField S_;
+        surfaceSymmTensorField Sf_;
+
 
     // Private Member Functions
 
