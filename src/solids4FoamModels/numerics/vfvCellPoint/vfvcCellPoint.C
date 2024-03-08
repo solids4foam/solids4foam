@@ -892,9 +892,9 @@ tmp<volScalarField> interpolate
     {
         // Points in the current cell
         const labelList& curCellPoints = cellPoints[cellI];
-        
+
         // Number of points in current cell
-        const scalar nPoints = curCellPoints.size(); 
+        const scalar nPoints = curCellPoints.size();
 
         // Calculate the pointP average for each cell
         scalar pointPAvg = 0;
@@ -902,16 +902,16 @@ tmp<volScalarField> interpolate
         {
             // Primary point index
             const label pointID = curCellPoints[cpI];
-            
+
             // Sum pointP for curCellPoints
             pointPAvg += pointPI[pointID];
         }
-        
+
         pointPAvg /= nPoints;
-        
+
         result[cellI] = pointPAvg;
     }
-    
+
     result.correctBoundaryConditions();
 
     return tresult;
@@ -1008,7 +1008,7 @@ tmp<surfaceScalarField> interpolate
             // Calculate the gradient component in the edge direction using
             // central-differencing and use the primary mesh cell value for the
             // tangential directions
-            resultI[dualFaceI] = volPI[cellID]; 
+            resultI[dualFaceI] = volPI[cellID];
         }
         else // boundary face
         {
@@ -1027,7 +1027,7 @@ tmp<surfaceScalarField> interpolate
 
 				if (cellID > -1)
 				{
-				
+
 		            // Use the gradient in the adjacent primary cell-centre
 		            // This will result in inconsistent values at processor patches
 		            // Is this an issue?
@@ -1037,7 +1037,7 @@ tmp<surfaceScalarField> interpolate
 #else
 		            result.boundaryField()[dualPatchID][localDualFaceID] =
 		                volPI[cellID];
-#endif			
+#endif
 				}
             }
         }

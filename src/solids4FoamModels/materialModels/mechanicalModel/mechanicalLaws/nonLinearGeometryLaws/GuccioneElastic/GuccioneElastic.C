@@ -237,7 +237,7 @@ Foam::GuccioneElastic::materialTangentField() const
 
             // Calculate perturbed stress
             const_cast<GuccioneElastic&>(*this).calculateStress(sigmaPerturb, gradDPerturb);
-            
+
             // Calculate tangent component
             const surfaceSymmTensorField tangCmpt((sigmaPerturb - sigmaRef)/eps);
             const symmTensorField& tangCmptI = tangCmpt.internalField();

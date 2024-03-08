@@ -71,7 +71,7 @@ class neoHookeanElasticMisesPlastic
 
         //- Shear modulus
         dimensionedScalar mu_;
-        
+
         //- Bulk modulus
                 dimensionedScalar K_;
 

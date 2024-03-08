@@ -235,7 +235,7 @@ void Foam::linearElasticMisesPlastic::newtonLoop
 void Foam::linearElasticMisesPlastic::calculateStress
 (
     surfaceSymmTensorField& sigma,
-    const surfaceTensorField& gradD  
+    const surfaceTensorField& gradD
 ) const
 {
     // Calculate strain
@@ -1080,7 +1080,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
     // Calculate tangent field
     const Switch numericalTangent(dict().lookup("numericalTangent"));
     if (numericalTangent)
-    {        
+    {
         // Lookup current stress and store it as the reference
         const surfaceSymmTensorField& sigmaRef =
             mesh().lookupObject<surfaceSymmTensorField>("sigmaf");
@@ -1577,7 +1577,7 @@ void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
         const surfaceScalarField sigmaHydf(K_*tr(epsilonf()));
 
         // Update the stress
-		sigma = sigmaHydf*I + s;		
+		sigma = sigmaHydf*I + s;
     }
 }
 

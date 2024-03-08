@@ -83,7 +83,7 @@ class vertexCentredLinGeomPressureDisplacementSolid
 
         //- Flag to enable steadyState
         Switch steadyState_;
-        
+
         //- Pressure smoothing factor
         const scalar pressureSmoothing_;
 
@@ -107,7 +107,7 @@ class vertexCentredLinGeomPressureDisplacementSolid
         //- Scale factor for the fixed degree of freedom equations to improve the
         //  matrix conditioning
         const scalar fixedDofScale_;
-        
+
         //- Point pressure
         pointScalarField pointP_;
 
@@ -129,7 +129,7 @@ class vertexCentredLinGeomPressureDisplacementSolid
 
         //- Stress field at the dual mesh faces
         surfaceSymmTensorField dualSigmaf_;
-        
+
         //- Pressure at the dual mesh faces
         surfaceScalarField dualPf_;
 

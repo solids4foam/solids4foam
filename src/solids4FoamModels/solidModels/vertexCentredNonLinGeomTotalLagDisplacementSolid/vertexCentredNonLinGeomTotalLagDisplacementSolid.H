@@ -101,7 +101,7 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
         //- Scale factor for the fixed degree of freedom equations to improve the
         //  matrix conditioning
         const scalar fixedDofScale_;
-        
+
         //- Point pressure
         pointScalarField pointP_;
 

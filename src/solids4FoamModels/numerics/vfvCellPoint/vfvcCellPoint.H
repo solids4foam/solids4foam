@@ -131,14 +131,14 @@ namespace vfvc
 		const scalar& zeta,
 		const bool debug
     );
-    
+
     // Interpolate a pointScalarField to a volScalarField
     tmp<volScalarField> interpolate
 	(
 		const pointScalarField& pointP,
 		const fvMesh& mesh
 	);
-	
+
 	// Interpolate a pointScalarField to a surfaceScalarField
 	// at the dual mesh faces
 	tmp<surfaceScalarField> interpolate
