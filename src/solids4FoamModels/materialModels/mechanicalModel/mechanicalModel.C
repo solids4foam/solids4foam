@@ -378,9 +378,9 @@ const Foam::fvMesh& Foam::mechanicalModel::mesh() const
 
 
 #ifdef OPENFOAM_NOT_EXTEND
-const Foam::volPointInterpolation& Foam::mechanicalModel::volToPoint() const
+const Foam::enhancedVolPointInterpolation& Foam::mechanicalModel::volToPoint() const
 {
-    return volPointInterpolation::New(mesh_);
+    return enhancedVolPointInterpolation::New(mesh_);
 }
 #else
 const Foam::newLeastSquaresVolPointInterpolation& Foam::mechanicalModel::volToPoint() const
@@ -890,6 +890,47 @@ void Foam::mechanicalModel::interpolate
             solSubMeshes().subMeshVolToPoint()[lawI].interpolate
             (
                 solSubMeshes().subMeshD()[lawI],
+                solSubMeshes().subMeshPointD()[lawI]
+            );
+        }
+
+        // Map subMesh pointD fields back to the base pointD field
+        solSubMeshes().mapSubMeshPointFields<vector>
+        (
+            solSubMeshes().subMeshPointD(), pointD
+        );
+    }
+}
+
+
+void Foam::mechanicalModel::interpolate
+(
+    const volVectorField& D,
+    const volTensorField& gradD,
+    pointVectorField& pointD,
+    const bool useVolFieldSigma
+)
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        volToPoint().interpolate(D, gradD, pointD);
+    }
+    else
+    {
+        // Interpolate the base D to the subMesh D
+        // If necessary, corrections are applied on bi-material interfaces
+        solSubMeshes().interpolateDtoSubMeshD(D, useVolFieldSigma);
+
+        // Accumulate data for all fields
+        forAll(laws, lawI)
+        {
+            // Interpolate the subMeshD to the subMeshPointD
+            solSubMeshes().subMeshVolToPoint()[lawI].interpolate
+            (
+                solSubMeshes().subMeshD()[lawI],
+                solSubMeshes().subMeshGradD()[lawI],
                 solSubMeshes().subMeshPointD()[lawI]
             );
         }

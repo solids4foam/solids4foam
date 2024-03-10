@@ -67,6 +67,11 @@ class GuccioneElastic
         //- Shear modulus in the limited of small strains
         dimensionedScalar mu_;
 
+        //- Flag to indicate a uniform fibre field
+        //  If true, the fibre direction is read from mechanicalProperties
+        //  If false, the fibre field is read from the starting time directory
+        const Switch uniformFibreField_;
+
         //- Fibre directions in the reference configuration
         volVectorField f0_;
         surfaceVectorField f0f_;
@@ -96,6 +101,22 @@ class GuccioneElastic
 
 
     // Private Member Functions
+
+        //- Create f0 field
+        tmp<volVectorField> makeF0
+        (
+            const Switch& uniformFibreField,
+            const fvMesh& mesh,
+            const dictionary& dict
+        ) const;
+
+        //- Create f0f field
+        tmp<surfaceVectorField> makeF0f
+        (
+            const Switch& uniformFibreField,
+            const fvMesh& mesh,
+            const dictionary& dict
+        ) const;
 
         //- Calculate stress given gradD and pressure
         void calculateStress

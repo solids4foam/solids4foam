@@ -34,6 +34,95 @@ namespace Foam
 
 // * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
 
+Foam::tmp<Foam::volVectorField> Foam::GuccioneElastic::makeF0
+(
+    const Switch& uniformFibreField,
+    const fvMesh& mesh,
+    const dictionary& dict
+) const
+{
+    if (uniformFibreField)
+    {
+        return tmp<volVectorField>
+        (
+            new volVectorField
+            (
+                IOobject
+                (
+                    "f0",
+                    mesh.time().timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh,
+                dimensionedVector("f0", dimless, dict.lookup("f0"))
+            )
+        );
+    }
+
+    return tmp<volVectorField>
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "f0",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh
+        )
+    );
+}
+
+
+Foam::tmp<Foam::surfaceVectorField> Foam::GuccioneElastic::makeF0f
+(
+    const Switch& uniformFibreField,
+    const fvMesh& mesh,
+    const dictionary& dict
+) const
+{
+    if (uniformFibreField)
+    {
+        return tmp<surfaceVectorField>
+        (
+            new surfaceVectorField
+            (
+                IOobject
+                (
+                    "f0f",
+                    mesh.time().timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh,
+                dimensionedVector("f0", dimless, dict.lookup("f0"))
+            )
+        );
+    }
+
+    return tmp<surfaceVectorField>
+    (
+        new surfaceVectorField
+        (
+            IOobject
+            (
+                "f0f",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh
+        )
+    );
+}
+
 
 void Foam::GuccioneElastic::calculateStress
 (
@@ -182,31 +271,14 @@ Foam::GuccioneElastic::GuccioneElastic
     cf_(readScalar(dict.lookup("cf"))),
     ct_(readScalar(dict.lookup("ct"))),
     cfs_(readScalar(dict.lookup("cfs"))),
-    mu_(0.75*(cf_ - 2.0*cfs_ + 2.0*cfs_)*k_), // check: is this the equivalent of linear shear modulus?
-    f0_
+    // Check: is this mu equivalent to the linearised shear modulus?
+    mu_(0.75*(cf_ - 2.0*cfs_ + 2.0*cfs_)*k_),
+    uniformFibreField_
     (
-        IOobject
-        (
-            "f0",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh
+        dict.lookupOrDefault<Switch>("uniformFibreField", false)
     ),
-    f0f_
-    (
-        IOobject
-        (
-            "f0f",
-            mesh.time().timeName(),
-            mesh,
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh
-    ),
+    f0_(makeF0(uniformFibreField_, mesh, dict)),
+    f0f_(makeF0f(uniformFibreField_, mesh, dict)),
     s0_
     (
         IOobject
@@ -354,12 +426,14 @@ Foam::GuccioneElastic::GuccioneElastic
     {
         const volScalarField magS0(mag(s0_));
         const volScalarField posMagS0(pos(magS0));
-        s0_ = posMagS0*s0_ + (1.0 - posMagS0)*((I - f0f0_) & vector(0, 1, 0));
+        s0_ =
+            posMagS0*s0_ + (1.0 - posMagS0)*((I - f0f0_) & vector(0, 1, 0));
     }
     {
         const surfaceScalarField magS0(mag(s0f_));
         const surfaceScalarField posMagS0(pos(magS0));
-        s0f_ = posMagS0*s0f_ + (1.0 - posMagS0)*((I - f0f0f_) & vector(0, 1, 0));
+        s0f_ =
+            posMagS0*s0f_ + (1.0 - posMagS0)*((I - f0f0f_) & vector(0, 1, 0));
     }
 
     // Make s0 unit vectors
@@ -398,6 +472,9 @@ Foam::GuccioneElastic::GuccioneElastic
         s0_.write();
         n0_.write();
         R_.write();
+        s0f_.write();
+        n0f_.write();
+        Rf_.write();
     }
 }
 
@@ -453,13 +530,19 @@ Foam::GuccioneElastic::materialTangentField() const
 
     if (numericalTangent)
     {
-        // Lookup current stress and store it as the reference
-        const surfaceSymmTensorField& sigmaRef =
-            mesh().lookupObject<surfaceSymmTensorField>("sigmaf");
-
         // Lookup gradient of displacement
         const surfaceTensorField& gradDRef =
             mesh().lookupObject<surfaceTensorField>("grad(D)f");
+
+        // Lookup current stress and store it as the reference
+        // const surfaceSymmTensorField& sigmaRef =
+        //     mesh().lookupObject<surfaceSymmTensorField>("sigmaf")
+        // Calculate sigmaRef to be consistent with gradDRef;
+        surfaceSymmTensorField sigmaRef
+        (
+            "sigmaRef", 1.0*mesh().lookupObject<surfaceSymmTensorField>("sigmaf")
+        );
+        const_cast<GuccioneElastic&>(*this).calculateStress(sigmaRef, gradDRef);
 
         // Create fields to be used for perturbations
         surfaceSymmTensorField sigmaPerturb("sigmaPerturb", sigmaRef);
