@@ -47,6 +47,7 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
+#include "pointFieldFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -124,6 +125,9 @@ class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
         //- Point volume field
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
+        
+        //- Point J field
+        pointScalarField pointJ_;
 
  		//- Point gradD field
         //  gradD associated with the primary mesh points
@@ -224,11 +228,11 @@ class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
 			const surfaceTensorField gradDRef //Reference gradD
 		) const;
 
-		Foam::tmp<tensorField>
-		pBarSensitivityField
-		(
-			const pointTensorField pGradDRef //Reference pointGradD
-		) const;
+/*		Foam::tmp<tensorField>*/
+/*		pBarSensitivityField*/
+/*		(*/
+/*			const pointTensorField pGradDRef //Reference pointGradD*/
+/*		) const;*/
 
         //- Disallow default bitwise copy construct
         vertexCentredNonLinGeomTotalLagPressureDisplacementSolid(const vertexCentredNonLinGeomTotalLagPressureDisplacementSolid&);
