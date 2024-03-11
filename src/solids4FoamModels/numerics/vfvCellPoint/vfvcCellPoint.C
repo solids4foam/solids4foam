@@ -904,10 +904,8 @@ tmp<volScalarField> interpolate
             const label pointID = curCellPoints[cpI];
             
             // Sum pointP for curCellPoints
-            pointPAvg += pointPI[pointID];
+            pointPAvg += pointPI[pointID]/nPoints;
         }
-        
-        pointPAvg /= nPoints;
         
         result[cellI] = pointPAvg;
     }
@@ -1050,7 +1048,6 @@ tmp<surfaceScalarField> interpolate
 
     return tresult;
 }
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

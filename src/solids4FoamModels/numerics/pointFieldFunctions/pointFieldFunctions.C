@@ -151,6 +151,132 @@ tmp<pointScalarField> tr(const pointSymmTensorField& ptr)
 	return tresult;
 }
 
+tmp<pointTensorField> cof(const pointTensorField& ptr)
+{
+
+	const pointMesh& pMesh =  ptr.mesh();
+
+	// Prepare the temporary field
+	tmp<pointTensorField> tresult
+	(
+	    new pointTensorField
+	    (
+	        IOobject
+	        (
+	            "cofField",
+	            pMesh.mesh().time().timeName(),
+	            pMesh.mesh(),
+	            IOobject::NO_READ,
+	            IOobject::NO_WRITE
+	        ),
+	        pMesh,
+	        dimensionedTensor("zero", dimless, tensor::zero)
+	    )
+	);
+
+#ifdef OPENFOAM_NOT_EXTEND
+	pointTensorField& result = tresult.ref();
+#else
+	pointTensorField& result = tresult();
+#endif
+
+	//Set the result field to be cof(ptr)
+#ifdef OPENFOAM_NOT_EXTEND
+    result.primitiveFieldRef() = cof(ptr.primitiveField());
+#else
+    pointD.internalField() = cof(ptr.internalField());
+#endif
+
+	//Call the correctBoundaryConditions function
+	result.correctBoundaryConditions();
+
+	return tresult;
+}
+
+tmp<pointScalarField> sqr(const pointScalarField& ptr)
+{
+
+	const pointMesh& pMesh =  ptr.mesh();
+
+	// Prepare the temporary field
+	tmp<pointScalarField> tresult
+	(
+	    new pointScalarField
+	    (
+	        IOobject
+	        (
+	            "sqrField",
+	            pMesh.mesh().time().timeName(),
+	            pMesh.mesh(),
+	            IOobject::NO_READ,
+	            IOobject::NO_WRITE
+	        ),
+	        pMesh,
+	        dimensionedScalar("0", dimless, 0.0)
+	    )
+	);
+
+#ifdef OPENFOAM_NOT_EXTEND
+	pointScalarField& result = tresult.ref();
+#else
+	pointScalarField& result = tresult();
+#endif
+
+	//Set the result field to be symm(ptr)
+#ifdef OPENFOAM_NOT_EXTEND
+    result.primitiveFieldRef() = sqr(ptr.primitiveField());
+#else
+    pointD.internalField() = sqr(ptr.internalField());
+#endif
+
+	//Call the correctBoundaryConditions function
+	result.correctBoundaryConditions();
+
+	return tresult;
+}
+
+tmp<pointScalarField> pow(const pointScalarField& ptr, const scalar& power)
+{
+
+	const pointMesh& pMesh =  ptr.mesh();
+
+	// Prepare the temporary field
+	tmp<pointScalarField> tresult
+	(
+	    new pointScalarField
+	    (
+	        IOobject
+	        (
+	            "powField",
+	            pMesh.mesh().time().timeName(),
+	            pMesh.mesh(),
+	            IOobject::NO_READ,
+	            IOobject::NO_WRITE
+	        ),
+	        pMesh,
+	        dimensionedScalar("0", dimless, 0.0)
+	    )
+	);
+
+#ifdef OPENFOAM_NOT_EXTEND
+	pointScalarField& result = tresult.ref();
+#else
+	pointScalarField& result = tresult();
+#endif
+
+	//Set the result field to be symm(ptr)
+#ifdef OPENFOAM_NOT_EXTEND
+    result.primitiveFieldRef() = pow(ptr.primitiveField(), power);
+#else
+    pointD.internalField() = pow(ptr.internalField(), power);
+#endif
+
+	//Call the correctBoundaryConditions function
+	result.correctBoundaryConditions();
+
+	return tresult;
+}
+
 }
 
 // ************************************************************************* //

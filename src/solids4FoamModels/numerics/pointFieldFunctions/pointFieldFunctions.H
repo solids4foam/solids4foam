@@ -53,6 +53,16 @@ namespace Foam
 
     // Return the trace of a pointSymmTensorField
     tmp<pointScalarField> tr(const pointSymmTensorField& ptr);
+    
+    // Return the cofactor of a pointTensorField
+    tmp<pointTensorField> cof(const pointTensorField& ptr);
+    
+    // Return the square of a pointScalarField
+    tmp<pointScalarField> sqr(const pointScalarField& ptr);
+    
+    // Return the power of a pointScalarField
+    tmp<pointScalarField> pow(const pointScalarField& ptr, const scalar& power);
+
 
 } // End namespace Foam
 

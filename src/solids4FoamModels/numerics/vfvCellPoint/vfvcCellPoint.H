@@ -150,7 +150,7 @@ namespace vfvc
 		const labelList& dualCellToPoint,
 		const bool debug
 	);
-
+	
 } // End namespace vfvc
 
 } // End namespace Foam
