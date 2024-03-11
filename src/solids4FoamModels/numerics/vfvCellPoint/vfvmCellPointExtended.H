@@ -45,6 +45,7 @@ Author
 #include "sparseMatrixExtended.H"
 #include "RectangularMatrix.H"
 #include "cellPointLeastSquaresVectors.H"
+#include "pointPointLeastSquaresVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -112,6 +113,7 @@ namespace vfvm
 		const fvMesh& dualMesh,
 		const labelList& dualFaceToCell,
 		const labelList& dualCellToPoint,
+		const tensorField& dualGradDField,
 		const scalar& diffusivity,
 		const bool debug
 	);

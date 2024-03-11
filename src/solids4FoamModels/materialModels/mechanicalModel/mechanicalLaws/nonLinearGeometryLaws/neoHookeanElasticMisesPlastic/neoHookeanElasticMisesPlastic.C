@@ -1112,7 +1112,6 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
         mesh,
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
-
     nonLinearPlasticity_(stressPlasticStrainSeries_.size() > 2),
     updateBEbarConsistent_
     (
