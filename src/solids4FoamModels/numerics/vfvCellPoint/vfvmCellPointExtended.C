@@ -168,13 +168,13 @@ void Foam::vfvm::divSigma
             matrix(ownPointID, pointID) += coeff;
 //			Info << "dualFaceI: " << dualFaceI << endl;
 //			Info << "matrix ( " << ownPointID << ", " << pointID << " ) " << matrix(ownPointID, pointID) << endl;
-//			Info << "coeff ( " << ownPointID << ", " << pointID << " ) " << coeff << endl; 
+//			Info << "coeff ( " << ownPointID << ", " << pointID << " ) " << coeff << endl;
 
             // Add the coefficient to the neiPointID equation coming from
             // pointID
             matrix(neiPointID, pointID) -= coeff;
 //			Info << "matrix ( " << neiPointID << ", " << pointID << " ) " << matrix(neiPointID, pointID) << endl;
-//			Info << "coeff ( " << neiPointID << ", " << pointID << " ) " << coeff << endl; 
+//			Info << "coeff ( " << neiPointID << ", " << pointID << " ) " << coeff << endl;
         }
 
         // Add compact central-differencing component in the edge direction
@@ -202,17 +202,17 @@ void Foam::vfvm::divSigma
         matrix(ownPointID, neiPointID) += edgeDirCoeff;
 //		Info << "dualFaceI: " << dualFaceI << endl;
 //		Info << "matrix ( " << ownPointID << ", " << ownPointID << " ) " << matrix(ownPointID, ownPointID) << endl;
-//		Info << "coeff ( " << ownPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl; 
+//		Info << "coeff ( " << ownPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl;
 //		Info << "matrix ( " << ownPointID << ", " << neiPointID << " ) " << matrix(ownPointID, neiPointID) << endl;
-//		Info << "coeff ( " << ownPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl; 
+//		Info << "coeff ( " << ownPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl;
 
         // Insert coefficients for the neiPoint
         matrix(neiPointID, neiPointID) -= edgeDirCoeff;
         matrix(neiPointID, ownPointID) += edgeDirCoeff;
 //		Info << "matrix ( " << neiPointID << ", " << neiPointID << " ) " << matrix(neiPointID, neiPointID) << endl;
-//		Info << "coeff ( " << neiPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl; 
+//		Info << "coeff ( " << neiPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl;
 //		Info << "matrix ( " << neiPointID << ", " << ownPointID << " ) " << matrix(neiPointID, ownPointID) << endl;
-//		Info << "coeff ( " << neiPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl; 
+//		Info << "coeff ( " << neiPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl;
 
     }
 
@@ -324,21 +324,6 @@ void Foam::vfvm::divSigma
         const scalar edgeLength = mag(edgeDir);
         edgeDir /= edgeLength;
 
-        // dualFaceI will contribute coefficients to the equation for each
-        // primary mesh point in the dual own cell, and, if an internal
-        // face, the dual neighbour cell
-	    
-//	    if (ownPointID == 6)
-//	    {
-//	    	Info << "neiPointID: " << neiPointID << endl;
-//	    }
-//	    
-//	    if (ownPointID == 10 && neiPointID == 6)
-//	    {
-//	    	Info << "matrix ( " << ownPointID << ", " << ownPointID << " ) " << matrix(ownPointID, ownPointID) << endl;
-//	    	Info << "matrix ( " << neiPointID << ", " << ownPointID << " ) " << matrix(neiPointID, ownPointID) << endl;
-//	    }
-
         forAll(curCellPoints, cpI)
         {
             // Primary point index
@@ -395,16 +380,16 @@ void Foam::vfvm::divSigma
                     matrix(ownPointID, pointID)(i,k) += coeff.component(cmptI);
 //					Info << "dualFaceI: " << dualFaceI << endl;
 //				    Info << "matrix ( " << ownPointID << ", " << pointID << " ) " << matrix(ownPointID, pointID) << endl;
-//					Info << "coeff ( " << ownPointID << ", " << pointID << " ) " << coeff << endl; 
+//					Info << "coeff ( " << ownPointID << ", " << pointID << " ) " << coeff << endl;
                     // Add the coefficient to the neiPointID equation coming from
                     // pointID
                     matrix(neiPointID, pointID)(i,k) -= coeff.component(cmptI);
 //				    Info << "matrix ( " << neiPointID << ", " << pointID << " ) " << matrix(neiPointID, pointID) << endl;
-//					Info << "coeff ( " << neiPointID << ", " << pointID << " ) " << coeff << endl; 
+//					Info << "coeff ( " << neiPointID << ", " << pointID << " ) " << coeff << endl;
                     cmptI++;
                 }
-            }         
-        }       
+            }
+        }
 
         // Add compact central-differencing component in the edge direction
         // This is the gradient in the direction of the edge
@@ -437,17 +422,17 @@ void Foam::vfvm::divSigma
                 matrix(ownPointID, neiPointID)(i,k) += edgeDirCoeff.component(cmptI);
 //				Info << "dualFaceI: " << dualFaceI << endl;
 //			    Info << "matrix ( " << ownPointID << ", " << ownPointID << " ) " << matrix(ownPointID, ownPointID) << endl;
-//				Info << "coeff ( " << ownPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl; 
+//				Info << "coeff ( " << ownPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl;
 //			    Info << "matrix ( " << ownPointID << ", " << neiPointID << " ) " << matrix(ownPointID, neiPointID) << endl;
-//				Info << "coeff ( " << ownPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl; 
-				
+//				Info << "coeff ( " << ownPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl;
+
                 // Insert coefficients for the neiPoint
                 matrix(neiPointID, neiPointID)(i,k) -= edgeDirCoeff.component(cmptI);
                 matrix(neiPointID, ownPointID)(i,k) += edgeDirCoeff.component(cmptI);
 //			    Info << "matrix ( " << neiPointID << ", " << neiPointID << " ) " << matrix(neiPointID, neiPointID) << endl;
-//				Info << "coeff ( " << neiPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl; 
+//				Info << "coeff ( " << neiPointID << ", " << neiPointID << " ) " << edgeDirCoeff << endl;
 //			    Info << "matrix ( " << neiPointID << ", " << ownPointID << " ) " << matrix(neiPointID, ownPointID) << endl;
-//				Info << "coeff ( " << neiPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl; 
+//				Info << "coeff ( " << neiPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl;
                 cmptI++;
             }
         }        
@@ -710,7 +695,7 @@ void Foam::vfvm::Sp
     {    	
         matrix(pointI, pointI)(3,3) += pointVolI[pointI];
 //        Info << "matrix ( " << pointI << ", " << pointI << " ) " << matrix(pointI, pointI) << endl;
-//        Info << "pointVolI ( " << pointI << " ) " << pointVolI[pointI] << endl; 
+//        Info << "pointVolI ( " << pointI << " ) " << pointVolI[pointI] << endl;
     }
 
     if (debug)

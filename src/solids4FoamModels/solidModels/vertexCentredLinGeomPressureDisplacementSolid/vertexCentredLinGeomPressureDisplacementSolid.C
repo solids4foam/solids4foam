@@ -117,7 +117,7 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
         const label pointID = dualCellToPoint[dualCellI];
         pointDivSigma[pointID] = dualDivSigma[dualCellI];
     }
-    
+
     forAll (source, pointI)
     {
         for (int i = 0; i < 3; i++)
@@ -127,8 +127,8 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
 
             // Add gravity body forces
             source[pointI](i,0) -= pointRhoI[pointI]*g().value().component(i)*pointVolI[pointI];
-        }        
-    } 
+        }
+    }
 
     // The source vector for the momentum equation is -F, where:
     // F = p - gamma*laplacian(p) - pBar(D)
@@ -154,7 +154,7 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
 //    const dimensionedScalar E = dimensionedScalar(solidModelDict().lookup("E"));
 //    const dimensionedScalar nu = dimensionedScalar(solidModelDict().lookup("nu"));
     const scalar K( (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*(E/(2.0*(1.0 + nu))) );
-    
+
     // Calculate the pBar field
     const scalarField pBar(-0.5*K*(pow(pointJI, 2.0) - 1.0));
 
@@ -169,8 +169,8 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
         // Add pBar
         source[pointI](3,0) += pBar[pointI]*pointVolI[pointI];
     }
-    
-    
+
+
 
     if (debug)
     {
@@ -719,7 +719,7 @@ vertexCentredLinGeomPressureDisplacementSolid::vertexCentredLinGeomPressureDispl
         ),
         pMesh(),
         dimensionedScalar("0", dimPressure, 0.0)
-    ),    
+    ),
     pointU_
     (
         IOobject
@@ -907,7 +907,7 @@ bool vertexCentredLinGeomPressureDisplacementSolid::evolve()
 
     // Initialise matrix where each coefficient is a 4x4 tensor
     sparseMatrixExtended matrixExtended(sum(globalPointIndices_.stencilSize()));
-    
+
     dualPf_ = vfvc::dualPf
     (
         pointP_,
@@ -917,7 +917,7 @@ bool vertexCentredLinGeomPressureDisplacementSolid::evolve()
         dualMeshMap().dualCellToPoint(),
         zeta,
         debug
-    ); 
+    );
 
     // Store material tangent field for dual mesh faces
     Field<RectangularMatrix<scalar>> materialTangent
@@ -1004,7 +1004,7 @@ bool vertexCentredLinGeomPressureDisplacementSolid::evolve()
             zeta,
             debug
         );
-        
+
         // Calculate P at the dual faces
         dualPf_ = vfvc::dualPf
         (
@@ -1015,7 +1015,7 @@ bool vertexCentredLinGeomPressureDisplacementSolid::evolve()
             dualMeshMap().dualCellToPoint(),
             zeta,
             debug
-        );    
+        );
 
         // Calculate gradD at the primary mesh points
         pointGradD_ = vfvc::pGrad
@@ -1032,7 +1032,7 @@ bool vertexCentredLinGeomPressureDisplacementSolid::evolve()
 
         pointP_.correctBoundaryConditions();
         pointD().correctBoundaryConditions();
-        
+
         updateSource
         (
             sourceExtended,

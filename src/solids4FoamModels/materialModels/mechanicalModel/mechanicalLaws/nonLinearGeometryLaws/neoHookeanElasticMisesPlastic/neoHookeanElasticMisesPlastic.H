@@ -71,9 +71,9 @@ class neoHookeanElasticMisesPlastic
 
         //- Shear modulus
         dimensionedScalar mu_;
-        
+
         //- Bulk modulus
-		dimensionedScalar K_;
+                dimensionedScalar K_;
 
         //- Jacobian of the toal deformation gradient volField
         autoPtr<volScalarField> JPtr_;
@@ -257,10 +257,10 @@ class neoHookeanElasticMisesPlastic
 
         //-Calculate hydrostatic stress given gradD
         void calculateSigmaHyd
-		(
-			 surfaceScalarField& sigmaHyd,
-			 const surfaceTensorField& gradD
-		);
+        (
+            surfaceScalarField& sigmaHyd,
+            const surfaceTensorField& gradD
+        );
 
 public:
 

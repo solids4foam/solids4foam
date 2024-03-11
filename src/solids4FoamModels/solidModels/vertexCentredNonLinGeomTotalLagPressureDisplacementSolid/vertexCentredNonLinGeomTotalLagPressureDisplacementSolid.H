@@ -82,7 +82,7 @@ class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
 
         //- Flag to enable steadyState
         Switch steadyState_;
-        
+
         //- Compact stencil flag
         Switch compactStencil_;
 

@@ -217,7 +217,8 @@ void Foam::solidModel::makeDualMesh() const
         dualMesh.movePoints(map().preMotionPoints());
     }
 
-    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false)) //Find a way to add this default value to 'solidProperties' dict in the future
+    // Find a way to add this default value to 'solidProperties' dict in the future
+    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false))
     {
         dualMesh.setInstance(runTime().constant());
         Info<< "Writing dualMesh to " << dualMesh.polyMesh::instance() << endl;

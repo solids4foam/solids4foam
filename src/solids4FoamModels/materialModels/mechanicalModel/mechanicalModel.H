@@ -45,7 +45,7 @@ Author
 #include "Switch.H"
 #include "solidSubMeshes.H"
 #ifdef OPENFOAM_NOT_EXTEND
-    #include "volPointInterpolation.H"
+    #include "enhancedVolPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
@@ -138,7 +138,7 @@ public:
             //- Return a const reference to the vol-to-point base mesh
             //  interpolator
 #ifdef OPENFOAM_NOT_EXTEND
-            const volPointInterpolation& volToPoint() const;
+            const enhancedVolPointInterpolation& volToPoint() const;
 #else
             const newLeastSquaresVolPointInterpolation& volToPoint() const;
 #endif
@@ -215,6 +215,18 @@ public:
             void interpolate
             (
                 const volVectorField& D,
+                pointVectorField& pointD,
+                const bool useVolFieldSigma = true
+            );
+
+            //- Interpolate D to pointD and use gradD for
+            //  enhancedVolPointInterpolation
+            //  Note: for multi-material cases, it is assumed that gradD is
+            //  already up-to-date on sub-meshes
+            void interpolate
+            (
+                const volVectorField& D,
+                const volTensorField& gradD,
                 pointVectorField& pointD,
                 const bool useVolFieldSigma = true
             );

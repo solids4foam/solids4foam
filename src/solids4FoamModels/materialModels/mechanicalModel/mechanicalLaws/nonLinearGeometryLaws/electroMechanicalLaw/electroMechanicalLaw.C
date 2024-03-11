@@ -167,6 +167,13 @@ Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::impK() const
 }
 
 
+Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
+Foam::electroMechanicalLaw::materialTangentField() const
+{
+    return passiveMechLawPtr_->materialTangentField();
+}
+
+
 Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::bulkModulus() const
 {
     return passiveMechLawPtr_->bulkModulus();

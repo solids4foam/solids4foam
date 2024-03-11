@@ -54,7 +54,7 @@ namespace sparseMatrixExtendedTools
 
     //- Check if the case is 2-D
     bool checkTwoD(const polyMesh& mesh);
-    
+
     //- Solve the linear system using Eigen's SparseLU direct solver
     void solveLinearSystemEigen
     (

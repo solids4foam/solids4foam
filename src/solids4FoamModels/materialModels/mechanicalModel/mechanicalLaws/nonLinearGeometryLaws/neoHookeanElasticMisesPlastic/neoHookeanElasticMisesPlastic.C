@@ -547,9 +547,9 @@ Foam::tmp<Foam::surfaceScalarField> Foam::neoHookeanElasticMisesPlastic::Ibar
 
 void Foam::neoHookeanElasticMisesPlastic::calculateStress
 (
-	surfaceSymmTensorField& sigma,
-	const surfaceTensorField& gradD,
-	const surfaceScalarField& p
+    surfaceSymmTensorField& sigma,
+    const surfaceTensorField& gradD,
+    const surfaceScalarField& p
 )
 {
     // Calculate F
@@ -788,7 +788,7 @@ void Foam::neoHookeanElasticMisesPlastic::calculateStress
     // Note: updateSigmaHyd is not implemented for surface fields
 
     if (solvePressureEquation_)
-    {        
+    {
         sigma = (1.0/Jf())*(s - p*I);
 //        sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
     }
@@ -1316,7 +1316,7 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
 
             // Calculate perturbed stress
             const_cast<neoHookeanElasticMisesPlastic&>(*this).calculateStress(sigmaPerturb, gradDPerturb, pRef);
-            
+
 //            Info << "sigmaRef: " << sigmaRef << endl;
 //            Info << "sigmaPerturb: " << sigmaPerturb << endl;
 //            Info << "sigmaPerturb - sigmaRef: " << sigmaPerturb - sigmaRef << endl;

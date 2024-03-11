@@ -126,6 +126,7 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
     }
     
     // Insert momentum coefficients into the source
+
     forAll (source, pointI)
     {
         for (int i = 0; i < 3; i++)
@@ -1043,7 +1044,6 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::geometricStiffnessFiel
 //    return tresult;
 //}
 
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
@@ -1354,7 +1354,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
     Info<< "Evolving solid solver" << endl;
     
     ////// Prepare fields at the beginning of each time step //////
-    
+
     // Lookup compact edge gradient factor
     const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
     if (debug)
@@ -1406,7 +1406,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
         pointP_,
         mesh()
     );
-    
+
     // Store material tangent field for dual mesh faces
     Field<RectangularMatrix<scalar>> materialTangent
     (
@@ -1470,7 +1470,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
             dualMeshMap().dualFaceToCell(),
             dualMeshMap().dualCellToPoint(),
             debug
-        );    
+        );
 
         // Update gradD at the primary mesh points
         pointGradD_ = vfvc::pGrad
@@ -1488,7 +1488,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
 		    pointP_,
 		    mesh()
 		);
-    
+
         // Calculate stress at dual faces
         dualMechanicalPtr_().correct(dualSigmaf_);
 
@@ -1655,7 +1655,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
             // Use Eigen SparseLU direct solver
             notImplemented("Not implemented with Eigen SparseLU direct solver")
         }
-        
+
         if (debug)
         {
             Info<< "bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve(): "
@@ -1695,7 +1695,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
 
         pointD().correctBoundaryConditions();
         pointP_.correctBoundaryConditions();
-        
+
         // Update point accelerations
         // Note: for NewmarkBeta, this needs to come before the pointU update
 #ifdef OPENFOAM_NOT_EXTEND
@@ -1732,7 +1732,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
                 mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
                 pointD()
             );
-#endif   
+#endif
     }
     while
     (

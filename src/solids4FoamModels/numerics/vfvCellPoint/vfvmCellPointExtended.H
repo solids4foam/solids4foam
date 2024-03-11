@@ -104,7 +104,7 @@ namespace vfvm
 
 
     // Add coefficients to the matrix for the Laplacian of a scalar field with
-    // a scalar diffusivity field    
+    // a scalar diffusivity field
 	void laplacian
 	(
 		sparseMatrixExtended& matrix,

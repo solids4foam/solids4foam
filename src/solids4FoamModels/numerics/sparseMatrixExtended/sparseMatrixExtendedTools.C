@@ -658,7 +658,7 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
     }
 	//Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
     ierr = KSPSolve(ksp, b, x); checkErr(ierr);
-    
+
 
     if (debug)
     {
@@ -917,7 +917,7 @@ void Foam::sparseMatrixExtendedTools::setNonZerosPerRow
             if (blockSize == 4)
             {
 				d_nnz[rowI] += nCompOwned;
-				o_nnz[rowI++] += nCompNotOwned;            	
+				o_nnz[rowI++] += nCompNotOwned;
             }
             else if (blockSize != 3)
             {
