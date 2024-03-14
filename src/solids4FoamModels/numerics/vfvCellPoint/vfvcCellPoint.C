@@ -894,7 +894,7 @@ tmp<volScalarField> interpolate
         const labelList& curCellPoints = cellPoints[cellI];
 
         // Number of points in current cell
-        const scalar nPoints = curCellPoints.size();
+        const scalar& nPoints = curCellPoints.size();
 
         // Calculate the pointP average for each cell
         scalar pointPAvg = 0;
@@ -903,9 +903,9 @@ tmp<volScalarField> interpolate
             // Primary point index
             const label pointID = curCellPoints[cpI];
 
-            // Sum pointP for curCellPoints
+            // Calculate pointP average
             pointPAvg += pointPI[pointID]/nPoints;
-        }
+        } 
 
         result[cellI] = pointPAvg;
     }
@@ -959,7 +959,6 @@ tmp<surfaceScalarField> interpolate
 
     // Take references for clarity and efficiency
     scalarField& resultI = result;
-    //const scalarField& pointPI = pointP.internalField();
     const pointField& points = mesh.points();
     const labelList& dualOwn = dualMesh.faceOwner();
     const labelList& dualNei = dualMesh.faceNeighbour();
@@ -1040,7 +1039,7 @@ tmp<surfaceScalarField> interpolate
             }
         }
     }
-
+    
     if (debug)
     {
         Info<< "surfaceScalarField interpolate(...): end" << endl;

@@ -228,11 +228,11 @@ class vertexCentredNonLinGeomTotalLagPressureDisplacementSolid
 			const surfaceTensorField gradDRef //Reference gradD
 		) const;
 
-/*		Foam::tmp<tensorField>*/
-/*		pBarSensitivityField*/
-/*		(*/
-/*			const pointTensorField pGradDRef //Reference pointGradD*/
-/*		) const;*/
+		Foam::tmp<tensorField>
+		pBarSensitivityField
+		(
+			const pointTensorField pGradDRef //Reference pointGradD
+		) const;
 
         //- Disallow default bitwise copy construct
         vertexCentredNonLinGeomTotalLagPressureDisplacementSolid(const vertexCentredNonLinGeomTotalLagPressureDisplacementSolid&);

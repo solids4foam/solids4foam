@@ -163,7 +163,7 @@ void vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::updateSource
     const scalar K( (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*(E/(2.0*(1.0 + nu))) );
     
     // Calculate the pBar field (TO FIX LATER)
-    scalarField pBar(-0.5*K*(pow(pointJ_, 2.0)));    
+    scalarField pBar(-0.5*K*pow(pointJ_, 2.0));    
     pBar += 0.5*K;
     pBar /= pointJ_;
 
@@ -924,125 +924,125 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::geometricStiffnessFiel
 }
 
 
-//Foam::tmp<tensorField>
-//vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::pBarSensitivityField
-//(
-//    const pointTensorField pGradDRef
-//) const
-//{
-//    // Prepare tmp field
-//    tmp<tensorField> tresult
-//    (
-//        new tensorField(mesh().nPoints(), Foam::tensor::zero)
-//    );
-//#ifdef OPENFOAM_NOT_EXTEND
-//    tensorField& result = tresult.ref();
-//#else
-//    tensorField& result = tresult();
-//#endif
+Foam::tmp<tensorField>
+vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::pBarSensitivityField
+(
+    const pointTensorField pGradDRef
+) const
+{
+    // Prepare tmp field
+    tmp<tensorField> tresult
+    (
+        new tensorField(mesh().nPoints(), Foam::tensor::zero)
+    );
+#ifdef OPENFOAM_NOT_EXTEND
+    tensorField& result = tresult.ref();
+#else
+    tensorField& result = tresult();
+#endif
 
-//    //Calculate the bulk modulus
-//    const scalar E = 70e9;
-//    const scalar nu = 0.3;
-//    const scalar K( (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*(E/(2.0*(1.0 + nu))) );
+    //Calculate the bulk modulus
+    const scalar E = 70e9;
+    const scalar nu = 0.3;
+    const scalar K( (nu*E/((1.0 + nu)*(1.0 - 2.0*nu))) + (2.0/3.0)*(E/(2.0*(1.0 + nu))) );
 
-//    //d(pBar)/d(gradD) = -0.5*K*d(J^2)/d(gradD)
-//    
-//    // Calculate unperturbed F
-//    const tensorField FRef(I + pGradDRef.T());
+    //d(pBar)/d(gradD) = -0.5*K*d(J^2)/d(gradD)
+    
+    // Calculate unperturbed F
+    const tensorField FRef(I + pGradDRef.T());
 
-//    // Calculate unperturbed J
-//    const scalarField JRef(det(FRef));
+    // Calculate unperturbed J
+    const scalarField JRef(det(FRef));
 
-//    // Calculate unperturbed J
-//    const scalarField pBarRef(-0.5*K*(pow(JRef, 2.0) - 1.0)/JRef);
+    // Calculate unperturbed J
+    const scalarField pBarRef(-0.5*K*(pow(JRef, 2.0) - 1.0)/JRef);
 
-//    // Create field to be used for perturbations
-//    pointTensorField pGradDPerturb("pGradDPerturb", pGradDRef);
+    // Create field to be used for perturbations
+    pointTensorField pGradDPerturb("pGradDPerturb", pGradDRef);
 
-//    // Small number used for perturbations
-//    const scalar eps(solidModelDict().lookupOrDefault<scalar>("tangentEps", 1e-10));
+    // Small number used for perturbations
+    const scalar eps(solidModelDict().lookupOrDefault<scalar>("tangentEps", 1e-10));
 
-//    // For each component of gradD, sequentially apply a perturbation and
-//    // then calculate the resulting sigma
-//    for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
-//    {
-//        // Reset gradDPerturb and multiply by 1.0 to avoid it being removed
-//        // from the object registry
-//        pGradDPerturb = 1.0*pGradDRef;
+    // For each component of gradD, sequentially apply a perturbation and
+    // then calculate the resulting sigma
+    for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
+    {
+        // Reset gradDPerturb and multiply by 1.0 to avoid it being removed
+        // from the object registry
+        pGradDPerturb = 1.0*pGradDRef;
 
-//        // Perturb this component of pGradD field
-//        forAll(pGradDPerturb, pointI)
-//        {
-//            pGradDPerturb[pointI].component(cmptI) = pGradDRef[pointI].component(cmptI) + eps;
-//        }
+        // Perturb this component of pGradD field
+        forAll(pGradDPerturb, pointI)
+        {
+            pGradDPerturb[pointI].component(cmptI) = pGradDRef[pointI].component(cmptI) + eps;
+        }
 
-//        const tensorField FPerturb(I + pGradDPerturb.T());
-//        const scalarField JPerturb(det(FPerturb));
-//        const scalarField pBarPerturb(-0.5*K*(pow(JPerturb, 2.0) - 1.0)/JPerturb);
+        const tensorField FPerturb(I + pGradDPerturb.T());
+        const scalarField JPerturb(det(FPerturb));
+        const scalarField pBarPerturb(-0.5*K*(pow(JPerturb, 2.0) - 1.0)/JPerturb);
 
-//        // Calculate each component
-//        const scalarField tangCmpt((pBarPerturb - pBarRef)/eps);
-//        
-////        Info << "pBarPerturb: " << pBarPerturb << endl;
-////        Info << "pBarRef: " << pBarRef << endl;
+        // Calculate each component
+        const scalarField tangCmpt((pBarPerturb - pBarRef)/eps);
+        
+//        Info << "pBarPerturb: " << pBarPerturb << endl;
+//        Info << "pBarRef: " << pBarRef << endl;
 
-//        // Insert components
-//        forAll(tangCmpt, pointI)
-//        {
-//            if (cmptI == tensor::XX)
-//            {
-//                result[pointI][tensor::XX] = tangCmpt[pointI];
-//            }
-//            else if (cmptI == tensor::XY)
-//            {
-//                result[pointI][tensor::XY] = tangCmpt[pointI];
-//            }
-//            else if (cmptI == tensor::XZ)
-//            {
-//                result[pointI][tensor::XZ] = tangCmpt[pointI];
-//            }
-//            else if (cmptI == tensor::YX)
-//            {
-//                result[pointI][tensor::YX] = tangCmpt[pointI];
-//            }
-//            else if (cmptI == tensor::YY)
-//            {
-//                result[pointI][tensor::YY] = tangCmpt[pointI];
-//            }
-//            else if (cmptI == tensor::YZ)
-//            {
-//                result[pointI][tensor::YZ] = tangCmpt[pointI];
-//            }
-//            else if (cmptI == tensor::ZX)
-//            {
-//                result[pointI][tensor::ZX] = tangCmpt[pointI];
-//            }
-//            else if (cmptI == tensor::ZY)
-//            {
-//                result[pointI][tensor::ZY] = tangCmpt[pointI];
-//            }
-//            else // if (cmptI == tensor::ZZ)
-//            {
-//                result[pointI][tensor::ZZ] = tangCmpt[pointI];
-//            }
-//        }
-//    }
-//    
-//    //Info << result[0] << endl;
-//    //Info << pGradDRef << endl;
-//    //pointScalarField pointJ = det(I + pGradDRef.T());
-//    //Info << pointJ << endl;
-////    tensorField pBar = -0.5*K*( 
-////    	(2*(I + tr(pGradDRef)*I - pGradDRef.T() + cof(pGradDRef))) -
-////    	(I + tr(pGradDRef)*I - pGradDRef.T() + cof(pGradDRef))*(1 - 1/sqr(pointJ))
-////    	);
-//    
-//    //(sqr(pointJ) - 1)*(I + tr(pGradDRef)*I - pGradDRef.T() + cof(pGradDRef)));
-//    //Info << pBar[0] << endl;
-//    	
-//    return tresult;
-//}
+        // Insert components
+        forAll(tangCmpt, pointI)
+        {
+            if (cmptI == tensor::XX)
+            {
+                result[pointI][tensor::XX] = tangCmpt[pointI];
+            }
+            else if (cmptI == tensor::XY)
+            {
+                result[pointI][tensor::XY] = tangCmpt[pointI];
+            }
+            else if (cmptI == tensor::XZ)
+            {
+                result[pointI][tensor::XZ] = tangCmpt[pointI];
+            }
+            else if (cmptI == tensor::YX)
+            {
+                result[pointI][tensor::YX] = tangCmpt[pointI];
+            }
+            else if (cmptI == tensor::YY)
+            {
+                result[pointI][tensor::YY] = tangCmpt[pointI];
+            }
+            else if (cmptI == tensor::YZ)
+            {
+                result[pointI][tensor::YZ] = tangCmpt[pointI];
+            }
+            else if (cmptI == tensor::ZX)
+            {
+                result[pointI][tensor::ZX] = tangCmpt[pointI];
+            }
+            else if (cmptI == tensor::ZY)
+            {
+                result[pointI][tensor::ZY] = tangCmpt[pointI];
+            }
+            else // if (cmptI == tensor::ZZ)
+            {
+                result[pointI][tensor::ZZ] = tangCmpt[pointI];
+            }
+        }
+    }
+    
+    //Info << result[0] << endl;
+    //Info << pGradDRef << endl;
+    //pointScalarField pointJ = det(I + pGradDRef.T());
+    //Info << pointJ << endl;
+//    tensorField pBar = -0.5*K*( 
+//    	(2*(I + tr(pGradDRef)*I - pGradDRef.T() + cof(pGradDRef))) -
+//    	(I + tr(pGradDRef)*I - pGradDRef.T() + cof(pGradDRef))*(1 - 1/sqr(pointJ))
+//    	);
+    
+    //(sqr(pointJ) - 1)*(I + tr(pGradDRef)*I - pGradDRef.T() + cof(pGradDRef)));
+    //Info << pBar[0] << endl;
+    	
+    return tresult;
+}
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -1168,7 +1168,7 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
             IOobject::NO_WRITE
         ),
         pMesh(),
-        dimensionedScalar("one", dimless, 1.0),
+        dimensionedScalar("zero", dimless, 0.0),
         "calculated"
     ),
     pointGradD_
@@ -1252,7 +1252,7 @@ vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::vertexCentredNonLinGeo
             IOobject::NO_WRITE
         ),
         dualMesh(),
-        dimensionedScalar("one", dimless, 1.0),
+        dimensionedScalar("zero", dimless, 0.0),
         "calculated"
     ),
     dualPf_
@@ -1425,7 +1425,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
         globalPointIndices_.localToGlobalPointMap();
 
     // Coupled pressure and displacement correction
-    Field<RectangularMatrix<scalar>> pointDPcorr(pointP_.internalField().size(),RectangularMatrix<scalar>(4,1,0));
+    Field<RectangularMatrix<scalar>> pointDPcorr(pointD().internalField().size(),RectangularMatrix<scalar>(4,1,0));
 
     // Newton-Raphson loop over momentum equation
     int iCorr = 0;
@@ -1531,11 +1531,25 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
             )
         );
 
-        //Calculate pBarSensitivity
+        // Calculate pBarSensitivity
         tensorField pBarSensitivity = -0.5*K*(
         	I + tr(pointGradD_)*I - pointGradD_.T() + cof(pointGradD_) +
-        	pow(pointJ_,-2.0)*(I + tr(pointGradD_)*I - pointGradD_.T() + cof(pointGradD_)));   
-
+        	pow(pointJ_,-2.0)*(I + tr(pointGradD_)*I - pointGradD_.T() + cof(pointGradD_))); 
+        	
+//        tensorField pBarSensitivity
+//        (
+//            pBarSensitivityField
+//            (
+//                pointGradD_
+//            )
+//        );
+//        	
+//        for (int i = 0; i < 60; i++)
+//        {
+//        	Info << pBarSensitivity[i] << endl;
+//        }
+        //Info << pBarSensitivity << endl;  
+        
         // Add div(sigma) pressure and displacement coefficients
         vfvm::divSigma
         (
@@ -1569,7 +1583,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
             debug
         );
 
-        // Add source coefficients of pressure equation
+        // Add coefficients of pressure equation
         vfvm::Sp
         (
             matrixExtended,
@@ -1592,7 +1606,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
 //		    Info << endl;
 
         // Enforce fixed DOF on the linear system for
-        // displacement pressure implementation
+        // the displacement
         sparseMatrixExtendedTools::enforceFixedDof
         (
             matrixExtended,
@@ -1692,7 +1706,7 @@ bool vertexCentredNonLinGeomTotalLagPressureDisplacementSolid::evolve()
 #endif
             }
         }
-
+		
         pointD().correctBoundaryConditions();
         pointP_.correctBoundaryConditions();
 

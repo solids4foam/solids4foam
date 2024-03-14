@@ -114,19 +114,17 @@ void vertexCentredNonLinGeomTotalLagDisplacementSolid::updateSource
 
     // Map dual cell fields to primary mesh point fields
     vectorField pointDivSigmaI(mesh().nPoints(), vector::zero);
-    scalarField pointJI(mesh().nPoints(), 0.0);
     forAll(dualDivSigma, dualCellI)
     {
         const label pointID = dualCellToPoint[dualCellI];
         pointDivSigmaI[pointID] = dualDivSigma[dualCellI];
-        pointJI[pointID] = dualJf_[dualCellI];
     }
 
     // Add surface forces to source
-    source -= pointDivSigmaI*pointVolI*pointJI;
+    source -= pointDivSigmaI*pointVolI;
 
     // Add gravity body forces
-    source -= pointRhoI*g().value()*pointVolI*pointJI;
+    source -= pointRhoI*g().value()*pointVolI;
 
     // Add transient term
     source += vfvc::d2dt2
@@ -142,7 +140,7 @@ void vertexCentredNonLinGeomTotalLagDisplacementSolid::updateSource
         pointRho_,
         pointVol_,
         int(bool(debug))
-    )*pointJI;
+    );
 
     if (debug)
     {
@@ -1117,9 +1115,27 @@ vertexCentredNonLinGeomTotalLagDisplacementSolid::~vertexCentredNonLinGeomTotalL
 bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
+            
+    ////// Prepare fields at the beginning of each time step //////
 
+    // Lookup compact edge gradient factor
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
+    if (debug)
+    {
+        Info<< "zeta: " << zeta << endl;
+    }
+    
     // Initialise matrix
     sparseMatrix matrix(sum(globalPointIndices_.stencilSize()));
+    
+    // Calculate F
+    dualFf_ = I + dualGradDf_.T();
+
+    // Calculate Finv
+    dualFinvf_ = inv(dualFf_);
+
+    // Calculate J
+    dualJf_ = det(dualFf_);
 
     // Store material tangent field for dual mesh faces
     Field<RectangularMatrix<scalar>> materialTangent
@@ -1132,13 +1148,6 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
 
     // Calculate stress for primary cells
     mechanical().correct(sigma());
-
-    // Lookup compact edge gradient factor
-    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.2));
-    if (debug)
-    {
-        Info<< "zeta: " << zeta << endl;
-    }
 
     // Global point index lists
     const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
@@ -1217,6 +1226,8 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
 #endif
     do
     {
+    	////// Update fields at the beginning of each outer iteration //////
+    	
         // Calculate gradD at dual faces
         dualGradDf_ = vfvc::fGrad
         (
@@ -1244,11 +1255,18 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
         // Update the source vector
         vectorField source(mesh().nPoints(), vector::zero);
         pointD().correctBoundaryConditions();
-        updateSource(source, dualMeshMap().dualCellToPoint());
+        
+        ////// Assemble the source //////
+        
+        updateSource
+        (
+        	source, 
+        	dualMeshMap().dualCellToPoint()
+        );
 
         if (fullNewton_)
         {
-            // Info<< "    Assembling the matrix" << endl;
+            ////// Assemble the matrix //////
 
             // Assemble the matrix once per outer iteration
             matrix.clear();
@@ -1259,16 +1277,13 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
             //Obtain undeformed surface vector field
             surfaceVectorField SfUndef = dualMesh().Sf();
 
-            // Update gradDRef
-            surfaceTensorField gradDRef = dualGradDf_;
-
             // Calculate geometric stiffness field for dual mesh faces
             Foam::Field<Foam::RectangularMatrix<Foam::scalar>> geometricStiffness
             (
                 geometricStiffnessField
                 (
                     SfUndef,
-                    gradDRef
+                    dualGradDf_
                 )
             );
 
@@ -1340,7 +1355,8 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
 //	    }
 //	    Info << endl;
 
-        // Solve linear system for displacement correction
+        ////// Solve the linear system //////
+        
         if (debug)
         {
             Info<< "bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve(): "
@@ -1512,6 +1528,8 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
             pointDcorr
         ) && ++iCorr
     );
+    
+    ////// Update fields at the end of each time step //////
 
     // Calculate gradD at dual faces
     dualGradDf_ = vfvc::fGrad

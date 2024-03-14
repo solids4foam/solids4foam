@@ -773,24 +773,22 @@ void Foam::neoHookeanElasticMisesPlastic::calculateStress
     // Calculate deviatoric stress
     const surfaceSymmTensorField s(sTrial - 2*mu_*DEpsilonPf_);
 
-    //Update bEbar
-    if (updateBEbarConsistent_)
-    {
-        const surfaceSymmTensorField devBEbar(s/mu_);
-        bEbarf_ = devBEbar + this->Ibar(devBEbar)*I;
-    }
-    else
-    {
-        bEbarf_ = (s/mu_) + Ibar*I;
-    }
+//    //Update bEbar
+//    if (updateBEbarConsistent_)
+//    {
+//        const surfaceSymmTensorField devBEbar(s/mu_);
+//        bEbarf_ = devBEbar + this->Ibar(devBEbar)*I;
+//    }
+//    else
+//    {
+//        bEbarf_ = (s/mu_) + Ibar*I;
+//    }
 
     // Update the Cauchy stress
-    // Note: updateSigmaHyd is not implemented for surface fields
 
     if (solvePressureEquation_)
     {
-        sigma = (1.0/Jf())*(s - p*I);
-//        sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
+        sigma = (1.0/Jf())*(s - p*I);;
     }
     else
     {
@@ -1754,7 +1752,6 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     // Update the Cauchy stress
     if (solvePressureEquation_)
     {
-//      	sigma = (1.0/J())*(sigmaHyd()*I + s);
       	sigma = (1.0/J())*(s - p*I);
     }
     else
@@ -2015,7 +2012,6 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
 
     if (solvePressureEquation_)
     {
-//      	sigma = (1.0/Jf())*(0.5*K_*(pow(Jf(), 2) - 1)*I + s);
       	sigma = (1.0/Jf())*(s - p*I);
     }
     else

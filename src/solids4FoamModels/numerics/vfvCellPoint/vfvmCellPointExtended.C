@@ -356,7 +356,6 @@ void Foam::vfvm::divSigma
             // Insert pressure coefficients
 			for (int i = 0; i < 3; i++)
 			{
-			//forall pointpoint[cellID]
 			    // Add the coefficient to the ownPointID equation 
 			    matrix(ownPointID, pointID)(i,3) += -curDualSfDef.component(i)/curCellPoints.size();
 //		        Info << "dualFaceI: " << dualFaceI << endl;
@@ -672,6 +671,8 @@ void Foam::vfvm::Sp
         // neighbour
         forAll(curPointPoints, ppI)
         {
+            const label pointPointID = curPointPoints[ppI];
+            
             // Least squares vector from the average point to this neighbour
             // point
             const vector& lsVec = curLeastSquaresVecs[ppI];
@@ -681,8 +682,9 @@ void Foam::vfvm::Sp
             
             // Insert the displacement coefficient of pressure equation
             for (int i = 0; i < 3; i++)
-            {
-            	matrix(pointI, pointI)(3,i) += coeff.component(i);
+            {            	
+            	matrix(pointI, pointPointID)(3,i) -= coeff.component(i);
+            	matrix(pointPointID, pointI)(3,i) += coeff.component(i);
 //            	Info << "Before multiplying: " << endl;
 //			    Info << "matrix ( " << pointID << ", " << pointID << " ) " << matrix(pointID, pointID) << endl;
 //				Info << "coeff ( " << pointID << ", " << pointID << " ) " << coeff << endl;

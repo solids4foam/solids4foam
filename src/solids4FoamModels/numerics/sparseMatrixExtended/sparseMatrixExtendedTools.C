@@ -954,7 +954,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
     const scalar fixedDofScale
 )
 {
-        const bool debug = 0;
+    const bool debug = 0;
 
     // Loop though the matrix and overwrite the coefficients for fixed DOFs
     // To enforce the value we will set the diagonal to the identity and set
@@ -1068,7 +1068,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
                 coeff(2,1) = momDispCoeff.zy();
                 coeff(2,2) = momDispCoeff.zz();
             }
-
+            
             //Insert the changed source terms back into the source
             if (twoD)
             {
