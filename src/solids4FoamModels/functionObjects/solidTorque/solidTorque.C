@@ -58,7 +58,7 @@ bool Foam::solidTorque::writeData()
         const fvMesh& mesh = *meshPtr;
 
        // Lookup the patch stress field
-        const volSymmTensorField& sigma =
+        const symmTensorField& sigma =
             mesh.lookupObject<volSymmTensorField>
             (
                 "sigma"
@@ -168,12 +168,6 @@ Foam::solidTorque::solidTorque
     time_(t),
     historyPatchID_(-1),
     patchFound_(false),
-    stressName_
-    (
-        dict.found("stressName")
-      ? word(dict.lookup("stressName"))
-      : word("sigma")
-    ),
     pointOnAxis_(dict.lookup("pointOnAxis")),
     axis_(dict.lookup("axisDirection")),
     historyFilePtr_()
