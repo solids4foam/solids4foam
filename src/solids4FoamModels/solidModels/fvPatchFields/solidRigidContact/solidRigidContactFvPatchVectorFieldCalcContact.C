@@ -281,6 +281,7 @@ void Foam::solidRigidContactFvPatchVectorField::calcZoneToZones() const
                 0,              // Master non-overlapping face tolerances
                 0,              // Slave non-overlapping face tolerances
                 true,           // Rescale weighting factors
+                false,
                 quickReject_,
                 regionOfInterest_
             )

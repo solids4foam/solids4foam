@@ -169,6 +169,14 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
     List<DynamicList<label> > masterNeighbors(masterPatch_.size());
     List<DynamicList<scalar> > masterNeighborsWeights(masterPatch_.size());
 
+    // Master/slave list with corresponging integral gap value and
+    // relative area in overlapping contact
+    List<DynamicList<scalar> > masterNeighborsVolume(masterPatch_.size());
+    List<DynamicList<scalar> > masterNeighborsRelContactArea
+    (
+        masterPatch_.size()
+    );
+
     // Store slave negighbour weights at the same time, but under
     // addressing.  The list will be redistributed to slaves in a separate
     // loop.  HJ, 27/Apr/2016
@@ -314,6 +322,8 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
 
             if (doTransform())
             {
+                // TO_CHECK (is this performed)
+
                 // Transform points to master plane
                 if (forwardT_.size() == 1)
                 {
@@ -339,6 +349,8 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
             // neighbErrorProjectionAlongW values to a minimum
             if (doSeparation())
             {
+                // TO_CHECK (is this performed)
+
                 if (forwardSep_.size() == 1)
                 {
                     curSlaveFacePoints += forwardSep_[0];
@@ -409,12 +421,17 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
                 // final reject test, but it would also be an indication that
                 // our 2 previous rejection tests are a bit laxed...  or that
                 // maybe we are in presence of concave polygons....
-                scalar intersectionArea =
+                List<point2D> intersectionPolygonPoints =
                     polygonIntersection
                     (
                         masterPointsInUV,
                         neighbPointsInUV
                     );
+
+                // Compute the area of clippedPolygon if we indeed do have a
+                // clipped polygon; otherwise, the computed area stays at 0.0;
+                scalar intersectionArea =
+                    mag(area2D(intersectionPolygonPoints));
 
                 if (intersectionArea > VSMALL) // Or > areaErrorTol_ ???
                 {
@@ -447,6 +464,39 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
                     // Note: Slave side will be reconstructed after the
                     // parallel cutting and reduce operations.
                     // HJ, 27/Apr/2016
+
+                    // Addition for contact procedure with pressure integration
+                    // Clipped polygon is in master plane and UV coordinate
+                    // system. We can project back points to slave plane
+                    // to obtain penetration depth at point and to integrate
+                    // penetration (this integraion is in fact calculation of
+                    // the penetration volume of two faces)
+                    // Projection is done using master normal.
+                    if (gapIntegration_)
+                    {
+                        // Penetration volume between master and slave face and
+                        // their relative area in contact
+                        Tuple2<scalar, scalar> integralGap =
+                            normalGapIntegration
+                            (
+                                intersectionPolygonPoints,
+                                uvw,
+                                faceMaster,
+                                faceSlave
+                            );
+
+                        // Master faces penetrating volume
+                        masterNeighborsVolume[faceMaster].append
+                        (
+                            integralGap.first()
+                        );
+
+                        // Master faces relative contact area
+                        masterNeighborsRelContactArea[faceMaster].append
+                        (
+                            integralGap.second()
+                        );
+                    }
                 }
                 else
                 {
@@ -520,6 +570,43 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
         Pstream::combineGather(smaW, Pstream::listEq());
         Pstream::combineScatter(smaW);
     }
+
+    if (gapIntegration_)
+    {
+        masterNeiIntegralGapPtr_ = new scalarListList(masterPatch_.size());
+        scalarListList& mNIG = *masterNeiIntegralGapPtr_;
+
+        for (label mFaceI = this->parMasterStart(); mFaceI < this->parMasterEnd(); mFaceI++)
+        {
+            mNIG[mFaceI].transfer(masterNeighborsVolume[mFaceI].shrink());
+        }
+
+        // Parallel communication: reduce master addressing
+        if (globalData())
+        {
+            Pstream::combineGather(mNIG, Pstream::listEq());
+            Pstream::combineScatter(mNIG);
+        }
+
+        masterNeiRelContactAreaPtr_ = new scalarListList(masterPatch_.size());
+        scalarListList& mNRCA = *masterNeiRelContactAreaPtr_;
+
+        for (label mFaceI = this->parMasterStart(); mFaceI < this->parMasterEnd(); mFaceI++)
+        {
+            mNRCA[mFaceI].transfer
+            (
+                masterNeighborsRelContactArea[mFaceI].shrink()
+            );
+        }
+
+        // Parallel communication: reduce master addressing
+        if (globalData())
+        {
+            Pstream::combineGather(mNRCA, Pstream::listEq());
+            Pstream::combineScatter(mNRCA);
+        }
+    }
+
     // Slave neighbours and weights
     List<DynamicList<label, 8> > slaveNeighbors(slavePatch_.size());
     List<DynamicList<scalar, 8> > slaveNeighborsWeights(slavePatch_.size());

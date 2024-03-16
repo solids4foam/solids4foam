@@ -129,6 +129,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::newGGIInterpolation
     const scalar masterNonOverlapFaceTol,
     const scalar slaveNonOverlapFaceTol,
     const bool rescaleGGIWeightingFactors,
+    const bool gapIntegration,
     const quickReject reject,
     const boundBox regionOfInterest
 )
@@ -142,6 +143,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::newGGIInterpolation
     masterNonOverlapFaceTol_(masterNonOverlapFaceTol),
     slaveNonOverlapFaceTol_(slaveNonOverlapFaceTol),
     rescaleGGIWeightingFactors_(rescaleGGIWeightingFactors),
+    gapIntegration_(gapIntegration),
     reject_(reject),
     usePrevCandidateMasterNeighbors_(false),
     prevCandidateMasterNeighbors_(0),
@@ -153,6 +155,8 @@ newGGIInterpolation<MasterPatch, SlavePatch>::newGGIInterpolation
     masterPointDistancePtr_(NULL),
     masterPointDistanceVectorsPtr_(NULL),
     masterEdgeLoopsMap_(0),
+    masterNeiIntegralGapPtr_(NULL),
+    masterNeiRelContactAreaPtr_(NULL),
     slaveAddrPtr_(NULL),
     slaveWeightsPtr_(NULL),
     slavePointAddressingPtr_(NULL),

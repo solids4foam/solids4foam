@@ -69,6 +69,7 @@ SourceFiles
 #include "triPointRef.H"
 #include "Map.H"
 #include "Switch.H"
+#include "Tuple2.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -174,6 +175,10 @@ class newGGIInterpolation
         //- Rescale the GGI weighting factors or not
         const bool rescaleGGIWeightingFactors_;
 
+        //- Calculate the penetrating volume between patches. The calculation is
+        //  is done by gap integration across the faces of the master patch.
+        const bool gapIntegration_;
+
         //- Quick reject search algorithm
         quickReject reject_;
 
@@ -216,6 +221,18 @@ class newGGIInterpolation
 
             //- Master edge loops map
             mutable List< Map<label> > masterEdgeLoopsMap_;
+
+        // Integral gap calculation using semgent-to-segment integration
+
+            //- Master faces integral gap value per each intersecting slave face
+            mutable scalarListList* masterNeiIntegralGapPtr_;
+
+            //- Slave faces integral gap value per each intersecting master face
+            mutable scalarListList* slaveNeiIntegralGapPtr_;
+
+            //- Master faces relative area in contact per each intersecting
+            // slave face
+            mutable scalarListList* masterNeiRelContactAreaPtr_;
 
         // Slave-to-master interpolation
 
@@ -415,7 +432,7 @@ class newGGIInterpolation
         ) const;
 
         //- Compute the intersection area between 2 2D polygons
-        scalar polygonIntersection
+        List<point2D> polygonIntersection
         (
             const List<point2D>& poly1,
             const List<point2D>& poly2
@@ -453,6 +470,14 @@ class newGGIInterpolation
             const List<point2D>& polygon
         ) const;
 
+        //- Integrate gap across master face using master face normal
+        Tuple2<scalar, scalar> normalGapIntegration
+        (
+            const List<point2D>& clippedPolygon,
+            const orthoNormalBasis& orthoBase,
+            const label& faceMi,
+            const label& faceSi
+        ) const;
 
         //- Calculate addressing and weights
         void calcAddressing() const;
@@ -631,6 +656,7 @@ public:
             const scalar masterFaceNonOverlapFaceTol = 0,
             const scalar slaveFaceNonOverlapFaceTol = 0,
             const bool rescaleGGIWeightingFactors = true,
+            const bool gapIntegration = false,
             const quickReject reject = BB_OCTREE,
             const boundBox regionOfInterest =
                 boundBox(vector::min, vector::max)

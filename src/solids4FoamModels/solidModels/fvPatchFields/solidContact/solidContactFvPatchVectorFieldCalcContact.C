@@ -364,6 +364,7 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
                     // Do not rescale weighting factors, as it is wrong on
                     // partially covered faces
                     false,
+                    false,
                     quickReject_,
                     regionOfInterest_
                 )
