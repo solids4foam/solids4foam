@@ -193,6 +193,19 @@ standardPenalty::standardPenalty
         mesh_,
         dimensionedVector("zero", dimPressure, vector::zero)
     ),
+    masterPressureVolField_
+    (
+        IOobject
+        (
+            "masterPressure_" + mesh_.boundaryMesh()[slavePatchID].name(),
+            mesh_.time().timeName(),
+            mesh_,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh_,
+        dimensionedVector("zero", dimPressure, vector::zero)
+    ),
     areaInContactVolField_
     (
         IOobject
@@ -234,6 +247,7 @@ standardPenalty::standardPenalty(const standardPenalty& nm)
     normalContactModelDict_(nm.normalContactModelDict_),
     mesh_(nm.mesh_),
     slavePressureVolField_(nm.slavePressureVolField_),
+    masterPressureVolField_(nm.masterPressureVolField_),
     areaInContactVolField_(nm.areaInContactVolField_),
     penaltyFactor_(nm.penaltyFactor_),
     penaltyScale_(nm.penaltyScale_),
@@ -374,6 +388,59 @@ void standardPenalty::correct
     // Note: slavePressure_ is really a traction vector
     slavePressure() =
         relaxFac_*newSlaveTraction + (1.0 - relaxFac_)*slavePressure();
+}
+
+void standardPenalty::correct
+(
+    const vectorField& patchFaceNormals,
+    const scalarField& faceVolPenetration,
+    const scalarField& faceContactArea,
+    const bool master
+)
+{
+    // Preliminaries
+    const fvMesh& mesh = mesh_;
+    label patchIndex = -1;
+
+    if (master)
+    {
+        patchIndex = masterPatchID();
+    }
+    else
+    {
+        patchIndex = slavePatchID();
+    }
+
+    if (!master)
+    {
+        // Only slave stores face contact area
+        this->areaInContact() = faceContactArea;
+    }
+
+    const scalarField& magSf =
+        mesh.magSf().boundaryField()[patchIndex];
+
+    const scalar penaltyFac = penaltyFactor();
+
+    const vectorField newTraction
+    (
+       - patchFaceNormals
+       * (faceVolPenetration / magSf)
+       * penaltyFac
+    );
+
+    // Under-relax pressure/traction
+    // Note: slavePressure_ is really a traction vector
+    if (master)
+    {
+        masterPressure() =
+            relaxFac_*newTraction + (1.0 - relaxFac_)*masterPressure();
+    }
+    else
+    {
+        slavePressure() =
+            relaxFac_*newTraction + (1.0 - relaxFac_)*slavePressure();
+    }
 }
 
 

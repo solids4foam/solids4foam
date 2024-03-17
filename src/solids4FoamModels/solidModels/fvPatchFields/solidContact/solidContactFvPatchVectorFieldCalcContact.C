@@ -364,7 +364,6 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
                     // Do not rescale weighting factors, as it is wrong on
                     // partially covered faces
                     false,
-                    false,
                     quickReject_,
                     regionOfInterest_
                 )
@@ -372,6 +371,20 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
             );
 
 #ifndef OPENFOAM_NOT_EXTEND
+            // Check pointwise or integral normal gap calculation
+            const Switch integralNormalGap =
+                dict_.lookupOrDefault<Switch>
+                (
+                    "integralNormalGap", false
+                );
+            Info<< "    " << type() << ": " << patch().name() << nl
+                << "        integralNormalGap: "
+                << integralNormalGap
+                << endl;
+
+            zoneToZones_[shadPatchI].normalGapIntegration() =
+                integralNormalGap;
+
             // Check which point distance calculation method to use
             const Switch useNewPointDistanceMethod =
                 dict_.lookupOrDefault<Switch>

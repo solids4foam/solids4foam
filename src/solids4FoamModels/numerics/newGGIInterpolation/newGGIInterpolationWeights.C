@@ -93,6 +93,22 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
         )   << "Evaluation of GGI weighting factors:" << endl;
     }
 
+    if (gapIntegration_)
+    {
+        if (masterNeiIntegralGapPtr_
+         || slaveNeiIntegralGapPtr_
+         || masterNeiContactAreaPtr_
+        )
+        {
+            FatalErrorIn
+            (
+                "void newGGIInterpolation<MasterPatch, SlavePatch>::"
+                "calcAddressing() const"
+            )   << "Gap integration procedure; addresing already calculated"
+                << abort(FatalError);
+        }
+    }
+
     // Create the dynamic lists to hold the addressing
 
     // First, find a rough estimate of each slave and master facet
@@ -172,7 +188,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
     // Master/slave list with corresponging integral gap value and
     // relative area in overlapping contact
     List<DynamicList<scalar> > masterNeighborsVolume(masterPatch_.size());
-    List<DynamicList<scalar> > masterNeighborsRelContactArea
+    List<DynamicList<scalar> > masterNeighborsContactArea
     (
         masterPatch_.size()
     );
@@ -322,8 +338,6 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
 
             if (doTransform())
             {
-                // TO_CHECK (is this performed)
-
                 // Transform points to master plane
                 if (forwardT_.size() == 1)
                 {
@@ -349,7 +363,6 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
             // neighbErrorProjectionAlongW values to a minimum
             if (doSeparation())
             {
-                // TO_CHECK (is this performed)
 
                 if (forwardSep_.size() == 1)
                 {
@@ -492,7 +505,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
                         );
 
                         // Master faces relative contact area
-                        masterNeighborsRelContactArea[faceMaster].append
+                        masterNeighborsContactArea[faceMaster].append
                         (
                             integralGap.second()
                         );
@@ -518,7 +531,6 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
 
         // We went through all the possible neighbors for this face.
     }
-
 
     // Allocate the member attributes and pack addressing
     masterAddrPtr_ = new labelListList(masterPatch_.size());
@@ -571,12 +583,15 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
         Pstream::combineScatter(smaW);
     }
 
+    masterNeiIntegralGapPtr_ = new scalarListList(masterPatch_.size());
+    scalarListList& mNIG = *masterNeiIntegralGapPtr_;
+
+    masterNeiContactAreaPtr_ = new scalarListList(masterPatch_.size());
+    scalarListList& mNRCA = *masterNeiContactAreaPtr_;
+
     if (gapIntegration_)
     {
-        masterNeiIntegralGapPtr_ = new scalarListList(masterPatch_.size());
-        scalarListList& mNIG = *masterNeiIntegralGapPtr_;
-
-        for (label mFaceI = this->parMasterStart(); mFaceI < this->parMasterEnd(); mFaceI++)
+        for (label mFaceI = pmStart; mFaceI < this->parMasterEnd(); mFaceI++)
         {
             mNIG[mFaceI].transfer(masterNeighborsVolume[mFaceI].shrink());
         }
@@ -588,14 +603,11 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
             Pstream::combineScatter(mNIG);
         }
 
-        masterNeiRelContactAreaPtr_ = new scalarListList(masterPatch_.size());
-        scalarListList& mNRCA = *masterNeiRelContactAreaPtr_;
-
-        for (label mFaceI = this->parMasterStart(); mFaceI < this->parMasterEnd(); mFaceI++)
+        for (label mFaceI = pmStart; mFaceI < this->parMasterEnd(); mFaceI++)
         {
             mNRCA[mFaceI].transfer
             (
-                masterNeighborsRelContactArea[mFaceI].shrink()
+                masterNeighborsContactArea[mFaceI].shrink()
             );
         }
 
@@ -610,6 +622,8 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
     // Slave neighbours and weights
     List<DynamicList<label, 8> > slaveNeighbors(slavePatch_.size());
     List<DynamicList<scalar, 8> > slaveNeighborsWeights(slavePatch_.size());
+
+    List<DynamicList<scalar> > slaveNeighborsVolume(slavePatch_.size());
 
     // Note: slave side is not parallelised: book-keeping only
     // HJ, 27/Apr/2016
@@ -640,7 +654,6 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
         }
     }
 
-
     slaveAddrPtr_ = new labelListList(slavePatch_.size());
     labelListList& sa = *slaveAddrPtr_;
 
@@ -655,6 +668,29 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
     forAll (sa, sfI)
     {
         saW[sfI].transfer(slaveNeighborsWeights[sfI].shrink());
+    }
+
+    slaveNeiIntegralGapPtr_ = new scalarListList(slavePatch_.size());
+    scalarListList& sNIG = *slaveNeiIntegralGapPtr_;
+
+    if (gapIntegration_)
+    {
+        forAll (ma, mfI)
+        {
+            const labelList& curMa = ma[mfI];
+            const scalarList& curmNIG = mNIG[mfI];
+
+            forAll (curMa, mAI)
+            {
+                const label faceSlave = curMa[mAI];
+                slaveNeighborsVolume[faceSlave].append(curmNIG[mAI]);
+            }
+        }
+
+        forAll (sNIG, sfI)
+        {
+            sNIG[sfI].transfer(slaveNeighborsVolume[sfI].shrink());
+        }
     }
 
     // Now that the neighbourhood is known, let's go hunting for
@@ -685,6 +721,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
     {
         rescaleWeightingFactors();
     }
+
 }
 
 

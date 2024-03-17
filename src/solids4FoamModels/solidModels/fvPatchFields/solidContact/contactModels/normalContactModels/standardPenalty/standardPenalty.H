@@ -67,6 +67,9 @@ class standardPenalty
         //- Slave pressure
         volVectorField slavePressureVolField_;
 
+        //- Master pressure
+        volVectorField masterPressureVolField_;
+
         //- Area in contact
         volScalarField areaInContactVolField_;
 
@@ -151,6 +154,15 @@ public:
             const vectorField& masterDUInterpToSlave
         );
 
+        //- Correct contact model
+        virtual void correct
+        (
+            const vectorField& patchFaceNormals,
+            const scalarField& faceVolPenetration,
+            const scalarField& faceContactArea,
+            const bool master
+        );
+
         //- It is the start of a new time step e.g. update penalty factor
         virtual void newTimeStep() const
         {}
@@ -161,6 +173,12 @@ public:
             return slavePressureVolField_.boundaryField()[slavePatchID()];
         }
 
+        //- Return master pressure
+        virtual const vectorField& masterPressure() const
+        {
+            return masterPressureVolField_.boundaryField()[masterPatchID()];
+        }
+
         //- Return slave pressure
         virtual vectorField& slavePressure()
         {
@@ -168,6 +186,16 @@ public:
             return slavePressureVolField_.boundaryFieldRef()[slavePatchID()];
 #else
             return slavePressureVolField_.boundaryField()[slavePatchID()];
+#endif
+        }
+
+        //- Return master pressure
+        virtual vectorField& masterPressure()
+        {
+#ifdef OPENFOAM_NOT_EXTEND
+            return masterPressureVolField_.boundaryFieldRef()[masterPatchID()];
+#else
+            return masterPressureVolField_.boundaryField()[masterPatchID()];
 #endif
         }
 

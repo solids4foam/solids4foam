@@ -177,7 +177,7 @@ class newGGIInterpolation
 
         //- Calculate the penetrating volume between patches. The calculation is
         //  is done by gap integration across the faces of the master patch.
-        const bool gapIntegration_;
+        Switch gapIntegration_;
 
         //- Quick reject search algorithm
         quickReject reject_;
@@ -232,7 +232,7 @@ class newGGIInterpolation
 
             //- Master faces relative area in contact per each intersecting
             // slave face
-            mutable scalarListList* masterNeiRelContactAreaPtr_;
+            mutable scalarListList* masterNeiContactAreaPtr_;
 
         // Slave-to-master interpolation
 
@@ -656,7 +656,6 @@ public:
             const scalar masterFaceNonOverlapFaceTol = 0,
             const scalar slaveFaceNonOverlapFaceTol = 0,
             const bool rescaleGGIWeightingFactors = true,
-            const bool gapIntegration = false,
             const quickReject reject = BB_OCTREE,
             const boundBox regionOfInterest =
                 boundBox(vector::min, vector::max)
@@ -695,6 +694,15 @@ public:
             //- Return reference to slave weights
             const scalarListList& slaveWeights() const;
 
+            //- Return refeternce to master penetration volume of each neighbour
+            const scalarListList& masterNeiPenVol() const;
+
+            //- Return refeternce to slave penetration volume of each neighbour
+            const scalarListList& slaveNeiPenVol() const;
+
+            //- Return relative area in contact for each master neighbour
+            const scalarListList& masterNeiAreaInContact() const;
+
             //- Return reference to the master list of non-overlap faces
             const labelList& uncoveredMasterFaces() const;
 
@@ -725,6 +733,19 @@ public:
             //- Return distance to intersection vectors for patch points
             const vectorField& slavePointDistanceVectorsToIntersection() const;
 
+            //- Return integral gap value (penetrating volume) for master side
+            const tmp<scalarField> masterFacePenVol() const;
+
+            //- Return integral gap value (penetrating volume) for slave side
+            const tmp<scalarField> slaveFacePenVol() const;
+
+            //- Return area in contact for each master face
+            const tmp<scalarField> masterAreaInContact() const;
+
+            //- Return area in contact for each slave face
+            const tmp<scalarField> slaveAreaInContact() const;
+
+
             //- Non-const reference to the usePrevCandidateMasterNeighbours
             //  switch
             Switch& usePrevCandidateMasterNeighbors()
@@ -736,6 +757,18 @@ public:
             void clearPrevCandidateMasterNeighbors()
             {
                 prevCandidateMasterNeighbors_.clear();
+            }
+
+            //- Non-const reference to the gap integration switch
+            Switch& normalGapIntegration()
+            {
+                return gapIntegration_;
+            }
+
+            //- Const reference to the gap integration switch
+            const Switch& normalGapIntegration() const
+            {
+                return gapIntegration_;
             }
 
             //- Non-const reference to the point distance calculation switch
