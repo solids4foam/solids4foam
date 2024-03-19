@@ -769,6 +769,18 @@ Foam::mechanicalModel& Foam::solidModel::mechanical()
 }
 
 
+bool Foam::solidModel::newTimeStep() const
+{
+    if (curTimeIndex_ != runTime().timeIndex())
+    {
+        curTimeIndex_ = runTime().timeIndex();
+        return true;
+    }
+
+    return false;
+}
+
+
 Foam::volScalarField& Foam::solidModel::rho()
 {
     if (rhoPtr_.empty())
@@ -1110,6 +1122,7 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
     ),
+    curTimeIndex_(-1),
     rhoPtr_(),
     g_
     (

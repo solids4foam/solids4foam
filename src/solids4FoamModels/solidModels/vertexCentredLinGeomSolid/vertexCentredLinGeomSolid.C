@@ -49,6 +49,24 @@ namespace solidModels
 defineTypeNameAndDebug(vertexCentredLinGeomSolid, 0);
 addToRunTimeSelectionTable(solidModel, vertexCentredLinGeomSolid, dictionary);
 
+const Enum<vertexCentredLinGeomSolid::solutionAlgorithm>
+vertexCentredLinGeomSolid::solutionAlgorithmNames_
+({
+    {
+        vertexCentredLinGeomSolid::solutionAlgorithm::IMPLICIT_COUPLED,
+        "implicitCoupled"
+    },
+    {
+        vertexCentredLinGeomSolid::solutionAlgorithm::IMPLICIT_SEGREGATED,
+        "implicitSegregated"
+    },
+    {
+        vertexCentredLinGeomSolid::solutionAlgorithm::EXPLICIT,
+        "explicit"
+    },
+});
+
+
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 void vertexCentredLinGeomSolid::updateSource
@@ -106,7 +124,9 @@ void vertexCentredLinGeomSolid::updateSource
     const vectorField dualDivSigma = fvc::div(dualTraction*dualMesh().magSf());
 
     // Map dual cell field to primary mesh point field
-    vectorField pointDivSigma(mesh().nPoints(), vector::zero);
+    //vectorField pointDivSigma(mesh().nPoints(), vector::zero);
+    vectorField& pointDivSigma = pointDivSigma_;
+    pointDivSigma = vector::zero;
     forAll(dualDivSigma, dualCellI)
     {
         const label pointID = dualCellToPoint[dualCellI];
@@ -139,6 +159,104 @@ void vertexCentredLinGeomSolid::updateSource
     {
         Info<< "void vertexCentredLinGeomSolid::updateSource(...): end"
             << endl;
+    }
+}
+
+
+void vertexCentredLinGeomSolid::updatePointDivSigma
+(
+    const pointVectorField& pointD,
+    surfaceTensorField& dualGradDf,
+    surfaceSymmTensorField& dualSigmaf,
+    pointVectorField& pointDivSigma
+)
+{
+    if (debug)
+    {
+        Info<< "void explicitVertexCentredLinGeomSolid::"
+            << "updatePointDivSigma(...): start" << endl;
+    }
+
+    // Lookup compact edge gradient factor
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
+
+    // Calculate gradD at dual faces
+    dualGradDf = vfvc::fGrad
+    (
+        pointD,
+        mesh(),
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        zeta,
+        debug
+    );
+
+    // Calculate stress at dual faces
+    dualMechanicalPtr_().correct(dualSigmaf);
+
+    // Calculate the tractions at the dual faces
+    surfaceVectorField dualTraction
+    (
+        (dualMesh().Sf()/dualMesh().magSf()) & dualSigmaf
+    );
+
+    // Enforce extract tractions on traction boundaries
+    enforceTractionBoundaries
+    (
+        pointD, dualTraction, mesh(), dualMeshMap().pointToDualFaces()
+    );
+
+    // Set coupled boundary (e.g. processor) traction fields to zero: this
+    // ensures their global contribution is zero
+    forAll(dualTraction.boundaryField(), patchI)
+    {
+        if (dualTraction.boundaryField()[patchI].coupled())
+        {
+#ifdef OPENFOAM_NOT_EXTEND
+            dualTraction.boundaryFieldRef()[patchI] = vector::zero;
+#else
+            dualTraction.boundaryField()[patchI] = vector::zero;
+#endif
+        }
+    }
+
+    // Calculate divergence of stress (force per unit volume) for the dual cells
+    const vectorField dualDivSigma = fvc::div(dualTraction*dualMesh().magSf());
+
+    // Calculate absolute divergence of stress (force)
+    // We do this to allow syncing of forces at points on processor boundaries
+    const vectorField dualDivSigmaAbs(dualDivSigma*dualMesh().V());
+
+    // Map dual cell field to primary mesh point field
+    // We temporarily use the pointDivSigma field to hold absolute forces
+    // but convert them back to force per unit volume below
+    vectorField& pointDivSigmaI = pointDivSigma;
+    const labelList& dualCellToPoint = dualMeshMap().dualCellToPoint();
+    forAll(dualDivSigmaAbs, dualCellI)
+    {
+        const label pointID = dualCellToPoint[dualCellI];
+        pointDivSigmaI[pointID] = dualDivSigmaAbs[dualCellI];
+    }
+
+    // Sum absolute forces in parallel
+    pointConstraints::syncUntransformedData
+    (
+        mesh(), pointDivSigma, plusEqOp<vector>()
+    );
+
+    // Convert force to force per unit volume
+    // Perform calculation per point to avoid dimension checks
+    const scalarField& pointVolI = pointVol_;
+    forAll(pointDivSigmaI, pointI)
+    {
+        pointDivSigmaI[pointI] /= pointVolI[pointI];
+    }
+
+    if (debug)
+    {
+        Info<< "void explicitVertexCentredLinGeomSolid::"
+            << " updatePointDivSigma(...): end" << endl;
     }
 }
 
@@ -459,7 +577,7 @@ bool vertexCentredLinGeomSolid::vertexCentredLinGeomSolid::converged
         // If the initial residual is small then convergence has been achieved
         if (initResidual < SMALL)
         {
-            Info<< "    Initial residual is less than 1e-15"
+            Info<< "    Initial residual is less than " << SMALL << nl
                 << "    Converged" << endl;
             return true;
         }
@@ -476,34 +594,42 @@ bool vertexCentredLinGeomSolid::vertexCentredLinGeomSolid::converged
     const scalar maxMagD = gMax(mag(pointD.internalField()));
 #endif
 
-    // Print information
-    Info<< "    Iter = " << iCorr
-        << ", relRef = " << residualNorm
-        << ", res = " << res
-        << ", resAbs = " << residualAbs
-        << ", nIters = " << nInterations
-        << ", maxD = " << maxMagD << endl;
-
     // Check for convergence
+    bool converged = false;
     if (residualNorm < solutionTol())
     {
         Info<< "    Converged" << endl;
-        return true;
+        converged = true;
     }
-    else if (iCorr >= nCorr() - 1)
+    else if (residualAbs < SMALL)
     {
-        if (nCorr() > 1)
+        Info<< "    Converged: absolute residual is less than " << SMALL
+            << endl;
+        converged = true;
+    }
+
+    if (iCorr == 0)
+    {
+        Info<< "    Corr, res, relRes, resAbs, iters, maxMagD" << endl;
+    }
+    else if (iCorr % infoFrequency() == 0 || converged || iCorr >= nCorr() - 1)
+    {
+        Info<< "    " << iCorr
+            << ", " << res
+            << ", " << residualNorm
+            << ", " << residualAbs
+            << ", " << nInterations
+            << ", " << maxMagD << endl;
+
+        if (iCorr >= nCorr() - 1)
         {
             Warning
-                << "Max iterations reached within the momentum Newton-Raphson "
-                "loop" << endl;
+                << "Max iterations reached within the momentum loop"
+                << endl;
         }
-
-        return true;
     }
 
-    // Convergence has not been reached
-    return false;
+    return converged;
 }
 
 
@@ -626,192 +752,53 @@ scalar vertexCentredLinGeomSolid::calculateLineSearchFactor
 }
 
 
-// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
-
-vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
-(
-    Time& runTime,
-    const word& region
-)
-:
-    solidModel(typeName, runTime, region),
-    dualMechanicalPtr_
-    (
-        new dualMechanicalModel
-        (
-            dualMesh(),
-            nonLinGeom(),
-            incremental(),
-            mechanical(),
-            dualMeshMap().dualFaceToCell()
-        )
-    ),
-    fullNewton_(solidModelDict().lookup("fullNewton")),
-    steadyState_(false),
-    twoD_(sparseMatrixTools::checkTwoD(mesh())),
-    fixedDofs_(mesh().nPoints(), false),
-    fixedDofValues_(fixedDofs_.size(), vector::zero),
-    fixedDofDirections_(fixedDofs_.size(), symmTensor::zero),
-    fixedDofScale_
-    (
-        solidModelDict().lookupOrDefault<scalar>
-        (
-            "fixedDofScale",
-            (
-                average(mechanical().impK())
-               *Foam::sqrt(gAverage(mesh().magSf()))
-            ).value()
-        )
-    ),
-    pointU_
-    (
-        IOobject
-        (
-            "pointU",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        pMesh(),
-        dimensionedVector("0", dimVelocity, vector::zero)
-    ),
-    pointA_
-    (
-        IOobject
-        (
-            "pointA",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        pMesh(),
-        dimensionedVector("0", dimVelocity/dimTime, vector::zero)
-    ),
-    pointRho_
-    (
-        IOobject
-        (
-            "point(rho)",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        pMesh(),
-        dimensionedScalar("0", dimDensity, 0.0)
-    ),
-    pointVol_
-    (
-        IOobject
-        (
-            "pointVolumes",
-            runTime.timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        pMesh(),
-        dimensionedScalar("0", dimVolume, 0.0)
-    ),
-    dualGradDf_
-    (
-        IOobject
-        (
-            "grad(D)f",
-            runTime.timeName(),
-            dualMesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        dualMesh(),
-        dimensionedTensor("zero", dimless, tensor::zero),
-        "calculated"
-    ),
-    dualSigmaf_
-    (
-        IOobject
-        (
-            "sigmaf",
-            runTime.timeName(),
-            dualMesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        dualMesh(),
-        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero),
-        "calculated"
-    ),
-    globalPointIndices_(mesh())
-#ifdef OPENFOAM_COM
-    ,
-    pointVolInterp_(pMesh(), mesh())
-#endif
+void vertexCentredLinGeomSolid::makeDualImpKf() const
 {
-    // Create dual mesh and set write option
-    dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
-
-    // pointD field must be defined
-    pointDisRequired();
-
-    // Set fixed degree of freedom list
-    setFixedDofs(pointD(), fixedDofs_, fixedDofValues_, fixedDofDirections_);
-
-    // Set point density field
-    mechanical().volToPoint().interpolate(rho(), pointRho_);
-
-    // Set the pointVol field
-    // Map dualMesh cell volumes to the primary mesh points
-#ifdef OPENFOAM_NOT_EXTEND
-    scalarField& pointVolI = pointVol_.primitiveFieldRef();
-#else
-    scalarField& pointVolI = pointVol_.internalField();
-#endif
-    const scalarField& dualCellVol = dualMesh().V();
-    const labelList& dualCellToPoint = dualMeshMap().dualCellToPoint();
-    forAll(dualCellToPoint, dualCellI)
+    if (dualImpKfPtr_.valid())
     {
-        // Find point which maps to this dual cell
-        const label pointID = dualCellToPoint[dualCellI];
-
-        // Map the cell volume
-        pointVolI[pointID] = dualCellVol[dualCellI];
+        FatalErrorIn("void vertexCentredLinGeomSolid::makeDualImpKf() const")
+            << "Pointer already set!" << abort(FatalError);
     }
 
-    // Store old time fields
-    pointD().oldTime().storeOldTime();
-    pointU_.oldTime().storeOldTime();
-    pointA_.storeOldTime();
-
-    // Write fixed degree of freedom equation scale
-    Info<< "fixedDofScale: " << fixedDofScale_ << endl;
-
-    // Disable the writing of the unused fields
-    D().writeOpt() = IOobject::NO_WRITE;
-    D().oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
-    DD().writeOpt() = IOobject::NO_WRITE;
-    DD().oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
-    U().writeOpt() = IOobject::NO_WRITE;
-    pointDD().writeOpt() = IOobject::NO_WRITE;
+    dualImpKfPtr_.set
+    (
+        new surfaceScalarField(dualMechanicalPtr_().impKf())
+    );
 }
 
 
-// * * * * * * * * * * * * * * * *  Destructors  * * * * * * * * * * * * * * //
-
-vertexCentredLinGeomSolid::~vertexCentredLinGeomSolid()
+const surfaceScalarField& vertexCentredLinGeomSolid::dualImpKf() const
 {
-#ifdef USE_PETSC
-    if (Switch(solidModelDict().lookup("usePETSc")))
+    if (dualImpKfPtr_.empty())
     {
-        PetscFinalize();
+        makeDualImpKf();
     }
-#endif
+
+    return dualImpKfPtr_();
 }
 
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-bool vertexCentredLinGeomSolid::evolve()
+void vertexCentredLinGeomSolid::predict()
+{
+    Info<< "Predicting pointD" << endl;
+
+    if (true)
+    {
+        // Assuming constant velocity
+        pointD() = pointD().oldTime() + pointU_*runTime().deltaT();
+    }
+    else
+    {
+        // Assuming constant acceleration
+        pointD() =
+            pointD().oldTime()
+          + pointU_*runTime().deltaT()
+          + 0.5*pointA_*pow(runTime().deltaT(), 2);
+    }
+}
+
+
+bool vertexCentredLinGeomSolid::evolveImplicitCoupled()
 {
     Info<< "Evolving solid solver" << endl;
 
@@ -1189,6 +1176,594 @@ bool vertexCentredLinGeomSolid::evolve()
 
     return true;
 }
+
+
+bool vertexCentredLinGeomSolid::evolveImplicitSegregated()
+{
+    Info<< "Evolving solid solver" << endl;
+
+    // Predict pointD
+    if (predictor_ && newTimeStep())
+    {
+        predict();
+    }
+
+    // Initialise matrix
+    sparseScalarMatrix matrixNoBCs(sum(globalPointIndices_.stencilSize()));
+
+    // Lookup flag to indicate compact or large Laplacian stencil
+    const Switch compactImplicitStencil
+    (
+        solidModelDict().lookupOrDefault<Switch>("compactImplicitStencil", true)
+    );
+    Info<< "compactImplicitStencil: " << compactImplicitStencil << endl;
+
+    // Create scalar Laplacian discretisation matrix without boundary conditions
+    vfvm::laplacian
+    (
+        matrixNoBCs,
+        compactImplicitStencil,
+        mesh(),
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        dualImpKf().primitiveField(),
+        debug
+    );
+
+    // Lookup compact edge gradient factor
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
+    Info<< "zeta: " << zeta << endl;
+
+    // // Global point index lists
+    // const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
+    // const labelList& localToGlobalPointMap =
+    //     globalPointIndices_.localToGlobalPointMap();
+
+    // Solution field: point displacement componnet correction
+    scalarField pointDcorr(pointD().internalField().size(), 0.0);
+
+    // Vector field version of pointDcorr
+    vectorField pointDcorrVec(pointD().internalField().size(), vector::zero);
+
+    // Initialise the source
+    vectorField source(mesh().nPoints(), vector::zero);
+
+    // Outer loop over momentum equation
+    int iCorr = 0;
+    scalar initResidual = 0.0;
+#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<vector> solverPerf;
+#else
+    BlockSolverPerformance<vector> solverPerf;
+#endif
+    do
+    {
+        // Store previous iteration of pointD for residual calculation
+        pointD().storePrevIter();
+
+        // Calculate gradD at dual faces
+        dualGradDf_ = vfvc::fGrad
+        (
+            pointD(),
+            mesh(),
+            dualMesh(),
+            dualMeshMap().dualFaceToCell(),
+            dualMeshMap().dualCellToPoint(),
+            zeta,
+            debug
+        );
+
+        // Calculate stress at dual faces
+        dualMechanicalPtr_().correct(dualSigmaf_);
+
+        // Update the source vector
+        source = vector::zero;
+        pointD().correctBoundaryConditions();
+        updateSource(source, dualMeshMap().dualCellToPoint());
+
+        // Loop over solution directions (e.g., x, y, z)
+        forAll(mesh().solutionD(), dirI)
+        {
+            if (mesh().solutionD()[dirI] < 0)
+            {
+                // Empty direction
+                continue;
+            }
+
+            vector dir = vector::zero;
+            if (dirI == 0)
+            {
+                dir = vector(1, 0, 0);
+            }
+            else if (dirI == 1)
+            {
+                dir = vector(0, 1, 0);
+            }
+            else
+            {
+                dir = vector(0, 0, 1);
+            }
+
+            // Take a copy of matrixNoBCs and enforce the boundary conditions
+            // for this direction
+            sparseScalarMatrix matrixDirI(matrixNoBCs);
+
+            // Take a copy of the source for this direction
+            scalarField sourceDirI(source.component(dirI));
+
+            // Enforce fixed DOF on the linear system for this direction
+            // We are not current using fixedDofDirections_
+            sparseMatrixTools::enforceFixedDof
+            (
+                matrixDirI,
+                sourceDirI,
+                fixedDofs_,
+                dir & (dir & fixedDofDirections_),
+                fixedDofValues_.component(dirI),
+                fixedDofScale_,
+                debug
+            );
+
+            // Solve linear system for displacement component correction
+
+            // For now, use Eigen as linear solver
+            // We can add PETSc or other aproaches later
+            {
+                // Lookup exportToMatlab flag
+                const Switch writeMatlabMatrix
+                (
+                    solidModelDict().lookup("writeMatlabMatrix")
+                );
+
+                // Use Eigen SparseLU direct solver
+                sparseMatrixTools::solveLinearSystemEigen
+                (
+                    matrixDirI, sourceDirI, pointDcorr, writeMatlabMatrix, debug
+                );
+            }
+
+#ifdef OPENFOAM_NOT_EXTEND
+            pointD().primitiveFieldRef().replace
+            (
+                dirI, pointD().primitiveField().component(dirI) + pointDcorr
+            );
+#else
+            pointD().internalField().replace
+            (
+                dirI, pointD().internalField().component(dirI) + pointDcorr
+            );
+#endif
+
+            pointD().correctBoundaryConditions();
+        }
+
+        // Update point accelerations
+        // Note: for NewmarkBeta, this needs to come before the pointU update
+#ifdef OPENFOAM_NOT_EXTEND
+        pointA_.primitiveFieldRef() =
+            vfvc::ddt
+            (
+                mesh().ddtScheme("ddt(pointU)"),
+                mesh().d2dt2Scheme("d2dt2(pointD)"),
+                pointU_
+            );
+
+        // Update point velocities
+        pointU_.primitiveFieldRef() =
+            vfvc::ddt
+            (
+                mesh().ddtScheme("ddt(pointD)"),
+                mesh().d2dt2Scheme("d2dt2(pointD)"),
+                pointD()
+            );
+#else
+        pointA_.internalField() =
+            vfvc::ddt
+            (
+                mesh().schemesDict().ddtScheme("ddt(pointU)"),
+                mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
+                pointU_
+            );
+
+        // Update point velocities
+        pointU_.internalField() =
+            vfvc::ddt
+            (
+                mesh().schemesDict().ddtScheme("ddt(pointD)"),
+                mesh().schemesDict().d2dt2Scheme("d2dt2(pointD)"),
+                pointD()
+            );
+#endif
+
+        if (twoD_)
+        {
+            twoDCorrector_.correctPoints(pointD());
+
+            // Remove displacement in the empty directions
+            forAll(mesh().geometricD(), dirI)
+            {
+                if (mesh().geometricD()[dirI] < 0)
+                {
+                    pointD().primitiveFieldRef().replace(dirI, 0.0);
+                }
+            }
+        }
+
+        // Relax pointD
+        if (mesh().relaxField(pointD().name()))
+        {
+            pointD().relax(mesh().fieldRelaxationFactor(pointD().name()));
+        }
+
+        // Update correction vector field
+        pointDcorrVec = pointD() - pointD().prevIter();
+    }
+    while
+    (
+        !converged
+        (
+            iCorr,
+            initResidual,
+            solverPerf.finalResidual()[vector::X],
+#ifdef OPENFOAM_NOT_EXTEND
+            cmptMax(solverPerf.nIterations()),
+#else
+            solverPerf.nIterations(),
+#endif
+            pointD(),
+            pointDcorrVec
+        )
+     && ++iCorr < nCorr()
+    );
+
+    // Calculate gradD at dual faces
+    dualGradDf_ = vfvc::fGrad
+    (
+        pointD(),
+        mesh(),
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        zeta,
+        debug
+    );
+
+    // Update the increment of displacement
+    pointDD() = pointD() - pointD().oldTime();
+
+    // Calculate cell gradient
+    // This assumes a constant gradient within each primary mesh cell
+    // This is a first-order approximation
+    gradD() = vfvc::grad(pointD(), mesh());
+
+    // Map primary cell gradD field to sub-meshes for multi-material cases
+    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
+    {
+        mechanical().mapGradToSubMeshes(gradD());
+    }
+
+    // Update dual face stress field
+    dualMechanicalPtr_().correct(dualSigmaf_);
+
+    // Update primary mesh cell stress field, assuming it is constant per
+    // primary mesh cell
+    // This stress will be first-order accurate
+    mechanical().correct(sigma());
+
+#ifdef OPENFOAM_COM
+    // Interpolate pointD to D
+    // This is useful for visualisation but it is also needed when using preCICE
+    pointVolInterp_.interpolate(pointD(), D());
+#endif
+
+    return true;
+}
+
+
+bool vertexCentredLinGeomSolid::evolveExplicit()
+{
+    if (time().timeIndex() == 1)
+    {
+        Info<< "Solving the solid momentum equation for pointD" << nl
+            << "Simulation Time, Clock Time, Max Stress" << endl;
+    }
+
+    physicsModel::printInfo() = bool
+    (
+        time().timeIndex() % infoFrequency() == 0
+     || mag(time().value() - time().endTime().value()) < SMALL
+    );
+
+    if (physicsModel::printInfo())
+    {
+        Info<< time().value() << " " << time().elapsedClockTime()
+            << " " << max(mag(dualSigmaf_)).value() << endl;
+
+        physicsModel::printInfo() = false;
+    }
+
+    // Central difference scheme
+
+    // Take a reference to the current and previous time-step
+    const dimensionedScalar& deltaT = time().deltaT();
+    //const dimensionedScalar& deltaT0 = time().deltaT0();
+
+    // Compute the velocity
+    // Note: this is the velocity at the middle of the time-step
+    //pointU_ = pointU_.oldTime() + 0.5*(deltaT + deltaT0)*pointA_.oldTime();
+    pointU_ = pointU_.oldTime() + deltaT*pointA_.oldTime();
+
+    // Compute displacement
+    pointD() = pointD().oldTime() + deltaT*pointU_;
+
+    // Enforce boundary conditions on the displacement field
+    pointD().correctBoundaryConditions();
+
+    if (twoD_)
+    {
+        twoDCorrector_.correctPoints(pointD());
+
+        // Remove displacement in the empty directions
+        forAll(mesh().geometricD(), dirI)
+        {
+            if (mesh().geometricD()[dirI] < 0)
+            {
+                pointD().primitiveFieldRef().replace(dirI, 0.0);
+            }
+        }
+    }
+
+    // Update the divergence of stress based on the latest pointD field
+    updatePointDivSigma(pointD(), dualGradDf_, dualSigmaf_, pointDivSigma_);
+
+    // Compute acceleration
+    pointA_ = pointDivSigma_/pointRho_ - dampingCoeff()*pointU_ + g();
+
+    // Check energies
+    // To-do
+
+    return true;
+}
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
+(
+    Time& runTime,
+    const word& region
+)
+:
+    solidModel(typeName, runTime, region),
+    dualMechanicalPtr_
+    (
+        new dualMechanicalModel
+        (
+            dualMesh(),
+            nonLinGeom(),
+            incremental(),
+            mechanical(),
+            dualMeshMap().dualFaceToCell()
+        )
+    ),
+    solutionAlgorithm_
+    (
+        solutionAlgorithmNames_.get("solutionAlgorithm", solidModelDict())
+    ),
+    fullNewton_
+    (
+        (solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_COUPLED)
+      ? Switch(solidModelDict().lookup("fullNewton"))
+      : Switch(false)
+    ),
+    steadyState_(false),
+    twoD_(sparseMatrixTools::checkTwoD(mesh())),
+    twoDCorrector_(mesh()),
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    fixedDofs_(mesh().nPoints(), false),
+    fixedDofValues_(fixedDofs_.size(), vector::zero),
+    fixedDofDirections_(fixedDofs_.size(), symmTensor::zero),
+    fixedDofScale_
+    (
+        solidModelDict().lookupOrDefault<scalar>
+        (
+            "fixedDofScale",
+            (
+                average(mechanical().impK())
+               *Foam::sqrt(gAverage(mesh().magSf()))
+            ).value()
+        )
+    ),
+    pointU_
+    (
+        IOobject
+        (
+            "pointU",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedVector("0", dimVelocity, vector::zero)
+    ),
+    pointA_
+    (
+        IOobject
+        (
+            "pointA",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        pMesh(),
+        dimensionedVector("0", dimVelocity/dimTime, vector::zero)
+    ),
+    pointRho_
+    (
+        IOobject
+        (
+            "point(rho)",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        pMesh(),
+        dimensionedScalar("0", dimDensity, 0.0)
+    ),
+    pointVol_
+    (
+        IOobject
+        (
+            "pointVolumes",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        pMesh(),
+        dimensionedScalar("0", dimVolume, 0.0)
+    ),
+    pointDivSigma_
+    (
+        IOobject
+        (
+            "pointDivSigma",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        pMesh(),
+        dimensionedVector("0", dimForce/dimVolume, vector::zero)
+    ),
+    dualGradDf_
+    (
+        IOobject
+        (
+            "grad(D)f",
+            runTime.timeName(),
+            dualMesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        dualMesh(),
+        dimensionedTensor("zero", dimless, tensor::zero),
+        "calculated"
+    ),
+    dualSigmaf_
+    (
+        IOobject
+        (
+            "sigmaf",
+            runTime.timeName(),
+            dualMesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        dualMesh(),
+        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero),
+        "calculated"
+    ),
+    globalPointIndices_(mesh())
+#ifdef OPENFOAM_COM
+    ,
+    pointVolInterp_(pMesh(), mesh())
+#endif
+{
+    // Create dual mesh and set write option
+    dualMesh().objectRegistry::writeOpt() = IOobject::NO_WRITE;
+
+    // pointD field must be defined
+    pointDisRequired();
+
+    // Set fixed degree of freedom list
+    setFixedDofs(pointD(), fixedDofs_, fixedDofValues_, fixedDofDirections_);
+
+    // Set point density field
+    mechanical().volToPoint().interpolate(rho(), pointRho_);
+
+    // Set the pointVol field
+    // Map dualMesh cell volumes to the primary mesh points
+#ifdef OPENFOAM_NOT_EXTEND
+    scalarField& pointVolI = pointVol_.primitiveFieldRef();
+#else
+    scalarField& pointVolI = pointVol_.internalField();
+#endif
+    const scalarField& dualCellVol = dualMesh().V();
+    const labelList& dualCellToPoint = dualMeshMap().dualCellToPoint();
+    forAll(dualCellToPoint, dualCellI)
+    {
+        // Find point which maps to this dual cell
+        const label pointID = dualCellToPoint[dualCellI];
+
+        // Map the cell volume
+        pointVolI[pointID] = dualCellVol[dualCellI];
+    }
+
+    // Store old time fields
+    pointD().oldTime().storeOldTime();
+    pointU_.oldTime().storeOldTime();
+    pointA_.storeOldTime();
+
+    // Write fixed degree of freedom equation scale
+    Info<< "fixedDofScale: " << fixedDofScale_ << endl;
+
+    // Disable the writing of the unused fields
+    D().writeOpt() = IOobject::NO_WRITE;
+    D().oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
+    DD().writeOpt() = IOobject::NO_WRITE;
+    DD().oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
+    U().writeOpt() = IOobject::NO_WRITE;
+    pointDD().writeOpt() = IOobject::NO_WRITE;
+}
+
+
+// * * * * * * * * * * * * * * * *  Destructors  * * * * * * * * * * * * * * //
+
+vertexCentredLinGeomSolid::~vertexCentredLinGeomSolid()
+{
+#ifdef USE_PETSC
+    if
+    (
+        solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_COUPLED
+     && Switch(solidModelDict().lookup("usePETSc"))
+    )
+    {
+        PetscFinalize();
+    }
+#endif
+}
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+bool vertexCentredLinGeomSolid::evolve()
+{
+    if (solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_COUPLED)
+    {
+        return evolveImplicitCoupled();
+    }
+    else if (solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_SEGREGATED)
+    {
+        return evolveImplicitSegregated();
+    }
+    else if (solutionAlgorithm_ == solutionAlgorithm::EXPLICIT)
+    {
+        return evolveExplicit();
+    }
+    else
+    {
+        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+            << "Unrecognised solution algorithm. Available options are "
+            << solutionAlgorithmNames_.names() << endl;
+    }
+
+    // Keep compiler happy
+    return true;
+}
+
 
 void vertexCentredLinGeomSolid::setTraction
 (
