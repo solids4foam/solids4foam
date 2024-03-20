@@ -1163,7 +1163,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
             // Pointwise contact algorithm, contact pressure at mesh points
             // Everything is calculated on slave and subsequently inretpolated
             // to master patch
-            if(!zoneToZones()[shadPatchI].normalGapIntegration())
+            if (!zoneToZones()[shadPatchI].normalGapIntegration())
             {
                 // Calculate normal contact force on slave
                 normalModels()[shadPatchI].correct
@@ -1251,7 +1251,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
             {
                 // Pointwise contact force calculation algorithm,
                 // Interpolate slave contact traction onto master
-                if(!zoneToZones()[shadPatchI].normalGapIntegration())
+                if (!zoneToZones()[shadPatchI].normalGapIntegration())
                 {
                     // Interpolate slave traction to the master
                     const vectorField slavePatchTraction

@@ -424,9 +424,7 @@ void standardPenalty::correct
 
     const vectorField newTraction
     (
-       - patchFaceNormals
-       * (faceVolPenetration / magSf)
-       * penaltyFac
+       - patchFaceNormals*(faceVolPenetration/magSf)*penaltyFac
     );
 
     // Under-relax pressure/traction

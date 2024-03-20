@@ -358,19 +358,18 @@ newGGIInterpolation<MasterPatch, SlavePatch>::normalGapIntegration
     const pointField& slavePatchPoints = slavePatch_.localPoints();
     const pointField& masterPatchPoints = masterPatch_.localPoints();
 
-    const vector& slaveFaceCentre =
-        slavePatch_[faceSi].centre(slavePatchPoints);
+    const vector slaveFaceCentre = slavePatch_[faceSi].centre(slavePatchPoints);
 
     // Master face center is offset for ortho base c.s.
-    const vector& orthoBaseOffset =
+    const vector orthoBaseOffset =
         masterPatch_[faceMi].centre(masterPatchPoints);
 
     // Recalculate slave face centre and normal into UVW coordinate system
     vector slaveFaceCentreInUVW = vector
     (
-        (slaveFaceCentre-orthoBaseOffset)&orthoBase[0],
-        (slaveFaceCentre-orthoBaseOffset)&orthoBase[1],
-        (slaveFaceCentre-orthoBaseOffset)&orthoBase[2]
+        (slaveFaceCentre-orthoBaseOffset) & orthoBase[0],
+        (slaveFaceCentre-orthoBaseOffset) & orthoBase[1],
+        (slaveFaceCentre-orthoBaseOffset) & orthoBase[2]
     );
 
     vector slaveFaceNormalInUVW = vector
@@ -535,7 +534,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::normalGapIntegration
 
         // Centre point
         labelList sfl(points.size());
-        forAll (sfl, I)
+        forAll(sfl, I)
         {
             sfl[I] = I;
         }
@@ -577,7 +576,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::normalGapIntegration
     {
         // Fan triangulation and calculation of volume
 
-        for( label i = 1; i<p.size()-1; i++)
+        for (label i = 1; i < p.size() - 1; i++)
         {
             List<point2D> tri(3);
             tri[0] = point2D(points[0].x(), points[0].y());
