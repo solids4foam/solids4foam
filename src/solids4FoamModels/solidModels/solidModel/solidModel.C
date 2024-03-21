@@ -1096,19 +1096,6 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
-    sigma_
-    (
-        IOobject
-        (
-            "sigma",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
-    ),
     rhoPtr_(),
     g_
     (
@@ -1236,7 +1223,6 @@ Foam::solidModel::solidModel
     pointDD_.oldTime();
     gradD_.oldTime();
     gradDD_.oldTime();
-    sigma_.oldTime();
 
     if (restart_)
     {
@@ -1977,6 +1963,9 @@ void Foam::solidModel::writeFields(const Time& runTime)
         Info<< "Writing residualD field" << endl;
         residualD.write();
     }
+
+
+    mechanical().writeFields(runTime);
 
     physicsModel::writeFields(runTime);
 }

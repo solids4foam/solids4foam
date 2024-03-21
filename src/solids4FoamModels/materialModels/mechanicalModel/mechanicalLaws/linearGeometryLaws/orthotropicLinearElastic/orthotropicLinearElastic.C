@@ -287,10 +287,11 @@ Foam::orthotropicLinearElastic::orthotropicLinearElastic
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom
+    const nonLinearGeometry::nonLinearType& nonLinGeom,
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     E1_(dict.lookup("E1")),
     E2_(dict.lookup("E2")),
     E3_(dict.lookup("E3")),

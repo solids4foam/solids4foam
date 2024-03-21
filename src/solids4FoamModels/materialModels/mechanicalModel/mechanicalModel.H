@@ -52,6 +52,7 @@ Author
 #include "nonLinearGeometry.H"
 #include "volFields.H"
 #include "surfaceFields.H"
+#include "hashedWordList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -71,6 +72,9 @@ class mechanicalModel
         //- Const reference to the mesh
         const fvMesh& mesh_;
 
+        //- Stress field
+        volSymmTensorField sigma_;
+
         //- Is the current case plane stress or plain strain/3-D
         //  Todo: this should be moved to actual mechanical law
         const Switch planeStress_;
@@ -85,9 +89,19 @@ class mechanicalModel
         //- Sub-meshes for each mechanicalLaw
         mutable autoPtr<solidSubMeshes> solSubMeshes_;
 
-       //- The implicit stiffness surface field for Rhie-Chow correction
+        //- The implicit stiffness surface field for Rhie-Chow correction
         mutable autoPtr<surfaceScalarField> impKfcorrPtr_;
 
+        //- List with the names of all internal state variables
+        //  Key = datatypes (volScalarField, etc.)
+        //  Values = hashed wordLists of names of internal vars
+        mutable HashTable<hashedWordList> internalVariables_;
+
+        //- Flag to see if internal variables got read
+        bool gotInternalVariables_;
+
+        //- Which datatypes will be considered internal state variables
+        static const hashedWordList internalVariableTypes;
 
     // Private Member Functions
 
@@ -100,6 +114,9 @@ class mechanicalModel
 
         //- Return the implicit stiffness surface field for Rhie-Chow correction
         const surfaceScalarField& impKfcorr() const;
+
+        //- Get the internal variable names
+        bool getInternalVariables();
 
         //- Clear out demand driven data
         void clearOut();
@@ -134,6 +151,12 @@ public:
 
             //- Return const access to the mesh
             const fvMesh& mesh() const;
+
+            //- Return reference to the stress field
+            volSymmTensorField& sigma();
+
+            //- Return const reference to the stress field
+            const volSymmTensorField& sigma() const;
 
             //- Return a const reference to the vol-to-point base mesh
             //  interpolator
@@ -246,6 +269,9 @@ public:
             //- Set restart: some mechanical laws may change the writeOpt of
             //  fields accordingly
             void setRestart();
+
+            //- Write fields
+            virtual void writeFields(const Time& runTime);
 
             //- Write current state of 'materialProperties' dictionary to disk
             void writeDict();

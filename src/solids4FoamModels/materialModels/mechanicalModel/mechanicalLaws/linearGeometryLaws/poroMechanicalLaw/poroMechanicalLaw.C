@@ -126,22 +126,26 @@ const Foam::surfaceScalarField& Foam::poroMechanicalLaw::p0f() const
 
 const Foam::volScalarField& Foam::poroMechanicalLaw::lookupPressureField() const
 {
-    if (mesh().thisDb().parent().foundObject<objectRegistry>(pRegion_))
+    if (mesh().thisDb().parent().foundObject<objectRegistry>(pRegion_) && lawI()==-1)
     {
         return mesh().thisDb().parent().subRegistry
         (
             pRegion_
         ).lookupObject<volScalarField>(pName_);
     }
-    else if
-    (
-        mesh().thisDb().parent().foundObject<objectRegistry>("solid")
-    )
+    else if (mesh().thisDb().parent().foundObject<objectRegistry>("solid") && lawI()==-1)
     {
         return mesh().thisDb().parent().subRegistry
-        (
-            "solid"
-        ).lookupObject<volScalarField>(pName_);
+                (
+                    "solid"
+                ).lookupObject<volScalarField>(pName_);
+    }
+    else if(lawI()!=-1)
+    {
+        return baseMesh().lookupObject<mechanicalModel>
+                (
+                   "mechanicalProperties"
+                ).solSubMeshes().lookupBaseMeshVolField<scalar>(pName_,mesh());
     }
     else
     {
@@ -149,7 +153,6 @@ const Foam::volScalarField& Foam::poroMechanicalLaw::lookupPressureField() const
             << "Cannot find " << pName_ << " field in " << pRegion_
             << " or in 'solid'" << abort(FatalError);
     }
-
     // Keep compiler happy
     return mesh().lookupObject<volScalarField>("null");
 }
@@ -163,18 +166,20 @@ Foam::poroMechanicalLaw::poroMechanicalLaw
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom
+    const nonLinearGeometry::nonLinearType& nonLinGeom,
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     effectiveStressMechLawPtr_
     (
         mechanicalLaw::NewLinGeomMechLaw
         (
-            word(dict.subDict("effectiveStressMechanicalLaw").lookup("type")),
+            name,
             mesh,
             dict.subDict("effectiveStressMechanicalLaw"),
-            nonLinGeom
+            nonLinGeom,
+            lawI
         )
     ),
     sigmaEff_(),
@@ -297,5 +302,9 @@ void Foam::poroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
     sigma = sigmaEfff_() - b_*(pf + p0f())*symmTensor(I);
 }
 
+void Foam::poroMechanicalLaw::writeFields(const Time& runTime)
+{
+    effectiveStressMechLawPtr_->writeFields(runTime);
+}
 
 // ************************************************************************* //

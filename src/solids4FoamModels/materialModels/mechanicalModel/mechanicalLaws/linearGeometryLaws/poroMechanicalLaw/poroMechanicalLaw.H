@@ -82,6 +82,9 @@ class poroMechanicalLaw
         //- Initial (residual) stress surface field
         mutable surfaceScalarField* p0fPtr_;
 
+        //- Flag if sigmaEff has already been initialized
+        bool sigmaEffInizialized_;
+
     // Private Member Functions
 
         //- check if sigmaEff has been initalized already
@@ -121,7 +124,8 @@ public:
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
-            const nonLinearGeometry::nonLinearType& nonLinGeom
+            const nonLinearGeometry::nonLinearType& nonLinGeom,
+            const label lawI = -1
         );
 
 
@@ -144,6 +148,8 @@ public:
 
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        void writeFields(const Time& runTime);
 };
 
 

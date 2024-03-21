@@ -39,10 +39,11 @@ Foam::neoHookeanElastic::neoHookeanElastic
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom
+    const nonLinearGeometry::nonLinearType& nonLinGeom,
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     mu_("mu", dimPressure, 0.0),
     K_("K", dimPressure, 0.0)
 {

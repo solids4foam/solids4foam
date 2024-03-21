@@ -236,7 +236,7 @@ void Foam::mechanicalLaw::makeSigma0() const
             (
                 baseMesh().lookupObject<mechanicalModel>
                 (
-                    "mechanicalProperties"
+                   "mechanicalProperties"
                 ).solSubMeshes().lookupBaseMeshVolField<symmTensor>
                 (
                     "sigma0", mesh()
@@ -1360,7 +1360,7 @@ void Foam::mechanicalLaw::updateSigmaHyd
                     (
                         baseMesh().lookupObject<mechanicalModel>
                         (
-                            "mechanicalProperties"
+                        "mechanicalProperties"
                         ).solSubMeshes().lookupBaseMeshVolField<scalar>
                         (
                             "DEqnA", mesh()
@@ -1460,11 +1460,13 @@ Foam::mechanicalLaw::mechanicalLaw
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom
+    const nonLinearGeometry::nonLinearType& nonLinGeom,
+    const label lawI
 )
 :
     name_(name),
     mesh_(mesh),
+    lawI_(lawI),
     dict_(dict),
     baseMeshRegionName_(),
     nonLinGeom_(nonLinGeom),

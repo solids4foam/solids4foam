@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "mathematicalConstants.H"
 #include "zeroGradientFvPatchFields.H"
+#include "mechanicalModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -415,10 +416,11 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom
+    const nonLinearGeometry::nonLinearType& nonLinGeom,
+    const label lawI
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom),
+    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
     E_(dict.lookup("E")),
     nu_(dict.lookup("nu")),
     lambda_
@@ -941,6 +943,5 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
         << "    " << numCellsYielding << " cells are actively yielding"
         << nl << endl;
 }
-
 
 // ************************************************************************* //

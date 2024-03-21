@@ -36,7 +36,8 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewLinGeomMechLaw
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom
+    const nonLinearGeometry::nonLinearType& nonLinGeom,
+    const label lawI
 )
 {
     const word modelType(dict.lookup("type"));
@@ -123,7 +124,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewLinGeomMechLaw
     auto* ctorPtr = cstrIter();
 #endif
 
-    return autoPtr<mechanicalLaw>(ctorPtr(name, mesh, dict, nonLinGeom));
+    return autoPtr<mechanicalLaw>(ctorPtr(name, mesh, dict, nonLinGeom, lawI));
 }
 
 
@@ -132,7 +133,8 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom
+    const nonLinearGeometry::nonLinearType& nonLinGeom,
+    const label lawI
 )
 {
     const word modelType(dict.lookup("type"));
@@ -169,7 +171,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
         }
     }
 
-    return autoPtr<mechanicalLaw>(ctorPtr(name, mesh, dict, nonLinGeom));
+    return autoPtr<mechanicalLaw>(ctorPtr(name, mesh, dict, nonLinGeom, lawI));
 
     #else
     nonLinGeomMechLawConstructorTable::iterator cstrIter =
@@ -221,7 +223,7 @@ autoPtr<mechanicalLaw> mechanicalLaw::NewNonLinGeomMechLaw
     auto* ctorPtr = cstrIter();
     #endif
 
-    return autoPtr<mechanicalLaw>(ctorPtr(name, mesh, dict, nonLinGeom));
+    return autoPtr<mechanicalLaw>(ctorPtr(name, mesh, dict, nonLinGeom, lawI));
 
 }
 
