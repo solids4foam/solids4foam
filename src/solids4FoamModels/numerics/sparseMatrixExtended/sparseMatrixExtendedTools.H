@@ -110,14 +110,24 @@ namespace sparseMatrixExtendedTools
     //- Enforce fixed DOF contributions on the linear system
     void enforceFixedDof
     (
-                sparseMatrixExtended& matrix,
-                Field<RectangularMatrix<scalar>>& source,
-                const bool twoD,
+        sparseMatrixExtended& matrix,
+        Field<RectangularMatrix<scalar>>& source,
+        const bool twoD,
         const boolList& fixedDofs,
         const symmTensorField& fixedDofDirections,
         const pointField& fixedDofValues,
         const scalar fixedDofScale
     );
+    
+    //- Enforce pressure equation coefficients
+    void enforceFixedDof
+	(
+		sparseMatrixExtended& matrix,
+		Field<RectangularMatrix<scalar>>& source,
+		const bool twoD,
+		const boolList& fixedDofs,
+		const symmTensorField& fixedDofDirections
+	);
 
     //- Add fixed DOF contributions to the source
     // void addFixedDofToSource
