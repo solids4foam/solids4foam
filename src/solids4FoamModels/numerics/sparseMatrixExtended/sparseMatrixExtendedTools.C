@@ -567,7 +567,7 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
 
     // Create KSP linear solver
     // Pout<< "    Creating the linear solver" << endl;
-	KSP   ksp;          /* linear solver context */
+        KSP   ksp;          /* linear solver context */
     ierr = KSPCreate(PETSC_COMM_WORLD, &ksp); checkErr(ierr);
 
 
@@ -656,7 +656,7 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
     {
         Pout<< "        Solving the linear solver: start" << endl;
     }
-	//Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
+        //Info << "file: " << __FILE__ << ", line: " << __LINE__ << endl;
     ierr = KSPSolve(ksp, b, x); checkErr(ierr);
 
 
@@ -916,8 +916,8 @@ void Foam::sparseMatrixExtendedTools::setNonZerosPerRow
 
             if (blockSize == 4)
             {
-				d_nnz[rowI] += nCompOwned;
-				o_nnz[rowI++] += nCompNotOwned;
+                                d_nnz[rowI] += nCompOwned;
+                                o_nnz[rowI++] += nCompNotOwned;
             }
             else if (blockSize != 3)
             {
@@ -977,7 +977,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
         if (fixedDofs[blockRowI])
         {
             RectangularMatrix<scalar>& coeff = iter();
-            
+
 //            Info << "coeff before: " << coeff << endl;
 
             // Extract the displacement coefficients of the momentum equation
@@ -1003,7 +1003,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
                 momDispCoeff.zy() = coeff(2,1);
                 momDispCoeff.zz() = coeff(2,2);
             }
-            
+
             // Extract the pressure coefficients of the momentum equation
             vector momPressCoeff(vector::zero);
 
@@ -1014,7 +1014,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
             }
             else
             {
-				momPressCoeff.x() = coeff(0,3);
+                momPressCoeff.x() = coeff(0,3);
                 momPressCoeff.y() = coeff(1,3);
                 momPressCoeff.z() = coeff(2,3);
             }
@@ -1045,7 +1045,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 
             // Free direction
             const tensor freeDir(I - fixedDofDirections[blockRowI]);
-            
+
 //            Info << "blockRowI: " << blockRowI << endl;
 //            Info << "freeDir: " << freeDir << endl;
 
@@ -1066,14 +1066,14 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 
                 // Fixed direction
                 const tensor& fixedDir = fixedDofDirections[blockRowI];
-                
+
 //                Info << "fixedDir: " << fixedDir << endl;
 
                 // Set the fixed direction diagonal to enforce a zero correction
                 momDispCoeff -= tensor(fixedDofScale*fixedDir);
             }
 
-            //Insert the changed displacement coefficients back into the matrix
+            // Insert the changed displacement coefficients back into the matrix
             if (twoD)
             {
                 coeff(0,0) = momDispCoeff.xx();
@@ -1093,9 +1093,9 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
                 coeff(2,1) = momDispCoeff.zy();
                 coeff(2,2) = momDispCoeff.zz();
             }
-            
-            //Insert the changed pressure coefficients back into the matrix
-         	if (twoD)
+
+            // Insert the changed pressure coefficients back into the matrix
+            if (twoD)
             {
                 coeff(0,2) = momPressCoeff.x();
                 coeff(1,2) = momPressCoeff.y();
@@ -1105,9 +1105,9 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
                 coeff(0,3) = momPressCoeff.x();
                 coeff(1,3) = momPressCoeff.y();
                 coeff(2,3) = momPressCoeff.z();
-            }    
-                   
-            //Insert the changed source terms back into the source
+            }
+
+            // Insert the changed source terms back into the source
             if (twoD)
             {
                 source[blockRowI](0,0) = sourceTerms.x();
@@ -1119,7 +1119,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
                 source[blockRowI](1,0) = sourceTerms.y();
                 source[blockRowI](2,0) = sourceTerms.z();
             }
-            
+
 //            Info << "coeff after: " << coeff << endl;
 
             if (debug)
@@ -1135,7 +1135,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
             // We will eliminate the coeff and add the contribution to the
             // source
             RectangularMatrix<scalar>& coeff = iter();
-            
+
 //            Info << "coeff before: " << coeff << endl;
 
             if (debug)
@@ -1169,7 +1169,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
                 momDispCoeff.zy() = coeff(2,1);
                 momDispCoeff.zz() = coeff(2,2);
             }
-            
+
             // Extract the displacement coefficients of the pressure equation
             vector pressDispCoeff(vector::zero);
 
@@ -1180,7 +1180,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
             }
             else
             {
-				pressDispCoeff.x() = coeff(3,0);
+                pressDispCoeff.x() = coeff(3,0);
                 pressDispCoeff.y() = coeff(3,1);
                 pressDispCoeff.z() = coeff(3,2);
             }
@@ -1196,10 +1196,10 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
             // Eliminate the fixed directions
             momDispCoeff = (momDispCoeff & freeDir);
             pressDispCoeff = (freeDir & pressDispCoeff);
-            
+
 //            Info << "pressDispCoeff: " << pressDispCoeff << endl;
 
-            //Insert the changed coefficients back into the matrix
+            // Insert the changed coefficients back into the matrix
             if (twoD)
             {
                 coeff(0,0) = momDispCoeff.xx();
@@ -1219,9 +1219,9 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
                 coeff(2,1) = momDispCoeff.zy();
                 coeff(2,2) = momDispCoeff.zz();
             }
-            
-            //Insert the changed pressure coefficients back into the matrix
-         	if (twoD)
+
+            // Insert the changed pressure coefficients back into the matrix
+            if (twoD)
             {
                 coeff(2,0) = pressDispCoeff.x();
                 coeff(2,1) = pressDispCoeff.y();
@@ -1231,15 +1231,14 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
                 coeff(3,0) = pressDispCoeff.x();
                 coeff(3,1) = pressDispCoeff.y();
                 coeff(3,2) = pressDispCoeff.z();
-            }  
-            
+            }
+
 //            Info << "coeff after: " << coeff << endl;
 
             if (debug)
             {
                 Info<< "    coeff after: " << momDispCoeff << nl << endl;
             }
-
         }
     }
 }
@@ -1277,23 +1276,23 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
         if (fixedDofs[blockRowI])
         {
             RectangularMatrix<scalar>& coeff = iter();
-            
+
             Info << "coeff before: " << coeff << endl;
-            
+
             // Set the displacement coefficients of the pressure equation to zero
-            coeff(3,0) = 0; 
-            coeff(3,1) = 0; 
-            coeff(3,2) = 0; 
-            
+            coeff(3,0) = 0;
+            coeff(3,1) = 0;
+            coeff(3,2) = 0;
+
             if (blockRowI == blockColI)
             {
                 // Set the pressure coefficient to the identity
                 coeff(3,3) = 1;
             }
-            
-            source[blockRowI](3,0) = 0;              
-        }        
-    }          
+
+            source[blockRowI](3,0) = 0;
+        }
+    }
 }
 //            // Extract the displacement coefficients of the pressure equation
 //            vector pressDispCoeff(vector::zero);
@@ -1309,10 +1308,10 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 //                pressDispCoeff.y() = coeff(3,1);
 //                pressDispCoeff.z() = coeff(3,2);
 //            }
-//            
+//
 //            // Extract the pressure coefficient of the pressure equation
-// 			scalar pressPressCoeff = 0;
-// 			
+//                      scalar pressPressCoeff = 0;
+//
 //            if (twoD)
 //            {
 //                pressPressCoeff = coeff(2,2);
@@ -1345,7 +1344,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 
 //            // Free direction
 //            const tensor freeDir(I - fixedDofDirections[blockRowI]);
-//            
+//
 //            Info << "blockRowI: " << blockRowI << endl;
 //            Info << "freeDir: " << freeDir << endl;
 
@@ -1362,9 +1361,9 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 //                // Set the pressure coefficient to the identity
 //                pressPressCoeff = 1;
 //            }
-//            
+//
 //            //Insert the changed displacement coefficients back into the matrix
-//         	if (twoD)
+//              if (twoD)
 //            {
 //                coeff(2,0) = pressDispCoeff.x();
 //                coeff(2,1) = pressDispCoeff.y();
@@ -1374,18 +1373,18 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 //                coeff(3,0) = pressDispCoeff.x();
 //                coeff(3,1) = pressDispCoeff.y();
 //                coeff(3,2) = pressDispCoeff.z();
-//            }    
-//            
+//            }
+//
 //            //Insert the changed pressure coefficient back into the matrix
-//         	if (twoD)
+//              if (twoD)
 //            {
 //                coeff(2,2) = pressPressCoeff;
 //            }
 //            else
 //            {
 //                coeff(3,3) = pressPressCoeff;
-//            } 
-//                   
+//            }
+//
 //            //Insert the changed source terms back into the source
 //            if (twoD)
 //            {
@@ -1395,7 +1394,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 //            {
 //                source[blockRowI](3,3) = sourceTerm;
 //            }
-//            
+//
 //            Info << "coeff after: " << coeff << endl;
 
 ////            if (debug)
@@ -1411,7 +1410,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 //            // We will eliminate the coeff and add the contribution to the
 //            // source
 //            RectangularMatrix<scalar>& coeff = iter();
-//            
+//
 //            Info << "coeff before: " << coeff << endl;
 
 //            if (debug)
@@ -1445,7 +1444,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 //                momDispCoeff.zy() = coeff(2,1);
 //                momDispCoeff.zz() = coeff(2,2);
 //            }
-//            
+//
 //            // Extract the displacement coefficients of the pressure equation
 //            vector pressDispCoeff(vector::zero);
 
@@ -1472,7 +1471,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 //            // Eliminate the fixed directions
 //            momDispCoeff = (momDispCoeff & freeDir);
 //            pressDispCoeff = (freeDir & pressDispCoeff);
-//            
+//
 //            Info << "pressDispCoeff: " << pressDispCoeff << endl;
 
 //            //Insert the changed coefficients back into the matrix
@@ -1495,9 +1494,9 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 //                coeff(2,1) = momDispCoeff.zy();
 //                coeff(2,2) = momDispCoeff.zz();
 //            }
-//            
+//
 //            //Insert the changed pressure coefficients back into the matrix
-//         	if (twoD)
+//              if (twoD)
 //            {
 //                coeff(2,0) = pressDispCoeff.x();
 //                coeff(2,1) = pressDispCoeff.y();
@@ -1507,8 +1506,8 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
 //                coeff(3,0) = pressDispCoeff.x();
 //                coeff(3,1) = pressDispCoeff.y();
 //                coeff(3,2) = pressDispCoeff.z();
-//            }  
-//            
+//            }
+//
 //            Info << "coeff after: " << coeff << endl;
 
 //            if (debug)
