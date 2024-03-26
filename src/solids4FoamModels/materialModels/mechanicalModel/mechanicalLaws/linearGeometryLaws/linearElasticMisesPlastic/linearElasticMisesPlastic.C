@@ -23,6 +23,7 @@ License
 #include "logVolFields.H"
 #include "fvc.H"
 #include "fvm.H"
+#include "pointFieldFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -233,18 +234,21 @@ void Foam::linearElasticMisesPlastic::newtonLoop
 
 void Foam::linearElasticMisesPlastic::calculateStress
 (
- surfaceSymmTensorField& sigma,
- const surfaceSymmTensorField& epsilon
- ) const
+    surfaceSymmTensorField& sigma,
+    const surfaceTensorField& gradD
+) const
 {
+    // Calculate strain
+    const surfaceSymmTensorField epsilon(symm(gradD));
+
     // Calculate deviatoric strain
     const surfaceSymmTensorField e(dev(epsilon));
 
     // Calculate deviatoric trial stress
     const surfaceSymmTensorField sTrial
     (
-     2.0*mu_*(e - dev(epsilonPf_.oldTime()))
-     );
+        2.0*mu_*(e - dev(epsilonPf_.oldTime()))
+    );
 
     // Calculate the yield function
     const surfaceScalarField fTrial(mag(sTrial) - sqrtTwoOverThree_*sigmaYf_);
@@ -290,17 +294,17 @@ void Foam::linearElasticMisesPlastic::calculateStress
         // Update plasticN, DLambda, DSigmaY and sigmaY for this face
         updatePlasticity
         (
-         plasticNI[faceI],
-         DLambdaI[faceI],
-         DSigmaYI[faceI],
-         sigmaYI[faceI],
-         sigmaYOldI[faceI],
-         fTrialI[faceI],
-         sTrialI[faceI],
-         epsilonPEqOldI[faceI],
-         mu_.value(),
-         maxMagBE
-         );
+            plasticNI[faceI],
+            DLambdaI[faceI],
+            DSigmaYI[faceI],
+            sigmaYI[faceI],
+            sigmaYOldI[faceI],
+            fTrialI[faceI],
+            sTrialI[faceI],
+            epsilonPEqOldI[faceI],
+            mu_.value(),
+            maxMagBE
+        );
 
         // if (fTrialI[faceI] > 0)
         // {
@@ -314,6 +318,7 @@ void Foam::linearElasticMisesPlastic::calculateStress
         // Take references to the boundary patch fields for efficiency
         const scalarField& fTrialP = fTrial.boundaryField()[patchI];
         const symmTensorField& sTrialP = sTrial.boundaryField()[patchI];
+
 #ifdef OPENFOAM_NOT_EXTEND
         symmTensorField& plasticNP = plasticN.boundaryFieldRef()[patchI];
         scalarField& DSigmaYP = DSigmaY.boundaryFieldRef()[patchI];
@@ -325,27 +330,28 @@ void Foam::linearElasticMisesPlastic::calculateStress
         scalarField& DLambdaP = DLambda.boundaryField()[patchI];
         scalarField& sigmaYP = sigmaY.boundaryField()[patchI];
 #endif
+
         const scalarField& sigmaYOldP =
-        sigmaYf_.oldTime().boundaryField()[patchI];
+            sigmaYf_.oldTime().boundaryField()[patchI];
         const scalarField& epsilonPEqOldP =
-        epsilonPEqf_.oldTime().boundaryField()[patchI];
+            epsilonPEqf_.oldTime().boundaryField()[patchI];
 
         forAll(fTrialP, faceI)
         {
             // Update plasticN, DLambda, DSigmaY and sigmaY for this face
             updatePlasticity
             (
-             plasticNP[faceI],
-             DLambdaP[faceI],
-             DSigmaYP[faceI],
-             sigmaYP[faceI],
-             sigmaYOldP[faceI],
-             fTrialP[faceI],
-             sTrialP[faceI],
-             epsilonPEqOldP[faceI],
-             mu_.value(),
-             maxMagBE
-             );
+                plasticNP[faceI],
+                DLambdaP[faceI],
+                DSigmaYP[faceI],
+                sigmaYP[faceI],
+                sigmaYOldP[faceI],
+                fTrialP[faceI],
+                sTrialP[faceI],
+                epsilonPEqOldP[faceI],
+                mu_.value(),
+                maxMagBE
+            );
         }
     }
 
@@ -373,9 +379,8 @@ void Foam::linearElasticMisesPlastic::calculateStress
     // calculateHydrostaticStress(sigmaHydf_, trEpsilon);
 
     // Update the stress
-    sigma = K_*tr(epsilon)*I + s;
+	sigma = K_*tr(epsilon)*I + s;
 }
-
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -389,6 +394,7 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
+    pMesh_(pointMesh::New(mesh)),
     mu_("zero", dimPressure, 0.0),
     K_("zero", dimPressure, 0.0),
     E_("zero", dimPressure, 0.0),
@@ -426,6 +432,22 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
            "initialYieldStress", dimPressure, stressPlasticStrainSeries_(0.0)
         )
     ),
+    pSigmaY_
+    (
+        IOobject
+        (
+            "pSigmaY",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh_,
+        dimensionedScalar
+        (
+           "initialYieldStress", dimPressure, stressPlasticStrainSeries_(0.0)
+        )
+    ),
     DSigmaY_
     (
         IOobject
@@ -452,6 +474,19 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
         mesh,
         dimensionedScalar("0", dimPressure, 0.0)
     ),
+    pDSigmaY_
+    (
+        IOobject
+        (
+            "pDSigmaY",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        pMesh_,
+        dimensionedScalar("0", dimPressure, 0.0)
+    ),
     epsilonP_
     (
         IOobject
@@ -476,6 +511,19 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
             IOobject::AUTO_WRITE
         ),
         mesh,
+        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
+    ),
+    pEpsilonP_
+    (
+        IOobject
+        (
+            "pEpsilonP",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh_,
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     DEpsilonP_
@@ -556,6 +604,19 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
         mesh,
         dimensionedScalar("0", dimless, 0.0)
     ),
+    pDLambda_
+    (
+        IOobject
+        (
+            "pDLambda",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        pMesh_,
+        dimensionedScalar("0", dimless, 0.0)
+    ),
     epsilonPEq_
     (
         IOobject
@@ -580,6 +641,19 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
             IOobject::AUTO_WRITE
         ),
         mesh,
+        dimensionedScalar("0", dimless, 0.0)
+    ),
+    pEpsilonPEq_
+    (
+        IOobject
+        (
+            "pEpsilonPEq",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh_,
         dimensionedScalar("0", dimless, 0.0)
     ),
     activeYield_
@@ -621,7 +695,28 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
         mesh,
         dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
+    pPlasticN_
+    (
+        IOobject
+        (
+            "pPlasticN",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        pMesh_,
+        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
+    ),
     nonLinearPlasticity_(stressPlasticStrainSeries_.size() > 2),
+    solvePressureEquation_
+    (
+        dict.lookupOrDefault<Switch>
+        (
+            "solvePressureEquation",
+            false
+        )
+    ),
     Hp_(0.0),
     maxDeltaErr_
     (
@@ -643,8 +738,10 @@ Foam::linearElasticMisesPlastic::linearElasticMisesPlastic
     epsilonf().oldTime();
     epsilonP_.oldTime();
     epsilonPf_.oldTime();
+    pEpsilonP_.oldTime();
     epsilonPEq_.oldTime();
     epsilonPEqf_.oldTime();
+    pEpsilonPEq_.oldTime();
     plasticN_.oldTime();
     sigmaY_.oldTime();
     sigmaYf_.oldTime();
@@ -725,37 +822,6 @@ Foam::linearElasticMisesPlastic::~linearElasticMisesPlastic()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::volScalarField>
-Foam::linearElasticMisesPlastic::bulkModulus() const
-{
-    tmp<volScalarField> tresult
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "bulkModulus",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            mesh(),
-            K_,
-            zeroGradientFvPatchScalarField::typeName
-        )
-    );
-
-#ifdef OPENFOAM_NOT_EXTEND
-    tresult.ref().correctBoundaryConditions();
-#else
-    tresult().correctBoundaryConditions();
-#endif
-
-    return tresult;
-}
-
 
 Foam::tmp<Foam::volScalarField>
 Foam::linearElasticMisesPlastic::impK() const
@@ -870,20 +936,120 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
 }
 #endif
 
-
 #ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
+void Foam::linearElasticMisesPlastic::calculatePStress
+(
+    pointSymmTensorField& pSigma,
+    const pointTensorField& pGradD
+) const
+{
+    // Calculate strain
+    const pointSymmTensorField pEpsilon(symm(pGradD));
+
+    // Calculate deviatoric strain
+    const pointSymmTensorField e(dev(pEpsilon));
+
+    // Calculate deviatoric trial stress
+    const pointSymmTensorField sTrial
+        (
+            2.0*mu_*(e - dev(pEpsilonP_.oldTime()))
+        );
+
+    // Calculate the yield function
+    const pointScalarField fTrial(mag(sTrial) - sqrtTwoOverThree_*pSigmaY_);
+
+    // Make a copy of history fields that are updated
+    pointSymmTensorField plasticN("plasticNtmp", 1.0*pPlasticN_);
+    pointScalarField DSigmaY("DSigmaYtmp", 1.0*pDSigmaY_);
+    pointScalarField DLambda("DLambdatmp", 1.0*pDLambda_);
+    pointScalarField sigmaY("sigmaYtmp", 1.0*pSigmaY_);
+
+    // Normalise residual in Newton method with respect to mag(bE)
+    const scalar maxMagBE = max(gMax(mag(pEpsilon.primitiveField())), SMALL);
+
+    // Take references to the internal fields for efficiency
+    const scalarField& fTrialI = fTrial.primitiveField();
+    const symmTensorField& sTrialI = sTrial.primitiveField();
+    symmTensorField& plasticNI = plasticN.primitiveFieldRef();
+    scalarField& DSigmaYI = DSigmaY.primitiveFieldRef();
+    scalarField& DLambdaI = DLambda.primitiveFieldRef();
+    scalarField& sigmaYI = sigmaY.primitiveFieldRef();
+    const scalarField& sigmaYOldI = pSigmaY_.oldTime().primitiveField();
+    const scalarField& epsilonPEqOldI = pEpsilonPEq_.oldTime().primitiveField();
+
+    // Calculate DLambdaf_ and plasticNf_
+    // int numYield = 0;
+    forAll(fTrialI, faceI)
+    {
+        // Update plasticN, DLambda, DSigmaY and sigmaY for this face
+        updatePlasticity
+        (
+           plasticNI[faceI],
+           DLambdaI[faceI],
+           DSigmaYI[faceI],
+           sigmaYI[faceI],
+           sigmaYOldI[faceI],
+           fTrialI[faceI],
+           sTrialI[faceI],
+           epsilonPEqOldI[faceI],
+           mu_.value(),
+           maxMagBE
+        );
+
+        // if (fTrialI[faceI] > 0)
+        // {
+        //     numYield++;
+        // }
+    }
+    // Info<< "        tang: numYield = " <<  numYield << endl;
+
+    // Update DEpsilonPEq
+    // DEpsilonPEqf_ = sqrtTwoOverThree_*DLambdaf_;
+
+    // Store previous iteration for residual calculation
+    // DEpsilonPf_.storePrevIter();
+
+    // Update DEpsilonP
+    const pointSymmTensorField DEpsilonP(DLambda*plasticN);
+
+    // Update total plastic strain
+    // epsilonPf_ = epsilonPf_.oldTime() + DEpsilonPf_;
+
+    // Update equivalent total plastic strain
+    // epsilonPEqf_ = epsilonPEqf_.oldTime() + DEpsilonPEqf_;
+
+    // Calculate deviatoric stress
+    const pointSymmTensorField s(sTrial - 2*mu_*DEpsilonP);
+
+    // Calculate the hydrostatic pressure directly from the displacement
+    // field
+    // const surfaceScalarField trEpsilon(tr(epsilon));
+    // calculateHydrostaticStress(sigmaHydf_, trEpsilon);
+
+    // Update the stress
+    pSigma = K_*tr(pEpsilon)*I + s;
+
+    pSigma.correctBoundaryConditions();
+}
+
+
+Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 Foam::linearElasticMisesPlastic::materialTangentField() const
 {
     // Prepare tmp field
-    tmp<Field<Foam::scalarSquareMatrix>> tresult
+    tmp<Field<Foam::RectangularMatrix<Foam::scalar>>> tresult
     (
-        new Field<Foam::scalarSquareMatrix>
-        (
-            mesh().nFaces(), Foam::scalarSquareMatrix(6, 0.0)
-        )
+        new Field<Foam::RectangularMatrix<Foam::scalar>>(mesh().nFaces(), Foam::RectangularMatrix<scalar>(6,9,0))
     );
-    Field<Foam::scalarSquareMatrix>& result = tresult.ref();
+#ifdef OPENFOAM_NOT_EXTEND
+    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult.ref();
+#else
+    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult();
+#endif
+
+    // Calculated as per box 3.2 in Simo and Hughes
+
+    // Info<< "max(mag(epsilonf)) = " << max(mag(epsilonf_)) << endl;
 
     // Update total strain
     const_cast<linearElasticMisesPlastic&>(*this).updateEpsilonf();
@@ -905,9 +1071,11 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
     (
         mag(sTrial) - sqrtTwoOverThree_*sigmaYf_.oldTime()
     );
+    // const scalarField& fTrialI = fTrial.internalField();
 
     // Return direction
     const surfaceSymmTensorField plasticN(sTrial/magSTrial);
+    // const symmTensorField& plasticNI = plasticN.internalField();
 
     // Calculate tangent field
     const Switch numericalTangent(dict().lookup("numericalTangent"));
@@ -916,38 +1084,43 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
         // Lookup current stress and store it as the reference
         const surfaceSymmTensorField& sigmaRef =
             mesh().lookupObject<surfaceSymmTensorField>("sigmaf");
-        const surfaceSymmTensorField& epsilonRef = epsilonf();
+        // Lookup gradient of displacement
+        const surfaceTensorField& gradDRef =
+            mesh().lookupObject<surfaceTensorField>("grad(D)f");
+        //const surfaceSymmTensorField& epsilonRef = epsilonf();
 
         // Create fields to be used for perturbations
         surfaceSymmTensorField sigmaPerturb("sigmaPerturb", sigmaRef);
-        surfaceSymmTensorField epsilonPerturb("epsilonPerturb", epsilonRef);
+        surfaceTensorField gradDPerturb("gradDPerturb", gradDRef);
+//        surfaceSymmTensorField epsilonPerturb("epsilonPerturb", epsilonRef);
 
         // Small number used for perturbations
         const scalar eps(readScalar(dict().lookup("tangentEps")));
 
         // For each component of epsilon, sequentially apply a perturbation and
         // then calculate the resulting sigma
-        for (label cmptI = 0; cmptI < symmTensor::nComponents; cmptI++)
+        for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
         {
             // Reset epsilonPerturb
             // We multiply by 1.0 to avoid issues with epsilonf being removed
             // from the object registry
-            epsilonPerturb = 1.0*epsilonRef;
+            gradDPerturb = 1.0*gradDRef;
 
-            // Perturb this component of epsilon
-            epsilonPerturb.replace(cmptI, epsilonPerturb.component(cmptI) + eps);
+            // Perturb this component of gradD
+            gradDPerturb.replace(cmptI, gradDRef.component(cmptI) + eps);
 
             // Calculate perturbed stress
-            calculateStress(sigmaPerturb, epsilonPerturb);
+            const_cast<linearElasticMisesPlastic&>(*this).calculateStress(sigmaPerturb, gradDPerturb);
+            //calculateStress(sigmaPerturb, gradDPerturb);
 
             // Calculate tangent component
             const surfaceSymmTensorField tangCmpt((sigmaPerturb - sigmaRef)/eps);
             const symmTensorField& tangCmptI = tangCmpt.internalField();
 
-            // Insert tangent component
+// Insert tangent component
             forAll(tangCmptI, faceI)
             {
-                if (cmptI == symmTensor::XX)
+                if (cmptI == tensor::XX)
                 {
                     result[faceI](0,0) = tangCmptI[faceI][symmTensor::XX];
                     result[faceI](1,0) = tangCmptI[faceI][symmTensor::YY];
@@ -956,7 +1129,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
                     result[faceI](4,0) = tangCmptI[faceI][symmTensor::YZ];
                     result[faceI](5,0) = tangCmptI[faceI][symmTensor::XZ];
                 }
-                else if (cmptI == symmTensor::YY)
+                else if (cmptI == tensor::XY)
                 {
                     result[faceI](0,1) = tangCmptI[faceI][symmTensor::XX];
                     result[faceI](1,1) = tangCmptI[faceI][symmTensor::YY];
@@ -965,7 +1138,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
                     result[faceI](4,1) = tangCmptI[faceI][symmTensor::YZ];
                     result[faceI](5,1) = tangCmptI[faceI][symmTensor::XZ];
                 }
-                else if (cmptI == symmTensor::ZZ)
+                else if (cmptI == tensor::XZ)
                 {
                     result[faceI](0,2) = tangCmptI[faceI][symmTensor::XX];
                     result[faceI](1,2) = tangCmptI[faceI][symmTensor::YY];
@@ -974,7 +1147,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
                     result[faceI](4,2) = tangCmptI[faceI][symmTensor::YZ];
                     result[faceI](5,2) = tangCmptI[faceI][symmTensor::XZ];
                 }
-                else if (cmptI == symmTensor::XY)
+                else if (cmptI == tensor::YX)
                 {
                     result[faceI](0,3) = tangCmptI[faceI][symmTensor::XX];
                     result[faceI](1,3) = tangCmptI[faceI][symmTensor::YY];
@@ -983,7 +1156,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
                     result[faceI](4,3) = tangCmptI[faceI][symmTensor::YZ];
                     result[faceI](5,3) = tangCmptI[faceI][symmTensor::XZ];
                 }
-                else if (cmptI == symmTensor::YZ)
+                else if (cmptI == tensor::YY)
                 {
                     result[faceI](0,4) = tangCmptI[faceI][symmTensor::XX];
                     result[faceI](1,4) = tangCmptI[faceI][symmTensor::YY];
@@ -992,7 +1165,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
                     result[faceI](4,4) = tangCmptI[faceI][symmTensor::YZ];
                     result[faceI](5,4) = tangCmptI[faceI][symmTensor::XZ];
                 }
-                else // if (cmptI == symmTensor::XZ)
+                else if (cmptI == tensor::YZ)
                 {
                     result[faceI](0,5) = tangCmptI[faceI][symmTensor::XX];
                     result[faceI](1,5) = tangCmptI[faceI][symmTensor::YY];
@@ -1000,6 +1173,33 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
                     result[faceI](3,5) = tangCmptI[faceI][symmTensor::XY];
                     result[faceI](4,5) = tangCmptI[faceI][symmTensor::YZ];
                     result[faceI](5,5) = tangCmptI[faceI][symmTensor::XZ];
+                }
+                else if (cmptI == tensor::ZX)
+                {
+                    result[faceI](0,6) = tangCmptI[faceI][symmTensor::XX];
+                    result[faceI](1,6) = tangCmptI[faceI][symmTensor::YY];
+                    result[faceI](2,6) = tangCmptI[faceI][symmTensor::ZZ];
+                    result[faceI](3,6) = tangCmptI[faceI][symmTensor::XY];
+                    result[faceI](4,6) = tangCmptI[faceI][symmTensor::YZ];
+                    result[faceI](5,6) = tangCmptI[faceI][symmTensor::XZ];
+                }
+                else if (cmptI == tensor::ZY)
+                {
+                    result[faceI](0,7) = tangCmptI[faceI][symmTensor::XX];
+                    result[faceI](1,7) = tangCmptI[faceI][symmTensor::YY];
+                    result[faceI](2,7) = tangCmptI[faceI][symmTensor::ZZ];
+                    result[faceI](3,7) = tangCmptI[faceI][symmTensor::XY];
+                    result[faceI](4,7) = tangCmptI[faceI][symmTensor::YZ];
+                    result[faceI](5,7) = tangCmptI[faceI][symmTensor::XZ];
+                }
+                else // if (cmptI == tensor::ZZ)
+                {
+                    result[faceI](0,8) = tangCmptI[faceI][symmTensor::XX];
+                    result[faceI](1,8) = tangCmptI[faceI][symmTensor::YY];
+                    result[faceI](2,8) = tangCmptI[faceI][symmTensor::ZZ];
+                    result[faceI](3,8) = tangCmptI[faceI][symmTensor::XY];
+                    result[faceI](4,8) = tangCmptI[faceI][symmTensor::YZ];
+                    result[faceI](5,8) = tangCmptI[faceI][symmTensor::XZ];
                 }
             }
 
@@ -1013,80 +1213,94 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
                 {
                     const label faceID = start + fI;
 
-                    if (cmptI == symmTensor::XX)
-                    {
-                        result[faceID](0,0) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,0) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,0) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,0) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,0) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,0) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == symmTensor::YY)
-                    {
-                        result[faceID](0,1) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,1) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,1) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,1) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,1) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,1) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == symmTensor::ZZ)
-                    {
-                        result[faceID](0,2) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,2) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,2) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,2) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,2) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,2) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == symmTensor::XY)
-                    {
-                        result[faceID](0,3) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,3) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,3) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,3) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,3) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,3) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == symmTensor::YZ)
-                    {
-                        result[faceID](0,4) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,4) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,4) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,4) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,4) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,4) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else // if (cmptI == symmTensor::XZ)
-                    {
-                        result[faceID](0,5) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,5) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,5) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,5) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,5) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,5) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                }
-            }
-        }
-
-        // Include 0.5 factor for shear components
-        forAll(result, faceI)
-        {
-
-            for (int i = 3; i < 6; i++)
-            {
-                for (int j = 3; j < 6; j++)
-                {
-                    result[faceI](i,j) *= 0.5;
-                }
+                            if (cmptI == tensor::XX)
+                            {
+                                result[faceID](0,0) = tangCmptI[fI][symmTensor::XX];
+                                result[faceID](1,0) = tangCmptI[fI][symmTensor::YY];
+                                result[faceID](2,0) = tangCmptI[fI][symmTensor::ZZ];
+                                result[faceID](3,0) = tangCmptI[fI][symmTensor::XY];
+                                result[faceID](4,0) = tangCmptI[fI][symmTensor::YZ];
+                                result[faceID](5,0) = tangCmptI[fI][symmTensor::XZ];
+                            }
+                            else if (cmptI == tensor::XY)
+                            {
+                                result[faceID](0,1) = tangCmptI[fI][symmTensor::XX];
+                                result[faceID](1,1) = tangCmptI[fI][symmTensor::YY];
+                                result[faceID](2,1) = tangCmptI[fI][symmTensor::ZZ];
+                                result[faceID](3,1) = tangCmptI[fI][symmTensor::XY];
+                                result[faceID](4,1) = tangCmptI[fI][symmTensor::YZ];
+                                result[faceID](5,1) = tangCmptI[fI][symmTensor::XZ];
+                            }
+                            else if (cmptI == tensor::XZ)
+                            {
+                                result[faceID](0,2) = tangCmptI[fI][symmTensor::XX];
+                                result[faceID](1,2) = tangCmptI[fI][symmTensor::YY];
+                                result[faceID](2,2) = tangCmptI[fI][symmTensor::ZZ];
+                                result[faceID](3,2) = tangCmptI[fI][symmTensor::XY];
+                                result[faceID](4,2) = tangCmptI[fI][symmTensor::YZ];
+                                result[faceID](5,2) = tangCmptI[fI][symmTensor::XZ];
+                            }
+                            else if (cmptI == tensor::YX)
+                            {
+                                result[faceID](0,3) = tangCmptI[fI][symmTensor::XX];
+                                result[faceID](1,3) = tangCmptI[fI][symmTensor::YY];
+                                result[faceID](2,3) = tangCmptI[fI][symmTensor::ZZ];
+                                result[faceID](3,3) = tangCmptI[fI][symmTensor::XY];
+                                result[faceID](4,3) = tangCmptI[fI][symmTensor::YZ];
+                                result[faceID](5,3) = tangCmptI[fI][symmTensor::XZ];
+                            }
+                            else if (cmptI == tensor::YY)
+                            {
+                                result[faceID](0,4) = tangCmptI[fI][symmTensor::XX];
+                                result[faceID](1,4) = tangCmptI[fI][symmTensor::YY];
+                                result[faceID](2,4) = tangCmptI[fI][symmTensor::ZZ];
+                                result[faceID](3,4) = tangCmptI[fI][symmTensor::XY];
+                                result[faceID](4,4) = tangCmptI[fI][symmTensor::YZ];
+                                result[faceID](5,4) = tangCmptI[fI][symmTensor::XZ];
+                            }
+                            else if (cmptI == tensor::YZ)
+                            {
+                                result[faceID](0,5) = tangCmptI[fI][symmTensor::XX];
+                                result[faceID](1,5) = tangCmptI[fI][symmTensor::YY];
+                                result[faceID](2,5) = tangCmptI[fI][symmTensor::ZZ];
+                                result[faceID](3,5) = tangCmptI[fI][symmTensor::XY];
+                                result[faceID](4,5) = tangCmptI[fI][symmTensor::YZ];
+                                result[faceID](5,5) = tangCmptI[fI][symmTensor::XZ];
+                            }
+                            else if (cmptI == tensor::ZX)
+                            {
+                                result[faceID](0,6) = tangCmptI[fI][symmTensor::XX];
+                                result[faceID](1,6) = tangCmptI[fI][symmTensor::YY];
+                                result[faceID](2,6) = tangCmptI[fI][symmTensor::ZZ];
+                                result[faceID](3,6) = tangCmptI[fI][symmTensor::XY];
+                                result[faceID](4,6) = tangCmptI[fI][symmTensor::YZ];
+                                result[faceID](5,6) = tangCmptI[fI][symmTensor::XZ];
+                            }
+                            else if (cmptI == tensor::ZY)
+                            {
+                                result[faceID](0,7) = tangCmptI[fI][symmTensor::XX];
+                                result[faceID](1,7) = tangCmptI[fI][symmTensor::YY];
+                                result[faceID](2,7) = tangCmptI[fI][symmTensor::ZZ];
+                                result[faceID](3,7) = tangCmptI[fI][symmTensor::XY];
+                                result[faceID](4,7) = tangCmptI[fI][symmTensor::YZ];
+                                result[faceID](5,7) = tangCmptI[fI][symmTensor::XZ];
+                            }
+                            else // if (cmptI == tensor::ZZ)
+                            {
+                                result[faceID](0,8) = tangCmptI[fI][symmTensor::XX];
+                                result[faceID](1,8) = tangCmptI[fI][symmTensor::YY];
+                                result[faceID](2,8) = tangCmptI[fI][symmTensor::ZZ];
+                                result[faceID](3,8) = tangCmptI[fI][symmTensor::XY];
+                                result[faceID](4,8) = tangCmptI[fI][symmTensor::YZ];
+                                result[faceID](5,8) = tangCmptI[fI][symmTensor::XZ];
+                            }
+                        }
             }
         }
     }
     else // Analytical tangent
     {
-        // Defined in box 3.2 of Simo and Hughes
+
         notImplemented("Analytical tangent not implemented");
     }
 
@@ -1363,7 +1577,7 @@ void Foam::linearElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
         const surfaceScalarField sigmaHydf(K_*tr(epsilonf()));
 
         // Update the stress
-        sigma = sigmaHydf*I + s;
+		sigma = sigmaHydf*I + s;
     }
 }
 

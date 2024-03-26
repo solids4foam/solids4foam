@@ -1,3 +1,4 @@
 newLeastSquaresVolPointInterpolation/newLeastSquaresVolPointInterpolation.C
+enhancedVolPointInterpolation/enhancedVolPointInterpolation.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libblockCoupledSolids4FoamTools

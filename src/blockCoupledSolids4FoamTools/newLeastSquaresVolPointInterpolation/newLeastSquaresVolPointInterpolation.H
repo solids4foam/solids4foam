@@ -296,19 +296,17 @@ public:
 
         // Edit
 
-            //- Correct weighting factors for moving mesh.
-            //  Updated for MeshObject.  HJ, 30/Aug/2010
 #ifdef OPENFOAM_NOT_EXTEND
+            //- Correct weighting factors for moving mesh.
             virtual bool movePoints();
-#else
-            virtual bool movePoints() const;
-#endif
 
             //- Update mesh topology using the morph engine
-            //  Updated for MeshObject.  HJ, 30/Aug/2010
-#ifdef OPENFOAM_NOT_EXTEND
             virtual void updateMesh(const mapPolyMesh&);
 #else
+            //- Correct weighting factors for moving mesh.
+            virtual bool movePoints() const;
+
+            //- Update mesh topology using the morph engine
             virtual bool updateMesh(const mapPolyMesh&) const;
 #endif
 

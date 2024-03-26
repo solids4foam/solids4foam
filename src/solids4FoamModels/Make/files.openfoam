@@ -23,7 +23,13 @@ solidModels/thermalSolid/thermalSolid.C
 solidModels/unsLinGeomSolid/unsLinGeomSolid.C
 solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
 solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
+solidModels/vertexCentredLaplacian/vertexCentredLaplacian.C
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
+/*solidModels/vertexCentredLinGeomPressureDisplacementSolid/vertexCentredLinGeomPressureDisplacementSolid.C*/
+/*solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C*/
+solidModels/vertexCentredNonLinGeomTotalLagPressureDisplacementSolid/vertexCentredNonLinGeomTotalLagPressureDisplacementSolid.C
+solidModels/vertexCentredNonLinGeomTotalLagDisplacementSolid/vertexCentredNonLinGeomTotalLagDisplacementSolid.C
+solidModels/vertexCentredSegregatedLinGeomSolid/vertexCentredSegregatedLinGeomSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
 
 fluidModels/fluidModel/fluidModel.C
@@ -75,6 +81,9 @@ $(nonLinGeomLaws)/OgdenElastic/OgdenElastic.C
 $(nonLinGeomLaws)/MooneyRivlinElastic/MooneyRivlinElastic.C
 $(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
 $(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
+$(nonLinGeomLaws)/neoHookeanMisesGTNDamage/neoHookeanMisesGTNDamage.C
+$(nonLinGeomLaws)/neoHookeanMisesLemaitreDamage/neoHookeanMisesLemaitreDamage.C
+$(nonLinGeomLaws)/neoHookeanMisesPhaseFieldDamage/neoHookeanMisesPhaseFieldDamage.C
 $(nonLinGeomLaws)/rotationInvariantLinearElastic/rotationInvariantLinearElastic.C
 $(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 $(nonLinGeomLaws)/viscoNeoHookeanElastic/viscoNeoHookeanElastic.C
@@ -116,6 +125,8 @@ $(pointPatchFields)/pointSolidForce/solidForcePointPatchVectorField.C
 $(pointPatchFields)/pointSolidTraction/solidTractionPointPatchVectorField.C
 $(pointPatchFields)/pointFixedDisplacementZeroShear/fixedDisplacementZeroShearPointPatchVectorField.C
 $(pointPatchFields)/pointNormalDisplacement/normalDisplacementPointPatchVectorField.C
+/*$(pointPatchFields)/pointLinearSpatialDisplacementCantilever/linearSpatialDisplacementCantileverPointPatchVectorField.C*/
+$(pointPatchFields)/pointFixedRotation/fixedRotationPointPatchVectorField.C
 
 contactModels = $(solidFvPatchFields)/solidContact/contactModels
 normalContactModels = $(contactModels)/normalContactModels
@@ -209,6 +220,11 @@ numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
+numerics/vfvCellPoint/vfvmCellPointExtended.C
+numerics/vfvCellPoint/vfvmCellPointOriginal.C
+numerics/vfvCellPoint/vfvcCellPoint.C
+numerics/vfvCellPoint/vfvmCellPoint.C
+numerics/pointFieldFunctions/pointFieldFunctions.C
 
 numerics/interpolationTable/tableReaders/tableReaders.C
 numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C
@@ -219,10 +235,13 @@ numerics/meshDualiser/meshDualiser.C
 numerics/minEdgeLength/minEdgeLength.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/multiplyCoeff/multiplyCoeff.C
+numerics/multiplyCoeff/multiplyCoeffRectMat.C
+numerics/multiplyCoeff/multiplyCoeffExtended.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/sparseMatrix/sparseMatrix.C
+numerics/sparseMatrix/SparseMatrixTemplates.C
 numerics/sparseMatrix/sparseMatrixTools.C
-numerics/vfvCellPoint/vfvcCellPoint.C
-numerics/vfvCellPoint/vfvmCellPoint.C
+numerics/sparseMatrixExtended/sparseMatrixExtended.C
+numerics/sparseMatrixExtended/sparseMatrixExtendedTools.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels

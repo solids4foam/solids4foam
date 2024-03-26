@@ -177,7 +177,7 @@ bool linGeomSolid::evolve()
         );
 
         // Update point displacement increment
-        mechanical().interpolate(DD(), pointDD());
+        mechanical().interpolate(DD(), gradD(), pointDD());
 
         // Update point displacement
         pointD() = pointD().oldTime() + pointDD();

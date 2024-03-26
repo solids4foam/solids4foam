@@ -20,7 +20,7 @@ License
 #include "explicitVertexCentredLinGeomSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "sparseMatrix.H"
-#include "symmTensor4thOrder.H"
+//#include "symmTensor4thOrder.H"
 #include "vfvcCellPoint.H"
 #include "vfvmCellPoint.H"
 #include "fvcDiv.H"

@@ -41,11 +41,9 @@ Author
 #include "volFields.H"
 #include "pointFields.H"
 #include "sparseMatrix.H"
-#ifdef OPENFOAM_NOT_EXTEND
-    #include "scalarMatrices.H"
-#else
-    #include "scalarSquareMatrix.H"
-#endif
+#include "RectangularMatrix.H"
+#include "cellPointLeastSquaresVectors.H"
+#include "SparseMatrixTemplate.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -59,19 +57,30 @@ namespace vfvm
     // side
     void divSigma
     (
-        sparseMatrix& matrix,
+		sparseMatrix& matrix,
+		const fvMesh& mesh,
+		const fvMesh& dualMesh,
+		const labelList& dualFaceToCell,
+		const labelList& dualCellToPoint,
+		const Field<RectangularMatrix<scalar>>& materialTangentField,
+		const scalar zeta,
+		const bool debug = false
+    );
+
+
+    // Add coefficients to the matrix for the Laplacian of a scalar field with
+    // a scalar diffusivity field
+    void laplacian
+    (
+        sparseScalarMatrix& matrix,
+        const Switch compactStencil,
         const fvMesh& mesh,
         const fvMesh& dualMesh,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
-        const Field<scalarSquareMatrix>& materialTangentField,
-        const boolList& fixedDofs,
-        const symmTensorField& fixedDofDirections,
-        const scalar fixedDofScale,
-        const scalar zeta, // fraction of compact edge direction component used
+        const scalarField& diffusivity, // diffusivity in the primary cells
         const bool debug = false
     );
-
 
     // Add coefficients to the matrix for the second time derivative
     // Note: this function does not calculate contributions to the right-hand

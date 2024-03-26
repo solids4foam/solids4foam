@@ -130,6 +130,9 @@ class solidModel
         //  approaches
         volSymmTensorField sigma_;
 
+        //- Time-step index used to determine when it is a new time-step
+        mutable label curTimeIndex_;
+
         //- Density
         mutable autoPtr<volScalarField> rhoPtr_;
 
@@ -447,6 +450,10 @@ public:
             {
                 return solidProperties_;
             }
+
+            //- Is it a new time step? This function return true the first time
+            //  it is called in a time step
+            bool newTimeStep() const;
 
             //- Return const-reference to the density
             const volScalarField& rho() const;

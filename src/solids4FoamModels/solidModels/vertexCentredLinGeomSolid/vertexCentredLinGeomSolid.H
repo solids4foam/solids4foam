@@ -49,6 +49,8 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
+#include "Enum.H"
+#include "twoDPointCorrector.H"
 #ifdef OPENFOAM_COM
     #include "pointVolInterpolation.H"
 #endif
@@ -71,10 +73,35 @@ class vertexCentredLinGeomSolid
 :
     public solidModel
 {
+public:
+
+        //- Solution algorithms
+        enum solutionAlgorithm
+        {
+            IMPLICIT_COUPLED,
+            IMPLICIT_SEGREGATED,
+            EXPLICIT
+        };
+
+        //- Solution algorithm names
+        static const Enum<solutionAlgorithm> solutionAlgorithmNames_;
+
+
+private:
+
     // Private Data
 
         //- Mechanical model for dual mesh
         autoPtr<dualMechanicalModel> dualMechanicalPtr_;
+
+        //- Solution algorithm, e.g. coupled, segregated, explicit
+        const solutionAlgorithm solutionAlgorithm_;
+
+        //- Implicit stiffness used by segregated algorithm
+        //  Coefficient of the Laplacian term. Defined at the dual mesh faces.
+        //  The value of this term only affects convergence and not the answer
+        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
+        mutable autoPtr<surfaceScalarField> dualImpKfPtr_;
 
         //- Flag to enable full Newton-Raphson approach, where the stiffness
         //  matrix is updated once per outer iteration. Alternatively, the
@@ -86,6 +113,13 @@ class vertexCentredLinGeomSolid
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
+
+        //- Object for correcting the displacement field in 2-D
+        //  This ensures the front and back planes have the same displacements
+        twoDPointCorrector twoDCorrector_;
+
+        //- Predict new time-step fields using the velocity field
+        const Switch predictor_;
 
         //- Field of flags indicating the degrees of freedom where the value is
         //  set
@@ -118,6 +152,9 @@ class vertexCentredLinGeomSolid
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
 
+        //- Divergence of sigma at each primary point
+        pointVectorField pointDivSigma_;
+
         //- Displacement gradient field at the dual mesh faces
         surfaceTensorField dualGradDf_;
 
@@ -140,6 +177,15 @@ class vertexCentredLinGeomSolid
         (
             vectorField& source,
             const labelList& dualCellToPoint
+        );
+
+        //- Update the divergence of stress based on the current pointD field
+        void updatePointDivSigma
+        (
+            const pointVectorField& pointD,
+            surfaceTensorField& dualGradDf,
+            surfaceSymmTensorField& dualSigmaf,
+            pointVectorField& pointDivSigma
         );
 
         //- Set fixed degree of freedom lists
@@ -190,6 +236,24 @@ class vertexCentredLinGeomSolid
             const vectorField& source, // Linear system source
             const scalar zeta // Discretisation parameter
         );
+
+        //- Make dualImpKf field
+        void makeDualImpKf() const;
+
+        //- Return dualImpK field
+        const surfaceScalarField& dualImpKf() const;
+
+        //- Predict displacement field using the velocity field
+        void predict();
+
+        //- Evolve the solid solver using the implicit coupled approach
+        virtual bool evolveImplicitCoupled();
+
+        //- Evolve the solid solver using the implicit segregated approach
+        virtual bool evolveImplicitSegregated();
+
+        //- Evolve the solid solver using the explicit approach
+        virtual bool evolveExplicit();
 
         //- Disallow default bitwise copy construct
         vertexCentredLinGeomSolid(const vertexCentredLinGeomSolid&);

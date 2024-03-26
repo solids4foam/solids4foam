@@ -107,6 +107,10 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+        //- Material tangent for Newton Raphson loop
+        virtual tmp<Field<RectangularMatrix<scalar>>>
+        materialTangentField() const;
+
         //- Return the bulk modulus field
         virtual tmp<volScalarField> bulkModulus() const;
 

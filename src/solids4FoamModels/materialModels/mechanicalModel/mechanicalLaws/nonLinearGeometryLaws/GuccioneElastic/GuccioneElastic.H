@@ -67,17 +67,63 @@ class GuccioneElastic
         //- Shear modulus in the limited of small strains
         dimensionedScalar mu_;
 
+        //- Flag to indicate a uniform fibre field
+        //  If true, the fibre direction is read from mechanicalProperties
+        //  If false, the fibre field is read from the starting time directory
+        const Switch uniformFibreField_;
+
         //- Fibre directions in the reference configuration
-        //  vol and surface fields
         volVectorField f0_;
         surfaceVectorField f0f_;
 
+        //- Sheet directions in the reference configuration
+        //  f0 & s0 == 0
+        volVectorField s0_;
+        surfaceVectorField s0f_;
+
+        //- Sheet normal directions in the reference configuration
+        //  n0 & f0 == n0 & s0 == 0
+        volVectorField n0_;
+        surfaceVectorField n0f_;
+
+        //- Rotation matrix from local fibre coordinate system to the global
+        //  coordinate system
+        volTensorField R_;
+        surfaceTensorField Rf_;
+
         //- Outer product of the fibre directions with themselves
-        //  vol and surface fields
         volSymmTensorField f0f0_;
         surfaceSymmTensorField f0f0f_;
 
+        //- 2nd Piola-Kirchhoff stress (without the hydrostatic term)
+        volSymmTensorField S_;
+        surfaceSymmTensorField Sf_;
+
+
     // Private Member Functions
+
+        //- Create f0 field
+        tmp<volVectorField> makeF0
+        (
+            const Switch& uniformFibreField,
+            const fvMesh& mesh,
+            const dictionary& dict
+        ) const;
+
+        //- Create f0f field
+        tmp<surfaceVectorField> makeF0f
+        (
+            const Switch& uniformFibreField,
+            const fvMesh& mesh,
+            const dictionary& dict
+        ) const;
+
+        //- Calculate stress given gradD and pressure
+        void calculateStress
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceTensorField& gradD
+        );
 
         //- Disallow default bitwise copy construct
         GuccioneElastic(const GuccioneElastic&);
@@ -115,6 +161,10 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
+
+        //- Material tangent for Newton Raphson loop
+        virtual tmp<Field<RectangularMatrix<scalar>>>
+        materialTangentField() const;
 
         //- Return the bulk modulus field
         virtual tmp<volScalarField> bulkModulus() const;

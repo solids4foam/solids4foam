@@ -496,20 +496,18 @@ public:
         virtual tmp<surfaceScalarField> impKf() const;
 
         //- Material tangent for Newton Raphson loop
-        virtual scalarSquareMatrix materialTangent() const
+        virtual RectangularMatrix<scalar> materialTangent() const
         {
             // We could use numerical differentiation for this if needed
             notImplemented("Not yet implemented for this mechanical law");
 
             // Keep compiler happy
-            return scalarSquareMatrix(0);
+            return RectangularMatrix<scalar>(0);
         }
 
-#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent field for Newton Raphson loop
         //  The size of this field should be mesh.nFaces()
-        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
-#endif
+        virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
 
         //- Return bulk modulus
         virtual tmp<volScalarField> bulkModulus() const

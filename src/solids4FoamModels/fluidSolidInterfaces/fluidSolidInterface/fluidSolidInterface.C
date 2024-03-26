@@ -1114,12 +1114,6 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
 void Foam::fluidSolidInterface::updateForce()
 {
-    // Check if coupling switch needs to be updated
-    if (!coupled_)
-    {
-        updateCoupled();
-    }
-
     Info<< "Setting traction on solid interfaces" << endl;
 
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
