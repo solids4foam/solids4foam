@@ -347,7 +347,6 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowPatchNames_(),
     shadowPatchIndicesPtr_(NULL),
     rigidMaster_(false),
-    rigidSlave_(false),
     normalModels_(),
     frictionModels_(),
     normalPenaltyFactors_(),
@@ -385,7 +384,6 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowPatchNames_(),
     shadowPatchIndicesPtr_(NULL),
     rigidMaster_(false),
-    rigidSlave_(false),
     normalModels_(),
     frictionModels_(),
     normalPenaltyFactors_(),
@@ -469,10 +467,6 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
                 << "patch!" << endl;
         }
     }
-    else
-    {
-        rigidSlave_ = Switch(dict.lookupOrDefault<Switch>("rigidSlave", false));
-    }
 
     if (dict.found("gradient"))
     {
@@ -512,7 +506,6 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowPatchNames_(ptf.shadowPatchNames_),
     shadowPatchIndicesPtr_(NULL),
     rigidMaster_(ptf.rigidMaster_),
-    rigidSlave_(ptf.rigidSlave_),
     normalModels_(ptf.normalModels_),
     frictionModels_(ptf.frictionModels_),
     normalPenaltyFactors_(ptf.normalPenaltyFactors_.size(), -1),
@@ -551,7 +544,6 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowPatchNames_(ptf.shadowPatchNames_),
     shadowPatchIndicesPtr_(NULL),
     rigidMaster_(ptf.rigidMaster_),
-    rigidSlave_(ptf.rigidSlave_),
     normalModels_(ptf.normalModels_),
     frictionModels_(ptf.frictionModels_),
     normalPenaltyFactors_(ptf.normalPenaltyFactors_.size(), -1),
@@ -591,7 +583,6 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowPatchNames_(ptf.shadowPatchNames_),
     shadowPatchIndicesPtr_(NULL),
     rigidMaster_(ptf.rigidMaster_),
-    rigidSlave_(ptf.rigidSlave_),
     normalModels_(ptf.normalModels_),
     frictionModels_(ptf.frictionModels_),
     normalPenaltyFactors_(ptf.normalPenaltyFactors_.size(), -1),
@@ -1040,17 +1031,6 @@ Foam::solidContactFvPatchVectorField::frictionModelForThisSlave()
             << abort(FatalError);
     }
 
-    if (masterPatchField.rigidMaster_ && this->rigidSlave_)
-    {
-        FatalErrorIn
-        (
-            "frictionContactModel& solidContactFvPatchVectorField::"
-            "frictionModelForThisSlave()"
-        )   << "Both master and slave are rigid! One should be deformable!"
-            << abort(FatalError);
-    }
-
-
     return frictionModels()[masterShadowID];
 }
 
@@ -1237,27 +1217,6 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                     !master_
                 );
 
-                // Correct master contact pressure
-                const vectorField patchFaceNormals =
-                    zone().globalFaceToPatch
-                    (
-                        zone().globalPatch().faceNormals()
-                    );
-
-                normalModels()[shadPatchI].correct
-                (
-                    patchFaceNormals,
-                    zone().globalFaceToPatch
-                    (
-                        zoneToZones()[shadPatchI].masterFacePenVol()()
-                    ),
-                    zone().globalFaceToPatch
-                    (
-                        zoneToZones()[shadPatchI].masterAreaInContact()()
-                    ),
-                    master_
-                );
-
                 // Correct friction contact forces on slave
                 frictionModels()[shadPatchI].correct
                 (
@@ -1269,34 +1228,65 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                     !master_
                 );
 
-                // Interpolate the slave displacement increment to the master
-                // patch. This is required in order to simultaneously calculate
-                // friction traction on both contact patches
+                // Avoid updating master if it is rigid
+                if (!rigidMaster_)
+                {
+                    // Correct master contact pressure
+                    const vectorField patchFaceNormals =
+                        zone().globalFaceToPatch
+                        (
+                            zone().globalPatch().faceNormals()
+                        );
 
-                // Slave zone DD
-                const vectorField shadowZoneDD
-                (
-                    shadowZones()[shadPatchI].patchFaceToGlobal(shadowPatchDD)
-                );
-
-                const vectorField shadowPatchDDInterpToPatch
-                (
-                    zone().globalFaceToPatch
+                    normalModels()[shadPatchI].correct
                     (
-                        zoneToZones()[shadPatchI].slaveToMaster(shadowZoneDD)()
-                    )
-                );
+                        patchFaceNormals,
+                        zone().globalFaceToPatch
+                        (
+                            zoneToZones()[shadPatchI].masterFacePenVol()()
+                        ),
+                        zone().globalFaceToPatch
+                        (
+                            zoneToZones()[shadPatchI].masterAreaInContact()()
+                        ),
+                        master_
+                    );
 
-                // Correct friction contact forces on master
-                frictionModels()[shadPatchI].correct
-                (
-                    normalModels()[shadPatchI].masterPressure(),
-                    patchFaceNormals,
-                    normalModels()[shadPatchI].masterAreaInContact(),
-                    patchDD,
-                    shadowPatchDDInterpToPatch,
-                    master_
-                );
+                    // Interpolate the slave displacement increment to the
+                    // master patch. This is required in order to simultaneously
+                    // calculate friction traction on both contact patches
+
+                    // Slave zone DD
+                    const vectorField shadowZoneDD
+                    (
+                        shadowZones()[shadPatchI].patchFaceToGlobal
+                        (
+                            shadowPatchDD
+                        )
+                    );
+
+                    const vectorField shadowPatchDDInterpToPatch
+                    (
+                        zone().globalFaceToPatch
+                        (
+                            zoneToZones()[shadPatchI].slaveToMaster
+                            (
+                                shadowZoneDD
+                            )()
+                        )
+                    );
+
+                    // Correct friction contact forces on master
+                    frictionModels()[shadPatchI].correct
+                    (
+                        normalModels()[shadPatchI].masterPressure(),
+                        patchFaceNormals,
+                        normalModels()[shadPatchI].masterAreaInContact(),
+                        patchDD,
+                        shadowPatchDDInterpToPatch,
+                        master_
+                    );
+                }
             }
 
             if (rigidMaster_)
@@ -1409,17 +1399,9 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
         // Set the traction on the slave patch
         // The master stores the friction and normal models, so we need to find
         // which models correspond to the current shadow
-        if (!rigidSlave_)
-        {
-            traction() =
-                frictionModelForThisSlave().slaveTraction()
-              + normalModelForThisSlave().slavePressure();
-        }
-        else
-        {
-            // Set slave traction free to mimic a rigid contact
-            traction() = vector::zero;
-        }
+        traction() =
+            frictionModelForThisSlave().slaveTraction()
+          + normalModelForThisSlave().slavePressure();
 
         // TESTING - START
         // Scale traction vectors on faces, which share an edge with the
@@ -1750,11 +1732,6 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
                 os  << '}' << endl;
             }
         }
-    }
-    else
-    {
-        os.writeKeyword("rigidSlave") << rigidSlave_
-            << token::END_STATEMENT << nl;
     }
 
 #ifdef FOAMEXTEND

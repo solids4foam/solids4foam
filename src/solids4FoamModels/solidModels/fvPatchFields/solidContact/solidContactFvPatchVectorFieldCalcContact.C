@@ -377,10 +377,6 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
                 (
                     "integralNormalGap", false
                 );
-            Info<< "    " << type() << ": " << patch().name() << nl
-                << "        integralNormalGap: "
-                << integralNormalGap
-                << endl;
 
             zoneToZones_[shadPatchI].normalGapIntegration() =
                 integralNormalGap;
@@ -394,7 +390,9 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
 
             Info<< "    " << type() << ": " << patch().name() << nl
                 << "        useNewPointDistanceMethod: "
-                << useNewPointDistanceMethod
+                << useNewPointDistanceMethod << nl
+                << "        integralNormalGap: "
+                << integralNormalGap
                 << endl;
 
             zoneToZones_[shadPatchI].useNewPointDistanceMethod() =
