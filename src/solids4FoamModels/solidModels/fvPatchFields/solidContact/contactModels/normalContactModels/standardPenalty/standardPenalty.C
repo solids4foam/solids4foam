@@ -412,17 +412,13 @@ void standardPenalty::correct
     );
 
     // Under-relax pressure/traction
-    // Note: slavePressure_ is really a traction vector
-    if (master)
-    {
-        masterPressure() =
-            relaxFac_*newTraction + (1.0 - relaxFac_)*masterPressure();
-    }
-    else
-    {
-        slavePressure() =
-            relaxFac_*newTraction + (1.0 - relaxFac_)*slavePressure();
-    }
+    // Note: patchPressure is really a traction vector
+    vectorField& patchPressure =
+        pressureVolField_.boundaryField()[patchIndex];
+
+    // Under-relax traction
+    patchPressure =
+        relaxFac_*newTraction + (1.0 - relaxFac_)*patchPressure;
 }
 
 
