@@ -64,11 +64,8 @@ class standardPenalty
         //- Const reference to mesh
         const fvMesh& mesh_;
 
-        //- Slave pressure
-        volVectorField slavePressureVolField_;
-
-        //- Master pressure
-        volVectorField masterPressureVolField_;
+        //- Pressure fields
+        volVectorField pressureVolField_;
 
         //- Area in contact
         volScalarField areaInContactVolField_;
@@ -170,22 +167,22 @@ public:
         //- Return slave pressure
         virtual const vectorField& slavePressure() const
         {
-            return slavePressureVolField_.boundaryField()[slavePatchID()];
+            return pressureVolField_.boundaryField()[slavePatchID()];
         }
 
         //- Return master pressure
         virtual const vectorField& masterPressure() const
         {
-            return masterPressureVolField_.boundaryField()[masterPatchID()];
+            return pressureVolField_.boundaryField()[masterPatchID()];
         }
 
         //- Return slave pressure
         virtual vectorField& slavePressure()
         {
 #ifdef OPENFOAM_NOT_EXTEND
-            return slavePressureVolField_.boundaryFieldRef()[slavePatchID()];
+            return pressureVolField_.boundaryFieldRef()[slavePatchID()];
 #else
-            return slavePressureVolField_.boundaryField()[slavePatchID()];
+            return pressureVolField_.boundaryField()[slavePatchID()];
 #endif
         }
 
@@ -193,9 +190,9 @@ public:
         virtual vectorField& masterPressure()
         {
 #ifdef OPENFOAM_NOT_EXTEND
-            return masterPressureVolField_.boundaryFieldRef()[masterPatchID()];
+            return pressureVolField_.boundaryFieldRef()[masterPatchID()];
 #else
-            return masterPressureVolField_.boundaryField()[masterPatchID()];
+            return pressureVolField_.boundaryField()[masterPatchID()];
 #endif
         }
 
@@ -203,18 +200,35 @@ public:
         virtual scalar penaltyFactor() const;
 
         //- Return area in contact of slave patch
-        virtual const scalarField& areaInContact() const
+        virtual const scalarField& slaveAreaInContact() const
         {
             return areaInContactVolField_.boundaryField()[slavePatchID()];
         };
 
+        //- Return area in contact of master patch
+        virtual const scalarField& masterAreaInContact() const
+        {
+            return areaInContactVolField_.boundaryField()[masterPatchID()];
+        };
+
+
         //- Return area in contact of slave patch
-        virtual scalarField& areaInContact()
+        virtual scalarField& slaveAreaInContact()
         {
 #ifdef OPENFOAM_NOT_EXTEND
             return areaInContactVolField_.boundaryFieldRef()[slavePatchID()];
 #else
             return areaInContactVolField_.boundaryField()[slavePatchID()];
+#endif
+        };
+
+        //- Return area in contact of master patch
+        virtual scalarField& masterAreaInContact()
+        {
+#ifdef OPENFOAM_NOT_EXTEND
+            return areaInContactVolField_.boundaryFieldRef()[masterPatchID()];
+#else
+            return areaInContactVolField_.boundaryField()[masterPatchID()];
 #endif
         };
 

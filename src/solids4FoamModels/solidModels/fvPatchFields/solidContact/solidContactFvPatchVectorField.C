@@ -347,6 +347,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowPatchNames_(),
     shadowPatchIndicesPtr_(NULL),
     rigidMaster_(false),
+    rigidSlave_(false),
     normalModels_(),
     frictionModels_(),
     normalPenaltyFactors_(),
@@ -384,6 +385,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowPatchNames_(),
     shadowPatchIndicesPtr_(NULL),
     rigidMaster_(false),
+    rigidSlave_(false),
     normalModels_(),
     frictionModels_(),
     normalPenaltyFactors_(),
@@ -467,6 +469,10 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
                 << "patch!" << endl;
         }
     }
+    else
+    {
+        rigidSlave_ = Switch(dict.lookupOrDefault<Switch>("rigidSlave", false));
+    }
 
     if (dict.found("gradient"))
     {
@@ -506,6 +512,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowPatchNames_(ptf.shadowPatchNames_),
     shadowPatchIndicesPtr_(NULL),
     rigidMaster_(ptf.rigidMaster_),
+    rigidSlave_(ptf.rigidSlave_),
     normalModels_(ptf.normalModels_),
     frictionModels_(ptf.frictionModels_),
     normalPenaltyFactors_(ptf.normalPenaltyFactors_.size(), -1),
@@ -544,6 +551,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowPatchNames_(ptf.shadowPatchNames_),
     shadowPatchIndicesPtr_(NULL),
     rigidMaster_(ptf.rigidMaster_),
+    rigidSlave_(ptf.rigidSlave_),
     normalModels_(ptf.normalModels_),
     frictionModels_(ptf.frictionModels_),
     normalPenaltyFactors_(ptf.normalPenaltyFactors_.size(), -1),
@@ -583,6 +591,7 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
     shadowPatchNames_(ptf.shadowPatchNames_),
     shadowPatchIndicesPtr_(NULL),
     rigidMaster_(ptf.rigidMaster_),
+    rigidSlave_(ptf.rigidSlave_),
     normalModels_(ptf.normalModels_),
     frictionModels_(ptf.frictionModels_),
     normalPenaltyFactors_(ptf.normalPenaltyFactors_.size(), -1),
@@ -1025,11 +1034,22 @@ Foam::solidContactFvPatchVectorField::frictionModelForThisSlave()
     {
         FatalErrorIn
         (
-            "void solidContactFvPatchVectorField::"
+            "frictionContactModel& solidContactFvPatchVectorField::"
             "frictionModelForThisSlave()"
         )   << "Something went wrong when looking for the shadowPatch"
             << abort(FatalError);
     }
+
+    if (masterPatchField.rigidMaster_ && this->rigidSlave_)
+    {
+        FatalErrorIn
+        (
+            "frictionContactModel& solidContactFvPatchVectorField::"
+            "frictionModelForThisSlave()"
+        )   << "Both master and slave are rigid! One should be deformable!"
+            << abort(FatalError);
+    }
+
 
     return frictionModels()[masterShadowID];
 }
@@ -1187,7 +1207,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                 (
                     normalModels()[shadPatchI].slavePressure(),
                     shadowPatchFaceNormals,
-                    normalModels()[shadPatchI].areaInContact(),
+                    normalModels()[shadPatchI].slaveAreaInContact(),
                     shadowPatchDD,
                     patchDDInterpToShadowPatch
                 );
@@ -1214,7 +1234,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                     (
                         zoneToZones()[shadPatchI].slaveAreaInContact()()
                     ),
-                    false
+                    !master_
                 );
 
                 // Correct master contact pressure
@@ -1235,7 +1255,47 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                     (
                         zoneToZones()[shadPatchI].masterAreaInContact()()
                     ),
-                    true
+                    master_
+                );
+
+                // Correct friction contact forces on slave
+                frictionModels()[shadPatchI].correct
+                (
+                    normalModels()[shadPatchI].slavePressure(),
+                    shadowPatchFaceNormals,
+                    normalModels()[shadPatchI].slaveAreaInContact(),
+                    shadowPatchDD,
+                    patchDDInterpToShadowPatch,
+                    !master_
+                );
+
+                // Interpolate the slave displacement increment to the master
+                // patch. This is required in order to simultaneously calculate
+                // friction traction on both contact patches
+
+                // Slave zone DD
+                const vectorField shadowZoneDD
+                (
+                    shadowZones()[shadPatchI].patchFaceToGlobal(shadowPatchDD)
+                );
+
+                const vectorField shadowPatchDDInterpToPatch
+                (
+                    zone().globalFaceToPatch
+                    (
+                        zoneToZones()[shadPatchI].slaveToMaster(shadowZoneDD)()
+                    )
+                );
+
+                // Correct friction contact forces on master
+                frictionModels()[shadPatchI].correct
+                (
+                    normalModels()[shadPatchI].masterPressure(),
+                    patchFaceNormals,
+                    normalModels()[shadPatchI].masterAreaInContact(),
+                    patchDD,
+                    shadowPatchDDInterpToPatch,
+                    master_
                 );
             }
 
@@ -1289,35 +1349,58 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                             )()
                         )
                     );
+
+                    // Accumulate the traction on the master patch
+                    traction() += tractionForThisShadow;
+
+                    // Update contactPerShadow field
+                    // Note: this is used by thermalContact to know which faces
+                    // are in contact
+                    const scalarField magTraction(mag(tractionForThisShadow));
+                    const scalar tol = 1e-6*gMax(magTraction);
+                    scalarField& contactForThisShadow =
+                         contactPerShadow()[shadPatchI];
+                    forAll(contactForThisShadow, faceI)
+                    {
+                        if (magTraction[faceI] > tol)
+                        {
+                             contactForThisShadow[faceI] = 1.0;
+                        }
+                        else
+                        {
+                            contactForThisShadow[faceI] = 0.0;
+                        }
+                    }
                 }
                 else
                 {
                     // Segment-to-segment contact force calculation algrorithm
+                    // Traction on master side without interpolation
+                    vectorField tractionForThisShadow =
+                        normalModels()[shadPatchI].masterPressure()
+                      + frictionModels()[shadPatchI].masterTraction();
 
-                }
-/*
-                // Accumulate the traction on the master patch
-                traction() += tractionForThisShadow;
+                    traction() += tractionForThisShadow;
 
-                // Update contactPerShadow field
-                // Note: this is used by thermalContact to know which faces
-                // are in contact
-                const scalarField magTraction(mag(tractionForThisShadow));
-                const scalar tol = 1e-6*gMax(magTraction);
-                scalarField& contactForThisShadow =
-                    contactPerShadow()[shadPatchI];
-                forAll(contactForThisShadow, faceI)
-                {
-                    if (magTraction[faceI] > tol)
+                    // Update contactPerShadow field
+                    // Note: this is used by thermalContact to know which faces
+                    // are in contact
+                    const scalarField magTraction(mag(tractionForThisShadow));
+                    const scalar tol = 1e-6*gMax(magTraction);
+                    scalarField& contactForThisShadow =
+                         contactPerShadow()[shadPatchI];
+                    forAll(contactForThisShadow, faceI)
                     {
-                        contactForThisShadow[faceI] = 1.0;
-                    }
-                    else
-                    {
-                        contactForThisShadow[faceI] = 0.0;
+                        if (magTraction[faceI] > tol)
+                        {
+                             contactForThisShadow[faceI] = 1.0;
+                        }
+                        else
+                        {
+                            contactForThisShadow[faceI] = 0.0;
+                        }
                     }
                 }
-*/
             }
         }
     }
@@ -1326,9 +1409,17 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
         // Set the traction on the slave patch
         // The master stores the friction and normal models, so we need to find
         // which models correspond to the current shadow
-        traction() =
-            frictionModelForThisSlave().slaveTraction()
-          + normalModelForThisSlave().slavePressure();
+        if (!rigidSlave_)
+        {
+            traction() =
+                frictionModelForThisSlave().slaveTraction()
+              + normalModelForThisSlave().slavePressure();
+        }
+        else
+        {
+            // Set slave traction free to mimic a rigid contact
+            traction() = vector::zero;
+        }
 
         // TESTING - START
         // Scale traction vectors on faces, which share an edge with the
@@ -1439,7 +1530,7 @@ Foam::solidContactFvPatchVectorField::frictionHeatRate() const
 
         const vectorField slavePatchSlip
         (
-            frictionModels()[shadPatchI].slip()
+            frictionModels()[shadPatchI].slipOnSlave()
         );
 
         const vectorField slaveZoneSlip
@@ -1659,6 +1750,11 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
                 os  << '}' << endl;
             }
         }
+    }
+    else
+    {
+        os.writeKeyword("rigidSlave") << rigidSlave_
+            << token::END_STATEMENT << nl;
     }
 
 #ifdef FOAMEXTEND

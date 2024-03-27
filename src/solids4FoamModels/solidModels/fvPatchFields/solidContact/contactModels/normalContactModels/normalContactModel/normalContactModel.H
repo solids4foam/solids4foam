@@ -216,7 +216,10 @@ public:
         }
 
         //- Return area in contact of slave patch
-        virtual const scalarField& areaInContact() const = 0;
+        virtual const scalarField& slaveAreaInContact() const = 0;
+
+        //- Return area in contact of master patch
+        virtual const scalarField& masterAreaInContact() const = 0;
 
         //- Update penalty scale factors (for penalty laws)
         virtual scalar updatePenaltyScale(const scalar previousPenaltyScale)
