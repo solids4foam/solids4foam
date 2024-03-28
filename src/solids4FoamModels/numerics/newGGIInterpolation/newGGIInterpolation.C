@@ -97,9 +97,12 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::clearOut()
     deleteDemandDrivenData(slaveAddrPtr_);
     deleteDemandDrivenData(slaveWeightsPtr_);
 
-    deleteDemandDrivenData(masterNeiIntegralGapPtr_);
-    deleteDemandDrivenData(slaveNeiIntegralGapPtr_);
-    deleteDemandDrivenData(masterNeiContactAreaPtr_);
+    if (gapIntegration_)
+    {
+        deleteDemandDrivenData(masterNeiIntegralGapPtr_);
+        deleteDemandDrivenData(slaveNeiIntegralGapPtr_);
+        deleteDemandDrivenData(masterNeiContactAreaPtr_);
+    }
 
     deleteDemandDrivenData(uncoveredMasterAddrPtr_);
     deleteDemandDrivenData(uncoveredSlaveAddrPtr_);
