@@ -61,14 +61,17 @@ class standardPenaltyFriction
          //- Const reference to the mesh
         const fvMesh& mesh_;
 
-        //- Slave traction
-        volVectorField slaveTractionVolField_;
+        //- Friction traction on slave or on slave and master
+        volVectorField tractionVolField_;
 
         //- Previous slave traction used for under-relaxation
         //vectorField prevSlaveTraction_;
 
-        //- Slip
-        vectorField slip_;
+        //- Slave slip field
+        vectorField slipOnSlave_;
+
+        //- Master slip field
+        vectorField slipOnMaster_;
 
         //- Frictional penalty factor and scaling factor
         scalar frictionPenaltyFactor_;
@@ -142,31 +145,79 @@ public:
             const vectorField& masterDUInterpToSlave
         );
 
+        //- Correct the friction model
+        virtual void correct
+        (
+            const vectorField& patchPressure,
+            const vectorField& patchFaceNormals,
+            const scalarField& patchAreaInContact,
+            const vectorField& DD,
+            const vectorField& shadowDDInterpToPatch,
+            const bool master
+        );
+
         //- Return const reference to slave friction traction
         virtual const vectorField& slaveTraction() const
         {
-            return slaveTractionVolField_.boundaryField()[slavePatchID()];
+            return tractionVolField_.boundaryField()[slavePatchID()];
+        }
+
+        //- Return const reference to master friction traction
+        virtual const vectorField& masterTraction() const
+        {
+            return tractionVolField_.boundaryField()[masterPatchID()];
         }
 
         //- Return non-const reference to slave friction traction
         virtual vectorField& slaveTraction()
         {
 #ifdef OPENFOAM_NOT_EXTEND
-            return slaveTractionVolField_.boundaryFieldRef()[slavePatchID()];
+            return tractionVolField_.boundaryFieldRef()[slavePatchID()];
 #else
-            return slaveTractionVolField_.boundaryField()[slavePatchID()];
+            return tractionVolField_.boundaryField()[slavePatchID()];
+#endif
+        }
+
+        //- Return non-const reference to master friction traction
+        virtual vectorField& masterTraction()
+        {
+#ifdef OPENFOAM_NOT_EXTEND
+            return tractionVolField_.boundaryFieldRef()[masterPatchID()];
+#else
+            return tractionVolField_.boundaryField()[masterPatchID()];
 #endif
         }
 
         //- calculate penalty factor
         void calcFrictionPenaltyFactor();
 
-        //- Return slip field
-        virtual const vectorField& slip() const
+        //- Return slip field on slave
+        virtual const vectorField& slipOnSlave() const
         {
             // Note: slip is updated inside the correct function
-            return slip_;
+            return slipOnSlave_;
         }
+
+        //- Return slip field on slave
+        virtual const vectorField& slipOnMaster() const
+        {
+            // Note: slip is updated inside the correct function
+            return slipOnMaster_;
+        }
+
+        //- Return slip field
+        virtual vectorField& slip(bool master)
+        {
+            if (master)
+            {
+                return slipOnMaster_;
+            }
+            else
+            {
+                return slipOnSlave_;
+            }
+        }
+
 
         //- Perform any reauired field mapping e.g. after a topo change
         virtual void autoMap(const fvPatchFieldMapper& m);

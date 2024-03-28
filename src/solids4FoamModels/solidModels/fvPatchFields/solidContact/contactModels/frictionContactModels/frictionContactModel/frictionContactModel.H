@@ -168,7 +168,7 @@ public:
             return patch_.boundaryMesh().mesh();
         }
 
-        //- Correct contatc model
+        //- Correct the friction model
         virtual void correct
         (
             const vectorField& slavePressure,
@@ -178,12 +178,26 @@ public:
             const vectorField& masterDUInterpToSlave
         ) = 0;
 
+        //- Correct the friction model
+        virtual void correct
+        (
+            const vectorField& patchPressure,
+            const vectorField& patchFaceNormals,
+            const scalarField& patchAreaInContact,
+            const vectorField& DD,
+            const vectorField& shadowDDInterpToPatch,
+            const bool master
+        ) = 0;
+
         //- It is the start of a new time step
         virtual void newTimeStep() const
         {}
 
         //- Return slave friction traction
         virtual const vectorField& slaveTraction() const = 0;
+
+        //- Return master friction traction
+        virtual const vectorField& masterTraction() const = 0;
 
         //- Return slave friction traction for master.
         //  This has the same size as the slave patch
@@ -211,8 +225,11 @@ public:
             return stickSlipFaces_;
         }
 
-        //- Return slip field
-        virtual const vectorField& slip() const = 0;
+        //- Return slave slip field
+        virtual const vectorField& slipOnSlave() const = 0;
+
+        //- Return master slip field
+        virtual const vectorField& slipOnMaster() const = 0;
 
         //- Perform any reauired field mapping e.g. after a topo change
         virtual void autoMap(const fvPatchFieldMapper& m);

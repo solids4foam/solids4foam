@@ -651,7 +651,7 @@ void Foam::solidRigidContactFvPatchVectorField::updateCoeffs()
         (
             normalModels()[triSurfI].slavePressure(),
             patchFaceNormals,
-            normalModels()[triSurfI].areaInContact(),
+            normalModels()[triSurfI].slaveAreaInContact(),
             patchDD,
             interpShadowPatchDD
         );
@@ -746,7 +746,8 @@ Foam::solidRigidContactFvPatchVectorField::frictionHeatRate() const
     {
         // Calculate slip
 
-        const vectorField masterPatchSlip = frictionModels()[triSurfI].slip();
+        const vectorField masterPatchSlip =
+            frictionModels()[triSurfI].slipOnSlave();
 
         const scalar deltaT =
             patch().boundaryMesh().mesh().time().deltaTValue();

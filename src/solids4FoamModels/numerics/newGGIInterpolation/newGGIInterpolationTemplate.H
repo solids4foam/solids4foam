@@ -69,6 +69,7 @@ SourceFiles
 #include "triPointRef.H"
 #include "Map.H"
 #include "Switch.H"
+#include "Tuple2.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -174,6 +175,10 @@ class newGGIInterpolation
         //- Rescale the GGI weighting factors or not
         const bool rescaleGGIWeightingFactors_;
 
+        //- Calculate the penetrating volume between patches. The calculation is
+        //  is done by gap integration across the faces of the master patch.
+        Switch gapIntegration_;
+
         //- Quick reject search algorithm
         quickReject reject_;
 
@@ -216,6 +221,18 @@ class newGGIInterpolation
 
             //- Master edge loops map
             mutable List< Map<label> > masterEdgeLoopsMap_;
+
+        // Integral gap calculation using semgent-to-segment integration
+
+            //- Master faces integral gap value per each intersecting slave face
+            mutable scalarListList* masterNeiIntegralGapPtr_;
+
+            //- Slave faces integral gap value per each intersecting master face
+            mutable scalarListList* slaveNeiIntegralGapPtr_;
+
+            //- Master faces relative area in contact per each intersecting
+            // slave face
+            mutable scalarListList* masterNeiContactAreaPtr_;
 
         // Slave-to-master interpolation
 
@@ -415,7 +432,7 @@ class newGGIInterpolation
         ) const;
 
         //- Compute the intersection area between 2 2D polygons
-        scalar polygonIntersection
+        List<point2D> polygonIntersection
         (
             const List<point2D>& poly1,
             const List<point2D>& poly2
@@ -453,6 +470,14 @@ class newGGIInterpolation
             const List<point2D>& polygon
         ) const;
 
+        //- Integrate gap across master face using master face normal
+        Tuple2<scalar, scalar> normalGapIntegration
+        (
+            const List<point2D>& clippedPolygon,
+            const orthoNormalBasis& orthoBase,
+            const label& faceMi,
+            const label& faceSi
+        ) const;
 
         //- Calculate addressing and weights
         void calcAddressing() const;
@@ -669,6 +694,15 @@ public:
             //- Return reference to slave weights
             const scalarListList& slaveWeights() const;
 
+            //- Return refeternce to master penetration volume of each neighbour
+            const scalarListList& masterNeiPenVol() const;
+
+            //- Return refeternce to slave penetration volume of each neighbour
+            const scalarListList& slaveNeiPenVol() const;
+
+            //- Return relative area in contact for each master neighbour
+            const scalarListList& masterNeiAreaInContact() const;
+
             //- Return reference to the master list of non-overlap faces
             const labelList& uncoveredMasterFaces() const;
 
@@ -699,6 +733,19 @@ public:
             //- Return distance to intersection vectors for patch points
             const vectorField& slavePointDistanceVectorsToIntersection() const;
 
+            //- Return integral gap value (penetrating volume) for master side
+            const tmp<scalarField> masterFacePenVol() const;
+
+            //- Return integral gap value (penetrating volume) for slave side
+            const tmp<scalarField> slaveFacePenVol() const;
+
+            //- Return area in contact for each master face
+            const tmp<scalarField> masterAreaInContact() const;
+
+            //- Return area in contact for each slave face
+            const tmp<scalarField> slaveAreaInContact() const;
+
+
             //- Non-const reference to the usePrevCandidateMasterNeighbours
             //  switch
             Switch& usePrevCandidateMasterNeighbors()
@@ -710,6 +757,18 @@ public:
             void clearPrevCandidateMasterNeighbors()
             {
                 prevCandidateMasterNeighbors_.clear();
+            }
+
+            //- Non-const reference to the gap integration switch
+            Switch& normalGapIntegration()
+            {
+                return gapIntegration_;
+            }
+
+            //- Const reference to the gap integration switch
+            const Switch& normalGapIntegration() const
+            {
+                return gapIntegration_;
             }
 
             //- Non-const reference to the point distance calculation switch
