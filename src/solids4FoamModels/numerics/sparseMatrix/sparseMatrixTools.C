@@ -801,7 +801,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
                 }
             }
 
-            ierr = PCSetCoordinates(pc, sdim, blockN, petscPoints.data());
+            ierr = PCSetCoordinates(pc, sdim, blockn, petscPoints.data());
             checkErr(ierr);
         }
     }
