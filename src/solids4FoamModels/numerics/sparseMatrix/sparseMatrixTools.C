@@ -624,11 +624,6 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // Populate the PETSc source vector
     // Note: uses global indices
 
-    if (debug)
-    {
-        Pout<< "        Populating the source vector" << endl;
-    }
-
     // Create PETSc vectors
     // x and b have local size n
     // Note: the sizes of x and b are, in general, not equal the number of
@@ -636,6 +631,10 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // proc. To acess the values not-owned by the proc, we will use an
     // xWithGhosts vector
     // x is the global solution vector
+    if (debug)
+    {
+        Pout<< "        Creating the solution vector" << endl;
+    }
     Vec x;
     ierr = VecCreate(PETSC_COMM_WORLD, &x); checkErr(ierr);
     ierr = VecSetSizes(x, n, N); checkErr(ierr);
@@ -646,9 +645,18 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     ierr = VecSetFromOptions(x); checkErr(ierr);
 
     // Create the source (b) using the same settings as b
+    if (debug)
+    {
+        Pout<< "        Creating the source vector" << endl;
+    }
     Vec b;
     ierr =  VecDuplicate(x, &b); checkErr(ierr);
     ierr = PetscObjectSetName((PetscObject) b, "Source"); checkErr(ierr);
+
+    if (debug)
+    {
+        Pout<< "        Populating the source vector" << endl;
+    }
 
     {
         forAll(source, localBlockRowI)
@@ -684,12 +692,28 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         }
     }
 
+    if (debug)
+    {
+        Pout<< "        Assembling the solution vector" << endl;
+    }
+
+    ierr = VecAssemblyBegin(x); checkErr(ierr);
+    ierr = VecAssemblyEnd(x); checkErr(ierr);
+
+    if (debug)
+    {
+        Pout<< "        Assembling the source vector" << endl;
+    }
+
     ierr = VecAssemblyBegin(b); checkErr(ierr);
     ierr = VecAssemblyEnd(b); checkErr(ierr);
 
 
     // Create KSP linear solver
-    // Pout<< "    Creating the linear solver" << endl;
+    if (debug)
+    {
+        Pout<< "        Creating the linear solver" << endl;
+    }
     KSP            ksp;          /* linear solver context */
     ierr = KSPCreate(PETSC_COMM_WORLD, &ksp); checkErr(ierr);
 
@@ -710,6 +734,10 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     // ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
     // ierr = PCSetType(pc,PCJACOBI);CHKERRQ(ierr);
     // ierr = KSPSetTolerances(ksp,1.e-5,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);CHKERRQ(ierr);
+    if (debug)
+    {
+        Pout<< "        Creating the preconditioner solver" << endl;
+    }
     PC pc;
     ierr = KSPGetPC(ksp, &pc); checkErr(ierr);
     //ierr = KSPSetType(ksp, KSPFGMRES);
@@ -740,6 +768,10 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
 
 
     // Pass the point coordinates to PETSc to allow multigrid
+    if (debug)
+    {
+        Pout<< "        Passing the coordinates to allow multigrid" << endl;
+    }
     {
         PC pc;
         void (*f)(void) = NULL;
@@ -769,7 +801,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
                 }
             }
 
-            ierr = PCSetCoordinates(pc, sdim, n, petscPoints.data());
+            ierr = PCSetCoordinates(pc, sdim, blockN, petscPoints.data());
             checkErr(ierr);
         }
     }
