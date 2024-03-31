@@ -308,6 +308,9 @@ public:
 
         // Edit
 
+            //- Update the size of the time-step
+            virtual void setDeltaT(Time& runTime);
+
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 

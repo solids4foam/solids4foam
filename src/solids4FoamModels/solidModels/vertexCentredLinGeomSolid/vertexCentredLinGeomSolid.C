@@ -815,11 +815,11 @@ bool vertexCentredLinGeomSolid::evolveImplicitCoupled()
     );
 
     // Lookup compact edge gradient factor
+    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
     const scalar zetaImplicit
     (
-        solidModelDict().lookupOrDefault<scalar>("zetaImplicit", 1e-6)
+        solidModelDict().lookupOrDefault<scalar>("zetaImplicit", zeta)
     );
-    const scalar zeta(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0));
     //if (debug)
     {
         Info<< "zetaImplicit: " << zetaImplicit << nl
@@ -1520,9 +1520,6 @@ bool vertexCentredLinGeomSolid::evolveExplicit()
     // Compute acceleration
     pointA_ = pointDivSigma_/pointRho_ - dampingCoeff()*pointU_ + g();
 
-    // Check energies
-    // To-do
-
     return true;
 }
 
@@ -1739,6 +1736,64 @@ vertexCentredLinGeomSolid::~vertexCentredLinGeomSolid()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+void vertexCentredLinGeomSolid::setDeltaT(Time& runTime)
+{
+    if (solutionAlgorithm_ == solutionAlgorithm::EXPLICIT)
+    {
+        // Max wave speed in the domain
+        const scalar waveSpeed = max
+        (
+            Foam::sqrt(mechanical().impK()/mechanical().rho())
+        ).value();
+
+        // deltaT = cellWidth/waveVelocity == (1.0/deltaCoeff)/waveSpeed
+        // In the current discretisation, information can move two cells per
+        // time-step. This means that we use 1/(2*d) == 0.5*deltaCoeff when
+        // calculating the required stable time-step
+        // i.e. deltaT = (1.0/(0.5*deltaCoeff)/waveSpeed
+        // For safety, we should use a time-step smaller than this e.g. Abaqus uses
+        // stableTimeStep/sqrt(2): we will default to this value
+        const scalar requiredDeltaT =
+            1.0/
+            gMax
+            (
+    #ifdef OPENFOAM_NOT_EXTEND
+                DimensionedField<scalar, Foam::surfaceMesh>
+    #else
+                Field<scalar>
+    #endif
+                (
+                    dualMesh().surfaceInterpolation::deltaCoeffs().internalField()
+                   *waveSpeed
+                )
+            );
+
+        // Lookup the desired Courant number
+        const scalar maxCo =
+            runTime.controlDict().lookupOrDefault<scalar>("maxCo", 0.1);
+
+        const scalar newDeltaT = maxCo*requiredDeltaT;
+
+        // Update print info
+        physicsModel::printInfo() = bool
+        (
+            runTime.timeIndex() % infoFrequency() == 0
+         || mag(runTime.value() - runTime.endTime().value()) < SMALL
+        );
+
+        physicsModel::printInfo() = false;
+
+        if (time().timeIndex() == 1)
+        {
+            Info<< nl << "Setting deltaT = " << newDeltaT
+                << ", maxCo = " << maxCo << endl;
+        }
+
+        runTime.setDeltaT(newDeltaT);
+    }
+}
+
+
 bool vertexCentredLinGeomSolid::evolve()
 {
     if (solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_COUPLED)
@@ -1819,6 +1874,22 @@ void vertexCentredLinGeomSolid::setTraction
 
 void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 {
+    // Calculate cell gradient
+    // This assumes a constant gradient within each primary mesh cell
+    // This is a first-order approximation
+    gradD() = vfvc::grad(pointD(), mesh());
+
+    // Map primary cell gradD field to sub-meshes for multi-material cases
+    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
+    {
+        mechanical().mapGradToSubMeshes(gradD());
+    }
+
+    // Update primary mesh cell stress field, assuming it is constant per
+    // primary mesh cell
+    // This stress will be first-order accurate
+    mechanical().correct(sigma());
+
     // Calculate gradD at the primary points using least squares: this should
     // be second-order accurate (... I think).
     const pointTensorField pGradD(vfvc::pGrad(pointD(), mesh()));
