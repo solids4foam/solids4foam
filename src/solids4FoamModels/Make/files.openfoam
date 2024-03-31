@@ -210,7 +210,6 @@ numerics/rotation/RodriguesRotation.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
 numerics/vfvCellPoint/vfvmCellPointExtended.C
-numerics/vfvCellPoint/vfvmCellPointOriginal.C
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
 numerics/pointFieldFunctions/pointFieldFunctions.C
