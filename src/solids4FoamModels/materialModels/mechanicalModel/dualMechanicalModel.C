@@ -339,7 +339,10 @@ Foam::dualMechanicalModel::materialTangentFaceField() const
     // Prepare the field
     tmp< Field<RectangularMatrix<scalar>> > tresult
     (
-        new Field<RectangularMatrix<scalar>>(mesh().nFaces(), RectangularMatrix<scalar>(6))
+        new Field<RectangularMatrix<scalar>>
+        (
+            mesh().nFaces(), RectangularMatrix<scalar>(6)
+        )
     );
     Field<RectangularMatrix<scalar>>& result = tresult.ref();
 

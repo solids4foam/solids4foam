@@ -152,15 +152,15 @@ Foam::linearElastic::linearElastic
     }
 
     // Read the initial stress
-    // if (dict.found("sigma0"))
-    // {
-    //     Info<< "Reading sigma0 from the dict" << endl;
-    //     sigma0() = dimensionedSymmTensor(dict.lookup("sigma0"));
-    // }
-    // else if (gMax(mag(sigma0())()) > SMALL)
-    // {
-    //     Info<< "Reading sigma0 stress field" << endl;
-    // }
+    if (dict.found("sigma0"))
+    {
+        Info<< "Reading sigma0 from the dict" << endl;
+        sigma0() = dimensionedSymmTensor(dict.lookup("sigma0"));
+    }
+    else if (gMax(mag(sigma0())()) > SMALL)
+    {
+        Info<< "Reading sigma0 stress field" << endl;
+    }
 }
 
 

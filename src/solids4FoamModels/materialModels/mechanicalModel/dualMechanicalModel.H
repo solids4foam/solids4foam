@@ -133,7 +133,8 @@ public:
 
 #ifdef OPENFOAM_NOT_EXTEND
             //- Material tangent field defined at dual mesh faces
-            tmp< Field< RectangularMatrix<scalar>>> materialTangentFaceField() const;
+            tmp< Field< RectangularMatrix<scalar>>>
+            materialTangentFaceField() const;
 #endif
 
             //- Implicit modulus field at the faces
