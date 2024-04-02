@@ -1253,7 +1253,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedDof
     const symmTensorField& fixedDofDirections
 )
 {
-    const bool debug = 0;
+    //const bool debug = 0;
 
     // Loop though the matrix and overwrite the coefficients for fixed DOFs
     // To enforce the value we will set the diagonal to the identity and set

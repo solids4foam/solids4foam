@@ -258,36 +258,36 @@ void Foam::multiplyCoeffExtended
     //          = (Sf_1 C_1ik3 + G_1k3 sigma_1i) g_k
     //            + (Sf_2 C_2ik3 + G_2k3 sigma_2i) g_k
     //            + (Sf_3 C_3ik3 + G_3k3 sigma_3i) g_k
-	//
-	//			= (Sf_1 C_1i13 + G_113 sigma_1i) g_1
-	//			  + (Sf_1 C_1i23 + G_123 sigma_1i) g_2
-	//			  + (Sf_1 C_1i33 + G_133 sigma_1i) g_3
-	//
-	//			  + (Sf_2 C_2i13 + G_213 sigma_2i) g_1
-	//			  + (Sf_2 C_2i23 + G_223 sigma_2i) g_2
-	//			  + (Sf_2 C_2i33 + G_233 sigma_2i) g_3
-	//
-	//			  + (Sf_3 C_3i13 + G_313 sigma_3i) g_1
-	//			  + (Sf_3 C_3i23 + G_323 sigma_3i) g_2
-	//			  + (Sf_3 C_3i33 + G_333 sigma_3i) g_3
+        //
+        //			= (Sf_1 C_1i13 + G_113 sigma_1i) g_1
+        //			  + (Sf_1 C_1i23 + G_123 sigma_1i) g_2
+        //			  + (Sf_1 C_1i33 + G_133 sigma_1i) g_3
+        //
+        //			  + (Sf_2 C_2i13 + G_213 sigma_2i) g_1
+        //			  + (Sf_2 C_2i23 + G_223 sigma_2i) g_2
+        //			  + (Sf_2 C_2i33 + G_233 sigma_2i) g_3
+        //
+        //			  + (Sf_3 C_3i13 + G_313 sigma_3i) g_1
+        //			  + (Sf_3 C_3i23 + G_323 sigma_3i) g_2
+        //			  + (Sf_3 C_3i33 + G_333 sigma_3i) g_3
 
     // coeff_13 = (Sf_m C_m1k3 + G_mk3 sigma_m1) g_k
 
     //          = (Sf_1 C_11k3 + G_1k3 sigma_11) g_k
     //            + (Sf_2 C_21k3 + G_2k3 sigma_21) g_k
     //            + (Sf_3 C_31k3 + G_3k3 sigma_31) g_k
-	//
-	//			= (Sf_1 C_1113 + G_113 sigma_11) g_1
-	//			  + (Sf_1 C_1123 + G_123 sigma_11) g_2
-	//			  + (Sf_1 C_1133 + G_133 sigma_11) g_3
-	//
-	//			  + (Sf_2 C_2113 + G_213 sigma_21) g_1
-	//			  + (Sf_2 C_2123 + G_223 sigma_21) g_2
-	//			  + (Sf_2 C_2133 + G_233 sigma_21) g_3
-	//
-	//			  + (Sf_3 C_3113 + G_313 sigma_31) g_1
-	//			  + (Sf_3 C_3123 + G_323 sigma_31) g_2
-	//			  + (Sf_3 C_3133 + G_333 sigma_31) g_3
+        //
+        //			= (Sf_1 C_1113 + G_113 sigma_11) g_1
+        //			  + (Sf_1 C_1123 + G_123 sigma_11) g_2
+        //			  + (Sf_1 C_1133 + G_133 sigma_11) g_3
+        //
+        //			  + (Sf_2 C_2113 + G_213 sigma_21) g_1
+        //			  + (Sf_2 C_2123 + G_223 sigma_21) g_2
+        //			  + (Sf_2 C_2133 + G_233 sigma_21) g_3
+        //
+        //			  + (Sf_3 C_3113 + G_313 sigma_31) g_1
+        //			  + (Sf_3 C_3123 + G_323 sigma_31) g_2
+        //			  + (Sf_3 C_3133 + G_333 sigma_31) g_3
 
     coeff[tensor::XZ] =
         (Sf[vector::X]*C(XX,tensor::XZ) + G(vector::X,tensor::XZ)*sigma[symmTensor::XX])*g[vector::X]
@@ -307,18 +307,18 @@ void Foam::multiplyCoeffExtended
     //          = (Sf_1 C_12k3 + G_1k3 sigma_12) g_k
     //            + (Sf_2 C_22k3 + G_2k3 sigma_22) g_k
     //            + (Sf_3 C_32k3 + G_3k3 sigma_32) g_k
-	//
-	//			= (Sf_1 C_1213 + G_113 sigma_12) g_1
-	//			  + (Sf_1 C_1223 + G_123 sigma_12) g_2
-	//			  + (Sf_1 C_1233 + G_133 sigma_12) g_3
-	//
-	//			  + (Sf_2 C_2213 + G_213 sigma_22) g_1
-	//			  + (Sf_2 C_2223 + G_223 sigma_22) g_2
-	//			  + (Sf_2 C_2233 + G_233 sigma_22) g_3
-	//
-	//			  + (Sf_3 C_3213 + G_313 sigma_32) g_1
-	//			  + (Sf_3 C_3223 + G_323 sigma_32) g_2
-	//			  + (Sf_3 C_3233 + G_333 sigma_32) g_3
+        //
+        //			= (Sf_1 C_1213 + G_113 sigma_12) g_1
+        //			  + (Sf_1 C_1223 + G_123 sigma_12) g_2
+        //			  + (Sf_1 C_1233 + G_133 sigma_12) g_3
+        //
+        //			  + (Sf_2 C_2213 + G_213 sigma_22) g_1
+        //			  + (Sf_2 C_2223 + G_223 sigma_22) g_2
+        //			  + (Sf_2 C_2233 + G_233 sigma_22) g_3
+        //
+        //			  + (Sf_3 C_3213 + G_313 sigma_32) g_1
+        //			  + (Sf_3 C_3223 + G_323 sigma_32) g_2
+        //			  + (Sf_3 C_3233 + G_333 sigma_32) g_3
 
     coeff[tensor::YZ] =
         (Sf[vector::X]*C(XY,tensor::XZ) + G(vector::X,tensor::XZ)*sigma[symmTensor::XY])*g[vector::X]
@@ -338,18 +338,18 @@ void Foam::multiplyCoeffExtended
     //          = (Sf_1 C_13k3 + G_1k3 sigma_13) g_k
     //            + (Sf_2 C_23k3 + G_2k3 sigma_23) g_k
     //            + (Sf_3 C_33k3 + G_3k3 sigma_33) g_k
-	//
-	//			= (Sf_1 C_1313 + G_113 sigma_13) g_1
-	//			  + (Sf_1 C_1323 + G_123 sigma_13) g_2
-	//			  + (Sf_1 C_1333 + G_133 sigma_13) g_3
-	//
-	//			  + (Sf_2 C_2313 + G_213 sigma_23) g_1
-	//			  + (Sf_2 C_2323 + G_223 sigma_23) g_2
-	//			  + (Sf_2 C_2333 + G_233 sigma_23) g_3
-	//
-	//			  + (Sf_3 C_3313 + G_313 sigma_33) g_1
-	//			  + (Sf_3 C_3323 + G_323 sigma_33) g_2
-	//			  + (Sf_3 C_3333 + G_333 sigma_33) g_3
+        //
+        //			= (Sf_1 C_1313 + G_113 sigma_13) g_1
+        //			  + (Sf_1 C_1323 + G_123 sigma_13) g_2
+        //			  + (Sf_1 C_1333 + G_133 sigma_13) g_3
+        //
+        //			  + (Sf_2 C_2313 + G_213 sigma_23) g_1
+        //			  + (Sf_2 C_2323 + G_223 sigma_23) g_2
+        //			  + (Sf_2 C_2333 + G_233 sigma_23) g_3
+        //
+        //			  + (Sf_3 C_3313 + G_313 sigma_33) g_1
+        //			  + (Sf_3 C_3323 + G_323 sigma_33) g_2
+        //			  + (Sf_3 C_3333 + G_333 sigma_33) g_3
 
     coeff[tensor::ZZ] =
         (Sf[vector::X]*C(XZ,tensor::XZ) + G(vector::X,tensor::XZ)*sigma[symmTensor::XZ])*g[vector::X]
@@ -363,7 +363,6 @@ void Foam::multiplyCoeffExtended
       + (Sf[vector::Z]*C(ZZ,tensor::XZ) + G(vector::Z,tensor::XZ)*sigma[symmTensor::ZZ])*g[vector::X]
       + (Sf[vector::Z]*C(ZZ,tensor::YZ) + G(vector::Z,tensor::YZ)*sigma[symmTensor::ZZ])*g[vector::Y]
       + (Sf[vector::Z]*C(ZZ,tensor::ZZ) + G(vector::Z,tensor::ZZ)*sigma[symmTensor::ZZ])*g[vector::Z];
-
 }
 
 

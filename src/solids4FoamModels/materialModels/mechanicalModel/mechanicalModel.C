@@ -378,16 +378,19 @@ const Foam::fvMesh& Foam::mechanicalModel::mesh() const
 
 
 #ifdef OPENFOAM_NOT_EXTEND
-const Foam::enhancedVolPointInterpolation& Foam::mechanicalModel::volToPoint() const
+const Foam::enhancedVolPointInterpolation&
+Foam::mechanicalModel::volToPoint() const
 {
     return enhancedVolPointInterpolation::New(mesh_);
 }
 #else
-const Foam::newLeastSquaresVolPointInterpolation& Foam::mechanicalModel::volToPoint() const
+const Foam::newLeastSquaresVolPointInterpolation&
+Foam::mechanicalModel::volToPoint() const
 {
     return newLeastSquaresVolPointInterpolation::New(mesh_);
 }
 #endif
+
 
 Foam::tmp<Foam::volScalarField> Foam::mechanicalModel::rho() const
 {
@@ -911,6 +914,7 @@ void Foam::mechanicalModel::interpolate
     const bool useVolFieldSigma
 )
 {
+#ifdef OPENFOAM_NOT_EXTEND
     const PtrList<mechanicalLaw>& laws = *this;
 
     if (laws.size() == 1)
@@ -941,67 +945,9 @@ void Foam::mechanicalModel::interpolate
             solSubMeshes().subMeshPointD(), pointD
         );
     }
-}
-
-
-Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
-(
-    const volVectorField& D,
-    const volTensorField& gradD,
-    const surfaceScalarField& gamma
-) const
-{
-    // Mathematically "div(grad(phi))" is equivalent to "laplacian(phi)";
-    // however, numerically "div(grad(phi))" uses a larger stencil than the
-    // "laplacian(phi)"; the difference between these two approximations is
-    // a small amount of numerical diffusion that quells oscillations
-    //if (D.name() == "DD" || biMaterialInterfaceActive())
-    if (true)
-    {
-        return
-        (
-            fvc::laplacian
-            (
-                gamma,
-                D,
-                "laplacian(D" + D.name() + ',' + D.name() + ')'
-            )
-          - fvc::div(gamma*mesh().Sf() & fvc::interpolate(gradD))
-        );
-    }
-    else
-    {
-        // We will calculate this numerical diffusion based on the increment of
-        // displacement, as it may become large of we base it on the total
-        // displacement
-        // Issue: The increment field "D - D.oldTime()" will be incorrect on
-        // non-orthogonal meshes as the grad(D - D.oldTime()) field would not be
-        // stored... we can/should fix this
-        return
-        (
-            fvc::laplacian
-            (
-                gamma,
-                D - D.oldTime(),
-                "laplacian(D" + D.name() + ',' + D.name() + ')'
-            )
-          - fvc::div
-            (
-                gamma*mesh().Sf()
-              & fvc::interpolate(gradD - gradD.oldTime())
-            )
-        );
-    }
-}
-
-
-Foam::tmp<Foam::volVectorField> Foam::mechanicalModel::RhieChowCorrection
-(
-    const volVectorField& D,
-    const volTensorField& gradD
-) const
-{
-    return RhieChowCorrection(D, gradD, impKfcorr());
+#else
+    this->interpolate(D, pointD, useVolFieldSigma);
+#endif    
 }
 
 

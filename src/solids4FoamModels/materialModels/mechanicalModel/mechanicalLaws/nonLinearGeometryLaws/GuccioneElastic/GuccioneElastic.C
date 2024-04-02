@@ -508,6 +508,7 @@ Foam::tmp<Foam::volScalarField> Foam::GuccioneElastic::impK() const
 }
 
 
+#ifdef OPENFOAM_NOT_EXTEND
 Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 Foam::GuccioneElastic::materialTangentField() const
 {
@@ -757,7 +758,7 @@ Foam::GuccioneElastic::materialTangentField() const
 
     return tresult;
 }
-
+#endif
 
 Foam::tmp<Foam::volScalarField> Foam::GuccioneElastic::bulkModulus() const
 {

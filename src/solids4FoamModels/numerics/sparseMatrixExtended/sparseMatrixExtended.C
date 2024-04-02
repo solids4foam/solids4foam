@@ -78,12 +78,12 @@ Foam::RectangularMatrix<Foam::scalar>& Foam::sparseMatrixExtended::operator()
 
 void Foam::sparseMatrixExtended::print() const
 {
-    Info << "Print out sparseMatrixExtended coefficients: " << endl;
+    Info<< "Print out sparseMatrixExtended coefficients: " << endl;
 
-    //Create a vector to store the matrix indices
+    // Create a vector to store the matrix indices
     std::vector<FixedList<label, 2>> keys(data_.size());
 
-    //Insert the matrix indices into the vector for all data
+    // Insert the matrix indices into the vector for all data
     int i = 0;
     for (auto iter = data_.begin(); iter != data_.end(); ++iter)
     {
@@ -91,34 +91,34 @@ void Foam::sparseMatrixExtended::print() const
         i++;
     }
 
-    //Define custom sorting criteria
+    // Define custom sorting criteria
     auto cmp = [](const FixedList<label, 2>& a, const FixedList<label, 2>& b)
     {
         if (a[0] < b[0])
         {
-                return true;
+            return true;
         }
         else if (a[0] == b[0])
         {
-                return a[1] < b[1];
+            return a[1] < b[1];
         }
         else
         {
-                return false;
+            return false;
         }
     };
 
-    //Sort keys by row and column
+    // Sort keys by row and column
     std::sort(keys.begin(), keys.end(), cmp);
 
-    //Print out sorted values
+    // Print out sorted values
     for (unsigned long k = 0; k < keys.size(); ++k)
     {
         const label rowI = keys[k][0];
         const label colI = keys[k][1];
         const RectangularMatrix<scalar>& coeff = data_[keys[k]];
 
-        Info << "(" << rowI << ", " << colI << ") : " << coeff << endl;
+        Info<< "(" << rowI << ", " << colI << ") : " << coeff << endl;
     }
 }
 

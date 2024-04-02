@@ -73,7 +73,7 @@ class neoHookeanElasticMisesPlastic
         dimensionedScalar mu_;
 
         //- Bulk modulus
-                dimensionedScalar K_;
+        dimensionedScalar K_;
 
         //- Jacobian of the toal deformation gradient volField
         autoPtr<volScalarField> JPtr_;
@@ -161,9 +161,6 @@ class neoHookeanElasticMisesPlastic
         //- Update bEbar consistently with the assumption that det(bEbar) == 1
         //  defaults to off
         const Switch updateBEbarConsistent_;
-
-        //- Flag to add pressure
-        const Switch solvePressureEquation_;
 
         //- Linear plastic modulus. It is only used if plasticity is linear,
         //  defined by two points on the stress-plastic strain curve
@@ -292,8 +289,11 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+#ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
-        virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
+        virtual tmp<Field<RectangularMatrix<scalar>>>
+            materialTangentField() const;
+#endif
 
         //- Update the stress
         virtual void correct(volSymmTensorField& sigma);

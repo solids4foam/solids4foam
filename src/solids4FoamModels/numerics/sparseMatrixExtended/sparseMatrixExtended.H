@@ -34,7 +34,7 @@ Description
         mat(0, 2) += 3*I;
 
 Author
-	Philip Cardiff,UCD.
+    Philip Cardiff,UCD.
     Federico Mazzanti, UCD.
 
 SourceFiles
@@ -58,7 +58,9 @@ namespace Foam
 
     typedef HashTable
     <
-        RectangularMatrix<scalar>, FixedList<label, 2>, FixedList<label, 2>::Hash<>
+        RectangularMatrix<scalar>,
+        FixedList<label, 2>,
+        FixedList<label, 2>::Hash<>
     > sparseMatrixExtendedData;
 
 /*---------------------------------------------------------------------------*\
@@ -135,7 +137,10 @@ public:
 
             //- Non-const access to a value entry. If the entry does not exist
             //  then create it and initialise it to zero
-            RectangularMatrix<scalar>& operator()(const label rowI, const label colI);
+            RectangularMatrix<scalar>& operator()
+            (
+                const label rowI, const label colI
+            );
 };
 
 

@@ -486,7 +486,6 @@ void Foam::multiplyCoeffRectMat
 //      + Sf[vector::Z]*C(ZZ,ZX)*g[vector::X]
 //      + Sf[vector::Z]*C(ZZ,YZ)*g[vector::Y]
 //      + Sf[vector::Z]*C(ZZ,ZZ)*g[vector::Z];
-
 }
 
 // ************************************************************************* //

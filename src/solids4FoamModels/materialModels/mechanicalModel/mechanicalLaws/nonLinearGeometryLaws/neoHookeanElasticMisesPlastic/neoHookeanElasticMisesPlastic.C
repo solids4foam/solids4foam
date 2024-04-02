@@ -786,7 +786,7 @@ void Foam::neoHookeanElasticMisesPlastic::calculateStress
 
     // Update the Cauchy stress
 
-    if (solvePressureEquation_)
+    if (solvePressureEqn())
     {
         sigma = (1.0/Jf())*(s - p*I);;
     }
@@ -1119,14 +1119,6 @@ Foam::neoHookeanElasticMisesPlastic::neoHookeanElasticMisesPlastic
             Switch(true)
         )
     ),
-    solvePressureEquation_
-    (
-        dict.lookupOrDefault<Switch>
-        (
-            "solvePressureEquation",
-            false
-        )
-    ),
     Hp_(0.0),
     maxDeltaErr_
     (
@@ -1264,13 +1256,17 @@ Foam::neoHookeanElasticMisesPlastic::impK() const
 }
 
 
+#ifdef OPENFOAM_NOT_EXTEND
 Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
 {
     // Prepare tmp field
     tmp<Field<Foam::RectangularMatrix<Foam::scalar>>> tresult
     (
-        new Field<Foam::RectangularMatrix<Foam::scalar>>(mesh().nFaces(), Foam::RectangularMatrix<scalar>(6,9,0))
+        new Field<Foam::RectangularMatrix<Foam::scalar>>
+        (
+            mesh().nFaces(), Foam::RectangularMatrix<scalar>(6, 9, 0.0)
+        )
     );
 #ifdef OPENFOAM_NOT_EXTEND
     Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult.ref();
@@ -1279,8 +1275,7 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
 #endif
 
     // Calculate tangent field
-    const Switch numericalTangent(dict().lookup("numericalTangent"));
-    if (numericalTangent)
+    if (dict().lookup("numericalTangent"))
     {
 
         // Look up current pressure and store it as the reference
@@ -1514,6 +1509,7 @@ Foam::neoHookeanElasticMisesPlastic::materialTangentField() const
 
     return tresult;
 }
+#endif
 
 
 void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
@@ -1750,7 +1746,7 @@ void Foam::neoHookeanElasticMisesPlastic::correct(volSymmTensorField& sigma)
     );
 
     // Update the Cauchy stress
-    if (solvePressureEquation_)
+    if (solvePressureEqn())
     {
       	sigma = (1.0/J())*(s - p*I);
     }
@@ -2008,9 +2004,9 @@ void Foam::neoHookeanElasticMisesPlastic::correct(surfaceSymmTensorField& sigma)
     }
 
     // Update the Cauchy stress
-    // Note: updayeSigmaHyd is not implemented for surface fields
+    // Note: updateSigmaHyd is not implemented for surface fields
 
-    if (solvePressureEquation_)
+    if (solvePressureEqn())
     {
       	sigma = (1.0/Jf())*(s - p*I);
     }
