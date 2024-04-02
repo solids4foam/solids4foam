@@ -52,6 +52,25 @@ void Foam::vfvm::divSigma
     const List<vectorList>& leastSquaresVecs =
         cellPointLeastSquaresVecs.vectors();
 
+    // Check the material tangents are the correct shape
+    forAll(materialTangentField, faceI)
+    {
+        if (materialTangentField[faceI].m() != 6)
+        {
+            FatalErrorIn("void Foam::vfvm::divSigma(...)")
+                << "The materialTangent for face " << faceI << " has "
+                << materialTangentField[faceI].m() << " rows "
+                << "but it should have 6!" << abort(FatalError);
+        }
+        else if (materialTangentField[faceI].n() != 9)
+        {
+            FatalErrorIn("void Foam::vfvm::divSigma(...)")
+                << "The materialTangent for face " << faceI << " has "
+                << materialTangentField[faceI].m() << " rows "
+                << "but it should have 9!" << abort(FatalError);
+        }
+    }
+
     // Loop over all internal faces of the dual mesh
     forAll(dualOwn, dualFaceI)
     {

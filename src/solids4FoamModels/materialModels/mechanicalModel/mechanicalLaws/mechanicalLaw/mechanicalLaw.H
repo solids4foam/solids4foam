@@ -357,20 +357,33 @@ protected:
             const surfaceScalarField& K
         );
 
-        //- Update the hydrostatic stress field by solving a diffusion equation.
-        //  An explicit calculation of sigmaHyd is passed as an argument.
-        //  Passing a zero will enforce incompressibility, although for
-        //  covergence it may be better to pass a penalty calculation of
-        //  sigmaHyd
+        //- Update the provided hydrostatic stress field
+        void updateSigmaHyd
+        (
+            volScalarField& sigmaHyd,
+            const volScalarField& sigmaHydExplicit,
+            const dimensionedScalar& impK
+        );
+
+        //- Update the "sigmaHyd()" hydrostatic stress field
         void updateSigmaHyd
         (
             const volScalarField& sigmaHydExplicit,
             const dimensionedScalar& impK
         );
 
-        //- Update the hydrostatic stress field by solving a diffusion equation.
+        //- Update "sigmaHyd()" and "gradSigmaHyd()"
         void updateSigmaHyd
         (
+            const volScalarField& sigmaHydExplicit,
+            const volScalarField& impK
+        );
+
+        //- Update the provided hydrostatic stress field and its gradient
+        void updateSigmaHyd
+        (
+            volScalarField& sigmaHyd,
+            volVectorField& gradSigmaHyd,
             const volScalarField& sigmaHydExplicit,
             const volScalarField& impK
         );

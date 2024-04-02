@@ -244,19 +244,42 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 #ifdef OPENFOAM_NOT_EXTEND
 Foam::RectangularMatrix<Foam::scalar> Foam::linearElastic::materialTangent() const
 {
-    RectangularMatrix<scalar> matTang(6,6,0);
-    matTang(0,0) = 2*mu_.value() + lambda().value();
-    matTang(0,1) = lambda().value();
-    matTang(0,2) = lambda().value();
-    matTang(1,0) = lambda().value();
-    matTang(1,1) = 2*mu_.value() + lambda().value();
-    matTang(1,2) = lambda().value();
-    matTang(2,0) = lambda().value();
-    matTang(2,1) = lambda().value();
-    matTang(2,2) = 2*mu_.value() + lambda().value();
-    matTang(3,3) = mu_.value();
-    matTang(4,4) = mu_.value();
-    matTang(5,5) = mu_.value();
+    // We currently assume a 6x9 matrix
+    // Todo: refactor in terms of 6x6 matrix
+    RectangularMatrix<scalar> matTang(6, 9, 0.0);
+
+    // The 9 columns are ordered as tensor::XX, tensor::XY, etc., while the
+    // rows are ordered as
+    const label XX = 0;
+    const label YY = 1;
+    const label ZZ = 2;
+    const label XY = 3;
+    const label YZ = 4;
+    const label XZ = 5;
+
+    const scalar lambda = lambda_.value();
+    const scalar mu = mu_.value();
+    const scalar twoMuLambda = 2*mu + lambda;
+
+    // Set components
+    matTang(XX, tensor::XX) = twoMuLambda;
+    matTang(XX, tensor::YY) = lambda;
+    matTang(XX, tensor::ZZ) = lambda;
+
+    matTang(YY, tensor::XX) = lambda;
+    matTang(YY, tensor::YY) = twoMuLambda;
+    matTang(YY, tensor::ZZ) = lambda;
+
+    matTang(ZZ, tensor::XX) = lambda;
+    matTang(ZZ, tensor::YY) = lambda;
+    matTang(ZZ, tensor::ZZ) = twoMuLambda;
+
+    matTang(XY, tensor::XY) = mu;
+    matTang(YZ, tensor::YZ) = mu;
+    matTang(XZ, tensor::XZ) = mu;
+    matTang(XY, tensor::YX) = mu;
+    matTang(YZ, tensor::ZY) = mu;
+    matTang(XZ, tensor::ZX) = mu;
 
     return matTang;
 }
@@ -298,22 +321,22 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
     // Update epsilon
     updateEpsilon();
 
-    if (solvePressureEqn())
-    {
-        // Calculate hydrostatic stress
-        updateSigmaHyd(K_*tr(epsilon()), 2*mu_ + lambda_);
+    // Calculate stress using epsilon
+    correct(sigma, epsilon());
+}
 
-        // Hooke's law: partitioned deviatoric and dilation form
-        sigma = 2.0*mu_*dev(epsilon()) + sigmaHyd()*I; // + sigma0();
-    }
-    else
-    {
-        // Hooke's law: standard form
-        sigma = 2.0*mu_*epsilon() + lambda_*tr(epsilon())*I; // + sigma0();
 
-        // Update sigmaHyd variable
-        sigmaHyd() = -K_*tr(epsilon());
-    }
+void Foam::linearElastic::correct
+(
+    volSymmTensorField& sigma,
+    const volSymmTensorField& epsilon
+)
+{
+    // Calculate hydrostatic stress
+    updateSigmaHyd(sigmaHyd(), K_*tr(epsilon), 2*mu_ + lambda_);
+
+    // Hooke's law: partitioned deviatoric and dilation form
+    sigma = 2.0*mu_*dev(epsilon) + sigmaHyd()*I + sigma0();
 }
 
 
@@ -322,23 +345,28 @@ void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
     // Update epsilon
     updateEpsilonf();
 
+    // Calculate stress using epsilon
+    correct(sigma, epsilonf());
+}
+
+
+void Foam::linearElastic::correct
+(
+    surfaceSymmTensorField& sigma,
+    const surfaceSymmTensorField& epsilon
+)
+{
     if (solvePressureEqn())
     {
-        // Calculate hydrostatic stress at the cell-centres
-        // Solve pressure equation at cells
-        updateEpsilon();
-        updateSigmaHyd(K_*tr(epsilon()), 2*mu_ + lambda_);
-
-        // Interpolate to faces
-        const surfaceScalarField sigmaHydf(fvc::interpolate(sigmaHyd()));
-
-        // Add deviatoric and initial stresses
-        sigma = 2.0*mu_*dev(epsilonf()) + sigmaHydf*I; // + sigma0f();
+        notImplemented
+        (
+            "void Foam::linearElastic::correct(...) not implemented with solvePressureEqn"
+        );
     }
     else
     {
         // Hooke's law : standard form
-        sigma = 2.0*mu_*epsilonf() + lambda_*tr(epsilonf())*I; // + sigma0f();
+        sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I + sigma0f();
     }
 }
 

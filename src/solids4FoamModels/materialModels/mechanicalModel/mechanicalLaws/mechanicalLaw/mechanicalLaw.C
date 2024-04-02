@@ -1316,16 +1316,50 @@ bool Foam::mechanicalLaw::updateF
 
 void Foam::mechanicalLaw::updateSigmaHyd
 (
+    volScalarField& sigmaHyd,
     const volScalarField& sigmaHydExplicit,
     const dimensionedScalar& impK
 )
 {
-    updateSigmaHyd(sigmaHydExplicit, mechanicalLaw::impK(impK));
+    updateSigmaHyd
+    (
+        sigmaHyd, gradSigmaHyd(), sigmaHydExplicit, mechanicalLaw::impK(impK)
+    );
 }
 
 
 void Foam::mechanicalLaw::updateSigmaHyd
 (
+    const volScalarField& sigmaHydExplicit,
+    const dimensionedScalar& impK
+)
+{
+    // Use sigmaHyd and gradSigmaHyd private fields
+    updateSigmaHyd
+    (
+        sigmaHyd(), gradSigmaHyd(), sigmaHydExplicit, mechanicalLaw::impK(impK)
+    );
+}
+
+
+void Foam::mechanicalLaw::updateSigmaHyd
+(
+    const volScalarField& sigmaHydExplicit,
+    const volScalarField& impK
+)
+{
+    // Use sigmaHyd and gradSigmaHyd private fields
+    updateSigmaHyd
+    (
+        sigmaHyd(), gradSigmaHyd(), sigmaHydExplicit, impK
+    );
+}
+
+
+void Foam::mechanicalLaw::updateSigmaHyd
+(
+    volScalarField& sigmaHyd,
+    volVectorField& gradSigmaHyd,
     const volScalarField& sigmaHydExplicit,
     const volScalarField& impK
 )
@@ -1337,7 +1371,7 @@ void Foam::mechanicalLaw::updateSigmaHyd
 #endif
 
         // Store previous iteration to allow relaxation, if needed
-        sigmaHyd().storePrevIter();
+        sigmaHyd.storePrevIter();
 
         // Lookup the momentum equation inverse diagonal field
         const volScalarField* ADPtr = NULL;
@@ -1393,7 +1427,7 @@ void Foam::mechanicalLaw::updateSigmaHyd
             "rDAf",
             pressureSmoothingScaleFactor_*fvc::interpolate
             (
-                impK/AD, "interpolate(" + gradSigmaHyd().name() + ")"
+                impK/AD, "interpolate(" + gradSigmaHyd.name() + ")"
             )
         );
         const dimensionedScalar one("one", dimless, 1.0);
@@ -1404,18 +1438,18 @@ void Foam::mechanicalLaw::updateSigmaHyd
         // oscillations
         fvScalarMatrix sigmaHydEqn
         (
-            fvm::Sp(one, sigmaHyd())
-          - fvm::laplacian(rDAf, sigmaHyd(), "laplacian(rDA,sigmaHyd)")
+            fvm::Sp(one, sigmaHyd)
+          - fvm::laplacian(rDAf, sigmaHyd, "laplacian(rDA,sigmaHyd)")
          ==
             sigmaHydExplicit
-          - fvc::div(rDAf*fvc::interpolate(gradSigmaHyd()) & mesh().Sf())
+          - fvc::div(rDAf*fvc::interpolate(gradSigmaHyd) & mesh().Sf())
         );
 
         // Solve the pressure equation
         sigmaHydEqn.solve();
 
         // Relax the pressure field
-        sigmaHyd().relax();
+        sigmaHyd.relax();
 
         if (allocatedMemory)
         {
@@ -1427,11 +1461,11 @@ void Foam::mechanicalLaw::updateSigmaHyd
         // Explicitly calculate hydrostatic stress
         // We use 1.0* to overwritting the field IOobject attributes e.g. its
         // name and writeOpt
-        sigmaHyd() = 1.0*sigmaHydExplicit;
+        sigmaHyd = 1.0*sigmaHydExplicit;
     }
 
     // Update the gradient
-    gradSigmaHyd() = fvc::grad(sigmaHyd());
+    gradSigmaHyd = fvc::grad(sigmaHyd);
 }
 
 

@@ -621,11 +621,12 @@ bool vertexCentredLinGeomSolid::vertexCentredLinGeomSolid::converged
             << ", " << nInterations
             << ", " << maxMagD << endl;
 
-        if (iCorr >= nCorr() - 1)
+        if (iCorr >= nCorr())
         {
             Warning
                 << "Max iterations reached within the momentum loop"
                 << endl;
+            converged = true;
         }
     }
 
