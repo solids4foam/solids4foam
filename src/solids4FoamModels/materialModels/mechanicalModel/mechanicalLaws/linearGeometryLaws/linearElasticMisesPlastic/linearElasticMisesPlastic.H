@@ -249,13 +249,6 @@ class linearElasticMisesPlastic
             const surfaceScalarField& trEpsilon
         );
 
-        //- Calculate stress given the strain
-        void calculateStress
-        (
-            surfaceSymmTensorField& sigma,
-            const surfaceTensorField& gradD
-        ) const;
-
 
 public:
 
@@ -276,13 +269,6 @@ public:
             const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
-        //- Calculate stress at the points
-                void calculatePStress
-                (
-                        pointSymmTensorField& pSigma,
-                        const pointTensorField& pGradD
-                ) const;
-
 
     // Destructor
 
@@ -291,16 +277,14 @@ public:
 
     // Member Functions
 
-        //- Return bulk modulus
-        // virtual tmp<volScalarField> bulkModulus() const;
-
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
 #ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
-        virtual tmp<Field<RectangularMatrix<scalar>>> materialTangentField() const;
+        virtual tmp<Field<RectangularMatrix<scalar>>>
+            materialTangentField() const;
 #endif
 
         //- Return the implicit stiffness as a diagTensor
@@ -311,8 +295,29 @@ public:
         //- Update the stress
         virtual void correct(volSymmTensorField& sigma);
 
+        //- Calculate the stress surface field given gradD
+        void correct
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceTensorField& gradD
+        );
+
+        //- Calculate the stress surface field given the strain field
+        void correct
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceSymmTensorField& epsilon
+        );
+
         //- Update the stress surface field
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Update the stress point field
+        virtual void correct
+        (
+            pointSymmTensorField& sigma,
+            const pointTensorField& gradD
+        ) const;
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model

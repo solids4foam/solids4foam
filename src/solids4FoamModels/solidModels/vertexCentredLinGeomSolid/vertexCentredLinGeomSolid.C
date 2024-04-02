@@ -1966,7 +1966,7 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
     const linearElasticMisesPlastic& mech = refCast<const linearElasticMisesPlastic>(mechLaws[0]);
 
     // Calculate the stress at the points
-    mech.calculatePStress(pSigma, pGradD);
+    mech.correct(pSigma, pGradD);
 
     pSigma.write();
 
