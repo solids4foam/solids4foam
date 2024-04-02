@@ -1467,7 +1467,7 @@ setSourceToTargetPointAddressing
 
         scalarField orientation(sourcePointAddr.size(), 0);
 
-        label nIncorrectPoints = 0;
+        //label nIncorrectPoints = 0;
 
         forAll(sourcePointAddr, pointI)
         {
@@ -1481,7 +1481,7 @@ setSourceToTargetPointAddressing
 
                 if (orientation[pointI] > -SMALL)
                 {
-                    nIncorrectPoints++;
+                    //nIncorrectPoints++;
 
                     // Ignore these points
                     sourcePointAddr[pointI] = labelPair(-1, -1);
@@ -1628,7 +1628,7 @@ setSourceToTargetPointAddressingPrev
 
         scalarField orientation(sourcePointAddr.size(), 0);
 
-        label nIncorrectPoints = 0;
+        //label nIncorrectPoints = 0;
 
         forAll(sourcePointAddr, pointI)
         {
@@ -1642,7 +1642,7 @@ setSourceToTargetPointAddressingPrev
 
                 if (orientation[pointI] > -SMALL)
                 {
-                    nIncorrectPoints++;
+                    //nIncorrectPoints++;
 
                     // Ignore these points
                     sourcePointAddr[pointI] = labelPair(-1, -1);

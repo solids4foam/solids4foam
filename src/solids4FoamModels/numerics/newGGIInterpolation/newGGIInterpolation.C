@@ -162,6 +162,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::newGGIInterpolation
     masterPointDistanceVectorsPtr_(NULL),
     masterEdgeLoopsMap_(0),
     masterNeiIntegralGapPtr_(NULL),
+    slaveNeiIntegralGapPtr_(NULL),
     masterNeiContactAreaPtr_(NULL),
     slaveAddrPtr_(NULL),
     slaveWeightsPtr_(NULL),
