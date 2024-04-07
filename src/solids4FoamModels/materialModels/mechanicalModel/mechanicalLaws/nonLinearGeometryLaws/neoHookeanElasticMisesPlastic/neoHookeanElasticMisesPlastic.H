@@ -244,27 +244,13 @@ class neoHookeanElasticMisesPlastic
             const surfaceSymmTensorField& devBEbar
         );
 
-        //- Calculate stress given gradD and pressure
-        void calculateStress
-        (
-            surfaceSymmTensorField& sigma,
-            const surfaceTensorField& gradD,
-            const surfaceScalarField& p
-        );
-
-        //-Calculate hydrostatic stress given gradD
-        void calculateSigmaHyd
-        (
-            surfaceScalarField& sigmaHyd,
-            const surfaceTensorField& gradD
-        );
-
 public:
 
     //- Runtime type information
     TypeName("neoHookeanElasticMisesPlastic");
 
     // Static data members
+
 
     // Constructors
 
@@ -288,11 +274,6 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
-
-#ifdef OPENFOAM_NOT_EXTEND
-        //- Material tangent for Newton Raphson loop
-        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
-#endif
 
         //- Update the stress
         virtual void correct(volSymmTensorField& sigma);
