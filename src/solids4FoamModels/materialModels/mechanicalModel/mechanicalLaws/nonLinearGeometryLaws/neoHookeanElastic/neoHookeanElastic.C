@@ -31,30 +31,6 @@ namespace Foam
     );
 }
 
-// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
-
-void Foam::neoHookeanElastic::calculateStress
-(
- surfaceSymmTensorField& sigma,
- const surfaceTensorField& gradD
-)
-{
-	//Calculate F
-	Ff() = I + gradD.T();
-
-    // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J(det(Ff()));
-
-    // Calculate left Cauchy Green strain tensor with volumetric term removed
-    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(Ff() & Ff().T()));
-
-    // Calculate deviatoric stress
-    const surfaceSymmTensorField s(mu_*dev(bEbar));
-
-    // Calculate the Cauchy stress
-    sigma = (1.0/J)*(0.5*K_*(pow(J, 2) - 1)*I + s);
-}
-
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -249,7 +225,7 @@ Foam::neoHookeanElastic::materialTangentField() const
             );
 
             // Calculate perturbed stress
-            const_cast<neoHookeanElastic&>(*this).calculateStress
+            const_cast<neoHookeanElastic&>(*this).correct
             (
                 sigmaPerturb, gradDPerturb
             );
@@ -339,11 +315,36 @@ void Foam::neoHookeanElastic::correct(surfaceSymmTensorField& sigma)
         return;
     }
 
+    // Update stress
+    correctF(sigma, Ff());
+}
+
+
+void Foam::neoHookeanElastic::correct
+(
+    surfaceSymmTensorField& sigma,
+    const surfaceTensorField& gradD
+) const
+{
+    // Update deformation gradient
+    const surfaceTensorField F(I + gradD.T());
+
+    // Update stress
+    correctF(sigma, F);
+}
+
+
+void Foam::neoHookeanElastic::correctF
+(
+    surfaceSymmTensorField& sigma,
+    const surfaceTensorField& F
+) const
+{
     // Calculate the Jacobian of the deformation gradient
-    const surfaceScalarField J(det(Ff()));
+    const surfaceScalarField J(det(F));
 
     // Calculate left Cauchy Green strain tensor with volumetric term removed
-    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(Ff() & Ff().T()));
+    const surfaceSymmTensorField bEbar(pow(J, -2.0/3.0)*symm(F & F.T()));
 
     // Calculate deviatoric stress
     const surfaceSymmTensorField s(mu_*dev(bEbar));
