@@ -123,20 +123,20 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::bulkModulus() const
 {
     return tmp<volScalarField>
     (
-     new volScalarField
-     (
-      IOobject
-      (
-       "impK",
-       mesh().time().timeName(),
-       mesh(),
-       IOobject::NO_READ,
-       IOobject::NO_WRITE
-       ),
-      mesh(),
-      K_
-      )
-     );
+        new volScalarField
+        (
+            IOobject
+            (
+                "K",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            K_
+        )
+    );
 }
 
 Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
