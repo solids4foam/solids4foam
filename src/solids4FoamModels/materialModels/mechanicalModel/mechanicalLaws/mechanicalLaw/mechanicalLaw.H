@@ -534,11 +534,17 @@ public:
             return rho();
         }
 
-        //- Calculate the stress
+        //- Calculate the volField stress
         virtual void correct(volSymmTensorField& sigma) = 0;
 
-        //- Calculate the stress
+        //- Calculate the surfaceField stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Calculate the pointField stress given the displacement gradient
+        virtual void correct
+        (
+            pointSymmTensorField& sigma, const pointTensorField& gradD
+        ) const;
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model

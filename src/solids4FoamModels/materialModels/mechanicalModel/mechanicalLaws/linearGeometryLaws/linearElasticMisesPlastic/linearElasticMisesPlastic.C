@@ -791,14 +791,12 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
 Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
 Foam::linearElasticMisesPlastic::materialTangentField() const
 {
-    // Todo: use 6x6 form of tangent instead of 6x9
-
     // Prepare tmp field
     tmp<Field<Foam::RectangularMatrix<Foam::scalar>>> tresult
     (
         new Field<Foam::RectangularMatrix<Foam::scalar>>
         (
-            mesh().nFaces(), Foam::RectangularMatrix<scalar>(6, 9, 0.0)
+            mesh().nFaces(), Foam::RectangularMatrix<scalar>(6, 6, 0.0)
         )
     );
     Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult.ref();
@@ -847,17 +845,57 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
         // Small number used for perturbations
         const scalar eps(readScalar(dict().lookup("tangentEps")));
 
+        // Define matrix indices for readability
+        const label XX = symmTensor::XX;
+        const label YY = symmTensor::YY;
+        const label ZZ = symmTensor::ZZ;
+        const label XY = symmTensor::XY;
+        const label YZ = symmTensor::YZ;
+        const label XZ = symmTensor::XZ;
+
         // For each component of epsilon, sequentially apply a perturbation and
         // then calculate the resulting sigma
-        for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
+        //for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
+        for (label cmptI = 0; cmptI < symmTensor::nComponents; cmptI++)
         {
+            // Map tensor component to symmTensor
+            // We can avoid this is we perturb epsilon directly
+            label tensorCmptI = -1;
+            if (cmptI == symmTensor::XX)
+            {
+                tensorCmptI = tensor::XX;
+            }
+            else if (cmptI == symmTensor::XY)
+            {
+                tensorCmptI = tensor::XY;
+            }
+            else if (cmptI == symmTensor::XZ)
+            {
+                tensorCmptI = tensor::XZ;
+            }
+            else if (cmptI == symmTensor::YY)
+            {
+                tensorCmptI = tensor::YY;
+            }
+            else if (cmptI == symmTensor::YZ)
+            {
+                tensorCmptI = tensor::YZ;
+            }
+            else // if (cmptI == symmTensor::ZZ)
+            {
+                tensorCmptI = tensor::ZZ;
+            }
+
             // Reset epsilonPerturb
             // We multiply by 1.0 to avoid issues with epsilonf being removed
             // from the object registry
             gradDPerturb = 1.0*gradDRef;
 
             // Perturb this component of gradD
-            gradDPerturb.replace(cmptI, gradDRef.component(cmptI) + eps);
+            gradDPerturb.replace
+            (
+                tensorCmptI, gradDRef.component(tensorCmptI) + eps
+            );
 
             // Calculate perturbed stress
             const_cast<linearElasticMisesPlastic&>
@@ -875,87 +913,12 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
             // Insert tangent component
             forAll(tangCmptI, faceI)
             {
-                if (cmptI == tensor::XX)
-                {
-                    result[faceI](0,0) = tangCmptI[faceI][symmTensor::XX];
-                    result[faceI](1,0) = tangCmptI[faceI][symmTensor::YY];
-                    result[faceI](2,0) = tangCmptI[faceI][symmTensor::ZZ];
-                    result[faceI](3,0) = tangCmptI[faceI][symmTensor::XY];
-                    result[faceI](4,0) = tangCmptI[faceI][symmTensor::YZ];
-                    result[faceI](5,0) = tangCmptI[faceI][symmTensor::XZ];
-                }
-                else if (cmptI == tensor::XY)
-                {
-                    result[faceI](0,1) = tangCmptI[faceI][symmTensor::XX];
-                    result[faceI](1,1) = tangCmptI[faceI][symmTensor::YY];
-                    result[faceI](2,1) = tangCmptI[faceI][symmTensor::ZZ];
-                    result[faceI](3,1) = tangCmptI[faceI][symmTensor::XY];
-                    result[faceI](4,1) = tangCmptI[faceI][symmTensor::YZ];
-                    result[faceI](5,1) = tangCmptI[faceI][symmTensor::XZ];
-                }
-                else if (cmptI == tensor::XZ)
-                {
-                    result[faceI](0,2) = tangCmptI[faceI][symmTensor::XX];
-                    result[faceI](1,2) = tangCmptI[faceI][symmTensor::YY];
-                    result[faceI](2,2) = tangCmptI[faceI][symmTensor::ZZ];
-                    result[faceI](3,2) = tangCmptI[faceI][symmTensor::XY];
-                    result[faceI](4,2) = tangCmptI[faceI][symmTensor::YZ];
-                    result[faceI](5,2) = tangCmptI[faceI][symmTensor::XZ];
-                }
-                else if (cmptI == tensor::YX)
-                {
-                    result[faceI](0,3) = tangCmptI[faceI][symmTensor::XX];
-                    result[faceI](1,3) = tangCmptI[faceI][symmTensor::YY];
-                    result[faceI](2,3) = tangCmptI[faceI][symmTensor::ZZ];
-                    result[faceI](3,3) = tangCmptI[faceI][symmTensor::XY];
-                    result[faceI](4,3) = tangCmptI[faceI][symmTensor::YZ];
-                    result[faceI](5,3) = tangCmptI[faceI][symmTensor::XZ];
-                }
-                else if (cmptI == tensor::YY)
-                {
-                    result[faceI](0,4) = tangCmptI[faceI][symmTensor::XX];
-                    result[faceI](1,4) = tangCmptI[faceI][symmTensor::YY];
-                    result[faceI](2,4) = tangCmptI[faceI][symmTensor::ZZ];
-                    result[faceI](3,4) = tangCmptI[faceI][symmTensor::XY];
-                    result[faceI](4,4) = tangCmptI[faceI][symmTensor::YZ];
-                    result[faceI](5,4) = tangCmptI[faceI][symmTensor::XZ];
-                }
-                else if (cmptI == tensor::YZ)
-                {
-                    result[faceI](0,5) = tangCmptI[faceI][symmTensor::XX];
-                    result[faceI](1,5) = tangCmptI[faceI][symmTensor::YY];
-                    result[faceI](2,5) = tangCmptI[faceI][symmTensor::ZZ];
-                    result[faceI](3,5) = tangCmptI[faceI][symmTensor::XY];
-                    result[faceI](4,5) = tangCmptI[faceI][symmTensor::YZ];
-                    result[faceI](5,5) = tangCmptI[faceI][symmTensor::XZ];
-                }
-                else if (cmptI == tensor::ZX)
-                {
-                    result[faceI](0,6) = tangCmptI[faceI][symmTensor::XX];
-                    result[faceI](1,6) = tangCmptI[faceI][symmTensor::YY];
-                    result[faceI](2,6) = tangCmptI[faceI][symmTensor::ZZ];
-                    result[faceI](3,6) = tangCmptI[faceI][symmTensor::XY];
-                    result[faceI](4,6) = tangCmptI[faceI][symmTensor::YZ];
-                    result[faceI](5,6) = tangCmptI[faceI][symmTensor::XZ];
-                }
-                else if (cmptI == tensor::ZY)
-                {
-                    result[faceI](0,7) = tangCmptI[faceI][symmTensor::XX];
-                    result[faceI](1,7) = tangCmptI[faceI][symmTensor::YY];
-                    result[faceI](2,7) = tangCmptI[faceI][symmTensor::ZZ];
-                    result[faceI](3,7) = tangCmptI[faceI][symmTensor::XY];
-                    result[faceI](4,7) = tangCmptI[faceI][symmTensor::YZ];
-                    result[faceI](5,7) = tangCmptI[faceI][symmTensor::XZ];
-                }
-                else // if (cmptI == tensor::ZZ)
-                {
-                    result[faceI](0,8) = tangCmptI[faceI][symmTensor::XX];
-                    result[faceI](1,8) = tangCmptI[faceI][symmTensor::YY];
-                    result[faceI](2,8) = tangCmptI[faceI][symmTensor::ZZ];
-                    result[faceI](3,8) = tangCmptI[faceI][symmTensor::XY];
-                    result[faceI](4,8) = tangCmptI[faceI][symmTensor::YZ];
-                    result[faceI](5,8) = tangCmptI[faceI][symmTensor::XZ];
-                }
+                result[faceI](XX, cmptI) = tangCmptI[faceI][XX];
+                result[faceI](YY, cmptI) = tangCmptI[faceI][YY];
+                result[faceI](ZZ, cmptI) = tangCmptI[faceI][ZZ];
+                result[faceI](XY, cmptI) = tangCmptI[faceI][XY];
+                result[faceI](YZ, cmptI) = tangCmptI[faceI][YZ];
+                result[faceI](XZ, cmptI) = tangCmptI[faceI][XZ];
             }
 
             forAll(tangCmpt.boundaryField(), patchI)
@@ -968,87 +931,12 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
                 {
                     const label faceID = start + fI;
 
-                    if (cmptI == tensor::XX)
-                    {
-                        result[faceID](0,0) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,0) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,0) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,0) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,0) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,0) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == tensor::XY)
-                    {
-                        result[faceID](0,1) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,1) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,1) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,1) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,1) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,1) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == tensor::XZ)
-                    {
-                        result[faceID](0,2) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,2) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,2) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,2) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,2) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,2) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == tensor::YX)
-                    {
-                        result[faceID](0,3) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,3) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,3) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,3) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,3) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,3) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == tensor::YY)
-                    {
-                        result[faceID](0,4) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,4) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,4) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,4) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,4) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,4) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == tensor::YZ)
-                    {
-                        result[faceID](0,5) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,5) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,5) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,5) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,5) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,5) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == tensor::ZX)
-                    {
-                        result[faceID](0,6) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,6) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,6) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,6) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,6) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,6) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else if (cmptI == tensor::ZY)
-                    {
-                        result[faceID](0,7) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,7) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,7) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,7) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,7) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,7) = tangCmptI[fI][symmTensor::XZ];
-                    }
-                    else // if (cmptI == tensor::ZZ)
-                    {
-                        result[faceID](0,8) = tangCmptI[fI][symmTensor::XX];
-                        result[faceID](1,8) = tangCmptI[fI][symmTensor::YY];
-                        result[faceID](2,8) = tangCmptI[fI][symmTensor::ZZ];
-                        result[faceID](3,8) = tangCmptI[fI][symmTensor::XY];
-                        result[faceID](4,8) = tangCmptI[fI][symmTensor::YZ];
-                        result[faceID](5,8) = tangCmptI[fI][symmTensor::XZ];
-                    }
+                    result[faceID](XX, cmptI) = tangCmptI[fI][XX];
+                    result[faceID](YY, cmptI) = tangCmptI[fI][YY];
+                    result[faceID](ZZ, cmptI) = tangCmptI[fI][ZZ];
+                    result[faceID](XY, cmptI) = tangCmptI[fI][XY];
+                    result[faceID](YZ, cmptI) = tangCmptI[fI][YZ];
+                    result[faceID](XZ, cmptI) = tangCmptI[fI][XZ];
                 }
             }
         }

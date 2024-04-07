@@ -1634,6 +1634,20 @@ void Foam::mechanicalLaw::correct(surfaceSymmTensorField&)
 }
 
 
+void Foam::mechanicalLaw::correct
+(
+    pointSymmTensorField&, const pointTensorField&
+) const
+{
+    notImplemented
+    (
+        type() + "::correct(pointSymmTensorField&)\n"
+        "The correct(pointSymmTensorField&) function is not implemented\n"
+        " for the " + type() + " mechanical law"
+    );
+}
+
+
 Foam::scalar Foam::mechanicalLaw::residual()
 {
     // Default to zero; this can be overwritten by any derived mechanical law

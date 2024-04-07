@@ -147,6 +147,12 @@ public:
         (
             surfaceSymmTensorField& sigma, const surfaceSymmTensorField& epsilon
         );
+
+        //- Calculate the stress given the displacement gradient
+        virtual void correct
+        (
+            pointSymmTensorField& sigma, const pointTensorField& gradD
+        ) const;
 };
 
 

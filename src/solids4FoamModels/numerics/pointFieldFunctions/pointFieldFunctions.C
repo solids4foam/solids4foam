@@ -234,6 +234,41 @@ tmp<pointScalarField> pow(const pointScalarField& ptr, const scalar& exponent)
     return tresult;
 }
 
+
+tmp<pointScalarField> sqrt(const pointScalarField& ptr)
+{
+    const pointMesh& pMesh =  ptr.mesh();
+
+    // Prepare the temporary field
+    tmp<pointScalarField> tresult
+    (
+        new pointScalarField
+        (
+            IOobject
+            (
+                "sqrt(" + ptr.name() + ")",
+                pMesh.mesh().time().timeName(),
+                pMesh.mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            pMesh,
+            dimensionedScalar("0", sqrt(ptr.dimensions()), 0.0)
+        )
+    );
+
+    // Set the result field to be sqrt(ptr)
+#ifdef OPENFOAM_NOT_EXTEND
+    tresult.ref().primitiveFieldRef() = sqrt(ptr.primitiveField());
+    tresult.ref().correctBoundaryConditions();
+#else
+    tresult().internalField() = sqrt(ptr.internalField());
+    tresult().correctBoundaryConditions();
+#endif
+
+    return tresult;
+}
+
 }
 
 // ************************************************************************* //

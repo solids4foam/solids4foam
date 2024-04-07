@@ -66,6 +66,9 @@ namespace Foam
         const pointScalarField& ptr, const scalar& exponent
     );
 
+    // Return the sqrt of a pointScalarField
+    tmp<pointScalarField> sqrt(const pointScalarField& ptr);
+
 } // End namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
 #include "fvm.H"
+#include "pointFieldFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -244,42 +245,37 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 #ifdef OPENFOAM_NOT_EXTEND
 Foam::RectangularMatrix<Foam::scalar> Foam::linearElastic::materialTangent() const
 {
-    // We currently assume a 6x9 matrix
-    // Todo: refactor in terms of 6x6 matrix
-    RectangularMatrix<scalar> matTang(6, 9, 0.0);
+    // Prepare 6x6 tangent matrix
+    RectangularMatrix<scalar> matTang(6, 6, 0.0);
 
-    // The 9 columns are ordered as tensor::XX, tensor::XY, etc., while the
-    // rows are ordered as
-    const label XX = 0;
-    const label YY = 1;
-    const label ZZ = 2;
-    const label XY = 3;
-    const label YZ = 4;
-    const label XZ = 5;
+    // Define matrix indices for readability
+    const label XX = symmTensor::XX;
+    const label YY = symmTensor::YY;
+    const label ZZ = symmTensor::ZZ;
+    const label XY = symmTensor::XY;
+    const label YZ = symmTensor::YZ;
+    const label XZ = symmTensor::XZ;
 
     const scalar lambda = lambda_.value();
     const scalar mu = mu_.value();
     const scalar twoMuLambda = 2*mu + lambda;
 
     // Set components
-    matTang(XX, tensor::XX) = twoMuLambda;
-    matTang(XX, tensor::YY) = lambda;
-    matTang(XX, tensor::ZZ) = lambda;
+    matTang(XX, XX) = twoMuLambda;
+    matTang(XX, YY) = lambda;
+    matTang(XX, ZZ) = lambda;
 
-    matTang(YY, tensor::XX) = lambda;
-    matTang(YY, tensor::YY) = twoMuLambda;
-    matTang(YY, tensor::ZZ) = lambda;
+    matTang(YY, XX) = lambda;
+    matTang(YY, YY) = twoMuLambda;
+    matTang(YY, ZZ) = lambda;
 
-    matTang(ZZ, tensor::XX) = lambda;
-    matTang(ZZ, tensor::YY) = lambda;
-    matTang(ZZ, tensor::ZZ) = twoMuLambda;
+    matTang(ZZ, XX) = lambda;
+    matTang(ZZ, YY) = lambda;
+    matTang(ZZ, ZZ) = twoMuLambda;
 
-    matTang(XY, tensor::XY) = mu;
-    matTang(YZ, tensor::YZ) = mu;
-    matTang(XZ, tensor::XZ) = mu;
-    matTang(XY, tensor::YX) = mu;
-    matTang(YZ, tensor::ZY) = mu;
-    matTang(XZ, tensor::ZX) = mu;
+    matTang(XY, XY) = mu;
+    matTang(YZ, YZ) = mu;
+    matTang(XZ, XZ) = mu;
 
     return matTang;
 }
@@ -367,6 +363,38 @@ void Foam::linearElastic::correct
     {
         // Hooke's law : standard form
         sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I + sigma0f();
+    }
+}
+
+
+void Foam::linearElastic::correct
+(
+    pointSymmTensorField& sigma,
+    const pointTensorField& gradD
+) const
+{
+    const pointSymmTensorField epsilon(symm(gradD));
+
+    if (solvePressureEqn())
+    {
+        notImplemented
+        (
+            "void Foam::linearElastic::correct(...) not implemented "
+            "with solvePressureEqn"
+        );
+    }
+    else if (max(mag(sigma0())).value() > SMALL)
+    {
+        notImplemented
+        (
+            "void Foam::linearElastic::correct(...) not implemented "
+            "with non-zero sigma0"
+        );
+    }
+    else
+    {
+        // Hooke's law : standard form
+        sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
     }
 }
 

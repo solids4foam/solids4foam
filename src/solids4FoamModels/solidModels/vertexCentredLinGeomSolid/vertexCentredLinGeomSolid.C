@@ -18,10 +18,8 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "vertexCentredLinGeomSolid.H"
-#include "linearElasticMisesPlastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "sparseMatrix.H"
-#include "symmTensor4thOrder.H"
 #include "vfvcCellPoint.H"
 #include "vfvmCellPoint.H"
 #include "fvcDiv.H"
@@ -30,6 +28,7 @@ License
 #include "sparseMatrixTools.H"
 #include "symmetryPointPatchFields.H"
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
+#include "pointFieldFunctions.H"
 #ifdef USE_PETSC
     #include <petscksp.h>
 #endif
@@ -1948,63 +1947,50 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 
     // Stress at the points
     pointSymmTensorField pSigma
-	(
-		IOobject
-		(
-		    "pSigma",
-		    runTime.timeName(),
-		    runTime,
-		    IOobject::NO_READ,
-		    IOobject::AUTO_WRITE
-		),
-		pMesh(),
-		dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+    (
+        IOobject
+        (
+            "pSigma",
+            runTime.timeName(),
+            runTime,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        pMesh(),
+        dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
     );
 
-    // Acces the linearElasticMisesPlastic mechanical law
-    const PtrList<mechanicalLaw>& mechLaws = mechanical();
-    const linearElasticMisesPlastic& mech = refCast<const linearElasticMisesPlastic>(mechLaws[0]);
-
     // Calculate the stress at the points
-    mech.correct(pSigma, pGradD);
+    mechanical().correct(pSigma, pGradD);
 
+    // Write point sigma
     pSigma.write();
 
-//    // Equivalent stress at the points
-//    pointScalarField pSigmaEq
-//    (
-//        IOobject
-//        (
-//            "pSigmaEq",
-//            runTime.timeName(),
-//            runTime,
-//            IOobject::NO_READ,
-//            IOobject::AUTO_WRITE
-//        ),
-//        pMesh(),
-//        dimensionedScalar("0", dimPressure, 0.0)
-//    );
+    // Equivalent stress at the points
+    pointScalarField pSigmaEq
+    (
+        IOobject
+        (
+            "pSigmaEq",
+            runTime.timeName(),
+            runTime,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        //sqrt((3.0/2.0)*magSqr(dev(pSigma)))
+        pMesh(),
+        dimensionedScalar("0", dimPressure, 0.0)
+    );
 
-//    pSigmaEq.primitiveFieldRef() =
-//        sqrt(0.5*((pSigma.component(symmTensor::XX) - pSigma.component(symmTensor::YY))^2 +
-//        (pSigma.component(symmTensor::YY) - pSigma.component(symmTensor::ZZ))^2 +
-//        (pSigma.component(symmTensor::ZZ) - component(symmTensor::XX))^2) +
-//        3*(pSigma.component(symmTensor::XY)^2 + pSigma.component(symmTensor::YZ)^2 + pSigma.component(symmTensor::XZ)^2));
+#ifdef OPENFOAM_NOT_EXTEND
+    pSigmaEq.primitiveFieldRef() =
+        sqrt((3.0/2.0)*magSqr(dev(pSigma.primitiveField())));
+#else
+    pSigmaEq.internalField() =
+        sqrt((3.0/2.0)*magSqr(dev(pSigma.internalFeld())));
+#endif
 
-//#ifdef FOAMEXTEND
-//    pSigmaEq.internalField() =
-//        sqrt(0.5*((pSigma.XX().internalField() - pSigma.internalField().YY())^2 +
-//        (pSigma.internalField().YY() - pSigma.internalField().ZZ())^2 +
-//        (pSigma.internalField().ZZ() - pSigma.internalField().XX())^2) +
-//        3*(pSigma.internalField().XY()^2 + pSigma.internalField().YZ()^2 + pSigma.internalField().XZ()^2));
-//#else
-//    pSigmaEq.primitiveFieldRef() =
-//        sqrt(0.5*((pSigma.component(symmTensor::XX).internalField() - pSigma.internalField().YY())^2 +
-//        (pSigma.internalField().YY() - pSigma.internalField().ZZ())^2 +
-//        (pSigma.internalField().ZZ() - pSigma.internalField().XX())^2) +
-//        3*(pSigma.internalField().XY()^2 + pSigma.internalField().YZ()^2 + pSigma.internalField().XZ()^2));
-//#endif
-//    pSigmaEq.write();
+    pSigmaEq.write();
 
     solidModel::writeFields(runTime);
 }

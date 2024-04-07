@@ -85,21 +85,11 @@ class mechanicalModel
         //- Sub-meshes for each mechanicalLaw
         mutable autoPtr<solidSubMeshes> solSubMeshes_;
 
-       //- The implicit stiffness surface field for Rhie-Chow correction
-        mutable autoPtr<surfaceScalarField> impKfcorrPtr_;
-
 
     // Private Member Functions
 
         //- Make material sub-meshes
         void makeSolSubMeshes() const;
-
-        //- Calculate the impKf field for Rhie-Chow correction
-        //  This field is zero on bi-material interfaces
-        void calcImpKfcorr() const;
-
-        //- Return the implicit stiffness surface field for Rhie-Chow correction
-        const surfaceScalarField& impKfcorr() const;
 
         //- Clear out demand driven data
         void clearOut();
@@ -174,6 +164,12 @@ public:
 
             //- Calculate the stress surfaceField
             void correct(surfaceSymmTensorField& sigma);
+
+            //- Calculate the stress pointField given the displacement gradient
+            void correct
+            (
+                pointSymmTensorField& sigma, const pointTensorField& gradD
+            ) const;
 
             //- Map grad field to subMeshes
             void mapGradToSubMeshes(const volTensorField& gradD);

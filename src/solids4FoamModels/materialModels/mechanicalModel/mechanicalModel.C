@@ -86,107 +86,6 @@ Foam::solidSubMeshes& Foam::mechanicalModel::solSubMeshes()
 }
 
 
-void Foam::mechanicalModel::calcImpKfcorr() const
-{
-    if (impKfcorrPtr_.valid())
-    {
-        FatalErrorIn
-        (
-            "const Foam::volScalarField& "
-            "Foam::mechanicalModel::calcImpKfcorr() const"
-        )   << "pointer already set" << abort(FatalError);
-    }
-
-    impKfcorrPtr_.set
-    (
-        new surfaceScalarField
-        (
-            IOobject
-            (
-                "impKfcorr",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            impKf()
-        )
-    );
-
-    const PtrList<mechanicalLaw>& laws = *this;
-
-    if (laws.size() > 1)
-    {
-#ifndef OPENFOAM_NOT_EXTEND
-        // To disable Rhie-Chow correction on bi-material interface, we will set
-        // impKfcorr to zero on bi-material interface faces
-
-        surfaceScalarField& impKfcorr = impKfcorrPtr_();
-        scalarField& impKfcorrI = impKfcorrPtr_().internalField();
-
-        forAll(laws, lawI)
-        {
-            const fvMesh& subMesh = solSubMeshes().subMeshes()[lawI].subMesh();
-            const labelList& patchMap =
-                solSubMeshes().subMeshes()[lawI].patchMap();
-            const labelList& faceMap =
-                solSubMeshes().subMeshes()[lawI].faceMap();
-
-            forAll(subMesh.boundaryMesh(), patchI)
-            {
-                if (patchMap[patchI] == -1)
-                {
-                    const polyPatch& ppatch = subMesh.boundaryMesh()[patchI];
-                    const label start = ppatch.start();
-
-                    forAll(ppatch, faceI)
-                    {
-                        const label baseFaceID = faceMap[start + faceI];
-
-                        if (mesh().isInternalFace(baseFaceID))
-                        {
-                            impKfcorrI[baseFaceID] = 0.0;
-                        }
-                        else
-                        {
-                            // Face is on a coupled patch
-                            const label patchID =
-                                mesh().boundaryMesh().whichPatch(baseFaceID);
-
-                            const label basePatchStart =
-                                mesh().boundaryMesh()[patchID].start();
-
-                            impKfcorr.boundaryField()
-                            [
-                                patchID
-                            ][baseFaceID - basePatchStart] = 0.0;
-                        }
-                    }
-                }
-            }
-        }
-
-        impKfcorrPtr_().correctBoundaryConditions();
-#else
-        FatalErrorIn(type())
-            << "Not implemented for this version of OpenFOAM"
-            << abort(FatalError);
-#endif
-    }
-}
-
-
-const Foam::surfaceScalarField& Foam::mechanicalModel::impKfcorr() const
-{
-    if (impKfcorrPtr_.empty())
-    {
-        calcImpKfcorr();
-    }
-
-    return impKfcorrPtr_();
-}
-
-
 void Foam::mechanicalModel::clearOut()
 {
     // Clear the list of mechanical laws
@@ -226,8 +125,7 @@ Foam::mechanicalModel::mechanicalModel
     planeStress_(lookup("planeStress")),
     incremental_(incremental),
     cellZoneNames_(),
-    solSubMeshes_(),
-    impKfcorrPtr_()
+    solSubMeshes_()
 {
     Info<< "Creating the mechanicalModel" << endl;
 
@@ -626,6 +524,28 @@ void Foam::mechanicalModel::correct(surfaceSymmTensorField& sigma)
         solSubMeshes().mapSubMeshSurfaceFields<symmTensor>
         (
             solSubMeshes().subMeshSigmaf(), sigma
+        );
+    }
+}
+
+
+void Foam::mechanicalModel::correct
+(
+    pointSymmTensorField& sigma, const pointTensorField& gradD
+) const
+{
+    const PtrList<mechanicalLaw>& laws = *this;
+
+    if (laws.size() == 1)
+    {
+        laws[0].correct(sigma, gradD);
+    }
+    else
+    {
+        notImplemented
+        (
+            "mechanicalModel::correct(...): not implemented for more than "
+            "one material"
         );
     }
 }

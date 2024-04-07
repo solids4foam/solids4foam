@@ -18,7 +18,8 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "vfvmCellPoint.H"
-#include "multiplyCoeffRectMat.H"
+// #include "multiplyCoeffRectMat.H"
+#include "multiplyCoeff.H"
 #include "sparseMatrixTools.H"
 #include "cellPointLeastSquaresVectors.H"
 
@@ -62,12 +63,12 @@ void Foam::vfvm::divSigma
                 << materialTangentField[faceI].m() << " rows "
                 << "but it should have 6!" << abort(FatalError);
         }
-        else if (materialTangentField[faceI].n() != 9)
+        else if (materialTangentField[faceI].n() != 6)
         {
             FatalErrorIn("void Foam::vfvm::divSigma(...)")
                 << "The materialTangent for face " << faceI << " has "
                 << materialTangentField[faceI].m() << " rows "
-                << "but it should have 9!" << abort(FatalError);
+                << "but it should have 6!" << abort(FatalError);
         }
     }
 
@@ -129,7 +130,8 @@ void Foam::vfvm::divSigma
 
             // Calculate the coefficient for this point coming from dualFaceI
             tensor coeff;
-            multiplyCoeffRectMat(coeff, curDualSf, materialTangent, lsVec);
+            // multiplyCoeffRectMat(coeff, curDualSf, materialTangent, lsVec);
+            multiplyCoeff(coeff, curDualSf, materialTangent, lsVec);
 
             // Add the coefficient to the ownPointID equation coming from
             // pointID
@@ -149,7 +151,8 @@ void Foam::vfvm::divSigma
 
         // Compact edge direction coefficient
         tensor edgeDirCoeff;
-        multiplyCoeffRectMat
+        // multiplyCoeffRectMat
+        multiplyCoeff
         (
             edgeDirCoeff, curDualSf, materialTangent, eOverLength
         );
