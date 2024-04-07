@@ -654,14 +654,17 @@ vertexCentredNonLinGeomTotalLagDisplacementSolid::geometricStiffnessField
 ) const
 {
     // Prepare tmp field
-    tmp<Field<Foam::RectangularMatrix<Foam::scalar>>> tresult
+    tmp<Field<RectangularMatrix<scalar>>> tresult
     (
-        new Field<Foam::RectangularMatrix<Foam::scalar>>(dualMesh().nFaces(), Foam::RectangularMatrix<scalar>(3,9,0))
+        new Field<RectangularMatrix<scalar>>
+        (
+            dualMesh().nFaces(), RectangularMatrix<scalar>(3, 9, 0.0)
+        )
     );
 #ifdef OPENFOAM_NOT_EXTEND
-    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult.ref();
+    Field<RectangularMatrix<scalar>>& result = tresult.ref();
 #else
-    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult();
+    Field<RectangularMatrix<scalar>>& result = tresult();
 #endif
 
     //For small strain the geometric stiffness is zero
@@ -1138,7 +1141,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
     dualJf_ = det(dualFf_);
 
     // Store material tangent field for dual mesh faces
-    Field<RectangularMatrix<scalar>> materialTangent
+    Field<scalarSquareMatrix> materialTangent
     (
         dualMechanicalPtr_().materialTangentFaceField()
     );

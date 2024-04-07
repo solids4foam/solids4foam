@@ -31,13 +31,13 @@ void Foam::multiplyCoeffExtended
     const vector& g
 )
 {
-    //Define indexes for readability only for C
-    const label XX = 0;
-    const label YY = 1;
-    const label ZZ = 2;
-    const label XY = 3;
-    const label YZ = 4;
-    const label XZ = 5;
+    // Define matrix indices for readability (only for C)
+    const label XX = symmTensor::XX;
+    const label YY = symmTensor::YY;
+    const label ZZ = symmTensor::ZZ;
+    const label XY = symmTensor::XY, YX = XY;
+    const label YZ = symmTensor::YZ, ZY = YZ;
+    const label XZ = symmTensor::XZ, ZX = XZ;
 
     // Index notation
     // coeff_ij = (Sf_m C_mikl + G_mkl sigma_mi) g_k delta_lj
@@ -67,17 +67,17 @@ void Foam::multiplyCoeffExtended
     //            + (Sf_3 C_3131 + G_331 sigma_31) g_3
 
     coeff[tensor::XX] =
-        (Sf[vector::X]*C(XX,tensor::XX) + G(vector::X,tensor::XX)*sigma[symmTensor::XX])*g[vector::X]
-      + (Sf[vector::X]*C(XX,tensor::YX) + G(vector::X,tensor::YX)*sigma[symmTensor::XX])*g[vector::Y]
-      + (Sf[vector::X]*C(XX,tensor::ZX) + G(vector::X,tensor::ZX)*sigma[symmTensor::XX])*g[vector::Z]
+        (Sf[vector::X]*C(XX,XX) + G(vector::X,tensor::XX)*sigma[symmTensor::XX])*g[vector::X]
+      + (Sf[vector::X]*C(XX,YX) + G(vector::X,tensor::YX)*sigma[symmTensor::XX])*g[vector::Y]
+      + (Sf[vector::X]*C(XX,ZX) + G(vector::X,tensor::ZX)*sigma[symmTensor::XX])*g[vector::Z]
 
-      + (Sf[vector::Y]*C(XY,tensor::XX) + G(vector::Y,tensor::XX)*sigma[symmTensor::XY])*g[vector::X]
-      + (Sf[vector::Y]*C(XY,tensor::YX) + G(vector::Y,tensor::YX)*sigma[symmTensor::XY])*g[vector::Y]
-      + (Sf[vector::Y]*C(XY,tensor::ZX) + G(vector::Y,tensor::ZX)*sigma[symmTensor::XY])*g[vector::Z]
+      + (Sf[vector::Y]*C(XY,XX) + G(vector::Y,tensor::XX)*sigma[symmTensor::XY])*g[vector::X]
+      + (Sf[vector::Y]*C(XY,YX) + G(vector::Y,tensor::YX)*sigma[symmTensor::XY])*g[vector::Y]
+      + (Sf[vector::Y]*C(XY,ZX) + G(vector::Y,tensor::ZX)*sigma[symmTensor::XY])*g[vector::Z]
 
-      + (Sf[vector::Z]*C(XZ,tensor::XX) + G(vector::Z,tensor::XX)*sigma[symmTensor::XZ])*g[vector::X]
-      + (Sf[vector::Z]*C(XZ,tensor::YX) + G(vector::Z,tensor::YX)*sigma[symmTensor::XZ])*g[vector::Y]
-      + (Sf[vector::Z]*C(XZ,tensor::ZX) + G(vector::Z,tensor::ZX)*sigma[symmTensor::XZ])*g[vector::Z];
+      + (Sf[vector::Z]*C(XZ,XX) + G(vector::Z,tensor::XX)*sigma[symmTensor::XZ])*g[vector::X]
+      + (Sf[vector::Z]*C(XZ,YX) + G(vector::Z,tensor::YX)*sigma[symmTensor::XZ])*g[vector::Y]
+      + (Sf[vector::Z]*C(XZ,ZX) + G(vector::Z,tensor::ZX)*sigma[symmTensor::XZ])*g[vector::Z];
 
     // Similarly the other components can be calculated as
     // coeff_21 = (Sf_m C_m2k1 + G_mk1 sigma_m2) g_k
@@ -99,17 +99,17 @@ void Foam::multiplyCoeffExtended
     //            + (Sf_3 C_3231 + G_331 sigma_32) g_3
 
     coeff[tensor::YX] =
-        (Sf[vector::X]*C(XY,tensor::XX) + G(vector::X,tensor::XX)*sigma[symmTensor::XY])*g[vector::X]
-      + (Sf[vector::X]*C(XY,tensor::YX) + G(vector::X,tensor::YX)*sigma[symmTensor::XY])*g[vector::Y]
-      + (Sf[vector::X]*C(XY,tensor::ZX) + G(vector::X,tensor::ZX)*sigma[symmTensor::XY])*g[vector::Z]
+        (Sf[vector::X]*C(XY,XX) + G(vector::X,tensor::XX)*sigma[symmTensor::XY])*g[vector::X]
+      + (Sf[vector::X]*C(XY,YX) + G(vector::X,tensor::YX)*sigma[symmTensor::XY])*g[vector::Y]
+      + (Sf[vector::X]*C(XY,ZX) + G(vector::X,tensor::ZX)*sigma[symmTensor::XY])*g[vector::Z]
 
-      + (Sf[vector::Y]*C(YY,tensor::XX) + G(vector::Y,tensor::XX)*sigma[symmTensor::YY])*g[vector::X]
-      + (Sf[vector::Y]*C(YY,tensor::YX) + G(vector::Y,tensor::YX)*sigma[symmTensor::YY])*g[vector::Y]
-      + (Sf[vector::Y]*C(YY,tensor::ZX) + G(vector::Y,tensor::ZX)*sigma[symmTensor::YY])*g[vector::Z]
+      + (Sf[vector::Y]*C(YY,XX) + G(vector::Y,tensor::XX)*sigma[symmTensor::YY])*g[vector::X]
+      + (Sf[vector::Y]*C(YY,YX) + G(vector::Y,tensor::YX)*sigma[symmTensor::YY])*g[vector::Y]
+      + (Sf[vector::Y]*C(YY,ZX) + G(vector::Y,tensor::ZX)*sigma[symmTensor::YY])*g[vector::Z]
 
-      + (Sf[vector::Z]*C(YZ,tensor::XX) + G(vector::Z,tensor::XX)*sigma[symmTensor::YZ])*g[vector::X]
-      + (Sf[vector::Z]*C(YZ,tensor::YX) + G(vector::Z,tensor::YX)*sigma[symmTensor::YZ])*g[vector::Y]
-      + (Sf[vector::Z]*C(YZ,tensor::ZX) + G(vector::Z,tensor::ZX)*sigma[symmTensor::YZ])*g[vector::Z];
+      + (Sf[vector::Z]*C(YZ,XX) + G(vector::Z,tensor::XX)*sigma[symmTensor::YZ])*g[vector::X]
+      + (Sf[vector::Z]*C(YZ,YX) + G(vector::Z,tensor::YX)*sigma[symmTensor::YZ])*g[vector::Y]
+      + (Sf[vector::Z]*C(YZ,ZX) + G(vector::Z,tensor::ZX)*sigma[symmTensor::YZ])*g[vector::Z];
 
     // coeff_31 = (Sf_m C_m3k1 + G_mk1 sigma_m3) g_k
     //
@@ -130,17 +130,17 @@ void Foam::multiplyCoeffExtended
     //            + (Sf_3 C_3331 + G_331 sigma_33) g_3
 
     coeff[tensor::ZX] =
-        (Sf[vector::X]*C(XZ,tensor::XX) + G(vector::X,tensor::XX)*sigma[symmTensor::XZ])*g[vector::X]
-      + (Sf[vector::X]*C(XZ,tensor::YX) + G(vector::X,tensor::YX)*sigma[symmTensor::XZ])*g[vector::Y]
-      + (Sf[vector::X]*C(XZ,tensor::ZX) + G(vector::X,tensor::ZX)*sigma[symmTensor::XZ])*g[vector::Z]
+        (Sf[vector::X]*C(XZ,XX) + G(vector::X,tensor::XX)*sigma[symmTensor::XZ])*g[vector::X]
+      + (Sf[vector::X]*C(XZ,YX) + G(vector::X,tensor::YX)*sigma[symmTensor::XZ])*g[vector::Y]
+      + (Sf[vector::X]*C(XZ,ZX) + G(vector::X,tensor::ZX)*sigma[symmTensor::XZ])*g[vector::Z]
 
-      + (Sf[vector::Y]*C(YZ,tensor::XX) + G(vector::Y,tensor::XX)*sigma[symmTensor::YZ])*g[vector::X]
-      + (Sf[vector::Y]*C(YZ,tensor::YX) + G(vector::Y,tensor::YX)*sigma[symmTensor::YZ])*g[vector::Y]
-      + (Sf[vector::Y]*C(YZ,tensor::ZX) + G(vector::Y,tensor::ZX)*sigma[symmTensor::YZ])*g[vector::Z]
+      + (Sf[vector::Y]*C(YZ,XX) + G(vector::Y,tensor::XX)*sigma[symmTensor::YZ])*g[vector::X]
+      + (Sf[vector::Y]*C(YZ,YX) + G(vector::Y,tensor::YX)*sigma[symmTensor::YZ])*g[vector::Y]
+      + (Sf[vector::Y]*C(YZ,ZX) + G(vector::Y,tensor::ZX)*sigma[symmTensor::YZ])*g[vector::Z]
 
-      + (Sf[vector::Z]*C(ZZ,tensor::XX) + G(vector::Z,tensor::XX)*sigma[symmTensor::ZZ])*g[vector::X]
-      + (Sf[vector::Z]*C(ZZ,tensor::YX) + G(vector::Z,tensor::YX)*sigma[symmTensor::ZZ])*g[vector::Y]
-      + (Sf[vector::Z]*C(ZZ,tensor::ZX) + G(vector::Z,tensor::ZX)*sigma[symmTensor::ZZ])*g[vector::Z];
+      + (Sf[vector::Z]*C(ZZ,XX) + G(vector::Z,tensor::XX)*sigma[symmTensor::ZZ])*g[vector::X]
+      + (Sf[vector::Z]*C(ZZ,YX) + G(vector::Z,tensor::YX)*sigma[symmTensor::ZZ])*g[vector::Y]
+      + (Sf[vector::Z]*C(ZZ,ZX) + G(vector::Z,tensor::ZX)*sigma[symmTensor::ZZ])*g[vector::Z];
 
     // coeff_i2 = (Sf_m C_mik2 + G_mk2 sigma_mi) g_k delta_22
     //
@@ -179,17 +179,17 @@ void Foam::multiplyCoeffExtended
     //            + (Sf_3 C_3132 + G_332 sigma_31) g_3
 
     coeff[tensor::XY] =
-        (Sf[vector::X]*C(XX,tensor::XY) + G(vector::X,tensor::XY)*sigma[symmTensor::XX])*g[vector::X]
-      + (Sf[vector::X]*C(XX,tensor::YY) + G(vector::X,tensor::YY)*sigma[symmTensor::XX])*g[vector::Y]
-      + (Sf[vector::X]*C(XX,tensor::ZY) + G(vector::X,tensor::ZY)*sigma[symmTensor::XX])*g[vector::Z]
+        (Sf[vector::X]*C(XX,XY) + G(vector::X,tensor::XY)*sigma[symmTensor::XX])*g[vector::X]
+      + (Sf[vector::X]*C(XX,YY) + G(vector::X,tensor::YY)*sigma[symmTensor::XX])*g[vector::Y]
+      + (Sf[vector::X]*C(XX,ZY) + G(vector::X,tensor::ZY)*sigma[symmTensor::XX])*g[vector::Z]
 
-      + (Sf[vector::Y]*C(XY,tensor::XY) + G(vector::Y,tensor::XY)*sigma[symmTensor::XY])*g[vector::X]
-      + (Sf[vector::Y]*C(XY,tensor::YY) + G(vector::Y,tensor::YY)*sigma[symmTensor::XY])*g[vector::Y]
-      + (Sf[vector::Y]*C(XY,tensor::ZY) + G(vector::Y,tensor::ZY)*sigma[symmTensor::XY])*g[vector::Z]
+      + (Sf[vector::Y]*C(XY,XY) + G(vector::Y,tensor::XY)*sigma[symmTensor::XY])*g[vector::X]
+      + (Sf[vector::Y]*C(XY,YY) + G(vector::Y,tensor::YY)*sigma[symmTensor::XY])*g[vector::Y]
+      + (Sf[vector::Y]*C(XY,ZY) + G(vector::Y,tensor::ZY)*sigma[symmTensor::XY])*g[vector::Z]
 
-      + (Sf[vector::Z]*C(XZ,tensor::XY) + G(vector::Z,tensor::XY)*sigma[symmTensor::XZ])*g[vector::X]
-      + (Sf[vector::Z]*C(XZ,tensor::YY) + G(vector::Z,tensor::YY)*sigma[symmTensor::XZ])*g[vector::Y]
-      + (Sf[vector::Z]*C(XZ,tensor::ZY) + G(vector::Z,tensor::ZY)*sigma[symmTensor::XZ])*g[vector::Z];
+      + (Sf[vector::Z]*C(XZ,XY) + G(vector::Z,tensor::XY)*sigma[symmTensor::XZ])*g[vector::X]
+      + (Sf[vector::Z]*C(XZ,YY) + G(vector::Z,tensor::YY)*sigma[symmTensor::XZ])*g[vector::Y]
+      + (Sf[vector::Z]*C(XZ,ZY) + G(vector::Z,tensor::ZY)*sigma[symmTensor::XZ])*g[vector::Z];
 
     // coeff_22 = (Sf_m C_m2k2 + G_mk2 sigma_m2) g_k
     //
@@ -210,17 +210,17 @@ void Foam::multiplyCoeffExtended
     //            + (Sf_3 C_3232 + G_332 sigma_32) g_3
 
     coeff[tensor::YY] =
-        (Sf[vector::X]*C(XY,tensor::XY) + G(vector::X,tensor::XY)*sigma[symmTensor::XY])*g[vector::X]
-      + (Sf[vector::X]*C(XY,tensor::YY) + G(vector::X,tensor::YY)*sigma[symmTensor::XY])*g[vector::Y]
-      + (Sf[vector::X]*C(XY,tensor::ZY) + G(vector::X,tensor::ZY)*sigma[symmTensor::XY])*g[vector::Z]
+        (Sf[vector::X]*C(XY,XY) + G(vector::X,tensor::XY)*sigma[symmTensor::XY])*g[vector::X]
+      + (Sf[vector::X]*C(XY,YY) + G(vector::X,tensor::YY)*sigma[symmTensor::XY])*g[vector::Y]
+      + (Sf[vector::X]*C(XY,ZY) + G(vector::X,tensor::ZY)*sigma[symmTensor::XY])*g[vector::Z]
 
-      + (Sf[vector::Y]*C(YY,tensor::XY) + G(vector::Y,tensor::XY)*sigma[symmTensor::YY])*g[vector::X]
-      + (Sf[vector::Y]*C(YY,tensor::YY) + G(vector::Y,tensor::YY)*sigma[symmTensor::YY])*g[vector::Y]
-      + (Sf[vector::Y]*C(YY,tensor::ZY) + G(vector::Y,tensor::ZY)*sigma[symmTensor::YY])*g[vector::Z]
+      + (Sf[vector::Y]*C(YY,XY) + G(vector::Y,tensor::XY)*sigma[symmTensor::YY])*g[vector::X]
+      + (Sf[vector::Y]*C(YY,YY) + G(vector::Y,tensor::YY)*sigma[symmTensor::YY])*g[vector::Y]
+      + (Sf[vector::Y]*C(YY,ZY) + G(vector::Y,tensor::ZY)*sigma[symmTensor::YY])*g[vector::Z]
 
-      + (Sf[vector::Z]*C(YZ,tensor::XY) + G(vector::Z,tensor::XY)*sigma[symmTensor::YZ])*g[vector::X]
-      + (Sf[vector::Z]*C(YZ,tensor::YY) + G(vector::Z,tensor::YY)*sigma[symmTensor::YZ])*g[vector::Y]
-      + (Sf[vector::Z]*C(YZ,tensor::ZY) + G(vector::Z,tensor::ZY)*sigma[symmTensor::YZ])*g[vector::Z];
+      + (Sf[vector::Z]*C(YZ,XY) + G(vector::Z,tensor::XY)*sigma[symmTensor::YZ])*g[vector::X]
+      + (Sf[vector::Z]*C(YZ,YY) + G(vector::Z,tensor::YY)*sigma[symmTensor::YZ])*g[vector::Y]
+      + (Sf[vector::Z]*C(YZ,ZY) + G(vector::Z,tensor::ZY)*sigma[symmTensor::YZ])*g[vector::Z];
 
     // coeff_32 = (Sf_m C_m3k2 + G_mk2 sigma_m3) g_k
     //
@@ -241,17 +241,17 @@ void Foam::multiplyCoeffExtended
     //            + (Sf_3 C_3332 + G_332 sigma_33) g_3
 
     coeff[tensor::ZY] =
-        (Sf[vector::X]*C(XZ,tensor::XY) + G(vector::X,tensor::XY)*sigma[symmTensor::XZ])*g[vector::X]
-      + (Sf[vector::X]*C(XZ,tensor::YY) + G(vector::X,tensor::YY)*sigma[symmTensor::XZ])*g[vector::Y]
-      + (Sf[vector::X]*C(XZ,tensor::ZY) + G(vector::X,tensor::ZY)*sigma[symmTensor::XZ])*g[vector::Z]
+        (Sf[vector::X]*C(XZ,XY) + G(vector::X,tensor::XY)*sigma[symmTensor::XZ])*g[vector::X]
+      + (Sf[vector::X]*C(XZ,YY) + G(vector::X,tensor::YY)*sigma[symmTensor::XZ])*g[vector::Y]
+      + (Sf[vector::X]*C(XZ,ZY) + G(vector::X,tensor::ZY)*sigma[symmTensor::XZ])*g[vector::Z]
 
-      + (Sf[vector::Y]*C(YZ,tensor::XY) + G(vector::Y,tensor::XY)*sigma[symmTensor::YZ])*g[vector::X]
-      + (Sf[vector::Y]*C(YZ,tensor::YY) + G(vector::Y,tensor::YY)*sigma[symmTensor::YZ])*g[vector::Y]
-      + (Sf[vector::Y]*C(YZ,tensor::ZY) + G(vector::Y,tensor::ZY)*sigma[symmTensor::YZ])*g[vector::Z]
+      + (Sf[vector::Y]*C(YZ,XY) + G(vector::Y,tensor::XY)*sigma[symmTensor::YZ])*g[vector::X]
+      + (Sf[vector::Y]*C(YZ,YY) + G(vector::Y,tensor::YY)*sigma[symmTensor::YZ])*g[vector::Y]
+      + (Sf[vector::Y]*C(YZ,ZY) + G(vector::Y,tensor::ZY)*sigma[symmTensor::YZ])*g[vector::Z]
 
-      + (Sf[vector::Z]*C(ZZ,tensor::XY) + G(vector::Z,tensor::XY)*sigma[symmTensor::ZZ])*g[vector::X]
-      + (Sf[vector::Z]*C(ZZ,tensor::YY) + G(vector::Z,tensor::YY)*sigma[symmTensor::ZZ])*g[vector::Y]
-      + (Sf[vector::Z]*C(ZZ,tensor::ZY) + G(vector::Z,tensor::ZY)*sigma[symmTensor::ZZ])*g[vector::Z];
+      + (Sf[vector::Z]*C(ZZ,XY) + G(vector::Z,tensor::XY)*sigma[symmTensor::ZZ])*g[vector::X]
+      + (Sf[vector::Z]*C(ZZ,YY) + G(vector::Z,tensor::YY)*sigma[symmTensor::ZZ])*g[vector::Y]
+      + (Sf[vector::Z]*C(ZZ,ZY) + G(vector::Z,tensor::ZY)*sigma[symmTensor::ZZ])*g[vector::Z];
 
     // coeff_i3 = (Sf_m C_mik3 + G_mk3 sigma_mi) g_k delta_33
     //
@@ -290,17 +290,17 @@ void Foam::multiplyCoeffExtended
         //			  + (Sf_3 C_3133 + G_333 sigma_31) g_3
 
     coeff[tensor::XZ] =
-        (Sf[vector::X]*C(XX,tensor::XZ) + G(vector::X,tensor::XZ)*sigma[symmTensor::XX])*g[vector::X]
-      + (Sf[vector::X]*C(XX,tensor::YZ) + G(vector::X,tensor::YZ)*sigma[symmTensor::XX])*g[vector::Y]
-      + (Sf[vector::X]*C(XX,tensor::ZZ) + G(vector::X,tensor::ZZ)*sigma[symmTensor::XX])*g[vector::Z]
+        (Sf[vector::X]*C(XX,XZ) + G(vector::X,tensor::XZ)*sigma[symmTensor::XX])*g[vector::X]
+      + (Sf[vector::X]*C(XX,YZ) + G(vector::X,tensor::YZ)*sigma[symmTensor::XX])*g[vector::Y]
+      + (Sf[vector::X]*C(XX,ZZ) + G(vector::X,tensor::ZZ)*sigma[symmTensor::XX])*g[vector::Z]
 
-      + (Sf[vector::Y]*C(XY,tensor::XZ) + G(vector::Y,tensor::XZ)*sigma[symmTensor::XY])*g[vector::X]
-      + (Sf[vector::Y]*C(XY,tensor::YZ) + G(vector::Y,tensor::YZ)*sigma[symmTensor::XY])*g[vector::Y]
-      + (Sf[vector::Y]*C(XY,tensor::ZZ) + G(vector::Y,tensor::ZZ)*sigma[symmTensor::XY])*g[vector::Z]
+      + (Sf[vector::Y]*C(XY,XZ) + G(vector::Y,tensor::XZ)*sigma[symmTensor::XY])*g[vector::X]
+      + (Sf[vector::Y]*C(XY,YZ) + G(vector::Y,tensor::YZ)*sigma[symmTensor::XY])*g[vector::Y]
+      + (Sf[vector::Y]*C(XY,ZZ) + G(vector::Y,tensor::ZZ)*sigma[symmTensor::XY])*g[vector::Z]
 
-      + (Sf[vector::Z]*C(XZ,tensor::XZ) + G(vector::Z,tensor::XZ)*sigma[symmTensor::XZ])*g[vector::X]
-      + (Sf[vector::Z]*C(XZ,tensor::YZ) + G(vector::Z,tensor::YZ)*sigma[symmTensor::XZ])*g[vector::Y]
-      + (Sf[vector::Z]*C(XZ,tensor::ZZ) + G(vector::Z,tensor::ZZ)*sigma[symmTensor::XZ])*g[vector::Z];
+      + (Sf[vector::Z]*C(XZ,XZ) + G(vector::Z,tensor::XZ)*sigma[symmTensor::XZ])*g[vector::X]
+      + (Sf[vector::Z]*C(XZ,YZ) + G(vector::Z,tensor::YZ)*sigma[symmTensor::XZ])*g[vector::Y]
+      + (Sf[vector::Z]*C(XZ,ZZ) + G(vector::Z,tensor::ZZ)*sigma[symmTensor::XZ])*g[vector::Z];
 
     // coeff_23 = (Sf_m C_m2k3 + G_mk3 sigma_m2) g_k
     //
@@ -321,17 +321,17 @@ void Foam::multiplyCoeffExtended
         //			  + (Sf_3 C_3233 + G_333 sigma_32) g_3
 
     coeff[tensor::YZ] =
-        (Sf[vector::X]*C(XY,tensor::XZ) + G(vector::X,tensor::XZ)*sigma[symmTensor::XY])*g[vector::X]
-      + (Sf[vector::X]*C(XY,tensor::YZ) + G(vector::X,tensor::YZ)*sigma[symmTensor::XY])*g[vector::Y]
-      + (Sf[vector::X]*C(XY,tensor::ZZ) + G(vector::X,tensor::ZZ)*sigma[symmTensor::XY])*g[vector::Z]
+        (Sf[vector::X]*C(XY,XZ) + G(vector::X,tensor::XZ)*sigma[symmTensor::XY])*g[vector::X]
+      + (Sf[vector::X]*C(XY,YZ) + G(vector::X,tensor::YZ)*sigma[symmTensor::XY])*g[vector::Y]
+      + (Sf[vector::X]*C(XY,ZZ) + G(vector::X,tensor::ZZ)*sigma[symmTensor::XY])*g[vector::Z]
 
-      + (Sf[vector::Y]*C(YY,tensor::XZ) + G(vector::Y,tensor::XZ)*sigma[symmTensor::YY])*g[vector::X]
-      + (Sf[vector::Y]*C(YY,tensor::YZ) + G(vector::Y,tensor::YZ)*sigma[symmTensor::YY])*g[vector::Y]
-      + (Sf[vector::Y]*C(YY,tensor::ZZ) + G(vector::Y,tensor::ZZ)*sigma[symmTensor::YY])*g[vector::Z]
+      + (Sf[vector::Y]*C(YY,XZ) + G(vector::Y,tensor::XZ)*sigma[symmTensor::YY])*g[vector::X]
+      + (Sf[vector::Y]*C(YY,YZ) + G(vector::Y,tensor::YZ)*sigma[symmTensor::YY])*g[vector::Y]
+      + (Sf[vector::Y]*C(YY,ZZ) + G(vector::Y,tensor::ZZ)*sigma[symmTensor::YY])*g[vector::Z]
 
-      + (Sf[vector::Z]*C(YZ,tensor::XZ) + G(vector::Z,tensor::XZ)*sigma[symmTensor::YZ])*g[vector::X]
-      + (Sf[vector::Z]*C(YZ,tensor::YZ) + G(vector::Z,tensor::YZ)*sigma[symmTensor::YZ])*g[vector::Y]
-      + (Sf[vector::Z]*C(YZ,tensor::ZZ) + G(vector::Z,tensor::ZZ)*sigma[symmTensor::YZ])*g[vector::Z];
+      + (Sf[vector::Z]*C(YZ,XZ) + G(vector::Z,tensor::XZ)*sigma[symmTensor::YZ])*g[vector::X]
+      + (Sf[vector::Z]*C(YZ,YZ) + G(vector::Z,tensor::YZ)*sigma[symmTensor::YZ])*g[vector::Y]
+      + (Sf[vector::Z]*C(YZ,ZZ) + G(vector::Z,tensor::ZZ)*sigma[symmTensor::YZ])*g[vector::Z];
 
     // coeff_33 = (Sf_m C_m3k3 + G_mk3 sigma_m3) g_k
     //
@@ -352,17 +352,17 @@ void Foam::multiplyCoeffExtended
         //			  + (Sf_3 C_3333 + G_333 sigma_33) g_3
 
     coeff[tensor::ZZ] =
-        (Sf[vector::X]*C(XZ,tensor::XZ) + G(vector::X,tensor::XZ)*sigma[symmTensor::XZ])*g[vector::X]
-      + (Sf[vector::X]*C(XZ,tensor::YZ) + G(vector::X,tensor::YZ)*sigma[symmTensor::XZ])*g[vector::Y]
-      + (Sf[vector::X]*C(XZ,tensor::ZZ) + G(vector::X,tensor::ZZ)*sigma[symmTensor::XZ])*g[vector::Z]
+        (Sf[vector::X]*C(XZ,XZ) + G(vector::X,tensor::XZ)*sigma[symmTensor::XZ])*g[vector::X]
+      + (Sf[vector::X]*C(XZ,YZ) + G(vector::X,tensor::YZ)*sigma[symmTensor::XZ])*g[vector::Y]
+      + (Sf[vector::X]*C(XZ,ZZ) + G(vector::X,tensor::ZZ)*sigma[symmTensor::XZ])*g[vector::Z]
 
-      + (Sf[vector::Y]*C(YZ,tensor::XZ) + G(vector::Y,tensor::XZ)*sigma[symmTensor::YZ])*g[vector::X]
-      + (Sf[vector::Y]*C(YZ,tensor::YZ) + G(vector::Y,tensor::YZ)*sigma[symmTensor::YZ])*g[vector::Y]
-      + (Sf[vector::Y]*C(YZ,tensor::ZZ) + G(vector::Y,tensor::ZZ)*sigma[symmTensor::YZ])*g[vector::Z]
+      + (Sf[vector::Y]*C(YZ,XZ) + G(vector::Y,tensor::XZ)*sigma[symmTensor::YZ])*g[vector::X]
+      + (Sf[vector::Y]*C(YZ,YZ) + G(vector::Y,tensor::YZ)*sigma[symmTensor::YZ])*g[vector::Y]
+      + (Sf[vector::Y]*C(YZ,ZZ) + G(vector::Y,tensor::ZZ)*sigma[symmTensor::YZ])*g[vector::Z]
 
-      + (Sf[vector::Z]*C(ZZ,tensor::XZ) + G(vector::Z,tensor::XZ)*sigma[symmTensor::ZZ])*g[vector::X]
-      + (Sf[vector::Z]*C(ZZ,tensor::YZ) + G(vector::Z,tensor::YZ)*sigma[symmTensor::ZZ])*g[vector::Y]
-      + (Sf[vector::Z]*C(ZZ,tensor::ZZ) + G(vector::Z,tensor::ZZ)*sigma[symmTensor::ZZ])*g[vector::Z];
+      + (Sf[vector::Z]*C(ZZ,XZ) + G(vector::Z,tensor::XZ)*sigma[symmTensor::ZZ])*g[vector::X]
+      + (Sf[vector::Z]*C(ZZ,YZ) + G(vector::Z,tensor::YZ)*sigma[symmTensor::ZZ])*g[vector::Y]
+      + (Sf[vector::Z]*C(ZZ,ZZ) + G(vector::Z,tensor::ZZ)*sigma[symmTensor::ZZ])*g[vector::Z];
 }
 
 

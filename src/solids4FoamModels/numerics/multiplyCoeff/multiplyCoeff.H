@@ -58,8 +58,7 @@ namespace Foam
     (
         tensor& coeff,
         const vector& Sf,
-        // const scalarSquareMatrix& C,
-        const RectangularMatrix<scalar>& C,
+        const scalarSquareMatrix& C,
         const vector& g
     );
 

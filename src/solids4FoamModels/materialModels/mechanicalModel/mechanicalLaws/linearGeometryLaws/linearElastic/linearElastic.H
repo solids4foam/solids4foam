@@ -112,7 +112,7 @@ public:
 
 #ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
-        virtual RectangularMatrix<scalar> materialTangent() const;
+        virtual scalarSquareMatrix materialTangent() const;
 #endif
 
         //- Provide access to mu for the coupledUnsNonLinLinearElasticSolid

@@ -1608,14 +1608,14 @@ Foam::tmp<Foam::surfaceScalarField> Foam::mechanicalLaw::impKf() const
 
 
 #ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
+Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::mechanicalLaw::materialTangentField() const
 {
     // Default to uniform field
     // This function can be overwritten in specific mechanical laws
-    tmp<Field<RectangularMatrix<scalar>>> tresult
+    tmp<Field<scalarSquareMatrix>> tresult
     (
-        new Field<RectangularMatrix<scalar>>(mesh().nFaces(), materialTangent())
+        new Field<scalarSquareMatrix>(mesh().nFaces(), materialTangent())
     );
 
     return tresult;

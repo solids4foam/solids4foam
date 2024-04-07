@@ -41,6 +41,7 @@ Author
 #include "volFields.H"
 #include "pointFields.H"
 #include "sparseMatrix.H"
+#include "scalarMatrices.H"
 #include "RectangularMatrix.H"
 #include "cellPointLeastSquaresVectors.H"
 #include "SparseMatrixTemplate.H"
@@ -57,14 +58,14 @@ namespace vfvm
     // side
     void divSigma
     (
-		sparseMatrix& matrix,
-		const fvMesh& mesh,
-		const fvMesh& dualMesh,
-		const labelList& dualFaceToCell,
-		const labelList& dualCellToPoint,
-		const Field<RectangularMatrix<scalar>>& materialTangentField,
-		const scalar zeta,
-		const bool debug = false
+        sparseMatrix& matrix,
+        const fvMesh& mesh,
+        const fvMesh& dualMesh,
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const Field<scalarSquareMatrix>& materialTangentField,
+        const scalar zeta,
+        const bool debug = false
     );
 
 

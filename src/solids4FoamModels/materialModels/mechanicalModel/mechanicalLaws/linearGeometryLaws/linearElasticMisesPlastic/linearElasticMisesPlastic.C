@@ -788,18 +788,18 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
 
 
 #ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
+Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::linearElasticMisesPlastic::materialTangentField() const
 {
     // Prepare tmp field
-    tmp<Field<Foam::RectangularMatrix<Foam::scalar>>> tresult
+    tmp<Field<scalarSquareMatrix>> tresult
     (
-        new Field<Foam::RectangularMatrix<Foam::scalar>>
+        new Field<scalarSquareMatrix>
         (
-            mesh().nFaces(), Foam::RectangularMatrix<scalar>(6, 6, 0.0)
+            mesh().nFaces(), Foam::scalarSquareMatrix(6, 0.0)
         )
     );
-    Field<Foam::RectangularMatrix<Foam::scalar>>& result = tresult.ref();
+    Field<scalarSquareMatrix>& result = tresult.ref();
 
     // Calculated as per box 3.2 in Simo and Hughes
 
@@ -855,7 +855,6 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
 
         // For each component of epsilon, sequentially apply a perturbation and
         // then calculate the resulting sigma
-        //for (label cmptI = 0; cmptI < tensor::nComponents; cmptI++)
         for (label cmptI = 0; cmptI < symmTensor::nComponents; cmptI++)
         {
             // Map tensor component to symmTensor

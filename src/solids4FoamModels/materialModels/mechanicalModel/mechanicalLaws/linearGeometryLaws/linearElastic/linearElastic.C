@@ -243,10 +243,10 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 
 
 #ifdef OPENFOAM_NOT_EXTEND
-Foam::RectangularMatrix<Foam::scalar> Foam::linearElastic::materialTangent() const
+Foam::scalarSquareMatrix Foam::linearElastic::materialTangent() const
 {
     // Prepare 6x6 tangent matrix
-    RectangularMatrix<scalar> matTang(6, 6, 0.0);
+    scalarSquareMatrix matTang(6, 0.0);
 
     // Define matrix indices for readability
     const label XX = symmTensor::XX;

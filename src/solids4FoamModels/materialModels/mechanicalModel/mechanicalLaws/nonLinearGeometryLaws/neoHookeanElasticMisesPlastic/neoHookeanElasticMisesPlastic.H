@@ -291,8 +291,7 @@ public:
 
 #ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
-        virtual tmp<Field<RectangularMatrix<scalar>>>
-            materialTangentField() const;
+        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
 #endif
 
         //- Update the stress

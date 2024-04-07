@@ -125,8 +125,7 @@ public:
         virtual tmp<volScalarField> impK() const;
 
         //- Return material tangent
-        Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
-		materialTangentField() const;
+        tmp<Field<scalarSquareMatrix>> materialTangentField() const;
 
         //- Return the bulk modulus field
         virtual tmp<volScalarField> bulkModulus() const;

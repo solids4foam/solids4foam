@@ -331,20 +331,20 @@ const Foam::fvMesh& Foam::dualMechanicalModel::mesh() const
 }
 
 #ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
+Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::dualMechanicalModel::materialTangentFaceField() const
 {
     const PtrList<mechanicalLaw>& laws = *this;
 
     // Prepare the field
-    tmp< Field<RectangularMatrix<scalar>> > tresult
+    tmp<Field<scalarSquareMatrix>> tresult
     (
-        new Field<RectangularMatrix<scalar>>
+        new Field<scalarSquareMatrix>
         (
-            mesh().nFaces(), RectangularMatrix<scalar>(6)
+            mesh().nFaces(), scalarSquareMatrix(6)
         )
     );
-    Field<RectangularMatrix<scalar>>& result = tresult.ref();
+    Field<scalarSquareMatrix>& result = tresult.ref();
 
     if (laws.size() == 1)
     {

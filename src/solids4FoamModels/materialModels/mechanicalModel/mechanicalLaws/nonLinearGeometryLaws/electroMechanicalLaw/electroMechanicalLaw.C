@@ -168,7 +168,7 @@ Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::impK() const
 
 
 #ifdef OPENFOAM_NOT_EXTEND
-Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
+Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::electroMechanicalLaw::materialTangentField() const
 {
     return passiveMechLawPtr_->materialTangentField();

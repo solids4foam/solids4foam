@@ -510,18 +510,18 @@ public:
 
 #ifdef OPENFOAM_NOT_EXTEND
         //- Material tangent for Newton Raphson loop
-        virtual RectangularMatrix<scalar> materialTangent() const
+        virtual scalarSquareMatrix materialTangent() const
         {
             // We could use numerical differentiation for this if needed
             notImplemented("Not yet implemented for this mechanical law");
 
             // Keep compiler happy
-            return RectangularMatrix<scalar>(0);
+            return scalarSquareMatrix(0);
         }
 
         //- Material tangent field for Newton Raphson loop
         //  The size of this field should be mesh.nFaces()
-        virtual tmp<Field<RectangularMatrix<scalar>>>
+        virtual tmp<Field<scalarSquareMatrix>>
             materialTangentField() const;
 #endif
 
