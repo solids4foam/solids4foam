@@ -352,20 +352,20 @@ void Foam::vfvm::divSigma
                 sigmaf,
                 lsVec
             );
-            
+
             // Insert pressure coefficients
 			for (int i = 0; i < 3; i++)
 			{
-			    // Add the coefficient to the ownPointID equation 
+			    // Add the coefficient to the ownPointID equation
 			    matrix(ownPointID, pointID)(i,3) += -curDualSfDef.component(i)/curCellPoints.size();
 //		        Info << "dualFaceI: " << dualFaceI << endl;
 //	            Info << "matrix ( " << ownPointID << ", " << ownPointID << " ) " << matrix(ownPointID, ownPointID) << endl;
-//	        	Info << "-curDualSfDef ( " << ownPointID << ", " << ownPointID << " ) " << -curDualSfDef << endl; 
-			    
+//	        	Info << "-curDualSfDef ( " << ownPointID << ", " << ownPointID << " ) " << -curDualSfDef << endl;
+
 			    // Add the coefficient to the neiPointID equation coming from ownPointID
 			    matrix(neiPointID, pointID)(i,3) -= -curDualSfDef.component(i)/curCellPoints.size();
 //	            Info << "matrix ( " << neiPointID << ", " << ownPointID << " ) " << matrix(neiPointID, ownPointID) << endl;
-//	        	Info << "curDualSfDef ( " << ownPointID << ", " << ownPointID << " ) " << curDualSfDef << endl; 
+//	        	Info << "curDualSfDef ( " << ownPointID << ", " << ownPointID << " ) " << curDualSfDef << endl;
 			}
 
             // Insert displacement coefficients
@@ -434,7 +434,7 @@ void Foam::vfvm::divSigma
 //				Info << "coeff ( " << neiPointID << ", " << ownPointID << " ) " << edgeDirCoeff << endl;
                 cmptI++;
             }
-        }        
+        }
     }
 
     if (debug)
@@ -660,7 +660,7 @@ void Foam::vfvm::Sp
     {
     	// pBarSensitivity for pointI
         const tensor& pBarSensitivityI = pBarSensitivity[pointI];
-        
+
         // Point-point neighbours
         const labelList& curPointPoints = pointPoints[pointI];
 
@@ -672,29 +672,29 @@ void Foam::vfvm::Sp
         forAll(curPointPoints, ppI)
         {
             const label pointPointID = curPointPoints[ppI];
-            
+
             // Least squares vector from the average point to this neighbour
             // point
             const vector& lsVec = curLeastSquaresVecs[ppI];
-            
+
             // Calculate the coefficient for this pointPoint
             const vector coeff = (pBarSensitivityI & lsVec)*pointVolI[pointI];
-            
+
             // Insert the displacement coefficient of pressure equation
             for (int i = 0; i < 3; i++)
-            {            	
+            {
             	matrix(pointI, pointPointID)(3,i) -= coeff.component(i);
             	matrix(pointPointID, pointI)(3,i) += coeff.component(i);
 //            	Info << "Before multiplying: " << endl;
 //			    Info << "matrix ( " << pointID << ", " << pointID << " ) " << matrix(pointID, pointID) << endl;
 //				Info << "coeff ( " << pointID << ", " << pointID << " ) " << coeff << endl;
-            }            
-        }               
+            }
+        }
     }
 
     // Insert pressure coefficient of pressure equation
     forAll(pointVolI, pointI)
-    {    	
+    {
         matrix(pointI, pointI)(3,3) += pointVolI[pointI];
 //        Info << "matrix ( " << pointI << ", " << pointI << " ) " << matrix(pointI, pointI) << endl;
 //        Info << "pointVolI ( " << pointI << " ) " << pointVolI[pointI] << endl;

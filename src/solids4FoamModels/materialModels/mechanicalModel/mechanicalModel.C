@@ -867,7 +867,7 @@ void Foam::mechanicalModel::interpolate
     }
 #else
     this->interpolate(D, pointD, useVolFieldSigma);
-#endif    
+#endif
 }
 
 

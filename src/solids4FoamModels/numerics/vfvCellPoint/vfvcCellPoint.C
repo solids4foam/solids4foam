@@ -905,7 +905,7 @@ tmp<volScalarField> interpolate
 
             // Calculate pointP average
             pointPAvg += pointPI[pointID]/nPoints;
-        } 
+        }
 
         result[cellI] = pointPAvg;
     }
@@ -1039,7 +1039,7 @@ tmp<surfaceScalarField> interpolate
             }
         }
     }
-    
+
     if (debug)
     {
         Info<< "surfaceScalarField interpolate(...): end" << endl;
