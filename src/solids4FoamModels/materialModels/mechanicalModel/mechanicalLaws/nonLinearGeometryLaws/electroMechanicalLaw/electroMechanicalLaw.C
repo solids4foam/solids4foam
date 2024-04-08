@@ -34,67 +34,6 @@ namespace Foam
 }
 
 
-// * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * * //
-
-// void Foam::electroMechanicalLaw::makeP0f() const
-// {
-//     if (p0fPtr_)
-//     {
-//         FatalErrorIn("void Foam::electroMechanicalLaw::makeP0f() const")
-//             << "pointer already set" << abort(FatalError);
-//     }
-
-//     p0fPtr_ =
-//         new surfaceScalarField
-//         (
-//             "p0f",
-//             fvc::interpolate(p0_)
-//         );
-// }
-
-
-// const Foam::surfaceScalarField& Foam::electroMechanicalLaw::p0f() const
-// {
-//     if (!p0fPtr_)
-//     {
-//         makeP0f();
-//     }
-
-//     return *p0fPtr_;
-// }
-
-
-// const Foam::volScalarField& Foam::electroMechanicalLaw::lookupPressureField() const
-// {
-//     if (mesh().thisDb().parent().foundObject<objectRegistry>(pRegion_))
-//     {
-//         return mesh().thisDb().parent().subRegistry
-//         (
-//             pRegion_
-//         ).lookupObject<volScalarField>(pName_);
-//     }
-//     else if
-//     (
-//         mesh().thisDb().parent().foundObject<objectRegistry>("solid")
-//     )
-//     {
-//         return mesh().thisDb().parent().subRegistry
-//         (
-//             "solid"
-//         ).lookupObject<volScalarField>(pName_);
-//     }
-//     else
-//     {
-//         FatalErrorIn("Foam::electroMechanicalLaw::lookupPressureField()")
-//             << "Cannot find " << pName_ << " field in " << pRegion_
-//             << " or in 'solid'" << abort(FatalError);
-//     }
-
-//     // Keep compiler happy
-//     return mesh().lookupObject<volScalarField>("null");
-// }
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 // Construct from dictionary
@@ -117,48 +56,22 @@ Foam::electroMechanicalLaw::electroMechanicalLaw
             nonLinGeom
         )
     ),
-    Ta_(dict.lookup("activeTension"))
-    // b_
-    // (
-    //     mechanicalLaw::dict().lookupOrAddDefault<dimensionedScalar>
-    //     (
-    //         "biotCoeff", dimensionedScalar("0", dimless, 1.0)
-    //     )
-    // ),
-    // pName_(mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldName", "p")),
-    // pRegion_(mechanicalLaw::dict().lookupOrAddDefault<word>("pressureFieldRegion", "region0")),
-    // p0_
-    // (
-    //     IOobject
-    //     (
-    //         "p0",
-    //         mesh.time().timeName(),
-    //         mesh,
-    //         IOobject::NO_READ,
-    //         IOobject::NO_WRITE
-    //     ),
-    //     mesh,
-    //     mechanicalLaw::dict().lookupOrAddDefault<dimensionedScalar>
-    //     (
-    //         "p0",
-    //         dimensionedScalar("zero", dimPressure, 0.0)
-    //     )
-    // ),
-    // p0fPtr_(NULL)
+    Ta_(dict.lookup("activeTension")),
+    rampTime_(readScalar(dict.lookup("rampTime")))
 {
-    // if (gMax(mag(p0_)()) > SMALL)
-    // {
-    //     Info<< "Reading p0 initial/residual pore-pressure field" << endl;
-    // }
+    if (rampTime_ < 0.0)
+    {
+        FatalErrorIn("electroMechanicalLaw::electroMechanicalLaw(...)")
+            << "rampTime should be greater than or equal to zero"
+            << abort(FatalError);
+    }
 }
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
 Foam::electroMechanicalLaw::~electroMechanicalLaw()
-{
-    // deleteDemandDrivenData(p0fPtr_);
-}
+{}
 
 
 Foam::tmp<Foam::volScalarField> Foam::electroMechanicalLaw::impK() const
@@ -204,10 +117,17 @@ void Foam::electroMechanicalLaw::correct(volSymmTensorField& sigma)
     // The next step will be to include an active-stress model to convert
     // muscle activation to fibre tension
 
+    // Calculate current value of Ta
+    dimensionedScalar currentTa = Ta_;
+    if (mesh().time().value() < rampTime_)
+    {
+        currentTa = (mesh().time().value()/rampTime_)*Ta_;
+    }
+
     // Add active stress to the passive stress
     // Note that the active stress is converted from a 2nd Piola-Kirchhoff
     // stress to a Cauchy stress
-    sigma += J*symm(F & (Ta_*f0f0) & F.T());
+    sigma += J*symm(F & (currentTa*f0f0) & F.T());
 }
 
 
@@ -233,10 +153,17 @@ void Foam::electroMechanicalLaw::correct(surfaceSymmTensorField& sigma)
     // The next step will be to include an active-stress model to convert
     // muscle activation to fibre tension
 
+    // Calculate current value of Ta
+    dimensionedScalar currentTa = Ta_;
+    if (mesh().time().value() < rampTime_)
+    {
+        currentTa = (mesh().time().value()/rampTime_)*Ta_;
+    }
+
     // Add active stress to the passive stress
     // Note that the active stress is converted from a 2nd Piola-Kirchhoff
     // stress to a Cauchy stress
-    sigma += J*symm(F & (Ta_*f0f0) & F.T());
+    sigma += J*symm(F & (currentTa*f0f0) & F.T());
 }
 
 
