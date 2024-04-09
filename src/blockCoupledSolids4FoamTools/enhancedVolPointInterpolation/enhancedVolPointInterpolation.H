@@ -40,6 +40,18 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_ORG
+
+    // For OpenFOAM.org, enhancedVolPointInterpolation is just an alias for
+    // volPointInterpolation
+    #include "volPointInterpolation.H"
+    namespace Foam
+    {
+        typedef volPointInterpolation enhancedVolPointInterpolation;
+    }
+
+#else
+
 #ifndef enhancedVolPointInterpolation_H
 #define enhancedVolPointInterpolation_H
 
@@ -334,5 +346,7 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
+
+#endif // not OPENFOAM_ORG
 
 // ************************************************************************* //

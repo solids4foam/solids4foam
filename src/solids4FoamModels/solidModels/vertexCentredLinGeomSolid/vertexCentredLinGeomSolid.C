@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_COM
+
 #include "vertexCentredLinGeomSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "sparseMatrix.H"
@@ -2003,5 +2005,7 @@ void vertexCentredLinGeomSolid::writeFields(const Time& runTime)
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //

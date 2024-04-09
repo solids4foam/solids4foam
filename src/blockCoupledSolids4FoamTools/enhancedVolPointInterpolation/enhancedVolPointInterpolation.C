@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifndef OPENFOAM_ORG
+
 #include "enhancedVolPointInterpolation.H"
 #include "fvMesh.H"
 #include "volFields.H"
@@ -515,5 +517,6 @@ void Foam::enhancedVolPointInterpolation::interpolateDisplacement
     pcs.constrainDisplacement(pf, false);
 }
 
+#endif // not OPENFOAM_ORG
 
 // ************************************************************************* //
