@@ -68,6 +68,28 @@ namespace vfvm
         const bool debug = false
     );
 
+    // Add coefficients to the matrix for the divergence of stress
+    // for a finite strain displacement formulation. Each coefficient in the
+    // matrix is a 3x3 matrix.
+    // Note: this function does not calculate contributions to the right-hand
+    // side
+    void divSigma
+    (
+        sparseMatrix& matrix,
+        const fvMesh& mesh,
+        const fvMesh& dualMesh,
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const Field<scalarSquareMatrix>& materialTangentField,
+        const Field<RectangularMatrix<scalar>>& geometricStiffnessField,
+        const symmTensorField& sigma,
+        const tensorField& dualGradDField,
+        const boolList& fixedDofs,
+        const symmTensorField& fixedDofDirections,
+        const scalar fixedDofScale,
+        const scalar zeta, // fraction of compact edge direction component used
+        const bool debug = false
+    );
 
     // Add coefficients to the matrix for the Laplacian of a scalar field with
     // a scalar diffusivity field

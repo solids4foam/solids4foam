@@ -20,7 +20,6 @@ License
 #include "vertexCentredNonLinGeomTotalLagDisplacementSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "vfvcCellPoint.H"
-#include "vfvmCellPointExtended.H"
 #include "fvcDiv.H"
 #include "fixedValuePointPatchFields.H"
 #include "solidTractionPointPatchVectorField.H"
