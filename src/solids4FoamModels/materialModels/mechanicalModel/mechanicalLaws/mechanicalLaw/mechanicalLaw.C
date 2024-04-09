@@ -1455,6 +1455,9 @@ void Foam::mechanicalLaw::updateSigmaHyd
         {
             delete ADPtr;
         }
+
+        // Update the gradient
+        gradSigmaHyd = fvc::grad(sigmaHyd);
     }
     else
     {
@@ -1463,9 +1466,6 @@ void Foam::mechanicalLaw::updateSigmaHyd
         // name and writeOpt
         sigmaHyd = 1.0*sigmaHydExplicit;
     }
-
-    // Update the gradient
-    gradSigmaHyd = fvc::grad(sigmaHyd);
 }
 
 
