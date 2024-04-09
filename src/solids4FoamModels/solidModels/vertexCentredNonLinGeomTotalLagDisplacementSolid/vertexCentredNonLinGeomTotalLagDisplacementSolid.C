@@ -20,6 +20,7 @@ License
 #include "vertexCentredNonLinGeomTotalLagDisplacementSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "vfvcCellPoint.H"
+#include "vfvmCellPoint.H"
 #include "fvcDiv.H"
 #include "fixedValuePointPatchFields.H"
 #include "solidTractionPointPatchVectorField.H"
@@ -1199,7 +1200,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
         );
 
         // Add d2dt2 coefficients
-        vfvm::d2dt2Extended
+        vfvm::d2dt2
         (
 #ifdef OPENFOAM_NOT_EXTEND
             mesh().d2dt2Scheme("d2dt2(pointD)"),
@@ -1308,7 +1309,7 @@ bool vertexCentredNonLinGeomTotalLagDisplacementSolid::evolve()
             );
 
             // Add d2dt2 coefficients
-            vfvm::d2dt2Extended
+            vfvm::d2dt2
             (
 #ifdef OPENFOAM_NOT_EXTEND
                 mesh().d2dt2Scheme("d2dt2(pointD)"),
