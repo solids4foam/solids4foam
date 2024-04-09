@@ -35,4 +35,12 @@ solids4Foam::runApplication surfaceToPatch base.stl -noFunctionObjects
 rm -rf constant/polyMesh; mv 0.01/polyMesh constant/; rm -rf 0.01
 
 # Run solver
-solids4Foam::runApplication solids4Foam
+if [[ "$1" == "parallel" ]]; then
+    # Run parallel
+    solids4Foam::runApplication decomposePar
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication reconstructPar
+else
+    # Run serial
+    solids4Foam::runApplication solids4Foam
+fi
