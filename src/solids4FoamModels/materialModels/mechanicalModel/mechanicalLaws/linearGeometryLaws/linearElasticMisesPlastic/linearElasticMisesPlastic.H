@@ -281,7 +281,7 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         //- Material tangent for Newton Raphson loop
         virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
 #endif
@@ -316,7 +316,7 @@ public:
         (
             pointSymmTensorField& sigma,
             const pointTensorField& gradD
-        ) const;
+        );
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model

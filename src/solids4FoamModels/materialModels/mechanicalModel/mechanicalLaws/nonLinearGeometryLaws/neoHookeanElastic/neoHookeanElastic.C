@@ -139,6 +139,7 @@ Foam::tmp<Foam::volScalarField> Foam::neoHookeanElastic::bulkModulus() const
     );
 }
 
+#ifdef OPENFOAM_COM
 Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::neoHookeanElastic::materialTangentField() const
 {
@@ -150,11 +151,7 @@ Foam::neoHookeanElastic::materialTangentField() const
             mesh().nFaces(), scalarSquareMatrix(6, 0.0)
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
     Field<scalarSquareMatrix>& result = tresult.ref();
-#else
-    Field<scalarSquareMatrix>& result = tresult();
-#endif
 
     // Calculate tangent field
     //if (dict().lookup("numericalTangent"));
@@ -272,6 +269,7 @@ Foam::neoHookeanElastic::materialTangentField() const
 
     return tresult;
 }
+#endif // OPENFOAM_COM
 
 
 void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)

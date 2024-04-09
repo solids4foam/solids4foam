@@ -787,7 +787,7 @@ Foam::linearElasticMisesPlastic::impKdiagTensor() const
 #endif
 
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
 Foam::tmp<Foam::Field<Foam::scalarSquareMatrix>>
 Foam::linearElasticMisesPlastic::materialTangentField() const
 {
@@ -947,7 +947,7 @@ Foam::linearElasticMisesPlastic::materialTangentField() const
 
     return tresult;
 }
-#endif
+#endif // OPENFOAM_COM
 
 
 void Foam::linearElasticMisesPlastic::correct(volSymmTensorField& sigma)
@@ -1247,7 +1247,7 @@ void Foam::linearElasticMisesPlastic::correct
 (
     pointSymmTensorField& sigma,
     const pointTensorField& gradD
-) const
+)
 {
     // Calculate strain
     const pointSymmTensorField pEpsilon(symm(gradD));
@@ -1268,8 +1268,8 @@ void Foam::linearElasticMisesPlastic::correct
     pointSymmTensorField plasticN("plasticNtmp", 1.0*pPlasticN_);
     pointScalarField DSigmaY("DSigmaYtmp", 1.0*pDSigmaY_);
     pointScalarField DLambda("DLambdatmp", 1.0*pDLambda_);
-    pointScalarField sigmaY("sigmaYtmp", 1.0*pSigmaY_);
 
+#ifdef OPENFOAM_NOT_EXTEND
     // Normalise residual in Newton method with respect to mag(bE)
     const scalar maxMagBE = max(gMax(mag(pEpsilon.primitiveField())), SMALL);
 
@@ -1279,9 +1279,23 @@ void Foam::linearElasticMisesPlastic::correct
     symmTensorField& plasticNI = plasticN.primitiveFieldRef();
     scalarField& DSigmaYI = DSigmaY.primitiveFieldRef();
     scalarField& DLambdaI = DLambda.primitiveFieldRef();
-    scalarField& sigmaYI = sigmaY.primitiveFieldRef();
+    scalarField& sigmaYI = pSigmaY_.primitiveFieldRef();
     const scalarField& sigmaYOldI = pSigmaY_.oldTime().primitiveField();
     const scalarField& epsilonPEqOldI = pEpsilonPEq_.oldTime().primitiveField();
+#else
+    // Normalise residual in Newton method with respect to mag(bE)
+    const scalar maxMagBE = max(gMax(mag(pEpsilon.internalField())), SMALL);
+
+    // Take references to the internal fields for efficiency
+    const scalarField& fTrialI = fTrial.internalField();
+    const symmTensorField& sTrialI = sTrial.internalField();
+    symmTensorField& plasticNI = plasticN.internalField();
+    scalarField& DSigmaYI = DSigmaY.internalField();
+    scalarField& DLambdaI = DLambda.internalField();
+    scalarField& sigmaYI = pSigmaY_.internalField();
+    const scalarField& sigmaYOldI = pSigmaY_.oldTime().internalField();
+    const scalarField& epsilonPEqOldI = pEpsilonPEq_.oldTime().internalField();
+#endif
 
     // Calculate DLambdaf_ and plasticNf_
     // int numYield = 0;
@@ -1290,39 +1304,31 @@ void Foam::linearElasticMisesPlastic::correct
         // Update plasticN, DLambda, DSigmaY and sigmaY for this face
         updatePlasticity
         (
-           plasticNI[faceI],
-           DLambdaI[faceI],
-           DSigmaYI[faceI],
-           sigmaYI[faceI],
-           sigmaYOldI[faceI],
-           fTrialI[faceI],
-           sTrialI[faceI],
-           epsilonPEqOldI[faceI],
-           mu_.value(),
-           maxMagBE
+            plasticNI[faceI],
+            DLambdaI[faceI],
+            DSigmaYI[faceI],
+            sigmaYI[faceI],
+            sigmaYOldI[faceI],
+            fTrialI[faceI],
+            sTrialI[faceI],
+            epsilonPEqOldI[faceI],
+            mu_.value(),
+            maxMagBE
         );
-
-        // if (fTrialI[faceI] > 0)
-        // {
-        //     numYield++;
-        // }
     }
-    // Info<< "        tang: numYield = " <<  numYield << endl;
 
-    // Update DEpsilonPEq
-    // DEpsilonPEqf_ = sqrtTwoOverThree_*DLambdaf_;
+    // Calculate DEpsilonPEq
+    const pointScalarField DEpsilonPEq(sqrtTwoOverThree_*DLambda);
 
-    // Store previous iteration for residual calculation
-    // DEpsilonPf_.storePrevIter();
-
-    // Update DEpsilonP
+    // Calculate DEpsilonP
     const pointSymmTensorField DEpsilonP(DLambda*plasticN);
 
     // Update total plastic strain
-    // epsilonPf_ = epsilonPf_.oldTime() + DEpsilonPf_;
+    // We don't current store the point field
+    // pEepsilonP_ = pEpsilonP_.oldTime() + DEpsilonP;
 
     // Update equivalent total plastic strain
-    // epsilonPEqf_ = epsilonPEqf_.oldTime() + DEpsilonPEqf_;
+    pEpsilonPEq_ = pEpsilonPEq_.oldTime() + DEpsilonPEq;
 
     // Calculate deviatoric stress
     const pointSymmTensorField s(sTrial - 2*mu_*DEpsilonP);
@@ -1333,7 +1339,7 @@ void Foam::linearElasticMisesPlastic::correct
     // calculateHydrostaticStress(sigmaHydf_, trEpsilon);
 
     // Update the stress
-    sigma = K_*tr(pEpsilon)*I + s;
+    sigma = K_*tr(pEpsilon)*symmTensor(I) + s;
 }
 
 

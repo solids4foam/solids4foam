@@ -117,8 +117,10 @@ public:
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
+#ifdef OPENFOAM_COM
         //- Return material tangent
         tmp<Field<scalarSquareMatrix>> materialTangentField() const;
+#endif
 
         //- Return the bulk modulus field
         virtual tmp<volScalarField> bulkModulus() const;
