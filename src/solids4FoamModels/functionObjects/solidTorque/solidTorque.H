@@ -70,9 +70,6 @@ class solidTorque
         //- If the history patch is found
         bool patchFound_;
 
-        //- Name of stress field
-        const word stressName_;
-
         //- Point on the axis
         const vector pointOnAxis_;
 
