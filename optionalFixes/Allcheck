@@ -77,8 +77,16 @@ then
         "$FOAM_SRC/foam/fields/GeometricFields/GeometricField" \
         "$FOAM_SRC/foam"
     if [ $? -ne 0 ]; then result=1; fi
-elif [[ $WM_PROJECT_VERSION != v* ]]
+elif [[ $WM_PROJECT_VERSION == v* ]]
 then
+    # Fix time index storage in the storeOldTimes function
+    checkAndReport \
+        "OpenFOAM-v2012" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+    if [ $? -ne 0 ]; then result=1; fi
+else
     # Fix time index storage in the storeOldTimes function
     checkAndReport \
         "OpenFOAM-9" \
@@ -86,9 +94,14 @@ then
         "$FOAM_SRC/OpenFOAM/fields/GeometricFields/GeometricField" \
         "$FOAM_SRC/OpenFOAM"
     if [ $? -ne 0 ]; then result=1; fi
-else
-    echo "No fixes needed for this version of OpenFOAM"; echo
-    exit 0;
+
+    # Fix time index storage in the storeOldTimes function
+    checkAndReport \
+        "OpenFOAM-9" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+    if [ $? -ne 0 ]; then result=1; fi
 fi
 
 echo
