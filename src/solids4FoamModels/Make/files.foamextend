@@ -251,7 +251,5 @@ numerics/deltaVectors/deltaVectors.C
 numerics/meshDualiser/meshDualiser.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
-numerics/sparseMatrix/sparseMatrix.C
-numerics/sparseMatrix/sparseMatrixTools.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels
