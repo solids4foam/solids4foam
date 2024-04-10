@@ -104,7 +104,7 @@ class solidContactFvPatchVectorField
         //- Shadow patch indices
         mutable labelList* shadowPatchIndicesPtr_;
 
-        //- Is the contact boundary active
+        //- Is the master contact boundary active
         Switch rigidMaster_;
 
         //- Normal contact model pointers
