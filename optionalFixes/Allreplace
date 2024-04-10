@@ -1,11 +1,9 @@
 #!/bin/bash
 cd ${0%/*} || exit 1    # run from this directory
 
-echo "optionalFixes/Allcheck"
+echo "optionalFixes/Allreplace"
 
-# This script reports on files that require fixes in the OpenFOAM installation.
-# To skip these checks, set S4F_NO_FILE_FIXES=1, i.e.
-#   export S4F_NO_FILE_FIXES=1
+# This script replaces files that require fixes in the OpenFOAM installation.
 # To see the consequence of these fixes, visit www.solids4foam.com.
 
 # Function for the checking and reporting how to replace a file
@@ -14,103 +12,77 @@ echo "optionalFixes/Allcheck"
 #   $2  - Target path, without the file name and the slash at the end
 #   $3  - Path to library to be re-built
 #
-checkAndReport()
+replaceFile()
 {
-    if [ -n "$S4F_NO_FILE_FIXES" ]
-    then
-        echo "The S4F_NO_FILE_FIXES variable is set so checks will not be performed"
-    elif cmp --silent "./${1}/${2}" "${3}/${2}"
+    if cmp --silent "./${1}/${2}" "${3}/${2}"
     then
         echo "'${2}' has already been replaced"
         return 0
     else
-        echo
-        echo "******** PLEASE FIX THIS ***********"
-        echo "You should replace the file '${3}/${2}' with 'optionalFixes/${1}/${2}'"
-        echo
-        echo "You can do it by running the following commands:"
-        echo "    cp optionalFixes/${1}/${2} ${3}/"
-        echo "    wmake libso ${4}"
-        echo "************************************"
-        echo
-        return 1
+        echo "Replacing the file '${3}/${2}' with 'optionalFixes/${1}/${2}'"
+        cp "./${1}/${2}" "${3}/${2}"
+        return 0
     fi
 }
 
 
 # Different checks required for each version of OpenFOAM/foam
-result=0
 if [ "$WM_PROJECT" = "foam" ]
 then
     # This fixes the segmentation error that happens at the end of solver due to
     # a mesh object being freed twice
-    checkAndReport \
+    replaceFile \
         "foam-extend-4.1" \
         "meshObjectBase.H" \
         "$FOAM_SRC/foam/meshes/MeshObject" \
         "$FOAM_SRC/foam"
-    if [ $? -ne 0 ]; then result=1; fi
 
     # This fixes segmentation errors related to point fields when mesh
     # topological changes occur
-    checkAndReport \
+    replaceFile \
         "foam-extend-4.1" \
         "pointBoundaryMesh.C" \
         "$FOAM_SRC/foam/meshes/pointMesh/pointBoundaryMesh" \
         "$FOAM_SRC/foam"
-    if [ $? -ne 0 ]; then result=1; fi
     
     # This fixes consistent Rhie-Chow interpolation
     # for Euler scheme
-    checkAndReport \
+    replaceFile \
         "foam-extend-4.1" \
         "EulerDdtScheme.C" \
         "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/EulerDdtScheme" \
         "$FOAM_SRC/finiteVolume"
-    if [ $? -ne 0 ]; then result=1; fi
 
     # Fix time index storage in the storeOldTimes function
-    checkAndReport \
+    replaceFile \
         "foam-extend-4.1" \
         "GeometricField.C" \
         "$FOAM_SRC/foam/fields/GeometricFields/GeometricField" \
         "$FOAM_SRC/foam"
-    if [ $? -ne 0 ]; then result=1; fi
 elif [[ $WM_PROJECT_VERSION == v* ]]
 then
     # Fix time index storage in the storeOldTimes function
-    checkAndReport \
+    replaceFile \
         "OpenFOAM-v2012" \
         "backwardDdtScheme.C" \
         "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
         "$FOAM_SRC/finiteVolume"
-    if [ $? -ne 0 ]; then result=1; fi
 else
     # Fix time index storage in the storeOldTimes function
-    checkAndReport \
+    replaceFile \
         "OpenFOAM-9" \
         "GeometricField.C" \
         "$FOAM_SRC/OpenFOAM/fields/GeometricFields/GeometricField" \
         "$FOAM_SRC/OpenFOAM"
-    if [ $? -ne 0 ]; then result=1; fi
 
     # Fix time index storage in the storeOldTimes function
-    checkAndReport \
+    replaceFile \
         "OpenFOAM-9" \
         "backwardDdtScheme.C" \
         "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
         "$FOAM_SRC/finiteVolume"
-    if [ $? -ne 0 ]; then result=1; fi
 fi
 
 echo
-
-# If files check fails, then print error below
-if [ "$result" -ne 0 ]
-then
-    echo "******** PLEASE FIX THIS ***********"
-    echo "Please replace the files above"
-    echo "************************************"
-    echo
-    exit 1
-fi
+echo "Please run (cd $FOAM_SRC && ./Allwmake -j) after files have been replaced"
+echo
