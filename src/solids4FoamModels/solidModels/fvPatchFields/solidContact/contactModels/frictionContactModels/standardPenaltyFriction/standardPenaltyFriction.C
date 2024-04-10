@@ -456,7 +456,11 @@ void Foam::standardPenaltyFriction::correct
     }
 
     vectorField& patchTraction =
+#ifdef FOAMEXTEND
         tractionVolField_.boundaryField()[patchIndex];
+#else
+        tractionVolField_.boundaryFieldRef()[patchIndex];
+#endif
 
     // Under-relax traction
     patchTraction =

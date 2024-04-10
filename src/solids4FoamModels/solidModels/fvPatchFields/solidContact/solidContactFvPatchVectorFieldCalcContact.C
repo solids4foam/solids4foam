@@ -440,14 +440,6 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
 
             zoneToZones_[shadPatchI].usePrevCandidateMasterNeighbors() =
                 usePrevCandidateMasterNeighbors;
-#else
-            if (dict_.found("integralNormalGap"))
-            {
-                WarningIn("void Foam::solidContactFvPatchVectorField::"
-                          "calcZoneToZones() const")
-                << "integralNormlGap set but not used. Currently, it is "
-                << "available only with the foam-extend version" << endl;
-            }
 #endif
         }
         else

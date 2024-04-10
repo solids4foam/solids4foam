@@ -414,7 +414,11 @@ void standardPenalty::correct
     // Under-relax pressure/traction
     // Note: patchPressure is really a traction vector
     vectorField& patchPressure =
+#ifdef FOAMEXTEND
         pressureVolField_.boundaryField()[patchIndex];
+#else
+        pressureVolField_.boundaryFieldRef()[patchIndex];
+#endif
 
     // Under-relax traction
     patchPressure =

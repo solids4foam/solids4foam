@@ -1163,7 +1163,9 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
             // Pointwise contact algorithm, contact pressure at mesh points
             // Everything is calculated on slave and subsequently inretpolated
             // to master patch
+#ifdef FOAMEXTEND
             if (!zoneToZones()[shadPatchI].normalGapIntegration())
+#endif
             {
                 // Calculate normal contact force on slave
                 normalModels()[shadPatchI].correct
@@ -1196,6 +1198,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                 // to the shadow; and the difference between these two is the
                 // (and slip also the normal component of DU)
             }
+#ifdef FOAMEXTEND
             else
             {
                 // Segment-to-segment contact algorithm, contact pressure is
@@ -1288,7 +1291,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                     );
                 }
             }
-
+#endif
             if (rigidMaster_)
             {
                 // Set to master to traction free to mimic a rigid contact
@@ -1301,7 +1304,9 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
             {
                 // Pointwise contact force calculation algorithm,
                 // Interpolate slave contact traction onto master
+#ifdef FOAMEXTEND
                 if (!zoneToZones()[shadPatchI].normalGapIntegration())
+#endif
                 {
                     // Interpolate slave traction to the master
                     const vectorField slavePatchTraction
@@ -1362,6 +1367,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                         }
                     }
                 }
+#ifdef FOAMEXTEND
                 else
                 {
                     // Segment-to-segment contact force calculation algrorithm
@@ -1391,6 +1397,7 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                         }
                     }
                 }
+#endif
             }
         }
     }
