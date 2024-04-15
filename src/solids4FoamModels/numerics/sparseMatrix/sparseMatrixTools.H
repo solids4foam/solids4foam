@@ -79,11 +79,23 @@ namespace sparseMatrixTools
 #ifdef USE_PETSC
 
     //- Solve the linear system using PETSc
-#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<scalar> solveLinearSystemPETSc
+    (
+        const sparseScalarMatrix& matrix,
+        const scalarField& source,
+        scalarField& solution,
+        const bool twoD,
+        fileName& optionsFile,
+        const pointField& points,
+        const boolList& ownedByThisProc,
+        const labelList& localToGlobalPointMap,
+        const labelList& stencilSizeOwned,
+        const labelList& stencilSizeNotOwned,
+        const bool debug = false
+    );
+
+    //- Solve the linear system using PETSc
     SolverPerformance<vector> solveLinearSystemPETSc
-#else
-    BlockSolverPerformance<vector> solveLinearSystemPETSc
-#endif
     (
         const sparseMatrix& matrix,
         const vectorField& source,

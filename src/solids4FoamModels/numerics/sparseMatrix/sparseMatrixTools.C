@@ -81,8 +81,14 @@ void Foam::sparseMatrixTools::solveLinearSystemEigen
         << "S4F_NO_USE_EIGEN variable and re-run the top-level Allwmake script"
         << abort(FatalError);
 #else
-    // For now, we can directly use the Eigen direct solver to solve the
-    // linear system
+
+    if (Pstream::parRun())
+    {
+        FatalErrorIn("sparseMatrixTools::solveLinearSystemEigen(...)")
+            << "The Eigen linear solver can only be run in serial. Use the "
+            << "PETSc linear solver for running in parallel."
+            << abort(FatalError);
+    }
 
     // Define the number of degrees of freedom
     const label nDof = solution.size();
@@ -202,8 +208,14 @@ void Foam::sparseMatrixTools::solveLinearSystemEigen
         << "S4F_NO_USE_EIGEN variable and re-run the top-level Allwmake script"
         << abort(FatalError);
 #else
-    // For now, we can directly use the Eigen direct solver to solve the
-    // linear system
+
+    if (Pstream::parRun())
+    {
+        FatalErrorIn("sparseMatrixTools::solveLinearSystemEigen(...)")
+            << "The Eigen linear solver can only be run in serial. Use the "
+            << "PETSc linear solver for running in parallel."
+            << abort(FatalError);
+    }
 
     // Define the number of degrees of freedom
     label nDof;
@@ -347,16 +359,12 @@ void Foam::sparseMatrixTools::solveLinearSystemEigen
 
 #ifdef USE_PETSC
 
-#ifdef OPENFOAM_NOT_EXTEND
-    Foam::SolverPerformance<Foam::vector>
-#else
-    Foam::BlockSolverPerformance<Foam::vector>
-#endif
+Foam::SolverPerformance<Foam::scalar>
 Foam::sparseMatrixTools::solveLinearSystemPETSc
 (
-    const sparseMatrix& matrix,
-    const vectorField& source,
-    vectorField& solution,
+    const sparseScalarMatrix& matrix,
+    const scalarField& source,
+    scalarField& solution,
     const bool twoD,
     fileName& optionsFile,
     const pointField& points,
@@ -369,16 +377,12 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
 {
     if (debug)
     {
-        Info<< "BlockSolverPerformance<vector> "
+        Info<< "solverPerformance<scalar> "
             << "sparseMatrixTools::solveLinearSystemPETSc: start" << endl;
     }
 
     // Set the block coefficient size (2 for 2-D, 3 for 3-D)
-    label blockSize = 3;
-    if (twoD)
-    {
-        blockSize = 2;
-    }
+    const label blockSize = 1;
 
     // Find size of global system, i.e. the highest global point index + 1
     const label blockN = gMax(localToGlobalPointMap) + 1;
@@ -535,57 +539,37 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         Pout<< "    Inserting PETSc matrix coefficients: start" << endl;
     }
 
-    const sparseMatrixData& data = matrix.data();
+    typedef HashTable
+    <
+        scalar, FixedList<label, 2>, FixedList<label, 2>::Hash<>
+    > scalarSparseMatrixTemplateData;
+
+    const scalarSparseMatrixTemplateData& data = matrix.data();
+
     for
     (
-        sparseMatrixData::const_iterator iter = data.begin();
+        scalarSparseMatrixTemplateData::const_iterator iter = data.begin();
         iter != data.end();
         ++iter
     )
     {
-        const tensor& coeff = iter();
+        const scalar& coeff = iter();
         const label blockRowI = localToGlobalPointMap[iter.key()[0]];
         const label blockColI = localToGlobalPointMap[iter.key()[1]];
 
-        if (twoD)
-        {
-            // Prepare values
-            const PetscScalar values[4] =
-            {
-                coeff.xx(), coeff.xy(),
-                coeff.yx(), coeff.yy()
-            };
+        // Insert tensor coefficient
+        ierr = MatSetValuesBlocked
+        (
+            A, 1, &blockRowI, 1, &blockColI, &coeff, ADD_VALUES
+        ); checkErr(ierr);
 
-            // Insert tensor coefficient
-            ierr = MatSetValuesBlocked
-            (
-                A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
-            ); checkErr(ierr);
-        }
-        else // 3-D
+        if (ierr > 0)
         {
-            // Prepare values
-            // Maybe I can use coeff.cdata() here?
-            const PetscScalar values[9] =
-            {
-                coeff.xx(), coeff.xy(), coeff.xz(),
-                coeff.yx(), coeff.yy(), coeff.yz(),
-                coeff.zx(), coeff.zy(), coeff.zz()
-            };
-
-            // Insert tensor coefficient
-            ierr = MatSetValuesBlocked
-            (
-                A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
-            );
-            if (ierr > 0)
-            {
-                Pout<< "MatSetValuesBlocked returned ierr = " << ierr
-                    << " for " << blockRowI << " " << blockColI << ": "
-                    << coeff << endl;
-            }
-            checkErr(ierr);
+            Pout<< "MatSetValuesBlocked returned ierr = " << ierr
+                << " for " << blockRowI << " " << blockColI << ": "
+                << coeff << endl;
         }
+        checkErr(ierr);
     }
     if (debug)
     {
@@ -661,34 +645,14 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     {
         forAll(source, localBlockRowI)
         {
-            const vector& sourceI = source[localBlockRowI];
+            const scalar& sourceI = source[localBlockRowI];
             const label blockRowI = localToGlobalPointMap[localBlockRowI];
 
-            if (twoD)
-            {
-                // Prepare values
-                const PetscScalar values[2] = {sourceI.x(), sourceI.y()};
-
-                // Insert values
-                ierr = VecSetValuesBlocked
-                (
-                    b, 1, &blockRowI, values, ADD_VALUES
-                ); checkErr(ierr);
-            }
-            else
-            {
-                // Prepare values
-                const PetscScalar values[3] =
-                {
-                    sourceI.x(), sourceI.y(), sourceI.z()
-                };
-
-                // Insert values
-                ierr = VecSetValuesBlocked
-                (
-                    b, 1, &blockRowI, values, ADD_VALUES
-                ); checkErr(ierr);
-            }
+            // Insert values
+            ierr = VecSetValuesBlocked
+            (
+                b, 1, &blockRowI, &sourceI, ADD_VALUES
+            ); checkErr(ierr);
         }
     }
 
@@ -836,13 +800,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         {
             if (ownedByThisProc[i])
             {
-                solution[i].x() = xArr[index++];
-                solution[i].y() = xArr[index++];
-
-                if (!twoD)
-                {
-                    solution[i].z() = xArr[index++];
-                }
+                solution[i] = xArr[index++];
             }
         }
     }
@@ -869,12 +827,6 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
             if (!ownedByThisProc[pI])
             {
                 indices[index++] = blockSize*localToGlobalPointMap[pI];
-                indices[index++] = blockSize*localToGlobalPointMap[pI] + 1;
-
-                if (!twoD)
-                {
-                    indices[index++] = blockSize*localToGlobalPointMap[pI] + 2;
-                }
             }
         }
 
@@ -915,13 +867,7 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
             {
                 if (!ownedByThisProc[i])
                 {
-                    solution[i].x() = xNotOwnedArr[index++];
-                    solution[i].y() = xNotOwnedArr[index++];
-
-                    if (!twoD)
-                    {
-                        solution[i].z() = xNotOwnedArr[index++];
-                    }
+                    solution[i] = xNotOwnedArr[index++];
                 }
             }
         }
@@ -978,28 +924,10 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
             << "sparseMatrixTools::solveLinearSystemPETSc: end" << endl;
     }
 
-    vector initRes(vector::one);
-    vector finalRes(norm*vector::one);
+    scalar initRes(1.0);
+    scalar finalRes(0.0);
 
-    if (twoD)
-    {
-        initRes.z() = 0;
-        finalRes.z() = 0;
-    }
-
-#ifdef OPENFOAM_NOT_EXTEND
-    return SolverPerformance<vector>
-    (
-        "PETSc", // solver name
-        "pointD", // field name
-        initRes, // initial residual
-        finalRes, // final residual
-        vector(its, its, its) // nIteration
-        //false, // converged
-        //false // singular
-    );
-#else
-    return BlockSolverPerformance<vector>
+    return SolverPerformance<scalar>
     (
         "PETSc", // solver name
         "pointD", // field name
@@ -1009,7 +937,6 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
         //false, // converged
         //false // singular
     );
-#endif
 }
 #endif
 
@@ -1050,21 +977,24 @@ void Foam::sparseMatrixTools::setNonZerosPerRow
             d_nnz[rowI] += nCompOwned;
             o_nnz[rowI++] += nCompNotOwned;
 
-            d_nnz[rowI] += nCompOwned;
-            o_nnz[rowI++] += nCompNotOwned;
-
-            if (blockSize == 3)
+            if (blockSize > 1)
             {
                 d_nnz[rowI] += nCompOwned;
                 o_nnz[rowI++] += nCompNotOwned;
-            }
-            else if (blockSize != 2)
-            {
-                FatalErrorIn
-                (
-                    "void Foam::sparseMatrixTools::setNonZerosPerRow(...)"
-                )   << "Not implemented for blockSize = " << blockSize
-                    << abort(FatalError);
+
+                if (blockSize > 2)
+                {
+                    d_nnz[rowI] += nCompOwned;
+                    o_nnz[rowI++] += nCompNotOwned;
+                }
+                else if (blockSize > 3)
+                {
+                    FatalErrorIn
+                    (
+                        "void Foam::sparseMatrixTools::setNonZerosPerRow(...)"
+                    )   << "Not implemented for blockSize = " << blockSize
+                        << abort(FatalError);
+                }
             }
         }
     }

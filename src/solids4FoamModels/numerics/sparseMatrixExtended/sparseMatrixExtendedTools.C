@@ -393,7 +393,8 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
     // be thrown
     // For now, we will disable this check in debug mode so we can see how many
     // mallocs were made
-    if (debug)
+    // TO BE FIXED: some mallocs are still needed in parallel!
+    //if (debug)
     {
         MatSetOption(A, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
     }
@@ -646,7 +647,7 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
                 }
             }
 
-            ierr = PCSetCoordinates(pc, sdim, n, petscPoints.data());
+            ierr = PCSetCoordinates(pc, sdim, blockn, petscPoints.data());
             checkErr(ierr);
         }
     }

@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    vertexCentredNonLinGeomTotalLagDisplacementSolid
+    vertexCentredNonLinGeomTotalLagSolid
 
 Description
     Mathematical model where where non linear geometry is modelled i.e. large strains
@@ -26,16 +26,22 @@ Description
     where the governing equations are integrated over a dual mesh. The dual mesh
     is automatically constructed from the primary mesh using the meshDualiser.
 
+    Three solution are available, selected via solutionAlgorithm option:
+      - implicit Newton-Raphson
+      - implicit segregated
+      - explicit
+
 Author
-    Philip Cardiff, UCD.  All rights reserved.
+    Philip Cardiff, UCD.
+    Federico Mazzanti, UCD.
 
 SourceFiles
-    vertexCentredNonLinGeomTotalLagDisplacementSolid.C
+    vertexCentredNonLinGeomTotalLagSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef vertexCentredNonLinGeomTotalLagDisplacementSolid_H
-#define vertexCentredNonLinGeomTotalLagDisplacementSolid_H
+#ifndef vertexCentredNonLinGeomTotalLagSolid_H
+#define vertexCentredNonLinGeomTotalLagSolid_H
 
 #include "solidModel.H"
 #include "volFields.H"
@@ -46,6 +52,8 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
+#include "twoDPointCorrector.H"
+#include "pointVolInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,17 +66,42 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-       Class vertexCentredNonLinGeomTotalLagDisplacementSolid Declaration
+       Class vertexCentredNonLinGeomTotalLagSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class vertexCentredNonLinGeomTotalLagDisplacementSolid
+class vertexCentredNonLinGeomTotalLagSolid
 :
     public solidModel
 {
+public:
+
+        //- Solution algorithms
+        enum solutionAlgorithm
+        {
+            IMPLICIT_COUPLED,
+            IMPLICIT_SEGREGATED,
+            EXPLICIT
+        };
+
+        //- Solution algorithm names
+        static const Enum<solutionAlgorithm> solutionAlgorithmNames_;
+
+
+private:
+
     // Private Data
 
         //- Mechanical model for dual mesh
         autoPtr<dualMechanicalModel> dualMechanicalPtr_;
+
+        //- Solution algorithm, e.g. coupled, segregated, explicit
+        const solutionAlgorithm solutionAlgorithm_;
+
+        //- Implicit stiffness used by segregated algorithm
+        //  Coefficient of the Laplacian term. Defined at the dual mesh faces.
+        //  The value of this term only affects convergence and not the answer
+        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
+        mutable autoPtr<surfaceScalarField> dualImpKfPtr_;
 
         //- Flag to enable full Newton-Raphson approach, where the stiffness
         //  matrix is updated once per outer iteration. Alternatively, the
@@ -83,6 +116,13 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
+
+        //- Object for correcting the displacement field in 2-D
+        //  This ensures the front and back planes have the same displacements
+        twoDPointCorrector twoDCorrector_;
+
+        //- Predict new time-step fields using the velocity field
+        const Switch predictor_;
 
         //- Field of flags indicating the degrees of freedom where the value is
         //  set
@@ -118,6 +158,9 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
 
+        //- Divergence of sigma at each primary point
+        pointVectorField pointDivSigma_;
+
         //- Displacement gradient field at the dual mesh faces
         surfaceTensorField dualGradDf_;
 
@@ -142,6 +185,9 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
         //- Local-to-global point map and owner list
         globalPointIndices globalPointIndices_;
 
+        //- Interpolator from points to cells
+        pointVolInterpolation pointVolInterp_;
+
 
     // Private Member Functions
 
@@ -150,6 +196,18 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
         (
             vectorField& source,
             const labelList& dualCellToPoint
+        );
+
+        //- Update the divergence of stress based on the current pointD field
+        void updatePointDivSigma
+        (
+            const pointVectorField& pointD,
+            surfaceTensorField& dualGradDf,
+            surfaceTensorField& dualFf,
+            surfaceTensorField& dualFinvf,
+            surfaceScalarField& dualJf,
+            surfaceSymmTensorField& dualSigmaf,
+            pointVectorField& pointDivSigma
         );
 
         //- Set fixed degree of freedom lists
@@ -166,6 +224,7 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
         (
             const pointVectorField& pointD,
             surfaceVectorField& dualTraction,
+            const surfaceVectorField& dualDeformedNormals,
             const fvMesh& mesh, // corresponding to pointD mesh
             const labelListList& pointToDualFaces
         ) const;
@@ -192,6 +251,7 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
             const scalar zeta
         );
 
+        //- Calculate line search factor
         scalar calculateLineSearchFactor
         (
             const scalar rTol, // Slope reduction tolerance
@@ -201,18 +261,44 @@ class vertexCentredNonLinGeomTotalLagDisplacementSolid
             const scalar zeta // Discretisation parameter
         );
 
-        Foam::tmp<Foam::Field<Foam::RectangularMatrix<Foam::scalar>>>
-		geometricStiffnessField
-		(
-			const surfaceVectorField SfUndef, //Undeformed surface area vector field
-			const surfaceTensorField gradDRef //Reference gradD
-		) const;
+        //- Geometric stiffness (tangent)
+        //  This is the contribution to the stiffness matrix from geometric
+        //  nonlinearity
+        // The undeformed surface areas and current displacement gradient are
+        // required
+        tmp<Field<RectangularMatrix<scalar>>>
+        geometricStiffnessField
+        (
+            const surfaceVectorField& SfUndef,
+            const surfaceTensorField& gradDRef
+        ) const;
+
+        //- Make dualImpKf field
+        void makeDualImpKf() const;
+
+        //- Return const dualImpK field
+        const surfaceScalarField& dualImpKf() const;
+
+        //- Return dualImpK field
+        surfaceScalarField& dualImpKf();
+
+        //- Predict displacement field using the velocity field
+        void predict();
+
+        //- Evolve the solid solver using the implicit coupled approach
+        virtual bool evolveImplicitCoupled();
+
+        //- Evolve the solid solver using the implicit segregated approach
+        virtual bool evolveImplicitSegregated();
+
+        //- Evolve the solid solver using the explicit approach
+        virtual bool evolveExplicit();
 
         //- Disallow default bitwise copy construct
-        vertexCentredNonLinGeomTotalLagDisplacementSolid(const vertexCentredNonLinGeomTotalLagDisplacementSolid&);
+        vertexCentredNonLinGeomTotalLagSolid(const vertexCentredNonLinGeomTotalLagSolid&);
 
         //- Disallow default bitwise assignment
-        void operator=(const vertexCentredNonLinGeomTotalLagDisplacementSolid&);
+        void operator=(const vertexCentredNonLinGeomTotalLagSolid&);
 
 
 protected:
@@ -229,12 +315,12 @@ protected:
 public:
 
     //- Runtime type information
-    TypeName("vertexCentredNonLinTotalLagDisplacementGeometry");
+    TypeName("vertexCentredNonLinTotalLagGeometry");
 
     // Constructors
 
         //- Construct from components
-        vertexCentredNonLinGeomTotalLagDisplacementSolid
+        vertexCentredNonLinGeomTotalLagSolid
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -242,7 +328,7 @@ public:
 
     // Destructor
 
-        virtual ~vertexCentredNonLinGeomTotalLagDisplacementSolid();
+        virtual ~vertexCentredNonLinGeomTotalLagSolid();
 
 
     // Member Functions
@@ -260,6 +346,9 @@ public:
             }
 
         // Edit
+
+            //- Update the size of the time-step
+            virtual void setDeltaT(Time& runTime);
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
