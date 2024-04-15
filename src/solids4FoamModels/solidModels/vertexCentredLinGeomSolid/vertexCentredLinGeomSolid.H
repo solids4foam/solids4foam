@@ -27,10 +27,14 @@ Description
     where the governing equations are integrated over a dual mesh. The dual mesh
     is automatically constructed from the primary mesh using the meshDualiser.
 
-    An implicit Newton-Raphson algorithm is employed.
+    Three solution are available, selected via solutionAlgorithm option:
+      - implicit Newton-Raphson
+      - implicit segregated
+      - explicit
 
 Author
-    Philip Cardiff, UCD.  All rights reserved.
+    Philip Cardiff, UCD.
+    Federico Mazzanti, UCD.
 
 SourceFiles
     vertexCentredLinGeomSolid.C
@@ -51,9 +55,7 @@ SourceFiles
 #include "globalPointIndices.H"
 #include "Enum.H"
 #include "twoDPointCorrector.H"
-#ifdef OPENFOAM_COM
-    #include "pointVolInterpolation.H"
-#endif
+#include "pointVolInterpolation.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -152,6 +154,11 @@ private:
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
 
+        //- Global point volume field
+        //  Dual mesh cell volumes associated with the primary mesh points,
+        //  where point volumes on processor boundaries are summed
+        pointScalarField pointGlobalVol_;
+
         //- Divergence of sigma at each primary point
         pointVectorField pointDivSigma_;
 
@@ -164,10 +171,8 @@ private:
         //- Local-to-global point map and owner list
         globalPointIndices globalPointIndices_;
 
-#ifdef OPENFOAM_COM
         //- Interpolator from points to cells
         pointVolInterpolation pointVolInterp_;
-#endif
 
 
     // Private Member Functions

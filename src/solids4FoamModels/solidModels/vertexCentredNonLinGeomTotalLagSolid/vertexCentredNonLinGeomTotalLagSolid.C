@@ -88,6 +88,9 @@ void vertexCentredNonLinGeomTotalLagSolid::updateSource
     // The source vector is -F, where:
     // F = div(JF^-T * sigma) + rho*g - rho*d2dt2(D)
 
+    // Point volume field
+    const scalarField& pointVolI = pointVol_.internalField();
+
     // Point density field
     const scalarField& pointRhoI = pointRho_.internalField();
 
@@ -129,42 +132,13 @@ void vertexCentredNonLinGeomTotalLagSolid::updateSource
     // Calculate divergence of stress for the dual cells
     const vectorField dualDivSigma = fvc::div(dualTraction*deformedDualMagSf);
 
-    // // Calculate absolute divergence of stress (force)
-    // // We do this to allow syncing of forces at points on processor boundaries
-    // const vectorField dualDivSigmaAbs(dualDivSigma*dualMesh().V());
-
-    // // Map dual cell field to primary mesh point field
-    // // We temporarily use the pointDivSigma field to hold absolute forces
-    // // but convert them back to force per unit volume below
+    // Map dual cell field to primary mesh point field
     vectorField& pointDivSigmaI = pointDivSigma_;
     forAll(dualDivSigma, dualCellI)
     {
         const label pointID = dualCellToPoint[dualCellI];
-	pointDivSigmaI[pointID] = dualDivSigma[dualCellI];
+        pointDivSigmaI[pointID] = dualDivSigma[dualCellI];
     }
-
-    // forAll(dualDivSigmaAbs, dualCellI)
-    // {
-    //     const label pointID = dualCellToPoint[dualCellI];
-    //     pointDivSigmaI[pointID] = dualDivSigmaAbs[dualCellI];
-    // }
-
-    // // Sum absolute forces in parallel
-    // pointConstraints::syncUntransformedData
-    // (
-    //     mesh(), pointDivSigma_, plusEqOp<vector>()
-    // );
-
-    // // Convert force to force per unit volume
-    // // Perform calculation per point to avoid dimension checks
-    // // Point volume field
-    // const scalarField& pointVolI = pointVol_.internalField();
-    // forAll(pointDivSigmaI, pointI)
-    // {
-    //     pointDivSigmaI[pointI] /= pointVolI[pointI];
-    // }
-
-    const scalarField& pointVolI = pointVol_.internalField();
 
     // Add surface forces to source
     source -= pointDivSigmaI*pointVolI;
@@ -288,11 +262,6 @@ void vertexCentredNonLinGeomTotalLagSolid::updatePointDivSigma
         const label pointID = dualCellToPoint[dualCellI];
         pointDivSigmaI[pointID] = dualDivSigmaAbs[dualCellI];
     }
-    // forAll(dualDivSigma, dualCellI)
-    // {
-    //     const label pointID = dualCellToPoint[dualCellI];
-    //     pointDivSigma[pointID] = dualDivSigma[dualCellI];
-    // }
 
     // Sum absolute forces in parallel
     pointConstraints::syncUntransformedData
