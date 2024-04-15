@@ -1146,7 +1146,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveImplicitCoupled()
         );
 
         // Add d2dt2 coefficients
-        vfvm::d2dt2Extended
+        vfvm::d2dt2
         (
             mesh().d2dt2Scheme("d2dt2(pointD)"),
             runTime().deltaTValue(),
@@ -1229,7 +1229,7 @@ bool vertexCentredNonLinGeomTotalLagSolid::evolveImplicitCoupled()
             );
 
             // Add d2dt2 coefficients
-            vfvm::d2dt2Extended
+            vfvm::d2dt2
             (
                 mesh().d2dt2Scheme("d2dt2(pointD)"),
                 runTime().deltaTValue(),

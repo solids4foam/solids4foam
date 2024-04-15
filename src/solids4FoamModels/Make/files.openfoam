@@ -209,7 +209,6 @@ numerics/realEigenValues/realEigenValues.C
 numerics/rotation/RodriguesRotation.C
 numerics/SymmTensor4thOrder/labelSymmTensor4thOrder/labelSymmTensor4thOrder.C
 numerics/SymmTensor4thOrder/symmTensor4thOrder/symmTensor4thOrder.C
-numerics/vfvCellPoint/vfvmCellPointExtended.C
 numerics/vfvCellPoint/vfvcCellPoint.C
 numerics/vfvCellPoint/vfvmCellPoint.C
 numerics/pointFieldFunctions/pointFieldFunctions.C
@@ -229,7 +228,5 @@ numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/SparseMatrixTemplates.C
 numerics/sparseMatrix/sparseMatrixTools.C
-numerics/sparseMatrixExtended/sparseMatrixExtended.C
-numerics/sparseMatrixExtended/sparseMatrixExtendedTools.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels
