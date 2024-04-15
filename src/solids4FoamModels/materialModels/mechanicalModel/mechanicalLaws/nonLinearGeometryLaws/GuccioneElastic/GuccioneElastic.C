@@ -520,11 +520,7 @@ Foam::GuccioneElastic::materialTangentField() const
             mesh().nFaces(), Foam::scalarSquareMatrix(6, 0.0)
         )
     );
-#ifdef OPENFOAM_NOT_EXTEND
     Field<scalarSquareMatrix>& result = tresult.ref();
-#else
-    Field<scalarSquareMatrix>& result = tresult();
-#endif
 
     // Calculate tangent field
     // if (dict().lookup("numericalTangent"))
