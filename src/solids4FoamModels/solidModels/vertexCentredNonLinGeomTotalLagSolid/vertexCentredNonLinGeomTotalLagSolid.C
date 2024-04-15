@@ -22,7 +22,6 @@ License
 #include "vertexCentredNonLinGeomTotalLagSolid.H"
 #include "addToRunTimeSelectionTable.H"
 #include "vfvcCellPoint.H"
-#include "vfvmCellPointExtended.H"
 #include "vfvmCellPoint.H"
 #include "fvcDiv.H"
 #include "fixedValuePointPatchFields.H"
@@ -275,47 +274,39 @@ void vertexCentredNonLinGeomTotalLagSolid::updatePointDivSigma
     // Calculate divergence of stress (force per unit volume) for the dual cells
     const vectorField dualDivSigma = fvc::div(dualTraction*deformedDualMagSf);
 
-    if (Pstream::parRun())
-    {
-        // Todo: use same fix as in vertexCentredLinGeomSolid
-        FatalErrorIn("evolveExplicit()")
-            << "Check divSigma for parallel" << abort(FatalError);
-    }
-
     // Calculate absolute divergence of stress (force)
     // We do this to allow syncing of forces at points on processor boundaries
-    //const vectorField dualDivSigmaAbs(dualDivSigma*dualMesh().V());
+    const vectorField dualDivSigmaAbs(dualDivSigma*dualMesh().V());
 
     // Map dual cell field to primary mesh point field
     // We temporarily use the pointDivSigma field to hold absolute forces
     // but convert them back to force per unit volume below
-    // vectorField& pointDivSigmaI = pointDivSigma;
+    vectorField& pointDivSigmaI = pointDivSigma;
     const labelList& dualCellToPoint = dualMeshMap().dualCellToPoint();
-    // forAll(dualDivSigmaAbs, dualCellI)
-    // {
-    //     const label pointID = dualCellToPoint[dualCellI];
-    //     // pointDivSigmaI[pointID] = dualDivSigmaAbs[dualCellI];
-    //     pointDivSigmaI[pointID] = dualDivSigmaAbs[dualCellI];
-    // }
-    forAll(dualDivSigma, dualCellI)
+    forAll(dualDivSigmaAbs, dualCellI)
     {
         const label pointID = dualCellToPoint[dualCellI];
-	pointDivSigma[pointID] = dualDivSigma[dualCellI];
+        pointDivSigmaI[pointID] = dualDivSigmaAbs[dualCellI];
     }
-
-    // // Sum absolute forces in parallel
-    // pointConstraints::syncUntransformedData
-    // (
-    //     mesh(), pointDivSigma, plusEqOp<vector>()
-    // );
-
-    // // Convert force to force per unit volume
-    // // Perform calculation per point to avoid dimension checks
-    // const scalarField& pointVolI = pointVol_;
-    // forAll(pointDivSigmaI, pointI)
+    // forAll(dualDivSigma, dualCellI)
     // {
-    //     pointDivSigmaI[pointI] /= pointVolI[pointI];
+    //     const label pointID = dualCellToPoint[dualCellI];
+    //     pointDivSigma[pointID] = dualDivSigma[dualCellI];
     // }
+
+    // Sum absolute forces in parallel
+    pointConstraints::syncUntransformedData
+    (
+        mesh(), pointDivSigma, plusEqOp<vector>()
+    );
+
+    // Convert force to force per unit volume
+    // Perform calculation per point to avoid dimension checks
+    const scalarField& pointGlobalVolI = pointGlobalVol_;
+    forAll(pointDivSigmaI, pointI)
+    {
+        pointDivSigmaI[pointI] /= pointGlobalVolI[pointI];
+    }
 
     if (debug)
     {
@@ -1976,7 +1967,20 @@ vertexCentredNonLinGeomTotalLagSolid
             runTime.timeName(),
             mesh(),
             IOobject::NO_READ,
-            IOobject::AUTO_WRITE
+            IOobject::NO_WRITE
+        ),
+        pMesh(),
+        dimensionedScalar("0", dimVolume, 0.0)
+    ),
+    pointGlobalVol_
+    (
+        IOobject
+        (
+            "pointGlobalVolumes",
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
         ),
         pMesh(),
         dimensionedScalar("0", dimVolume, 0.0)
@@ -2107,9 +2111,10 @@ vertexCentredNonLinGeomTotalLagSolid
     // Set point density field
     mechanical().volToPoint().interpolate(rho(), pointRho_);
 
-    // Set the pointVol field
+    // Set the pointVol and pointGlobalVol fields
     // Map dualMesh cell volumes to the primary mesh points
     scalarField& pointVolI = pointVol_;
+    scalarField& pointGlobalVolI = pointGlobalVol_;
     const scalarField& dualCellVol = dualMesh().V();
     const labelList& dualCellToPoint = dualMeshMap().dualCellToPoint();
     forAll(dualCellToPoint, dualCellI)
@@ -2119,13 +2124,14 @@ vertexCentredNonLinGeomTotalLagSolid
 
         // Map the cell volume
         pointVolI[pointID] = dualCellVol[dualCellI];
+        pointGlobalVolI[pointID] = dualCellVol[dualCellI];
     }
 
-    // // Sum the shared point volumes for consistency with serial runs
-    // pointConstraints::syncUntransformedData
-    // (
-    //     mesh(), pointVol_, plusEqOp<scalar>()
-    // );
+    // Sum the shared point volumes to create the point global volumes
+    pointConstraints::syncUntransformedData
+    (
+        mesh(), pointGlobalVol_, plusEqOp<scalar>()
+    );
 
     // Store old time fields
     pointD().oldTime().storeOldTime();

@@ -158,6 +158,11 @@ private:
         //  Dual mesh cell volumes associated with the primary mesh points
         pointScalarField pointVol_;
 
+        //- Global point volume field
+        //  Dual mesh cell volumes associated with the primary mesh points,
+        //  where point volumes on processor boundaries are summed
+        pointScalarField pointGlobalVol_;
+
         //- Divergence of sigma at each primary point
         pointVectorField pointDivSigma_;
 
