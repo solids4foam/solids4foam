@@ -1637,7 +1637,7 @@ void Foam::mechanicalLaw::correct(surfaceSymmTensorField&)
 void Foam::mechanicalLaw::correct
 (
     pointSymmTensorField&, const pointTensorField&
-) const
+)
 {
     notImplemented
     (

@@ -544,7 +544,7 @@ public:
         virtual void correct
         (
             pointSymmTensorField& sigma, const pointTensorField& gradD
-        ) const;
+        );
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model

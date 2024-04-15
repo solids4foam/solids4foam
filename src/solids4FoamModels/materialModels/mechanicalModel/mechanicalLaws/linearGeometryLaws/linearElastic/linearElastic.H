@@ -152,7 +152,7 @@ public:
         virtual void correct
         (
             pointSymmTensorField& sigma, const pointTensorField& gradD
-        ) const;
+        );
 };
 
 

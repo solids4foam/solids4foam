@@ -532,9 +532,9 @@ void Foam::mechanicalModel::correct(surfaceSymmTensorField& sigma)
 void Foam::mechanicalModel::correct
 (
     pointSymmTensorField& sigma, const pointTensorField& gradD
-) const
+)
 {
-    const PtrList<mechanicalLaw>& laws = *this;
+    PtrList<mechanicalLaw>& laws = *this;
 
     if (laws.size() == 1)
     {

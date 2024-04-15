@@ -169,7 +169,7 @@ public:
             void correct
             (
                 pointSymmTensorField& sigma, const pointTensorField& gradD
-            ) const;
+            );
 
             //- Map grad field to subMeshes
             void mapGradToSubMeshes(const volTensorField& gradD);

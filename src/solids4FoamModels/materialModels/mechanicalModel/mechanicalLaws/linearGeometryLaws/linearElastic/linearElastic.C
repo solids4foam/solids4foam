@@ -371,7 +371,7 @@ void Foam::linearElastic::correct
 (
     pointSymmTensorField& sigma,
     const pointTensorField& gradD
-) const
+)
 {
     const pointSymmTensorField epsilon(symm(gradD));
 
