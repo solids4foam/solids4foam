@@ -3,6 +3,7 @@ name: Build and test
 
 on:
   workflow_dispatch:
+  pull_request:
 
 jobs:
   build-and-test-on-openfoam-v2012:
@@ -17,6 +18,7 @@ jobs:
         shell: bash -l {0}
         run: |
           source /usr/lib/openfoam/openfoam2012/etc/bashrc
+          (cd optionalFixes && ./Allreplace)
           ./Allwmake
 
       - name: Alltest
@@ -38,6 +40,7 @@ jobs:
         shell: bash -l {0}
         run: |
           source /opt/openfoam9/etc/bashrc
+          (cd optionalFixes && ./Allreplace)
           ./Allwmake
 
       - name: Alltest
@@ -59,6 +62,7 @@ jobs:
         shell: bash -l {0}
         run: |
           source /home/dockeruser/foam/foam-extend-4.1/etc/bashrc
+          (cd optionalFixes && ./Allreplace)
           ./Allwmake
 
       - name: Alltest
