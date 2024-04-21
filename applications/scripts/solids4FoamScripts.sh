@@ -426,7 +426,7 @@ function solids4Foam::err()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # caseOnlyRunsWithFoamExtend
-#     Give error if OpenFOAM version is not foam-extend
+#     Exit if OpenFOAM version is not foam-extend
 # Arguments:
 #     None
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -442,7 +442,7 @@ function solids4Foam::caseOnlyRunsWithFoamExtend()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # caseOnlyRunsWithOpenFOAM
-#     Give error if OpenFOAM version is foam-extend
+#     Exit if OpenFOAM version is foam-extend
 # Arguments:
 #     None
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -452,6 +452,25 @@ function solids4Foam::caseDoesNotRunWithFoamExtend()
     then
         echo; echo "This case currently does not run with foam-extend"; echo
         exit 0
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# caseDoesNotRunWithOpenFOAMOrg
+#     Exit if OpenFOAM version is OpenFOAM.org
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::caseDoesNotRunWithOpenFOAMOrg()
+{
+    if [[ $WM_PROJECT == "OpenFOAM" ]]
+    then
+        if [[ $WM_PROJECT_VERSION != v* ]]
+        then
+            echo; echo "This case currently does not run with OpenFOAM.org"; echo
+            exit 0
+        fi
     fi
 }
 

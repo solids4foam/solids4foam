@@ -52,6 +52,7 @@ Author
 #include "surfaceMesh.H"
 #include "zeroGradientFvPatchFields.H"
 #include "interpolationTable.H"
+#include "pointFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -67,6 +68,9 @@ class linearElasticMisesPlastic
     public mechanicalLaw
 {
     // Private data
+
+        //- Point mesh
+        const pointMesh& pMesh_;
 
         //- Shear modulus
         dimensionedScalar mu_;
@@ -89,17 +93,26 @@ class linearElasticMisesPlastic
         //- Yield stress surface field
         surfaceScalarField sigmaYf_;
 
+        //- Yield stress point field
+        pointScalarField pSigmaY_;
+
         //- Incremental change in sigmaY
         volScalarField DSigmaY_;
 
         //- Incremental change in sigmaY surface field
         surfaceScalarField DSigmaYf_;
 
+        //- Incremental change in sigmaY point field
+        pointScalarField pDSigmaY_;
+
         //- Total plastic strain
         volSymmTensorField epsilonP_;
 
         //- Total plastic strain surface field
         surfaceSymmTensorField epsilonPf_;
+
+        //- Total plastic strain point field
+        pointSymmTensorField pEpsilonP_;
 
         //- Incremental change of plastic strain
         volSymmTensorField DEpsilonP_;
@@ -119,11 +132,17 @@ class linearElasticMisesPlastic
         //- Plastic multiplier increment - surface field
         surfaceScalarField DLambdaf_;
 
+        //- Plastic multiplier increment - point field
+        pointScalarField pDLambda_;
+
         //- Equivalent plastic strain
         volScalarField epsilonPEq_;
 
         //- Equivalent plastic strain surface field
         surfaceScalarField epsilonPEqf_;
+
+        //- Equivalent plastic strain point field
+        pointScalarField pEpsilonPEq_;
 
         //- Active yielding flag
         //     1.0 for active yielding
@@ -136,9 +155,15 @@ class linearElasticMisesPlastic
         //- plasticN surface field
         surfaceSymmTensorField plasticNf_;
 
+        //- plasticN point field
+        pointSymmTensorField pPlasticN_;
+
         //- An iterative procedure is used when the yield stress is a nonlinear
         //  function of plastic strain
         const bool nonLinearPlasticity_;
+
+        //- Solve pressure equation
+        const bool solvePressureEquation_;
 
         //- Linear plastic modulus. It is only used if plasticity is linear,
         //  defined by two points on the stress-plastic strain curve
@@ -224,13 +249,6 @@ class linearElasticMisesPlastic
             const surfaceScalarField& trEpsilon
         );
 
-        //- Calculate stress given the strain
-        void calculateStress
-        (
-            surfaceSymmTensorField& sigma,
-            const surfaceSymmTensorField& epsilon
-        ) const;
-
 
 public:
 
@@ -259,14 +277,11 @@ public:
 
     // Member Functions
 
-        //- Return bulk modulus
-        virtual tmp<volScalarField> bulkModulus() const;
-
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
 
-#ifdef OPENFOAM_NOT_EXTEND
+#ifdef OPENFOAM_COM
         //- Material tangent for Newton Raphson loop
         virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
 #endif
@@ -279,8 +294,29 @@ public:
         //- Update the stress
         virtual void correct(volSymmTensorField& sigma);
 
+        //- Calculate the stress surface field given gradD
+        void correct
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceTensorField& gradD
+        );
+
+        //- Calculate the stress surface field given the strain field
+        void correct
+        (
+            surfaceSymmTensorField& sigma,
+            const surfaceSymmTensorField& epsilon
+        );
+
         //- Update the stress surface field
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Update the stress point field
+        virtual void correct
+        (
+            pointSymmTensorField& sigma,
+            const pointTensorField& gradD
+        );
 
         //- Return material residual i.e. a measured of how convergence of
         //  the material model
