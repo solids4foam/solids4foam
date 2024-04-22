@@ -49,6 +49,7 @@ SourceFiles
 #include "FixedList.H"
 #include "tensor.H"
 #include "refCount.H"
+#include "scalarField.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -136,6 +137,22 @@ public:
             //- Non-const access to a value entry. If the entry does not exist
             //  then create it and initialise it to zero
             tensor& operator()(const label rowI, const label colI);
+
+            //- Operator to add a sparseMatrix A to this object
+            void operator+=(const sparseMatrix& A);
+
+            //- Operator to add a sparseMatrix A to this object and return the
+            //  result
+            tmp<sparseMatrix> operator+(const sparseMatrix& A) const;
+
+            //- Operator to multiply the diagonal coefficients of this
+            //  sparseMatrix by a scalar and return the result
+            tmp<sparseMatrix> operator*(const scalar s) const;
+
+            //- Operator to multiply the diagonal coefficients of this
+            //  sparseMatrix by a scalarField and return the result
+            //  It is assumed that the field index corresponds to the matrix row
+            tmp<sparseMatrix> operator*(const scalarField& sf) const;
 };
 
 

@@ -45,6 +45,8 @@ Author
 #include "RectangularMatrix.H"
 #include "cellPointLeastSquaresVectors.H"
 #include "SparseMatrixTemplate.H"
+#include "meshDual.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -105,6 +107,28 @@ namespace vfvm
         const bool debug = false
     );
 
+    // Create and return a sparse matrix with the (Newton) linearised
+    // discretisation of the Laplacian term div(grad(pointP)) for a
+    // pointVectorField pointP
+    tmp<sparseMatrix> laplacian
+    (
+        const pointVectorField& pointP,
+        const meshDual& dualMesh,
+        const scalar zeta, // compact stencil coefficient
+        const bool debug = false
+    );
+
+    // Create and return a sparse matrix with the (Newton) linearised
+    // discretisation of the advection term div(rho*v*v)
+    tmp<sparseMatrix> div
+    (
+        // const surfaceScalarField& dualRho, // dual surface density field
+        // const scalar rho, // density
+        const pointVectorField& pointV, // primary mesh velocity point field
+        const meshDual& dualMesh, // dual mesh
+        const bool debug = false
+    );
+
     // Add coefficients to the matrix for the second time derivative
     // Note: this function does not calculate contributions to the right-hand
     // side
@@ -119,7 +143,17 @@ namespace vfvm
         const int debug  // debug switch
     );
 
-} // End namespace vfvc
+    // Add coefficients to the matrix for the first time derivative
+    // Note: this function does not calculate contributions to the right-hand
+    // side
+    tmp<sparseMatrix> ddt
+    (
+        ITstream& ddtScheme,
+        const pointVectorField& pointP,
+        const int debug = false
+    );
+
+} // End namespace vfvm
 
 } // End namespace Foam
 

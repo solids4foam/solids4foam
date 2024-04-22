@@ -50,7 +50,7 @@ SourceFiles
 #include "OFstream.H"
 #include "fvMatricesFwd.H"
 #include "PackedBoolList.H"
-#include "dualMeshToMeshMap.H"
+#include "meshDual.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -72,10 +72,7 @@ class solidModel
         autoPtr<dynamicFvMesh> meshPtr_;
 
         //- Dual mesh
-        mutable autoPtr<fvMesh> dualMeshPtr_;
-
-        //- Dual mesh to primary mesh map
-        mutable autoPtr<dualMeshToMeshMap> dualMeshToMeshMapPtr_;
+        mutable autoPtr<meshDual> dualMeshPtr_;
 
         //- Solid properties dictionary
         mutable IOdictionary solidProperties_;
@@ -265,20 +262,11 @@ protected:
         //- Make the dual mesh from the mesh
         void makeDualMesh() const;
 
-        //- Mark features for dual mesh
-        //  Copied from polyDualMeshApp.C
-        void simpleMarkFeatures
-        (
-            const polyMesh& mesh,
-            const PackedBoolList& isBoundaryEdge,
-            const scalar featureAngle,
-            const bool concaveMultiCells,
-            const bool doNotPreserveFaceZones,
-            labelList& featureFaces,
-            labelList& featureEdges,
-            labelList& singleCellFeaturePoints,
-            labelList& multiCellFeaturePoints
-        ) const;
+        //- Const-access to the dual mesh to mesh map object
+        const dualMeshToMeshMap& dualMeshMap() const
+        {
+            return dualMesh().dualMeshMap();
+        }
 
         //- Return non-const reference to solid properties dictionary
         IOdictionary& solidProperties()
@@ -425,13 +413,10 @@ public:
             }
 
             //- Return dualMesh
-            const fvMesh& dualMesh() const;
+            const meshDual& dualMesh() const;
 
             //- Return non-const dualMesh
-            fvMesh& dualMesh();
-
-            //- Return const dualMeshToMeshMap
-            const dualMeshToMeshMap& dualMeshMap() const;
+            meshDual& dualMesh();
 
             //- Return point mesh
             const pointMesh& pMesh() const

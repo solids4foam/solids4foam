@@ -126,5 +126,129 @@ void Foam::sparseMatrix::print() const
 }
 
 
+void Foam::sparseMatrix::operator+=
+(
+    const sparseMatrix& A
+)
+{
+    // Copy the A data into the result one-by-one
+    const sparseMatrixData& AData = A.data();
+    for (auto AIter = AData.begin(); AIter != AData.end(); ++AIter)
+    {
+        // Check if the entry already exists
+        sparseMatrixData::iterator iter =
+            data_.find(AIter.key());
+
+        if (iter == data_.end())
+        {
+            // Create a new entry
+            data_.insert(AIter.key(), AIter.val());
+        }
+        else
+        {
+            // Add to the existing entry
+            iter.val() += AIter.val();
+        }
+    }
+}
+
+
+Foam::tmp<Foam::sparseMatrix> Foam::sparseMatrix::operator+
+(
+    const sparseMatrix& A
+) const
+{
+    // Prepare the result
+    tmp<sparseMatrix> tresult
+    (
+        new sparseMatrix(max(data_.size(), A.data().size()))
+    );
+    sparseMatrix& result = tresult.ref();
+
+    // Copy data_ into the result
+    result.data() = data_;
+
+    // Copy the A data into the result one-by-one
+    sparseMatrixData& resultData = result.data();
+    const sparseMatrixData& AData = A.data();
+    for (auto AIter = AData.begin(); AIter != AData.end(); ++AIter)
+    {
+        // Check if the entry already exists
+        sparseMatrixData::iterator resultIter =
+            resultData.find(AIter.key());
+
+        if (resultIter == data_.end())
+        {
+            // Create a new entry
+            resultData.insert(AIter.key(), AIter.val());
+        }
+        else
+        {
+            // Add to the existing entry
+            resultIter.val() += AIter.val();
+        }
+    }
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::sparseMatrix> Foam::sparseMatrix::operator*
+(
+    const scalarField& sf
+) const
+{
+    // Prepare the result
+    tmp<sparseMatrix> tresult(new sparseMatrix(data_.size()));
+    sparseMatrix& result = tresult.ref();
+
+    // Copy data_ into the result
+    result.data() = data_;
+
+    sparseMatrixData& resultData = result.data();
+    forAll(sf, rowI)
+    {
+        // Create key for the entry
+        FixedList<label, 2> keyI;
+        keyI[0] = rowI;
+        keyI[1] = rowI;
+
+        // Check if the row exists
+        sparseMatrixData::iterator iter =
+            resultData.find(keyI);
+
+        if (iter != data_.end())
+        {
+            // Multiply the existing entry
+            iter.val() *= sf[rowI];
+        }
+    }
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::sparseMatrix> Foam::sparseMatrix::operator*
+(
+    const scalar s
+) const
+{
+    // Prepare the result
+    tmp<sparseMatrix> tresult(new sparseMatrix(data_.size()));
+    sparseMatrix& result = tresult.ref();
+
+    // Copy data_ into the result
+    result.data() = data_;
+
+    // Multiply each entry by s
+    sparseMatrixData& data = result.data();
+    for (auto iter = data.begin(); iter != data.end(); ++iter)
+    {
+        iter.val() *= s;
+    }
+
+    return tresult;
+}
+
 
 // ************************************************************************* //

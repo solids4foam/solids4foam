@@ -40,6 +40,7 @@ Author
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "vectorList.H"
+#include "meshDual.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -109,47 +110,80 @@ namespace vfvc
         const pointVectorField& pointA, // acceleration
         const scalarField& pointRho,    // density
         const scalarField& pointVol,    // volumes
-        const int debug // debug switch
+        const int debug = false
     );
 
-    // First time derivative pointVectorField pointP
+    // First time derivative of pointVectorField
+    // This function is primarily used for the displacement field and checks if
+    // the velocity and acceleration schemes are consistent
     tmp<vectorField> ddt
     (
         ITstream& ddtScheme,
         ITstream& d2dt2Scheme,
-        const pointVectorField& pointP // displacement
+        const pointVectorField& pointP
+    );
+
+    // First time derivative of pointVectorField
+    tmp<vectorField> ddt
+    (
+        ITstream& ddtScheme,
+        const pointVectorField& pointP
     );
 
     // Returns the laplacian of a scalar field on the dual mesh
     tmp<pointScalarField> laplacian
     (
-		pointScalarField& pointP,
-		const fvMesh& mesh,
-		const fvMesh& dualMesh,
-		const labelList& dualFaceToCell,
-		const labelList& dualCellToPoint,
-		const scalar& zeta,
-		const bool debug
+        pointScalarField& pointP,
+        const fvMesh& mesh,
+        const fvMesh& dualMesh,
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const scalar& zeta,
+        const bool debug = false
     );
 
     // Interpolate a pointScalarField to a volScalarField
     tmp<volScalarField> interpolate
-	(
-		const pointScalarField& pointP,
-		const fvMesh& mesh
-	);
+    (
+        const pointScalarField& pointP,
+        const fvMesh& mesh
+    );
 
-	// Interpolate a pointScalarField to a surfaceScalarField
-	// at the dual mesh faces
-	tmp<surfaceScalarField> interpolate
-	(
-		const pointScalarField& pointP,
-		const fvMesh& mesh,
-		const fvMesh& dualMesh,
-		const labelList& dualFaceToCell,
-		const labelList& dualCellToPoint,
-		const bool debug
-	);
+    // Interpolate a pointVectorField to a volVectorField
+    tmp<volVectorField> interpolate
+    (
+        const pointVectorField& pointP,
+        const fvMesh& mesh
+    );
+
+    // Interpolate a pointVectorField to a volVectorField
+    tmp<volVectorField> interpolate
+    (
+        const pointVectorField& pointP,
+        const fvMesh& mesh
+    );
+
+    // Interpolate a pointScalarField to a surfaceScalarField
+    // at the dual mesh faces
+    tmp<surfaceScalarField> interpolate
+    (
+        const pointScalarField& pointP,
+        const fvMesh& mesh,
+        const fvMesh& dualMesh,
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const bool debug = false
+    );
+
+    // Interpolate a pointVectorField to a surfaceVectorField
+    // at the dual mesh faces
+    tmp<surfaceVectorField> interpolate
+    (
+        const pointVectorField& pointP,
+        const fvMesh& mesh,
+        const meshDual& dualMesh,
+        const bool debug = false
+    );
 
 } // End namespace vfvc
 

@@ -4,7 +4,6 @@ solidModels/solidModel/solidModel.C
 solidModels/solidModel/lookupSolidModel.C
 solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
-solidModels/solidModel/dualMeshToMeshMap.C
 
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/explicitLinGeomTotalDispSolid/explicitLinGeomTotalDispSolid.C
@@ -31,6 +30,7 @@ fluidModels/oneWayFsiFluid/oneWayFsiFluid.C
 fluidModels/pimpleFluid/pimpleFluid.C
 fluidModels/pimpleOversetFluid/pimpleOversetFluid.C
 fluidModels/sonicLiquidFluid/sonicLiquidFluid.C
+fluidModels/vertexCentredFluid/vertexCentredFluid.C
 
 fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 fluidSolidInterfaces/AitkenCouplingInterface/AitkenCouplingInterface.C
@@ -217,7 +217,9 @@ numerics/interpolationTable/tableReaders/openFoam/openFoamTableReaders.C
 numerics/interpolationTable/tableReaders/csv/csvTableReaders.C
 
 numerics/deltaVectors/deltaVectors.C
-numerics/meshDualiser/meshDualiser.C
+numerics/meshDual/meshDual.C
+numerics/meshDual/dualMeshToMeshMap.C
+numerics/meshDual/meshDualiser.C
 numerics/minEdgeLength/minEdgeLength.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/multiplyCoeff/multiplyCoeff.C
