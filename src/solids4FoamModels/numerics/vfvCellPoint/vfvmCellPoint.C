@@ -545,17 +545,17 @@ Foam::tmp<Foam::sparseMatrix> Foam::vfvm::laplacian
         const vectorList& curLeastSquaresVecs = leastSquaresVecs[cellID];
 
         // Unit edge vector from the own point to the nei point
-        //vector edgeDir = points[neiPointID] - points[ownPointID];
-        //const scalar edgeLength = mag(edgeDir);
-        //edgeDir /= edgeLength;
+        vector edgeDir = points[neiPointID] - points[ownPointID];
+        const scalar edgeLength = mag(edgeDir);
+        edgeDir /= edgeLength;
 
         // Edge unit direction vector divided by the edge length, so that we
         // can reuse the multiplyCoeff function
-        //const vector eOverLength = edgeDir/edgeLength;
+        const vector eOverLength = edgeDir/edgeLength;
 
         // Dual face unit normal
-        const scalar curDualMagSf = mag(curDualSf);
-        const vector curDualN = curDualSf/curDualMagSf;
+        // const scalar curDualMagSf = mag(curDualSf);
+        // const vector curDualN = curDualSf/curDualMagSf;
 
         // dualFaceI will contribute coefficients to the equation for each
         // primary mesh point in the dual own cell, and, if an internal
@@ -575,8 +575,8 @@ Foam::tmp<Foam::sparseMatrix> Foam::vfvm::laplacian
             // We remove the edge direction component by multiplying the
             // least squares vectors by (I - sqr(edgeDir))
             // Note that the compact edge direction component is added below
-            // lsVec = ((I - zeta*sqr(edgeDir)) & lsVec);
-            lsVec = ((I - zeta*sqr(curDualN)) & lsVec);
+            lsVec = ((I - zeta*sqr(edgeDir)) & lsVec);
+            //lsVec = ((I - zeta*sqr(curDualN)) & lsVec);
 
             // Calculate the coefficient for this point coming from dualFaceI
             const tensor coeff((curDualSf & lsVec)*I2);
@@ -593,12 +593,12 @@ Foam::tmp<Foam::sparseMatrix> Foam::vfvm::laplacian
         // Add compact central-differencing component
 
         // Delta coefficient
-        const scalar deltaCoeff =
-            1.0/(curDualN & (points[neiPointID] - points[ownPointID]));
+        // const scalar deltaCoeff =
+        //     1.0/(curDualN & (points[neiPointID] - points[ownPointID]));
 
         // Compact edge direction coefficient
-        //const tensor edgeDirCoeff((curDualSf & eOverLength)*I2*zeta);
-        const tensor compactCoeff(curDualMagSf*deltaCoeff*I2*zeta);
+        const tensor compactCoeff((curDualSf & eOverLength)*I2*zeta);
+        //const tensor compactCoeff(curDualMagSf*deltaCoeff*I2*zeta);
 
         // Insert coefficients for the ownPoint
         matrix(ownPointID, ownPointID) -= compactCoeff;
@@ -804,7 +804,7 @@ Foam::tmp<Foam::sparseMatrix> Foam::vfvm::ddt
     }
 
     // Prepare the result field
-    tmp<sparseMatrix> tmatrix(new sparseMatrix(20*pointP.size()));
+    tmp<sparseMatrix> tmatrix(new sparseMatrix(pointP.size()));
     sparseMatrix& matrix = tmatrix.ref();
 
     // Read time scheme

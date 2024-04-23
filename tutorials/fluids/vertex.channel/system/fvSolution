@@ -23,7 +23,7 @@ relaxationFactors
 {
     fields
     {
-        //pointU    0.1;
+        //pointU    0.8;
     }
 }
 

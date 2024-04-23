@@ -31,10 +31,10 @@ vertexCentredFluidCoeffs
     zeta                 0.1;
 
     // Prescribed DOF diagonal scaling value
-    fixedDofScale        1.0;
+    //fixedDofScale        1.0;
 
     // Update Jacobian every outer iteration
-    fullNewton           yes;
+    fullNewton           no;
 
     // Outer loop tolerance
     solutionTolerance    1e-6;
@@ -52,7 +52,7 @@ vertexCentredFluidCoeffs
     mu                   mu [1 -1 -1 0 0 0 0] 3.5e-3;
 
     // Use PETSc, else use Eigen SparseLU
-    usePETSc no;
+    usePETSc yes;
     optionsFile petscOptions.mumps;
     //optionsFile petscOptions.hypre;
     //optionsFile petscOptions.cg;

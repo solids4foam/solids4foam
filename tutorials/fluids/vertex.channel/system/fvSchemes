@@ -16,16 +16,12 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-d2dt2Schemes
-{
-    default none;
-    ddt(pointU)  Euler;
-}
-
 ddtSchemes
 {
     default none;
     ddt(pointU)  Euler;
+    //ddt(pointU)  backward;
+    //ddt(pointU)  steadyState;
 }
 
 gradSchemes

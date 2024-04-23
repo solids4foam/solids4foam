@@ -86,17 +86,17 @@ tmp<vectorField> vertexCentredFluid::residualMomentum
         rho_.value()*pointVolI
        *vfvc::ddt(mesh().ddtScheme("ddt(pointU)"), pointU);
 
-
     // Calculate the advection term div(rho*U*U)
 
     // Interpolate pointU to the dual faces
     const surfaceVectorField dualUf
     (
+        "dualUf",
         vfvc::interpolate(pointU, mesh(), dualMesh_)
     );
 
-    // Calculate the flux through the dualf faces
-    surfaceScalarField dualFlux(dualMesh_.Sf() & dualUf);
+    // Calculate the flux through the dual faces
+    surfaceScalarField dualFlux("dualFlux", dualMesh_.Sf() & dualUf);
 
     // Enforce the flux at the boundaries
     enforceFluxBoundaries
@@ -126,6 +126,7 @@ tmp<vectorField> vertexCentredFluid::residualMomentum
     // Calculate the velocity gradient at the dual faces
     const surfaceTensorField dualGradUf
     (
+        "dualGradUf",
         vfvc::fGrad
         (
             pointU,
@@ -134,13 +135,14 @@ tmp<vectorField> vertexCentredFluid::residualMomentum
             dualMesh_.dualMeshMap().dualFaceToCell(),
             dualMesh_.dualMeshMap().dualCellToPoint(),
             zeta_,
-            false
+            false // debug
         )
     );
 
     // Interpolate pointP to the dual faces
     const surfaceScalarField dualPf
     (
+        "dualPf",
         vfvc::interpolate
         (
             pointP,
@@ -156,12 +158,19 @@ tmp<vectorField> vertexCentredFluid::residualMomentum
     const surfaceVectorField dualN(dualMesh_.Sf()/dualMesh_.magSf());
 
     // Calculate the tractions on the dual faces
-    surfaceVectorField dualTraction(mu_*(dualN & dualGradUf) - dualPf*dualN);
+    surfaceVectorField dualTraction
+    (
+        "dualTraction", mu_*(dualN & dualGradUf) - dualPf*dualN
+    );
 
     // Enforce exact tractions on traction boundaries, e.g. outlets
     enforceTractionBoundaries
     (
-        pointP, pointU, dualTraction, mesh(), dualMesh_.dualMeshMap().pointToDualFaces()
+        pointP,
+        pointU,
+        dualTraction,
+        mesh(),
+        dualMesh_.dualMeshMap().pointToDualFaces()
     );
 
     // Calculate divergence of stress for the dual cells
@@ -177,7 +186,6 @@ tmp<vectorField> vertexCentredFluid::residualMomentum
 
     // Add the surface force term to residual
     residual -= pointDivSigma*pointVolI;
-
 
     if (debug)
     {
@@ -452,7 +460,7 @@ void vertexCentredFluid::enforceTractionBoundaries
     {
         if
         (
-            isA<fixedValuePointPatchVectorField>
+            isA<fixedValuePointPatchScalarField>
             (
                 pointP.boundaryField()[patchI]
             )
@@ -537,7 +545,7 @@ void vertexCentredFluid::enforceTractionBoundaries
         }
         else if
         (
-            isA<symmetryPointPatchVectorField>(pointP.boundaryField()[patchI])
+            isA<symmetryPointPatchScalarField>(pointP.boundaryField()[patchI])
          || isA<slipPointPatchVectorField>
             (
                 pointU.boundaryField()[patchI]
@@ -661,15 +669,11 @@ vertexCentredFluid::vertexCentredFluid
     fixedDofDirections_(fixedDofs_.size(), symmTensor::zero),
     fixedDofScale_
     (
-        readScalar(fluidProperties().lookup("fixedDofScale"))
-        // fluidProperties().lookupOrDefault<scalar>
-        // (
-        //     "fixedDofScale",
-        //     (
-        //         average(mechanical().impK())
-        //        *Foam::sqrt(gAverage(mesh().magSf()))
-        //     ).value()
-        // )
+        fluidProperties().lookupOrDefault<scalar>
+        (
+            "fixedDofScale",
+            (mu_*Foam::sqrt(gAverage(mesh().magSf()))).value()
+        )
     ),
     pointU_
     (
@@ -814,8 +818,9 @@ bool vertexCentredFluid::evolve()
 {
     Info<< "Evolving fluid solver" << endl;
 
-    //Update boundary conditions
+    // Update boundary conditions
     pointU_.correctBoundaryConditions();
+    pointP_.correctBoundaryConditions();
 
     // Initialise matrix
     sparseMatrix matrix(sum(globalPointIndices_.stencilSize()));
@@ -853,11 +858,13 @@ bool vertexCentredFluid::evolve()
             // If we had a material tangent, we would update it here
             // materialTangent = dualMechanicalPtr_().materialTangentFaceField();
 
+            // Todo: vfvm operators are inconsisent in that some return the
+            // results per unit volume and some do not
             // Add ddt coefficients
             matrix +=
                 vfvm::ddt
                 (
-                    mesh().d2dt2Scheme("ddt(pointU)"),
+                    mesh().ddtScheme("ddt(pointU)"),
                     pointU_
                 )()*(rho_.value()*pointVolI);
 

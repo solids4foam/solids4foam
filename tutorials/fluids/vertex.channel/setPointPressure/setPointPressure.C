@@ -39,6 +39,7 @@ using namespace Foam;
 
 // Hard-code the pressure gradient
 const scalar PRESSURE_GRADIENT = -4.2e-4;
+//const scalar PRESSURE_GRADIENT = -4.2e-1;
 
 // Hard-code the pressure origin: x location where pressure is zero
 const scalar PRESSURE_ORIGIN = 0.2;

@@ -169,7 +169,7 @@ void Foam::sparseMatrix::operator-=
         if (iter == data_.end())
         {
             // Create a new entry
-            data_.insert(AIter.key(), AIter.val());
+            data_.insert(AIter.key(), -AIter.val());
         }
         else
         {
@@ -232,23 +232,15 @@ Foam::tmp<Foam::sparseMatrix> Foam::sparseMatrix::operator*
     // Copy data_ into the result
     result.data() = data_;
 
-    sparseMatrixData& resultData = result.data();
-    forAll(sf, rowI)
+    // Copy data_ into the result
+    result.data() = data_;
+
+    // Multiply each row by sf[rowI]
+    sparseMatrixData& data = result.data();
+    for (auto iter = data.begin(); iter != data.end(); ++iter)
     {
-        // Create key for the entry
-        FixedList<label, 2> keyI;
-        keyI[0] = rowI;
-        keyI[1] = rowI;
-
-        // Check if the row exists
-        sparseMatrixData::iterator iter =
-            resultData.find(keyI);
-
-        if (iter != data_.end())
-        {
-            // Multiply the existing entry
-            iter.val() *= sf[rowI];
-        }
+        const label rowI = iter.key()[0];
+        iter.val() *= sf[rowI];
     }
 
     return tresult;

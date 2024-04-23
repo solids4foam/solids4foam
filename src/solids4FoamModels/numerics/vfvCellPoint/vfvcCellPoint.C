@@ -173,8 +173,6 @@ tmp<volTensorField> grad
 
             // Add least squares contribution to the cell gradient
             cellGrad += lsVec*pointDI[pointID];
-
-            //Info << "GradD for cell " << cellI << " and point " << pointID << ": " << cellGrad << endl;
         }
     }
 
@@ -1235,7 +1233,6 @@ tmp<surfaceVectorField> interpolate
 
                 if (cellID > -1)
                 {
-
                     // Use the gradient in the adjacent primary cell-centre
                     // This will result in inconsistent values at processor patches
                     // Is this an issue?
