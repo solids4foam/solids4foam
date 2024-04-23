@@ -23,9 +23,6 @@ License
     #include <Eigen/Sparse>
     #include <unsupported/Eigen/SparseExtra>
 #endif
-#ifdef USE_PETSC
-    #include <petscksp.h>
-#endif
 
 // * * * * * * * * * * * * * * * * * Functions  * * * * * * * * * * * * * * * //
 
@@ -1567,6 +1564,658 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     {
         Pout<< "BlockSolverPerformance<vector> "
             << "sparseMatrixTools::solveLinearSystemPETSc: end" << endl;
+    }
+
+    vector initRes(vector::one);
+    vector finalRes(norm*vector::one);
+
+    if (twoD)
+    {
+        initRes.z() = 0;
+        finalRes.z() = 0;
+    }
+
+    return SolverPerformance<vector>
+    (
+        "PETSc", // solver name
+        "pointD", // field name
+        initRes, // initial residual
+        finalRes, // final residual
+        vector(its, its, its) // nIteration
+        //false, // converged
+        //false // singular
+    );
+}
+
+
+Foam::SolverPerformance<Foam::vector>
+Foam::sparseMatrixTools::solveNonLinearSystemPETSc
+(
+    PetscErrorCode (*formResidual)(SNES, Vec, Vec, void*),
+    PetscErrorCode (*formJacobian)(SNES snes, Vec x, Mat jac, Mat B, void *ctx),
+    void *ctx,
+    const sparseMatrix& matrix,
+    const vectorField& source,
+    vectorField& solution,
+    const bool twoD,
+    fileName& optionsFile,
+    const pointField& points,
+    const boolList& ownedByThisProc,
+    const labelList& localToGlobalPointMap,
+    const labelList& stencilSizeOwned,
+    const labelList& stencilSizeNotOwned,
+    const bool debug
+)
+{
+    if (debug)
+    {
+        Info<< "BlockSolverPerformance<vector> "
+            << "sparseMatrixTools::solveNonLinearSystemPETSc: start" << endl;
+    }
+
+    // Set the block coefficient size (2 for 2-D, 3 for 3-D)
+    label blockSize = 3;
+    if (twoD)
+    {
+        blockSize = 2;
+    }
+
+    // Find size of global system, i.e. the highest global point index + 1
+    const label blockN = gMax(localToGlobalPointMap) + 1;
+    const label N = blockSize*blockN;
+    if (debug)
+    {
+        Pout<< "blockN = " << blockN << ", N = " << N << endl;
+    }
+
+    // Find the start and end global point indices for this proc
+    label blockStartID = N;
+    label blockEndID = -1;
+    forAll(ownedByThisProc, pI)
+    {
+        if (ownedByThisProc[pI])
+        {
+            blockStartID = min(blockStartID, localToGlobalPointMap[pI]);
+            blockEndID = max(blockEndID, localToGlobalPointMap[pI]);
+        }
+    }
+    const label startID = blockSize*blockStartID;
+    const label endID = blockSize*(blockEndID + 1) - 1;
+    if (debug)
+    {
+        Pout<< "blockStartID = " << blockStartID
+            << ", blockEndID = " << blockEndID
+            << ", startID = " << startID << ", endID = " << endID << endl;
+    }
+
+    // Find size of local system, i.e. the range of points owned by this proc
+    const label blockn = blockEndID - blockStartID + 1;
+    const label n = blockSize*blockn;
+    if (debug)
+    {
+        Pout<< "blockn = " << blockn << ", n = " << n << endl;
+    }
+
+
+    // To keep PETSc happy, we will give it dummy command-line arguments
+    // int argc = 1;
+    // char * args1[argc];
+    // args1[0] = (char*)"solids4Foam";
+    // char** args = args1;
+
+    // Initialise PETSc with options file
+    optionsFile.expand();
+    // static char help[] = "Solves a linear system with KSP.\n\n";
+    PetscErrorCode ierr;
+    // ierr = PetscInitialize(&argc, &args, optionsFile.c_str(), help); checkErr(ierr);
+    if (debug)
+    {
+        Pout<< "PetscInitialize: start" << endl;
+    }
+    ierr = PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL); checkErr(ierr);
+    if (debug)
+    {
+        Pout<< "PetscInitialize: end" << endl;
+    }
+
+
+    //MPI_Comm_size(PETSC_COMM_WORLD,&size);
+
+    //ierr = MPI_Comm_size(PETSC_COMM_WORLD,&size);
+    //ierr = PetscOptionsGetInt(NULL,NULL,"-n",&n,NULL);
+    //ierr = PetscOptionsGetBool(NULL,NULL,"-nonzero_guess",&nonzeroguess,NULL);
+
+
+    // Create PETSc matrix
+
+    Mat A;
+    ierr = MatCreate(PETSC_COMM_WORLD, &A); checkErr(ierr);
+
+    // Set the local and global matrix size
+    // (matrix, local rows, local cols, global rows, global cols)
+    //MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,n,n);
+    ierr = MatSetSizes(A, n, n, N, N); checkErr(ierr);
+    //ierr = MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, N, N); checkErr(ierr);
+
+    ierr = MatSetFromOptions(A); checkErr(ierr);
+
+    // Set matrix to parallel type
+    ierr = MatSetType(A, MATMPIAIJ); checkErr(ierr);
+
+    // Set the block coefficient size
+    ierr = MatSetBlockSize(A, blockSize); checkErr(ierr);
+
+    // Pre-allocate matrix memory: this is critical for performance
+
+    // Set on-core (d_nnz) and off-core (o_nnz) non-zeros per row
+    // o_nnz is currently not set correctly, as it distinguishes between on-core
+    // and off-core instead of owned (all on-core) vs not-owned (on-core and
+    // off-core). For now, we will just use the max on-core non-zeros to
+    // initialise not-owned values
+
+    int* d_nnz = (int*)malloc(n*sizeof(int));
+    int* o_nnz = (int*)malloc(n*sizeof(int));
+    // label d_nnz[n];
+    // label o_nnz[n];
+    label d_nz = 0;
+    setNonZerosPerRow
+    (
+        d_nnz,
+        o_nnz,
+        d_nz,
+        n,
+        blockSize,
+        ownedByThisProc,
+        stencilSizeOwned,
+        stencilSizeNotOwned
+    );
+
+    // Find max non-zeros in a row
+    if (debug)
+    {
+        Pout<< "        Max non-zeros per row = " << d_nz << endl;
+    }
+
+    // Serial matrix
+    // Set exact number of non-zeros per row
+    // MatSeqAIJSetPreallocation(A, 0, d_nnz);
+    // or conservatively as
+    // MatSeqAIJSetPreallocation(A, nz, NULL);
+
+    // Parallel matrix
+    ierr = MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz); checkErr(ierr);
+    //ierr = MatMPIAIJSetPreallocation(A, 0, d_nnz, d_nz, NULL); checkErr(ierr);
+    // or conservatively as
+    // ierr = MatMPIAIJSetPreallocation(A, d_nz, NULL, o_nz, NULL);
+    // ierr = MatMPIAIJSetPreallocation(A, d_nz, NULL, d_nz, NULL); checkErr(ierr);
+    // const label nz = 81; // way too much in 2-D!
+    // ierr = MatMPIAIJSetPreallocation(A, nz, NULL, nz, NULL);
+
+    // Optional: no error if additional memory allocation is required
+    // If false, then an error is thrown for additional allocations
+    // If preallocation was correct (or conservative) then an error should never
+    // be thrown
+    // For now, we will disable this check in debug mode so we can see how many
+    // mallocs were made
+    // TO BE FIXED: some mallocs are still needed in parallel!
+    //if (debug)
+    {
+        MatSetOption(A, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+    }
+
+    // Not sure if this set is needed but it does not hurt
+    ierr = MatSetUp(A); checkErr(ierr);
+
+
+    // Insert coefficients into the matrix
+    // Note: we use global indices when inserting coefficients
+
+    if (debug)
+    {
+        Pout<< "    Inserting PETSc matrix coefficients: start" << endl;
+    }
+
+    const sparseMatrixData& data = matrix.data();
+    for
+    (
+        sparseMatrixData::const_iterator iter = data.begin();
+        iter != data.end();
+        ++iter
+    )
+    {
+        const tensor& coeff = iter();
+        const label blockRowI = localToGlobalPointMap[iter.key()[0]];
+        const label blockColI = localToGlobalPointMap[iter.key()[1]];
+
+        if (twoD)
+        {
+            // Prepare values
+            const PetscScalar values[4] =
+            {
+                coeff.xx(), coeff.xy(),
+                coeff.yx(), coeff.yy()
+            };
+
+            // Insert tensor coefficient
+            ierr = MatSetValuesBlocked
+            (
+                A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
+            ); checkErr(ierr);
+        }
+        else // 3-D
+        {
+            // Prepare values
+            // Maybe I can use coeff.cdata() here?
+            const PetscScalar values[9] =
+            {
+                coeff.xx(), coeff.xy(), coeff.xz(),
+                coeff.yx(), coeff.yy(), coeff.yz(),
+                coeff.zx(), coeff.zy(), coeff.zz()
+            };
+
+            // Insert tensor coefficient
+            ierr = MatSetValuesBlocked
+            (
+                A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
+            );
+            if (ierr > 0)
+            {
+                Pout<< "MatSetValuesBlocked returned ierr = " << ierr
+                    << " for " << blockRowI << " " << blockColI << ": "
+                    << coeff << endl;
+            }
+            checkErr(ierr);
+        }
+    }
+    if (debug)
+    {
+        Pout<< "    Inserting PETSc matrix coefficients: end" << endl;
+    }
+
+    if (debug)
+    {
+        Pout<< "        Assembling the matrix: start" << endl;
+    }
+    ierr = MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY); checkErr(ierr);
+    ierr = MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY); checkErr(ierr);
+    if (debug)
+    {
+        Pout<< "        Assembling the matrix: end" << endl;
+    }
+
+    // Check pre-allocation effectiveness, i.e. were additional memory
+    // allocations needed or was space left unused
+    if (debug)
+    {
+        MatInfo        matinfo;
+        //MatGetInfo(A, MAT_LOCAL, &matinfo);
+        MatGetInfo(A, MAT_GLOBAL_SUM, &matinfo);
+        // MatGetInfo(A, MAT_GLOBAL_MAX, &matinfo);
+        Pout<< "nz_allocated = " << matinfo.nz_allocated
+            << ", nz_used = " << matinfo.nz_used
+            << ", nz_unneeded = " << matinfo.nz_unneeded
+            << ", memory = " << matinfo.memory
+            << ", assemblies = " << matinfo.assemblies
+            << ", mallocs = " << matinfo.mallocs << endl;
+    }
+
+    //MatView(A, PETSC_VIEWER_STDOUT_WORLD);
+
+    // Populate the PETSc source vector
+    // Note: uses global indices
+
+    // Create PETSc vectors
+    // x and b have local size n
+    // Note: the sizes of x and b are, in general, not equal the number of
+    // points on this process, as they only contain the points owned by this
+    // proc. To acess the values not-owned by the proc, we will use an
+    // xWithGhosts vector
+    // x is the global solution vector
+    if (debug)
+    {
+        Pout<< "        Creating the solution vector" << endl;
+    }
+    Vec x;
+    ierr = VecCreate(PETSC_COMM_WORLD, &x); checkErr(ierr);
+    ierr = VecSetSizes(x, n, N); checkErr(ierr);
+    ierr = VecSetBlockSize(x, blockSize); checkErr(ierr);
+    ierr = VecSetType(x, VECMPI); checkErr(ierr);
+    ierr =  PetscObjectSetName((PetscObject) x, "Solution"); checkErr(ierr);
+    // VecSetSizes(x, PETSC_DECIDE, N);
+    ierr = VecSetFromOptions(x); checkErr(ierr);
+
+    // Create the source (b) using the same settings as b
+    if (debug)
+    {
+        Pout<< "        Creating the source vector" << endl;
+    }
+    Vec b;
+    ierr =  VecDuplicate(x, &b); checkErr(ierr);
+    ierr = PetscObjectSetName((PetscObject) b, "Source"); checkErr(ierr);
+
+    if (debug)
+    {
+        Pout<< "        Populating the source vector" << endl;
+    }
+
+    {
+        forAll(source, localBlockRowI)
+        {
+            const vector& sourceI = source[localBlockRowI];
+            const label blockRowI = localToGlobalPointMap[localBlockRowI];
+
+            if (twoD)
+            {
+                // Prepare values
+                const PetscScalar values[2] = {sourceI.x(), sourceI.y()};
+
+                // Insert values
+                ierr = VecSetValuesBlocked
+                (
+                    b, 1, &blockRowI, values, ADD_VALUES
+                ); checkErr(ierr);
+            }
+            else
+            {
+                // Prepare values
+                const PetscScalar values[3] =
+                {
+                    sourceI.x(), sourceI.y(), sourceI.z()
+                };
+
+                // Insert values
+                ierr = VecSetValuesBlocked
+                (
+                    b, 1, &blockRowI, values, ADD_VALUES
+                ); checkErr(ierr);
+            }
+        }
+    }
+
+    if (debug)
+    {
+        Pout<< "        Assembling the solution vector" << endl;
+    }
+
+    ierr = VecAssemblyBegin(x); checkErr(ierr);
+    ierr = VecAssemblyEnd(x); checkErr(ierr);
+
+    if (debug)
+    {
+        Pout<< "        Assembling the source vector" << endl;
+    }
+
+    ierr = VecAssemblyBegin(b); checkErr(ierr);
+    ierr = VecAssemblyEnd(b); checkErr(ierr);
+
+
+    // Create KSP linear solver
+    if (debug)
+    {
+        Pout<< "        Creating the linear solver" << endl;
+    }
+    KSP            ksp;          /* linear solver context */
+    ierr = KSPCreate(PETSC_COMM_WORLD, &ksp); checkErr(ierr);
+
+
+    // Set operators. Here the matrix that defines the linear system
+    // also serves as the preconditioning matrix.
+    ierr = KSPSetOperators(ksp, A, A); checkErr(ierr);
+
+
+    // Set linear solver defaults for this problem
+    // This are overwritten by the options file
+    // - By extracting the KSP and PC contexts from the KSP context,
+    //   we can then directly call any KSP and PC routines to set
+    //   various options.
+    // - The following four statements are optional; all of these
+    //   parameters could alternatively be specified at runtime via
+    //   KSPSetFromOptions();
+    // ierr = KSPGetPC(ksp,&pc);CHKERRQ(ierr);
+    // ierr = PCSetType(pc,PCJACOBI);CHKERRQ(ierr);
+    // ierr = KSPSetTolerances(ksp,1.e-5,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);CHKERRQ(ierr);
+    if (debug)
+    {
+        Pout<< "        Creating the preconditioner solver" << endl;
+    }
+    PC pc;
+    ierr = KSPGetPC(ksp, &pc); checkErr(ierr);
+    //ierr = KSPSetType(ksp, KSPFGMRES);
+    // ierr = PCSetType(pc, PCJACOBI);
+    //ierr = PCSetType(pc, PCILU);
+    ierr = KSPSetTolerances
+    (
+        ksp, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT
+    ); checkErr(ierr);
+
+    // Set runtime options, e.g.,
+    //     -ksp_type <type> -pc_type <type> -ksp_monitor -ksp_rtol <rtol>
+    // These options will override those specified above as long as
+    // KSPSetFromOptions() is called _after_ any other customization
+    // routines.
+    //ierr = KSPSetFromOptions(ksp);CHKERRQ(ierr);
+    ierr = KSPSetFromOptions(ksp); checkErr(ierr);
+
+    // PetscBool      nonzeroguess = PETSC_FALSE;
+    // if (nonzeroguess)
+    // {
+    //     PetscScalar p = .5;
+    //     // ierr = VecSet(x,p);CHKERRQ(ierr);
+    //     // ierr = KSPSetInitialGuessNonzero(ksp,PETSC_TRUE);CHKERRQ(ierr);
+    //     ierr = VecSet(x,p);
+    //     ierr = KSPSetInitialGuessNonzero(ksp,PETSC_TRUE);
+    // }
+
+
+    // Pass the point coordinates to PETSc to allow multigrid
+    if (debug)
+    {
+        Pout<< "        Passing the coordinates to allow multigrid" << endl;
+    }
+    {
+        PC pc;
+        void (*f)(void) = NULL;
+
+        ierr = KSPGetPC(ksp, &pc); checkErr(ierr);
+        PetscObjectQueryFunction((PetscObject)pc, "PCSetCoordinates_C", &f);
+
+        if (f)
+        {
+            PetscInt sdim = vector::nComponents;
+            if (twoD)
+            {
+                sdim = 2;
+            }
+
+            List<PetscReal> petscPoints(points.size()*sdim);
+
+            auto iter = petscPoints.data();
+            for (const vector& v : points)
+            {
+                *(iter++) = v.x();
+                *(iter++) = v.y();
+
+                if (!twoD)
+                {
+                    *(iter++) = v.z();
+                }
+            }
+
+            ierr = PCSetCoordinates(pc, sdim, blockn, petscPoints.data());
+            checkErr(ierr);
+        }
+    }
+
+    // Solve linear system
+    if (debug)
+    {
+        Pout<< "        Solving the linear solver: start" << endl;
+    }
+
+    ierr = KSPSolve(ksp, b, x); checkErr(ierr);
+
+    if (debug)
+    {
+        Pout<< "        Solving the linear solver: end" << endl;
+    }
+
+
+    // Copy the results from the PETSc vector into the foam field
+
+    if (debug)
+    {
+        Pout<< "        Copying the solution vector" << endl;
+    }
+
+    // Insert local process values
+    PetscScalar*   xArr;
+    ierr = VecGetArray(x, &xArr); checkErr(ierr);
+    {
+        label index = 0;
+        forAll(solution, i)
+        {
+            if (ownedByThisProc[i])
+            {
+                solution[i].x() = xArr[index++];
+                solution[i].y() = xArr[index++];
+
+                if (!twoD)
+                {
+                    solution[i].z() = xArr[index++];
+                }
+            }
+        }
+    }
+    ierr = VecRestoreArray(x, &xArr); checkErr(ierr);
+
+    // Sync values not owned by this proc
+
+    {
+        // Count points non-owned by this proc
+        label nNotOwnedByThisProc = 0;
+        forAll(ownedByThisProc, pI)
+        {
+            if (!ownedByThisProc[pI])
+            {
+                nNotOwnedByThisProc++;
+            }
+        }
+        nNotOwnedByThisProc *= blockSize;
+
+        PetscInt indices[nNotOwnedByThisProc];
+        int index = 0;
+        forAll(ownedByThisProc, pI)
+        {
+            if (!ownedByThisProc[pI])
+            {
+                indices[index++] = blockSize*localToGlobalPointMap[pI];
+                indices[index++] = blockSize*localToGlobalPointMap[pI] + 1;
+
+                if (!twoD)
+                {
+                    indices[index++] = blockSize*localToGlobalPointMap[pI] + 2;
+                }
+            }
+        }
+
+        IS indexSet;
+        ierr = ISCreateGeneral
+        (
+            PETSC_COMM_WORLD,
+            nNotOwnedByThisProc,
+            indices,
+            PETSC_COPY_VALUES,
+            &indexSet
+        ); checkErr(ierr);
+
+        // Local vector for holding not-owned values
+        Vec xNotOwned;
+        ierr = VecCreate(PETSC_COMM_WORLD, &xNotOwned); checkErr(ierr);
+        ierr = VecSetSizes(xNotOwned, nNotOwnedByThisProc, PETSC_DECIDE);
+        checkErr(ierr);
+        ierr = VecSetType(xNotOwned, VECMPI); checkErr(ierr);
+        ierr = VecSetUp(xNotOwned); checkErr(ierr);
+
+        // Context for syncing data
+        VecScatter ctx;
+        ierr = VecScatterCreate(x, indexSet, xNotOwned, NULL, &ctx);
+        checkErr(ierr);
+        ierr = VecScatterBegin(ctx, x, xNotOwned, INSERT_VALUES, SCATTER_FORWARD);
+        checkErr(ierr);
+        ierr = VecScatterEnd(ctx, x, xNotOwned, INSERT_VALUES, SCATTER_FORWARD);
+        checkErr(ierr);
+        ierr = VecScatterDestroy(&ctx); checkErr(ierr);
+
+        // Populate not-owned values
+        PetscScalar* xNotOwnedArr;
+        ierr = VecGetArray(xNotOwned, &xNotOwnedArr); checkErr(ierr);
+        {
+            label index = 0;
+            forAll(solution, i)
+            {
+                if (!ownedByThisProc[i])
+                {
+                    solution[i].x() = xNotOwnedArr[index++];
+                    solution[i].y() = xNotOwnedArr[index++];
+
+                    if (!twoD)
+                    {
+                        solution[i].z() = xNotOwnedArr[index++];
+                    }
+                }
+            }
+        }
+        ierr = VecRestoreArray(xNotOwned, &xNotOwnedArr); checkErr(ierr);
+
+        // Destroy the index set
+        ierr = ISDestroy(&indexSet); checkErr(ierr);
+    }
+
+    // View solver info; we could instead use the option -ksp_view to
+    // print this info to the screen at the conclusion of KSPSolve().
+    if (debug)
+    {
+        ierr = KSPView(ksp,PETSC_VIEWER_STDOUT_WORLD); checkErr(ierr);
+    }
+
+
+    // ierr = VecAXPY(x,neg_one,u);CHKERRQ(ierr);
+    // ierr = VecNorm(x,NORM_2,&norm);CHKERRQ(ierr);
+    // ierr = KSPGetIterationNumber(ksp,&its);CHKERRQ(ierr);
+    // ierr = PetscPrintf(PETSC_COMM_WORLD,"Norm of error %g, Iterations %D\n",(double)norm,its);CHKERRQ(ierr);
+    //ierr = VecAXPY(x,neg_one,u);
+    PetscInt       its;
+    PetscReal      norm;         /* norm of solution error */
+    ierr = VecNorm(x, NORM_2, &norm); checkErr(ierr);
+    ierr = KSPGetIterationNumber(ksp, &its); checkErr(ierr);
+    //ierr = PetscPrintf(PETSC_COMM_WORLD,"Norm of error %g, Iterations %D\n",(double)norm,its);
+    // Pout<< "    Error norm: " << norm << ", nIters = " << its << endl;
+
+
+    // Free work space.  All PETSc objects should be destroyed when they
+    // are no longer needed.
+    // Pout<< "        Freeing memory" << endl;
+    // ierr = VecDestroy(&x);CHKERRQ(ierr); ierr = VecDestroy(&u);CHKERRQ(ierr);
+    // ierr = VecDestroy(&b);CHKERRQ(ierr); ierr = MatDestroy(&A);CHKERRQ(ierr);
+    // ierr = KSPDestroy(&ksp);CHKERRQ(ierr);
+    ierr = VecDestroy(&x); checkErr(ierr);
+    //ierr = VecDestroy(&u);
+    ierr = VecDestroy(&b); checkErr(ierr);
+    ierr = MatDestroy(&A); checkErr(ierr);
+    ierr = KSPDestroy(&ksp); checkErr(ierr);
+
+
+    // I should not call this here otherwise I cannot call this function again
+    // Always call PetscFinalize() before exiting a program.  This routine
+    //   - finalizes the PETSc libraries as well as MPI
+    //   - provides summary and diagnostic information if certain runtime
+    //     options are chosen (e.g., -log_summary).
+    //ierr = PetscFinalize();
+
+    if (debug)
+    {
+        Pout<< "BlockSolverPerformance<vector> "
+            << "sparseMatrixTools::solveNonLinearSystemPETSc: end" << endl;
     }
 
     vector initRes(vector::one);

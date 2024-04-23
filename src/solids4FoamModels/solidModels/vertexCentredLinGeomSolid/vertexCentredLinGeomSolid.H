@@ -105,6 +105,9 @@ private:
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
         mutable autoPtr<surfaceScalarField> dualImpKfPtr_;
 
+        // Compact edge gradient factor
+        const scalar zeta_;
+
         //- Flag to enable full Newton-Raphson approach, where the stiffness
         //  matrix is updated once per outer iteration. Alternatively, the
         //  stiffness matrix is only updated once per time-step
@@ -176,13 +179,6 @@ private:
 
 
     // Private Member Functions
-
-        //- Update the source vector for the linear system
-        void updateSource
-        (
-            vectorField& source,
-            const labelList& dualCellToPoint
-        );
 
         //- Update the divergence of stress based on the current pointD field
         void updatePointDivSigma
@@ -312,6 +308,14 @@ public:
             }
 
         // Edit
+
+            //- Calculate the momentum equation residual
+            //  This should be const but is not because of the mechanical law
+            //  The can be fixed when the mechanical models are refactored
+            tmp<vectorField> residualMomentum
+            (
+                const pointVectorField& pointD
+            );
 
             //- Update the size of the time-step
             virtual void setDeltaT(Time& runTime);
