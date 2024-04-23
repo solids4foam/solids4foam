@@ -1,0 +1,61 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fluidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidModel vertexCentredFluid;
+
+vertexCentredFluidCoeffs
+{
+    // Dual Mehs settings
+    dualMesh
+    {
+        // Write dual mesh at the start of the analysis
+        writeDualMesh    no;
+    }
+
+    // Compact stencil coefficient
+    zeta                 0.1;
+
+    // Prescribed DOF diagonal scaling value
+    fixedDofScale        1.0;
+
+    // Update Jacobian every outer iteration
+    fullNewton           yes;
+
+    // Outer loop tolerance
+    solutionTolerance    1e-6;
+
+    // Maximum number of outer correctors
+    nCorr                100;
+
+    // Residual print-out frequency
+    infoFrequency        1;
+
+    // Density
+    rho                  rho [1 -3 0 0 0 0 0] 1050;
+
+    // Viscosity
+    mu                   mu [1 -1 -1 0 0 0 0] 3.5e-3;
+
+    // Use PETSc, else use Eigen SparseLU
+    usePETSc no;
+    optionsFile petscOptions.mumps;
+    //optionsFile petscOptions.hypre;
+    //optionsFile petscOptions.cg;
+}
+
+// ************************************************************************* //

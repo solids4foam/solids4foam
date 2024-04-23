@@ -153,6 +153,33 @@ void Foam::sparseMatrix::operator+=
 }
 
 
+void Foam::sparseMatrix::operator-=
+(
+    const sparseMatrix& A
+)
+{
+    // Copy the A data into the result one-by-one
+    const sparseMatrixData& AData = A.data();
+    for (auto AIter = AData.begin(); AIter != AData.end(); ++AIter)
+    {
+        // Check if the entry already exists
+        sparseMatrixData::iterator iter =
+            data_.find(AIter.key());
+
+        if (iter == data_.end())
+        {
+            // Create a new entry
+            data_.insert(AIter.key(), AIter.val());
+        }
+        else
+        {
+            // Add to the existing entry
+            iter.val() -= AIter.val();
+        }
+    }
+}
+
+
 Foam::tmp<Foam::sparseMatrix> Foam::sparseMatrix::operator+
 (
     const sparseMatrix& A

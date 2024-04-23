@@ -451,7 +451,7 @@ Foam::meshDual::meshDual(const fvMesh& mesh, const dictionary& dict)
             mesh.time().constant(),
             mesh.time(),
             Foam::IOobject::READ_IF_PRESENT,
-            Foam::IOobject::NO_WRITE            
+            Foam::IOobject::NO_WRITE
         ),
         pointField(mesh.points()),
         faceList(mesh.faces()),

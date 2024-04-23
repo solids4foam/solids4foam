@@ -70,9 +70,9 @@ tmp<vectorField> vertexCentredFluid::residualMomentum
     vectorField& residual = tresidual.ref();
 
     // The residual F is defined as
-    // F = rho*ddt(U) + rho*div(U*U) - div(sigma) - rho*g
-    //   = rho*ddt(U) + rho*div(U*U) - div(s - p*I) - rho*g
-    //   = rho*ddt(U) + rho*div(U*U) - div(mu*grad(U) - p*I) - rho*g
+    // F = rho*ddt(U) + rho*div(U*U) - div(sigma)
+    //   = rho*ddt(U) + rho*div(U*U) - div(s - p*I)
+    //   = rho*ddt(U) + rho*div(U*U) - div(mu*grad(U) - p*I)
     // where density is assumed constant and uniform.
     // Take care that the source of the linear system will be the negative of F
 
@@ -176,11 +176,7 @@ tmp<vectorField> vertexCentredFluid::residualMomentum
     }
 
     // Add the surface force term to residual
-    residual += pointDivSigma*pointVolI;
-
-
-    // Add gravity body forces
-    residual -= rho_.value()*g().value()*pointVolI;
+    residual -= pointDivSigma*pointVolI;
 
 
     if (debug)
@@ -586,7 +582,7 @@ bool vertexCentredFluid::vertexCentredFluid::converged
         initResidual = residualAbs;
 
         // If the initial residual is small then convergence has been achieved
-        if (initResidual < SMALL)
+        if (false) //initResidual < SMALL)
         {
             Info<< "    Initial residual is less than " << SMALL << nl
                 << "    Converged" << endl;
@@ -608,19 +604,20 @@ bool vertexCentredFluid::vertexCentredFluid::converged
         Info<< "    Converged" << endl;
         converged = true;
     }
-    else if (residualAbs < SMALL)
-    {
-        Info<< "    Converged: absolute residual is less than " << SMALL
-            << endl;
-        converged = true;
-    }
+    // else if (residualAbs < SMALL)
+    // {
+    //     Info<< "    Converged: absolute residual is less than " << SMALL
+    //         << endl;
+    //     converged = true;
+    // }
 
     if (iCorr == 0)
     {
         Info<< "    Corr, res, relRes, resAbs, iters, maxMag" << pointU.name()
             << endl;
     }
-    else if (iCorr % infoFrequency_ == 0 || converged || iCorr >= nCorr_ - 1)
+
+    if (iCorr % infoFrequency_ == 0 || converged || iCorr >= nCorr_ - 1)
     {
         Info<< "    " << iCorr
             << ", " << res
@@ -795,7 +792,8 @@ vertexCentredFluid::vertexCentredFluid
     Info<< "fixedDofScale: " << fixedDofScale_ << endl;
 
     // Disable the writing of the unused fields
-    //U().writeOpt() = IOobject::NO_WRITE;
+    U().writeOpt() = IOobject::NO_WRITE;
+    p().writeOpt() = IOobject::NO_WRITE;
 }
 
 
@@ -868,7 +866,7 @@ bool vertexCentredFluid::evolve()
 
             // Add div(s) coefficients
             // where div(s) == div(mu*grad(U)) == mu*laplacian(U)
-            matrix += vfvm::laplacian(pointU_, dualMesh_, zeta_)()*mu_.value();
+            matrix -= vfvm::laplacian(pointU_, dualMesh_, zeta_)()*mu_.value();
         }
 
         if (debug > 1)
@@ -877,7 +875,7 @@ bool vertexCentredFluid::evolve()
         }
 
         // Calculate the source as the negative of the momentum residual
-        vectorField source(residualMomentum(pointU_, pointP_));
+        vectorField source(-residualMomentum(pointU_, pointP_));
 
         // Enforce fixed DOF on the linear system
         sparseMatrixTools::enforceFixedDof
@@ -900,10 +898,6 @@ bool vertexCentredFluid::evolve()
         {
             Info<< "bool vertexCentredFluid::evolve(): "
                 << " solving linear system: start" << endl;
-        }
-        else
-        {
-            Info<< "    Solving" << endl;
         }
 
         if (Switch(fluidProperties().lookup("usePETSc")))
@@ -954,7 +948,6 @@ bool vertexCentredFluid::evolve()
             (
                 mesh().fieldRelaxationFactor(pointU_.name())
             );
-
             pointU_.primitiveFieldRef() += rf*pointUcorr;
         }
         else

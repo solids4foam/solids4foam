@@ -328,7 +328,7 @@ void Foam::sparseMatrixTools::solveLinearSystemEigen
     const Eigen::Matrix<scalar, Eigen::Dynamic, 1> initResidual = A*x - b;
 
     // Exit early if the initial residual is small
-    if (initResidual.squaredNorm() < 1e-12)
+    if (false) //initResidual.squaredNorm() < 1e-12)
     {
         Info<< "    Linear solver initial residual is "
             << initResidual.squaredNorm() << ": exiting" << endl;

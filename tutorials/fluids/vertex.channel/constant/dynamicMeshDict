@@ -1,0 +1,45 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      dynamicMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Stationary cylinder
+dynamicFvMesh   staticFvMesh;
+solver          velocityLaplacian;
+diffusivity     quadratic inverseDistance 1(cylinderWall);
+
+// Moving cylinder
+// dynamicFvMesh   dynamicBodyFvMesh;
+// solver          laplace;
+// diffusivity     quadratic;
+// distancePatches 1 ( cylinderWall );
+// frozenDiffusion yes;
+
+// dynamicBodyFvMeshCoeffs
+// {
+//   bodyPatchName cylinderWall;
+
+//   translationDirection (0 1 0);
+//   translationAmplitude 0.1;
+//   translationFrequency 0.3;
+
+//   initialRotationOrigin (0 0 0);
+//   rotationAxis (0 0 1);
+//   rotationAmplitude 0;
+//   rotationFrequency 0;
+// }
+
+// ************************************************************************* //

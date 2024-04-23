@@ -141,6 +141,9 @@ public:
             //- Operator to add a sparseMatrix A to this object
             void operator+=(const sparseMatrix& A);
 
+            //- Operator to subtract a sparseMatrix A from this object
+            void operator-=(const sparseMatrix& A);
+
             //- Operator to add a sparseMatrix A to this object and return the
             //  result
             tmp<sparseMatrix> operator+(const sparseMatrix& A) const;

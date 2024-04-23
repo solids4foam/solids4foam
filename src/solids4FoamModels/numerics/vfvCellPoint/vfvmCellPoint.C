@@ -674,7 +674,7 @@ Foam::tmp<Foam::sparseMatrix> Foam::vfvm::div
         // dualFaceI area vector
         const vector& curDualSf = dualSf[dualFaceI];
 
-        // dualFaceI density 
+        // dualFaceI density
         // const scalar curDualRho = dualRhoI[dualFaceI];
 
         forAll(curCellPoints, cpI)
@@ -743,6 +743,9 @@ void Foam::vfvm::d2dt2
     {
         Info<< "void Foam::vfvm::d2dt2(...): start" << endl;
     }
+
+    // TODO: why do we assume minus? For consistency, this should be a positive
+    // contribution!
 
     // Read time scheme
     const word d2dt2SchemeName(d2dt2Scheme);
@@ -825,14 +828,14 @@ Foam::tmp<Foam::sparseMatrix> Foam::vfvm::ddt
     {
         forAll(pointPI, pointI)
         {
-            matrix(pointI, pointI) -= I2/deltaT;
+            matrix(pointI, pointI) += I2/deltaT;
         }
     }
     else if (ddtSchemeName == "backward")
     {
         forAll(pointPI, pointI)
         {
-            matrix(pointI, pointI) -= (3.0/2.0)*I2/deltaT;
+            matrix(pointI, pointI) += (3.0/2.0)*I2/deltaT;
         }
     }
     else

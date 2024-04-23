@@ -70,7 +70,7 @@ class meshDual
         //  This function assumes the primary mesh has already been copied to
         //  the dual mesh
         void makeDualMesh();
-    
+
         //- Mark features for dual mesh
         //  Copied from polyDualMeshApp.C
         void simpleMarkFeatures
