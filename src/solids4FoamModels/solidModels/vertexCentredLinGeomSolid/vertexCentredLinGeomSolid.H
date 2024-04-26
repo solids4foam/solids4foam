@@ -307,6 +307,12 @@ public:
                 return D();
             }
 
+            //- Const-access the fixed DOFs list
+            const boolList& fixedDofs() const
+            {
+                return fixedDofs_;
+            }
+
         // Edit
 
             //- Calculate the momentum equation residual

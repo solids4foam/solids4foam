@@ -112,25 +112,70 @@ PetscErrorCode formResidual
     }
     pointD.correctBoundaryConditions();
 
+    // bool flag = false;
+    // if (mag(pointDI[18]) > Foam::SMALL)
+    // {
+    //     flag = true;
+    //     Foam::Info
+    //         << "pointDI[18] = " << pointDI[18] << Foam::endl;
+    // }
+    // Foam::Info
+    //     << "    max mag D " << max(mag(pointDI))
+    //     << Foam::endl;
+
     // Compute the residual
     const Foam::vectorField res(user->solMod_.residualMomentum(pointD));
+    // if (flag)
+    // {
+    //     Foam::Info
+    //         << "    res 5 = " << res[5]
+    //         << "    res 16 = " << res[16]
+    //         << "    res 18 = " << res[18]
+    //         << Foam::endl;
+    // }
+
+    // if (Foam::mag(267300 - sum(mag(res))) > Foam::SMALL)
+    // {
+    //     Foam::Info
+    //         << "    res = " << sum(mag(res))
+    //         << Foam::endl;
+    // }
 
     // Map the data to f
+    const Foam::boolList& fixedDofs = user->solMod_.fixedDofs();
     forAll(res, localBlockRowI)
     {
         const Foam::vector& resI = res[localBlockRowI];
         const int blockRowI = user->localToGlobalPointMap_[localBlockRowI];
 
-        if (user->twoD_)
+        if (fixedDofs[localBlockRowI])
         {
-            ff[blockRowI*2] = resI.x();
-            ff[blockRowI*2 + 1] = resI.y();
+            // Enforce a known DOF
+            if (user->twoD_)
+            {
+                ff[blockRowI*2] = -xx[blockRowI*2];
+                ff[blockRowI*2 + 1] = -xx[blockRowI*2 + 1];
+            }
+            else
+            {
+                ff[blockRowI*3] = -xx[blockRowI*3];
+                ff[blockRowI*3 + 1] = -xx[blockRowI*3 + 1];
+                ff[blockRowI*3 + 2] = -xx[blockRowI*3 + 2];
+            }
         }
         else
         {
-            ff[blockRowI*3] = resI.x();
-            ff[blockRowI*3 + 1] = resI.y();
-            ff[blockRowI*3 + 2] = resI.z();
+            if (user->twoD_)
+            {
+                ff[blockRowI*2] = resI.x();
+                ff[blockRowI*2 + 1] = resI.y();
+            }
+            else
+            {
+                ff[blockRowI*3] = resI.x();
+                ff[blockRowI*3 + 1] = resI.y();
+                ff[blockRowI*3 + 2] = resI.z();
+            }
         }
     }
 
@@ -962,31 +1007,17 @@ bool vertexCentredLinGeomSolid::evolveImplicitCoupled()
             fileName optionsFile(solidModelDict().lookup("optionsFile"));
             optionsFile.expand();
 
-            // Solve the system
-            // solverPerf = sparseMatrixTools::solveNonLinearSystemPETSc
-            // (
-            //     &formResidual,
-            //     &formJacobian,
-            //     &foamContext,
-            //     matrix,
-            //     source,
-            //     pointDcorr,
-            //     twoD_,
-            //     optionsFile,
-            //     mesh().points(),
-            //     globalPointIndices_.ownedByThisProc(),
-            //     globalPointIndices_.localToGlobalPointMap(),
-            //     globalPointIndices_.stencilSizeOwned(),
-            //     globalPointIndices_.stencilSizeNotOwned(),
-            //     solidModelDict().lookupOrDefault<bool>("debugPETSc", false)
-            // );
             const boolList& ownedByThisProc =
                 globalPointIndices_.ownedByThisProc();
             const labelList& localToGlobalPointMap =
                 globalPointIndices_.localToGlobalPointMap();
 
+            {
+                const Foam::vectorField res(residualMomentum(pointD()));
+                Foam::Info<< "    STARTING res = " << sum(mag(res)) << Foam::endl;
+            }
+
             SNES snes;
-            Vec x;
             //appCtx user;
             //PetscErrorCode ierr;
 
@@ -1006,7 +1037,7 @@ bool vertexCentredLinGeomSolid::evolveImplicitCoupled()
             //SNESSetJacobian(snes, NULL, NULL, formJacobian, &user);
 
             // Set solver options
-             // Uses default options, can be overridden by command line options
+            // Uses default options, can be overridden by command line options
             SNESSetFromOptions(snes);
 
             // Set the block coefficient size (2 for 2-D, 3 for 3-D)
@@ -1039,30 +1070,99 @@ bool vertexCentredLinGeomSolid::evolveImplicitCoupled()
             const label n = blockSize*blockn;
 
             // Create the solution vector
-            VecCreate(PETSC_COMM_WORLD, &x);
-            VecSetSizes(x, n, N);
-            VecSetBlockSize(x, blockSize);
-            VecSetType(x, VECMPI);
-            PetscObjectSetName((PetscObject) x, "Solution");
+            Vec x;
+            sparseMatrixTools::checkErr(VecCreate(PETSC_COMM_WORLD, &x));
+            sparseMatrixTools::checkErr(VecSetSizes(x, n, N));
+            sparseMatrixTools::checkErr(VecSetBlockSize(x, blockSize));
+            sparseMatrixTools::checkErr(VecSetType(x, VECMPI));
+            sparseMatrixTools::checkErr
+            (
+                PetscObjectSetName((PetscObject) x, "Solution")
+            );
             VecSetFromOptions(x);
 
             // Set initial guess
             VecSet(x, 0.0);
 
+            // Create the source vector
+            Vec b;
+            sparseMatrixTools::checkErr(VecDuplicate(x, &b));
+            sparseMatrixTools::checkErr
+            (
+                PetscObjectSetName((PetscObject) b, "Source")
+            );
+            forAll(source, localBlockRowI)
+            {
+                const vector& sourceI = source[localBlockRowI];
+                const label blockRowI = localToGlobalPointMap[localBlockRowI];
+
+                if (twoD_)
+                {
+                    // Prepare values
+                    const PetscScalar values[2] = {sourceI.x(), sourceI.y()};
+
+                    // Insert values
+                    sparseMatrixTools::checkErr
+                    (
+                        VecSetValuesBlocked
+                        (
+                            b, 1, &blockRowI, values, ADD_VALUES
+                        )
+                    );
+                }
+                else
+                {
+                    // Prepare values
+                    const PetscScalar values[3] =
+                    {
+                        sourceI.x(), sourceI.y(), sourceI.z()
+                    };
+
+                    // Insert values
+                    sparseMatrixTools::checkErr
+                    (
+                        VecSetValuesBlocked
+                        (
+                            b, 1, &blockRowI, values, ADD_VALUES
+                        )
+                    );
+                }
+            }                
+
+            Info<< nl << "Calling SNESSolve: start" << nl << endl;
             // Solve the nonlinear system
             SNESSolve(snes, NULL, x);
+            Info<< nl << "Calling SNESSolve: end" << nl << endl;
 
             // Access and print the solution
-            PetscReal solution;
-            VecGetValues(x, 1, NULL, &solution);
-            PetscPrintf(PETSC_COMM_WORLD, "Solution: %g\n", solution);
+            Info<< nl << "Print solution: start" << nl << endl;
+            //PetscReal solution;
+            //VecGetValues(x, 1, NULL, &solution);
+            //PetscPrintf(PETSC_COMM_WORLD, "Solution: %g\n", solution);
+            const PetscScalar *xx;
+            VecGetArrayRead(x,&xx);
+            Foam::vectorField& pointDI = pointD();
+            {
+                int index = 0;
+                forAll(pointDI, i)
+                {
+                    if (ownedByThisProc[i])
+                    {
+                        pointDI[i].x() = xx[index++];
+                        pointDI[i].y() = xx[index++];
+
+                        if (!twoD_)
+                        {
+                            pointDI[i].z() = xx[index++];
+                        }
+                    }
+                }
+            }
+            pointD().correctBoundaryConditions();
 
             // Destroy objects
             VecDestroy(&x);
             SNESDestroy(&snes);
-
-            FatalError
-                << "Stop after snes solve" << abort(FatalError);
 #else
             FatalErrorIn("vertexCentredLinGeomSolid::evolve()")
                 << "PETSc not available. Please set the PETSC_DIR environment "
@@ -1748,8 +1848,11 @@ tmp<vectorField> vertexCentredLinGeomSolid::residualMomentum
     const scalarField& pointRhoI = pointRho_.internalField();
 
     // Update the displacement gradient at the dual faces
-    const surfaceTensorField dualGradDf
-    (
+    // const surfaceTensorField dualGradDf
+    // NOTE: dualMechanicalPtr_().correct currently looks up dualGradDf from
+    // the object registry by name so we must use this field
+    dualGradDf_ =
+    // (
         vfvc::fGrad
         (
             pointD,
@@ -1759,8 +1862,8 @@ tmp<vectorField> vertexCentredLinGeomSolid::residualMomentum
             dualMeshMap().dualCellToPoint(),
             zeta_,
             debug
-        )
-    );
+        );
+    // );
 
     // Calculate the stress at the dual faces
     surfaceSymmTensorField dualSigmaf

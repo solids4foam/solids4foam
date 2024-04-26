@@ -114,29 +114,6 @@ namespace sparseMatrixTools
         const labelList& stencilSizeNotOwned,
         const bool debug = false
     );
-
-    //- Solve the non-linear system using PETSc SNES solvers
-    SolverPerformance<vector> solveNonLinearSystemPETSc
-    (
-        PetscErrorCode (*formResidual)(SNES, Vec, Vec, void*),
-        PetscErrorCode (*formJacobian)
-        (
-            SNES snes, Vec x, Mat jac, Mat B, void *ctx
-        ),
-        void *ctx,
-        const sparseMatrix& matrix,
-        const vectorField& source,
-        vectorField& solution,
-        const bool twoD,
-        fileName& optionsFile,
-        const pointField& points,
-        const boolList& ownedByThisProc,
-        const labelList& localToGlobalPointMap,
-        const labelList& stencilSizeOwned,
-        const labelList& stencilSizeNotOwned,
-        const bool debug = false
-    );
-
 #endif
 
     //- Set the number of non-zeros in per row in the given array
