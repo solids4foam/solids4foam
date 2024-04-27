@@ -46,28 +46,13 @@ typedef struct appCtx
     // Reference to the solid model object
     Foam::solidModels::vertexCentredLinGeomSolid& solMod_;
 
-    // twoD flag
-    const bool twoD_;
-
-    // List of points owned by this processor
-    const Foam::boolList& ownedByThisProc_;
-
-    // Map from local to global point indices
-    const Foam::labelList& localToGlobalPointMap_;
-
     // Constructor
     appCtx
     (
-        Foam::solidModels::vertexCentredLinGeomSolid& solMod,
-        const bool twoD,
-        const Foam::boolList& ownedByThisProc,
-        const Foam::labelList& localToGlobalPointMap
+        Foam::solidModels::vertexCentredLinGeomSolid& solMod
     )
     :
-        solMod_(solMod),
-        twoD_(twoD),
-        ownedByThisProc_(ownedByThisProc),
-        localToGlobalPointMap_(localToGlobalPointMap)
+        solMod_(solMod)
     {}
 } appCtx;
 
@@ -92,90 +77,49 @@ PetscErrorCode formResidual
     ierr = VecGetArray(f,&ff);CHKERRQ(ierr);
 
     // Map the solution to an OpenFOAM field
+    const bool twoD = user->solMod_.twoD();
     Foam::pointVectorField pointD("petsc_pointD", user->solMod_.pointD());
     Foam::vectorField& pointDI = pointD;
+    const Foam::boolList& ownedByThisProc =
+        user->solMod_.gPointIndices().ownedByThisProc();
     {
         int index = 0;
         forAll(pointDI, i)
         {
-            if (user->ownedByThisProc_[i])
+            if (ownedByThisProc[i])
             {
                 pointDI[i].x() = xx[index++];
                 pointDI[i].y() = xx[index++];
 
-                if (!user->twoD_)
+                if (!twoD)
                 {
                     pointDI[i].z() = xx[index++];
                 }
             }
         }
     }
-    pointD.correctBoundaryConditions();
 
-    // bool flag = false;
-    // if (mag(pointDI[18]) > Foam::SMALL)
-    // {
-    //     flag = true;
-    //     Foam::Info
-    //         << "pointDI[18] = " << pointDI[18] << Foam::endl;
-    // }
-    // Foam::Info
-    //     << "    max mag D " << max(mag(pointDI))
-    //     << Foam::endl;
+    // Don't call correctBCs as we want to allow perturbation of known DOFs
+    //pointD.correctBoundaryConditions();
 
     // Compute the residual
     const Foam::vectorField res(user->solMod_.residualMomentum(pointD));
-    // if (flag)
-    // {
-    //     Foam::Info
-    //         << "    res 5 = " << res[5]
-    //         << "    res 16 = " << res[16]
-    //         << "    res 18 = " << res[18]
-    //         << Foam::endl;
-    // }
-
-    // if (Foam::mag(267300 - sum(mag(res))) > Foam::SMALL)
-    // {
-    //     Foam::Info
-    //         << "    res = " << sum(mag(res))
-    //         << Foam::endl;
-    // }
 
     // Map the data to f
-    const Foam::boolList& fixedDofs = user->solMod_.fixedDofs();
+    const Foam::labelList& localToGlobalPointMap =
+        user->solMod_.gPointIndices().localToGlobalPointMap();
+    const int blockSize = twoD ? 2 : 3;
     forAll(res, localBlockRowI)
     {
         const Foam::vector& resI = res[localBlockRowI];
-        const int blockRowI = user->localToGlobalPointMap_[localBlockRowI];
+        const int blockRowI = localToGlobalPointMap[localBlockRowI];
 
-        if (fixedDofs[localBlockRowI])
+        ff[blockRowI*blockSize] = resI.x();
+        ff[blockRowI*blockSize + 1] = resI.y();
+
+        if (!twoD)
         {
-            // Enforce a known DOF
-            if (user->twoD_)
-            {
-                ff[blockRowI*2] = -xx[blockRowI*2];
-                ff[blockRowI*2 + 1] = -xx[blockRowI*2 + 1];
-            }
-            else
-            {
-                ff[blockRowI*3] = -xx[blockRowI*3];
-                ff[blockRowI*3 + 1] = -xx[blockRowI*3 + 1];
-                ff[blockRowI*3 + 2] = -xx[blockRowI*3 + 2];
-            }
-        }
-        else
-        {
-            if (user->twoD_)
-            {
-                ff[blockRowI*2] = resI.x();
-                ff[blockRowI*2 + 1] = resI.y();
-            }
-            else
-            {
-                ff[blockRowI*3] = resI.x();
-                ff[blockRowI*3 + 1] = resI.y();
-                ff[blockRowI*3 + 2] = resI.z();
-            }
+            ff[blockRowI*blockSize + 2] = resI.z();
         }
     }
 
@@ -252,6 +196,10 @@ addToRunTimeSelectionTable(solidModel, vertexCentredLinGeomSolid, dictionary);
 const Enum<vertexCentredLinGeomSolid::solutionAlgorithm>
 vertexCentredLinGeomSolid::solutionAlgorithmNames_
 ({
+    {
+        vertexCentredLinGeomSolid::solutionAlgorithm::PETSC_SNES,
+        "PETScSNES"
+    },
     {
         vertexCentredLinGeomSolid::solutionAlgorithm::IMPLICIT_COUPLED,
         "implicitCoupled"
@@ -894,11 +842,204 @@ void vertexCentredLinGeomSolid::predict()
 }
 
 
+bool vertexCentredLinGeomSolid::evolveSnes()
+{
+#ifdef USE_PETSC
+    Info<< "Evolving solid solver" << endl;
+
+    // Update boundary conditions
+    pointD().correctBoundaryConditions();
+
+
+    // Create user data context
+    appCtx user(*this);
+
+    // Lookup the PETSc options file
+    fileName optionsFile(solidModelDict().lookup("optionsFile"));
+    optionsFile.expand();
+
+    // Initialise PETSc with an options file
+    PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
+
+    // Create a SNES solver context
+    SNES snes;
+    SNESCreate(PETSC_COMM_WORLD, &snes);
+
+    // Set the user context
+    SNESSetApplicationContext(snes, &user);
+
+    // Set the residual function
+    SNESSetFunction(snes, NULL, formResidual, &user);
+
+    // Set the Jacobian function
+    //SNESSetJacobian(snes, NULL, NULL, formJacobian, &user);
+
+    // Set solver options
+    // Uses default options, can be overridden by command line options
+    SNESSetFromOptions(snes);
+
+    // Set the block coefficient size (2 for 2-D, 3 for 3-D)
+    label blockSize = 3;
+    if (twoD_)
+    {
+        blockSize = 2;
+    }
+
+    // Find size of global system, i.e. the highest global point index + 1
+    const labelList& localToGlobalPointMap =
+        globalPointIndices_.localToGlobalPointMap();
+    const label blockN = gMax(localToGlobalPointMap) + 1;
+    const label N = blockSize*blockN;
+
+    // Find the start and end global point indices for this proc
+    label blockStartID = N;
+    label blockEndID = -1;
+    const boolList& ownedByThisProc =
+        globalPointIndices_.ownedByThisProc();
+    forAll(ownedByThisProc, pI)
+    {
+        if (ownedByThisProc[pI])
+        {
+            blockStartID = min(blockStartID, localToGlobalPointMap[pI]);
+            blockEndID = max(blockEndID, localToGlobalPointMap[pI]);
+        }
+    }
+    //const label startID = blockSize*blockStartID;
+    //const label endID = blockSize*(blockEndID + 1) - 1;
+
+    // Find size of local system, i.e. the range of points owned by this proc
+    const label blockn = blockEndID - blockStartID + 1;
+    const label n = blockSize*blockn;
+
+    // Create the solution vector
+    Vec x;
+    sparseMatrixTools::checkErr(VecCreate(PETSC_COMM_WORLD, &x));
+    sparseMatrixTools::checkErr(VecSetSizes(x, n, N));
+    sparseMatrixTools::checkErr(VecSetBlockSize(x, blockSize));
+    sparseMatrixTools::checkErr(VecSetType(x, VECMPI));
+    sparseMatrixTools::checkErr
+    (
+        PetscObjectSetName((PetscObject) x, "Solution")
+    );
+    sparseMatrixTools::checkErr(VecSetFromOptions(x));
+
+    // Set initial guess
+    sparseMatrixTools::checkErr(VecSet(x, 0.0));
+
+    // Solve the nonlinear system
+    sparseMatrixTools::checkErr(SNESSolve(snes, NULL, x));
+
+    // Check if SNES converged
+    SNESConvergedReason reason;
+    sparseMatrixTools::checkErr(SNESGetConvergedReason(snes, &reason));
+    if (reason < 0)
+    {
+        FatalErrorIn("vertexCentredLinGeomSolid::evolveSnes()")
+            << "The SNES nonlinear solver did not converged."
+            << " PETSc SNES error code = " << reason << abort(FatalError);
+    }
+
+    // Access and print the solution
+    //PetscReal solution;
+    //VecGetValues(x, 1, NULL, &solution);
+    //PetscPrintf(PETSC_COMM_WORLD, "Solution: %g\n", solution);
+    const PetscScalar *xx;
+    VecGetArrayRead(x,&xx);
+    Foam::vectorField& pointDI = pointD();
+    {
+        int index = 0;
+        forAll(pointDI, i)
+        {
+            if (ownedByThisProc[i])
+            {
+                pointDI[i].x() = xx[index++];
+                pointDI[i].y() = xx[index++];
+
+                if (!twoD_)
+                {
+                    pointDI[i].z() = xx[index++];
+                }
+            }
+        }
+    }
+    pointD().correctBoundaryConditions();
+
+    // Destroy PETSc objects
+    VecDestroy(&x);
+    SNESDestroy(&snes);
+
+
+    // Update point accelerations
+    // Note: for NewmarkBeta, this needs to come before the pointU update
+    pointA_.primitiveFieldRef() =
+        vfvc::ddt
+        (
+            mesh().ddtScheme("ddt(pointU)"),
+            mesh().d2dt2Scheme("d2dt2(pointD)"),
+            pointU_
+        );
+
+    // Update point velocities
+    pointU_.primitiveFieldRef() =
+        vfvc::ddt
+        (
+            mesh().ddtScheme("ddt(pointD)"),
+            mesh().d2dt2Scheme("d2dt2(pointD)"),
+            pointD()
+        );
+
+    // Calculate gradD at dual faces
+    dualGradDf_ = vfvc::fGrad
+    (
+        pointD(),
+        mesh(),
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        zeta_,
+        debug
+    );
+
+    // Update the increment of displacement
+    pointDD() = pointD() - pointD().oldTime();
+
+    // Calculate cell gradient
+    // This assumes a constant gradient within each primary mesh cell
+    // This is a first-order approximation
+    gradD() = vfvc::grad(pointD(), mesh());
+
+    // Map primary cell gradD field to sub-meshes for multi-material cases
+    if (mechanical().PtrList<mechanicalLaw>::size() > 1)
+    {
+        mechanical().mapGradToSubMeshes(gradD());
+    }
+
+    // Update dual face stress field
+    dualMechanicalPtr_().correct(dualSigmaf_);
+
+    // Update primary mesh cell stress field, assuming it is constant per
+    // primary mesh cell
+    // This stress will be first-order accurate
+    mechanical().correct(sigma());
+
+    // Interpolate pointD to D
+    // This is useful for visualisation but it is also needed when using preCICE
+    pointVolInterp_.interpolate(pointD(), D());
+#else
+    FatalErrorIn("vertexCentredLinGeomSolid::evolveSnes()")
+        << "PETSc not available. Please set the PETSC_DIR environment "
+        << "variable and re-compile solids4foam" << abort(FatalError);
+#endif
+
+    return true;
+}
+
+
 bool vertexCentredLinGeomSolid::evolveImplicitCoupled()
 {
     Info<< "Evolving solid solver" << endl;
 
-    //Update boundary conditions
+    // Update boundary conditions
     pointD().correctBoundaryConditions();
 
     // Initialise matrix
@@ -993,176 +1134,21 @@ bool vertexCentredLinGeomSolid::evolveImplicitCoupled()
         if (Switch(solidModelDict().lookup("usePETSc")))
         {
 #ifdef USE_PETSC
-
-            // Create user data context
-            appCtx user
-            (
-                *this,
-                twoD_,
-                globalPointIndices_.ownedByThisProc(),
-                globalPointIndices_.localToGlobalPointMap()
-            );
-
-            // Lookup the PETSc options file
             fileName optionsFile(solidModelDict().lookup("optionsFile"));
-            optionsFile.expand();
-
-            const boolList& ownedByThisProc =
-                globalPointIndices_.ownedByThisProc();
-            const labelList& localToGlobalPointMap =
-                globalPointIndices_.localToGlobalPointMap();
-
-            {
-                const Foam::vectorField res(residualMomentum(pointD()));
-                Foam::Info<< "    STARTING res = " << sum(mag(res)) << Foam::endl;
-            }
-
-            SNES snes;
-            //appCtx user;
-            //PetscErrorCode ierr;
-
-            // Initialise PETSc with an options file
-            PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
-
-            // Create a SNES solver context
-            SNESCreate(PETSC_COMM_WORLD, &snes);
-
-            // Set the user context
-            SNESSetApplicationContext(snes, &user);
-
-            // Set the residual function
-            SNESSetFunction(snes, NULL, formResidual, &user);
-
-            // Set the Jacobian function
-            //SNESSetJacobian(snes, NULL, NULL, formJacobian, &user);
-
-            // Set solver options
-            // Uses default options, can be overridden by command line options
-            SNESSetFromOptions(snes);
-
-            // Set the block coefficient size (2 for 2-D, 3 for 3-D)
-            label blockSize = 3;
-            if (twoD_)
-            {
-                blockSize = 2;
-            }
-
-            // Find size of global system, i.e. the highest global point index + 1
-            const label blockN = gMax(localToGlobalPointMap) + 1;
-            const label N = blockSize*blockN;
-
-            // Find the start and end global point indices for this proc
-            label blockStartID = N;
-            label blockEndID = -1;
-            forAll(ownedByThisProc, pI)
-            {
-                if (ownedByThisProc[pI])
-                {
-                    blockStartID = min(blockStartID, localToGlobalPointMap[pI]);
-                    blockEndID = max(blockEndID, localToGlobalPointMap[pI]);
-                }
-            }
-            //const label startID = blockSize*blockStartID;
-            //const label endID = blockSize*(blockEndID + 1) - 1;
-
-            // Find size of local system, i.e. the range of points owned by this proc
-            const label blockn = blockEndID - blockStartID + 1;
-            const label n = blockSize*blockn;
-
-            // Create the solution vector
-            Vec x;
-            sparseMatrixTools::checkErr(VecCreate(PETSC_COMM_WORLD, &x));
-            sparseMatrixTools::checkErr(VecSetSizes(x, n, N));
-            sparseMatrixTools::checkErr(VecSetBlockSize(x, blockSize));
-            sparseMatrixTools::checkErr(VecSetType(x, VECMPI));
-            sparseMatrixTools::checkErr
+            solverPerf = sparseMatrixTools::solveLinearSystemPETSc
             (
-                PetscObjectSetName((PetscObject) x, "Solution")
+                matrix,
+                source,
+                pointDcorr,
+                twoD_,
+                optionsFile,
+                mesh().points(),
+                globalPointIndices_.ownedByThisProc(),
+                globalPointIndices_.localToGlobalPointMap(),
+                globalPointIndices_.stencilSizeOwned(),
+                globalPointIndices_.stencilSizeNotOwned(),
+                solidModelDict().lookupOrDefault<bool>("debugPETSc", false)
             );
-            VecSetFromOptions(x);
-
-            // Set initial guess
-            VecSet(x, 0.0);
-
-            // Create the source vector
-            Vec b;
-            sparseMatrixTools::checkErr(VecDuplicate(x, &b));
-            sparseMatrixTools::checkErr
-            (
-                PetscObjectSetName((PetscObject) b, "Source")
-            );
-            forAll(source, localBlockRowI)
-            {
-                const vector& sourceI = source[localBlockRowI];
-                const label blockRowI = localToGlobalPointMap[localBlockRowI];
-
-                if (twoD_)
-                {
-                    // Prepare values
-                    const PetscScalar values[2] = {sourceI.x(), sourceI.y()};
-
-                    // Insert values
-                    sparseMatrixTools::checkErr
-                    (
-                        VecSetValuesBlocked
-                        (
-                            b, 1, &blockRowI, values, ADD_VALUES
-                        )
-                    );
-                }
-                else
-                {
-                    // Prepare values
-                    const PetscScalar values[3] =
-                    {
-                        sourceI.x(), sourceI.y(), sourceI.z()
-                    };
-
-                    // Insert values
-                    sparseMatrixTools::checkErr
-                    (
-                        VecSetValuesBlocked
-                        (
-                            b, 1, &blockRowI, values, ADD_VALUES
-                        )
-                    );
-                }
-            }                
-
-            Info<< nl << "Calling SNESSolve: start" << nl << endl;
-            // Solve the nonlinear system
-            SNESSolve(snes, NULL, x);
-            Info<< nl << "Calling SNESSolve: end" << nl << endl;
-
-            // Access and print the solution
-            Info<< nl << "Print solution: start" << nl << endl;
-            //PetscReal solution;
-            //VecGetValues(x, 1, NULL, &solution);
-            //PetscPrintf(PETSC_COMM_WORLD, "Solution: %g\n", solution);
-            const PetscScalar *xx;
-            VecGetArrayRead(x,&xx);
-            Foam::vectorField& pointDI = pointD();
-            {
-                int index = 0;
-                forAll(pointDI, i)
-                {
-                    if (ownedByThisProc[i])
-                    {
-                        pointDI[i].x() = xx[index++];
-                        pointDI[i].y() = xx[index++];
-
-                        if (!twoD_)
-                        {
-                            pointDI[i].z() = xx[index++];
-                        }
-                    }
-                }
-            }
-            pointD().correctBoundaryConditions();
-
-            // Destroy objects
-            VecDestroy(&x);
-            SNESDestroy(&snes);
 #else
             FatalErrorIn("vertexCentredLinGeomSolid::evolve()")
                 << "PETSc not available. Please set the PETSC_DIR environment "
@@ -1927,6 +1913,23 @@ tmp<vectorField> vertexCentredLinGeomSolid::residualMomentum
         int(bool(debug))
     );
 
+    // Enforce fixed DOFs
+    // This is only important if this residual function is used to approximate the Jacobian using finite differences
+    const vectorField& pointDI = pointD;
+    forAll(residual, pointI)
+    {
+        if (fixedDofs_[pointI])
+        {
+            // Free direction
+            const symmTensor& fixedDir = fixedDofDirections_[pointI];
+            const symmTensor freeDir = I - fixedDir;
+
+            residual[pointI] =
+                (fixedDir & (-pointDI[pointI])) + (freeDir & residual[pointI]);
+        }
+    }
+
+
     if (debug)
     {
         Info<< "void vertexCentredLinGeomSolid::residualMomentum(...): end"
@@ -1994,7 +1997,11 @@ void vertexCentredLinGeomSolid::setDeltaT(Time& runTime)
 
 bool vertexCentredLinGeomSolid::evolve()
 {
-    if (solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_COUPLED)
+    if (solutionAlgorithm_ == solutionAlgorithm::PETSC_SNES)
+    {
+        return evolveSnes();
+    }
+    else if (solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_COUPLED)
     {
         return evolveImplicitCoupled();
     }

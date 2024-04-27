@@ -31,6 +31,7 @@ Description
       - implicit Newton-Raphson
       - implicit segregated
       - explicit
+      - PETSc SNES (Scalable Nonlinear Equations Solvers)
 
 Author
     Philip Cardiff, UCD.
@@ -80,6 +81,7 @@ public:
         //- Solution algorithms
         enum solutionAlgorithm
         {
+            PETSC_SNES,
             IMPLICIT_COUPLED,
             IMPLICIT_SEGREGATED,
             EXPLICIT
@@ -96,7 +98,7 @@ private:
         //- Mechanical model for dual mesh
         autoPtr<dualMechanicalModel> dualMechanicalPtr_;
 
-        //- Solution algorithm, e.g. coupled, segregated, explicit
+        //- Solution algorithm, e.g. coupled, segregated, explicit, SNES
         const solutionAlgorithm solutionAlgorithm_;
 
         //- Implicit stiffness used by segregated algorithm
@@ -247,6 +249,11 @@ private:
         //- Predict displacement field using the velocity field
         void predict();
 
+        //- Evolve the solid solver using the PETSc "SNES" nonlinear solver
+        //  SNES (Scalable Nonlinear Equations Solvers) is a general interface
+        //  to a large variety on nonlinear solution algorithms
+        virtual bool evolveSnes();
+
         //- Evolve the solid solver using the implicit coupled approach
         virtual bool evolveImplicitCoupled();
 
@@ -308,9 +315,21 @@ public:
             }
 
             //- Const-access the fixed DOFs list
+            const globalPointIndices& gPointIndices() const
+            {
+                return globalPointIndices_;
+            }
+
+            //- Is the model two-dimensional
             const boolList& fixedDofs() const
             {
                 return fixedDofs_;
+            }
+
+            //- Is the model two-dimensional
+            const bool& twoD() const
+            {
+                return twoD_;
             }
 
         // Edit
