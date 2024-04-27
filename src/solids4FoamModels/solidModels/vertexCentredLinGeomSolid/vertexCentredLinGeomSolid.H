@@ -342,6 +342,16 @@ public:
                 const pointVectorField& pointD
             );
 
+            //- Calculate the Jacobian for the momentum equation
+            //  This Jacobian is the derivative of residualMomentum with respect
+            //  to the solution vector (pointD)
+            //  This should be const but is not because of the mechanical law
+            //  The can be fixed when the mechanical models are refactored
+            tmp<sparseMatrix> JacobianMomentum
+            (
+                const pointVectorField& pointD
+            );
+
             //- Update the size of the time-step
             virtual void setDeltaT(Time& runTime);
 

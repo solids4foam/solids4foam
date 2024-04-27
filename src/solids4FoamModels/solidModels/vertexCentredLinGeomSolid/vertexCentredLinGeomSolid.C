@@ -65,7 +65,6 @@ PetscErrorCode formResidual
     void *ctx     // user context
 )
 {
-    PetscErrorCode    ierr;
     const PetscScalar *xx;
     PetscScalar       *ff;
     appCtx *user = (appCtx *)ctx;
@@ -73,8 +72,8 @@ PetscErrorCode formResidual
     // Access x and f data
     // VecRestoreArrayRead() and VecRestoreArray() must be called when access is
     // no longer needed
-    ierr = VecGetArrayRead(x,&xx);CHKERRQ(ierr);
-    ierr = VecGetArray(f,&ff);CHKERRQ(ierr);
+    CHKERRQ(VecGetArrayRead(x,&xx));
+    CHKERRQ(VecGetArray(f,&ff));
 
     // Map the solution to an OpenFOAM field
     const bool twoD = user->solMod_.twoD();
@@ -124,8 +123,8 @@ PetscErrorCode formResidual
     }
 
     // Restore vectors
-    ierr = VecRestoreArrayRead(x,&xx);CHKERRQ(ierr);
-    ierr = VecRestoreArray(f,&ff);CHKERRQ(ierr);
+    CHKERRQ(VecRestoreArrayRead(x,&xx));
+    CHKERRQ(VecRestoreArray(f,&ff));
 
     return 0;
 }
@@ -135,44 +134,175 @@ PetscErrorCode formJacobian
 (
     SNES snes,    // snes object
     Vec x,        // current solution
-    Mat jac,      // Jacobian
-    Mat B,        // Jaconian precondioner (can be jac)
+    Mat A,      // Jacobian
+    Mat B,        // Jaconian precondioner (can be A)
     void *ctx     // user context
 )
 {
     const PetscScalar *xx;
-    PetscScalar       A[4];
-    PetscErrorCode    ierr;
-    PetscInt          idx[2] = {0,1};
+    appCtx *user = (appCtx *)ctx;
+    // PetscScalar       A[4];
+    // PetscInt          idx[2] = {0,1};
 
-    /*
-        Get pointer to vector data
-        */
-    ierr = VecGetArrayRead(x,&xx);CHKERRQ(ierr);
+    // Get pointer to solution data
+    CHKERRQ(VecGetArrayRead(x,&xx));
 
-    /*
-        Compute Jacobian entries and insert into matrix.
-        - Since this is such a small problem, we set all entries for
-        the matrix at once.
-        */
-    A[0]  = 2.0*xx[0] + xx[1]; A[1] = xx[0];
-    A[2]  = xx[1]; A[3] = xx[0] + 2.0*xx[1];
-    ierr  = MatSetValues(B,2,idx,2,idx,A,INSERT_VALUES);CHKERRQ(ierr);
+    // Map the solution to an OpenFOAM field
+    const bool twoD = user->solMod_.twoD();
+    Foam::pointVectorField pointD("petsc_pointD", user->solMod_.pointD());
+    Foam::vectorField& pointDI = pointD;
+    const Foam::boolList& ownedByThisProc =
+        user->solMod_.gPointIndices().ownedByThisProc();
+    {
+        int index = 0;
+        forAll(pointDI, i)
+        {
+            if (ownedByThisProc[i])
+            {
+                pointDI[i].x() = xx[index++];
+                pointDI[i].y() = xx[index++];
 
-    /*
-        Restore vector
-        */
-    ierr = VecRestoreArrayRead(x,&xx);CHKERRQ(ierr);
-
-    /*
-        Assemble matrix
-        */
-    ierr = MatAssemblyBegin(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-    ierr = MatAssemblyEnd(B,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-    if (jac != B) {
-        ierr = MatAssemblyBegin(jac,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-        ierr = MatAssemblyEnd(jac,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+                if (!twoD)
+                {
+                    pointDI[i].z() = xx[index++];
+                }
+            }
+        }
     }
+
+    // This may not be needed
+    pointD.correctBoundaryConditions();
+
+    // Restore solution vector
+    CHKERRQ(VecRestoreArrayRead(x, &xx));
+
+
+    // Compute Jacobian in OpenFOAM format
+    Foam::sparseMatrix matrix;
+    matrix += user->solMod_.JacobianMomentum(pointD)();
+
+
+    // Insert OpenFOAM matrix into PETSc matrix
+
+    const int blockSize = twoD ? 2 : 3;
+    const Foam::labelList& localToGlobalPointMap =
+        user->solMod_.gPointIndices().localToGlobalPointMap();
+
+    // Find size of global system, i.e. the highest global point index + 1
+    const int blockN = Foam::gMax(localToGlobalPointMap) + 1;
+    const int N = blockSize*blockN;
+
+    // Find the start and end global point indices for this proc
+    int blockStartID = N;
+    int blockEndID = -1;
+    forAll(ownedByThisProc, pI)
+    {
+        if (ownedByThisProc[pI])
+        {
+            blockStartID = Foam::min(blockStartID, localToGlobalPointMap[pI]);
+            blockEndID = Foam::max(blockEndID, localToGlobalPointMap[pI]);
+        }
+    }
+    //const int startID = blockSize*blockStartID;
+    //const int endID = blockSize*(blockEndID + 1) - 1;
+
+    // Find size of local system, i.e. the range of points owned by this proc
+    const int blockn = blockEndID - blockStartID + 1;
+    const int n = blockSize*blockn;
+
+    // Set matrix characteristics
+    CHKERRQ(MatSetSizes(A, n, n, N, N));
+    //CHKERRQ(MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, N, N));
+    CHKERRQ(MatSetFromOptions(A));
+    CHKERRQ(MatSetType(A, MATMPIAIJ));
+    CHKERRQ(MatSetBlockSize(A, blockSize));
+
+    // Count the number of non-zeros
+    // TODO: fix for parallel
+    int* d_nnz = (int*)malloc(n*sizeof(int));
+    int* o_nnz = (int*)malloc(n*sizeof(int));
+    // label d_nnz[n];
+    // label o_nnz[n];
+    int d_nz = 0;
+    Foam::sparseMatrixTools::setNonZerosPerRow
+    (
+        d_nnz,
+        o_nnz,
+        d_nz,
+        n,
+        blockSize,
+        ownedByThisProc,
+        user->solMod_.gPointIndices().stencilSizeOwned(),
+        user->solMod_.gPointIndices().stencilSizeNotOwned()
+    );
+
+    // Allocate parallel matrix
+    CHKERRQ(MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz));
+
+    // TO BE FIXED: some mallocs are still needed in parallel!
+    MatSetOption(A, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+
+    CHKERRQ(MatSetUp(A));
+
+    // Insert coefficients into the matrix
+    // Note: we use global indices when inserting coefficients
+    const Foam::sparseMatrixData& data = matrix.data();
+    for (auto iter = data.begin(); iter != data.end(); ++iter)
+    {
+        const Foam::tensor& coeff = iter();
+        const int blockRowI = localToGlobalPointMap[iter.key()[0]];
+        const int blockColI = localToGlobalPointMap[iter.key()[1]];
+
+        if (twoD)
+        {
+            // Prepare values
+            const PetscScalar values[4] =
+            {
+                coeff.xx(), coeff.xy(),
+                coeff.yx(), coeff.yy()
+            };
+
+            // Insert tensor coefficient
+            CHKERRQ
+            (
+                MatSetValuesBlocked
+                (
+                    A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
+                )
+            );
+        }
+        else // 3-D
+        {
+            // Prepare values
+            // Maybe I can use coeff.cdata() here?
+            const PetscScalar values[9] =
+            {
+                coeff.xx(), coeff.xy(), coeff.xz(),
+                coeff.yx(), coeff.yy(), coeff.yz(),
+                coeff.zx(), coeff.zy(), coeff.zz()
+            };
+
+            // Insert tensor coefficient
+            CHKERRQ
+            (
+                MatSetValuesBlocked
+                (
+                    A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
+                )
+            );
+        }
+    }
+
+
+    // Complete matrix assembly
+    CHKERRQ(MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY));
+    CHKERRQ(MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY));
+    if (A != B)
+    {
+        CHKERRQ(MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY));
+        CHKERRQ(MatAssemblyEnd(B, MAT_FINAL_ASSEMBLY));
+    }
+
     return 0;
 }
 #endif
@@ -872,7 +1002,7 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     SNESSetFunction(snes, NULL, formResidual, &user);
 
     // Set the Jacobian function
-    //SNESSetJacobian(snes, NULL, NULL, formJacobian, &user);
+    SNESSetJacobian(snes, NULL, NULL, formJacobian, &user);
 
     // Set solver options
     // Uses default options, can be overridden by command line options
@@ -935,7 +1065,7 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     if (reason < 0)
     {
         FatalErrorIn("vertexCentredLinGeomSolid::evolveSnes()")
-            << "The SNES nonlinear solver did not converged."
+            << "The SNES nonlinear solver did not converge."
             << " PETSc SNES error code = " << reason << abort(FatalError);
     }
 
@@ -1937,6 +2067,80 @@ tmp<vectorField> vertexCentredLinGeomSolid::residualMomentum
     }
 
     return tresidual;
+}
+
+
+tmp<sparseMatrix> vertexCentredLinGeomSolid::JacobianMomentum
+(
+    const pointVectorField& pointD
+)
+{
+    // Initialise matrix
+    tmp<sparseMatrix> tmatrix
+    (
+        new sparseMatrix(sum(globalPointIndices_.stencilSize()))
+    );
+    sparseMatrix& matrix = tmatrix.ref();
+
+    // Update gradD at dual faces
+    dualGradDf_ =
+        vfvc::fGrad
+        (
+            pointD,
+            mesh(),
+            dualMesh(),
+            dualMeshMap().dualFaceToCell(),
+            dualMeshMap().dualCellToPoint(),
+            zeta_,
+            debug
+        );
+
+    // Calculate the stress at the dual faces
+    dualMechanicalPtr_().correct(dualSigmaf_);
+
+    // Update material tangent
+    const Field<scalarSquareMatrix> materialTangent
+    (
+        dualMechanicalPtr_().materialTangentFaceField()
+    );
+
+    // Add div(sigma) coefficients
+    vfvm::divSigma
+    (
+        matrix,
+        mesh(),
+        dualMesh(),
+        dualMeshMap().dualFaceToCell(),
+        dualMeshMap().dualCellToPoint(),
+        materialTangent,
+        zeta_
+    );
+
+    // Add d2dt2 coefficients
+    vfvm::d2dt2
+    (
+        mesh().d2dt2Scheme("d2dt2(pointD)"),
+        runTime().deltaTValue(),
+        pointD.name(),
+        matrix,
+        pointRho_.internalField(),
+        pointVol_.internalField(),
+        int(bool(debug))
+    );
+
+    // Enforce fixed DOF on the linear system
+    vectorField source(pointD.size()); // needed but not used
+    sparseMatrixTools::enforceFixedDof
+    (
+        matrix,
+        source, // not used
+        fixedDofs_,
+        fixedDofDirections_,
+        fixedDofValues_,
+        fixedDofScale_
+    );
+
+    return tmatrix;
 }
 
 
