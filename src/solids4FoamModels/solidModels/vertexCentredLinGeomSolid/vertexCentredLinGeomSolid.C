@@ -97,6 +97,12 @@ PetscErrorCode formResidual
             }
         }
     }
+    if (Pstream::parRun())
+    {
+        // I need to get values not owned by this proc
+        FatalError
+            << "Fix solution retrieval" << abort(FatalError);
+    }
 
     // Don't call correctBCs as we want to allow perturbation of known DOFs
     //pointD.correctBoundaryConditions();
@@ -121,6 +127,13 @@ PetscErrorCode formResidual
             ff[blockRowI*blockSize + 2] = resI.z();
         }
     }
+    if (Pstream::parRun())
+    {
+        // What happens for points not owned by this proc?
+        // I guess the source should be summed across procs
+        FatalError
+            << "Form residual: do we need to use owned by?" << abort(FatalError);
+    }
 
     // Restore vectors
     CHKERRQ(VecRestoreArrayRead(x,&xx));
@@ -134,20 +147,17 @@ PetscErrorCode formJacobian
 (
     SNES snes,    // snes object
     Vec x,        // current solution
-    Mat A,      // Jacobian
+    Mat A,        // Jacobian
     Mat B,        // Jaconian precondioner (can be A)
     void *ctx     // user context
 )
 {
-    const PetscScalar *xx;
-    appCtx *user = (appCtx *)ctx;
-    // PetscScalar       A[4];
-    // PetscInt          idx[2] = {0,1};
-
     // Get pointer to solution data
-    CHKERRQ(VecGetArrayRead(x,&xx));
+    const PetscScalar *xx;
+    CHKERRQ(VecGetArrayRead(x, &xx));
 
     // Map the solution to an OpenFOAM field
+    appCtx *user = (appCtx *)ctx;
     const bool twoD = user->solMod_.twoD();
     Foam::pointVectorField pointD("petsc_pointD", user->solMod_.pointD());
     Foam::vectorField& pointDI = pointD;
@@ -169,6 +179,12 @@ PetscErrorCode formJacobian
             }
         }
     }
+    if (Pstream::parRun())
+    {
+        // I need to get values not owned by this proc
+        FatalError
+            << "Fix solution retrieval" << abort(FatalError);
+    }
 
     // This may not be needed
     pointD.correctBoundaryConditions();
@@ -182,71 +198,22 @@ PetscErrorCode formJacobian
     matrix += user->solMod_.JacobianMomentum(pointD)();
 
 
-    // Insert OpenFOAM matrix into PETSc matrix
-
-    const int blockSize = twoD ? 2 : 3;
-    const Foam::labelList& localToGlobalPointMap =
-        user->solMod_.gPointIndices().localToGlobalPointMap();
-
-    // Find size of global system, i.e. the highest global point index + 1
-    const int blockN = Foam::gMax(localToGlobalPointMap) + 1;
-    const int N = blockSize*blockN;
-
-    // Find the start and end global point indices for this proc
-    int blockStartID = N;
-    int blockEndID = -1;
-    forAll(ownedByThisProc, pI)
+    // Set matrix coefficients, if any, to zero
+    MatInfo info;
+    MatGetInfo(A, MAT_LOCAL, &info);
+    if (info.nz_used)
     {
-        if (ownedByThisProc[pI])
-        {
-            blockStartID = Foam::min(blockStartID, localToGlobalPointMap[pI]);
-            blockEndID = Foam::max(blockEndID, localToGlobalPointMap[pI]);
-        }
+        CHKERRQ(MatZeroEntries(A));
     }
-    //const int startID = blockSize*blockStartID;
-    //const int endID = blockSize*(blockEndID + 1) - 1;
 
-    // Find size of local system, i.e. the range of points owned by this proc
-    const int blockn = blockEndID - blockStartID + 1;
-    const int n = blockSize*blockn;
 
-    // Set matrix characteristics
-    CHKERRQ(MatSetSizes(A, n, n, N, N));
-    //CHKERRQ(MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, N, N));
-    CHKERRQ(MatSetFromOptions(A));
-    CHKERRQ(MatSetType(A, MATMPIAIJ));
-    CHKERRQ(MatSetBlockSize(A, blockSize));
-
-    // Count the number of non-zeros
-    // TODO: fix for parallel
-    int* d_nnz = (int*)malloc(n*sizeof(int));
-    int* o_nnz = (int*)malloc(n*sizeof(int));
-    // label d_nnz[n];
-    // label o_nnz[n];
-    int d_nz = 0;
-    Foam::sparseMatrixTools::setNonZerosPerRow
-    (
-        d_nnz,
-        o_nnz,
-        d_nz,
-        n,
-        blockSize,
-        ownedByThisProc,
-        user->solMod_.gPointIndices().stencilSizeOwned(),
-        user->solMod_.gPointIndices().stencilSizeNotOwned()
-    );
-
-    // Allocate parallel matrix
-    CHKERRQ(MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz));
-
-    // TO BE FIXED: some mallocs are still needed in parallel!
-    MatSetOption(A, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
-
-    CHKERRQ(MatSetUp(A));
-
-    // Insert coefficients into the matrix
+    // Insert OpenFOAM matrix into PETSc matrix
     // Note: we use global indices when inserting coefficients
     const Foam::sparseMatrixData& data = matrix.data();
+    const Foam::labelList& localToGlobalPointMap =
+        user->solMod_.gPointIndices().localToGlobalPointMap();
+    PetscScalar values2d[4];
+    PetscScalar values3d[9];
     for (auto iter = data.begin(); iter != data.end(); ++iter)
     {
         const Foam::tensor& coeff = iter();
@@ -256,43 +223,48 @@ PetscErrorCode formJacobian
         if (twoD)
         {
             // Prepare values
-            const PetscScalar values[4] =
-            {
-                coeff.xx(), coeff.xy(),
-                coeff.yx(), coeff.yy()
-            };
+            values2d[0] = coeff.xx();
+            values2d[1] = coeff.xy();
+            values2d[2] = coeff.yx();
+            values2d[3] = coeff.yy();
 
             // Insert tensor coefficient
             CHKERRQ
             (
                 MatSetValuesBlocked
                 (
-                    A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
+                    A, 1, &blockRowI, 1, &blockColI, values2d, ADD_VALUES
                 )
             );
         }
         else // 3-D
         {
             // Prepare values
-            // Maybe I can use coeff.cdata() here?
-            const PetscScalar values[9] =
-            {
-                coeff.xx(), coeff.xy(), coeff.xz(),
-                coeff.yx(), coeff.yy(), coeff.yz(),
-                coeff.zx(), coeff.zy(), coeff.zz()
-            };
+            values3d[0] = coeff.xx();
+            values3d[1] = coeff.xy();
+            values3d[2] = coeff.xz();
+            values3d[3] = coeff.yx();
+            values3d[4] = coeff.yy();
+            values3d[5] = coeff.yz();
+            values3d[6] = coeff.zx();
+            values3d[7] = coeff.zy();
+            values3d[8] = coeff.zz();
 
             // Insert tensor coefficient
             CHKERRQ
             (
                 MatSetValuesBlocked
                 (
-                    A, 1, &blockRowI, 1, &blockColI, values, ADD_VALUES
+                    A, 1, &blockRowI, 1, &blockColI, values3d, ADD_VALUES
                 )
             );
         }
     }
-
+    if (Pstream::parRun())
+    {
+        FatalError
+            << "formJac: check if owned by is needed" << abort(FatalError);
+    }
 
     // Complete matrix assembly
     CHKERRQ(MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY));
@@ -779,9 +751,9 @@ bool vertexCentredLinGeomSolid::vertexCentredLinGeomSolid::converged
         Info<< "    Converged" << endl;
         converged = true;
     }
-    else if (residualAbs < SMALL)
+    else if (residualAbs < VSMALL)
     {
-        Info<< "    Converged: absolute residual is less than " << SMALL
+        Info<< "    Converged: absolute residual is less than " << VSMALL
             << endl;
         converged = true;
     }
@@ -980,7 +952,6 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     // Update boundary conditions
     pointD().correctBoundaryConditions();
 
-
     // Create user data context
     appCtx user(*this);
 
@@ -1001,31 +972,88 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     // Set the residual function
     SNESSetFunction(snes, NULL, formResidual, &user);
 
+    // Initialise the Jacobian matrix
+
+    const int blockSize = twoD_ ? 2 : 3;
+    const Foam::labelList& localToGlobalPointMap =
+        globalPointIndices_.localToGlobalPointMap();
+
+    // Find size of global system, i.e. the highest global point index + 1
+    const int blockN = Foam::gMax(localToGlobalPointMap) + 1;
+    const int N = blockSize*blockN;
+
+    // Find the start and end global point indices for this proc
+    int blockStartID = N;
+    int blockEndID = -1;
+    const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
+    forAll(ownedByThisProc, pI)
+    {
+        if (ownedByThisProc[pI])
+        {
+            blockStartID = Foam::min(blockStartID, localToGlobalPointMap[pI]);
+            blockEndID = Foam::max(blockEndID, localToGlobalPointMap[pI]);
+        }
+    }
+    //const int startID = blockSize*blockStartID;
+    //const int endID = blockSize*(blockEndID + 1) - 1;
+
+    // Find size of local system, i.e. the range of points owned by this proc
+    const int blockn = blockEndID - blockStartID + 1;
+    const int n = blockSize*blockn;
+
+    // Create the matrix
+    Mat A;
+    CHKERRQ(MatCreate(PETSC_COMM_WORLD, &A));
+
+    // Set matrix characteristics
+    CHKERRQ(MatSetSizes(A, n, n, N, N));
+    //CHKERRQ(MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, N, N));
+    CHKERRQ(MatSetFromOptions(A));
+    CHKERRQ(MatSetType(A, MATMPIAIJ));
+    //CHKERRQ(MatSetType(A, MATMPIBAIJ));
+    CHKERRQ(MatSetBlockSize(A, blockSize));
+
+    // Count the number of non-zeros
+    // TODO: fix for parallel
+    int* d_nnz = (int*)malloc(n*sizeof(int));
+    int* o_nnz = (int*)malloc(n*sizeof(int));
+    // label d_nnz[n];
+    // label o_nnz[n];
+    int d_nz = 0;
+    Foam::sparseMatrixTools::setNonZerosPerRow
+    (
+        d_nnz,
+        o_nnz,
+        d_nz,
+        n,
+        blockSize,
+        ownedByThisProc,
+        globalPointIndices_.stencilSizeOwned(),
+        globalPointIndices_.stencilSizeNotOwned()
+    );
+
+    // Allocate parallel matrix
+    CHKERRQ(MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz));
+    // TODO: change d_nnz/o_nnz to block sizes!
+    //CHKERRQ(MatMPIBAIJSetPreallocation(A, blockSize, 0, d_nnz, 0, o_nnz));
+
+    // TO BE FIXED: some mallocs are still needed in parallel!
+    MatSetOption(A, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+
+    CHKERRQ(MatSetUp(A));
+
+    // Do not call the matrix assembly as we have not inserted any values
+    //CHKERRQ(MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY));
+    //CHKERRQ(MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY));
+
     // Set the Jacobian function
-    SNESSetJacobian(snes, NULL, NULL, formJacobian, &user);
+    SNESSetJacobian(snes, A, A, formJacobian, &user);
 
     // Set solver options
     // Uses default options, can be overridden by command line options
     SNESSetFromOptions(snes);
 
-    // Set the block coefficient size (2 for 2-D, 3 for 3-D)
-    label blockSize = 3;
-    if (twoD_)
-    {
-        blockSize = 2;
-    }
-
-    // Find size of global system, i.e. the highest global point index + 1
-    const labelList& localToGlobalPointMap =
-        globalPointIndices_.localToGlobalPointMap();
-    const label blockN = gMax(localToGlobalPointMap) + 1;
-    const label N = blockSize*blockN;
-
     // Find the start and end global point indices for this proc
-    label blockStartID = N;
-    label blockEndID = -1;
-    const boolList& ownedByThisProc =
-        globalPointIndices_.ownedByThisProc();
     forAll(ownedByThisProc, pI)
     {
         if (ownedByThisProc[pI])
@@ -1037,31 +1065,24 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     //const label startID = blockSize*blockStartID;
     //const label endID = blockSize*(blockEndID + 1) - 1;
 
-    // Find size of local system, i.e. the range of points owned by this proc
-    const label blockn = blockEndID - blockStartID + 1;
-    const label n = blockSize*blockn;
-
     // Create the solution vector
     Vec x;
-    sparseMatrixTools::checkErr(VecCreate(PETSC_COMM_WORLD, &x));
-    sparseMatrixTools::checkErr(VecSetSizes(x, n, N));
-    sparseMatrixTools::checkErr(VecSetBlockSize(x, blockSize));
-    sparseMatrixTools::checkErr(VecSetType(x, VECMPI));
-    sparseMatrixTools::checkErr
-    (
-        PetscObjectSetName((PetscObject) x, "Solution")
-    );
-    sparseMatrixTools::checkErr(VecSetFromOptions(x));
+    CHKERRQ(VecCreate(PETSC_COMM_WORLD, &x));
+    CHKERRQ(VecSetSizes(x, n, N));
+    CHKERRQ(VecSetBlockSize(x, blockSize));
+    CHKERRQ(VecSetType(x, VECMPI));
+    CHKERRQ(PetscObjectSetName((PetscObject) x, "Solution"));
+    CHKERRQ(VecSetFromOptions(x));
 
     // Set initial guess
-    sparseMatrixTools::checkErr(VecSet(x, 0.0));
+    CHKERRQ(VecSet(x, 0.0));
 
     // Solve the nonlinear system
-    sparseMatrixTools::checkErr(SNESSolve(snes, NULL, x));
+    CHKERRQ(SNESSolve(snes, NULL, x));
 
     // Check if SNES converged
     SNESConvergedReason reason;
-    sparseMatrixTools::checkErr(SNESGetConvergedReason(snes, &reason));
+    CHKERRQ(SNESGetConvergedReason(snes, &reason));
     if (reason < 0)
     {
         FatalErrorIn("vertexCentredLinGeomSolid::evolveSnes()")
@@ -1069,10 +1090,7 @@ bool vertexCentredLinGeomSolid::evolveSnes()
             << " PETSc SNES error code = " << reason << abort(FatalError);
     }
 
-    // Access and print the solution
-    //PetscReal solution;
-    //VecGetValues(x, 1, NULL, &solution);
-    //PetscPrintf(PETSC_COMM_WORLD, "Solution: %g\n", solution);
+    // Retrieve the solution
     const PetscScalar *xx;
     VecGetArrayRead(x,&xx);
     Foam::vectorField& pointDI = pointD();
@@ -1091,6 +1109,12 @@ bool vertexCentredLinGeomSolid::evolveSnes()
                 }
             }
         }
+    }
+    if (Pstream::parRun())
+    {
+        // I need to get values not owned by this proc
+        FatalError
+            << "Fix solution retrieval" << abort(FatalError);
     }
     pointD().correctBoundaryConditions();
 
@@ -1255,10 +1279,6 @@ bool vertexCentredLinGeomSolid::evolveImplicitCoupled()
         {
             Info<< "bool vertexCentredLinGeomSolid::evolve(): "
                 << " solving linear system: start" << endl;
-        }
-        else
-        {
-            Info<< "    Solving" << endl;
         }
 
         if (Switch(solidModelDict().lookup("usePETSc")))

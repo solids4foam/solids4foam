@@ -445,7 +445,7 @@ void Foam::mechanicalLaw::makeSigmaHyd()
                 "sigmaHyd",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::READ_IF_PRESENT,
+                IOobject::NO_READ,
                 IOobject::AUTO_WRITE
             ),
             mesh(),
@@ -463,7 +463,7 @@ void Foam::mechanicalLaw::makeSigmaHyd()
                 "grad(sigmaHyd)",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::READ_IF_PRESENT,
+                IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
             mesh(),
