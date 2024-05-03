@@ -35,6 +35,23 @@ Foam::sparseMatrix::sparseMatrix(const label size)
     data_(size)
 {}
 
+
+Foam::sparseMatrix::sparseMatrix(const sparseMatrix& sm)
+:
+    refCount(),
+    data_(sm.data_)
+{}
+
+
+Foam::sparseMatrix::sparseMatrix(const tmp<sparseMatrix>& tsm)
+:
+    refCount(),
+    data_(std::move(tsm.ref().data_))
+{
+    tsm.clear();
+}
+
+
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 Foam::label Foam::sparseMatrix::nBlockRows() const

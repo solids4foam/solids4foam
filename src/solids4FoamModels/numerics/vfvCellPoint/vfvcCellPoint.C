@@ -760,7 +760,7 @@ tmp<vectorField> ddt
 
 tmp<pointScalarField> laplacian
 (
-    pointScalarField& pointP,
+    const pointScalarField& pointP,
     const fvMesh& mesh,
     const fvMesh& dualMesh,
     const labelList& dualFaceToCell,

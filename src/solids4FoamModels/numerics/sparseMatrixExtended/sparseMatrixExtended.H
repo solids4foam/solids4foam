@@ -16,40 +16,39 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    sparseMatrix
+    sparseMatrixExtended
 
 Description
     A simple but convenient matrix for storing sparse matrices.
     Values are stored using a HashTable where the Hash is based on the
     (rowI, columns) key.
 
-    For now, it is assumed that every value is a tensor, but the intention is to
-    template this.
+    It is assumed that every value is a 4x4 RectangularMatrix
 
     Used in coupled solid mechanics solvers in solids4foam.
 
     Example usage:
 
-        sparseMatrix mat;
+        sparseMatrixExtended mat;
         mat(1, 0) = tensor(1,2,3,4,5,6,7,8,9);
         mat(0, 2) += 3*I;
 
 Author
-    Philip Cardiff, UCD.
+	Philip Cardiff,UCD.
+    Federico Mazzanti, UCD.
 
 SourceFiles
-    sparseMatrix.C
+    sparseMatrixExtended.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef sparseMatrix_H
-#define sparseMatrix_H
+#ifndef sparseMatrixExtended_H
+#define sparseMatrixExtended_H
 
 #include "HashTable.H"
 #include "FixedList.H"
-#include "tensor.H"
+#include "RectangularMatrix.H"
 #include "refCount.H"
-#include "scalarField.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -59,47 +58,46 @@ namespace Foam
 
     typedef HashTable
     <
-        tensor, FixedList<label, 2>, FixedList<label, 2>::Hash<>
-    > sparseMatrixData;
+        RectangularMatrix<scalar>, FixedList<label, 2>, FixedList<label, 2>::Hash<>
+    > sparseMatrixExtendedData;
 
 /*---------------------------------------------------------------------------*\
-                       Class sparseMatrix Declaration
+                       Class sparseMatrixExtended Declaration
 \*---------------------------------------------------------------------------*/
 
-class sparseMatrix
+class sparseMatrixExtended
 :
     public refCount
 {
     // Private data
 
         //- Hashtable (map) where the values are stored
-        sparseMatrixData data_;
+        sparseMatrixExtendedData data_;
+
 
     // Private Member Functions
 
+        //- Disallow default bitwise copy construct
+        sparseMatrixExtended(const sparseMatrixExtended&);
+
         //- Disallow default bitwise assignment
-        void operator=(const sparseMatrix&);
+        void operator=(const sparseMatrixExtended&);
 
 public:
 
     //- Runtime type information
-    TypeName("sparseMatrix");
+    TypeName("sparseMatrixExtended");
 
 
     // Constructors
 
         //- Construct given approximate size
-        sparseMatrix(const label size = 128);
+        sparseMatrixExtended(const label size = 128);
 
-        //- Copy construct
-        sparseMatrix(const sparseMatrix& sm);
-
-        //- Construct from tmp\<sparseMatrix\> deleting argument
-        sparseMatrix(const tmp<sparseMatrix>& tsm);
 
     // Destructor
 
-        virtual ~sparseMatrix()
+        virtual ~sparseMatrixExtended()
         {}
 
 
@@ -108,13 +106,13 @@ public:
         // Access
 
             //- Const access to the data
-            const sparseMatrixData& data() const
+            const sparseMatrixExtendedData& data() const
             {
                 return data_;
             }
 
             //- Non-const access to the data
-            sparseMatrixData& data()
+            sparseMatrixExtendedData& data()
             {
                 return data_;
             }
@@ -137,26 +135,7 @@ public:
 
             //- Non-const access to a value entry. If the entry does not exist
             //  then create it and initialise it to zero
-            tensor& operator()(const label rowI, const label colI);
-
-            //- Operator to add a sparseMatrix A to this object
-            void operator+=(const sparseMatrix& A);
-
-            //- Operator to subtract a sparseMatrix A from this object
-            void operator-=(const sparseMatrix& A);
-
-            //- Operator to add a sparseMatrix A to this object and return the
-            //  result
-            tmp<sparseMatrix> operator+(const sparseMatrix& A) const;
-
-            //- Operator to multiply the diagonal coefficients of this
-            //  sparseMatrix by a scalar and return the result
-            tmp<sparseMatrix> operator*(const scalar s) const;
-
-            //- Operator to multiply the diagonal coefficients of this
-            //  sparseMatrix by a scalarField and return the result
-            //  It is assumed that the field index corresponds to the matrix row
-            tmp<sparseMatrix> operator*(const scalarField& sf) const;
+            RectangularMatrix<scalar>& operator()(const label rowI, const label colI);
 };
 
 

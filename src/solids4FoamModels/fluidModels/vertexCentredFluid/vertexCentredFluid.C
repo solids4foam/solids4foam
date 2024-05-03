@@ -24,8 +24,10 @@ License
 #include "sparseMatrix.H"
 #include "vfvcCellPoint.H"
 #include "vfvmCellPoint.H"
+#include "vfvmCellPointExtended.H"
 #include "fvcDiv.H"
 #include "sparseMatrixTools.H"
+#include "sparseMatrixExtendedTools.H"
 #include "fixedValuePointPatchFields.H"
 #include "symmetryPointPatchFields.H"
 #include "slipPointPatchFields.H"
@@ -53,7 +55,7 @@ addToRunTimeSelectionTable(fluidModel, vertexCentredFluid, dictionary);
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
-tmp<vectorField> vertexCentredFluid::residualMomentum
+tmp<vectorField> vertexCentredFluid::residualU
 (
     const pointVectorField& pointU,
     const pointScalarField& pointP
@@ -197,12 +199,69 @@ tmp<vectorField> vertexCentredFluid::residualMomentum
 }
 
 
-void vertexCentredFluid::setFixedDofs
+tmp<scalarField> vertexCentredFluid::residualP
 (
     const pointVectorField& pointU,
-    boolList& fixedDofs,
-    pointField& fixedDofValues,
-    symmTensorField& fixedDofDirections
+    const pointScalarField& pointP
+)
+{
+    if (debug)
+    {
+        Info<< "void vertexCentredFluid::residualMomentum(...): start"
+            << endl;
+    }
+
+    // Prepare the result field
+    tmp<scalarField> tresidual(new scalarField(pointU.size(), 0.0));
+    scalarField& residual = tresidual.ref();
+
+    // The residual for the pressure equation is:
+    // F = p - gamma*laplacian(p) - k*div(U)
+
+    // Take references to internal fields for clarity and brevity
+    const scalarField& pointVolI = pointVol_.internalField();
+
+    // Gradient of U at the points
+    // We will calculate the div(U) term as tr(grad(U))
+    const pointTensorField pointGradU(vfvc::pGrad(pointU_, mesh()));
+
+    // Calculate laplacian(p) field
+    const pointScalarField laplacianP
+    (
+        vfvc::laplacian
+        (
+            pointP,
+            mesh(),
+            dualMesh_,
+            dualMesh_.dualMeshMap().dualFaceToCell(),
+            dualMesh_.dualMeshMap().dualCellToPoint(),
+            zeta_,
+            debug
+        )
+    );
+
+    // Calculate the K*div(U) field, where K presents a penalty bulk modulus
+    const pointScalarField kDivU(-k_*tr(pointGradU));
+
+    // Add pressure term
+    residual += pointP*pointVolI;
+
+    // Add gamma*laplacian(p) term
+    residual -= pressureSmoothingCoeff_*laplacianP*pointVolI;
+
+    // Add kDivU term
+    residual += kDivU*pointVolI;
+
+    return tresidual;
+}
+
+
+void vertexCentredFluid::setFixedUDofs
+(
+    const pointVectorField& pointU,
+    boolList& fixedUDofs,
+    pointField& fixedUDofValues,
+    symmTensorField& fixedUDofDirections
 ) const
 {
     // Flag all fixed DOFs
@@ -226,7 +285,7 @@ void vertexCentredFluid::setFixedDofs
                 const vector& val = pointU[pointID];
 
                 // Check if this point has already been fixed
-                if (fixedDofs[pointID])
+                if (fixedUDofs[pointID])
                 {
                     // Check if the existing prescribed value is
                     // consistent with the new one
@@ -234,8 +293,8 @@ void vertexCentredFluid::setFixedDofs
                     (
                         mag
                         (
-                            fixedDofDirections[pointID]
-                          & (fixedDofValues[pointID] - val)
+                            fixedUDofDirections[pointID]
+                          & (fixedUDofValues[pointID] - val)
                         ) > SMALL
                     )
                     {
@@ -249,13 +308,13 @@ void vertexCentredFluid::setFixedDofs
 
                     // Set all directions as fixed, just in case it was
                     // previously marked as a symmetry point
-                    fixedDofDirections[pointID] = symmTensor(I);
+                    fixedUDofDirections[pointID] = symmTensor(I);
                 }
                 else
                 {
-                    fixedDofs[pointID] = true;
-                    fixedDofValues[pointID] = val;
-                    fixedDofDirections[pointID] = symmTensor(I);
+                    fixedUDofs[pointID] = true;
+                    fixedUDofValues[pointID] = val;
+                    fixedUDofDirections[pointID] = symmTensor(I);
                 }
             }
         }
@@ -281,7 +340,7 @@ void vertexCentredFluid::setFixedDofs
                 const label pointID = meshPoints[pI];
 
                 // Check if this point has already been fixed
-                if (fixedDofs[pointID])
+                if (fixedUDofs[pointID])
                 {
                     // Check if the existing prescribed displacement is
                     // consistent with the current condition
@@ -289,7 +348,7 @@ void vertexCentredFluid::setFixedDofs
                     (
                         mag
                         (
-                            (pointNormals[pI] & fixedDofValues[pointID])
+                            (pointNormals[pI] & fixedUDofValues[pointID])
                         ) > SMALL
                     )
                     {
@@ -303,11 +362,11 @@ void vertexCentredFluid::setFixedDofs
 
                     // If the point is not fully fixed then make sure the normal
                     // direction is fixed
-                    if (mag(fixedDofDirections[pointID] - symmTensor(I)) > 0)
+                    if (mag(fixedUDofDirections[pointID] - symmTensor(I)) > 0)
                     {
                         // If the directions are orthogonal we can add them
                         const symmTensor curDir = sqr(pointNormals[pI]);
-                        if (mag(fixedDofDirections[pointID] & curDir) > 0)
+                        if (mag(fixedUDofDirections[pointID] & curDir) > 0)
                         {
                             FatalError
                                 << "Point " << pointID << " is fixed in two "
@@ -315,14 +374,67 @@ void vertexCentredFluid::setFixedDofs
                                 << "Cartesian axis directions" << abort(FatalError);
                         }
 
-                        fixedDofDirections[pointID] += curDir;
+                        fixedUDofDirections[pointID] += curDir;
                     }
                 }
                 else
                 {
-                    fixedDofs[pointID] = true;
-                    fixedDofValues[pointID] = vector::zero;
-                    fixedDofDirections[pointID] = sqr(pointNormals[pI]);
+                    fixedUDofs[pointID] = true;
+                    fixedUDofValues[pointID] = vector::zero;
+                    fixedUDofDirections[pointID] = sqr(pointNormals[pI]);
+                }
+            }
+        }
+    }
+}
+
+
+void vertexCentredFluid::setFixedPDofs
+(
+    const pointScalarField& pointP,
+    boolList& fixedPDofs,
+    scalarField& fixedPDofValues
+) const
+{
+    // Flag all fixed DOFs
+
+    forAll(pointP.boundaryField(), patchI)
+    {
+        if
+        (
+            isA<fixedValuePointPatchScalarField>
+            (
+                pointP.boundaryField()[patchI]
+            )
+        )
+        {
+            const labelList& meshPoints =
+                pointP.mesh().mesh().boundaryMesh()[patchI].meshPoints();
+
+            forAll(meshPoints, pI)
+            {
+                const label pointID = meshPoints[pI];
+                const scalar val = pointP[pointID];
+
+                // Check if this point has already been fixed
+                if (fixedPDofs[pointID])
+                {
+                    // Check if the existing prescribed value is
+                    // consistent with the new one
+                    if (mag(fixedPDofValues[pointID] - val)  > SMALL)
+                    {
+                        FatalErrorIn
+                        (
+                            "void vertexCentredFluid::setFixedPDofs(...)"
+                        )   << "Inconsistent values prescribed at point "
+                            << "= " << pointP.mesh().mesh().points()[pointID]
+                            << abort(FatalError);
+                    }
+                }
+                else
+                {
+                    fixedPDofs[pointID] = true;
+                    fixedPDofValues[pointID] = val;
                 }
             }
         }
@@ -574,76 +686,119 @@ void vertexCentredFluid::enforceTractionBoundaries
 bool vertexCentredFluid::vertexCentredFluid::converged
 (
     const label iCorr,
-    scalar& initResidual,
+    scalar& initResidualU,
+    scalar& initResidualP,
     const scalar res,
     const label nInterations,
     const pointVectorField& pointU,
-    const vectorField& pointUcorr
+    const pointScalarField& pointP,
+    const Field<RectangularMatrix<scalar>>& pointUPcorr
 ) const
 {
-    // Calculate the residual as the root mean square of the correction
-    const scalar residualAbs = gSum(magSqr(pointUcorr));
+    // Calculate the residuals as the root mean square of the correction
+    // Velocity residual
+    scalar residualUAbs = 0;
+    scalar residualPAbs = 0;
+    scalar maxUCorr = 0.0;
+    scalar maxPCorr = 0.0;
+    forAll(pointUPcorr, pointI)
+    {
+        // Velocity residual
+        const vector curUCorr
+        (
+            pointUPcorr[pointI](0,0),
+            pointUPcorr[pointI](1,0),
+            pointUPcorr[pointI](2,0)
+        );
+
+        residualUAbs += magSqr(curUCorr);
+
+        maxUCorr = max(maxUCorr, mag(curUCorr));
+
+        // Pressure residual
+        residualPAbs += sqr(pointUPcorr[pointI](3,0));
+
+        maxPCorr = max(maxPCorr, mag(pointUPcorr[pointI](3,0)));
+    }
+
+    residualUAbs /= sqrt(residualUAbs/pointU.size());
+    residualPAbs /= sqrt(residualPAbs/pointU.size());
 
     // Store initial residual
     if (iCorr == 0)
     {
-        initResidual = residualAbs;
+        initResidualU = residualUAbs;
+        initResidualP = residualPAbs;
 
         // If the initial residual is small then convergence has been achieved
-        if (false) //initResidual < SMALL)
+        if (initResidualU < SMALL && initResidualP < SMALL)
         {
-            Info<< "    Initial residual is less than " << SMALL << nl
-                << "    Converged" << endl;
-            return true;
+            Info<< "    Both displacement and pressure residuals are less than " << VSMALL
+                        << "	Converged" << endl;
+                return true;
         }
-        Info<< "    Initial residual = " << initResidual << endl;
+        Info<< "	Initial displacement residual = " << initResidualU << nl
+            << "	Initial pressure residual = " << initResidualP << endl;
     }
 
     // Define a normalised residual wrt the initial residual
-    const scalar residualNorm = residualAbs/initResidual;
+    const scalar residualUNorm = residualUAbs/initResidualU;
+    const scalar residualPNorm = residualPAbs/initResidualP;
 
     // Calculate the maximum displacement
-    const scalar maxMagD = gMax(mag(pointU.primitiveField()));
+    const scalar maxMagU = gMax(mag(pointU.primitiveField()));
+
+    // Calculate the maximum pressure
+    const scalar maxMagP = gMax(mag(pointP.primitiveField()));
+
+    // Print information for the displacement
+    Info<< "	Iter = " << iCorr
+        << ", relRef = " << residualUNorm
+        << ", resAbs = " << residualUAbs
+        << ", nIters = " << nInterations
+        << ", maxU = " << maxMagU
+        << ", maxUCorr = " << maxUCorr << endl;
+
+    // Print information for the pressure
+    Info<< "	Iter = " << iCorr
+        << ", relRef = " << residualPNorm
+        << ", resAbs = " << residualPAbs
+        << ", nIters = " << nInterations
+        << ", maxP = " << maxMagP
+        << ", maxPCorr = " << maxPCorr << endl;
+
+    // Velocity tolerance
+    const scalar UTol
+    (
+        readScalar(fluidProperties().lookup("solutionUTolerance"))
+    );
+
+    // Pressure tolerance
+    const scalar PTol
+    (
+        readScalar(fluidProperties().lookup("solutionPTolerance"))
+    );
 
     // Check for convergence
-    bool converged = false;
-    if (residualNorm < solutionTol_)
+    if (residualUNorm < UTol && residualPNorm < PTol)
     {
-        Info<< "    Converged" << endl;
-        converged = true;
+        Info<< "	Converged" << endl;
+        return true;
     }
-    // else if (residualAbs < SMALL)
-    // {
-    //     Info<< "    Converged: absolute residual is less than " << SMALL
-    //         << endl;
-    //     converged = true;
-    // }
-
-    if (iCorr == 0)
+    else if (iCorr >= nCorr_ - 1)
     {
-        Info<< "    Corr, res, relRes, resAbs, iters, maxMag" << pointU.name()
-            << endl;
-    }
-
-    if (iCorr % infoFrequency_ == 0 || converged || iCorr >= nCorr_ - 1)
-    {
-        Info<< "    " << iCorr
-            << ", " << res
-            << ", " << residualNorm
-            << ", " << residualAbs
-            << ", " << nInterations
-            << ", " << maxMagD << endl;
-
-        if (iCorr >= nCorr_)
+        if (nCorr_ > 1)
         {
             Warning
-                << "Max iterations reached within the momentum loop"
-                << endl;
-            converged = true;
+                << "Max iterations reached within the momentum Newton-Raphson "
+                   "loop" << endl;
         }
+
+        return true;
     }
 
-    return converged;
+    // Convergence has not been reached
+    return false;
 }
 
 
@@ -659,20 +814,36 @@ vertexCentredFluid::vertexCentredFluid
     pMesh_(pointMesh::New(mesh())),
     dualMesh_(mesh(), fluidProperties().subDict("dualMesh")),
     zeta_(readScalar(fluidProperties().lookup("zeta"))),
+    compactStencil_("compactPressureStencil", fluidProperties()),
+    pressureSmoothingCoeff_
+    (
+        readScalar(fluidProperties().lookup("pressureSmoothingCoeff"))
+    ),
     mu_(fluidProperties().lookup("mu")),
+    k_(fluidProperties().lookup("k")),
     rho_(fluidProperties().lookup("rho")),
     fullNewton_(fluidProperties().lookup("fullNewton")),
     twoD_(sparseMatrixTools::checkTwoD(mesh())),
     twoDCorrector_(mesh()),
-    fixedDofs_(mesh().nPoints(), false),
-    fixedDofValues_(fixedDofs_.size(), vector::zero),
-    fixedDofDirections_(fixedDofs_.size(), symmTensor::zero),
-    fixedDofScale_
+    fixedUDofs_(mesh().nPoints(), false),
+    fixedPDofs_(mesh().nPoints(), false),
+    fixedUDofValues_(fixedUDofs_.size(), vector::zero),
+    fixedPDofValues_(fixedUDofs_.size(), 0.0),
+    fixedUDofDirections_(fixedUDofs_.size(), symmTensor::zero),
+    fixedUDofScale_
     (
         fluidProperties().lookupOrDefault<scalar>
         (
-            "fixedDofScale",
+            "fixedUDofScale",
             (mu_*Foam::sqrt(gAverage(mesh().magSf()))).value()
+        )
+    ),
+    fixedPDofScale_
+    (
+        fluidProperties().lookupOrDefault<scalar>
+        (
+            "fixedPDofScale",
+            Foam::sqrt(gAverage(mesh().magSf()))
         )
     ),
     pointU_
@@ -760,7 +931,8 @@ vertexCentredFluid::vertexCentredFluid
     pointVolInterp_(pointMesh::New(mesh()), mesh())
 {
     // Set fixed degree of freedom list
-    setFixedDofs(pointU_, fixedDofs_, fixedDofValues_, fixedDofDirections_);
+    setFixedUDofs(pointU_, fixedUDofs_, fixedUDofValues_, fixedUDofDirections_);
+    setFixedPDofs(pointP_, fixedPDofs_, fixedPDofValues_);
 
     // Set point density field
     // mechanical().volToPoint().interpolate(rho(), pointRho_);
@@ -792,8 +964,9 @@ vertexCentredFluid::vertexCentredFluid
     //pointP_.storeOldTime();
 
     // Write parameter values
-    Info<< "zeta: " << zeta_ << endl;
-    Info<< "fixedDofScale: " << fixedDofScale_ << endl;
+    Info<< "zeta: " << zeta_ << nl
+        << "fixedUDofScale: " << fixedUDofScale_ << nl
+        << "fixedPDofScale: " << fixedPDofScale_ << endl;
 
     // Disable the writing of the unused fields
     U().writeOpt() = IOobject::NO_WRITE;
@@ -823,7 +996,7 @@ bool vertexCentredFluid::evolve()
     pointP_.correctBoundaryConditions();
 
     // Initialise matrix
-    sparseMatrix matrix(sum(globalPointIndices_.stencilSize()));
+    sparseMatrixExtended matrix(sum(globalPointIndices_.stencilSize()));
 
     // A 6x6 material tangent is overkill for a Newtonian incompressible fluid
     // where the viscosity (mu) is the only parameter; however, it will be
@@ -836,17 +1009,21 @@ bool vertexCentredFluid::evolve()
     // );
 
     // Point volumes
-    const scalarField& pointVolI = pointVol_.internalField();
+    //const scalarField& pointVolI = pointVol_.internalField();
 
     // Point density
     //const scalarField& pointRhoI = pointRho_.internalField();
 
-    // Solution field: point velocity correction
-    vectorField pointUcorr(pointU_.internalField().size(), vector::zero);
+    // Solution field: point velocity vector (0, 1, 2) and point pressure (3)
+    Field<RectangularMatrix<scalar>> pointUPcorr
+    (
+        mesh().nPoints(), RectangularMatrix<scalar>(4, 1, 0.0)
+    );
 
     // Newton-Raphson loop over momentum equation
     int iCorr = 0;
-    scalar initResidual = 0.0;
+    scalar initResidualU = 0.0;
+    scalar initResidualP = 0.0;
     SolverPerformance<vector> solverPerf;
     do
     {
@@ -861,44 +1038,135 @@ bool vertexCentredFluid::evolve()
             // Todo: vfvm operators are inconsisent in that some return the
             // results per unit volume and some do not
             // Add ddt coefficients
-            matrix +=
-                vfvm::ddt
-                (
-                    mesh().ddtScheme("ddt(pointU)"),
-                    pointU_
-                )()*(rho_.value()*pointVolI);
+            sparseMatrix matrixU;
+            // matrixU +=
+            //     vfvm::ddt
+            //     (
+            //         mesh().ddtScheme("ddt(pointU)"),
+            //         pointU_
+            //     )()*(rho_.value()*pointVolI);
 
             // Add div(rho*U*U) coefficients
-            matrix += vfvm::div(pointU_, dualMesh_)()*rho_.value();
+            //matrixU += vfvm::div(pointU_, dualMesh_)()*rho_.value();
 
             // Add div(s) coefficients
             // where div(s) == div(mu*grad(U)) == mu*laplacian(U)
-            matrix -= vfvm::laplacian(pointU_, dualMesh_, zeta_)()*mu_.value();
+            matrixU -= vfvm::laplacian(pointU_, dualMesh_, zeta_)()*mu_.value();
+
+            // Insert matrixU into matrix
+            const sparseMatrixData& dataU = matrixU.data();
+            for
+            (
+                sparseMatrixData::const_iterator iter = dataU.begin();
+                iter != dataU.end();
+                ++iter
+            )
+            {
+                // Convert the coefficient from a tensor to a RectangularMatrix
+                // and insert it into the matrix
+                const tensor& coeffU = iter();
+                const label blockRowI = iter.key()[0];
+                const label blockColI = iter.key()[1];
+
+                if (twoD_)
+                {
+                    RectangularMatrix<scalar> coeff(3, 3, 0.0);
+                    coeff(0, 0) = coeffU.xx();
+                    coeff(0, 1) = coeffU.xy();
+                    coeff(1, 0) = coeffU.yx();
+                    coeff(1, 1) = coeffU.yy();
+
+                    matrix(blockRowI, blockColI) += coeff;
+                }
+                else
+                {
+                    RectangularMatrix<scalar> coeff(4, 4, 0.0);
+                    coeff(0, 0) = coeffU.xx();
+                    coeff(0, 1) = coeffU.xy();
+                    coeff(0, 2) = coeffU.xz();
+                    coeff(1, 0) = coeffU.yx();
+                    coeff(1, 1) = coeffU.yy();
+                    coeff(1, 2) = coeffU.yz();
+                    coeff(2, 0) = coeffU.zx();
+                    coeff(2, 1) = coeffU.zy();
+                    coeff(2, 2) = coeffU.zz();
+
+                    matrix(blockRowI, blockColI) += coeff;
+                }
+            }
+
+            // Add pressure terms
+            // Ideally this would return a matrix
+            // Add laplacian coefficient to the pressure equation
+            // Note: we have not yet implemented operator- so we will
+            // flip the sign of the pressureSmoothingCoeff as a hack to flip
+            // the sign of the laplacian
+            vfvm::laplacian
+            (
+                 matrix,
+                 compactStencil_,
+                 mesh(),
+                 dualMesh_,
+                 dualMesh_.dualMeshMap().dualFaceToCell(),
+                 dualMesh_.dualMeshMap().dualCellToPoint(),
+                 -pressureSmoothingCoeff_, // note negative sign!
+                 debug
+            );
+
+            // Add diagonal and div(U) coefficients to the pressure equation
+            // Ideally this would return a matrix and be split into two
+            // operators (Sp name is misleading as it includes div(U)
+            const tensorField pBarSensitivity(mesh().nPoints(), I);
+            vfvm::Sp
+            (
+                matrix,
+                mesh(),
+                dualMesh_.dualMeshMap().dualCellToPoint(),
+                pointVol_,
+                pBarSensitivity,
+                debug
+            );
         }
 
-        if (debug > 1)
+        // Calculate the source as the negative of the residuals
+        Field<RectangularMatrix<scalar>> source
+        (
+            mesh().nPoints(), RectangularMatrix<scalar>(4, 1, 0)
+        );
         {
-            matrix.print();
+            vectorField sourceU(-residualU(pointU_, pointP_));
+            scalarField sourceP(-residualP(pointU_, pointP_));
+            forAll(source, pointI)
+            {
+                source[pointI](0, 0) = sourceU[pointI].x();
+                source[pointI](1, 0) = sourceU[pointI].y();
+                source[pointI](2, 0) = sourceU[pointI].z();
+                source[pointI](3, 0) = sourceP[pointI];
+            }
         }
-
-        // Calculate the source as the negative of the momentum residual
-        vectorField source(-residualMomentum(pointU_, pointP_));
 
         // Enforce fixed DOF on the linear system
-        sparseMatrixTools::enforceFixedDof
+
+        sparseMatrixExtendedTools::enforceFixedDisplacementDof
         (
             matrix,
             source,
-            fixedDofs_,
-            fixedDofDirections_,
-            fixedDofValues_,
-            fixedDofScale_
+            twoD_,
+            fixedUDofs_,
+            fixedUDofDirections_,
+            fixedUDofValues_,
+            fixedUDofScale_
         );
 
-        if (debug > 1)
-        {
-            matrix.print();
-        }
+        sparseMatrixExtendedTools::enforceFixedPressureDof
+        (
+            matrix,
+            source,
+            twoD_,
+            fixedPDofs_,
+            fixedPDofValues_,
+            fixedPDofScale_
+        );
 
         // Solve linear system for displacement correction
         if (debug)
@@ -911,11 +1179,11 @@ bool vertexCentredFluid::evolve()
         {
 #ifdef USE_PETSC
             fileName optionsFile(fluidProperties().lookup("optionsFile"));
-            solverPerf = sparseMatrixTools::solveLinearSystemPETSc
+            solverPerf = sparseMatrixExtendedTools::solveLinearSystemPETSc
             (
                 matrix,
                 source,
-                pointUcorr,
+                pointUPcorr,
                 twoD_,
                 optionsFile,
                 mesh().points(),
@@ -934,9 +1202,9 @@ bool vertexCentredFluid::evolve()
         else
         {
             // Use Eigen SparseLU direct solver
-            sparseMatrixTools::solveLinearSystemEigen
+            sparseMatrixExtendedTools::solveLinearSystemEigen
             (
-                matrix, source, pointUcorr, twoD_, false, debug
+                matrix, source, pointUPcorr, twoD_, false, debug
             );
         }
 
@@ -946,40 +1214,40 @@ bool vertexCentredFluid::evolve()
                 << " solving linear system: end" << endl;
         }
 
-        // Update point displacement field
-        if (mesh().relaxField(pointU_.name()))
+        // Retrieve the solution
+        vectorField& pointUI = pointU_.primitiveFieldRef();
+        scalarField& pointPI = pointP_.primitiveFieldRef();
+        forAll(pointUPcorr, pointI)
         {
-            // Relaxing the correction can help convergence
+            pointUI[pointI][vector::X] += pointUPcorr[pointI](0, 0);
+            pointUI[pointI][vector::Y] += pointUPcorr[pointI](1, 0);
+            pointUI[pointI][vector::Z] += pointUPcorr[pointI](2, 0);
+            pointPI[pointI] += pointUPcorr[pointI](3, 0);
+        }
 
-            const scalar rf
-            (
-                mesh().fieldRelaxationFactor(pointU_.name())
-            );
-            pointU_.primitiveFieldRef() += rf*pointUcorr;
-        }
-        else
-        {
-            pointU_.primitiveFieldRef() += pointUcorr;
-        }
+        // Enforce boundary conditions
         pointU_.correctBoundaryConditions();
+        pointP_.correctBoundaryConditions();
     }
     while
     (
         !converged
         (
             iCorr,
-            initResidual,
+            initResidualU,
+            initResidualP,
             mag(solverPerf.finalResidual()),
             cmptMax(solverPerf.nIterations()),
             pointU_,
-            pointUcorr
+            pointP_,
+            pointUPcorr
         ) && ++iCorr
     );
 
     // // Calculate gradD at dual faces
     // dualGradDf_ = vfvc::fGrad
     // (
-    //     pointD(),
+    //     pointU(),
     //     mesh(),
     //     dualMesh_,
     //     dualMesh_.dualMeshMap().dualFaceToCell(),
@@ -991,11 +1259,11 @@ bool vertexCentredFluid::evolve()
     // // Calculate cell gradient
     // // This assumes a constant gradient within each primary mesh cell
     // // This is a first-order approximation
-    // gradD() = vfvc::grad(pointD(), mesh());
+    // gradD() = vfvc::grad(pointU(), mesh());
 
-    // Interpolate pointD to D
+    // Interpolate pointU to D
     // This is useful for visualisation but it is also needed when using preCICE
-    // pointVolInterp_.interpolate(pointD(), D());
+    // pointVolInterp_.interpolate(pointU(), D());
 
     return true;
 }
@@ -1006,11 +1274,11 @@ void vertexCentredFluid::writeFields(const Time& runTime)
     // // Calculate cell gradient
     // // This assumes a constant gradient within each primary mesh cell
     // // This is a first-order approximation
-    // gradD() = vfvc::grad(pointD(), mesh());
+    // gradD() = vfvc::grad(pointU(), mesh());
 
     // // Calculate gradD at the primary points using least squares: this should
     // // be second-order accurate (... I think).
-    // const pointTensorField pGradD(vfvc::pGrad(pointD(), mesh()));
+    // const pointTensorField pGradD(vfvc::pGrad(pointU(), mesh()));
 
     fluidModel::writeFields(runTime);
 }

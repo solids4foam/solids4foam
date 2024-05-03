@@ -133,7 +133,7 @@ namespace vfvc
     // Returns the laplacian of a scalar field on the dual mesh
     tmp<pointScalarField> laplacian
     (
-        pointScalarField& pointP,
+        const pointScalarField& pointP,
         const fvMesh& mesh,
         const fvMesh& dualMesh,
         const labelList& dualFaceToCell,

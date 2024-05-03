@@ -89,8 +89,17 @@ private:
         //  0 < zeta < 1: blended scheme
         const scalar zeta_;
 
+        //- Compact stencil flag for the pressure Laplacian
+        const Switch compactStencil_;
+
+        //- Pressure smoothing scaling factor
+        const scalar pressureSmoothingCoeff_;
+
         //- Dynamic viscosity
         const dimensionedScalar mu_;
+
+        //- Bulk (penalty) modulus
+        const dimensionedScalar k_;
 
         //- Density
         const dimensionedScalar rho_;
@@ -116,20 +125,23 @@ private:
         //- Field of flags indicating the degrees of freedom where the value is
         //  set
         //  Currently the size of this list is equal to the number of points
-        boolList fixedDofs_;
+        boolList fixedUDofs_;
+        boolList fixedPDofs_;
 
         //- Values for fixed degrees of freedom
         //  Currently the size of this list is equal to the number of points
-        pointField fixedDofValues_;
+        pointField fixedUDofValues_;
+        scalarField fixedPDofValues_;
 
         //- Fixed directions for fixed degrees of freedom
         //  Calculated as sqr(n) where n is a fixed direction, e.g. I for fully
         //  fixed
-        symmTensorField fixedDofDirections_;
+        symmTensorField fixedUDofDirections_;
 
         //- Scale factor for the fixed degree of freedom equations to improve the
         //  matrix conditioning
-        const scalar fixedDofScale_;
+        const scalar fixedUDofScale_;
+        const scalar fixedPDofScale_;
 
         //- Point velocity
         pointVectorField pointU_;
@@ -166,19 +178,34 @@ private:
     // Private Member Functions
 
         //- Calculate the residual of the momentum equation
-        tmp<vectorField> residualMomentum
+        tmp<vectorField> residualU
         (
             const pointVectorField& pointU, // velocity
             const pointScalarField& pointP  // pressure
         );
 
-        //- Set fixed degree of freedom lists
-        void setFixedDofs
+        //- Calculate the residual of the pressure equation
+        tmp<scalarField> residualP
+        (
+            const pointVectorField& pointU, // velocity
+            const pointScalarField& pointP  // pressure
+        );
+
+        //- Set velocity fixed degree of freedom lists
+        void setFixedUDofs
         (
             const pointVectorField& pointU,
-            boolList& fixedDofs,
-            pointField& fixedDofValues,
-            symmTensorField& fixedDofDirections
+            boolList& fixedUDofs,
+            pointField& fixedUDofValues,
+            symmTensorField& fixedUDofDirections
+        ) const;
+
+        //- Set pressure fixed degree of freedom lists
+        void setFixedPDofs
+        (
+            const pointScalarField& pointP,
+            boolList& fixedPDofs,
+            scalarField& fixedPDofValues
         ) const;
 
         //- Enforce exact flux on boundaries, e.g. walls and inlets
@@ -204,11 +231,13 @@ private:
         bool converged
         (
             const label iCorr,
-            scalar& initResidual,
+            scalar& initResidualU,
+            scalar& initResidualP,
             const scalar res,
             const label nInterations,
-            const pointVectorField& pointD,
-            const vectorField& pointDcorr
+            const pointVectorField& pointU,
+            const pointScalarField& pointP,
+            const Field<RectangularMatrix<scalar>>& pointUPcorr
         ) const;
 
         //- Disallow default bitwise copy construct

@@ -94,6 +94,9 @@ public:
         //- Copy constructer
         SparseMatrixTemplate(const SparseMatrixTemplate& mat);
 
+        //- Construct from tmp\<SparseMatrixTemplate\> deleting argument
+        SparseMatrixTemplate(const tmp<SparseMatrixTemplate>& tsm);
+
 
     // Destructor
 
