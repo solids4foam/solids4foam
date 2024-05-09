@@ -445,11 +445,12 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
         if (twoD)
         {
             // Prepare values
+            // Note: pressure is stored in row 3
             const PetscScalar values[9] =
             {
-                coeff(0,0), coeff(0,1), coeff(0,2),
-                coeff(1,0), coeff(1,1), coeff(1,2),
-                coeff(2,0), coeff(2,1), coeff(2,2)
+                coeff(0,0), coeff(0,1), coeff(0,3),
+                coeff(1,0), coeff(1,1), coeff(1,3),
+                coeff(3,0), coeff(3,1), coeff(3,3)
             };
 
             // Insert tensor coefficient
@@ -556,7 +557,8 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
             if (twoD)
             {
                 // Prepare values
-                const PetscScalar values[3] = {sourceI(0,0), sourceI(1,0), sourceI(2,0)};
+                // Note: pressure is in row 3
+                const PetscScalar values[3] = {sourceI(0,0), sourceI(1,0), sourceI(3,0)};
 
                 // Insert values
                 ierr = VecSetValuesBlocked
@@ -704,9 +706,10 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
             {
                 if (twoD)
                 {
+                    // Put pressure in row 3
                     solution[i](0,0) = xArr[index++];
                     solution[i](1,0) = xArr[index++];
-                    solution[i](2,0) = xArr[index++];
+                    solution[i](3,0) = xArr[index++];
                 }
                 else
                 {
@@ -789,9 +792,10 @@ Foam::sparseMatrixExtendedTools::solveLinearSystemPETSc
                 {
                     if (twoD)
                     {
+                        // Put pressure in row 3
                         solution[i](0,0) = xNotOwnedArr[index++];
                         solution[i](1,0) = xNotOwnedArr[index++];
-                        solution[i](2,0) = xNotOwnedArr[index++];
+                        solution[i](3,0) = xNotOwnedArr[index++];
                     }
                     else
                     {
@@ -1638,7 +1642,7 @@ void Foam::sparseMatrixExtendedTools::enforceFixedPressureDof
     const scalar fixedDofScale
 )
 {
-    const bool debug = 0;
+    //const bool debug = 0;
 
     sparseMatrixExtendedData& data = matrix.data();
     for (auto iter = data.begin(); iter != data.end(); ++iter)
