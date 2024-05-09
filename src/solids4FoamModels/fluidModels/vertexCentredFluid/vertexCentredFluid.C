@@ -72,9 +72,9 @@ tmp<vectorField> vertexCentredFluid::residualU
     vectorField& residual = tresidual.ref();
 
     // The residual F is defined as
-    // F = rho*ddt(U) + rho*div(U*U) - div(sigma)
-    //   = rho*ddt(U) + rho*div(U*U) - div(s - p*I)
-    //   = rho*ddt(U) + rho*div(U*U) - div(mu*grad(U) - p*I)
+    // resU = rho*ddt(U) + rho*div(U*U) - div(sigma)
+    //      = rho*ddt(U) + rho*div(U*U) - div(s - p*I)
+    //      = rho*ddt(U) + rho*div(U*U) - div(mu*grad(U) - p*I)
     // where density is assumed constant and uniform.
     // Take care that the source of the linear system will be the negative of F
 
@@ -120,6 +120,7 @@ tmp<vectorField> vertexCentredFluid::residualU
     }
 
     // Add the advection term to residual
+    // resU = rho*ddt(U) + rho*div(U*U) - div(mu*grad(U) - p*I)
     residual += rho_.value()*pointDivUU*pointVolI;
 
 
@@ -187,6 +188,7 @@ tmp<vectorField> vertexCentredFluid::residualU
     }
 
     // Add the surface force term to residual
+    // resU = rho*ddt(U) + rho*div(U*U) - div(mu*grad(U) - p*I)
     residual -= pointDivSigma*pointVolI;
 
     if (debug)
@@ -216,41 +218,53 @@ tmp<scalarField> vertexCentredFluid::residualP
     scalarField& residual = tresidual.ref();
 
     // The residual for the pressure equation is:
-    // F = p - gamma*laplacian(p) - k*div(U)
+    // resP = p - gamma*laplacian(p) + k*div(U)
 
     // Take references to internal fields for clarity and brevity
     const scalarField& pointVolI = pointVol_.internalField();
+
+    // Add pressure term
+    //residual += pointP*pointVolI;
+
+    // // Add gamma*laplacian(p) term
+    // if (mag(pressureSmoothingCoeff_) > SMALL)
+    // {
+    //     // Calculate laplacian(p) field
+    //     const pointScalarField laplacianP
+    //     (
+    //         vfvc::laplacian
+    //         (
+    //             pointP,
+    //             false, //compactStencil_,
+    //             mesh(),
+    //             dualMesh_,
+    //             dualMesh_.dualMeshMap().dualFaceToCell(),
+    //             dualMesh_.dualMeshMap().dualCellToPoint(),
+    //             zeta_,
+    //             pressureSmoothingCoeff_, // gamma
+    //             debug
+    //         )
+    //     );
+
+    //     residual -= laplacianP;
+    // }
 
     // Gradient of U at the points
     // We will calculate the div(U) term as tr(grad(U))
     const pointTensorField pointGradU(vfvc::pGrad(pointU_, mesh()));
 
-    // Calculate laplacian(p) field
-    const pointScalarField laplacianP
-    (
-        vfvc::laplacian
-        (
-            pointP,
-            mesh(),
-            dualMesh_,
-            dualMesh_.dualMeshMap().dualFaceToCell(),
-            dualMesh_.dualMeshMap().dualCellToPoint(),
-            zeta_,
-            debug
-        )
-    );
-
     // Calculate the K*div(U) field, where K presents a penalty bulk modulus
-    const pointScalarField kDivU(-k_*tr(pointGradU));
-
-    // Add pressure term
-    residual += pointP*pointVolI;
-
-    // Add gamma*laplacian(p) term
-    residual -= pressureSmoothingCoeff_*laplacianP*pointVolI;
+    const pointScalarField kDivU(k_*tr(pointGradU));
 
     // Add kDivU term
-    residual += kDivU*pointVolI;
+    // resP = p - gamma*laplacian(p) + k*div(U)
+    // residual += kDivU*pointVolI;
+
+    // Info<< "Writing resP" << endl;
+    // pointScalarField res("resP", kDivU);
+    // res.primitiveFieldRef() = residual;
+    // res.correctBoundaryConditions();
+    // res.write();
 
     return tresidual;
 }
@@ -721,14 +735,14 @@ bool vertexCentredFluid::vertexCentredFluid::converged
         maxPCorr = max(maxPCorr, mag(pointUPcorr[pointI](3,0)));
     }
 
-    residualUAbs /= sqrt(residualUAbs/pointU.size());
-    residualPAbs /= sqrt(residualPAbs/pointU.size());
+    residualUAbs /= max(sqrt(residualUAbs/pointU.size()), SMALL);
+    residualPAbs /= max(sqrt(residualPAbs/pointU.size()), SMALL);
 
     // Store initial residual
     if (iCorr == 0)
     {
-        initResidualU = residualUAbs;
-        initResidualP = residualPAbs;
+        initResidualU = max(residualUAbs, SMALL);
+        initResidualP = max(residualPAbs, SMALL);
 
         // If the initial residual is small then convergence has been achieved
         if (initResidualU < SMALL && initResidualP < SMALL)
@@ -1009,7 +1023,7 @@ bool vertexCentredFluid::evolve()
     // );
 
     // Point volumes
-    //const scalarField& pointVolI = pointVol_.internalField();
+    const scalarField& pointVolI = pointVol_.internalField();
 
     // Point density
     //const scalarField& pointRhoI = pointRho_.internalField();
@@ -1022,11 +1036,19 @@ bool vertexCentredFluid::evolve()
 
     // Newton-Raphson loop over momentum equation
     int iCorr = 0;
-    scalar initResidualU = 0.0;
-    scalar initResidualP = 0.0;
+    // scalar initResidualU = 0.0;
+    // scalar initResidualP = 0.0;
+    scalar initResidualU = sqrt(gSum(magSqr(residualU(pointU_, pointP_))));
+    scalar initResidualP = sqrt(gSum(magSqr(residualP(pointU_, pointP_))));
+    Info<< "initResidualU = " << initResidualU << nl
+        << "initResidualP = " << initResidualP << endl;
     SolverPerformance<vector> solverPerf;
     do
     {
+        // Store previous iterations to allow under-relaxation
+        pointU_.storePrevIter();
+        pointP_.storePrevIter();
+
         if (iCorr == 0 || fullNewton_)
         {
             // Assemble the matrix once per outer iteration
@@ -1039,15 +1061,15 @@ bool vertexCentredFluid::evolve()
             // results per unit volume and some do not
             // Add ddt coefficients
             sparseMatrix matrixU;
-            // matrixU +=
-            //     vfvm::ddt
-            //     (
-            //         mesh().ddtScheme("ddt(pointU)"),
-            //         pointU_
-            //     )()*(rho_.value()*pointVolI);
+            matrixU +=
+                vfvm::ddt
+                (
+                    mesh().ddtScheme("ddt(pointU)"),
+                    pointU_
+                )()*(rho_.value()*pointVolI);
 
             // Add div(rho*U*U) coefficients
-            //matrixU += vfvm::div(pointU_, dualMesh_)()*rho_.value();
+            matrixU += vfvm::div(pointU_, dualMesh_)()*rho_.value();
 
             // Add div(s) coefficients
             // where div(s) == div(mu*grad(U)) == mu*laplacian(U)
@@ -1068,32 +1090,48 @@ bool vertexCentredFluid::evolve()
                 const label blockRowI = iter.key()[0];
                 const label blockColI = iter.key()[1];
 
-                if (twoD_)
-                {
-                    RectangularMatrix<scalar> coeff(3, 3, 0.0);
-                    coeff(0, 0) = coeffU.xx();
-                    coeff(0, 1) = coeffU.xy();
-                    coeff(1, 0) = coeffU.yx();
-                    coeff(1, 1) = coeffU.yy();
+                RectangularMatrix<scalar> coeff(4, 4, 0.0);
+                coeff(0, 0) = coeffU.xx();
+                coeff(0, 1) = coeffU.xy();
+                coeff(0, 2) = coeffU.xz();
+                coeff(1, 0) = coeffU.yx();
+                coeff(1, 1) = coeffU.yy();
+                coeff(1, 2) = coeffU.yz();
+                coeff(2, 0) = coeffU.zx();
+                coeff(2, 1) = coeffU.zy();
+                coeff(2, 2) = coeffU.zz();
 
-                    matrix(blockRowI, blockColI) += coeff;
-                }
-                else
-                {
-                    RectangularMatrix<scalar> coeff(4, 4, 0.0);
-                    coeff(0, 0) = coeffU.xx();
-                    coeff(0, 1) = coeffU.xy();
-                    coeff(0, 2) = coeffU.xz();
-                    coeff(1, 0) = coeffU.yx();
-                    coeff(1, 1) = coeffU.yy();
-                    coeff(1, 2) = coeffU.yz();
-                    coeff(2, 0) = coeffU.zx();
-                    coeff(2, 1) = coeffU.zy();
-                    coeff(2, 2) = coeffU.zz();
-
-                    matrix(blockRowI, blockColI) += coeff;
-                }
+                matrix(blockRowI, blockColI) += coeff;
             }
+
+            // Subtract gradP from the U equation
+            // vfvm::grad seems to currently calculate -grad, which should be
+            // fixed
+            vfvm::grad
+            (
+                matrix,
+                mesh(),
+                dualMesh_,
+                dualMesh_.dualMeshMap().dualFaceToCell(),
+                dualMesh_.dualMeshMap().dualCellToPoint(),
+                debug
+            );
+
+            // Add diagonal and div(U) coefficients to the pressure equation
+            // Ideally this would return a matrix and be split into two
+            // operators (Sp name is misleading as it includes div(U)
+            // resP = p - gamma*laplacian(p) + k*div(U)
+            const tensorField pBarSensitivity(mesh().nPoints(), I);
+            vfvm::Sp
+            (
+                matrix,
+                1.0, // scalar coefficient
+                mesh(),
+                dualMesh_.dualMeshMap().dualCellToPoint(),
+                pointVol_,
+                pBarSensitivity,
+                debug
+            );
 
             // Add pressure terms
             // Ideally this would return a matrix
@@ -1101,31 +1139,34 @@ bool vertexCentredFluid::evolve()
             // Note: we have not yet implemented operator- so we will
             // flip the sign of the pressureSmoothingCoeff as a hack to flip
             // the sign of the laplacian
-            vfvm::laplacian
-            (
-                 matrix,
-                 compactStencil_,
-                 mesh(),
-                 dualMesh_,
-                 dualMesh_.dualMeshMap().dualFaceToCell(),
-                 dualMesh_.dualMeshMap().dualCellToPoint(),
-                 -pressureSmoothingCoeff_, // note negative sign!
-                 debug
-            );
+            // resP = p - gamma*laplacian(p) + k*div(U)
+            // if (mag(pressureSmoothingCoeff_) > SMALL)
+            // {
+            //     vfvm::laplacian
+            //     (
+            //          matrix,
+            //          compactStencil_,
+            //          mesh(),
+            //          dualMesh_,
+            //          dualMesh_.dualMeshMap().dualFaceToCell(),
+            //          dualMesh_.dualMeshMap().dualCellToPoint(),
+            //          -pressureSmoothingCoeff_, // note negative sign!
+            //          debug
+            //     );
+            // }
 
-            // Add diagonal and div(U) coefficients to the pressure equation
-            // Ideally this would return a matrix and be split into two
-            // operators (Sp name is misleading as it includes div(U)
-            const tensorField pBarSensitivity(mesh().nPoints(), I);
-            vfvm::Sp
-            (
-                matrix,
-                mesh(),
-                dualMesh_.dualMeshMap().dualCellToPoint(),
-                pointVol_,
-                pBarSensitivity,
-                debug
-            );
+            // Insert k*div(U)
+            // resP = p - gamma*laplacian(p) + k*div(U)
+            //pBarSensitivity *= -1;
+            // vfvm::divU
+            // (
+            //     matrix,
+            //     mesh(),
+            //     dualMesh_.dualMeshMap().dualCellToPoint(),
+            //     pointVol_,
+            //     pBarSensitivity,
+            //     debug
+            // );
         }
 
         // Calculate the source as the negative of the residuals
@@ -1134,8 +1175,8 @@ bool vertexCentredFluid::evolve()
             mesh().nPoints(), RectangularMatrix<scalar>(4, 1, 0)
         );
         {
-            vectorField sourceU(-residualU(pointU_, pointP_));
-            scalarField sourceP(-residualP(pointU_, pointP_));
+            const vectorField sourceU(-residualU(pointU_, pointP_));
+            const scalarField sourceP(-residualP(pointU_, pointP_));
             forAll(source, pointI)
             {
                 source[pointI](0, 0) = sourceU[pointI].x();
@@ -1165,7 +1206,7 @@ bool vertexCentredFluid::evolve()
             twoD_,
             fixedPDofs_,
             fixedPDofValues_,
-            fixedPDofScale_
+            fixedPDofScale_ // negative sign as diagonals should be negative
         );
 
         // Solve linear system for displacement correction
@@ -1228,6 +1269,26 @@ bool vertexCentredFluid::evolve()
         // Enforce boundary conditions
         pointU_.correctBoundaryConditions();
         pointP_.correctBoundaryConditions();
+
+        // Optionally relax fields
+        if (mesh().relaxField(pointU_.name()))
+        {
+            const scalar rf
+            (
+                mesh().fieldRelaxationFactor(pointU_.name())
+            );
+
+            pointU_ = rf*pointU_ + (1 - rf)*pointU_.prevIter();
+        }
+        if (mesh().relaxField(pointP_.name()))
+        {
+            const scalar rf
+            (
+                mesh().fieldRelaxationFactor(pointP_.name())
+            );
+
+            pointP_ = rf*pointP_ + (1 - rf)*pointP_.prevIter();
+        }
     }
     while
     (
