@@ -761,11 +761,13 @@ tmp<vectorField> ddt
 tmp<pointScalarField> laplacian
 (
     const pointScalarField& pointP,
+    const Switch compactStencil,
     const fvMesh& mesh,
     const fvMesh& dualMesh,
     const labelList& dualFaceToCell,
     const labelList& dualCellToPoint,
     const scalar& zeta,
+    const scalar& diffusivity,
     const bool debug
 )
 {
@@ -800,27 +802,35 @@ tmp<pointScalarField> laplacian
     pointScalarField& result = tresult();
 #endif
 
-        // Take reference for clarity and efficiency
+    // Take reference for clarity and efficiency
     //const labelListList& cellPoints = mesh.cellPoints();
-    //const pointField& points = mesh.points();
+    const pointField& points = mesh.points();
     const labelList& dualOwn = dualMesh.owner();
     const labelList& dualNei = dualMesh.neighbour();
     const vectorField& dualSf = dualMesh.faceAreas();
+    const scalarField& pointPI = pointP;
 
-    //Calculate the gradient of P for each dual face
-    const surfaceVectorField dualGradPField
-    (
-        fGrad
+    // Calculate the gradient of P for each dual face
+    autoPtr<surfaceVectorField> dualGradPFieldPtr;
+    if (!compactStencil)
+    {
+        dualGradPFieldPtr.set
         (
-            pointP,
-            mesh,
-            dualMesh,
-            dualFaceToCell,
-            dualCellToPoint,
-            zeta,
-            debug
-        )
-    );
+            new surfaceVectorField
+            (
+                fGrad
+                (
+                    pointP,
+                    mesh,
+                    dualMesh,
+                    dualFaceToCell,
+                    dualCellToPoint,
+                    zeta,
+                    debug
+                )
+            )
+        );
+    }
 
     // Loop over all internal faces of the dual mesh
     forAll(dualOwn, dualFaceI)
@@ -843,15 +853,41 @@ tmp<pointScalarField> laplacian
         // dualFaceI area vector
         const vector& curDualSf = dualSf[dualFaceI];
 
-        // gradP at the dual face
-        const vector& dualGradP = dualGradPField[dualFaceI];
+        if (compactStencil)
+        {
+            // Compact central-differencing Laplacian
 
-        // Calculate the flux at the dual face
-        const scalar& dualFluxP = dualGradP & curDualSf;
+            // Dual face unit normal
+            const scalar curDualMagSf = mag(curDualSf);
+            const vector curDualN = curDualSf/curDualMagSf;
 
-        // Add the fluxes
-        result[ownPointID] += dualFluxP;
-        result[neiPointID] -= dualFluxP;
+            // Delta coefficient
+            const scalar deltaCoeff =
+                1.0/(curDualN & (points[neiPointID] - points[ownPointID]));
+
+            // Compact edge direction coefficient
+            const scalar coeff = diffusivity*curDualMagSf*deltaCoeff;
+
+            // Calculate the flux
+            const scalar dualFluxP =
+                coeff*(pointPI[neiPointID] - pointPI[ownPointID]);
+
+            // Add the fluxes
+            result[ownPointID] += dualFluxP;
+            result[neiPointID] -= dualFluxP;
+        }
+        else
+        {
+            // gradP at the dual face
+            const vector& dualGradP = dualGradPFieldPtr()[dualFaceI];
+
+            // Calculate the flux at the dual face
+            const scalar dualFluxP = diffusivity*curDualSf & dualGradP;
+
+            // Add the fluxes
+            result[ownPointID] += dualFluxP;
+            result[neiPointID] -= dualFluxP;
+        }
     }
 
     return tresult;

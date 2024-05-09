@@ -164,9 +164,19 @@ namespace vfvm
     );
 
     // Add source coefficients to the matrix
-    // Note: this function does not calculate contributions to the right-hand
-    // side
     void Sp
+    (
+        sparseMatrixExtended& matrix,
+        const scalar s, // scalar coefficient
+        const fvMesh& dualMesh,
+        const labelList& dualCellToPoint,
+        const scalarField& pointVolI,
+        const tensorField& pBarSensitivity,
+        const int debug // debug switch
+    );
+
+    // Add div(U) coefficients to the pressure equation
+    void divU
     (
         sparseMatrixExtended& matrix,
         const fvMesh& dualMesh,
@@ -174,6 +184,18 @@ namespace vfvm
         const scalarField& pointVolI,
         const tensorField& pBarSensitivity,
         const int debug // debug switch
+    );
+
+    // Add gradP to the column 3 of a 4x4 system, e.g. representing gradP in the
+    // momentum equation
+    void grad
+    (
+        sparseMatrixExtended& matrix,
+        const fvMesh& mesh,
+        const fvMesh& dualMesh,
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const bool debug
     );
 
 } // End namespace vfvm

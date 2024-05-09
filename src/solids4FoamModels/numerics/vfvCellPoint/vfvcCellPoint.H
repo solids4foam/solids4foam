@@ -134,11 +134,13 @@ namespace vfvc
     tmp<pointScalarField> laplacian
     (
         const pointScalarField& pointP,
+        const Switch compactStencil,
         const fvMesh& mesh,
         const fvMesh& dualMesh,
         const labelList& dualFaceToCell,
         const labelList& dualCellToPoint,
         const scalar& zeta,
+        const scalar& diffusivity,
         const bool debug = false
     );
 
