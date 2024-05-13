@@ -36,6 +36,7 @@ License
 #include "movingWallPressureFvPatchScalarField.H"
 #include "RBFMeshMotionSolver.H"
 #include "FieldSumOp.H"
+#include "dynamicMotionSolverFvMesh.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -890,14 +891,13 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
 #ifndef OPENFOAM_ORG
         // Check for RBF motion solver
-        bool rbfMotionSolver = false;
-        if (fluidMesh().foundObject<motionSolver>("dynamicMeshDict"))
-        {
-            rbfMotionSolver = isA<RBFMeshMotionSolver>
+        const bool rbfMotionSolver
+        (
+            isA<RBFMeshMotionSolver>
             (
-                fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
-            );
-        }
+                refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion()
+            )
+        );
 #endif
 
         // Set motion on FSI interface
@@ -1060,7 +1060,10 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             // Note: take displacement as opposed to velocity
             const_cast<RBFMeshMotionSolver&>
             (
-                fluidMesh().lookupObject<RBFMeshMotionSolver>("dynamicMeshDict")
+                refCast<const RBFMeshMotionSolver>
+                (
+                    refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion()
+                )
             ).setMotion(motion);
         }
 #endif

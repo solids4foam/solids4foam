@@ -36,11 +36,9 @@ namespace Foam
             //- Store motion as a field
             Field<vectorField> motionCenters;
 
-            //- Store accumulated center motions as a volVectorField.
-            //  This allows this mesh motion solver to be used
-            //  in a similar way to standard motion solvers, i.e. we just access
-            //  and set the cellMotion volVectorField
+            //- Store accumulated patch face center motions
             volVectorField accumulatedMotionCentersField_;
+            //PtrList<vectorField> accumulatedMotionCentersField_;
 
             wordList staticPatches;
             labelList staticPatchIDs;

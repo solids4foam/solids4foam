@@ -342,11 +342,34 @@ void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
             assert(mpatch.size() == mesh().boundaryMesh()[ipatch].meshPoints().size());
 
         // Set values on motionCentersField boundary
-#ifdef OPENFOAM_NOT_EXTEND
-        accumulatedMotionCentersField_.boundaryFieldRef()[ipatch] = motion[ipatch];
-#else
-        accumulatedMotionCentersField_.boundaryField()[ipatch] = motion[ipatch];
-#endif
+        if (mesh().boundaryMesh()[ipatch].type() == "empty")
+        {
+            // Store data in internal field as field empty patches have zero
+            // size
+        #ifdef OPENFOAM_NOT_EXTEND
+            const labelUList& faceCells = mesh().boundaryMesh()[ipatch].faceCells();
+            forAll(faceCells, faceI)
+            {
+                const label cellID = faceCells[faceI];
+                accumulatedMotionCentersField_[cellID] = motion[ipatch][faceI];
+            }
+        #else
+            const labelList& faceCells = mesh().boundaryMesh()[ipatch].faceCells();
+            forAll(faceCells, faceI)
+            {
+                const label cellID = faceCells[faceI];
+                accumulatedMotionCentersField_[cellID] = motion[ipatch][faceI];
+            }
+        #endif
+        }
+        else
+        {
+        #ifdef OPENFOAM_NOT_EXTEND
+            accumulatedMotionCentersField_.boundaryFieldRef()[ipatch] = motion[ipatch];
+        #else
+            accumulatedMotionCentersField_.boundaryField()[ipatch] = motion[ipatch];
+        #endif
+        }
     }
 
     motionCenters = motion;
@@ -364,9 +387,34 @@ void RBFMeshMotionSolver::solve()
     // Copy motionCentersField to motionCenters
     forAll(accumulatedMotionCentersField_.boundaryField(), patchI)
     {
-        motionCenters[patchI] =
-            accumulatedMotionCentersField_.boundaryField()[patchI]
-          - accumulatedMotionCentersField_.prevIter().boundaryField()[patchI];
+        if (mesh().boundaryMesh()[patchI].type() == "empty")
+        {
+        #ifdef OPENFOAM_NOT_EXTEND
+            const labelUList& faceCells = mesh().boundaryMesh()[patchI].faceCells();
+            forAll(faceCells, faceI)
+            {
+                const label cellID = faceCells[faceI];
+                motionCenters[patchI][faceI] =
+                    accumulatedMotionCentersField_[cellID]
+                  - accumulatedMotionCentersField_.prevIter()[cellID];
+            }
+        #else
+            const labelList& faceCells = mesh().boundaryMesh()[patchI].faceCells();
+            forAll(faceCells, faceI)
+            {
+                const label cellID = faceCells[faceI];
+                motionCenters[patchI][faceI] =
+                    accumulatedMotionCentersField_[cellID]
+                  - accumulatedMotionCentersField_.prevIter()[cellID];
+            }
+        #endif
+        }
+        else
+        {
+            motionCenters[patchI] =
+                accumulatedMotionCentersField_.boundaryField()[patchI]
+              - accumulatedMotionCentersField_.prevIter().boundaryField()[patchI];
+        }
     }
 
     // Update previous field
