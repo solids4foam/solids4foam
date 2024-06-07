@@ -285,7 +285,11 @@ void elasticWallPressureFvPatchScalarField::patchFlux
 void elasticWallPressureFvPatchScalarField::write(Ostream& os) const
 {
     robinFvPatchScalarField::write(os);
-    this->writeEntry("prevPressure", os);
+#ifdef OPENFOAM_ORG
+    writeEntry(os, "prevPressure", prevPressure_);
+#else
+    prevPressure_.writeEntry("prevPressure", os);
+#endif
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
