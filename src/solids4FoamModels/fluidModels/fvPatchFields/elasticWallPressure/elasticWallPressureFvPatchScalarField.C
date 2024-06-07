@@ -72,6 +72,11 @@ elasticWallPressureFvPatchScalarField::elasticWallPressureFvPatchScalarField
         Field<scalar>::operator=(scalarField("value", dict, p.size()));
     }
 
+    if (dict.found("prevPressure"))
+    {
+        Field<scalar>::operator=(scalarField("prevPressure", dict, p.size()));
+    }
+
     this->coeff0() = 1.0;
     this->coeff1() = 1.0;
 }
@@ -280,6 +285,7 @@ void elasticWallPressureFvPatchScalarField::patchFlux
 void elasticWallPressureFvPatchScalarField::write(Ostream& os) const
 {
     robinFvPatchScalarField::write(os);
+    this->writeEntry("prevPressure", os);
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
