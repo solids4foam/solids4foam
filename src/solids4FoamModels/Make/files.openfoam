@@ -24,6 +24,7 @@ solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
 solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
 solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
+solidModels/solidFoam/solidFoam.C
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/interFluid/interFluid.C
