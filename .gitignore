@@ -91,3 +91,5 @@ SunOS*Gcc*/
 *.gtgz
 
 # end-of-file
+
+.vscode/

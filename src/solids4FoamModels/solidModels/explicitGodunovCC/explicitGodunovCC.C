@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "solidFoam.H"
+#include "explicitGodunovCC.H"
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
@@ -35,8 +35,8 @@ namespace solidModels
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-defineTypeNameAndDebug(solidFoam, 0);
-addToRunTimeSelectionTable(solidModel, solidFoam, dictionary);
+defineTypeNameAndDebug(explicitGodunovCC, 0);
+addToRunTimeSelectionTable(solidModel, explicitGodunovCC, dictionary);
 
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
@@ -46,7 +46,7 @@ addToRunTimeSelectionTable(solidModel, solidFoam, dictionary);
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-solidFoam::solidFoam
+explicitGodunovCC::explicitGodunovCC
 (
     Time& runTime,
     const word& region
@@ -63,14 +63,14 @@ solidFoam::solidFoam
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-bool solidFoam::evolve()
+bool explicitGodunovCC::evolve()
 {
-    Info<< "Evolving solid solver form solidFoam" << endl;
+    Info<< "Evolving solid solver form explicitGodunovCC" << endl;
 
     return true;
 }
 
-tmp<vectorField> solidFoam::tractionBoundarySnGrad
+tmp<vectorField> explicitGodunovCC::tractionBoundarySnGrad
 (
     const vectorField& traction,
     const scalarField& pressure,

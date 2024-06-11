@@ -33,10 +33,19 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef solidFoam_H
-#define SolidFoam_H
+#ifndef explicitGodunovCC_H
+#define explicitGodunovCC_H
 
 #include "solidModel.H"
+
+#include "pointFields.H"
+#include "operations.H"
+#include "solidMaterialModel.H"
+#include "mechanics.H"
+#include "gradientSchemes.H"
+#include "interpolationSchemes.H"
+#include "angularMomentum.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -52,7 +61,7 @@ namespace solidModels
                         Class linGeomSolid Declaration
 \*---------------------------------------------------------------------------*/
 
-class solidFoam
+class explicitGodunovCC
 :
     public solidModel
 {
@@ -62,10 +71,10 @@ class solidFoam
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
-        solidFoam(const solidFoam&);
+        explicitGodunovCC(const explicitGodunovCC&);
 
         //- Disallow default bitwise assignment
-        void operator=(const solidFoam&);
+        void operator=(const explicitGodunovCC&);
 
 
 protected:
@@ -82,12 +91,12 @@ protected:
 public:
 
     //- Runtime type information
-    TypeName("solidFoam");
+    TypeName("explicitGodunovCC");
 
     // Constructors
 
         //- Construct from components
-        solidFoam
+        explicitGodunovCC
         (
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
@@ -96,7 +105,7 @@ public:
 
     // Destructor
 
-        virtual ~solidFoam()
+        virtual ~explicitGodunovCC()
         {}
 
 
@@ -114,6 +123,9 @@ public:
             }
 
         // Edit
+        // #include "createFields.H"
+// Foam::operations op(mesh());
+
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
