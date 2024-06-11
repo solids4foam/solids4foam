@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_COM
+
 #include "kirchhoffPlateSolid.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -25,7 +27,7 @@ License
 #include "faCFD.H"
 #include "linearElastic.H"
 
-#include "BlockLduSystem.H"
+//#include "BlockLduSystem.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -48,8 +50,13 @@ addToRunTimeSelectionTable(solidModel, kirchhoffPlateSolid, dictionary);
 bool kirchhoffPlateSolid::converged
 (
     const int iCorr,
+#ifdef OPENFOAM_NOT_EXTEND
+    const SolverPerformance<scalar>& solverPerfM,
+    const SolverPerformance<scalar>& solverPerfw,
+#else
     const lduSolverPerformance& solverPerfM,
     const lduSolverPerformance& solverPerfw,
+#endif
     const areaScalarField& M,
     const areaScalarField& w
 )
@@ -61,23 +68,25 @@ bool kirchhoffPlateSolid::converged
     const scalar residualM =
         gMax
         (
-            mag(M.internalField() - M.prevIter().internalField())
-           /max
             (
-                gMax(mag(M.internalField() - M.oldTime().internalField())),
-                SMALL
-            )
+                mag(M - M.prevIter())
+               /max
+                (
+                    gMax(mag(M - M.oldTime())()), SMALL
+                )
+            )()
         );
 
     const scalar residualw =
         gMax
         (
-            mag(w.internalField() - w.prevIter().internalField())
-           /max
             (
-                gMax(mag(w.internalField() - w.oldTime().internalField())),
-                SMALL
-            )
+                mag(w - w.prevIter())
+               /max
+                (
+                    gMax(mag(w - w.oldTime())()), SMALL
+                )
+            )()
         );
 
     // Calculate material residual
@@ -465,9 +474,15 @@ bool kirchhoffPlateSolid::evolve()
     do
     {
         int iCorr = 0;
+#ifdef OPENFOAM_NOT_EXTEND
+        SolverPerformance<scalar> solverPerfM;
+        SolverPerformance<scalar> solverPerfw;
+        SolverPerformance<scalar>::debug = 0;
+#else
         lduSolverPerformance solverPerfM;
         lduSolverPerformance solverPerfw;
         blockLduMatrix::debug = 0;
+#endif
 
         Info<< "Solving the Kirchhoff plate equation for w and M" << endl;
 
@@ -586,7 +601,7 @@ bool kirchhoffPlateSolid::evolve()
         mapAreaFieldToSingleLayerVolumeField(theta_, thetaVf_);
         mapAreaFieldToSingleLayerVolumeField(p_, pVf_);
         {
-            const areaVectorField Ds = w_*aMesh_.faceAreaNormals();
+            const areaVectorField Ds(w_*aMesh_.faceAreaNormals());
             mapAreaFieldToSingleLayerVolumeField(Ds, D());
         }
 
@@ -627,21 +642,26 @@ tmp<vectorField> kirchhoffPlateSolid::tractionBoundarySnGrad
 
 void kirchhoffPlateSolid::setTraction
 (
+    const label interfaceI,
     const label patchID,
-    const vectorField& traction
+    const vectorField& faceZoneTraction
 )
 {
-    if (traction.size() != p_.size())
-    {
-        FatalErrorIn("void kirchhoffPlateSolid::setTraction(...)")
-            << "Something is wrong with the length of the traction field passed"
-            << "to the solid!"
-            << abort(FatalError);
-    }
+    // Map global field to patch field
+    const vectorField patchTraction
+    (
+        globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction)
+    );
 
     // Take normal component of the traction field
     // Note: p is the net pressure on the plate (from both sides)
-    p_.internalField() = aMesh_.faceAreaNormals().internalField() & traction;
+#ifdef OPENFOAM_NOT_EXTEND
+    p_.primitiveFieldRef() =
+        aMesh_.faceAreaNormals().primitiveField() & patchTraction;
+#else
+    p_.internalField() =
+        aMesh_.faceAreaNormals().internalField() & patchTraction;
+#endif
 }
 
 
@@ -660,5 +680,7 @@ void kirchhoffPlateSolid::writeFields(const Time& runTime)
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //
