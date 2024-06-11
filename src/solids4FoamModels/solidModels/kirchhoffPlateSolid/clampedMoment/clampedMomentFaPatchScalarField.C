@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
 
 #include "clampedMomentFaPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
@@ -186,6 +186,6 @@ namespace Foam
     );
 }
 
-#endif // OPENFOAM_COM
+#endif // OPENFOAM_ORG
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

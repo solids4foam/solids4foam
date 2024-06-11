@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
 
 #include "kirchhoffPlateSolid.H"
 #include "fvm.H"
@@ -681,6 +681,6 @@ void kirchhoffPlateSolid::writeFields(const Time& runTime)
 
 } // End namespace Foam
 
-#endif // OPENFOAM_COM
+#endif // OPENFOAM_ORG
 
 // ************************************************************************* //

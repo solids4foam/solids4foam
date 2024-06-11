@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
 
 #include "kirchhoffPlateSolid.H"
 #include "GeometricFields.H"
@@ -101,6 +101,6 @@ mapAreaFieldToSingleLayerVolumeField
     }
 }
 
-#endif // OPENFOAM_COM
+#endif // OPENFOAM_ORG
 
 // ************************************************************************* //

@@ -23,8 +23,6 @@ Description
 
     Based on "rotation-free formulation" of Torlak (2006).
 
-    Work in progress.
-
 Author
     Philip Cardiff, UCD.  All rights reserved.
 

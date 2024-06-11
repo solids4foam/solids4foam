@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAM_COM
+#ifndef OPENFOAM_ORG
 
 #include "freeEdgeDisplacementFaPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
@@ -220,6 +220,6 @@ namespace Foam
     );
 }
 
-#endif // OPENFOAM_COM
+#endif // OPENFOAM_ORG
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
