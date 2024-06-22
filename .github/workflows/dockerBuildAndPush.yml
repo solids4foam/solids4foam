@@ -9,8 +9,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  docker-openfoamv2012:
+  build-and-push:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - { version: "v2012", file: "Dockerfile.openfoamv2012" }
+          - { version: "9", file: "Dockerfile.openfoam9" }
+          - { version: "foam-extend-4.1", file: "Dockerfile.foamextend41" }
+
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v2
@@ -18,41 +25,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push the OpenFOAM-v2012 image
+      - name: Build and push the ${{ matrix.image.version }} image
         uses: docker/build-push-action@v3
         with:
           push: true
-          tags: solids4foam/solids4foam-v2.0-openfoam-v2012:latest
-          file: Dockerfile.openfoamv2012
-
-  docker-openfoam9:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push the OpenFOAM-9 image
-        uses: docker/build-push-action@v3
-        with:
-          push: true
-          tags: solids4foam/solids4foam-v2.0-openfoam-9:latest
-          file: Dockerfile.openfoam9
-
-  docker-foamextend41:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push the foam-extend-4.1 image
-        uses: docker/build-push-action@v3
-        with:
-          push: true
-          tags: solids4foam/solids4foam-v2.0-foam-extend-4.1:latest
-          file: Dockerfile.foamextend41
+          tags: solids4foam/solids4foam-v2.0-${{ matrix.image.version }}:latest
+          file: ${{ matrix.image.file }}
