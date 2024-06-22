@@ -375,8 +375,9 @@ void Foam::solidContactFvPatchVectorField::calcZoneToZones() const
             const Switch integralNormalGap =
                 dict_.lookupOrDefault<Switch>
                 (
-                    "integralNormalGap", false
+                    "integralNormalGap", true
                 );
+            Info<< "integralNormalGap: " << integralNormalGap << endl;
 
             zoneToZones_[shadPatchI].normalGapIntegration() =
                 integralNormalGap;

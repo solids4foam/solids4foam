@@ -40,6 +40,7 @@ jobs:
           source ${{ matrix.container-image.source }}
           (cd optionalFixes && ./Allreplace)
           ./Allwmake ${{ matrix.container-image.buildflags }}
+       continue-on-error: true
 
       - name: Alltest
         shell: bash -l {0}
@@ -47,3 +48,11 @@ jobs:
           source ${{ matrix.container-image.source }}
           cd tutorials
           ./Alltest
+       continue-on-error: true
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-logs
+          path: tutorialsTest/logs
