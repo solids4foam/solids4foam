@@ -34,18 +34,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-docker-
 
-      - name: Source OpenFOAM environment
-        shell: bash -l {0}
-        run: source ${{ matrix.container-image.source }}
-
       - name: Allwmake
         shell: bash -l {0}
         run: |
+          source ${{ matrix.container-image.source }}
           (cd optionalFixes && ./Allreplace)
-          ./Allwmake
+          ./Allwmake -j
 
       - name: Alltest
         shell: bash -l {0}
         run: |
+          source ${{ matrix.container-image.source }}
           cd tutorials
           ./Alltest
