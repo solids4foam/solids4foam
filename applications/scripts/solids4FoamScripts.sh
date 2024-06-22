@@ -199,23 +199,6 @@ function solids4Foam::convertCaseFormat()
         sed -i  "s@postProcessing/surfaces/@postProcessing/sample.surfaces/@g" plot.gnuplot
     fi
 
-    # 13. If found, move the faMeshDefinition to the system directory
-    if [[ -f "${CASE_DIR}"/constant/faMesh/faMeshDefinition ]]
-    then
-        echo "Moving constant/faMesh/faMeshDefinition to system"
-        \mv "${CASE_DIR}"/constant/faMesh/faMeshDefinition "${CASE_DIR}"/system/
-    fi
-    if [[ -f "${CASE_DIR}"/constant/solid/faMesh/faMeshDefinition ]]
-    then
-        echo "Moving constant/solid/faMesh/faMeshDefinition to system/solid"
-        \mv "${CASE_DIR}"/constant/solid/faMesh/faMeshDefinition "${CASE_DIR}"/system/solid
-    fi
-    if [[ -f "${CASE_DIR}"/constant/fluid/faMesh/faMeshDefinition ]]
-    then
-        echo "Moving constant/fluid/faMesh/faMeshDefinition to system/fluid"
-        \mv "${CASE_DIR}"/constant/fluid/faMesh/faMeshDefinition "${CASE_DIR}"/system/fluid
-    fi
-
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo "| solids4Foam::convertCaseFormat end                                  |"
@@ -400,26 +383,6 @@ function solids4Foam::convertCaseFormatFoamExtend()
     then
         echo "Updating plot.gnuplot"
         sed -i "s|postProcessing/sample.surfaces/|postProcessing/surfaces/|g" plot.gnuplot
-    fi
-
-    # 2. If found, move the faMeshDefinition to the constant directory
-    if [[ -f "${CASE_DIR}"/system/faMeshDefinition ]]
-    then
-        echo "Moving system/faMeshDefinition to constant/faMesh"
-        mkdir -p "${CASE_DIR}"/constant/faMesh
-        \mv "${CASE_DIR}"/system/faMeshDefinition "${CASE_DIR}"/constant/faMesh
-    fi
-    if [[ -f "${CASE_DIR}"/system/solid/faMeshDefinition ]]
-    then
-        echo "Moving system/solid/faMeshDefinition to constant/solid/faMesh"
-        mkdir -p "${CASE_DIR}"/constant/solid/faMesh
-        \mv "${CASE_DIR}"/system/solid/faMeshDefinition "${CASE_DIR}"/constant/solid/faMesh
-    fi
-    if [[ -f "${CASE_DIR}"/system/fluid/faMeshDefinition ]]
-    then
-        echo "Moving system/fluid/faMeshDefinition to constant/fluid/faMesh"
-        mkdir -p "${CASE_DIR}"/constant/fluid/faMesh
-        \mv "${CASE_DIR}"/system/fluid/faMeshDefinition "${CASE_DIR}"/constant/fluid/faMesh
     fi
 
     echo
