@@ -33,7 +33,7 @@ namespace Foam
 
 autoPtr<normalContactModel> normalContactModel::New
 (
-    const word& name,
+    const word& modelType,
     const fvPatch& patch,
     const dictionary& dict,
     const label masterPatchID,
@@ -42,10 +42,25 @@ autoPtr<normalContactModel> normalContactModel::New
     const standAlonePatch& slaveFaceZonePatch
 )
 {
-    Info<< "    Normal contact model: " << name << endl;
+    Info<< "    Normal contact model: " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            dict,
+            "normalContactModel",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(name);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -62,17 +77,19 @@ autoPtr<normalContactModel> normalContactModel::New
             ")",
             dict
         )   << "Unknown normalContactModel type "
-            << name << endl << endl
+            << modelType << endl << endl
             << "Valid  normalContactModels are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
+    auto* ctorPtr = cstrIter();
+#endif
 
     return autoPtr<normalContactModel>
     (
-        cstrIter()
+        ctorPtr
         (
-            name,
+            modelType,
             patch,
             dict,
             masterPatchID,

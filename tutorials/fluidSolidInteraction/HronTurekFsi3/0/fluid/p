@@ -24,7 +24,7 @@ boundaryField
 {
     plate
     {
-        type extrapolatedPressure;
+        type zeroGradient;
         value uniform 0;
     }
     outlet
@@ -34,22 +34,22 @@ boundaryField
     }
     inlet
     {
-        type extrapolatedPressure;
+        type zeroGradient;
         value uniform 0;
     }
     cylinder
     {
-        type extrapolatedPressure;
+        type zeroGradient;
         value uniform 0;
     }
     bottom
     {
-        type extrapolatedPressure;
+        type zeroGradient;
         value uniform 0;
     }
     top
     {
-        type extrapolatedPressure;
+        type zeroGradient;
         value uniform 0;
     }
     frontAndBackPlanes

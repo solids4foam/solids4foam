@@ -55,6 +55,9 @@ class fixedDisplacementFvPatchVectorField
 {
     // Private Data
 
+        //- Enable non-orthogonal corrections
+        const Switch nonOrthogonalCorrections_;
+
         //- Constant total displacement field
         vectorField totalDisp_;
 
@@ -114,7 +117,7 @@ public:
         fixedDisplacementFvPatchVectorField
         (
             const fixedDisplacementFvPatchVectorField&
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
         ) = delete;
 #else
         );
@@ -151,7 +154,7 @@ public:
 
     // Destructors
 
-        //- Construct from patch and internal field
+        //- Destructor
         virtual ~fixedDisplacementFvPatchVectorField();
 
 

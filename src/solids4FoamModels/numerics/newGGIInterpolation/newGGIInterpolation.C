@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -103,6 +97,13 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::clearOut()
     deleteDemandDrivenData(slaveAddrPtr_);
     deleteDemandDrivenData(slaveWeightsPtr_);
 
+    if (gapIntegration_)
+    {
+        deleteDemandDrivenData(masterNeiIntegralGapPtr_);
+        deleteDemandDrivenData(slaveNeiIntegralGapPtr_);
+        deleteDemandDrivenData(masterNeiContactAreaPtr_);
+    }
+
     deleteDemandDrivenData(uncoveredMasterAddrPtr_);
     deleteDemandDrivenData(uncoveredSlaveAddrPtr_);
 
@@ -148,6 +149,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::newGGIInterpolation
     masterNonOverlapFaceTol_(masterNonOverlapFaceTol),
     slaveNonOverlapFaceTol_(slaveNonOverlapFaceTol),
     rescaleGGIWeightingFactors_(rescaleGGIWeightingFactors),
+    gapIntegration_(false),
     reject_(reject),
     usePrevCandidateMasterNeighbors_(false),
     prevCandidateMasterNeighbors_(0),
@@ -159,6 +161,9 @@ newGGIInterpolation<MasterPatch, SlavePatch>::newGGIInterpolation
     masterPointDistancePtr_(NULL),
     masterPointDistanceVectorsPtr_(NULL),
     masterEdgeLoopsMap_(0),
+    masterNeiIntegralGapPtr_(NULL),
+    slaveNeiIntegralGapPtr_(NULL),
+    masterNeiContactAreaPtr_(NULL),
     slaveAddrPtr_(NULL),
     slaveWeightsPtr_(NULL),
     slavePointAddressingPtr_(NULL),
@@ -256,6 +261,81 @@ newGGIInterpolation<MasterPatch, SlavePatch>::slaveWeights() const
     }
 
     return *slaveWeightsPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const scalarListList&
+newGGIInterpolation<MasterPatch, SlavePatch>::masterNeiPenVol() const
+{
+    if (gapIntegration_)
+    {
+        if (!masterNeiIntegralGapPtr_)
+        {
+            calcAddressing();
+        }
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "const scalarListList& newGGIInterpolation<MasterPatch, SlavePatch>"
+            "::masterNeiPenVol() const"
+        )   << "Pointer not set if gapIntegration is false"
+            << abort(FatalError);
+    }
+
+    return *masterNeiIntegralGapPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const scalarListList&
+newGGIInterpolation<MasterPatch, SlavePatch>::slaveNeiPenVol() const
+{
+    if (gapIntegration_)
+    {
+        if (!slaveNeiIntegralGapPtr_)
+        {
+            calcAddressing();
+        }
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "const scalarListList& newGGIInterpolation<MasterPatch, SlavePatch>"
+            "::slaveNeiPenVol() const"
+        )   << "Pointer not set if gapIntegration is false"
+            << abort(FatalError);
+    }
+
+    return *slaveNeiIntegralGapPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const scalarListList&
+newGGIInterpolation<MasterPatch, SlavePatch>::masterNeiAreaInContact() const
+{
+    if (gapIntegration_)
+    {
+        if (!masterNeiContactAreaPtr_)
+        {
+            calcAddressing();
+        }
+    }
+    else
+    {
+        FatalErrorIn
+        (
+            "const scalarListList& newGGIInterpolation<MasterPatch, SlavePatch>"
+            "::masterNeiAreaInContact() const"
+        )   << "Pointer not set if gapIntegration is false"
+            << abort(FatalError);
+    }
+
+    return *masterNeiContactAreaPtr_;
 }
 
 
@@ -415,6 +495,183 @@ newGGIInterpolation<MasterPatch, SlavePatch>
     }
 
     return *slavePointDistanceVectorsPtr_;
+}
+
+template<class MasterPatch, class SlavePatch>
+const tmp<scalarField>
+newGGIInterpolation<MasterPatch, SlavePatch>::masterFacePenVol() const
+{
+    if (!gapIntegration_)
+    {
+        FatalErrorIn
+        (
+            "const tmp<scalarField>  newGGIInterpolation"
+            "<MasterPatch, SlavePatch>::masterFacePenVol() const"
+        )   << "Not available if gapIntegration is false"
+            << abort(FatalError);
+    }
+
+    tmp<scalarField> tresult
+    (
+        new scalarField
+        (
+            masterPatch_.size(),
+            pTraits<scalar>::zero
+        )
+    );
+
+    scalarField& result = tresult();
+
+    const labelListList& ma = masterAddr();
+    const scalarListList& mapv = masterNeiPenVol();
+
+    forAll(result, faceI)
+    {
+        const labelList& maFaceI = ma[faceI];
+        const scalarList& mapvFaceI = mapv[faceI];
+
+        if(maFaceI.size() > 0)
+        {
+            forAll(mapvFaceI, I)
+            {
+                result[faceI] += mapvFaceI[I];
+            }
+        }
+    }
+
+    return tresult;
+}
+
+template<class MasterPatch, class SlavePatch>
+const tmp<scalarField>
+newGGIInterpolation<MasterPatch, SlavePatch>::slaveFacePenVol() const
+{
+    if (!gapIntegration_)
+    {
+        FatalErrorIn
+        (
+            "const tmp<scalarField>  newGGIInterpolation"
+            "<MasterPatch, SlavePatch>::slaveFacePenVol() const"
+        )   << "Not available if gapIntegration is false"
+            << abort(FatalError);
+    }
+
+    tmp<scalarField> tresult
+    (
+        new scalarField
+        (
+            slavePatch_.size(),
+            pTraits<scalar>::zero
+        )
+    );
+
+    scalarField& result = tresult();
+
+    const labelListList& sa = slaveAddr();
+    const scalarListList& sapv = slaveNeiPenVol();
+
+    forAll(result, faceI)
+    {
+        const labelList& saFaceI = sa[faceI];
+        const scalarList& sapvFaceI = sapv[faceI];
+
+        if(saFaceI.size() > 0)
+        {
+            forAll(sapvFaceI, I)
+            {
+                result[faceI] += sapvFaceI[I];
+            }
+        }
+    }
+
+    return tresult;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const tmp<scalarField>
+newGGIInterpolation<MasterPatch, SlavePatch>::masterAreaInContact() const
+{
+    if (!gapIntegration_)
+    {
+        FatalErrorIn
+        (
+            "const tmp<scalarField>  newGGIInterpolation"
+            "<MasterPatch, SlavePatch>::masterAreaInContact() const"
+        )   << "Not available if gapIntegration is false"
+            << abort(FatalError);
+    }
+
+    tmp<scalarField> tresult
+    (
+        new scalarField
+        (
+            masterPatch_.size(),
+            pTraits<scalar>::zero
+        )
+    );
+
+    scalarField& result = tresult();
+
+    const scalarListList& mnrca = masterNeiAreaInContact();
+
+    forAll(result, faceI)
+    {
+        const scalarList& mnrcaFaceI = mnrca[faceI];
+
+        if(mnrcaFaceI.size() > 0)
+        {
+            forAll(mnrcaFaceI, I)
+            {
+                result[faceI] += mnrcaFaceI[I];
+            }
+        }
+    }
+
+    return tresult;
+}
+
+template<class MasterPatch, class SlavePatch>
+const tmp<scalarField>
+newGGIInterpolation<MasterPatch, SlavePatch>::slaveAreaInContact() const
+{
+    if (!gapIntegration_)
+    {
+        FatalErrorIn
+        (
+            "const tmp<scalarField>  newGGIInterpolation"
+            "<MasterPatch, SlavePatch>::slaveAreaInContact() const"
+        )   << "Not available if gapIntegration is false"
+            << abort(FatalError);
+    }
+
+    tmp<scalarField> tresult
+    (
+        new scalarField
+        (
+            slavePatch_.size(),
+            pTraits<scalar>::zero
+        )
+    );
+
+    scalarField& result = tresult();
+
+    const scalarListList& mnrca = masterNeiAreaInContact();
+    const labelListList& ma = masterAddr();
+
+    forAll(ma, faceI)
+    {
+        const labelList& curMa = ma[faceI];
+        const scalarList& curMnrca = mnrca[faceI];
+
+        forAll(curMa, mpI)
+        {
+            const label& slaveFace = curMa[mpI];
+            result[slaveFace] += curMnrca[mpI];
+        }
+    }
+
+    return tresult;
 }
 
 

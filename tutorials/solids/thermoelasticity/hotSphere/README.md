@@ -78,7 +78,7 @@ A tutorial case can be cleaned and reset using the included `Allrun` script, i.e
 
 ## Analysing the Results
 
-When viewing the results in ParaView, it can be insightful to warp the geometry by a scaled displacement field. This can be achieved using the *Warp By Vector* filter, where the `D` displacement field is selected as the *Vector* and a *Scale Factor* of 1 shows the true deformation. In this case, using a *Scale Factor* of 100 allows the deformation to be seen. 
+When viewing the results in ParaView, it can be insightful to warp the geometry by a scaled displacement field. This can be achieved using the *Warp By Vector* filter, where the `D` displacement field is selected as the *Vector* and a *Scale Factor* of 1 shows the true deformation. In this case, using a *Scale Factor* of 100 allows the deformation to be seen.
 ![](images/sol_runcase_1.PNG)
 ![](images/sol_runcase_2.PNG)
 
@@ -239,7 +239,7 @@ A **linear geometry** approach is also known as a “small strain” or “small
 
 - `nCorrectors`: this is the maximum number of outer correctors per time-step. If `nCorrectors` is reached, this means the equations have not converged to the required tolerance.
 - `solutionTolerance` and `alternativeTolerance`: these are solution tolerances for the outer corrector loop. Further details are given below.
-- Iterations will continue until either the D (and T) have converged to the specific **tolerances** or the maximum number of correctors has been reached. 
+- Iterations will continue until either the D (and T) have converged to the specific **tolerances** or the maximum number of correctors has been reached.
 - `infoFrequency`: this is the frequency that the outer loop residuals are printed to the standard output.
 
 ---

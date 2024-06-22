@@ -45,7 +45,7 @@ addToRunTimeSelectionTable(solidModel, poroLinGeomSolid, dictionary);
 bool poroLinGeomSolid::converged
 (
     const int iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     const SolverPerformance<vector>& solverPerfD,
     const SolverPerformance<scalar>& solverPerfp,
 #else
@@ -63,7 +63,7 @@ bool poroLinGeomSolid::converged
     const scalar residualD =
         gMax
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             DimensionedField<double, volMesh>
 #endif
             (
@@ -72,7 +72,7 @@ bool poroLinGeomSolid::converged
                 (
                     gMax
                     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                         DimensionedField<double, volMesh>
 #endif
                         (
@@ -88,7 +88,7 @@ bool poroLinGeomSolid::converged
     const scalar residualp =
         gMax
         (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             DimensionedField<double, volMesh>
 #endif
             (
@@ -97,7 +97,7 @@ bool poroLinGeomSolid::converged
                 (
                     gMax
                     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                         DimensionedField<double, volMesh>
 #endif
                         (
@@ -245,7 +245,7 @@ bool poroLinGeomSolid::evolve()
     Info << "Evolving poro solid solver" << endl;
 
     int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solverPerfD;
     SolverPerformance<scalar> solverPerfp;
     SolverPerformance<scalar>::debug = 0;
@@ -301,7 +301,7 @@ bool poroLinGeomSolid::evolve()
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
           + fvc::div(sigma(), "div(sigma)")
           + rho()*g()
-          + mechanical().RhieChowCorrection(D(), gradD())
+          + stabilisation().stabilisation(D(), gradD(), impK_)
         );
 
         // Under-relaxation the linear system
@@ -309,11 +309,6 @@ bool poroLinGeomSolid::evolve()
 
         // Enforce any cell displacements
         solidModel::setCellDisps(DEqn);
-
-        // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
-        const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
-#endif
 
         // Solve the linear system
         solverPerfD = DEqn.solve();
@@ -356,7 +351,7 @@ bool poroLinGeomSolid::evolve()
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<scalar>::debug = 1;
     SolverPerformance<vector>::debug = 1;
 #else

@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -54,7 +48,7 @@ Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
 :
     fixedValueFvPatchScalarField(ptf, p, iF, mapper),
     DTName_(ptf.DTName_),
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
     alpha_(mapper(ptf.alpha_)),
 #else
     alpha_(ptf.alpha_, mapper),
@@ -80,7 +74,7 @@ Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
     fvPatchField<scalar>::operator=(patchInternalField());
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 Foam::thermalConvectionFvPatchScalarField::thermalConvectionFvPatchScalarField
 (
     const thermalConvectionFvPatchScalarField& wbppsf
@@ -219,7 +213,7 @@ void Foam::thermalConvectionFvPatchScalarField::write(Ostream& os) const
         << DTName_ << token::END_STATEMENT << nl;
      os.writeKeyword("Tinf") << Tinf_.value() << token::END_STATEMENT << nl;
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
      writeEntry(os, "alpha", alpha_);
 #else
      alpha_.writeEntry("alpha", os);

@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      sample;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+type sets;
+//libs ("libsampling.so");
+
+interpolationScheme cellPointFace;
+//interpolationScheme cellPatchConstrained;
+
+setFormat raw;
+
+sets
+(
+    line
+    {
+        type face;
+        axis       distance;
+        start (0.0 0 0.5);
+        end   (13.2 13.2 0.5);
+    }
+);
+
+fields
+(
+    sigma:Transformed D
+);
+
+
+// ************************************************************************* //

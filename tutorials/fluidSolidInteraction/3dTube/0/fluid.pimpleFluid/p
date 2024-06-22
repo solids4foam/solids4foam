@@ -48,12 +48,14 @@ boundaryField
     }
     wall
     {
-        // Default Dirichlet-Neumann approach
-        type       zeroGradient;
+        // Dirichlet-Neumann approach
+        type        movingWallPressure;
+        value       uniform 0;
+        // type       zeroGradient;
 
         // Robin-Neumann condition approach
-        //type        elasticWallPressure;
-        //value       uniform 0;
+        // type        elasticWallPressure;
+        // value       uniform 0;
     }
 }
 

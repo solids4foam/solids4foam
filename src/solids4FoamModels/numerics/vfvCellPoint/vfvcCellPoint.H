@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -43,6 +37,7 @@ Author
 #define vfvcCellPoint_H
 
 #include "volFields.H"
+#include "surfaceFields.H"
 #include "pointFields.H"
 #include "vectorList.H"
 
@@ -54,11 +49,41 @@ namespace Foam
 namespace vfvc
 {
     // Gradient field
+    // Returns volVectorField on primary mesh
+    tmp<volVectorField> grad
+    (
+        const pointScalarField& pointT, // primary mesh point field
+        const fvMesh& mesh              // primary mesh
+    );
+
+    // Gradient field
     // Returns volTensorField on primary mesh
     tmp<volTensorField> grad
     (
         const pointVectorField& pointD, // primary mesh point displacement
         const fvMesh& mesh              // primary mesh
+    );
+
+    // Gradient field
+    // Returns pointTensorField on primary mesh
+    tmp<pointTensorField> pGrad
+    (
+        const pointVectorField& pointD, // primary mesh point displacement
+        const fvMesh& mesh              // primary mesh
+    );
+
+    // Gradient field
+    // Returns surfaceVectorField on dual mesh
+    // Only calculates the gradient for internal faces
+    tmp<surfaceVectorField> fGrad
+    (
+        const pointScalarField& pointT, // primary mesh point field
+        const fvMesh& mesh,             // primary mesh
+        const fvMesh& dualMesh,         // dual mesh
+        const labelList& dualFaceToCell,
+        const labelList& dualCellToPoint,
+        const scalar zeta, // fraction of compact edge direction component used
+        const bool debug = false
     );
 
     // Gradient field
@@ -95,25 +120,41 @@ namespace vfvc
         const pointVectorField& pointP // displacement
     );
 
-    // <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
-    // Returns laplacian of (gamma & pf) field on the dual mesh
-    // tmp<pointVectorField> laplacian
-    // (
-    //     const tensor& gamma,
-    //     const pointVectorField& pf,
-    //     const fvMesh& dualMesh,
-    //     const labelList& dualCellToPoint
-    // );
+    // Returns the laplacian of a scalar field on the dual mesh
+    tmp<pointScalarField> laplacian
+    (
+		pointScalarField& pointP,
+		const fvMesh& mesh,
+		const fvMesh& dualMesh,
+		const labelList& dualFaceToCell,
+		const labelList& dualCellToPoint,
+		const scalar& zeta,
+		const bool debug
+    );
+
+    // Interpolate a pointScalarField to a volScalarField
+    tmp<volScalarField> interpolate
+	(
+		const pointScalarField& pointP,
+		const fvMesh& mesh
+	);
+
+	// Interpolate a pointScalarField to a surfaceScalarField
+	// at the dual mesh faces
+	tmp<surfaceScalarField> interpolate
+	(
+		const pointScalarField& pointP,
+		const fvMesh& mesh,
+		const fvMesh& dualMesh,
+		const labelList& dualFaceToCell,
+		const labelList& dualCellToPoint,
+		const bool debug
+	);
 
 } // End namespace vfvc
 
 } // End namespace Foam
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-#ifdef NoRepository
-#   include "vfvcCellPoint.C"
-#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

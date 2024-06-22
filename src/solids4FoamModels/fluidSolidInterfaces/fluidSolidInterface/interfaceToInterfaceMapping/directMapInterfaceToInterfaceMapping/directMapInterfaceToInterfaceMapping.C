@@ -19,7 +19,7 @@ License
 
 #include "directMapInterfaceToInterfaceMapping.H"
 #include "addToRunTimeSelectionTable.H"
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     #include "Time.H"
 #endif
 
@@ -42,7 +42,7 @@ addToRunTimeSelectionTable
 );
 
 
-const scalar directMapInterfaceToInterfaceMapping::relTol_ = 0.001;
+const scalar directMapInterfaceToInterfaceMapping::relTol_ = 0.01;
 
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
@@ -93,7 +93,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBFaceMap() const
         IOobject::MUST_READ
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (mapHeader.typeHeaderOk<labelIOList>(true))
 #else
     if (mapHeader.headerOk())
@@ -148,7 +148,6 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBFaceMap() const
         forAll(zoneBCf, zoneBFaceI)
         {
             const vector& curZoneBCf = zoneBCf[zoneBFaceI];
-
             forAll(zoneACf, zoneAFaceI)
             {
                 if (mag(curZoneBCf - zoneACf[zoneAFaceI]) < tol)
@@ -162,6 +161,18 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBFaceMap() const
 
     if (gMin(zoneAToZoneBFaceMapPtr_()) == -1)
     {
+        labelList& zoneAToZoneBMap = zoneAToZoneBFaceMapPtr_();
+        const vectorField zoneBCf(zoneB().faceCentres());
+        Info<< "A direct map was not found for the following faces:" << endl;
+        forAll(zoneBCf, zoneBFaceI)
+        {
+            if (zoneAToZoneBMap[zoneBFaceI] == -1)
+            {
+                Info<< "face " << zoneBFaceI << ": " << zoneBCf[zoneBFaceI]
+                    << endl;
+            }
+        }
+
         FatalErrorIn(type() + "::calcZoneAToZoneBFaceMap() const")
             << "Cannot calculate the map between interfaces!" << nl
             << "ZoneA and zoneB interfaces are not conformal (zoneA patch ="
@@ -214,7 +225,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAFaceMap() const
         IOobject::MUST_READ
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (mapHeader.typeHeaderOk<labelIOList>(true))
 #else
     if (mapHeader.headerOk())
@@ -283,6 +294,18 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAFaceMap() const
 
     if (gMin(zoneBToZoneAFaceMapPtr_()) == -1)
     {
+        labelList& zoneBToZoneAMap = zoneBToZoneAFaceMapPtr_();
+        const vectorField zoneACf(zoneA().faceCentres());
+        Info<< "A direct map was not found for the following faces:" << endl;
+        forAll(zoneACf, zoneAFaceI)
+        {
+            if (zoneBToZoneAMap[zoneAFaceI] == -1)
+            {
+                Info<< "face " << zoneAFaceI << ": " << zoneACf[zoneAFaceI]
+                    << endl;
+            }
+        }
+
         FatalErrorIn(type() + "::calcZoneBToZoneAFaceMap() const")
             << "Cannot calculate the map between interfaces!" << nl
             << "ZoneA and zoneB interfaces are not conformal (zoneA patch ="
@@ -335,7 +358,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneAToZoneBPointMap() const
         IOobject::MUST_READ
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (mapHeader.typeHeaderOk<labelIOList>(true))
 #else
     if (mapHeader.headerOk())
@@ -456,7 +479,7 @@ void directMapInterfaceToInterfaceMapping::calcZoneBToZoneAPointMap() const
         IOobject::MUST_READ
     );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     if (mapHeader.typeHeaderOk<labelIOList>(true))
 #else
     if (mapHeader.headerOk())

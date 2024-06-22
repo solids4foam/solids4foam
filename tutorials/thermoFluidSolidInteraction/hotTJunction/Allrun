@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# Version specific changes
+if [[ $WM_PROJECT_VERSION = *"v"* ]] # OpenFOAM.com
+then
+    echo "OpenFOAM.com specific change"
+    echo "0/fluid/U: change timeVaryingUniformFixedValue to scaledFixedValue"
+
+    # Comment timeVaryingUniformFixedValue
+    sed -i '/timeVaryingUniformFixedValue/s/^/\/\//g' 0/fluid/U
+
+    # Uncomment 
+    sed -i '/scaledFixedValue/s/^\/\///g' 0/fluid/U
+fi
+
+# Create the mesh
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run the solver
+solids4Foam::runApplication solids4Foam
+
+# ----------------------------------------------------------------- end-of-file
+

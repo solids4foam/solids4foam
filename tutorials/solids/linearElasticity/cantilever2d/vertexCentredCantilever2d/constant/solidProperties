@@ -24,20 +24,22 @@ solidModel     vertexCentredLinearGeometry;
 
 "vertexCentredLinearGeometryCoeffs|linearGeometryTotalDisplacementCoeffs|linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
 {
+    // Solution algorithm (implicitCoupled, implicitSegregated, explicit, ...)
+    solutionAlgorithm implicitCoupled;
+
     // Update the stiffness matrix every outer iteration
     fullNewton no;
 
+    // Compact edge discretisation fraction
+    // 0 -> more accurate but oscillations more likely
+    // 1 -> less accurate but oscillations less likely
+    zeta            0.0;
+
     // Maximum number of Newton-Raphson iterations
-    nCorrectors     1;
+    nCorrectors 1;
 
     // Tolerance for Newton-Raphson loop
     solutionTolerance 1e-6;
-
-    // Write linear system to matlab compatible format
-    //writeMatlabMatrix yes;
-
-    // Scaling of fixed DOF equations
-    //fixedDofScale 1;
 
     // Fraction of compact edge direction gradient used
     zeta 1.0;
@@ -48,7 +50,9 @@ solidModel     vertexCentredLinearGeometry;
 
     // Use PETSc, else use Eigen SparseLU
     usePETSc yes;
-    optionsFile "$FOAM_CASE/petscOptions";
+    optionsFile petscOptions.mumps;
+    //optionsFile petscOptions.hypre;
+    //optionsFile petscOptions.cg;
 }
 
 // ************************************************************************* //

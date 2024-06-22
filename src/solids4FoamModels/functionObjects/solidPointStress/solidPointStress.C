@@ -22,14 +22,7 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "OSspecific.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "volPointInterpolation.H"
-#else
-    #include "newLeastSquaresVolPointInterpolation.H"
-#endif
-#ifdef OPENFOAMFOUNDATION
-    #include "OSspecific.H"
-#endif
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -86,19 +79,11 @@ bool Foam::solidPointStress::writeData()
             dimensionedSymmTensor("zero", sigma.dimensions(), symmTensor::zero)
         );
 
-#ifdef OPENFOAMFOUNDATION
-        volPointInterpolation::New(mesh).interpolate(sigma, pointSigma);
-#elif OPENFOAMESI
-        mesh.lookupObject<volPointInterpolation>
-        (
-            "volPointInterpolation"
-        ).interpolate(sigma, pointSigma);
-#else
-        mesh.lookupObject<newLeastSquaresVolPointInterpolation>
-        (
-            "newLeastSquaresVolPointInterpolation"
-        ).interpolate(sigma, pointSigma);
-#endif
+        // Lookup the solidModel object
+        const solidModel& solMod = lookupSolidModel(mesh);
+
+        // Interpolate vol field to point field
+        solMod.mechanical().volToPoint().interpolate(sigma, pointSigma);
 
         symmTensor pointSigmaValue = symmTensor::zero;
         if (pointID_ > -1)
@@ -267,10 +252,10 @@ bool Foam::solidPointStress::read(const dictionary& dict)
 }
 
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
 bool Foam::solidPointStress::write()
 {
-    return writeData();
+    return false;
 }
 #endif
 

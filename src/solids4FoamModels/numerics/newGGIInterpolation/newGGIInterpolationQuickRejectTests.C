@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -444,8 +438,8 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
         }
     }
 
-    int countMaster(0);
-    int countSlave(0);
+    //int countMaster(0);
+    //int countSlave(0);
 
     // Parallel search split.  HJ, 27/Apr/2016
     for
@@ -458,14 +452,14 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
     {
         if (checkMasterFace[faceMi - pmStart])
         {
-            countMaster++;
-            countSlave = 0;
+            //countMaster++;
+            //countSlave = 0;
 
             forAll(slavePatchBB, faceSi)
             {
                 if (checkSlaveFace[faceSi])
                 {
-                    countSlave++;
+                    //countSlave++;
 
                     // Compute the augmented AABB
                     boundBox augmentedBBMaster

@@ -1,5 +1,5 @@
 #!/bin/bash
-cd ${0%/*} || exit 1    # run from this directory
+cd "${0%/*}" || exit  # Run from this directory
 
 if [ "$WM_PROJECT" = "foam" ]
 then
@@ -24,4 +24,4 @@ else
     fi
 fi
 
-wmake libso
+wmake $* libso

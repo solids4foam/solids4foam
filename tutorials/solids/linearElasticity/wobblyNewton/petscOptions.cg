@@ -1,0 +1,8 @@
+-pc_type bjacobi
+-sub_pc_type icc
+-sub_pc_factor_levels 1
+-ksp_type cg
+-ksp_monitor_short
+-ksp_max_it 5000
+-ksp_atol 1e-11
+-ksp_rtol 1e-11

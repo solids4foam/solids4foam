@@ -39,6 +39,30 @@ defineTypeNameAndDebug(linGeomSolid, 0);
 addToRunTimeSelectionTable(solidModel, linGeomSolid, dictionary);
 
 
+// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+
+void linGeomSolid::predict()
+{
+    Info<< "Linear predictor using DD" << endl;
+
+    // Predict DD using the previous time steps
+    DD() = 2.0*DD().oldTime() - DD().oldTime().oldTime();
+
+    // Update the total displacement
+    D() = D().oldTime() + DD();
+
+    // Update gradient of displacement increment
+    mechanical().grad(DD(), gradDD());
+
+    // Update gradient of total displacement
+    gradD() = gradD().oldTime() + gradDD();
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 linGeomSolid::linGeomSolid
@@ -51,25 +75,14 @@ linGeomSolid::linGeomSolid
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
-    rhoDdtD_0_
-    (
-        IOobject
-        (
-            "rhoDdtD_0",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedVector("zero", dimForce/dimVolume, vector::zero)
-    )
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
 {
     DDisRequired();
 
     // Force all required old-time fields to be created
     fvm::d2dt2(DD());
     fvc::d2dt2(D().oldTime());
+    rhoD2dt2D().oldTime();
 
     // For consistent restarts, we will calculate the gradient field
     DD().correctBoundaryConditions();
@@ -85,11 +98,16 @@ bool linGeomSolid::evolve()
 {
     Info<< "Evolving solid solver" << endl;
 
+    if (predictor_)
+    {
+        predict();
+    }
+
     // Mesh update loop
     do
     {
         int iCorr = 0;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         SolverPerformance<vector> solverPerfDD;
         SolverPerformance<vector>::debug = 0;
 #else
@@ -109,7 +127,7 @@ bool linGeomSolid::evolve()
             fvVectorMatrix DDEqn
             (
                 rho()*fvm::d2dt2(DD())
-              + rhoDdtD_0_
+              + rhoD2dt2D().oldTime()
              == fvm::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
               - fvc::laplacian(impKf_, DD(), "laplacian(DDD,DD)")
               + fvc::div(sigma(), "div(sigma)")
@@ -122,11 +140,6 @@ bool linGeomSolid::evolve()
 
             // Enforce any cell displacements
             solidModel::setCellDisps(DDEqn);
-
-            // Hack to avoid expensive copy of residuals
-#ifdef OPENFOAMESI
-            const_cast<dictionary&>(mesh().solverPerformanceDict()).clear();
-#endif
 
             // Solve the linear system
             solverPerfDD = DDEqn.solve();
@@ -144,7 +157,7 @@ bool linGeomSolid::evolve()
             gradD() = gradD().oldTime() + gradDD();
 
             // Calculate the stress using run-time selectable mechanical law
-            const volScalarField DDEqnA("DDEqnA", DDEqn.A());
+            const volScalarField DDEqnA("DEqnA", DDEqn.A());
             mechanical().correct(sigma());
         }
         while
@@ -152,7 +165,7 @@ bool linGeomSolid::evolve()
             !converged
             (
                 iCorr,
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 mag(solverPerfDD.initialResidual()),
                 cmptMax(solverPerfDD.nIterations()),
 #else
@@ -164,7 +177,7 @@ bool linGeomSolid::evolve()
         );
 
         // Update point displacement increment
-        mechanical().interpolate(DD(), pointDD());
+        mechanical().interpolate(DD(), gradD(), pointDD());
 
         // Update point displacement
         pointD() = pointD().oldTime() + pointDD();
@@ -174,10 +187,10 @@ bool linGeomSolid::evolve()
     }
     while (mesh().update());
 
-    // Store ddt old term
-    rhoDdtD_0_ = rho()*fvc::d2dt2(D());
+    // Store d2dt2
+    rhoD2dt2D() = rho()*fvc::d2dt2(D());
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
     blockLduMatrix::debug = 1;

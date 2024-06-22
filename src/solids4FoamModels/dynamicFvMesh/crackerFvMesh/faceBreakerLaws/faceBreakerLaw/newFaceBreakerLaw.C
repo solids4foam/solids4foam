@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -41,12 +35,27 @@ autoPtr<faceBreakerLaw> faceBreakerLaw::New
     const dictionary& dict
 )
 {
-    word lawTypeName = dict.lookup("type");
+    const word modelType(dict.lookup("type"));
 
-    Info<< "Selecting face breaker law: " << lawTypeName << endl;
+    Info<< "Selecting face breaker law: " << modelType << endl;
 
+#if (OPENFOAM >= 2112)
+    auto* ctorPtr = dictionaryConstructorTable(modelType);
+
+    if (!ctorPtr)
+    {
+        FatalIOErrorInLookup
+        (
+            dict,
+            "faceBreakerLaw",
+            modelType,
+            *dictionaryConstructorTablePtr_
+        ) << exit(FatalIOError);
+    }
+
+#else
     dictionaryConstructorTable::iterator cstrIter =
-        dictionaryConstructorTablePtr_->find(lawTypeName);
+        dictionaryConstructorTablePtr_->find(modelType);
 
     if (cstrIter == dictionaryConstructorTablePtr_->end())
     {
@@ -59,13 +68,16 @@ autoPtr<faceBreakerLaw> faceBreakerLaw::New
             ")",
             dict
         )   << "Unknown faceBreakerLaw type "
-            << lawTypeName << endl << endl
+            << modelType << endl << endl
             << "Valid  faceBreakerLaws are : " << endl
             << dictionaryConstructorTablePtr_->toc()
             << exit(FatalIOError);
     }
 
-    return autoPtr<faceBreakerLaw>(cstrIter()(name, mesh, dict));
+    auto* ctorPtr = cstrIter();
+#endif
+
+    return autoPtr<faceBreakerLaw>(ctorPtr(name, mesh, dict));
 }
 
 

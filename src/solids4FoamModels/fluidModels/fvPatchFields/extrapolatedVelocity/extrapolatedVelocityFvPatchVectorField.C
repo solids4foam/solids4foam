@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -73,7 +67,7 @@ extrapolatedVelocityFvPatchVectorField
     zeroGradientFvPatchVectorField(ptf, p, iF, mapper)
 {}
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 extrapolatedVelocityFvPatchVectorField::
 extrapolatedVelocityFvPatchVectorField
 (
@@ -136,7 +130,7 @@ void extrapolatedVelocityFvPatchVectorField::evaluate(const Pstream::commsTypes)
 //     // Otherwise assume the variable is the static pressure.
 //     if
 //     (
-// #ifdef OPENFOAMESIORFOUNDATION
+// #ifdef OPENFOAM_NOT_EXTEND
 //         internalField().name() == "p_rgh"
 //      || internalField().name() == "pd"
 // #else

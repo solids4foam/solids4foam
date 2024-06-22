@@ -1,0 +1,88 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+convertToMeters 0.001;
+
+vertices
+(
+    (0 0 -0.5)
+    (48 44 -0.5)
+    (48 60 -0.5)
+    (0 44 -0.5)
+    (0 0 0.5)
+    (48 44 0.5)
+    (48 60 0.5)
+    (0 44 0.5)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (12 12 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+boundary
+(
+    topAndBottom
+    {
+        type patch;
+        faces
+        (
+            (7 6 2 3)
+            (4 0 1 5)
+        );
+    }
+
+    left
+    {
+        type patch;
+        faces
+        (
+            (4 7 3 0)
+        );
+    }
+
+    right
+    {
+        type patch;
+        faces
+        (
+            (5 1 2 6)
+        );
+    }
+
+    frontAndBack
+    {
+        type empty;
+        faces
+        (
+            (5 6 7 4)
+            (3 2 1 0)
+        );
+    }
+);
+
+mergePatchPairs
+(
+);
+
+
+// ************************************************************************* //

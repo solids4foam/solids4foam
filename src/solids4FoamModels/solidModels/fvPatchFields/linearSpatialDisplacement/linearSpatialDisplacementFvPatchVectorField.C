@@ -35,7 +35,7 @@ linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVec
 :
     fixedDisplacementFvPatchVectorField(p, iF),
     a_(vector::zero),
-    b_(vector::zero)
+    b_(tensor::zero)
 {}
 
 
@@ -67,7 +67,7 @@ linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVec
     Info<< "Creating " << type() << " boundary condition" << endl;
 }
 
-#ifndef OPENFOAMFOUNDATION
+#ifndef OPENFOAM_ORG
 linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVectorField
 (
     const linearSpatialDisplacementFvPatchVectorField& ptf
@@ -100,7 +100,7 @@ void linearSpatialDisplacementFvPatchVectorField::updateCoeffs()
         return;
     }
 
-    totalDisp() = a_ + cmptMultiply(b_, patch().Cf());
+    totalDisp() = a_ + (b_ & patch().Cf());
 
     fixedDisplacementFvPatchVectorField::updateCoeffs();
 }

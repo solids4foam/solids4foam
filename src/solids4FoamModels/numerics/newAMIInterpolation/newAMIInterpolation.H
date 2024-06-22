@@ -40,7 +40,7 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
-#ifdef OPENFOAMFOUNDATION
+#ifdef OPENFOAM_ORG
 
 #ifndef newAMIInterpolation_H
 #define newAMIInterpolation_H
@@ -664,6 +664,6 @@ public:
 
 #endif
 
-#endif // end of #ifdef OPENFOAMFOUNDATION
+#endif // end of #ifdef OPENFOAM_ORG
 
 // ************************************************************************* //

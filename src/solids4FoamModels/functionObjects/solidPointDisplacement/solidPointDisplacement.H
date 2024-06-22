@@ -19,14 +19,14 @@ Class
     solidPointDisplacement
 
 Description
-    FunctionObject reports temperature value at closest mesh point to the
-    specified point.
+    FunctionObject reports displacement vector value at closest mesh point to
+    the specified point.
 
     The temperature volField is interpolated to a pointField using the
     least squares vol-to-point interpolator.
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
     solidPointDisplacement.C
@@ -128,7 +128,7 @@ public:
         //- Read and set the function object if its data has changed
         virtual bool read(const dictionary& dict);
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         //- Write
         virtual bool write();
 #endif

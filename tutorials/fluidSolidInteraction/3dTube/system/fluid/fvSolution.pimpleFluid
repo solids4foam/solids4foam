@@ -21,8 +21,8 @@ solvers
     "p|pFinal"
     {
         solver          GAMG;
-        tolerance       1e-06;
-        relTol          0;
+        tolerance       1e-09;
+        relTol          1e-3;
         minIter         1;
         maxIter         1000;
         smoother        GaussSeidel;
@@ -40,7 +40,7 @@ solvers
     cellMotionU
     {
         solver          GAMG;
-        tolerance       1e-06;
+        tolerance       1e-09;
         relTol          0.001;
         minIter         1;
         maxIter         100;
@@ -60,8 +60,8 @@ solvers
     {
         solver          PBiCG;
         preconditioner  DILU;
-        tolerance       1e-08;
-        relTol          0;
+        tolerance       1e-09;
+        relTol          0.001;
         minIter         1;
     }
 }
@@ -71,9 +71,18 @@ PIMPLE
     //correctPhi          true;
     //checkMeshCourantNo  true;
 
-    nOuterCorrectors            1;
+    nOuterCorrectors            20;
     nCorrectors                 3;
     nNonOrthogonalCorrectors    1;
+
+    residualControl
+    {
+        U
+        {
+            relTol 1e-7;
+            tolerance 1e-7;
+        }
+    }
 }
 
 // ************************************************************************* //

@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -49,8 +43,8 @@ Author
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "newFvMeshSubset.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "volPointInterpolation.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "enhancedVolPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
@@ -60,7 +54,7 @@ Author
 namespace Foam
 {
     // labelUList in OpenFOAM is the same as unallocLabelList in foam extend
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     typedef labelUList unallocLabelList;
 #endif
 
@@ -89,8 +83,8 @@ class solidSubMeshes
         mutable PtrList<newFvMeshSubset> subMeshes_;
 
         //- Volume field to point field interpolator for each sub-mesh
-        #ifdef OPENFOAMESIORFOUNDATION
-        mutable PtrList<volPointInterpolation> subMeshVolToPoint_;
+        #ifdef OPENFOAM_NOT_EXTEND
+        mutable PtrList<enhancedVolPointInterpolation> subMeshVolToPoint_;
         #else
         mutable PtrList<newLeastSquaresVolPointInterpolation>
             subMeshVolToPoint_;
@@ -268,8 +262,8 @@ public:
             PtrList<newFvMeshSubset>& subMeshes();
 
             //- Return a const reference to the vol-to-point interpolators
-            #ifdef OPENFOAMESIORFOUNDATION
-            const PtrList<volPointInterpolation>& subMeshVolToPoint() const;
+            #ifdef OPENFOAM_NOT_EXTEND
+            const PtrList<enhancedVolPointInterpolation>& subMeshVolToPoint() const;
             #else
             const PtrList<newLeastSquaresVolPointInterpolation>&
                 subMeshVolToPoint() const;

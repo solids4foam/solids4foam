@@ -28,7 +28,7 @@ Description
     direction.
 
 Author
-    Philip Cardiff UCD
+    Philip Cardiff, UCD. All rights reserved.
 
 SourceFiles
     solidTorque.C
@@ -69,9 +69,6 @@ class solidTorque
 
         //- If the history patch is found
         bool patchFound_;
-
-        //- Name of stress field
-        const word stressName_;
 
         //- Point on the axis
         const vector pointOnAxis_;
@@ -127,7 +124,7 @@ public:
         //- Read and set the function object if its data has changed
         virtual bool read(const dictionary& dict);
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         //- Write
         virtual bool write();
 #else

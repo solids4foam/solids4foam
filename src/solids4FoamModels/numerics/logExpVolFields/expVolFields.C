@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -61,7 +55,7 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
             )
         );
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     volSymmTensorField& result = tresult.ref();
 #else
     volSymmTensorField& result = tresult();
@@ -118,7 +112,7 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
     const tensorField& eigenVecI = eigenVec.internalField();
     symmTensor expEigenVal = symmTensor::zero;
 
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     symmTensorField& resultI = result.primitiveFieldRef();
 #else
     symmTensorField& resultI = result.internalField();
@@ -148,7 +142,7 @@ tmp<volSymmTensorField> exp(const volSymmTensorField& vf)
         {
             const vectorField& eigenValB = eigenVal.boundaryField()[patchI];
             const tensorField& eigenVecB = eigenVec.boundaryField()[patchI];
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             symmTensorField& resultB = result.boundaryFieldRef()[patchI];
 #else
             symmTensorField& resultB = result.boundaryField()[patchI];

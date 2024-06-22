@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -58,7 +52,7 @@ namespace Foam
 //   by Hormann and Agathos.
 
 template<class MasterPatch, class SlavePatch>
-scalar
+List<point2D>
 newGGIInterpolation<MasterPatch, SlavePatch>::polygonIntersection
 (
     const List<point2D>& poly1,
@@ -77,7 +71,6 @@ newGGIInterpolation<MasterPatch, SlavePatch>::polygonIntersection
 
     // Empty list so we can detect weird cases later
     List<point2D> clippedPolygon;
-    scalar intersectionArea = 0.0;
 
     // First, let's get rid of the obvious:
     //  1: Neither polygons intersect one another
@@ -168,16 +161,10 @@ newGGIInterpolation<MasterPatch, SlavePatch>::polygonIntersection
         }
     }
 
-    // Compute the area of clippedPolygon if we indeed do have a
-    // clipped polygon; otherwise, the computed area stays at 0.0;
-    if (clippedPolygon.size() > 2)
-    {
-        // We are only interested in the absolute value
-        intersectionArea = mag(area2D(clippedPolygon));
-    }
-
     if (debug)
     {
+        const scalar intersectionArea = mag(area2D(clippedPolygon));
+
         // Check against tolerances
         scalar clippingArea  = area2D(*clippingPolygon);
         scalar subjectArea   = area2D(*subjectPolygon);
@@ -198,7 +185,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::polygonIntersection
         }
     }
 
-    return intersectionArea;
+    return clippedPolygon;
 }
 
 
@@ -316,6 +303,21 @@ scalar newGGIInterpolation<MasterPatch, SlavePatch>::area2D
     const List<point2D>& polygon
 ) const
 {
+    if (polygon.size() < 3)
+    {
+        WarningIn
+        (
+            "scalar newGGIInterpolation::area2D"
+            "(const List<point2D>&) const"
+        )   << "List of polygon points have size: " << polygon.size()
+            << ", at least 3 points in needed to form surface"
+            << endl;
+
+        Info<< "Returning zero area of polygon" << endl;
+        // If clipped polygon have only two points computed area stays at 0.
+        return 0.0;
+    }
+
     // For a non-self-intersecting (simple) polygon with n vertices,
     // the area is :
     // A = 0.5 * sum(x(i)y(i+1) - x(i+1)y(i)  , i=1 to n; where n+1 = 0;
@@ -336,6 +338,263 @@ scalar newGGIInterpolation<MasterPatch, SlavePatch>::area2D
 
     // NB: THe area can be positive or negative
     return area/2.0;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+Tuple2<scalar,scalar>
+newGGIInterpolation<MasterPatch, SlavePatch>::normalGapIntegration
+(
+    const List<point2D>& clippedPolygon,
+    const orthoNormalBasis& orthoBase,
+    const label& faceMi,
+    const label& faceSi
+) const
+{
+    // Preliminaries
+    scalar penArea = 0.0;
+    const vector& slaveFaceNormal = slavePatch_.faceNormals()[faceSi];
+    const vector& masterFaceNormal = masterPatch_.faceNormals()[faceMi];
+    const pointField& slavePatchPoints = slavePatch_.localPoints();
+    const pointField& masterPatchPoints = masterPatch_.localPoints();
+
+    const vector slaveFaceCentre = slavePatch_[faceSi].centre(slavePatchPoints);
+
+    // Master face center is offset for ortho base c.s.
+    const vector orthoBaseOffset =
+        masterPatch_[faceMi].centre(masterPatchPoints);
+
+    // Recalculate slave face centre and normal into UVW coordinate system
+    vector slaveFaceCentreInUVW = vector
+    (
+        (slaveFaceCentre-orthoBaseOffset) & orthoBase[0],
+        (slaveFaceCentre-orthoBaseOffset) & orthoBase[1],
+        (slaveFaceCentre-orthoBaseOffset) & orthoBase[2]
+    );
+
+    vector slaveFaceNormalInUVW = vector
+    (
+        slaveFaceNormal & orthoBase[0],
+        slaveFaceNormal & orthoBase[1],
+        slaveFaceNormal & orthoBase[2]
+    );
+
+    slaveFaceNormalInUVW /= mag(slaveFaceNormalInUVW);
+
+    // Transform master face normal and normal into UVW coordinate system
+    vector masterFaceNormalInUVW = vector
+    (
+        masterFaceNormal & orthoBase[0],
+        masterFaceNormal & orthoBase[1],
+        masterFaceNormal & orthoBase[2]
+    );
+
+    masterFaceNormalInUVW /= mag(masterFaceNormalInUVW);
+
+    // Transform 2D points of clipped polygon into 3D points in UVW c.s.
+    pointField clippedPolygonInUVW(clippedPolygon.size());
+
+    forAll(clippedPolygonInUVW, pointI)
+    {
+        clippedPolygonInUVW[pointI][0] = clippedPolygon[pointI][0];
+        clippedPolygonInUVW[pointI][1] = clippedPolygon[pointI][1];
+        clippedPolygonInUVW[pointI][2] = 0.0;
+    }
+
+    // Calculate normal penetration (normal gap) of clipped polygon points
+    scalarField ng(clippedPolygonInUVW.size());
+
+    // Calculate once to avoid recalculation each time
+    const scalar nn = slaveFaceNormalInUVW & masterFaceNormalInUVW;
+
+    // Points are in master plane, penetration (gap) is normal distance
+    // from point on master plane to slave plane
+    forAll(ng, pointI)
+    {
+        ng[pointI] =
+            (((clippedPolygonInUVW[pointI]-slaveFaceCentreInUVW)
+             & slaveFaceNormalInUVW)) / nn;
+    }
+
+    // Calculate penetrating volume...
+    // Here we can use sweptVol method from face class but then we need also
+    // to project points from master plane to slave plane. To avoid this we
+    // can manualy calculate penetrating volume, also sweptVol method decompose
+    // triangles but we can make direct calculation.
+
+    // Store new points and penetration values
+    DynamicList<Tuple2<vector, scalar>, 6> p;
+
+    // A simple algorithm for detect partial face contact in 3D
+    const label size = clippedPolygonInUVW.size();
+    label nextpI;
+
+    for (label pI = 0; pI < size; pI++)
+    {
+        if (pI < size - 1)
+        {
+            nextpI = pI + 1;
+        }
+        else
+        {
+            nextpI = 0;
+        }
+
+        if (ng[pI] >= 0.0)
+        {
+            // Point in contact
+            p.append
+            (
+                Tuple2<vector, scalar>
+                (
+                    clippedPolygonInUVW[pI],
+                    ng[pI]
+                )
+            );
+        }
+
+        if
+        (
+            (ng[pI] > 0 && ng[nextpI] < 0)
+         || (ng[pI] < 0 && ng[nextpI] > 0)
+        )
+        {
+            // Partial contact on this edge, calculate intersection
+            point intersection =
+                clippedPolygonInUVW[pI]
+              + ng[pI]/(ng[nextpI] - ng[pI])
+                *(clippedPolygonInUVW[pI] - clippedPolygonInUVW[nextpI]);
+
+            // Add intersection point and zero penetration
+            p.append
+            (
+                Tuple2<vector, scalar>
+                (
+                    intersection,
+                    0.0
+                )
+            );
+        }
+    }
+
+    p.shrink();
+
+    // Copy points into pointField becouse we need it for face centre calc
+    // These points are also in UVW c.s. and they are on master plane, because
+    // of that z component (W) is zero
+    pointField points(p.size());
+
+    forAll(points, pointI)
+    {
+        points[pointI] = p[pointI].first();
+    }
+
+    // Penetrating volume calculation
+    scalar pV = 0.0;
+
+    if (p.size() == 0)
+    {
+        // No penetration, zero area in contact
+        penArea = 0.0;
+    }
+    else if (p.size() > 0 && p.size() < 3)
+    {
+//        FatalErrorIn
+//        (
+//            "void solidContactInterface::calcPenetratingVolume\n(\n"
+//            "    const List<point2D>& clippedPolygon,\n"
+//            "    const orthoNormalBasis& orthoBase,\n"
+//            "    const label& faceMi,\n"
+//            "    const label& faceSi,\n"
+//            "    scalar& penArea\n)"
+//        )   << "List of polygon points have size: " << p.size()
+//            << ", at least 3 points in needed to calculate penetrating volume"
+//            << "\nCheck algorithm!"
+//            << abort(FatalError);
+    }
+    else if (p.size() == 3)
+    {
+        // Direct calculation, no decomposition
+        // Z component of triangle points is zero, we use only U and V to
+        // calculate triangle area in 2D
+        List<point2D> tri(3);
+        tri[0] = point2D(p[0].first()[0], p[0].first()[1]);
+        tri[1] = point2D(p[1].first()[0], p[1].first()[1]);
+        tri[2] = point2D(p[2].first()[0], p[2].first()[1]);
+
+        // Penetrating area
+        penArea = Foam::mag(area2D(tri));
+
+        // Penetrating volume
+        pV = (p[0].second() + p[1].second() + p[2].second())*(penArea/3.0);
+    }
+    else if (false)
+    {
+        // Decomposition and volume calculation using centre point
+
+        // Centre point
+        labelList sfl(points.size());
+        forAll(sfl, I)
+        {
+            sfl[I] = I;
+        }
+
+        const point centre = face(sfl).centre(points);
+
+        // Centre point penetration
+        const scalar centreGn =
+            ((centre - slaveFaceCentreInUVW) & slaveFaceNormalInUVW) / nn;
+
+        label nextpI;
+
+        for (label pI = 0; pI < p.size(); pI++)
+        {
+            if (pI < p.size() - 1)
+            {
+                nextpI = pI + 1;
+            }
+            else
+            {
+                nextpI = 0;
+            }
+
+            List<point2D> tri(3);
+            tri[0] = point2D(points[pI].x(), points[pI].y());
+            tri[1] = point2D(points[nextpI].x(), points[nextpI].y());
+            tri[2] = point2D(centre.x(),centre.y());
+
+            // Penetrating area
+            const scalar triArea = Foam::mag(area2D(tri));
+            penArea += triArea;
+
+            // Penetrating volume
+            pV +=
+                (p[pI].second() + p[nextpI].second() + centreGn)*(triArea/3.0);
+        }
+    }
+    else if (true)
+    {
+        // Fan triangulation and calculation of volume
+
+        for (label i = 1; i < p.size() - 1; i++)
+        {
+            List<point2D> tri(3);
+            tri[0] = point2D(points[0].x(), points[0].y());
+            tri[1] = point2D(points[i].x(), points[i].y());
+            tri[2] = point2D(points[i+1].x(), points[i+1].y());
+
+           scalar triArea = Foam::mag(area2D(tri));
+           penArea += triArea;
+
+           scalar avgPen =
+              (p[0].second() + p[i].second() + p[i+1].second())/3.0;
+
+            // Penetrating volume
+            pV += (triArea * avgPen);
+        }
+    }
+
+    return Tuple2<scalar, scalar>(pV, penArea);
 }
 
 

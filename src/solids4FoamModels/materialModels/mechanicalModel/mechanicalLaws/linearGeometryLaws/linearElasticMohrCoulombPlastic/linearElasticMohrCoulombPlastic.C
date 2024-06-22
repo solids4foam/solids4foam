@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     |
-    \\  /    A nd           | For copyright notice see file Copyright
-     \\/     M anipulation  |
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -26,9 +20,7 @@ License
 #include "linearElasticMohrCoulombPlastic.H"
 #include "addToRunTimeSelectionTable.H"
 #include "mathematicalConstants.H"
-#ifdef OPENFOAMESIORFOUNDATION
-    #include "zeroGradientFvPatchFields.H"
-#endif
+#include "zeroGradientFvPatchFields.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -159,6 +151,10 @@ void Foam::linearElasticMohrCoulombPlastic::calculateStress
 
         activeYield = 1.0;
     }
+    else
+    {
+        activeYield = 0.0;
+    }
 }
 
 
@@ -246,7 +242,7 @@ void Foam::linearElasticMohrCoulombPlastic::calculateEigens
                 const scalar aBy3 = a/3;
 
                 i = m2SqrtQ*Foam::cos(theta/3) - aBy3;
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
                 ii =
                     m2SqrtQ*Foam::cos((theta + constant::mathematical::twoPi)/3.0)
                   - aBy3;
@@ -277,8 +273,10 @@ void Foam::linearElasticMohrCoulombPlastic::calculateEigens
                 else
                 {
                     // Complex roots
-                    WarningIn("poroMohrCoulob::calculateEigens(...)")
-                        << "Complex eigenvalues detected for symmTensor: "
+                    WarningIn
+                    (
+                        "linearElasticMohrCoulombPlastic::calculateEigens(...)"
+                    )   << "Complex eigenvalues detected for symmTensor: "
                         << sigma << nl << "Setting roots to zero!" << endl;
 
                     i = 0;
@@ -394,8 +392,10 @@ void Foam::linearElasticMohrCoulombPlastic::calculateEigens
             }
             else
             {
-                WarningIn("poroMohrCoulob::calculateEigens(...)")
-                    << "Strange things detected for stress tensor: "
+                WarningIn
+                (
+                    "linearElasticMohrCoulombPlastic::calculateEigens(...)"
+                )   << "Strange things detected for stress tensor: "
                     << sigma << nl
                     << "Setting eigenvectors to (0, 0, 0)" << endl;
 
@@ -406,7 +406,6 @@ void Foam::linearElasticMohrCoulombPlastic::calculateEigens
         }
     }
 }
-
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -435,7 +434,7 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     varPsi_(dict.lookup("dilationAngle")),
     k_
     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         (
             (1 + sin(varPhi_/180.0*constant::mathematical::pi))
            /(1 - sin(varPhi_/180.0*constant::mathematical::pi))
@@ -449,7 +448,7 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     ),
     m_
     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         (
             (1 + sin(varPsi_/180.0*constant::mathematical::pi))
            /(1 - sin(varPsi_/180.0*constant::mathematical::pi))
@@ -479,11 +478,11 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
     r_lg1_(1, 1, m_),
     r_lg2_(1, m_, m_),
     sigma_a_((2.0*c_*Foam::sqrt(k_)/(k_ - 1.0)).value()*vector::one),
-    sigmaEff_
+    deltaSigma_
     (
         IOobject
         (
-            "sigmaEff",
+            "deltaSigma_",
             mesh.time().timeName(),
             mesh,
             IOobject::NO_READ,
@@ -492,11 +491,11 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
         mesh,
         dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
     ),
-    sigmaEfff_
+    deltaSigmaf_
     (
         IOobject
         (
-            "sigmaEfff",
+            "deltaSigmaf",
             mesh.time().timeName(),
             mesh,
             IOobject::NO_READ,
@@ -504,6 +503,32 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
         ),
         mesh,
         dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+    ),
+    DEpsilon_
+    (
+        IOobject
+        (
+            "DEpsilon",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
+    ),
+    DEpsilonf_
+    (
+        IOobject
+        (
+            "DEpsilonf",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
     ),
     DEpsilonP_
     (
@@ -570,7 +595,23 @@ Foam::linearElasticMohrCoulombPlastic::linearElasticMohrCoulombPlastic
         mesh,
         dimensionedScalar("0", dimless, 0)
     )
-{}
+{
+    // Store epsilon old time
+    epsilon().oldTime();
+    epsilonf().oldTime();
+
+    // Create the initial stress field
+    sigma0();
+
+    // Check and warn for zero inital stress
+    if (sum(mag(sigma0())).value() < SMALL)
+    {
+        WarningIn("linearElasticMohrCoulombPlastic")
+            << "Initial stress is zero everywhere, "
+            << "since Mohr-Coulomb material law is stress-state dependent, "
+            << "this may lead to problems. Proceed with caution." << endl;
+    }
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
@@ -618,67 +659,24 @@ Foam::linearElasticMohrCoulombPlastic::lambda() const
 
 void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
 {
-    // Reset sigma to sigmaEff, in case a derived poro-elastic based law is
-    // being used
-    sigma = 1.0*sigmaEff_;
+    // Update epsilon
+    updateEpsilon();
 
-    // Store the previous iteration of sigma to allow under-relaxation and also
-    // to calculate the material residual
-    sigma.storePrevIter();
-    sigmaEff_.storePrevIter();
-
-    // Calculate the increment of total strain
-    volSymmTensorField DEpsilon
-    (
-        IOobject
-        (
-            "DEpsilon",
-            mesh().time().timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    );
-
-    if (incremental())
-    {
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        DEpsilon = symm(gradDD);
-    }
-    else
-    {
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        // Calculate gradient of displacement increment
-        const volTensorField gradDD(gradD - gradD.oldTime());
-
-        DEpsilon = symm(gradDD);
-    }
+    // Update the increment of strain
+    DEpsilon_ = epsilon() - epsilon().oldTime();
 
     // Calculate trial elastic stress assuming Hooke's elastic law
     const volSymmTensorField DSigmaTrial
     (
-        2.0*mu_*DEpsilon + lambda_*I*tr(DEpsilon)
+        2.0*mu_*DEpsilon_ + lambda_*I*tr(DEpsilon_)
     );
 
-    // Set sigma to sigma effective trial
-    sigma = sigmaEff_.oldTime() + DSigmaTrial;
+    // Set sigma to sigma effective trial, including the initial stress
+    sigma = deltaSigma_.oldTime() + DSigmaTrial + sigma0();
 
     // Take a reference to internal fields for efficiency
-#ifdef OPENFOAMESIORFOUNDATION
-    symmTensorField& sigmaI = sigma.primitiveFieldRef();
-    scalarField& activeYieldI = activeYield_.primitiveFieldRef();
-#else
-    symmTensorField& sigmaI = sigma.internalField();
-    scalarField& activeYieldI = activeYield_.internalField();
-#endif
+    symmTensorField& sigmaI = sigma;
+    scalarField& activeYieldI = activeYield_;
 
     // Correct sigma internal field
     forAll(sigmaI, cellI)
@@ -687,10 +685,10 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
     }
 
     // Correct sigma on the boundary patches
-    forAll (sigma.boundaryField(), patchI)
+    forAll(sigma.boundaryField(), patchI)
     {
         // Take references to the boundary patches for efficiency
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         symmTensorField& sigmaP = sigma.boundaryFieldRef()[patchI];
         scalarField& activeYieldP = activeYield_.boundaryFieldRef()[patchI];
 #else
@@ -698,26 +696,20 @@ void Foam::linearElasticMohrCoulombPlastic::correct(volSymmTensorField& sigma)
         scalarField& activeYieldP = activeYield_.boundaryField()[patchI];
 #endif
 
-        if (!sigma.boundaryField()[patchI].coupled())
+        forAll(sigmaP, faceI)
         {
-            forAll(sigmaP, faceI)
-            {
-                calculateStress(sigmaP[faceI], activeYieldP[faceI]);
-            }
+            calculateStress(sigmaP[faceI], activeYieldP[faceI]);
         }
     }
 
-    // Correct the coupled boundary conditions
-    sigma.correctBoundaryConditions();
-    activeYield_.correctBoundaryConditions();
+    // Store previous iteration of deltaSigma as it is used to calculate the
+    // residual
+    deltaSigma_.storePrevIter();
 
-    // Under-relax the stress
-    sigma.relax();
-
-    // Update the effective stress tensor
+    // Update the stress variation tensor
+    deltaSigma_ = sigma - sigma0();
     // Note: if a poro-elasto-plastic law is used then the pore-pressure term
-    // will be added after this
-    sigmaEff_ = 1.0*sigma;
+    // will be added to the effective stress after this
 }
 
 
@@ -726,69 +718,26 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     surfaceSymmTensorField& sigma
 )
 {
-    // Reset sigma to sigmaEff, in case a derived poro-elastic based law is
-    // being used
-    sigma = 1.0*sigmaEfff_;
+    // Update epsilon
+    updateEpsilonf();
 
-    // Store the previous iteration of sigma to allow under-relaxation and also
-    // to calculate the material residual
-    sigma.storePrevIter();
-    sigmaEfff_.storePrevIter();
-
-    // Calculate the increment of total strain
-    surfaceSymmTensorField DEpsilon
-    (
-        IOobject
-        (
-            "DEpsilon",
-            mesh().time().timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    );
-
-    if (incremental())
-    {
-        // Lookup gradient of displacement increment
-        const surfaceTensorField& gradDD =
-            mesh().lookupObject<surfaceTensorField>("grad(DD)f");
-
-        DEpsilon = symm(gradDD);
-    }
-    else
-    {
-        // Lookup gradient of displacement
-        const surfaceTensorField& gradD =
-            mesh().lookupObject<surfaceTensorField>("grad(D)f");
-
-        // Calculate gradient of displacement increment
-        const surfaceTensorField gradDD(gradD - gradD.oldTime());
-
-        DEpsilon = symm(gradDD);
-    }
+    // Update the increment of strain
+    DEpsilonf_ = epsilonf() - epsilonf().oldTime();
 
     // Calculate trial elastic stress assuming Hooke's elastic law
     const surfaceSymmTensorField DSigmaTrial
     (
-        2.0*mu_*DEpsilon + lambda_*I*tr(DEpsilon)
+        2.0*mu_*DEpsilonf_ + lambda_*I*tr(DEpsilonf_)
     );
 
-    // Set sigma to sigma effective trial
-    sigma = sigmaEfff_.oldTime() + DSigmaTrial;
+    // Set sigma to sigma effective trial, including the initial stress
+    sigma = deltaSigmaf_.oldTime() + DSigmaTrial + sigma0f();
 
     // Take a reference to internal fields for efficiency
-#ifdef OPENFOAMESIORFOUNDATION
-    symmTensorField& sigmaI = sigma.primitiveFieldRef();
-    scalarField& activeYieldI = activeYield_.primitiveFieldRef();
-#else
-    symmTensorField& sigmaI = sigma.internalField();
-    scalarField& activeYieldI = activeYield_.internalField();
-#endif
+    symmTensorField& sigmaI = sigma;
+    scalarField& activeYieldI = activeYield_;
 
-#ifdef OPENFOAMESI
+#ifdef OPENFOAM_COM
     const labelList& faceOwner = mesh().faceOwner();
     const labelList& faceNeighbour = mesh().faceNeighbour();
 #else
@@ -799,17 +748,22 @@ void Foam::linearElasticMohrCoulombPlastic::correct
     // Correct sigma internal field
     forAll(sigmaI, faceI)
     {
-        calculateStress(sigmaI[faceI], activeYieldI[faceOwner[faceI]]);
+        const label ownCellID = faceOwner[faceI];
+        const label neiCellID = faceNeighbour[faceI];
 
-        // Update the neighbour activeYield as it is a vol field
-        activeYieldI[faceOwner[faceI]] = activeYieldI[faceNeighbour[faceI]];
+        calculateStress(sigmaI[faceI], activeYieldI[ownCellID]);
+
+        // Update the neighbour activeYield as it is a vol field, i.e. if a face
+        // is yielding then we set the active yield flag for both the owner and
+        // neighbour cells
+        activeYieldI[neiCellID] = activeYieldI[ownCellID];
     }
 
     // Correct sigma on the boundary patches
-    forAll (sigma.boundaryField(), patchI)
+    forAll(sigma.boundaryField(), patchI)
     {
         // Take references to the boundary patches for efficiency
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         symmTensorField& sigmaP = sigma.boundaryFieldRef()[patchI];
         scalarField& activeYieldP = activeYield_.boundaryFieldRef()[patchI];
 #else
@@ -817,29 +771,20 @@ void Foam::linearElasticMohrCoulombPlastic::correct
         scalarField& activeYieldP = activeYield_.boundaryField()[patchI];
 #endif
 
-        // We calculate on surfaceField coupled boundaries
-        //if (!sigma.boundaryField()[patchI].coupled())
+        forAll(sigmaP, faceI)
         {
-            forAll(sigmaP, faceI)
-            {
-                calculateStress(sigmaP[faceI], activeYieldP[faceI]);
-            }
+            calculateStress(sigmaP[faceI], activeYieldP[faceI]);
         }
     }
 
-    // Correct the coupled boundary conditions
-#ifndef OPENFOAMESIORFOUNDATION
-    sigma.correctBoundaryConditions();
-#endif
-    activeYield_.correctBoundaryConditions();
+    // Store previous iteration of deltaSigma as it is used to calculate the
+    // residual
+    deltaSigmaf_.storePrevIter();
 
-    // Under-relax the stress
-    sigma.relax();
-
-    // Update the effective stress tensor
+    // Update the stress variation tensor
+    deltaSigmaf_ = sigma - sigma0f();
     // Note: if a poro-elasto-plastic law is used then the pore-pressure term
     // will be added after this
-    sigmaEfff_ = 1.0*sigma;
 }
 
 
@@ -853,47 +798,47 @@ Foam::scalar Foam::linearElasticMohrCoulombPlastic::residual()
     )
     {
         return
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             gMax
             (
                 mag
                 (
-                    sigmaEfff_.primitiveField()
-                  - sigmaEfff_.prevIter().primitiveField()
+                    deltaSigmaf_.primitiveField()
+                  - deltaSigmaf_.prevIter().primitiveField()
                 )
-            )/gMax(SMALL + mag(sigmaEfff_.primitiveField()));
+            )/gMax(SMALL + mag(deltaSigmaf_.primitiveField()));
 #else
             gMax
             (
                 mag
                 (
-                    sigmaEfff_.internalField()
-                  - sigmaEfff_.prevIter().internalField()
+                    deltaSigmaf_.internalField()
+                  - deltaSigmaf_.prevIter().internalField()
                 )
-            )/gMax(SMALL + mag(sigmaEfff_.internalField()));
+            )/gMax(SMALL + mag(deltaSigmaf_.internalField()));
 #endif
     }
     else
     {
         return
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
             gMax
             (
                 mag
                 (
-                    sigmaEff_.primitiveField()
-                  - sigmaEff_.prevIter().primitiveField()
+                    deltaSigma_.primitiveField()
+                  - deltaSigma_.prevIter().primitiveField()
                 )
-            )/gMax(SMALL + mag(sigmaEff_.primitiveField()));
+            )/gMax(SMALL + mag(deltaSigma_.primitiveField()));
 #else
             gMax
             (
                 mag
                 (
-                    sigmaEff_.internalField()
-                  - sigmaEff_.prevIter().internalField()
+                    deltaSigma_.internalField()
+                  - deltaSigma_.prevIter().internalField()
                 )
-            )/gMax(SMALL + mag(sigmaEff_.internalField()));
+            )/gMax(SMALL + mag(deltaSigma_.internalField()));
 #endif
     }
 }
@@ -903,108 +848,84 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
 {
     Info<< type() << ": updating total fields" << endl;
 
+    // Update epsilon
+    updateEpsilon();
+
+    // Update the increment of strain
+    DEpsilon_ = epsilon() - epsilon().oldTime();
+
     // Calculate increment of plastic strain
     // This is complicated because DEpsilonP also has a volumetric term
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
     symmTensorField& DEpsilonPI = DEpsilonP_.primitiveFieldRef();
 #else
     symmTensorField& DEpsilonPI = DEpsilonP_.internalField();
 #endif
 
-    // Calculate the increment of total strain
-    volSymmTensorField DEpsilon
-    (
-        IOobject
-        (
-            "DEpsilon",
-            mesh().time().timeName(),
-            mesh(),
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh(),
-        dimensionedSymmTensor("zero", dimless, symmTensor::zero)
-    );
-
-    if (incremental())
-    {
-        // Lookup gradient of displacement increment
-        const volTensorField& gradDD =
-            mesh().lookupObject<volTensorField>("grad(DD)");
-
-        DEpsilon = symm(gradDD);
-    }
-    else
-    {
-        // Lookup gradient of displacement
-        const volTensorField& gradD =
-            mesh().lookupObject<volTensorField>("grad(D)");
-
-        // Calculate gradient of displacement increment
-        const volTensorField gradDD(gradD - gradD.oldTime());
-
-        DEpsilon = symm(gradDD);
-    }
-
-#ifdef OPENFOAMESIORFOUNDATION
-    const symmTensorField& DEpsilonI = DEpsilon.primitiveField();
-    const symmTensorField& sigmaEffI = sigmaEff_.primitiveField();
-#else
-    const symmTensorField& DEpsilonI = DEpsilon.internalField();
-    const symmTensorField& sigmaEffI = sigmaEff_.internalField();
-#endif
+    const symmTensorField& DEpsilonI = DEpsilon_;
+    const symmTensorField& deltaSigmaI = deltaSigma_;
+    const scalarField& activeYieldI = activeYield_;
     const scalar mu = mu_.value();
     const scalar lambda = lambda_.value();
 
-    forAll(DEpsilonPI, cellI)
+    const tensor A
+    (
+      - (2.0*mu + lambda), - lambda, - lambda,
+      - lambda, - (2.0*mu + lambda), - lambda,
+      - lambda,  - lambda, - (2.0*mu + lambda)
+    );
+
+    int numCellsYielding = 0;
+
+    forAll(activeYieldI, cellI)
     {
-        // Off-diagonal strains
-        DEpsilonPI[cellI].xy() =
-            DEpsilonI[cellI].xy() - (sigmaEffI[cellI].xy()/(2.0*mu));
-        DEpsilonPI[cellI].xz() =
-            DEpsilonI[cellI].xz() - (sigmaEffI[cellI].xz()/(2.0*mu));
-        DEpsilonPI[cellI].yz() =
-            DEpsilonI[cellI].yz() - (sigmaEffI[cellI].yz()/(2.0*mu));
+        if (activeYieldI[cellI] > SMALL)
+        {
+            // Off-diagonal strains
+            DEpsilonPI[cellI].xy() =
+                DEpsilonI[cellI].xy() - (deltaSigmaI[cellI].xy()/(2.0*mu));
+            DEpsilonPI[cellI].xz() =
+                DEpsilonI[cellI].xz() - (deltaSigmaI[cellI].xz()/(2.0*mu));
+            DEpsilonPI[cellI].yz() =
+                DEpsilonI[cellI].yz() - (deltaSigmaI[cellI].yz()/(2.0*mu));
 
-        // Solve a linear system (Ax = b) to calculate the strains on the
-        // diagonal strains
-        const tensor A =
-            tensor
-            (
-              - (2.0*mu + lambda), - lambda, - lambda,
-              - lambda, - (2.0*mu + lambda), - lambda,
-              - lambda,  - lambda, - (2.0*mu + lambda)
-            );
+            // Solve a linear system (Ax = b) to calculate the strains on the
+            // diagonal strains
+            const vector b =
+                vector
+                (
+                    deltaSigmaI[cellI].xx()
+                 - (2.0*mu + lambda)*DEpsilonI[cellI].xx()
+                 - lambda*DEpsilonI[cellI].yy()
+                 - lambda*DEpsilonI[cellI].zz(),
 
-        const vector b =
-            vector
-            (
-                sigmaEffI[cellI].xx()
-             - (2.0*mu + lambda)*DEpsilonI[cellI].xx()
-             - lambda*DEpsilonI[cellI].yy()
-             - lambda*DEpsilonI[cellI].zz(),
+                    deltaSigmaI[cellI].yy()
+                 - lambda*DEpsilonI[cellI].xx()
+                 - (2.0*mu + lambda)*DEpsilonI[cellI].yy()
+                 - lambda*DEpsilonI[cellI].zz(),
 
-                sigmaEffI[cellI].yy()
-             - lambda*DEpsilonI[cellI].xx()
-             - (2.0*mu + lambda)*DEpsilonI[cellI].yy()
-             - lambda*DEpsilonI[cellI].zz(),
+                    deltaSigmaI[cellI].zz()
+                 - lambda*DEpsilonI[cellI].xx()
+                 - lambda*DEpsilonI[cellI].yy()
+                 - (2.0*mu + lambda)*DEpsilonI[cellI].zz()
+                );
 
-                sigmaEffI[cellI].zz()
-             - lambda*DEpsilonI[cellI].xx()
-             - lambda*DEpsilonI[cellI].yy()
-             - (2.0*mu + lambda)*DEpsilonI[cellI].zz()
-            );
+            const vector x = (inv(A) & b);
 
-        const vector x = (inv(A) & b);
+            DEpsilonPI[cellI].xx() = x.x();
+            DEpsilonPI[cellI].yy() = x.y();
+            DEpsilonPI[cellI].zz() = x.z();
 
-        DEpsilonPI[cellI].xx() = x.x();
-        DEpsilonPI[cellI].yy() = x.y();
-        DEpsilonPI[cellI].zz() = x.z();
+            numCellsYielding++;
+        }
+        else
+        {
+            DEpsilonPI[cellI] = symmTensor::zero;
+        }
     }
 
-    //     DEpsilon
-    //   - (1.0/3.0)*I*tr(sigma - sigmaEff_.oldTime())/(2.0*mu_ + 3.0*lambda_)
-    //   - dev(sigma - sigmaEff_.oldTime())/(2.0*mu_);
+    // Sum the number of yielding cells on all processors
+    reduce(numCellsYielding, sumOp<int>());
 
     // Calculate the increment of equivalent plastic strain
     const volScalarField DEpsilonPEq(sqrt((2.0/3.0)*magSqr(dev(DEpsilonP_))));
@@ -1015,29 +936,9 @@ void Foam::linearElasticMohrCoulombPlastic::updateTotalFields()
     // Update the total equivalent plastic strain
     epsilonPEq_ = epsilonPEq_.oldTime() + DEpsilonPEq;
 
-    Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq) << endl;
-    Info<< "    Max epsilonPEq is " << gMax(epsilonPEq_) << endl;
-
-    // Count cells actively yielding
-    int numCellsYielding = 0;
-
-#ifdef OPENFOAMESIORFOUNDATION
-    forAll(activeYield_.primitiveField(), cellI)
-    {
-        if (activeYield_.primitiveField()[cellI] > SMALL)
-#else
-    forAll(activeYield_.internalField(), cellI)
-    {
-        if (activeYield_.internalField()[cellI] > SMALL)
-#endif
-        {
-            numCellsYielding++;
-        }
-    }
-
-    reduce(numCellsYielding, sumOp<int>());
-
-    Info<< "    " << numCellsYielding << " cells are actively yielding"
+    Info<< "    Max DEpsilonPEq is " << gMax(DEpsilonPEq) << nl
+        << "    Max epsilonPEq is " << gMax(epsilonPEq_) << nl
+        << "    " << numCellsYielding << " cells are actively yielding"
         << nl << endl;
 }
 

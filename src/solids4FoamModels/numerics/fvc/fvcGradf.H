@@ -1,10 +1,4 @@
 /*---------------------------------------------------------------------------*\
-  =========                 |
-  \\      /  F ield         | foam-extend: Open Source CFD
-   \\    /   O peration     | Version:     4.0
-    \\  /    A nd           | Web:         http://www.foam-extend.org
-     \\/     M anipulation  | For copyright notice see file Copyright
--------------------------------------------------------------------------------
 License
     This file is part of solids4foam.
 
@@ -106,7 +100,7 @@ namespace fvc
     template<class Type, template<class> class FaceList>
     tmp<Field<typename outerProduct<vector, Type>::type> > fGrad
     (
-#ifdef OPENFOAMESIORFOUNDATION
+#ifdef OPENFOAM_NOT_EXTEND
         const PrimitivePatch<FaceList<face>, const pointField&>& patch,
 #else
         const PrimitivePatch<face, FaceList, const pointField&>& patch,
