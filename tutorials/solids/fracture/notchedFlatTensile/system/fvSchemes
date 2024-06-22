@@ -1,0 +1,67 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+d2dt2Schemes
+{
+    default            steadyState;
+}
+
+ddtSchemes
+{
+    default            steadyState;
+}
+
+gradSchemes
+{
+    default            extendedLeastSquares 0;
+}
+
+divSchemes
+{
+    default            Gauss linear;
+}
+
+laplacianSchemes
+{
+    default            Gauss linear skewCorrected 1;
+    laplacian(DD,D)    Gauss linear skewCorrected 1;
+    laplacian(damageNonLocal) Gauss linear skewCorrected 1;
+    laplacian(damage) Gauss linear skewCorrected 1;
+    laplacian(DDD,DD)  Gauss linear skewCorrected 1;
+    laplacian(pow(charLength,2),damageNonLocal) Gauss linear skewCorrected 1;
+    laplacian(pow(charLength,2),Dpf) Gauss linear skewCorrected 1;
+}
+
+snGradSchemes
+{
+    default            none;
+    snGrad(D)          newSkewCorrected 1;
+    snGrad(DD)         newSkewCorrected 1;
+}
+
+interpolationSchemes
+{
+    default            none;
+    interpolate(impK)  linear;
+    interpolate(grad(DD)) linear;
+    interpolate(grad(D)) linear;
+    interpolate(grad(sigmaHyd)) linear;
+    interpolate(grad(D))  linear;
+}
+
+// ************************************************************************* //
