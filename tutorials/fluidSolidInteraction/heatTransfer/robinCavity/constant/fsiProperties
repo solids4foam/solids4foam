@@ -9,50 +9,32 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      D;
+    class       dictionary;
+    object      fsiProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
+fluidSolidInterface thermal;
 
-internalField   uniform (0 0 0);
-
-boundaryField
+thermalCoeffs
 {
-    top
-    {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
-    }
+    solidPatch left;
+    fluidPatch right;
 
-    left
-    {
-        type            solidTraction;
-        traction        uniform (0 0 0);
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
+    relaxationFactor 1;
 
-    right
-    {
-        type            solidTraction;
-        traction        uniform (0 0 0);
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
+    interfaceDeformationLimit 0;
 
-    bottom
-    {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
-    }
+    outerCorrTolerance 1e-6;
+    nOuterCorr 100;
 
-    frontAndBack
-    {
-        type            empty;
-    }
+    interpolatorUpdateFrequency 0;
+
+    // couplingReuse 0;
+
+    coupled yes;
+
+    writeResidualsToFile yes;
 }
-
 
 // ************************************************************************* //

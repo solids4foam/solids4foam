@@ -1,37 +1,22 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | foam-extend: Open Source CFD                    |
-|  \\    /   O peration     | Version:     3.0                                |
-|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
     format      ascii;
-    class       pointVectorField;
-    object      pointD;
+    class       uniformDimensionedVectorField;
+    location    "constant";
+    object      g;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
-
-internalField   uniform (0 0 0);
-
-boundaryField
-{
-    "left|right"
-    {
-        type           calculated;
-        value          uniform (0 0 0);
-    }
- 
-    "top|bottom"
-    {
-       type            fixedValue;
-       value           uniform (0 0 0);
-    }
-}
+dimensions      [0 1 -2 0 0 0 0];
+value           ( 0 -9.81 0 );
 
 
 // ************************************************************************* //
