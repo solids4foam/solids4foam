@@ -9,6 +9,8 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
 # Check for foundation version
 
 if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
