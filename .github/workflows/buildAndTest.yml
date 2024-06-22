@@ -7,14 +7,26 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         container-image:
-          - { name: "OpenFOAM-v2312", image: "opencfd/openfoam-dev:2312", source: "/usr/lib/openfoam/openfoam2312/etc/bashrc", buildflags: "-j" }
-          - { name: "OpenFOAM-v2012", image: "philippic/openfoam-v2012-ubuntu20.04:latest", source: "/usr/lib/openfoam/openfoam2012/etc/bashrc", buildflags: "-j" }
-          - { name: "OpenFOAM-9", image: "philippic/openfoam-9-ubuntu20.04:latest", source: "/opt/openfoam9/etc/bashrc", buildflags: "-j" }
-          - { name: "foam-extend-4.1", image: "philippic/foam-extend-4.1-ubuntu18.04-v2:latest", source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc", buildflags: "" }
+          - name: "OpenFOAM-v2312"
+            image: "opencfd/openfoam-dev:2312"
+            source: "/usr/lib/openfoam/openfoam2312/etc/bashrc"
+            buildflags: "-j"
+          - name: "OpenFOAM-v2012"
+            image: "philippic/openfoam-v2012-ubuntu20.04:latest"
+            source: "/usr/lib/openfoam/openfoam2012/etc/bashrc"
+            buildflags: "-j"
+          - name: "OpenFOAM-9"
+            image: "philippic/openfoam-9-ubuntu20.04:latest"
+            source: "/opt/openfoam9/etc/bashrc"
+            buildflags: "-j"
+          - name: "foam-extend-4.1"
+            image: "philippic/foam-extend-4.1-ubuntu18.04-v2:latest"
+            source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
+            buildflags: ""
 
     container:
       image: ${{ matrix.container-image.image }}
@@ -40,7 +52,7 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
-          name: test-logs
+          name: test-logs.${{ matrix.container-image.name }}
           path: tutorialsTest/logs
           retention-days: 10
 
