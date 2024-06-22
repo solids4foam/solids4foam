@@ -11,18 +11,18 @@ solids4Foam::convertCaseFormat .
 
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-# Check for foundation version
-
-if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
+# Version specific changes
+if [[ $WM_PROJECT_VERSION = *"v"* ]] # OpenFOAM.com
 then
-    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
-    then
-        echo "OpenFOAM.org specific: replacing 'residualControl' with"
-        echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
-        sed -i "s/residualControl/outerCorrectorResidualControl/g" "${CASE_DIR}"/system/fluid/fvSolution
-    fi
-fi
+    echo "OpenFOAM.com specific change"
+    echo "0/fluid/U: change timeVaryingUniformFixedValue to scaledFixedValue"
 
+    # Comment timeVaryingUniformFixedValue
+    sed -i '/timeVaryingUniformFixedValue/s/^/\/\//g' 0/fluid/U
+
+    # Uncomment 
+    sed -i '/scaledFixedValue/s/^\/\///g' 0/fluid/U
+fi
 
 # Create the mesh
 solids4Foam::runApplication -s solid blockMesh -region solid
