@@ -5,10 +5,6 @@ on:
   workflow_dispatch:
   pull_request:
 
-#concurrency:
-#  group: ${{ github.workflow }}-${{ github.ref }}
-#  cancel-in-progress: false
-
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -22,17 +18,9 @@ jobs:
 
     container:
       image: ${{ matrix.container-image.image }}
-      
+
     steps:
       - uses: actions/checkout@v3
-      
-#      - name: Cache Docker layers
-#        uses: actions/cache@v3
-#        with:
-#          path: /var/lib/docker
-#          key: ${{ runner.os }}-docker-${{ matrix.container-image.image }}
-#          restore-keys: |
-#            ${{ runner.os }}-docker-
 
       - name: Allwmake
         shell: bash -l {0}
@@ -40,7 +28,7 @@ jobs:
           source ${{ matrix.container-image.source }}
           (cd optionalFixes && ./Allreplace)
           ./Allwmake ${{ matrix.container-image.buildflags }}
-       continue-on-error: true
+        continue-on-error: true
 
       - name: Alltest
         shell: bash -l {0}
@@ -48,7 +36,7 @@ jobs:
           source ${{ matrix.container-image.source }}
           cd tutorials
           ./Alltest
-       continue-on-error: true
+        continue-on-error: true
 
       - name: Upload test logs
         if: failure()
