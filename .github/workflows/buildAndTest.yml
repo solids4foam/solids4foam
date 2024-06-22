@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-test:
@@ -15,10 +15,10 @@ jobs:
     strategy:
       matrix:
         container-image:
-          - { name: "OpenFOAM-v2312", image: "opencfd/openfoam-dev:2312", source: "/usr/lib/openfoam/openfoam2312/etc/bashrc" }
-          - { name: "OpenFOAM-v2012", image: "philippic/openfoam-v2012-ubuntu20.04:latest", source: "/usr/lib/openfoam/openfoam2012/etc/bashrc" }
-          - { name: "OpenFOAM-9", image: "philippic/openfoam-9-ubuntu20.04:latest", source: "/opt/openfoam9/etc/bashrc" }
-          - { name: "foam-extend-4.1", image: "philippic/foam-extend-4.1-ubuntu18.04-v2:latest", source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc" }
+          - { name: "OpenFOAM-v2312", image: "opencfd/openfoam-dev:2312", source: "/usr/lib/openfoam/openfoam2312/etc/bashrc", buildflags: "-j" }
+          - { name: "OpenFOAM-v2012", image: "philippic/openfoam-v2012-ubuntu20.04:latest", source: "/usr/lib/openfoam/openfoam2012/etc/bashrc", buildflags: "-j" }
+          - { name: "OpenFOAM-9", image: "philippic/openfoam-9-ubuntu20.04:latest", source: "/opt/openfoam9/etc/bashrc", buildflags: "-j" }
+          - { name: "foam-extend-4.1", image: "philippic/foam-extend-4.1-ubuntu18.04-v2:latest", source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc", buildflags: "" }
 
     container:
       image: ${{ matrix.container-image.image }}
@@ -39,7 +39,7 @@ jobs:
         run: |
           source ${{ matrix.container-image.source }}
           (cd optionalFixes && ./Allreplace)
-          ./Allwmake -j
+          ./Allwmake ${{ matrix.container-image.buildflags }}
 
       - name: Alltest
         shell: bash -l {0}
