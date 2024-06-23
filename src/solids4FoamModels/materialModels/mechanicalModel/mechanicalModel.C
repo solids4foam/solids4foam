@@ -186,8 +186,6 @@ Foam::mechanicalModel::mechanicalModel(
     gotInternalVariables_(false)
 {
     Info << "Creating the mechanicalModel" << endl;
-    // Forcing oldTime field to be stored
-    sigma().oldTime();
 
     // Read the mechanical laws
     const PtrList<entry> lawEntries(lookup("mechanical"));
@@ -308,16 +306,6 @@ Foam::mechanicalModel::~mechanicalModel()
 const Foam::fvMesh &Foam::mechanicalModel::mesh() const
 {
     return mesh_;
-}
-
-Foam::volSymmTensorField &Foam::mechanicalModel::sigma()
-{
-    return sigma_;
-}
-
-const Foam::volSymmTensorField &Foam::mechanicalModel::sigma() const
-{
-    return sigma_;
 }
 
 #ifdef OPENFOAM_NOT_EXTEND
