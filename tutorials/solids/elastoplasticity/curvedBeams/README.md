@@ -31,7 +31,7 @@ This example considers large sliding between two curved beams (Figure 1). The lo
 
 ## Expected Results
 
-During the sliding, due to the larger diameter, the lower beam exhibits larger plastic deformation (Figure 2). It is expected that the amount of plastic deformation is reduced as the coefficient of friction is increased.
+Due to its larger diameter, the lower beam exhibits greater plastic deformation during the sliding (Figure 2). Theic deformation is expected to be reduced as the coefficient of friction increases the amount of plasticity. Video 1 shows the evolution of the equivalent (von Mises) stress distribution.
 
 Figures 3 and 4 compare the evolution of the horizontal and vertical total reaction force between `solids4foam` and results reported in the literature  [[2]](https://www.sciencedirect.com/science/article/abs/pii/S0045782515003643).  The resulting evolution of the reaction forces is smooth and matches well with results from the literature. Reported results in `solids4foam` are obtained using the updated Lagrangian formulation (`nonLinearGeometryUpdatedLagrangian`) and `foam-extend-4.1`.
 
@@ -57,6 +57,9 @@ Figures 3 and 4 compare the evolution of the horizontal and vertical total react
     </figcaption>
 </div>
 
+{% include youtube.html id="l5eBz7TybpM" %}
+
+**Video 1: Evolution of the equivalent (von Mises) stress distribution**
 
 
 ---

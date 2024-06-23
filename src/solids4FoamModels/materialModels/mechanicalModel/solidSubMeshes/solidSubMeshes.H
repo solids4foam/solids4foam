@@ -44,7 +44,7 @@ Author
 #include "surfaceFields.H"
 #include "newFvMeshSubset.H"
 #ifdef OPENFOAM_NOT_EXTEND
-    #include "volPointInterpolation.H"
+    #include "enhancedVolPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
@@ -84,7 +84,7 @@ class solidSubMeshes
 
         //- Volume field to point field interpolator for each sub-mesh
         #ifdef OPENFOAM_NOT_EXTEND
-        mutable PtrList<volPointInterpolation> subMeshVolToPoint_;
+        mutable PtrList<enhancedVolPointInterpolation> subMeshVolToPoint_;
         #else
         mutable PtrList<newLeastSquaresVolPointInterpolation>
             subMeshVolToPoint_;
@@ -263,7 +263,7 @@ public:
 
             //- Return a const reference to the vol-to-point interpolators
             #ifdef OPENFOAM_NOT_EXTEND
-            const PtrList<volPointInterpolation>& subMeshVolToPoint() const;
+            const PtrList<enhancedVolPointInterpolation>& subMeshVolToPoint() const;
             #else
             const PtrList<newLeastSquaresVolPointInterpolation>&
                 subMeshVolToPoint() const;

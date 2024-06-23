@@ -317,6 +317,10 @@ Foam::fluidSolidInterface::fluidSolidInterface
     solidZonesPointsDisplsRef_(),
     interfacesPointsDispls_(),
     interfacesPointsDisplsPrev_(),
+    incrementalResiduals_
+    (
+        fsiProperties_.lookupOrAddDefault<Switch>("incrementalResiduals", true)
+    ),
     residuals_(),
     residualsPrev_(),
     maxResidualsNorm_(),
@@ -1110,12 +1114,6 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
 void Foam::fluidSolidInterface::updateForce()
 {
-    // Check if coupling switch needs to be updated
-    if (!coupled_)
-    {
-        updateCoupled();
-    }
-
     Info<< "Setting traction on solid interfaces" << endl;
 
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
@@ -1330,9 +1328,68 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
         // Update interface residuals
         residualsPrev()[interfaceI] = residuals()[interfaceI];
-        residuals()[interfaceI] =
-            solidZonesPointsDispls()[interfaceI]
-          - fluidZonesPointsDispls()[interfaceI];
+
+        if (incrementalResiduals_)
+        {
+            // Residual calculated based on the displacement increments of the
+            // fluid and solid interfaces
+            residuals()[interfaceI] =
+                solidZonesPointsDispls()[interfaceI]
+              - fluidZonesPointsDispls()[interfaceI];
+        }
+        else
+        {
+            // Residual based on the current position of the interfaces
+            // Potentially this approach will avoid the accumulation of errors
+            // that can occur in the incrementalResiduals approach
+
+            // Calculate solid deformed point positions
+            vectorField solidZonePointsAtSolid
+            (
+                solid().globalPatches()[interfaceI].patchPointToGlobal
+                (
+                    solidMesh().boundaryMesh()
+                    [
+                        solid().globalPatches()[interfaceI].patch().index()
+                    ].localPoints()
+                )
+              + solidZonePointsDisplsAtSolid
+            );
+
+            if (!solid().movingMesh())
+            {
+                solidZonePointsAtSolid += solidZonePointsTotDisplsAtSolid;
+            }
+
+            // Map solid points to the fluid interface
+
+            vectorField solidZonePoints
+            (
+                fluidZonesPointsDispls()[interfaceI].size(), vector::zero
+            );
+
+            interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
+            (
+                solidZone,                              // from zone
+                fluidZone,                              // to zone
+                solidZonePointsAtSolid,                 // from field
+                solidZonePoints                         // to field
+            );
+
+            // Calculate fluid zone positions
+            const vectorField fluidZonePoints
+            (
+                fluid().globalPatches()[interfaceI].patchPointToGlobal
+                (
+                    fluidMesh().boundaryMesh()
+                    [
+                        fluid().globalPatches()[interfaceI].patch().index()
+                    ].localPoints()
+                )
+            );
+
+            residuals()[interfaceI] = solidZonePoints - fluidZonePoints;
+        }
 
         // We will use two definitions of residual
         scalar residualNorm1 = Foam::sqrt(gSum(magSqr(residuals()[interfaceI])));

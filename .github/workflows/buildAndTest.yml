@@ -2,70 +2,60 @@
 name: Build and test
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
+  pull_request:
 
 jobs:
-  build-and-test-on-openfoam-v2012:
-    name: Build on OpenFOAM-v2012
-    runs-on: ubuntu-latest
+  build-and-test:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        container-image:
+          - name: "OpenFOAM-v2312"
+            image: "opencfd/openfoam-dev:2312"
+            source: "/usr/lib/openfoam/openfoam2312/etc/bashrc"
+            buildflags: "-j"
+          - name: "OpenFOAM-v2012"
+            image: "philippic/openfoam-v2012-ubuntu20.04:latest"
+            source: "/usr/lib/openfoam/openfoam2012/etc/bashrc"
+            buildflags: "-j"
+          - name: "OpenFOAM-9"
+            image: "philippic/openfoam-9-ubuntu20.04:latest"
+            source: "/opt/openfoam9/etc/bashrc"
+            buildflags: "-j"
+          - name: "foam-extend-4.1"
+            image: "philippic/foam-extend-4.1-ubuntu18.04-v2:latest"
+            source: "/home/dockeruser/foam/foam-extend-4.1/etc/bashrc"
+            buildflags: ""
+
     container:
-      image: philippic/openfoam-v2012-ubuntu20.04:latest
+      image: ${{ matrix.container-image.image }}
+
     steps:
       - uses: actions/checkout@v3
 
       - name: Allwmake
         shell: bash -l {0}
         run: |
-          source /usr/lib/openfoam/openfoam2012/etc/bashrc
-          ./Allwmake
+          source ${{ matrix.container-image.source }}
+          (cd optionalFixes && ./Allreplace)
+          ./Allwmake ${{ matrix.container-image.buildflags }}
 
       - name: Alltest
         shell: bash -l {0}
         run: |
-          source /usr/lib/openfoam/openfoam2012/etc/bashrc
+          source ${{ matrix.container-image.source }}
           cd tutorials
           ./Alltest
 
-  build-and-test-on-openfoam-9:
-    name: Build on OpenFOAM-9
-    runs-on: ubuntu-latest
-    container:
-      image: philippic/openfoam-9-ubuntu20.04:latest
-    steps:
-      - uses: actions/checkout@v3
+      - name: Upload test logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs.${{ matrix.container-image.name }}
+          path: tutorialsTest/logs
+          retention-days: 10
 
-      - name: Allwmake
-        shell: bash -l {0}
-        run: |
-          source /opt/openfoam9/etc/bashrc
-          ./Allwmake
-
-      - name: Alltest
-        shell: bash -l {0}
-        run: |
-          source /opt/openfoam9/etc/bashrc
-          cd tutorials
-          ./Alltest
-
-  build-and-test-on-foamextend41:
-    name: Build on foam-extend-4.1
-    runs-on: ubuntu-latest
-    container:
-      image: philippic/foam-extend-4.1-ubuntu18.04-v2:latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Allwmake
-        shell: bash -l {0}
-        run: |
-          source /home/dockeruser/foam/foam-extend-4.1/etc/bashrc
-          ./Allwmake
-
-      - name: Alltest
-        shell: bash -l {0}
-        run: |
-          source /home/dockeruser/foam/foam-extend-4.1/etc/bashrc
-          cd tutorials
-          ./Alltest
+      - name: Set job status
+        if: ${{ failure() }}
+        run: echo "::error::Alltest failed, marking job as failed"

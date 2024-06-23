@@ -19,6 +19,8 @@ FoamFile
 fluidModel pimpleFluid;
 
 pimpleFluidCoeffs
-{}
+{
+    ddtCorr true;
+}
 
 // ************************************************************************* //

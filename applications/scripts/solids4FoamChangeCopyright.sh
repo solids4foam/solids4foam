@@ -25,7 +25,7 @@
 #
 #     To run the script on multiple files, use the following command:
 #
-#     $ find . \( -name "*.C" -o -name "*.H" \) | xargs -n 1 "./scriptPath.sh"
+#     $ find . \( -name "*.C" -o -name "*.H" \) | xargs -n 1 "./solids4FoamChangeCopyright.sh"
 #
 #------------------------------------------------------------------------------
 

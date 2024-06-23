@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fvc.H"
 #include "fvm.H"
+#include "pointFieldFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -243,26 +244,39 @@ Foam::tmp<Foam::volScalarField> Foam::linearElastic::impK() const
 
 
 #ifdef OPENFOAM_NOT_EXTEND
-Foam::scalarSquareMatrix
-Foam::linearElastic::materialTangent() const
+Foam::scalarSquareMatrix Foam::linearElastic::materialTangent() const
 {
+    // Prepare 6x6 tangent matrix
     scalarSquareMatrix matTang(6, 0.0);
 
-    matTang(0,0) = 2*mu_.value() + lambda().value();
-    matTang(0,1) = lambda().value();
-    matTang(0,2) = lambda().value();
+    // Define matrix indices for readability
+    const label XX = symmTensor::XX;
+    const label YY = symmTensor::YY;
+    const label ZZ = symmTensor::ZZ;
+    const label XY = symmTensor::XY;
+    const label YZ = symmTensor::YZ;
+    const label XZ = symmTensor::XZ;
 
-    matTang(1,0) = lambda().value();
-    matTang(1,1) = 2*mu_.value() + lambda().value();
-    matTang(1,2) = lambda().value();
+    const scalar lambda = lambda_.value();
+    const scalar mu = mu_.value();
+    const scalar twoMuLambda = 2*mu + lambda;
 
-    matTang(2,0) = lambda().value();
-    matTang(2,1) = lambda().value();
-    matTang(2,2) = 2*mu_.value() + lambda().value();
+    // Set components
+    matTang(XX, XX) = twoMuLambda;
+    matTang(XX, YY) = lambda;
+    matTang(XX, ZZ) = lambda;
 
-    matTang(3,3) = mu_.value();
-    matTang(4,4) = mu_.value();
-    matTang(5,5) = mu_.value();
+    matTang(YY, XX) = lambda;
+    matTang(YY, YY) = twoMuLambda;
+    matTang(YY, ZZ) = lambda;
+
+    matTang(ZZ, XX) = lambda;
+    matTang(ZZ, YY) = lambda;
+    matTang(ZZ, ZZ) = twoMuLambda;
+
+    matTang(XY, XY) = mu;
+    matTang(YZ, YZ) = mu;
+    matTang(XZ, XZ) = mu;
 
     return matTang;
 }
@@ -304,24 +318,22 @@ void Foam::linearElastic::correct(volSymmTensorField& sigma)
     // Update epsilon
     updateEpsilon();
 
-    if (solvePressureEqn())
-    {
-        // Calculate hydrostatic stress
-        updateSigmaHyd(K_*tr(epsilon()), 2*mu_ + lambda_);
+    // Calculate stress using epsilon
+    correct(sigma, epsilon());
+}
 
-        // Hooke's law: partitioned deviatoric and dilation form
-        sigma = 2.0*mu_*dev(epsilon()) + sigmaHyd()*I + sigma0();
-    }
-    else
-    {
-        // Hooke's law: standard form
-        sigma = 2.0*mu_*epsilon() + lambda_*tr(epsilon())*I + sigma0();
 
-        // Update sigmaHyd variable
-        sigmaHyd() = -K_*tr(epsilon());
-    }
+void Foam::linearElastic::correct
+(
+    volSymmTensorField& sigma,
+    const volSymmTensorField& epsilon
+)
+{
+    // Calculate hydrostatic stress
+    updateSigmaHyd(sigmaHyd(), K_*tr(epsilon), 2*mu_ + lambda_);
 
-    sigma.write();
+    // Hooke's law: partitioned deviatoric and dilation form
+    sigma = 2.0*mu_*dev(epsilon) + sigmaHyd()*I + sigma0();
 }
 
 
@@ -330,23 +342,60 @@ void Foam::linearElastic::correct(surfaceSymmTensorField& sigma)
     // Update epsilon
     updateEpsilonf();
 
+    // Calculate stress using epsilon
+    correct(sigma, epsilonf());
+}
+
+
+void Foam::linearElastic::correct
+(
+    surfaceSymmTensorField& sigma,
+    const surfaceSymmTensorField& epsilon
+)
+{
     if (solvePressureEqn())
     {
-        // Calculate hydrostatic stress at the cell-centres
-        // Solve pressure equation at cells
-        updateEpsilon();
-        updateSigmaHyd(K_*tr(epsilon()), 2*mu_ + lambda_);
-
-        // Interpolate to faces
-        const surfaceScalarField sigmaHydf(fvc::interpolate(sigmaHyd()));
-
-        // Add deviatoric and initial stresses
-        sigma = 2.0*mu_*dev(epsilonf()) + sigmaHydf*I + sigma0f();
+        notImplemented
+        (
+            "void Foam::linearElastic::correct(...) not implemented with solvePressureEqn"
+        );
     }
     else
     {
         // Hooke's law : standard form
-        sigma = 2.0*mu_*epsilonf() + lambda_*tr(epsilonf())*I + sigma0f();
+        sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I + sigma0f();
+    }
+}
+
+
+void Foam::linearElastic::correct
+(
+    pointSymmTensorField& sigma,
+    const pointTensorField& gradD
+)
+{
+    const pointSymmTensorField epsilon(symm(gradD));
+
+    if (solvePressureEqn())
+    {
+        notImplemented
+        (
+            "void Foam::linearElastic::correct(...) not implemented "
+            "with solvePressureEqn"
+        );
+    }
+    else if (max(mag(sigma0())).value() > SMALL)
+    {
+        notImplemented
+        (
+            "void Foam::linearElastic::correct(...) not implemented "
+            "with non-zero sigma0"
+        );
+    }
+    else
+    {
+        // Hooke's law : standard form
+        sigma = 2.0*mu_*epsilon + lambda_*tr(epsilon)*I;
     }
 }
 

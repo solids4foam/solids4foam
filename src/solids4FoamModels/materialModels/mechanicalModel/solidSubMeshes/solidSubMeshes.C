@@ -136,7 +136,7 @@ void Foam::solidSubMeshes::makeSubMeshVolToPoint() const
         (
             matI,
 #ifdef OPENFOAM_NOT_EXTEND
-            new volPointInterpolation
+            new enhancedVolPointInterpolation
 #else
             new newLeastSquaresVolPointInterpolation
 #endif
@@ -1395,7 +1395,7 @@ Foam::PtrList<Foam::newFvMeshSubset>& Foam::solidSubMeshes::subMeshes()
 }
 
 #ifdef OPENFOAM_NOT_EXTEND
-    const Foam::PtrList<Foam::volPointInterpolation>&
+    const Foam::PtrList<Foam::enhancedVolPointInterpolation>&
 #else
     const Foam::PtrList<Foam::newLeastSquaresVolPointInterpolation>&
 #endif

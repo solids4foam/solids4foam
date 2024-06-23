@@ -1025,7 +1025,7 @@ Foam::solidContactFvPatchVectorField::frictionModelForThisSlave()
     {
         FatalErrorIn
         (
-            "void solidContactFvPatchVectorField::"
+            "frictionContactModel& solidContactFvPatchVectorField::"
             "frictionModelForThisSlave()"
         )   << "Something went wrong when looking for the shadowPatch"
             << abort(FatalError);
@@ -1160,37 +1160,138 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                 )
              );
 
-            // Calculate normal contact forces
-            // shadowPatchDD is the DU on the shadow patch, whereas
-            // patchDDInterpToShadowPatch is the master patch DU interpolated to
-            // the shadow; and the difference between these two is the slip (and
-            // also the normal component of DU)
-            normalModels()[shadPatchI].correct
-            (
-                shadowPatchFaceNormals,
-                shadowZones()[shadPatchI].globalPointToPatch
-                (
-#ifdef OPENFOAM_NOT_EXTEND
-                    zoneToZones()[shadPatchI].targetPointDistanceToIntersection()
-#else
-                    zoneToZones()[shadPatchI].slavePointDistanceToIntersection()
+            // Pointwise contact algorithm, contact pressure at mesh points
+            // Everything is calculated on slave and subsequently inretpolated
+            // to master patch
+#ifdef FOAMEXTEND
+            if (!zoneToZones()[shadPatchI].normalGapIntegration())
 #endif
-                ),
-                // zoneToZones()[shadPatchI],
-                shadowPatchDD,
-                patchDDInterpToShadowPatch
-            );
+            {
+                // Calculate normal contact force on slave
+                normalModels()[shadPatchI].correct
+                (
+                    shadowPatchFaceNormals,
+                    shadowZones()[shadPatchI].globalPointToPatch
+                    (
+#ifdef OPENFOAM_NOT_EXTEND
+                        zoneToZones()[shadPatchI].targetPointDistanceToIntersection()
+#else
+                        zoneToZones()[shadPatchI].slavePointDistanceToIntersection()
+#endif
+                    ),
+                    // zoneToZones()[shadPatchI],
+                    shadowPatchDD,
+                    patchDDInterpToShadowPatch
+                );
 
-            // Calculate friction contact forces
-            frictionModels()[shadPatchI].correct
-            (
-                normalModels()[shadPatchI].slavePressure(),
-                shadowPatchFaceNormals,
-                normalModels()[shadPatchI].areaInContact(),
-                shadowPatchDD,
-                patchDDInterpToShadowPatch
-            );
+                // Calculate friction contact forces on slave
+                frictionModels()[shadPatchI].correct
+                (
+                    normalModels()[shadPatchI].slavePressure(),
+                    shadowPatchFaceNormals,
+                    normalModels()[shadPatchI].slaveAreaInContact(),
+                    shadowPatchDD,
+                    patchDDInterpToShadowPatch
+                );
+                // shadowPatchDD is the DU on the shadow patch, whereas
+                // patchDDInterpToShadowPatch is the master patch DU interpolated
+                // to the shadow; and the difference between these two is the
+                // (and slip also the normal component of DU)
+            }
+#ifdef FOAMEXTEND
+            else
+            {
+                // Segment-to-segment contact algorithm, contact pressure is
+                // integrated using master normals and simultaneously updated
+                // on master and slave (without interpolation)
 
+                // Correct slave contact pressure
+                normalModels()[shadPatchI].correct
+                (
+                    shadowPatchFaceNormals,
+                    shadowZones()[shadPatchI].globalFaceToPatch
+                    (
+                        zoneToZones()[shadPatchI].slaveFacePenVol()()
+                    ),
+                    shadowZones()[shadPatchI].globalFaceToPatch
+                    (
+                        zoneToZones()[shadPatchI].slaveAreaInContact()()
+                    ),
+                    !master_
+                );
+
+                // Correct friction contact forces on slave
+                frictionModels()[shadPatchI].correct
+                (
+                    normalModels()[shadPatchI].slavePressure(),
+                    shadowPatchFaceNormals,
+                    normalModels()[shadPatchI].slaveAreaInContact(),
+                    shadowPatchDD,
+                    patchDDInterpToShadowPatch,
+                    !master_
+                );
+
+                // Avoid updating master if it is rigid
+                if (!rigidMaster_)
+                {
+                    // Correct master contact pressure
+                    const vectorField patchFaceNormals =
+                        zone().globalFaceToPatch
+                        (
+                            zone().globalPatch().faceNormals()
+                        );
+
+                    normalModels()[shadPatchI].correct
+                    (
+                        patchFaceNormals,
+                        zone().globalFaceToPatch
+                        (
+                            zoneToZones()[shadPatchI].masterFacePenVol()()
+                        ),
+                        zone().globalFaceToPatch
+                        (
+                            zoneToZones()[shadPatchI].masterAreaInContact()()
+                        ),
+                        master_
+                    );
+
+                    // Interpolate the slave displacement increment to the
+                    // master patch. This is required in order to simultaneously
+                    // calculate friction traction on both contact patches
+
+                    // Slave zone DD
+                    const vectorField shadowZoneDD
+                    (
+                        shadowZones()[shadPatchI].patchFaceToGlobal
+                        (
+                            shadowPatchDD
+                        )
+                    );
+
+                    const vectorField shadowPatchDDInterpToPatch
+                    (
+                        zone().globalFaceToPatch
+                        (
+                            zoneToZones()[shadPatchI].slaveToMaster
+                            (
+                                shadowZoneDD
+                            )()
+                        )
+                    );
+
+                    // Correct friction contact forces on master
+                    frictionModels()[shadPatchI].correct
+                    (
+                        normalModels()[shadPatchI].masterPressure(),
+                        patchFaceNormals,
+                        normalModels()[shadPatchI].masterAreaInContact(),
+                        patchDD,
+                        shadowPatchDDInterpToPatch,
+                        master_
+                    );
+                }
+            }
+#endif
             if (rigidMaster_)
             {
                 // Set to master to traction free to mimic a rigid contact
@@ -1201,64 +1302,102 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
             }
             else
             {
-                // Interpolate slave traction to the master
-                const vectorField slavePatchTraction
-                (
-                   - frictionModels()[shadPatchI].slaveTractionForMaster()
-                   - normalModels()[shadPatchI].slavePressure()
-                );
-
-                const vectorField slaveZoneTraction
-                (
-                    shadowZones()[shadPatchI].patchFaceToGlobal
-                    (
-                        slavePatchTraction
-                    )
-                );
-
-                // We have two options for interpolating from the slave to the
-                // master:
-                // 1. face-to-face
-                // 2. point-to-point
-                // We will use 1.
-
-                // Calculate traction for this contact
-                vectorField tractionForThisShadow
-                (
-                    zone().globalFaceToPatch
-                    (
-#ifdef OPENFOAM_NOT_EXTEND
-                        zoneToZones()[shadPatchI].interpolateToSource
-#else
-                        zoneToZones()[shadPatchI].slaveToMaster
+                // Pointwise contact force calculation algorithm,
+                // Interpolate slave contact traction onto master
+#ifdef FOAMEXTEND
+                if (!zoneToZones()[shadPatchI].normalGapIntegration())
 #endif
-                        (
-                            slaveZoneTraction
-                        )()
-                    )
-                );
-
-                // Accumulate the traction on the master patch
-                traction() += tractionForThisShadow;
-
-                // Update contactPerShadow field
-                // Note: this is used by thermalContact to know which faces
-                // are in contact
-                const scalarField magTraction(mag(tractionForThisShadow));
-                const scalar tol = 1e-6*gMax(magTraction);
-                scalarField& contactForThisShadow =
-                    contactPerShadow()[shadPatchI];
-                forAll(contactForThisShadow, faceI)
                 {
-                    if (magTraction[faceI] > tol)
+                    // Interpolate slave traction to the master
+                    const vectorField slavePatchTraction
+                    (
+                        - frictionModels()[shadPatchI].slaveTractionForMaster()
+                        - normalModels()[shadPatchI].slavePressure()
+                    );
+
+                    const vectorField slaveZoneTraction
+                    (
+                        shadowZones()[shadPatchI].patchFaceToGlobal
+                        (
+                            slavePatchTraction
+                        )
+                    );
+
+                    // We have two options for interpolating from the slave to
+                    // the master:
+                    // 1. face-to-face
+                    // 2. point-to-point
+                    // We will use 1.
+
+                    // Calculate traction for this contact
+                    vectorField tractionForThisShadow
+                    (
+                        zone().globalFaceToPatch
+                        (
+#ifdef OPENFOAM_NOT_EXTEND
+                            zoneToZones()[shadPatchI].interpolateToSource
+#else
+                            zoneToZones()[shadPatchI].slaveToMaster
+#endif
+                            (
+                                slaveZoneTraction
+                            )()
+                        )
+                    );
+
+                    // Accumulate the traction on the master patch
+                    traction() += tractionForThisShadow;
+
+                    // Update contactPerShadow field
+                    // Note: this is used by thermalContact to know which faces
+                    // are in contact
+                    const scalarField magTraction(mag(tractionForThisShadow));
+                    const scalar tol = 1e-6*gMax(magTraction);
+                    scalarField& contactForThisShadow =
+                         contactPerShadow()[shadPatchI];
+                    forAll(contactForThisShadow, faceI)
                     {
-                        contactForThisShadow[faceI] = 1.0;
-                    }
-                    else
-                    {
-                        contactForThisShadow[faceI] = 0.0;
+                        if (magTraction[faceI] > tol)
+                        {
+                             contactForThisShadow[faceI] = 1.0;
+                        }
+                        else
+                        {
+                            contactForThisShadow[faceI] = 0.0;
+                        }
                     }
                 }
+#ifdef FOAMEXTEND
+                else
+                {
+                    // Segment-to-segment contact force calculation algrorithm
+                    // Traction on master side without interpolation
+                    vectorField tractionForThisShadow =
+                        normalModels()[shadPatchI].masterPressure()
+                      + frictionModels()[shadPatchI].masterTraction();
+
+                    traction() += tractionForThisShadow;
+
+                    // Update contactPerShadow field
+                    // Note: this is used by thermalContact to know which faces
+                    // are in contact
+                    const scalarField magTraction(mag(tractionForThisShadow));
+                    const scalar tol = 1e-6*gMax(magTraction);
+                    scalarField& contactForThisShadow =
+                         contactPerShadow()[shadPatchI];
+                    forAll(contactForThisShadow, faceI)
+                    {
+                        if (magTraction[faceI] > tol)
+                        {
+                             contactForThisShadow[faceI] = 1.0;
+                        }
+                        else
+                        {
+                            contactForThisShadow[faceI] = 0.0;
+                        }
+                    }
+                }
+#endif
             }
         }
     }
@@ -1380,7 +1519,7 @@ Foam::solidContactFvPatchVectorField::frictionHeatRate() const
 
         const vectorField slavePatchSlip
         (
-            frictionModels()[shadPatchI].slip()
+            frictionModels()[shadPatchI].slipOnSlave()
         );
 
         const vectorField slaveZoneSlip

@@ -16,7 +16,7 @@ FoamFile
 
 fluidSolidInterface thermal;
 
-thermalCoeffs
+"thermalCoeffs|fixedRelaxationCoeffs"
 {
     solidPatch left;
     fluidPatch right;

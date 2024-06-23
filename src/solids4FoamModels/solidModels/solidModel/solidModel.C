@@ -217,7 +217,8 @@ void Foam::solidModel::makeDualMesh() const
         dualMesh.movePoints(map().preMotionPoints());
     }
 
-    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false)) //Find a way to add this default value to 'solidProperties' dict in the future
+    // Find a way to add this default value to 'solidProperties' dict in the future
+    if (solidModelDict().lookupOrDefault<Switch>("writeDualMesh", false))
     {
         dualMesh.setInstance(runTime().constant());
         Info<< "Writing dualMesh to " << dualMesh.polyMesh::instance() << endl;
@@ -768,6 +769,18 @@ Foam::mechanicalModel& Foam::solidModel::mechanical()
 }
 
 
+bool Foam::solidModel::newTimeStep() const
+{
+    if (curTimeIndex_ != runTime().timeIndex())
+    {
+        curTimeIndex_ = runTime().timeIndex();
+        return true;
+    }
+
+    return false;
+}
+
+
 Foam::volScalarField& Foam::solidModel::rho()
 {
     if (rhoPtr_.empty())
@@ -1096,6 +1109,20 @@ Foam::solidModel::solidModel
         mesh(),
         dimensionedTensor("0", dimless, tensor::zero)
     ),
+    sigma_
+    (
+        IOobject
+        (
+            "sigma",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedSymmTensor("zero", dimForce/dimArea, symmTensor::zero)
+    ),
+    curTimeIndex_(-1),
     rhoPtr_(),
     g_
     (
@@ -2020,6 +2047,7 @@ void Foam::solidModel::moveMesh
             if
             (
                 returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
+             == 0
             )
             {
                 continue;

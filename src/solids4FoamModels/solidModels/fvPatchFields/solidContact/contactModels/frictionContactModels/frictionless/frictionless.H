@@ -49,8 +49,11 @@ class frictionless
 {
     // Private data
 
-       //- slave friction traction - always zero for frictionless
+       //- Slave friction traction - always zero for frictionless
        vectorField slaveTraction_;
+
+       //- Master friction traction - always zero for frictionless
+       vectorField masterTraction_;
 
     // Private Member Functions
 
@@ -110,19 +113,43 @@ public:
         )
         {}
 
+        //- Correct the friction model
+        virtual void correct
+        (
+            const vectorField& patchPressure,
+            const vectorField& patchFaceNormals,
+            const scalarField& patchAreaInContact,
+            const vectorField& DD,
+            const vectorField& shadowDDInterpToPatch,
+            const bool master
+        )
+        {}
+
         //- Return slave friction traction
         virtual const vectorField& slaveTraction() const
         {
             return slaveTraction_;
         }
 
+        //- Return master friction traction
+        virtual const vectorField& masterTraction() const
+        {
+            return masterTraction_;
+        }
+
         //- Return slip field
-        virtual const vectorField& slip() const
+        virtual const vectorField& slipOnSlave() const
         {
             // slaveTraction is always zero
             return slaveTraction_;
         }
 
+        //- Return slip field
+        virtual const vectorField& slipOnMaster() const
+        {
+            // masterTraction is always zero
+            return masterTraction_;
+        }
         //- Perform any reauired field mapping e.g. after a topo change
         virtual void autoMap(const fvPatchFieldMapper& m);
 

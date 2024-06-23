@@ -1107,13 +1107,10 @@ This function object is currently only implemented for serial run!
           historyPatch     right;
           pointOnAxis      (0 0 0);
           axisDirection    (0 0 1);
-          
-          //Optional
-          stressName	sigma;
       }
   }
   ```
-
+  
 - __Arguments__
 
   - `pointOnAxis` - point on axis;
@@ -1128,7 +1125,7 @@ This function object is currently only implemented for serial run!
 
 - __Optional arguments__
 
-  - `stressName`- stress tensor name,  the default value is set to `sigma`.
+  - None
 
 - __Outputs__
 

@@ -45,7 +45,7 @@ Author
 #include "Switch.H"
 #include "solidSubMeshes.H"
 #ifdef OPENFOAM_NOT_EXTEND
-    #include "volPointInterpolation.H"
+    #include "enhancedVolPointInterpolation.H"
 #else
     #include "newLeastSquaresVolPointInterpolation.H"
 #endif
@@ -89,9 +89,6 @@ class mechanicalModel
         //- Sub-meshes for each mechanicalLaw
         mutable autoPtr<solidSubMeshes> solSubMeshes_;
 
-        //- The implicit stiffness surface field for Rhie-Chow correction
-        mutable autoPtr<surfaceScalarField> impKfcorrPtr_;
-
         //- List with the names of all internal state variables
         //  Key = datatypes (volScalarField, etc.)
         //  Values = hashed wordLists of names of internal vars
@@ -107,13 +104,6 @@ class mechanicalModel
 
         //- Make material sub-meshes
         void makeSolSubMeshes() const;
-
-        //- Calculate the impKf field for Rhie-Chow correction
-        //  This field is zero on bi-material interfaces
-        void calcImpKfcorr() const;
-
-        //- Return the implicit stiffness surface field for Rhie-Chow correction
-        const surfaceScalarField& impKfcorr() const;
 
         //- Get the internal variable names
         bool getInternalVariables();
@@ -161,7 +151,7 @@ public:
             //- Return a const reference to the vol-to-point base mesh
             //  interpolator
 #ifdef OPENFOAM_NOT_EXTEND
-            const volPointInterpolation& volToPoint() const;
+            const enhancedVolPointInterpolation& volToPoint() const;
 #else
             const newLeastSquaresVolPointInterpolation& volToPoint() const;
 #endif
@@ -197,6 +187,12 @@ public:
 
             //- Calculate the stress surfaceField
             void correct(surfaceSymmTensorField& sigma);
+
+            //- Calculate the stress pointField given the displacement gradient
+            void correct
+            (
+                pointSymmTensorField& sigma, const pointTensorField& gradD
+            );
 
             //- Map grad field to subMeshes
             void mapGradToSubMeshes(const volTensorField& gradD);
@@ -242,20 +238,17 @@ public:
                 const bool useVolFieldSigma = true
             );
 
-            //- Return explicit Rhie-Chow correction field to quell oscillations
-            tmp<volVectorField> RhieChowCorrection
+            //- Interpolate D to pointD and use gradD for
+            //  enhancedVolPointInterpolation
+            //  Note: for multi-material cases, it is assumed that gradD is
+            //  already up-to-date on sub-meshes
+            void interpolate
             (
                 const volVectorField& D,
                 const volTensorField& gradD,
-                const surfaceScalarField& gamma
-            ) const;
-
-            //- Return explicit Rhie-Chow correction field to quell oscillations
-            tmp<volVectorField> RhieChowCorrection
-            (
-                const volVectorField& D,
-                const volTensorField& gradD
-            ) const;
+                pointVectorField& pointD,
+                const bool useVolFieldSigma = true
+            );
 
             //- Update total accumulated fields
             void updateTotalFields();

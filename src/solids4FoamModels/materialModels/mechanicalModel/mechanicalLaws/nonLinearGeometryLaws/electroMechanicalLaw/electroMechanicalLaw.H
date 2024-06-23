@@ -59,16 +59,10 @@ class electroMechanicalLaw
         //- Constant active tension
         const dimensionedScalar Ta_;
 
+        //- Ramp time over which Ta is increased from zero to its maximum value
+        const scalar rampTime_;
+
     // Private Member Functions
-
-        // //- Make the initial pore-pressure surface field
-        // void makeP0f() const;
-
-        // //- Return a reference to the initial pore-pressure surface field
-        // const surfaceScalarField& p0f() const;
-
-        // //- Lookup and return a reference to the pressure field
-        // const volScalarField& lookupPressureField() const;
 
         //- Disallow default bitwise copy construct
         electroMechanicalLaw(const electroMechanicalLaw&);
@@ -80,8 +74,6 @@ public:
 
     //- Runtime type information
     TypeName("electroMechanicalLaw");
-
-    // Static data members
 
 
     // Constructors
@@ -107,6 +99,11 @@ public:
         //- Return the implicit stiffness
         //  This is the diffusivity for the Laplacian term
         virtual tmp<volScalarField> impK() const;
+
+#ifdef OPENFOAM_NOT_EXTEND
+        //- Material tangent for Newton Raphson loop
+        virtual tmp<Field<scalarSquareMatrix>> materialTangentField() const;
+#endif
 
         //- Return the bulk modulus field
         virtual tmp<volScalarField> bulkModulus() const;

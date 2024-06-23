@@ -9,6 +9,13 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
+if (( "${WM_PROJECT_VERSION#v}" > 2012 ))
+then
+    echo; echo "This case currently does not run with this OpenFOAM verion";
+    echo
+    exit 0
+fi
+
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
@@ -31,8 +38,11 @@ if command -v gnuplot &> /dev/null
 then
     echo "Generating deflection.pdf using gnuplot"
     gnuplot deflection.gnuplot &> /dev/null
-    echo "Generating force.pdf using gnuplot"
-    gnuplot force.gnuplot &> /dev/null
+    if [ $(find . -name forces.dat | wc -l) -eq 1 ]
+    then
+        echo "Generating force.pdf using gnuplot"
+        gnuplot force.gnuplot &> /dev/null
+    fi
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
