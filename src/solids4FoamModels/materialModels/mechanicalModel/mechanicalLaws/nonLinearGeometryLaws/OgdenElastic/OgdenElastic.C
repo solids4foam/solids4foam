@@ -42,11 +42,10 @@ Foam::OgdenElastic::OgdenElastic
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     mu1_(dict.lookup("mu1")),
     mu2_(dict.lookup("mu2")),
     mu3_(dict.lookup("mu3")),

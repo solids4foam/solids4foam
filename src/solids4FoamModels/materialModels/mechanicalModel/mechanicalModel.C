@@ -250,8 +250,7 @@ Foam::mechanicalModel::mechanicalModel(
                         lawEntries[lawI].keyword(),
                         solSubMeshes().subMeshes()[lawI].subMesh(),
                         lawEntries[lawI].dict(),
-                        nonLinGeom,
-                        lawI));
+                        nonLinGeom));
             }
             else if (
                 nonLinGeom == nonLinearGeometry::UPDATED_LAGRANGIAN || nonLinGeom == nonLinearGeometry::TOTAL_LAGRANGIAN)
@@ -262,8 +261,7 @@ Foam::mechanicalModel::mechanicalModel(
                         lawEntries[lawI].keyword(),
                         solSubMeshes().subMeshes()[lawI].subMesh(),
                         lawEntries[lawI].dict(),
-                        nonLinGeom,
-                        lawI));
+                        nonLinGeom));
             }
             else
             {
@@ -940,11 +938,6 @@ void Foam::mechanicalModel::writeFields(const Time &runTime)
                 *fieldIter
             )().write();
         }
-    }
-
-    forAll(laws, lawI)
-    {
-        laws[lawI].writeFields(runTime);
     }
 }
 

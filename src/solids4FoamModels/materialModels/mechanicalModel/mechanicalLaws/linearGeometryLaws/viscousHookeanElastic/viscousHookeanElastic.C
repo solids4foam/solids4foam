@@ -43,11 +43,10 @@ Foam::viscousHookeanElastic::viscousHookeanElastic
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     EInf_(dict.lookup("EInfinity")),
     E_(dict.lookup("E")),
     tau_(dict.lookup("relaxationTimes")),

@@ -129,8 +129,7 @@ public:
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
-            const nonLinearGeometry::nonLinearType& nonLinGeom,
-            const label lawI = -1
+            const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
 

@@ -262,11 +262,10 @@ Foam::GuccioneElastic::GuccioneElastic
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     bulkModulus_(dict.lookup("bulkModulus")),
     k_(dict.lookup("k")),
     cf_(readScalar(dict.lookup("cf"))),

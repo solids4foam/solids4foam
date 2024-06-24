@@ -160,11 +160,6 @@ class linearElasticMohrCoulombPlastic
         //- Calculate the stress
         void calculateStress(symmTensor& sigma, scalar& activeYield) const;
 
-        tmp<volScalarField> activeYield()
-        {
-            return activeYield_;
-        }
-
         //- Calculate Eigen values and vectors
         void calculateEigens
         (
@@ -195,8 +190,7 @@ public:
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
-            const nonLinearGeometry::nonLinearType& nonLinGeom,
-            const label lawI = -1
+            const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
 

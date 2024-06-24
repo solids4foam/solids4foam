@@ -67,9 +67,6 @@ class mechanicalLaw
         //- Const reference to mesh
         const fvMesh& mesh_;
 
-        //- submesh label (-1 if baseMesh)
-        const label lawI_;
-
         //- Mechanical law dictionary
         mutable dictionary dict_;
 
@@ -196,12 +193,6 @@ protected:
         const fvMesh& mesh() const
         {
             return mesh_;
-        }
-
-        //- Return label of solid submesh (-1 if baseMesh)
-        label lawI() const
-        {
-            return lawI_;
         }
 
         //- If the case is plane stress
@@ -428,10 +419,9 @@ public:
                 const word name,
                 const fvMesh& mesh,
                 const dictionary& dict,
-                const nonLinearGeometry::nonLinearType& nonLinGeom,
-                const label lawI
+                const nonLinearGeometry::nonLinearType& nonLinGeom
             ),
-            (name, mesh, dict, nonLinGeom, lawI)
+            (name, mesh, dict, nonLinGeom)
         );
 
         //- Mechanical law for nonlinear geometry i.e. finite strains and
@@ -445,10 +435,9 @@ public:
                 const word name,
                 const fvMesh& mesh,
                 const dictionary& dict,
-                const nonLinearGeometry::nonLinearType& nonLinGeom,
-                const label lawI
+                const nonLinearGeometry::nonLinearType& nonLinGeom
             ),
-            (name, mesh, dict, nonLinGeom, lawI)
+            (name, mesh, dict, nonLinGeom)
         );
 
 
@@ -460,8 +449,7 @@ public:
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
-            const nonLinearGeometry::nonLinearType& nonLinGeom,
-            const label lawI = -1
+            const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
         //- Create a nonlinear geometry mechanical law
@@ -470,8 +458,7 @@ public:
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
-            const nonLinearGeometry::nonLinearType& nonLinGeom,
-            const label lawI = -1
+            const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
 
@@ -483,8 +470,7 @@ public:
             const word& name,
             const fvMesh& mesh,
             const dictionary& dict,
-            const nonLinearGeometry::nonLinearType& nonLinGeom,
-            const label lawI = -1
+            const nonLinearGeometry::nonLinearType& nonLinGeom
         );
 
 
@@ -574,10 +560,6 @@ public:
         //- Set restart: some mechanical laws may change the writeOpt of fields
         //  accordingly
         virtual void setRestart()
-        {}
-
-        //- Write fields
-        virtual void writeFields(const Time& runTime)
         {}
 };
 

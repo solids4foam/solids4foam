@@ -316,20 +316,18 @@ Foam::thermoMechanicalLaw::thermoMechanicalLaw
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     mechLawPtr_
     (
         mechanicalLaw::NewLinGeomMechLaw
         (
-            name,
+            word(dict.subDict("mechanicalLaw").lookup("type")),
             mesh,
             dict.subDict("mechanicalLaw"),
-            nonLinGeom,
-            lawI
+            nonLinGeom
         )
     ),
     alpha_(dict.lookup("alpha")),

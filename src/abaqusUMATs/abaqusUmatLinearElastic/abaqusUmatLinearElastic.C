@@ -89,8 +89,7 @@ Foam::abaqusUmatLinearElastic::abaqusUmatLinearElastic
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),

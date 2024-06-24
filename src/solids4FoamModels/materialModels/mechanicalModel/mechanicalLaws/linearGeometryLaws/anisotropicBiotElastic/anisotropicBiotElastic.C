@@ -42,11 +42,10 @@ Foam::anisotropicBiotElastic::anisotropicBiotElastic
     const word& name,
     const fvMesh& mesh,
     const dictionary& dict,
-    const nonLinearGeometry::nonLinearType& nonLinGeom,
-    const label lawI
+    const nonLinearGeometry::nonLinearType& nonLinGeom
 )
 :
-    mechanicalLaw(name, mesh, dict, nonLinGeom, lawI),
+    mechanicalLaw(name, mesh, dict, nonLinGeom),
     model2d_(bool(mesh.solutionD()[vector::Z] > 0)),
     A11_(0.0),
     A22_(0.0),
