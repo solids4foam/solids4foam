@@ -1,0 +1,21 @@
+{
+  "log_pattern": "Max sigmaEq \\(von Mises stress\\) = ([\\d\\.]+)",
+  "comparisons": [
+    {
+      "type": "equality",
+      "value": 1.62914
+    },
+    {
+      "type": "range",
+      "value": [1.6, 1.7]
+    },
+    {
+      "type": "greater_than",
+      "value": 1.6
+    },
+    {
+      "type": "less_than",
+      "value": 1.7
+    }
+  ]
+}

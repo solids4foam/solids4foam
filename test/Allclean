@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Test cases directory
+TEST_CASES=testCases
+
+# Call all Allclean scripts
+find "${TEST_CASES}" -type f -name "Allclean" -execdir bash -c 'echo "Executing Allclean in $(pwd)" && ./Allclean' \;
+
+# Remove all files except for testExpectedValues.json files and directories
+# containing these files
+find "${TEST_CASES}" -type f ! -name 'testExpectedValues.json' -exec bash -c '
+    for file do
+        dir=$(dirname "$file")
+        if ! grep -q "^testExpectedValues\.json$" "$dir"/*.json 2>/dev/null; then
+            echo "Removing ${file}"
+            rm -f "$file"
+        fi
+    done
+' bash {} +
+
+# Remove empty directories
+find "${TEST_CASES}" -type d -empty -delete
