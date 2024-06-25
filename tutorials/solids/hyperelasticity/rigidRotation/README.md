@@ -18,7 +18,7 @@ Prepared by Philip Cardiff
 
 ## Overview of Cases
 
-Quasi-static rigid translations and rigid rotations should not cause strains or strains to develop. As small strain (linear geometry) approaches neglect the higher-order strain terms, unphysical stresses are predicted when rotations are large. For rotation in the $$x-y$$ plane about the $$z$$ axis, the definition of engineering stress gives the following non-zero, unphysical stresses [1]:
+Strains and stress should remain zero in a body undergoing rigid body rotation. As small strain (linear geometry) approaches neglect the higher-order strain terms, unphysical stresses are predicted when rotations are large. For rotation in the $$x-y$$ plane about the $$z$$ axis, the definition of engineering stress gives the following non-zero, unphysical stresses [1]:
 
 $$
 \sigma_{xx} = \sigma_{yy} = 2(\mu + \lambda)\left[\cos(\theta) - 1\right]
