@@ -21,8 +21,14 @@ Prepared by Philip Cardiff
 Quasi-static rigid translations and rigid rotations should not cause strains or strains to develop. As small strain (linear geometry) approaches neglect the higher-order strain terms, unphysical stresses are predicted when rotations are large. For rotation in the $$x-y$$ plane about the $$z$$ axis, the definition of engineering stress gives the following non-zero, unphysical stresses [1]:
 
 $$
-\sigma_{xx} = \sigma_{yy} = 2(\mu + \lambda)\left[\cos(\theta) - 1\right] \\
-\sigma_{zz} =  2\lambda\left[\cos(\theta) - 1\right] \\
+\sigma_{xx} = \sigma_{yy} = 2(\mu + \lambda)\left[\cos(\theta) - 1\right]
+$$
+
+$$
+\sigma_{zz} =  2\lambda\left[\cos(\theta) - 1\right]
+$$
+
+$$
 \sigma_{xy} = 0
 $$
 
@@ -40,7 +46,7 @@ Three test cases are examined here (Figure 1), where rigid rotation about the ob
   <img src="./images/rotatingCylinder-geometry.png" alt="Image" width="300">
   <img src="./images/rotatingSphere-geometry.png" alt="Image" width="300">
     <figcaption>
-     <strong>Figure 1: Problem geometry for the three rigid rotation cases: `rotatingBlock` (left), `rotatingCylinder` (centre) and `rotatingSphere` (right)</strong>
+     <strong>Figure 1: Problem geometry for the three rigid rotation cases: rotatingBlock (left), rotatingCylinder (centre) and rotatingSphere (right)</strong>
     </figcaption>
 </div>
 
@@ -91,7 +97,7 @@ Video 1 shows a cross-section of the mesh from time = 0 s to time = 100 s in the
 Figure 2 shows the equivalent (von Mises) stress after $$100^{\circ}$$ of rigid rotation, with the maximum value being below 20 Pa. As noted above, this can be considered small, confirming that the implemented finite strain procedures accurately account for rigid body motion without unphysical deformations. Similar results can be seen in the `rotatingBlock` and `rotatingCylinder` cases.
 
 <div style="text-align: center;">
-  <img src="./images/rotatingSphere-stress.png" alt="Image" width="380">
+  <img src="./images/rotatingSphere-stress.png" alt="Image" width="700">
     <figcaption>
      <strong>Figure 2: equivalent (von Mises) stress (in Pa) after 100 degrees of rigid body rotation</strong>
     </figcaption>
