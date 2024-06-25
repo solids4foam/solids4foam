@@ -44,7 +44,7 @@ This case extends the traditional OpenFOAM `damBreak` tutorial to include a flex
 
 ## Results
 
-Upon starting the solution, the water column collapses due to gravity and will hit the flexible dam. The `solids4foam` predictions for the deflection of the top-right corner of the dam are compared with numerical solutions from the literature in Figure 2, showing reasonable agreement. For better agreement, a mesh and time-step independence study should be performed.
+Upon starting the solution, the water column collapses due to gravity and will hit the flexible dam. Video 1 shows the time evolution of the volume-of-fluid field in the fluid domain and the displacement field in the solid domain. The `solids4foam` predictions for the deflection of the top-right corner of the dam are compared with numerical solutions from the literature in Figure 2, showing reasonable agreement. For better agreement, a mesh and time-step independence study should be performed.
 
 <div style="text-align: center;">
   <img src="./images/flexibleDamBreak-plot.pdf" alt="Image" width="500">
@@ -53,6 +53,9 @@ Upon starting the solution, the water column collapses due to gravity and will h
     </figcaption>
 </div>
 
+{% include youtube.html id="Ttmvg7r9MJgc" %}
+
+**Video 1: Evolution of the volume-of-fluid field in the fluid domain and the displacement field in the solid domain**
 
 
 
