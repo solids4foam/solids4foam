@@ -28,7 +28,7 @@ bibliography: paper.bib
 
 # Summary
 
-`solids4foam` is a toolbox for performing solid mechanics and fluid-solid interaction simulations within the popular OpenFOAM [@OpenFOAM.com, @OpenFOAM.org, @foam-extend] software. The `solids4foam` toolbox offered a rich set of features, including fluid-solid and thermo-fluid-solid interaction coupling algorithms, a suite of solid material models, advanced solid boundary conditions (e.g. frictional contact, fracture), and several discretisations (e.g., cell-centred, vertex-centred) and solution algorithms (coupled, segregated, explicit) for solid mechanics.
+`solids4foam` is a toolbox for performing solid mechanics and fluid-solid interaction simulations within the popular OpenFOAM [@OpenFOAM.com; @OpenFOAM.org; @foam-extend] software. The `solids4foam` toolbox offered a rich set of features, including fluid-solid and thermo-fluid-solid interaction coupling algorithms, a suite of solid material models, advanced solid boundary conditions (e.g. frictional contact, fracture), and several discretisations (e.g., cell-centred, vertex-centred) and solution algorithms (coupled, segregated, explicit) for solid mechanics.
 
 
 # Statement of need
