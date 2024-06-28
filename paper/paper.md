@@ -11,10 +11,10 @@ authors:
     orcid: 0000-0002-4824-427X
     corresponding: true #
     affiliation: 1
-  - name: Ivan Batisti\'{c}
+  - name: Ivan Batisti$\'{c}$
     orcid: 0000-0002-6104-0415
     affiliation: 2
-  - name: \v{Z}eljko Tukovi\'{c}
+  - name: $\v{Z}$eljko Tukovi$\'{c}$
     orcid: 0000-0001-8719-0983
     affiliation: 2
 affiliations:
