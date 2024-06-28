@@ -77,7 +77,7 @@ The `solids4foam-v2.1` release includes the following features:
 
 ## Solid Boundary Conditions
 
-- Frictional contact (node-to-segment [@Cardiff2012a; @Cardiff2016b], segment-to-segment [@Batistic2022; @Batistic2024])
+- Frictional contact (node-to-segment [@Cardiff2012a; @Cardiff2016b], segment-to-segment [@Batistic2022; @Batistic2023])
 - Cohesive zone models
 - Traction, displacement, rotation
 
