@@ -28,24 +28,77 @@ bibliography: paper.bib
 
 # Summary
 
-`solids4foam` is a toolbox for performing solid mechanics and fluid-solid interaction simulations within the popular OpenFOAM [@OpenFOAM.com; @OpenFOAM.org; @foam-extend] software. The `solids4foam` toolbox offered a rich set of features, including fluid-solid and thermo-fluid-solid interaction coupling algorithms, a suite of solid material models, advanced solid boundary conditions (e.g. frictional contact, fracture), and several discretisations (e.g., cell-centred, vertex-centred) and solution algorithms (coupled, segregated, explicit) for solid mechanics.
+`solids4foam` is a toolbox designed for conducting solid mechanics and fluid-solid interaction simulations within the widely-used OpenFOAM software [@OpenFOAM.com; @OpenFOAM.org; @foam-extend]. The toolbox has a comprehensive set of features, including advanced algorithms for fluid-solid and thermo-fluid-solid coupling, a variety of solid material models, non-trivial solid boundary conditions, and numerous discretisation and solution methods for solid mechanics.
 
 
-# Statement of need
+# Statement of Need
 
-The `solids4foam` toolbox has been designed to address four primary needs:
-- There is a desire to solve fluid-solid interactions in OpenFOAM;
-- There is a desire to solve advanced solid mechanics problems natively in OpenFOAM;
-- There is a need for a modular approach for coupling different solid and fluid procedures in OpenFOAM;
-- There is a desire for an extendible framework for research into novel finite volume methods for solid mechanics.
+The `solids4foam` toolbox addresses four primary needs within the OpenFOAM community:
 
-In addition, four principles have been followed in the design of the `solids4foam` toolbox:
-- If you can use OpenFOAM, you can use solids4foam;
-- The three main OpenFOAM forks are supported by `solids4foam`: OpenFOAM.com, OpenFOAM.org, and foam-extend;
-- Easy toolbox should be easy to install and minimise additional dependencies beyond the requirements of OpenFOAM;
-- A significant emphasis is placed on code design and code style, following the [OpenFOAM coding style guide](https://openfoam.org/dev/coding-style-guide) closely.
+1. The need to perform fluid-solid interactions using OpenFOAM.
+2. The need to solve complex solid mechanics problems directly within OpenFOAM.
+3. The necessity for a modular approach to coupling various solid and fluid processes in OpenFOAM.
+4. The demand for an extendable framework to facilitate research into innovative finite volume methods for solid mechanics.
+
+The design of `solids4foam` adheres to four guiding principles:
+
+1. **Usability:** If you can use OpenFOAM, you can use `solids4foam`.
+2. **Compatibility:** Supports the three main OpenFOAM forks: OpenFOAM.com, OpenFOAM.org, and foam-extend.
+3. **Ease of Installation:** The toolbox is easy to install and requires minimal additional dependencies beyond OpenFOAM.
+4. **Code Quality:** Emphasis on code design and style, closely following the [OpenFOAM coding style guide](https://openfoam.org/dev/coding-style-guide).
 
 
+# Features
+
+`solids4foam` employs a modular design, offering generic class interfaces for solid mechanics, fluid dynamics, fluid-solid coupling methods, and solid material models. It also supports all native OpenFOAM modularity, including boundary conditions and function objects.
+
+The `solids4foam-v2.1` release includes the following features:
+
+## Partitioned Fluid-Solid Interaction Coupling Methods
+
+- Fixed under-relaxation [@Tukovic2018a]
+- Aitkens accelerated under-relaxation [@Tukovic2018a]
+- Interface-quasi-Newton coupling [@Degroote2009]
+- Robin-Neumann coupling [@Tukovic2018b]
+- Thermo-fluid-solid interaction coupling
+
+## Finite Volume Solid Model Discretizations and Solution Algorithms
+
+- Segregated [@Cardiff2018a], coupled [@Cardiff2016a], and explicit solution algorithms
+- Linear geometry (small strain) and nonlinear geometry (finite strain) formulations, including total and updated Lagrangian
+- Cell-centered and vertex-centered formulations
+- Continuum and plate formulations
+
+## Solid Material Models
+
+- Linear elasticity (isotropic, orthotropic [@Cardiff2014a]), plasticity ($J_2$ [@Cardiff2016b], Mohr-Coulomb [@Tang2015]), viscoelasticity [@Cardiff2018a], thermo-elasticity [@Cardiff2018a], poroelasticity [@Tang2015]
+- Hyperelasticity (neo-Hookean, Ogden, Mooney-Rivlin [@Oliveira2022; @Oliveira2023], Fung [@Oliveira2022; @Oliveira2023], Yeoh [@Oliveira2022; @Oliveira2023]), hyperelastoplasticity [@Cardiff2016b]
+- Interface to Abaqus material model subroutines (UMATs)
+
+## Solid Boundary Conditions
+
+- Frictional contact (node-to-segment [@Cardiff2012a; @Cardiff2016b], segment-to-segment [@Batistic2022; @Batistic2024])
+- Cohesive zone models
+- Traction, displacement, rotation
+
+## Fluid Models
+
+- Incompressible (PIMPLE, PIMPLE-overset)
+- Multiphase (volume-of-fluid)
+- Weakly compressible [@Oliveira2022]
+
+## Function Objects
+
+- Energies, displacements, forces, stresses, principal stresses, torques
+
+## Utilities and Scripts
+
+- Scripts for ensuring compatibility with the main OpenFOAM forks
+- Mesh conversion utilities: OpenFOAM to/from Abaqus
+
+## Tutorials
+
+- A suite of example cases and benchmark problems to demonstrate functionality and verify performance
 
 
 # Acknowledgements
