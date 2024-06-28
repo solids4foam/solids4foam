@@ -1250,6 +1250,7 @@ Foam::solidModel::solidModel
     pointDD_.oldTime();
     gradD_.oldTime();
     gradDD_.oldTime();
+    sigma_.oldTime();
 
     if (restart_)
     {
