@@ -375,8 +375,6 @@ Foam::sparseMatrixTools::solveLinearSystemPETSc
     const bool debug
 )
 {
-    notImplemented("test");
-
     if (debug)
     {
         Info<< "solverPerformance<scalar> "

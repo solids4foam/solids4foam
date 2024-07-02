@@ -433,6 +433,9 @@ public:
             //- Return const dualMeshToMeshMap
             const dualMeshToMeshMap& dualMeshMap() const;
 
+            //- Clear the dual mesh and dual mesh map
+            void clearDualMesh() const;
+
             //- Return point mesh
             const pointMesh& pMesh() const
             {
@@ -784,7 +787,8 @@ public:
             (
                 const pointField& oldPoints,
                 const volVectorField& DD,
-                pointVectorField& pointDD
+                pointVectorField& pointDD,
+                const bool interpolateDDtoPointDD = true
             );
 
             //- End of the program

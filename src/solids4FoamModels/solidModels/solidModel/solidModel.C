@@ -747,6 +747,13 @@ const Foam::dualMeshToMeshMap& Foam::solidModel::dualMeshMap() const
 }
 
 
+void Foam::solidModel::clearDualMesh() const
+{
+    dualMeshPtr_.clear();
+    dualMeshToMeshMapPtr_.clear();
+}
+
+
 Foam::thermalModel& Foam::solidModel::thermal()
 {
     if (thermalPtr_.empty())
@@ -2009,21 +2016,11 @@ void Foam::solidModel::moveMesh
 (
     const pointField& oldPoints,
     const volVectorField& DD,
-    pointVectorField& pointDD
+    pointVectorField& pointDD,
+    const bool interpolateDDtoPointDD
 )
 {
     Info<< "Moving the mesh to the deformed configuration" << nl << endl;
-
-    //- Move mesh by interpolating displacement field to vertices
-
-    // Interpolate cell displacements to vertices
-    mechanical().interpolate(DD, pointDD);
-
-    // Fix, AW/PC, 22-Dec-20,
-    // correctBoundaryConditions should not be called as it causes (global?)
-    // points to become out of sync. This results in the error "face area does
-    // not match neighbour..."
-    //pointDD.correctBoundaryConditions();
 
 #ifdef OPENFOAM_NOT_EXTEND
     vectorField& pointDDI = pointDD.primitiveFieldRef();
@@ -2031,77 +2028,89 @@ void Foam::solidModel::moveMesh
     vectorField& pointDDI = pointDD.internalField();
 #endif
 
-    vectorField newPoints = oldPoints;
-
-    // Correct symmetryPlane points
-
-    forAll(mesh().boundaryMesh(), patchI)
+    if (interpolateDDtoPointDD)
     {
-        if (isA<symmetryPolyPatch>(mesh().boundaryMesh()[patchI]))
+        //- Move mesh by interpolating displacement field to vertices
+
+        // Interpolate cell displacements to vertices
+        mechanical().interpolate(DD, pointDD);
+
+        // Fix, AW/PC, 22-Dec-20,
+        // correctBoundaryConditions should not be called as it causes (global?)
+        // points to become out of sync. This results in the error "face area does
+        // not match neighbour..."
+        //pointDD.correctBoundaryConditions();
+
+        // Correct symmetryPlane points
+
+        forAll(mesh().boundaryMesh(), patchI)
         {
-            const labelList& meshPoints =
-                mesh().boundaryMesh()[patchI].meshPoints();
-
-            if
-            (
-                returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
-             == 0
-            )
+            if (isA<symmetryPolyPatch>(mesh().boundaryMesh()[patchI]))
             {
-                continue;
-            }
+                const labelList& meshPoints =
+                    mesh().boundaryMesh()[patchI].meshPoints();
 
-            const vector avgN =
-                gAverage(mesh().boundaryMesh()[patchI].pointNormals());
-
-            const vector i(1, 0, 0);
-            const vector j(0, 1, 0);
-            const vector k(0, 0, 1);
-
-            if (mag(avgN & i) > 0.95)
-            {
-                forAll(meshPoints, pI)
+                if
+                (
+                    returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
+                 == 0
+                )
                 {
-                    pointDDI[meshPoints[pI]].x() = 0;
+                    continue;
+                }
+
+                const vector avgN =
+                    gAverage(mesh().boundaryMesh()[patchI].pointNormals());
+
+                const vector i(1, 0, 0);
+                const vector j(0, 1, 0);
+                const vector k(0, 0, 1);
+
+                if (mag(avgN & i) > 0.95)
+                {
+                    forAll(meshPoints, pI)
+                    {
+                        pointDDI[meshPoints[pI]].x() = 0;
+                    }
+                }
+                else if (mag(avgN & j) > 0.95)
+                {
+                    forAll(meshPoints, pI)
+                    {
+                        pointDDI[meshPoints[pI]].y() = 0;
+                    }
+                }
+                else if (mag(avgN & k) > 0.95)
+                {
+                    forAll(meshPoints, pI)
+                    {
+                        pointDDI[meshPoints[pI]].z() = 0;
+                    }
                 }
             }
-            else if (mag(avgN & j) > 0.95)
+            else if (isA<emptyPolyPatch>(mesh().boundaryMesh()[patchI]))
             {
-                forAll(meshPoints, pI)
+                const labelList& meshPoints =
+                    mesh().boundaryMesh()[patchI].meshPoints();
+
+                if
+                (
+                    returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
+                )
                 {
-                    pointDDI[meshPoints[pI]].y() = 0;
+                    continue;
                 }
-            }
-            else if (mag(avgN & k) > 0.95)
-            {
-                forAll(meshPoints, pI)
+
+                const vector avgN =
+                    gAverage(mesh().boundaryMesh()[patchI].pointNormals());
+                const vector k(0, 0, 1);
+
+                if (mag(avgN & k) > 0.95)
                 {
-                    pointDDI[meshPoints[pI]].z() = 0;
-                }
-            }
-        }
-        else if (isA<emptyPolyPatch>(mesh().boundaryMesh()[patchI]))
-        {
-            const labelList& meshPoints =
-                mesh().boundaryMesh()[patchI].meshPoints();
-
-            if
-            (
-                returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
-            )
-            {
-                continue;
-            }
-
-            const vector avgN =
-                gAverage(mesh().boundaryMesh()[patchI].pointNormals());
-            const vector k(0, 0, 1);
-
-            if (mag(avgN & k) > 0.95)
-            {
-                forAll(meshPoints, pI)
-                {
-                    pointDDI[meshPoints[pI]].z() = 0;
+                    forAll(meshPoints, pI)
+                    {
+                        pointDDI[meshPoints[pI]].z() = 0;
+                    }
                 }
             }
         }
@@ -2109,6 +2118,7 @@ void Foam::solidModel::moveMesh
 
     // Note: allPoints will have more points than pointDD if there are
     // globalFaceZones
+    vectorField newPoints = oldPoints;
     forAll(pointDDI, pointI)
     {
         newPoints[pointI] += pointDDI[pointI];

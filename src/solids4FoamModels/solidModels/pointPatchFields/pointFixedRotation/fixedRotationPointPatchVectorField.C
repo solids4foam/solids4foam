@@ -138,14 +138,14 @@ fixedRotationPointPatchVectorField::fixedRotationPointPatchVectorField
 
     if (dict.found("value"))
     {
-        pointPatchField<vector>::operator==
+        this->operator==
         (
             vectorField("value", dict, p.size())
         );
     }
     else
     {
-        pointPatchField<vector>::operator==
+        this->operator==
         (
             vectorField(p.size(), vector::zero)
         );
@@ -276,7 +276,7 @@ void fixedRotationPointPatchVectorField::updateCoeffs()
     }
 
     // Set the point displacement
-    pointPatchField<vector>::operator==
+    this->operator==
     (
         pointDisp
     );

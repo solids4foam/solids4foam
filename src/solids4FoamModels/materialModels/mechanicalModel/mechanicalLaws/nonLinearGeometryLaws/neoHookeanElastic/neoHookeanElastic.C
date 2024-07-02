@@ -161,8 +161,20 @@ Foam::neoHookeanElastic::materialTangentField() const
             mesh().lookupObject<surfaceSymmTensorField>("sigmaf");
 
         // Lookup gradient of displacement
-        const surfaceTensorField& gradDRef =
-            mesh().lookupObject<surfaceTensorField>("grad(D)f");
+        const surfaceTensorField* gradDRefPtr;
+        if (nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+        {
+            // Lookup gradient of displacement increment
+            gradDRefPtr =
+                &mesh().lookupObject<surfaceTensorField>("grad(DD)f");
+        }
+        else
+        {
+            // Lookup gradient of displacement
+            gradDRefPtr =
+                &mesh().lookupObject<surfaceTensorField>("grad(D)f");
+        }
+        const surfaceTensorField& gradDRef = *gradDRefPtr;
 
         // Create fields to be used for perturbations
         surfaceSymmTensorField sigmaPerturb("sigmaPerturb", sigmaRef);
