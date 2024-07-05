@@ -23,8 +23,6 @@ Description
 
     Based on "rotation-free formulation" of Torlak (2006).
 
-    Work in progress.
-
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
@@ -130,8 +128,13 @@ class kirchhoffPlateSolid
         bool converged
         (
             const int iCorr,
+#ifdef OPENFOAM_NOT_EXTEND
+            const SolverPerformance<scalar>& solverPerfM,
+            const SolverPerformance<scalar>& solverPerfw,
+#else
             const lduSolverPerformance& solverPerfM,
             const lduSolverPerformance& solverPerfw,
+#endif
             const areaScalarField& M,
             const areaScalarField& w
         );
@@ -237,8 +240,9 @@ public:
             //- Set traction at specified patch
             virtual void setTraction
             (
+                const label interfaceI,
                 const label patchID,
-                const vectorField& traction
+                const vectorField& faceZoneTraction
             );
 
             //- Write fields

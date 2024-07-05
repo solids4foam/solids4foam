@@ -64,15 +64,19 @@ bool fixedRelaxationCouplingInterface::evolve()
 
     scalar residualNorm = 0;
 
-    if (predictSolid_ && (runTime().timeIndex() > 1))
-    // if (predictSolid_)
+    // Check if coupling switch needs to be updated
+    if (!coupled())
+    {
+        updateCoupled();
+    }
+
+    if (predictSolid_ && coupled())
     {
         updateForce();
 
         solid().evolve();
 
-        residualNorm =
-            updateResidual();
+        residualNorm = updateResidual();
     }
 
     do
@@ -88,14 +92,21 @@ bool fixedRelaxationCouplingInterface::evolve()
         // Solve fluid
         fluid().evolve();
 
-        // Transfer the force from the fluid to the solid
-        updateForce();
+        if (coupled())
+        {
+            // Transfer the force from the fluid to the solid
+            updateForce();
 
-        // Solve solid
-        solid().evolve();
+            // Solve solid
+            solid().evolve();
 
-        // Calculate the FSI residual
-        residualNorm = updateResidual();
+            // Calculate the FSI residual
+            residualNorm = updateResidual();
+        }
+        else
+        {
+            residualNorm = 0.0;
+        }
 
         // Optional: write residuals to file
         if (writeResidualsToFile() && Pstream::master())

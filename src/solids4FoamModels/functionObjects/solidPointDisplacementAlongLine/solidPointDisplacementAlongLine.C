@@ -181,12 +181,12 @@ Foam::solidPointDisplacementAlongLine::solidPointDisplacementAlongLine
         const scalar minDist(dict.lookupOrDefault<scalar>("minDist", 1e-6));
         Info<< "    minDist: " << minDist << endl;
 
-        //Define vector between points A and B
+        // Define vector between points A and B
         const vector line_vector = pointB - pointA;
 
         forAll(mesh.points(), pI)
         {
-            //Define vector between point A and mesh point P
+            // Define vector between point A and mesh point P
             const vector point_vector = mesh.points()[pI] - pointA;
 
             // Create bounding box for the line from A to B
@@ -195,7 +195,7 @@ Foam::solidPointDisplacementAlongLine::solidPointDisplacementAlongLine
             // Inflate the box in case it has zero volume
             bb.inflate(0.01);
 
-            //Check whether point is within the region defined by the segment
+            // Check whether point is within the region defined by the segment
             if (bb.contains(mesh.points()[pI]))
             {
                 // Calculate coordinates of projection point on line
@@ -219,36 +219,45 @@ Foam::solidPointDisplacementAlongLine::solidPointDisplacementAlongLine
             }
         }
 
-        //Sort point coordinates by x, y or z-coordinates
-        if (mag(pointCoord_[0].component(vector::Y)) == mag(pointCoord_[1].component(vector::Y)) && mag(pointCoord_[0].component(vector::Z)) ==
-        mag(pointCoord_[1].component(vector::Z)))
+        // Sort point coordinates by x, y or z-coordinates
+        if
+        (
+            mag(pointCoord_[0].component(vector::Y))
+         == mag(pointCoord_[1].component(vector::Y))
+         && mag(pointCoord_[0].component(vector::Z))
+         == mag(pointCoord_[1].component(vector::Z))
+        )
         {
-            //Sort point coordinates by x-coordinates
+            // Sort point coordinates by x-coordinates
             sortByComp(pointCoord_, pointID_, vector::X);
-
-            Info<< "SortByCompX called" << pointID_.size() << pointCoord_.size() << endl;
         }
-        else if (mag(pointCoord_[0].component(vector::X)) == mag(pointCoord_[1].component(vector::X)) && mag(pointCoord_[0].component(vector::Z)) ==
-        mag(pointCoord_[1].component(vector::Z)))
+        else if
+        (
+            mag(pointCoord_[0].component(vector::X))
+         == mag(pointCoord_[1].component(vector::X))
+         && mag(pointCoord_[0].component(vector::Z))
+         == mag(pointCoord_[1].component(vector::Z)))
         {
-            //Sort point coordinates by y-coordinates
+            // Sort point coordinates by y-coordinates
             sortByComp(pointCoord_, pointID_, vector::Y);
-
-            Info<< "SortByCompY called" << pointID_.size() << pointCoord_.size() << endl;
         }
-        else if (mag(pointCoord_[0].component(vector::X)) == mag(pointCoord_[1].component(vector::X)) && mag(pointCoord_[0].component(vector::Y)) ==
-        mag(pointCoord_[1].component(vector::Y)))
+        else if
+        (
+            mag(pointCoord_[0].component(vector::X))
+         == mag(pointCoord_[1].component(vector::X))
+         && mag(pointCoord_[0].component(vector::Y))
+         == mag(pointCoord_[1].component(vector::Y))
+        )
         {
-            //Sort point coordinates by z-coordinates
+            // Sort point coordinates by z-coordinates
             sortByComp(pointCoord_, pointID_, vector::Z);
-
-            Info<< "SortByCompZ called" << pointID_.size() << pointCoord_.size() << endl;
         }
         else
         {
-            //Sort point coordinates by x-coordinates
+            // Sort point coordinates by x-coordinates
             sortByComp(pointCoord_, pointID_, vector::X);
-            Info << "SortByCompX since two or three coordinates are different" << endl;
+            Info<< "SortByCompX since two or three coordinates are different"
+                << endl;
         }
 
         // File update

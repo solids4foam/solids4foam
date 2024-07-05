@@ -22,14 +22,7 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "OSspecific.H"
-#ifdef OPENFOAM_NOT_EXTEND
-    #include "volPointInterpolation.H"
-#else
-    #include "newLeastSquaresVolPointInterpolation.H"
-#endif
-#ifdef OPENFOAM_ORG
-    #include "OSspecific.H"
-#endif
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -86,19 +79,11 @@ bool Foam::solidPointStress::writeData()
             dimensionedSymmTensor("zero", sigma.dimensions(), symmTensor::zero)
         );
 
-#ifdef OPENFOAM_ORG
-        volPointInterpolation::New(mesh).interpolate(sigma, pointSigma);
-#elif OPENFOAM_COM
-        mesh.lookupObject<volPointInterpolation>
-        (
-            "volPointInterpolation"
-        ).interpolate(sigma, pointSigma);
-#else
-        mesh.lookupObject<newLeastSquaresVolPointInterpolation>
-        (
-            "newLeastSquaresVolPointInterpolation"
-        ).interpolate(sigma, pointSigma);
-#endif
+        // Lookup the solidModel object
+        const solidModel& solMod = lookupSolidModel(mesh);
+
+        // Interpolate vol field to point field
+        solMod.mechanical().volToPoint().interpolate(sigma, pointSigma);
 
         symmTensor pointSigmaValue = symmTensor::zero;
         if (pointID_ > -1)

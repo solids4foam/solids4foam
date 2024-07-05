@@ -178,12 +178,24 @@ public:
             const vectorField& masterDUInterpToSlave
         ) = 0;
 
+        //- Correct contact model
+        virtual void correct
+        (
+            const vectorField& patchFaceNormals,
+            const scalarField& faceVolPenetration,
+            const scalarField& faceContactArea,
+            const bool master
+        ) = 0;
+
         //- It is the start of a new time step
         virtual void newTimeStep() const
         {}
 
         //- Return slave pressure
         virtual const vectorField& slavePressure() const = 0;
+
+        //- Return master pressure
+        virtual const vectorField& masterPressure() const = 0;
 
         //- Return master patch ID
         virtual label masterPatchID() const
@@ -204,7 +216,10 @@ public:
         }
 
         //- Return area in contact of slave patch
-        virtual const scalarField& areaInContact() const = 0;
+        virtual const scalarField& slaveAreaInContact() const = 0;
+
+        //- Return area in contact of master patch
+        virtual const scalarField& masterAreaInContact() const = 0;
 
         //- Update penalty scale factors (for penalty laws)
         virtual scalar updatePenaltyScale(const scalar previousPenaltyScale)

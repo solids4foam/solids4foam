@@ -29,13 +29,13 @@ void Foam::multiplyCoeff
     const vector& g
 )
 {
-    //Define indexes for readability.
-    scalar XX = 0;
-    scalar YY = 1;
-    scalar ZZ = 2;
-    scalar XY = 3;
-    scalar YZ = 4;
-    scalar ZX = 5;
+    // Define matrix indices for readability
+    const label XX = symmTensor::XX;
+    const label YY = symmTensor::YY;
+    const label ZZ = symmTensor::ZZ;
+    const label XY = symmTensor::XY;
+    const label YZ = symmTensor::YZ;
+    const label XZ = symmTensor::XZ;
 
     // Index notation
     // coeff_ij = Sf_m C_mikl g_k delta_lj
@@ -68,15 +68,15 @@ void Foam::multiplyCoeff
     coeff[tensor::XX] =
         Sf[vector::X]*C(XX,XX)*g[vector::X]
       + Sf[vector::X]*C(XX,XY)*g[vector::Y]
-      + Sf[vector::X]*C(XX,ZX)*g[vector::Z]
+      + Sf[vector::X]*C(XX,XZ)*g[vector::Z]
 
       + Sf[vector::Y]*C(XY,XX)*g[vector::X]
       + Sf[vector::Y]*C(XY,XY)*g[vector::Y]
-      + Sf[vector::Y]*C(XY,ZX)*g[vector::Z]
+      + Sf[vector::Y]*C(XY,XZ)*g[vector::Z]
 
-      + Sf[vector::Z]*C(ZX,XX)*g[vector::X]
-      + Sf[vector::Z]*C(ZX,XY)*g[vector::Y]
-      + Sf[vector::Z]*C(ZX,ZX)*g[vector::Z];
+      + Sf[vector::Z]*C(XZ,XX)*g[vector::X]
+      + Sf[vector::Z]*C(XZ,XY)*g[vector::Y]
+      + Sf[vector::Z]*C(XZ,XZ)*g[vector::Z];
 
     // Similarly the other components can be calculated as
     // coeff_21 = Sf_m C_m2k1 g_k
@@ -102,15 +102,15 @@ void Foam::multiplyCoeff
     coeff[tensor::YX] =
         Sf[vector::X]*C(XY,XX)*g[vector::X]
       + Sf[vector::X]*C(XY,XY)*g[vector::Y]
-      + Sf[vector::X]*C(XY,ZX)*g[vector::Z]
+      + Sf[vector::X]*C(XY,XZ)*g[vector::Z]
 
       + Sf[vector::Y]*C(YY,XX)*g[vector::X]
       + Sf[vector::Y]*C(YY,XY)*g[vector::Y]
-      + Sf[vector::Y]*C(YY,ZX)*g[vector::Z]
+      + Sf[vector::Y]*C(YY,XZ)*g[vector::Z]
 
       + Sf[vector::Z]*C(YZ,XX)*g[vector::X]
       + Sf[vector::Z]*C(YZ,XY)*g[vector::Y]
-      + Sf[vector::Z]*C(YZ,ZX)*g[vector::Z];
+      + Sf[vector::Z]*C(YZ,XZ)*g[vector::Z];
 
     // coeff_31 = Sf_m C_m3k1 g_k
     //
@@ -133,17 +133,17 @@ void Foam::multiplyCoeff
     // Note: C_1331 == C_1313 and C_3311 == C_1133
 
     coeff[tensor::ZX] =
-        Sf[vector::X]*C(ZX,XX)*g[vector::X]
-      + Sf[vector::X]*C(ZX,XY)*g[vector::Y]
-      + Sf[vector::X]*C(ZX,ZX)*g[vector::Z]
+        Sf[vector::X]*C(XZ,XX)*g[vector::X]
+      + Sf[vector::X]*C(XZ,XY)*g[vector::Y]
+      + Sf[vector::X]*C(XZ,XZ)*g[vector::Z]
 
       + Sf[vector::Y]*C(YZ,XX)*g[vector::X]
       + Sf[vector::Y]*C(YZ,XY)*g[vector::Y]
-      + Sf[vector::Y]*C(YZ,ZX)*g[vector::Z]
+      + Sf[vector::Y]*C(YZ,XZ)*g[vector::Z]
 
       + Sf[vector::Z]*C(ZZ,XX)*g[vector::X]
       + Sf[vector::Z]*C(ZZ,XY)*g[vector::Y]
-      + Sf[vector::Z]*C(ZZ,ZX)*g[vector::Z];
+      + Sf[vector::Z]*C(ZZ,XZ)*g[vector::Z];
 
     // coeff_i2 = Sf_m C_mik2 g_k delta_22
     //
@@ -192,9 +192,9 @@ void Foam::multiplyCoeff
       + Sf[vector::Y]*C(XY,YY)*g[vector::Y]
       + Sf[vector::Y]*C(XY,YZ)*g[vector::Z]
 
-      + Sf[vector::Z]*C(ZX,XY)*g[vector::X]
-      + Sf[vector::Z]*C(ZX,YY)*g[vector::Y]
-      + Sf[vector::Z]*C(ZX,YZ)*g[vector::Z];
+      + Sf[vector::Z]*C(XZ,XY)*g[vector::X]
+      + Sf[vector::Z]*C(XZ,YY)*g[vector::Y]
+      + Sf[vector::Z]*C(XZ,YZ)*g[vector::Z];
 
     // coeff_22 = Sf_m C_m2k2 g_k
     //
@@ -249,9 +249,9 @@ void Foam::multiplyCoeff
     // Note: C_2332 == C_2323 and C_3322 == C_2233
 
     coeff[tensor::ZY] =
-        Sf[vector::X]*C(ZX,XY)*g[vector::X]
-      + Sf[vector::X]*C(ZX,YY)*g[vector::Y]
-      + Sf[vector::X]*C(ZX,YZ)*g[vector::Z]
+        Sf[vector::X]*C(XZ,XY)*g[vector::X]
+      + Sf[vector::X]*C(XZ,YY)*g[vector::Y]
+      + Sf[vector::X]*C(XZ,YZ)*g[vector::Z]
 
       + Sf[vector::Y]*C(YZ,XY)*g[vector::X]
       + Sf[vector::Y]*C(YZ,YY)*g[vector::Y]
@@ -286,17 +286,17 @@ void Foam::multiplyCoeff
     //            + Sf_3 C_3133 g_3
 
     coeff[tensor::XZ] =
-        Sf[vector::X]*C(XX,ZX)*g[vector::X]
+        Sf[vector::X]*C(XX,XZ)*g[vector::X]
       + Sf[vector::X]*C(XX,YZ)*g[vector::Y]
       + Sf[vector::X]*C(XX,ZZ)*g[vector::Z]
 
-      + Sf[vector::Y]*C(XY,ZX)*g[vector::X]
+      + Sf[vector::Y]*C(XY,XZ)*g[vector::X]
       + Sf[vector::Y]*C(XY,YZ)*g[vector::Y]
       + Sf[vector::Y]*C(XY,ZZ)*g[vector::Z]
 
-      + Sf[vector::Z]*C(ZX,ZX)*g[vector::X]
-      + Sf[vector::Z]*C(ZX,YZ)*g[vector::Y]
-      + Sf[vector::Z]*C(ZX,ZZ)*g[vector::Z];
+      + Sf[vector::Z]*C(XZ,XZ)*g[vector::X]
+      + Sf[vector::Z]*C(XZ,YZ)*g[vector::Y]
+      + Sf[vector::Z]*C(XZ,ZZ)*g[vector::Z];
 
     // coeff_23 = Sf_m C_m2k3 g_k
     //
@@ -317,15 +317,15 @@ void Foam::multiplyCoeff
     //            + Sf_3 C_3233 g_3
 
     coeff[tensor::YZ] =
-        Sf[vector::X]*C(XY,ZX)*g[vector::X]
+        Sf[vector::X]*C(XY,XZ)*g[vector::X]
       + Sf[vector::X]*C(XY,YZ)*g[vector::Y]
       + Sf[vector::X]*C(XY,ZZ)*g[vector::Z]
 
-      + Sf[vector::Y]*C(YY,ZX)*g[vector::X]
+      + Sf[vector::Y]*C(YY,XZ)*g[vector::X]
       + Sf[vector::Y]*C(YY,YZ)*g[vector::Y]
       + Sf[vector::Y]*C(YY,ZZ)*g[vector::Z]
 
-      + Sf[vector::Z]*C(YZ,ZX)*g[vector::X]
+      + Sf[vector::Z]*C(YZ,XZ)*g[vector::X]
       + Sf[vector::Z]*C(YZ,YZ)*g[vector::Y]
       + Sf[vector::Z]*C(YZ,ZZ)*g[vector::Z];
 
@@ -349,15 +349,15 @@ void Foam::multiplyCoeff
     // Note: C_1313 == C_3131
 
     coeff[tensor::ZZ] =
-        Sf[vector::X]*C(ZX,ZX)*g[vector::X]
-      + Sf[vector::X]*C(ZX,YZ)*g[vector::Y]
-      + Sf[vector::X]*C(ZX,ZZ)*g[vector::Z]
+        Sf[vector::X]*C(XZ,XZ)*g[vector::X]
+      + Sf[vector::X]*C(XZ,YZ)*g[vector::Y]
+      + Sf[vector::X]*C(XZ,ZZ)*g[vector::Z]
 
-      + Sf[vector::Y]*C(YZ,ZX)*g[vector::X]
+      + Sf[vector::Y]*C(YZ,XZ)*g[vector::X]
       + Sf[vector::Y]*C(YZ,YZ)*g[vector::Y]
       + Sf[vector::Y]*C(YZ,ZZ)*g[vector::Z]
 
-      + Sf[vector::Z]*C(ZZ,ZX)*g[vector::X]
+      + Sf[vector::Z]*C(ZZ,XZ)*g[vector::X]
       + Sf[vector::Z]*C(ZZ,YZ)*g[vector::Y]
       + Sf[vector::Z]*C(ZZ,ZZ)*g[vector::Z];
 }
