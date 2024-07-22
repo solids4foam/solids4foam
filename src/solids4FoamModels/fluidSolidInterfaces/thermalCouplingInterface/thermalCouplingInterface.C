@@ -48,16 +48,26 @@ thermalCouplingInterface::thermalCouplingInterface
     const word& region
 )
 :
-    fluidSolidInterface(typeName, runTime, region),
+    fixedRelaxationCouplingInterface(runTime, region),
     relaxationFactor_
     (
-        fsiProperties().lookupOrAddDefault<scalar>("relaxationFactor", 0.01)
+        fsiProperties().found("thermoRelaxationFactor")
+      ? readScalar(fsiProperties().lookup("thermoRelaxationFactor"))
+      : fsiProperties().lookupOrAddDefault<scalar>("relaxationFactor", 0.01)
     ),
     predictTemperatureAndHeatFlux_
     (
-        fsiProperties().lookupOrAddDefault<bool>
+        fsiProperties().lookupOrAddDefault<Switch>
         (
             "predictTemperatureAndHeatFlux",
+            false
+        )
+    ),
+    mechanicalCoupling_
+    (
+        fsiProperties().lookupOrAddDefault<Switch>
+        (
+            "mechanicalCoupling",
             false
         )
     ),
@@ -130,7 +140,9 @@ bool thermalCouplingInterface::evolve()
 
     updateInterpolatorAndGlobalPatches();
 
-    scalar residualNorm = 0;
+    // Initialise thermal and mechanical interface residuals
+    scalar residualNormTherm = 0;
+    scalar residualNormMech = 0;
 
     do
     {
@@ -142,17 +154,38 @@ bool thermalCouplingInterface::evolve()
         // Transfer temperature and heat flux from the solid to the fluid
         updateHeatFluxAndTemperatureOnFluidInterface();
 
+        if (mechanicalCoupling_)
+        {
+            // Transfer the displacement from the solid to the fluid
+            updateDisplacement();
+
+            // Move the fluid mesh
+            moveFluidMesh();
+        }
+
         // Solve fluid
         fluid().evolve();
 
         // Transfer temperature and heat flux from the fluid to the solid
         updateHeatFluxAndTemperatureOnSolidInterface();
 
+        if (mechanicalCoupling_)
+        {
+            // Transfer the force from the fluid to the solid
+            updateForce();
+        }
+
         // Solve solid
         solid().evolve();
 
         // Calculate the thermal residual
-        residualNorm = calcThermalResidual();
+        residualNormTherm = calcThermalResidual();
+
+        if (mechanicalCoupling_)
+        {
+            // Calculate the mechanical residual
+            residualNormMech = updateResidual();
+        }
 
         // Optional: write residuals to file
         if (writeResidualsToFile() && Pstream::master())
@@ -160,10 +193,22 @@ bool thermalCouplingInterface::evolve()
             thermalResidualFile()
                 << runTime().value() << " "
                 << outerCorr() << " "
-                << residualNorm << endl;
+                << residualNormTherm << endl;
+
+            residualFile()
+                << runTime().value() << " "
+                << outerCorr() << " "
+                << residualNormMech << endl;
         }
     }
-    while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
+    while
+    (
+        (
+            residualNormTherm > outerCorrTolerance()
+         || residualNormMech > outerCorrTolerance()
+        )
+     && outerCorr() < nOuterCorr()
+    );
 
     return 0;
 }
@@ -212,7 +257,7 @@ void thermalCouplingInterface::updateHeatFluxAndTemperatureOnFluidInterface()
              && (runTime().timeIndex() > 2)
             )
             {
-                Info << "Predicting temperature and heat-flux" << endl;
+                Info<< "Predicting temperature and heat-flux" << endl;
 
                 // Linear extrapolation of temp. and heat-flux in time
                 solidZoneTemperature =
@@ -367,7 +412,7 @@ scalar thermalCouplingInterface::calcThermalResidual()
         // interpolated to the fluid zone
         scalarField solidZoneTemperature(fluidZone.size(), 0);
 
-        // Transfer displacement field from the solid to the fluid
+        // Transfer temperature field from the solid to the fluid
         interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
         (
             solidZone,                              // from zone

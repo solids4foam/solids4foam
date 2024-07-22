@@ -133,8 +133,26 @@ public:
         //- Calculate the stress
         virtual void correct(volSymmTensorField& sigma);
 
+        //- Calculate the stress given epsilon
+        virtual void correct
+        (
+            volSymmTensorField& sigma, const volSymmTensorField& epsilon
+        );
+
         //- Calculate the stress
         virtual void correct(surfaceSymmTensorField& sigma);
+
+        //- Calculate the stress given epsilon
+        virtual void correct
+        (
+            surfaceSymmTensorField& sigma, const surfaceSymmTensorField& epsilon
+        );
+
+        //- Calculate the stress given the displacement gradient
+        virtual void correct
+        (
+            pointSymmTensorField& sigma, const pointTensorField& gradD
+        );
 };
 
 

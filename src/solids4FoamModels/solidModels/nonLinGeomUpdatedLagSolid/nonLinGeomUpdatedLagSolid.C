@@ -255,7 +255,7 @@ bool nonLinGeomUpdatedLagSolid::evolve()
     D() = D().oldTime() + DD();
 
     // Update pointDD as it used by FSI procedure
-    mechanical().interpolate(DD(), pointDD());
+    mechanical().interpolate(DD(), gradDD(), pointDD());
 
     // Total displacement at points
     pointD() = pointD().oldTime() + pointDD();

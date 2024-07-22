@@ -4,10 +4,9 @@ cd ${0%/*} || exit 1    # run from this directory
 echo "optionalFixes/Allcheck"
 
 # This script reports on files that require fixes in the OpenFOAM installation.
-# Currently, only foam-extend-4.1 requires fixes.
 # To skip these checks, set S4F_NO_FILE_FIXES=1, i.e.
 #   export S4F_NO_FILE_FIXES=1
-# To see the consequence of these fixes, visit solids4foam.github.io
+# To see the consequence of these fixes, visit www.solids4foam.com.
 
 # Function for the checking and reporting how to replace a file
 # Arguments:
@@ -77,8 +76,16 @@ then
         "$FOAM_SRC/foam/fields/GeometricFields/GeometricField" \
         "$FOAM_SRC/foam"
     if [ $? -ne 0 ]; then result=1; fi
-elif [[ $WM_PROJECT_VERSION != v* ]]
+elif [[ $WM_PROJECT_VERSION == v* ]]
 then
+    # Fix time index storage in the storeOldTimes function
+    checkAndReport \
+        "OpenFOAM-v2012" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+    if [ $? -ne 0 ]; then result=1; fi
+else
     # Fix time index storage in the storeOldTimes function
     checkAndReport \
         "OpenFOAM-9" \
@@ -86,9 +93,14 @@ then
         "$FOAM_SRC/OpenFOAM/fields/GeometricFields/GeometricField" \
         "$FOAM_SRC/OpenFOAM"
     if [ $? -ne 0 ]; then result=1; fi
-else
-    echo "No fixes needed for this version of OpenFOAM"; echo
-    exit 0;
+
+    # Fix time index storage in the storeOldTimes function
+    checkAndReport \
+        "OpenFOAM-9" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+    if [ $? -ne 0 ]; then result=1; fi
 fi
 
 echo

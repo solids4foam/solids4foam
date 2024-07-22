@@ -17,6 +17,8 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#ifndef OPENFOAM_ORG
+
 #include "clampedMomentFaPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "kirchhoffPlateSolid.H"
@@ -114,13 +116,15 @@ void Foam::clampedMomentFaPatchScalarField::updateCoeffs()
         patch().lookupPatchField<areaTensorField, tensor>("grad(theta)");
 
     // Calculate correction vectors
-    const vectorField n = patch().edgeNormals();
+    const vectorField n(patch().edgeNormals());
     const vectorField delta(patch().delta());
-    const vectorField k = (I - sqr(n)) & delta;
+    const vectorField k((I - sqr(n)) & delta);
 
     // Calculate the patch internal field and correction for non-orthogonality
-    const scalarField nDotThetaPif =
-        n & (theta.patchInternalField() + (k & gradTheta.patchInternalField()));
+    const scalarField nDotThetaPif
+    (
+        n & (theta.patchInternalField() + (k & gradTheta.patchInternalField()))
+    );
 
     // Lookup fvMesh
     // Fix for FSI: this is only correct for
@@ -146,7 +150,7 @@ void Foam::clampedMomentFaPatchScalarField::updateCoeffs()
     const scalar D = plateSolid.bendingStiffness().value();
 
     // Set the boundary moment sum to force a clamped edge
-    const scalarField prevMomentSum = *this;
+    const scalarField prevMomentSum(*this);
     faPatchField<scalar>::operator==
     (
         relaxFac_*(-D*nDotThetaPif*patch().deltaCoeffs())
@@ -181,5 +185,7 @@ namespace Foam
         clampedMomentFaPatchScalarField
     );
 }
+
+#endif // OPENFOAM_ORG
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

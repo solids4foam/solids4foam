@@ -180,11 +180,11 @@ standardPenalty::standardPenalty
     ),
     normalContactModelDict_(dict.subDict(name + "NormalModelDict")),
     mesh_(patch.boundaryMesh().mesh()),
-    slavePressureVolField_
+    pressureVolField_
     (
         IOobject
         (
-            "slavePressure_" + mesh_.boundaryMesh()[slavePatchID].name(),
+            "normalTraction_" + mesh_.boundaryMesh()[slavePatchID].name(),
             mesh_.time().timeName(),
             mesh_,
             IOobject::NO_READ,
@@ -233,7 +233,7 @@ standardPenalty::standardPenalty(const standardPenalty& nm)
     normalContactModel(nm),
     normalContactModelDict_(nm.normalContactModelDict_),
     mesh_(nm.mesh_),
-    slavePressureVolField_(nm.slavePressureVolField_),
+    pressureVolField_(nm.pressureVolField_),
     areaInContactVolField_(nm.areaInContactVolField_),
     penaltyFactor_(nm.penaltyFactor_),
     penaltyScale_(nm.penaltyScale_),
@@ -270,17 +270,17 @@ void standardPenalty::correct
 
     scalarField slavePatchLocalFaceAreas(slavePatchLocalFaces.size(), 0.0);
 
-    scalarField& areaInContact = this->areaInContact();
+    scalarField& slaveAreaInContact = this->slaveAreaInContact();
     forAll(slavePatchLocalFaces, faceI)
     {
-        areaInContact[faceI] =
+        slaveAreaInContact[faceI] =
             slavePatchLocalFaces[faceI].areaInContact
             (
                 slavePatchLocalPoints,
                 slavePointPenetration
             );
 
-        if (areaInContact[faceI] < -SMALL)
+        if (slaveAreaInContact[faceI] < -SMALL)
         {
             const labelList& labels = slavePatchLocalFaces[faceI];
             scalarField vertexValue(labels.size());
@@ -290,8 +290,8 @@ void standardPenalty::correct
             }
 
             FatalErrorIn(type())
-                << "areaInContact is less than zero!" << nl
-                << "areaInContact[" << faceI << "] = " << areaInContact[faceI]
+                << "slaveAreaInContact is less than zero!" << nl
+                << "slaveAreaInContact[" << faceI << "] = " << slaveAreaInContact[faceI]
                 << nl
                 << "vertexValue = " << vertexValue << nl
                 << endl;
@@ -376,6 +376,55 @@ void standardPenalty::correct
         relaxFac_*newSlaveTraction + (1.0 - relaxFac_)*slavePressure();
 }
 
+void standardPenalty::correct
+(
+    const vectorField& patchFaceNormals,
+    const scalarField& faceVolPenetration,
+    const scalarField& faceContactArea,
+    const bool master
+)
+{
+    // Preliminaries
+    const fvMesh& mesh = mesh_;
+    label patchIndex = -1;
+
+    if (master)
+    {
+        patchIndex = masterPatchID();
+        // Update master contact area field
+        this->masterAreaInContact() = faceContactArea;
+    }
+    else
+    {
+        patchIndex = slavePatchID();
+        // Update slave contact area field
+        this->slaveAreaInContact() = faceContactArea;
+    }
+
+    const scalarField& magSf =
+        mesh.magSf().boundaryField()[patchIndex];
+
+    const scalar penaltyFac = penaltyFactor();
+
+    const vectorField newTraction
+    (
+       - patchFaceNormals*(faceVolPenetration/magSf)*penaltyFac
+    );
+
+    // Under-relax pressure/traction
+    // Note: patchPressure is really a traction vector
+    vectorField& patchPressure =
+#ifdef FOAMEXTEND
+        pressureVolField_.boundaryField()[patchIndex];
+#else
+        pressureVolField_.boundaryFieldRef()[patchIndex];
+#endif
+
+    // Under-relax traction
+    patchPressure =
+        relaxFac_*newTraction + (1.0 - relaxFac_)*patchPressure;
+}
+
 
 scalar standardPenalty::penaltyFactor() const
 {
@@ -425,10 +474,10 @@ void standardPenalty::autoMap(const fvPatchFieldMapper& m)
     // The internal fields for the volFields should always be zero
     // We will reset them as they may not be zero after field advection
 #ifdef OPENFOAM_NOT_EXTEND
-    slavePressureVolField_.primitiveFieldRef() = vector::zero;
+    pressureVolField_.primitiveFieldRef() = vector::zero;
     areaInContactVolField_.primitiveFieldRef() = 0.0;
 #else
-    slavePressureVolField_.internalField() = vector::zero;
+    pressureVolField_.internalField() = vector::zero;
     areaInContactVolField_.internalField() = 0.0;
 #endif
 }

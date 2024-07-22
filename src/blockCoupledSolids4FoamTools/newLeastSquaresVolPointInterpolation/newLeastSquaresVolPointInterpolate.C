@@ -25,6 +25,8 @@ License
 #include "cyclicFvPatch.H"
 #include "processorPolyPatch.H"
 #include "transform.H"
+#include "fixedValuePointPatchFields.H"
+
 #ifdef FOAMEXTEND
     #include "cyclicGgiPolyPatch.H"
     #include "cyclicGgiFvPatchFields.H"
@@ -621,9 +623,64 @@ void newLeastSquaresVolPointInterpolation::interpolate
           + coeffs[2]*dr.z();
     }
 
-    // ZT: Correct only patches which are not coupled
+    // ZT: Correct only fixedValue patches
     // (for example, processor patches should already be sinchronized)
     // pf.correctBoundaryConditions();
+    forAll(pf.boundaryField(), patchI)
+    {
+        if
+        (
+            isA
+            <
+#ifdef OPENFOAM_NOT_EXTEND
+                fixedValuePointPatchField<Type>
+#else
+                FixedValuePointPatchField
+                <
+                    pointPatchField,
+                    pointMesh,
+                    pointPatch,
+                    DummyMatrix,
+                    Type
+                >
+#endif
+            >
+            (
+                pf.boundaryField()[patchI]
+            )
+        )
+        {
+            pf.boundaryField()[patchI].initEvaluate();
+        }
+    }
+    forAll(pf.boundaryField(), patchI)
+    {
+        if
+        (
+            isA
+            <
+#ifdef OPENFOAM_NOT_EXTEND
+                fixedValuePointPatchField<Type>
+#else
+                FixedValuePointPatchField
+                <
+                    pointPatchField,
+                    pointMesh,
+                    pointPatch,
+                    DummyMatrix,
+                    Type
+                >
+#endif
+            >
+            (
+                pf.boundaryField()[patchI]
+            )
+        )
+        {
+            pf.boundaryField()[patchI].evaluate();
+        }
+    }
+
     // forAll(pf.boundaryField(), patchI)
     // {
     //     if (!pf.boundaryField()[patchI].coupled())

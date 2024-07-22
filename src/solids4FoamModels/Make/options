@@ -26,7 +26,8 @@ else
         -lcompressibleTurbulenceModels -lsampling \
         -lincompressibleTransportModels -linterfaceProperties -lwaveModels \
         -lVoFphaseTurbulentTransportModels \
-        -lincompressibleInterPhaseTransportModels -ladjointOptimisation
+        -lincompressibleInterPhaseTransportModels -ladjointOptimisation \
+        -lfiniteArea
 endif
 
 ifdef PETSC_DIR

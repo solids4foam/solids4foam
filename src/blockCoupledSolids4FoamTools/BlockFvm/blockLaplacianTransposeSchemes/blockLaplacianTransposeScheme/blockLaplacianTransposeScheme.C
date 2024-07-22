@@ -102,7 +102,7 @@ tmp<blockLaplacianTranspose> blockLaplacianTranspose::New
     auto* ctorPtr = cstrIter();
 #endif
 
-    return cstrIter()(mesh, schemeData);
+    return ctorPtr(mesh, schemeData);
 }
 
 
