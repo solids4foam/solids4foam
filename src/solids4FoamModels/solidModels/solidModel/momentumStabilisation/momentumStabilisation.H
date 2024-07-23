@@ -83,6 +83,14 @@ public:
 
     // Member Functions
 
+        // Access
+
+            //- Const access to the dict
+            const dictionary& dict() const
+            {
+                return dict_;
+            }
+
         // Evaluation
 
             //- Stabilisation term

@@ -97,11 +97,12 @@ PetscErrorCode formResidual
             }
         }
     }
-    if (Pstream::parRun())
+
+    if (Foam::Pstream::parRun())
     {
         // I need to get values not owned by this proc
-        FatalError
-            << "Fix solution retrieval" << abort(FatalError);
+        Foam::FatalError
+            << "Fix solution retrieval" << Foam::abort(Foam::FatalError);
     }
 
     // Don't call correctBCs as we want to allow perturbation of known DOFs
@@ -127,12 +128,14 @@ PetscErrorCode formResidual
             ff[blockRowI*blockSize + 2] = resI.z();
         }
     }
-    if (Pstream::parRun())
+
+    if (Foam::Pstream::parRun())
     {
         // What happens for points not owned by this proc?
         // I guess the source should be summed across procs
-        FatalError
-            << "Form residual: do we need to use owned by?" << abort(FatalError);
+        Foam::FatalError
+            << "Form residual: do we need to use owned by?"
+            << abort(Foam::FatalError);
     }
 
     // Restore vectors
@@ -179,11 +182,12 @@ PetscErrorCode formJacobian
             }
         }
     }
-    if (Pstream::parRun())
+
+    if (Foam::Pstream::parRun())
     {
         // I need to get values not owned by this proc
-        FatalError
-            << "Fix solution retrieval" << abort(FatalError);
+        Foam::FatalError
+            << "Fix solution retrieval" << abort(Foam::FatalError);
     }
 
     // This may not be needed
@@ -260,10 +264,10 @@ PetscErrorCode formJacobian
             );
         }
     }
-    if (Pstream::parRun())
+    if (Foam::Pstream::parRun())
     {
-        FatalError
-            << "formJac: check if owned by is needed" << abort(FatalError);
+        Foam::FatalError
+            << "formJac: check if owned by is needed" << abort(Foam::FatalError);
     }
 
     // Complete matrix assembly
@@ -1053,15 +1057,15 @@ bool vertexCentredLinGeomSolid::evolveSnes()
     // Uses default options, can be overridden by command line options
     SNESSetFromOptions(snes);
 
-    // Find the start and end global point indices for this proc
-    forAll(ownedByThisProc, pI)
-    {
-        if (ownedByThisProc[pI])
-        {
-            blockStartID = min(blockStartID, localToGlobalPointMap[pI]);
-            blockEndID = max(blockEndID, localToGlobalPointMap[pI]);
-        }
-    }
+    // // Find the start and end global point indices for this proc
+    // forAll(ownedByThisProc, pI)
+    // {
+    //     if (ownedByThisProc[pI])
+    //     {
+    //         blockStartID = min(blockStartID, localToGlobalPointMap[pI]);
+    //         blockEndID = max(blockEndID, localToGlobalPointMap[pI]);
+    //     }
+    // }
     //const label startID = blockSize*blockStartID;
     //const label endID = blockSize*(blockEndID + 1) - 1;
 

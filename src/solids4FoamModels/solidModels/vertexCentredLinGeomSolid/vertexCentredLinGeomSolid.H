@@ -69,7 +69,7 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class vertexCentredLinGeomSolid Declaration
+                  Class vertexCentredLinGeomSolid Declaration
 \*---------------------------------------------------------------------------*/
 
 class vertexCentredLinGeomSolid

@@ -81,6 +81,10 @@ class solidTractionFvPatchVectorField
         //- Second order accuracy correction
         const Switch secondOrder_;
 
+        //- Extrapolate values to the patch using the patch internal gradient
+        //  field. Alternatively, if false, use the gradient at the patch
+        const Switch extrapolateValue_;
+
         //- Switch so that the effective traction is enforced rather than the
         //  total traction. This only applies to porous flow based solids
         const Switch setEffectiveTraction_;

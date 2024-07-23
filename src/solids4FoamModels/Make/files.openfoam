@@ -10,6 +10,7 @@ solidModels/explicitLinGeomTotalDispSolid/explicitLinGeomTotalDispSolid.C
 solidModels/explicitUnsLinGeomTotalDispSolid/explicitUnsLinGeomTotalDispSolid.C
 solidModels/linGeomSolid/linGeomSolid.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C
+solidModels/linGeomTotalDispSnesSolid/linGeomTotalDispSnesSolid.C
 solidModels/linGeomPressureDisplacementSolid/linGeomPressureDisplacementSolid.C
 solidModels/nonLinGeomUpdatedLagSolid/nonLinGeomUpdatedLagSolid.C
 solidModels/nonLinGeomTotalLagSolid/nonLinGeomTotalLagSolid.C
@@ -193,6 +194,8 @@ numerics/AMIInterpolationS4F/faceAreaWeightAMIS4F/faceAreaWeightAMIS4F.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresVectors.C
 numerics/extendedLeastSquaresGrad/extendedLeastSquaresGrads.C
+numerics/leastSquaresS4fGrad/leastSquaresS4fGrads.C
+numerics/leastSquaresS4fGrad/leastSquaresS4fVectors.C
 numerics/fvc/fvcCellLimitedGrad.C
 numerics/globalPointIndices/globalPointIndices.C
 numerics/globalPolyPatch/globalPolyPatch.C
