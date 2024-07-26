@@ -47,6 +47,7 @@ SourceFiles
 #include "uniformDimensionedFields.H"
 #include "twoDPointCorrector.H"
 #include "sparseMatrix.H"
+#include "globalIndex.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -86,6 +87,10 @@ class linGeomTotalDispSnesSolid
 
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
+
+        //- Helper object for converting between local (on processor) and global
+        //  cell indices
+        globalIndex globalCells_;
 
 
     // Private Member Functions
@@ -148,6 +153,12 @@ public:
             const bool& twoD() const
             {
                 return twoD_;
+            }
+
+            //- Const access to the global index object
+            const globalIndex& globalCells() const
+            {
+                return globalCells_;
             }
 
         // Edit

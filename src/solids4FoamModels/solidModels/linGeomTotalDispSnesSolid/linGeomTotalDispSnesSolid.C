@@ -25,14 +25,13 @@ License
 #include "momentumStabilisation.H"
 #include "backwardDdtScheme.H"
 #include "sparseMatrixTools.H"
+#include "processorFvPatchField.H"
+#include "solidTractionFvPatchVectorField.H"
 #ifdef USE_PETSC
     #include <petscksp.h>
     #include <petscsnes.h>
 #endif
 
-// TESTING
-#include "linearElastic.H"
-#include "solidTractionFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
 
@@ -63,60 +62,49 @@ PetscErrorCode formResidualLinGeomTotalDispSnesSolid
     void *ctx     // user context
 )
 {
+    // Foam::Pout<< __LINE__ << Foam::endl;
     const PetscScalar *xx;
     PetscScalar       *ff;
     appCtx *user = (appCtx *)ctx;
 
     // Access x and f data
-    // VecRestoreArrayRead() and VecRestoreArray() must be called when access is
-    // no longer needed
-    CHKERRQ(VecGetArrayRead(x,&xx));
-    CHKERRQ(VecGetArray(f,&ff));
+    CHKERRQ(VecGetArrayRead(x, &xx));
+    CHKERRQ(VecGetArray(f, &ff));
 
     // Map the solution to an OpenFOAM field
     const bool twoD = user->solMod_.twoD();
-    // Foam::volVectorField D("petsc_D", user->solMod_.D());
-    // Foam::volVectorField D("D", user->solMod_.D());
+    const int blockSize = twoD ? 2 : 3;
     Foam::volVectorField& D = user->solMod_.D();
     Foam::vectorField& DI = D;
-    // const Foam::boolList& ownedByThisProc =
-    //     user->solMod_.gPointIndices().ownedByThisProc();
-    if (Foam::Pstream::parRun())
-    {
-        // globalPoint should do what I need
-        Foam::FatalError
-            << "Fix parallel" << Foam::abort(Foam::FatalError);
-    }
+
     {
         int index = 0;
-        forAll(DI, i)
+        forAll(DI, localCellI)
         {
-            //if (ownedByThisProc[i])
-            {
-                DI[i].x() = xx[index++];
-                DI[i].y() = xx[index++];
+            DI[localCellI][Foam::vector::X] = xx[index++];
+            DI[localCellI][Foam::vector::Y] = xx[index++];
 
-                if (!twoD)
-                {
-                    DI[i].z() = xx[index++];
-                }
+            if (!twoD)
+            {
+                DI[localCellI][Foam::vector::Z] = xx[index++];
             }
         }
     }
 
+    // Restore the solution vector
+    CHKERRQ(VecRestoreArrayRead(x, &xx));
+
+    // Enforce the D boundary conditions and sync processor boundaries
+    D.correctBoundaryConditions();
 
     // Compute the residual
     const Foam::vectorField res(user->solMod_.residualMomentum(D));
 
     // Map the data to f
-    // const Foam::labelList& localToGlobalPointMap =
-    //     user->solMod_.gPointIndices().localToGlobalPointMap();
-    const int blockSize = twoD ? 2 : 3;
     forAll(res, localBlockRowI)
     {
         const Foam::vector& resI = res[localBlockRowI];
-        //const int blockRowI = localToGlobalPointMap[localBlockRowI];
-        const int blockRowI = localBlockRowI; // serial only
+        const int blockRowI = localBlockRowI;
 
         ff[blockRowI*blockSize] = resI.x();
         ff[blockRowI*blockSize + 1] = resI.y();
@@ -127,9 +115,8 @@ PetscErrorCode formResidualLinGeomTotalDispSnesSolid
         }
     }
 
-    // Restore vectors
-    CHKERRQ(VecRestoreArrayRead(x,&xx));
-    CHKERRQ(VecRestoreArray(f,&ff));
+    // Restore the source vector
+    CHKERRQ(VecRestoreArray(f, &ff));
 
     return 0;
 }
@@ -140,10 +127,11 @@ PetscErrorCode formJacobianLinGeomTotalDispSnesSolid
     SNES snes,    // snes object
     Vec x,        // current solution
     Mat jac,      // Jacobian
-    Mat B,        // Jaconian precondioner (can be jac)
+    Mat B,        // Preconditioner matrix (can be jac)
     void *ctx     // user context
 )
 {
+    // Foam::Pout<< __LINE__ << Foam::endl;
     // Get pointer to solution data
     const PetscScalar *xx;
     CHKERRQ(VecGetArrayRead(x, &xx));
@@ -151,37 +139,25 @@ PetscErrorCode formJacobianLinGeomTotalDispSnesSolid
     // Map the solution to an OpenFOAM field
     appCtx *user = (appCtx *)ctx;
     const bool twoD = user->solMod_.twoD();
-    // Foam::volVectorField D("petsc_D", user->solMod_.D());
-    // Foam::volVectorField D("D", user->solMod_.D());
+    const int blockSize = twoD ? 2 : 3;
     Foam::volVectorField& D = user->solMod_.D();
     Foam::vectorField& DI = D;
-    // const Foam::boolList& ownedByThisProc =
-    //     user->solMod_.gPointIndices().ownedByThisProc();
-    if (Foam::Pstream::parRun())
-    {
-        // globalPoint should do what I need
-        Foam::FatalError
-            << "Fix parallel" << Foam::abort(Foam::FatalError);
-    }
+
     {
         int index = 0;
-        forAll(DI, i)
+        forAll(DI, localCellI)
         {
-            // if (ownedByThisProc[i])
-            {
-                DI[i].x() = xx[index++];
-                DI[i].y() = xx[index++];
+            DI[localCellI][Foam::vector::X] = xx[index++];
+            DI[localCellI][Foam::vector::Y] = xx[index++];
 
-                if (!twoD)
-                {
-                    DI[i].z() = xx[index++];
-                }
+            if (!twoD)
+            {
+                DI[localCellI][Foam::vector::Z] = xx[index++];
             }
         }
     }
 
-    // Correct boundaries
-    // Do I need a traction loop here?
+    // Enforce boundary conditions
     D.correctBoundaryConditions();
 
     // Restore solution vector
@@ -192,55 +168,117 @@ PetscErrorCode formJacobianLinGeomTotalDispSnesSolid
     Foam::sparseMatrix matrix;
     matrix += user->solMod_.JacobianMomentum(D)();
 
-
-    // Set matrix coefficients, if any, to zero
-    // TODO: only set the matrix once since it does not change!!!
+    // Initialise the matrix if it has yet to be allocated; otherwise zero all
+    // entries
     MatInfo info;
     MatGetInfo(B, MAT_LOCAL, &info);
     if (info.nz_used)
     {
-        // Foam::Info<< "Zeroing the matrix" << Foam::endl;
-        // If we don't change the matrix then we should return it
+        // Foam::Info<< "Zeroing the Jacobian" << Foam::endl;
+        // Zero the matrix but do not reallocate the space
+        // The "-snes_lag_jacobian -2" PETSc option can be used to avoid
+        // re-building the matrix
         CHKERRQ(MatZeroEntries(B));
     }
     else
     {
-        const int blockSize = twoD ? 2 : 3;
         Foam::Info<< "Initialising the matrix" << Foam::endl;
-        Foam::labelList nonZerosPerBlockRow(user->solMod_.mesh().nCells(), 1);
-        forAll(user->solMod_.mesh().owner(), faceI)
-        {
-            nonZerosPerBlockRow[user->solMod_.mesh().owner()[faceI]]++;
-            nonZerosPerBlockRow[user->solMod_.mesh().neighbour()[faceI]]++;
-        }
-        const int d_nz = blockSize*Foam::max(nonZerosPerBlockRow);
-        Foam::Info<< "    d_nz = " << d_nz << Foam::endl;
+        // Foam::labelList nonZerosPerBlockRow(user->solMod_.mesh().nCells(), 1);
+        // forAll(user->solMod_.mesh().owner(), faceI)
+        // {
+        //     nonZerosPerBlockRow[user->solMod_.mesh().owner()[faceI]]++;
+        //     nonZerosPerBlockRow[user->solMod_.mesh().neighbour()[faceI]]++;
+        // }
+        // const int d_nz = blockSize*Foam::max(nonZerosPerBlockRow);
+        // Foam::Info<< "    d_nz = " << d_nz << Foam::endl;
 
-        MatSetOption(B, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+        // MatSetOption(B, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+
+        // // Allocate parallel matrix
+        // // To-do: count exact number of non-zeros rather than conservatively
+        // // estimating
+        // //CHKERRQ(MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz));
+        // // Allocate parallel matrix with the same conservative stencil per node
+        // CHKERRQ(MatMPIAIJSetPreallocation(B, d_nz, NULL, 0, NULL));
+
+        // Set the block size
+        CHKERRQ(MatSetBlockSize(B, blockSize));
+
+        const int blockn = user->solMod_.globalCells().localSize();
+        //const int n = blockSize*blockn;
+        // const int blockN = user->solMod_.globalCells().size();
+        // const int N = blockSize*blockN;
+
+        // Number of on-processor non-zeros per row
+        // int* d_nnz = (int*)malloc(n*sizeof(int));
+        int* D_nnz = (int*)malloc(blockn*sizeof(int));
+
+        // Number of off-processor non-zeros per row
+        // int* o_nnz = (int*)malloc(n*sizeof(int));
+        int* O_nnz = (int*)malloc(blockn*sizeof(int));
+
+        // Initialise D_nnz and O_nnz to zero
+        for (int i = 0; i < blockn; ++i)
+        {
+            D_nnz[i] = 1; // count diagonal cell
+            O_nnz[i] = 0;
+        }
+
+        // Count neighbours sharing an internal face
+        const Foam::labelUList& own = user->solMod_.mesh().owner();
+        const Foam::labelUList& nei = user->solMod_.mesh().neighbour();
+        forAll(own, faceI)
+        {
+            const Foam::label ownCellID = own[faceI];
+            const Foam::label neiCellID = nei[faceI];
+            D_nnz[ownCellID]++;
+            D_nnz[neiCellID]++;
+        }
+
+        // Count off-processor neighbour cells
+        forAll(user->solMod_.mesh().boundary(), patchI)
+        {
+            if (user->solMod_.mesh().boundary()[patchI].type() == "processor")
+            {
+                const Foam::unallocLabelList& faceCells =
+                    user->solMod_.mesh().boundary()[patchI].faceCells();
+
+                forAll(faceCells, fcI)
+                {
+                    const Foam::label cellID = faceCells[fcI];
+                    O_nnz[cellID]++;
+                }
+            }
+            else if (user->solMod_.mesh().boundary()[patchI].coupled())
+            {
+                // Other coupled boundaries are not implemented
+                Foam::FatalError
+                    << "Coupled boundary are not implemented, except for"
+                    << " processor boundaries" << Foam::abort(Foam::FatalError);
+            }
+        }
 
         // Allocate parallel matrix
-        //CHKERRQ(MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz));
+        //CHKERRQ(MatMPIAIJSetPreallocation(B, 0, D_nnz, 0, O_nnz));
         // Allocate parallel matrix with the same conservative stencil per node
-        CHKERRQ(MatMPIAIJSetPreallocation(B, d_nz, NULL, 0, NULL));
+        //CHKERRQ(MatMPIAIJSetPreallocation(B, d_nz, NULL, 0, NULL));
+        CHKERRQ(MatMPIBAIJSetPreallocation(B, blockSize, 0, D_nnz, 0, O_nnz));
+
+        // Raise error if mallocs are required during matrix assembly
+        MatSetOption(B, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
     }
 
-    // Todo: do I need to set the number of non-zeros here?
-    // This will majorly impact performance
-
     // Insert OpenFOAM matrix into PETSc matrix
-    // Note: we use global indices when inserting coefficients
+    // Note: the matrix contains global indices, which we use when inserting
+    // coefficients
     const Foam::sparseMatrixData& data = matrix.data();
-    // const Foam::labelList& localToGlobalPointMap =
-    //     user->solMod_.gPointIndices().localToGlobalPointMap();
     PetscScalar values2d[4];
     PetscScalar values3d[9];
     for (auto iter = data.begin(); iter != data.end(); ++iter)
     {
         const Foam::tensor& coeff = iter();
-        // const int blockRowI = localToGlobalPointMap[iter.key()[0]];
-        // const int blockColI = localToGlobalPointMap[iter.key()[1]];
-        const int blockRowI = iter.key()[0];
-        const int blockColI = iter.key()[1];
+        const Foam::label globalBlockRowI = iter.key()[0];
+        const Foam::label globalBlockColI = iter.key()[1];
 
         if (twoD)
         {
@@ -255,7 +293,8 @@ PetscErrorCode formJacobianLinGeomTotalDispSnesSolid
             (
                 MatSetValuesBlocked
                 (
-                    B, 1, &blockRowI, 1, &blockColI, values2d, ADD_VALUES
+                    B, 1, &globalBlockRowI, 1, &globalBlockColI, values2d,
+                    ADD_VALUES
                 )
             );
         }
@@ -277,7 +316,8 @@ PetscErrorCode formJacobianLinGeomTotalDispSnesSolid
             (
                 MatSetValuesBlocked
                 (
-                    B, 1, &blockRowI, 1, &blockColI, values3d, ADD_VALUES
+                    B, 1, &globalBlockRowI, 1, &globalBlockColI, values3d,
+                    ADD_VALUES
                 )
             );
         }
@@ -344,7 +384,8 @@ linGeomTotalDispSnesSolid::linGeomTotalDispSnesSolid
     impKf_(mechanical().impKf()),
     rImpK_(1.0/impK_),
     twoD_(sparseMatrixTools::checkTwoD(mesh())),
-    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    globalCells_(mesh().nCells())
 {
     DisRequired();
 
@@ -415,6 +456,7 @@ tmp<vectorField> linGeomTotalDispSnesSolid::residualMomentum
     traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
 
     // Enforce traction conditions
+    // To-do: add zero-shear boundaries
     forAll(D.boundaryField(), patchI)
     {
         if
@@ -464,19 +506,13 @@ tmp<sparseMatrix> linGeomTotalDispSnesSolid::JacobianMomentum
     // Count the number of non-zeros for a Laplacian discretisation
     // This equals the sum of one plus the number of internal faces for each,
     // which can be calculated as nCells + 2*nInternalFaces
-    // Multiply by 3 since we will form the block matrix
-    // Todo: look 2D vs 3D
+    // Multiply by the blockSize since we will form the block matrix
+    const int blockSize = twoD_ ? 2 : 3;
     const label numNonZeros =
-        3*returnReduce
+        blockSize*returnReduce
         (
             mesh().nCells() + 2.0*mesh().nInternalFaces(), sumOp<label>()
         );
-    // globalIndex globalCells(mesh.nCells());
-    // label globalCellI = globalCells.toGlobal(cellI);
-
-    // const surfaceVectorField Df(fvc::interpolate(D));
-    // const dimensionedScalar dimLL("1", dimless/pow(dimLength, 2), 1);
-    // surfaceScalarField scaleFac(1.0 + (Df & Df)*dimLL);
 
     // Calculate a segregated approximation of the Jacobian
     fvVectorMatrix approxJ
@@ -490,7 +526,7 @@ tmp<sparseMatrix> linGeomTotalDispSnesSolid::JacobianMomentum
         approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
     }
 
-    // Optional under-relaxation of the linear system
+    // Optional: under-relaxation of the linear system
     approxJ.relax();
 
     // Convert fvMatrix matrix to sparseMatrix
@@ -511,7 +547,9 @@ tmp<sparseMatrix> linGeomTotalDispSnesSolid::JacobianMomentum
                 0,  0, diag[blockRowI][vector::Z]
             );
 
-            matrix(blockRowI, blockRowI) = coeff;
+            const label globalBlockRowI = globalCells_.toGlobal(blockRowI);
+
+            matrix(globalBlockRowI, globalBlockRowI) = coeff;
         }
     }
 
@@ -522,13 +560,116 @@ tmp<sparseMatrix> linGeomTotalDispSnesSolid::JacobianMomentum
         const scalarField& upper = approxJ.upper();
         forAll(own, faceI)
         {
-            const label blockRowI = own[faceI];
-            const label blockColI = nei[faceI];
             const tensor coeff(upper[faceI]*I);
 
-            matrix(blockRowI, blockColI) = coeff;
-            matrix(blockColI, blockRowI) = coeff;
+            const label blockRowI = own[faceI];
+            const label blockColI = nei[faceI];
+
+            const label globalBlockRowI = globalCells_.toGlobal(blockRowI);
+            const label globalBlockColI = globalCells_.toGlobal(blockColI);
+
+            matrix(globalBlockRowI, globalBlockColI) = coeff;
+            matrix(globalBlockColI, globalBlockRowI) = coeff;
         }
+    }
+
+    // Collect the global cell indices from neighbours at processor boundaries
+    // These are used to insert the off-processor coefficients
+    // First, send the data
+    forAll(D.boundaryField(), patchI)
+    {
+        const fvPatchField<vector>& pD = D.boundaryField()[patchI];
+        if (pD.type() == "processor")
+        {
+            // Take a copy of the faceCells (local IDs) and convert them to
+            // global IDs
+            labelList globalFaceCells(mesh().boundary()[patchI].faceCells());
+            globalCells_.inplaceToGlobal(globalFaceCells);
+
+            // Send global IDs to the neighbour proc
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(mesh().boundary()[patchI]);
+            procPatch.compressedSend
+            (
+                Pstream::commsTypes::blocking, globalFaceCells
+            );
+        }
+    }
+    // Next, receive the data
+    PtrList<labelList> neiProcGlobalIDs(D.boundaryField().size());
+    forAll(D.boundaryField(), patchI)
+    {
+        const fvPatchField<vector>& pD = D.boundaryField()[patchI];
+        if (pD.type() == "processor")
+        {
+            neiProcGlobalIDs.set(patchI, new labelList(pD.size()));
+            labelList& globalFaceCells = neiProcGlobalIDs[patchI];
+
+            // Receive global IDs from the neighbour proc
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(mesh().boundary()[patchI]);
+            procPatch.compressedReceive
+            (
+                Pstream::commsTypes::blocking, globalFaceCells
+            );
+        }
+    }
+
+    // Insert the off-processor coefficients
+    forAll(D.boundaryField(), patchI)
+    {
+        const fvPatchField<vector>& pD = D.boundaryField()[patchI];
+
+        if (pD.type() == "processor")
+        {
+            const vectorField& intCoeffs = approxJ.internalCoeffs()[patchI];
+            const vectorField& neiCoeffs = approxJ.boundaryCoeffs()[patchI];
+            const unallocLabelList& faceCells =
+                mesh().boundary()[patchI].faceCells();
+            const labelList& neiGlobalFaceCells = neiProcGlobalIDs[patchI];
+
+            forAll(pD, faceI)
+            {
+                const label globalBlockRowI =
+                    globalCells_.toGlobal(faceCells[faceI]);
+
+                // On-proc diagonal coefficient
+                {
+                    const tensor coeff
+                    (
+                        intCoeffs[faceI][vector::X], 0, 0,
+                        0, intCoeffs[faceI][vector::Y], 0,
+                        0, 0, intCoeffs[faceI][vector::Z]
+                    );
+
+                    matrix(globalBlockRowI, globalBlockRowI) += coeff;
+                }
+
+                // Off-proc off-diagonal coefficient
+                {
+                    const tensor coeff
+                    (
+                        neiCoeffs[faceI][vector::X], 0, 0,
+                        0, neiCoeffs[faceI][vector::Y], 0,
+                        0, 0, neiCoeffs[faceI][vector::Z]
+                    );
+
+                    const label globalBlockColI = neiGlobalFaceCells[faceI];
+
+                    matrix(globalBlockRowI, globalBlockColI) += coeff;
+                }
+            }
+        }
+        else if (pD.coupled()) // coupled but not a processor boundary
+        {
+            FatalErrorIn
+            (
+                "tmp<sparseMatrix> linGeomTotalDispSnesSolid::JacobianMomentum"
+            )   << "Coupled boundaries (except processors) not implemented"
+                << abort(FatalError);
+        }
+        // else non-coupled boundary contributions have already been added to
+        // the diagonal
     }
 
     return tmatrix;
@@ -539,7 +680,7 @@ bool linGeomTotalDispSnesSolid::evolve()
 {
     Info<< "Solving the momentum equation for D using PETSc SNES" << endl;
 
-    if (predictor_)
+    if (predictor_ && newTimeStep())
     {
         predict();
     }
@@ -561,6 +702,8 @@ bool linGeomTotalDispSnesSolid::evolve()
     PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
 
     // Create a SNES solver context
+    // To-do: store snes object as member data, so it does not need to be
+    // re-created between time-steps
     SNES snes;
     SNESCreate(PETSC_COMM_WORLD, &snes);
 
@@ -568,43 +711,19 @@ bool linGeomTotalDispSnesSolid::evolve()
     SNESSetApplicationContext(snes, &user);
 
     // Set the residual function
+    Pout<< "Setting the function" << endl;
     SNESSetFunction(snes, NULL, formResidualLinGeomTotalDispSnesSolid, &user);
 
     // Initialise the Jacobian matrix
 
     const int blockSize = twoD_ ? 2 : 3;
-    if (Pstream::parRun())
-    {
-        FatalError
-            << "evolve to be fixed for parallel" << abort(FatalError);
-    }
-    // const Foam::labelList& localToGlobalPointMap =
-    //     globalPointIndices_.localToGlobalPointMap();
 
-    // Find size of global system, i.e. the highest global cell index + 1
-    //const int blockN = Foam::gMax(localToGlobalPointMap) + 1;
-    const int blockN = mesh().nCells(); // fix for parallel
+    // Global system size
+    const int blockN = globalCells_.size();
     const int N = blockSize*blockN;
 
-    // Find the start and end global point indices for this proc
-    const int blockStartID = 0; // fix for parallel
-    const int blockEndID = mesh().nCells() - 1; // fix for parallel
-    // int blockStartID = N;
-    // int blockEndID = -1;
-    // const boolList& ownedByThisProc = globalPointIndices_.ownedByThisProc();
-    // forAll(ownedByThisProc, pI)
-    // {
-    //     if (ownedByThisProc[pI])
-    //     {
-    //         blockStartID = Foam::min(blockStartID, localToGlobalPointMap[pI]);
-    //         blockEndID = Foam::max(blockEndID, localToGlobalPointMap[pI]);
-    //     }
-    // }
-    //const int startID = blockSize*blockStartID;
-    //const int endID = blockSize*(blockEndID + 1) - 1;
-
-    // Find size of local system, i.e. the range of points owned by this proc
-    const int blockn = blockEndID - blockStartID + 1;
+    // Local (this processor) system size
+    const int blockn = globalCells_.localSize();
     const int n = blockSize*blockn;
 
     // Create the matrix
@@ -612,54 +731,26 @@ bool linGeomTotalDispSnesSolid::evolve()
     CHKERRQ(MatCreate(PETSC_COMM_WORLD, &A));
 
     // Set matrix characteristics
+    // Pout<< "Setting A sizes" << endl;
+    // Pout<< "    n = " << n << nl
+    //     << "    N = " << N << endl;
     CHKERRQ(MatSetSizes(A, n, n, N, N));
     //CHKERRQ(MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, N, N));
     CHKERRQ(MatSetFromOptions(A));
     CHKERRQ(MatSetType(A, MATMPIAIJ));
     //CHKERRQ(MatSetType(A, MATMPIBAIJ));
-    CHKERRQ(MatSetBlockSize(A, blockSize));
+    //CHKERRQ(MatSetBlockSize(A, blockSize));
 
-    // Count the number of non-zeros
-    // TODO: fix for parallel
-    // int* d_nnz = (int*)malloc(n*sizeof(int));
-    // int* o_nnz = (int*)malloc(n*sizeof(int));
-    // label d_nnz[n];
-    // label o_nnz[n];
-    // int d_nz = 0;
-    // Foam::sparseMatrixTools::setNonZerosPerRow
-    // (
-    //     d_nnz,
-    //     o_nnz,
-    //     d_nz,
-    //     n,
-    //     blockSize,
-    //     ownedByThisProc,
-    //     globalPointIndices_.stencilSizeOwned(),
-    //     globalPointIndices_.stencilSizeNotOwned()
-    // );
-    labelList nonZerosPerBlockRow(mesh().nCells(), 1);
-    forAll(mesh().owner(), faceI)
-    {
-        nonZerosPerBlockRow[mesh().owner()[faceI]]++;
-        nonZerosPerBlockRow[mesh().neighbour()[faceI]]++;
-    }
-    const int d_nz = blockSize*max(nonZerosPerBlockRow);
-
+    // TESTING: start
     // Allocate parallel matrix
-    //CHKERRQ(MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz));
+    //CHKERRQ(MatMPIAIJSetPreallocation(B, 0, D_nnz, 0, O_nnz));
     // Allocate parallel matrix with the same conservative stencil per node
-    CHKERRQ(MatMPIAIJSetPreallocation(A, d_nz, NULL, 0, NULL));
-    // TODO: change d_nnz/o_nnz to block sizes!
-    //CHKERRQ(MatMPIBAIJSetPreallocation(A, blockSize, 0, d_nnz, 0, o_nnz));
+    //CHKERRQ(MatMPIAIJSetPreallocation(B, d_nz, NULL, 0, NULL));
+    CHKERRQ(MatMPIBAIJSetPreallocation(A, blockSize, 10, NULL, 10, NULL));
 
-    // TO BE FIXED: some mallocs are still needed in parallel!
-    MatSetOption(A, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
-
-    CHKERRQ(MatSetUp(A));
-
-    // Do not call the matrix assembly as we have not inserted any values
-    //CHKERRQ(MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY));
-    //CHKERRQ(MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY));
+    // Raise error if mallocs are required during matrix assembly
+    //MatSetOption(B, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
+    // TESTING: end
 
     // Set the Jacobian function
     SNESSetJacobian(snes, A, A, formJacobianLinGeomTotalDispSnesSolid, &user);
@@ -667,18 +758,6 @@ bool linGeomTotalDispSnesSolid::evolve()
     // Set solver options
     // Uses default options, can be overridden by command line options
     SNESSetFromOptions(snes);
-
-    // // Find the start and end global point indices for this proc
-    // forAll(ownedByThisProc, pI)
-    // {
-    //     if (ownedByThisProc[pI])
-    //     {
-    //         blockStartID = min(blockStartID, localToGlobalPointMap[pI]);
-    //         blockEndID = max(blockEndID, localToGlobalPointMap[pI]);
-    //     }
-    // }
-    //const label startID = blockSize*blockStartID;
-    //const label endID = blockSize*(blockEndID + 1) - 1;
 
     // Create the solution vector
     Vec x;
@@ -690,6 +769,7 @@ bool linGeomTotalDispSnesSolid::evolve()
     CHKERRQ(VecSetFromOptions(x));
 
     // Set initial guess
+    // To-do: use a better initial guess, e.g. extrapolate from old times
     CHKERRQ(VecSet(x, 0.0));
 
     // Solve the nonlinear system
@@ -713,21 +793,18 @@ bool linGeomTotalDispSnesSolid::evolve()
 
     // Retrieve the solution
     const PetscScalar *xx;
-    VecGetArrayRead(x,&xx);
+    VecGetArrayRead(x, &xx);
     Foam::vectorField& DI = D();
     {
         int index = 0;
         forAll(DI, i)
         {
-            // if (ownedByThisProc[i])
-            {
-                DI[i].x() = xx[index++];
-                DI[i].y() = xx[index++];
+            DI[i].x() = xx[index++];
+            DI[i].y() = xx[index++];
 
-                if (!twoD_)
-                {
-                    DI[i].z() = xx[index++];
-                }
+            if (!twoD_)
+            {
+                DI[i].z() = xx[index++];
             }
         }
     }
