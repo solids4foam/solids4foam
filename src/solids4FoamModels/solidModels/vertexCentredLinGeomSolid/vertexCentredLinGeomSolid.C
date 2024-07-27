@@ -299,27 +299,6 @@ namespace solidModels
 defineTypeNameAndDebug(vertexCentredLinGeomSolid, 0);
 addToRunTimeSelectionTable(solidModel, vertexCentredLinGeomSolid, dictionary);
 
-const Enum<vertexCentredLinGeomSolid::solutionAlgorithm>
-vertexCentredLinGeomSolid::solutionAlgorithmNames_
-({
-    {
-        vertexCentredLinGeomSolid::solutionAlgorithm::PETSC_SNES,
-        "PETScSNES"
-    },
-    {
-        vertexCentredLinGeomSolid::solutionAlgorithm::IMPLICIT_COUPLED,
-        "implicitCoupled"
-    },
-    {
-        vertexCentredLinGeomSolid::solutionAlgorithm::IMPLICIT_SEGREGATED,
-        "implicitSegregated"
-    },
-    {
-        vertexCentredLinGeomSolid::solutionAlgorithm::EXPLICIT,
-        "explicit"
-    },
-});
-
 
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
@@ -1754,15 +1733,11 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
             dualMeshMap().dualFaceToCell()
         )
     ),
-    solutionAlgorithm_
-    (
-        solutionAlgorithmNames_.get("solutionAlgorithm", solidModelDict())
-    ),
     dualImpKfPtr_(),
     zeta_(solidModelDict().lookupOrDefault<scalar>("zeta", 0.0)),
     fullNewton_
     (
-        (solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_COUPLED)
+        (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
       ? Switch(solidModelDict().lookup("fullNewton"))
       : Switch(false)
     ),
@@ -1952,7 +1927,7 @@ vertexCentredLinGeomSolid::~vertexCentredLinGeomSolid()
 #ifdef USE_PETSC
     if
     (
-        solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_COUPLED
+        solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED
      && Switch(solidModelDict().lookup("usePETSc"))
     )
     {
@@ -2170,7 +2145,7 @@ tmp<sparseMatrix> vertexCentredLinGeomSolid::JacobianMomentum
 
 void vertexCentredLinGeomSolid::setDeltaT(Time& runTime)
 {
-    if (solutionAlgorithm_ == solutionAlgorithm::EXPLICIT)
+    if (solutionAlg() == solutionAlgorithm::EXPLICIT)
     {
         // Max wave speed in the domain
         const scalar waveSpeed = max
@@ -2225,19 +2200,19 @@ void vertexCentredLinGeomSolid::setDeltaT(Time& runTime)
 
 bool vertexCentredLinGeomSolid::evolve()
 {
-    if (solutionAlgorithm_ == solutionAlgorithm::PETSC_SNES)
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
     {
         return evolveSnes();
     }
-    else if (solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_COUPLED)
+    else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
     {
         return evolveImplicitCoupled();
     }
-    else if (solutionAlgorithm_ == solutionAlgorithm::IMPLICIT_SEGREGATED)
+    else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
     {
         return evolveImplicitSegregated();
     }
-    else if (solutionAlgorithm_ == solutionAlgorithm::EXPLICIT)
+    else if (solutionAlg() == solutionAlgorithm::EXPLICIT)
     {
         return evolveExplicit();
     }

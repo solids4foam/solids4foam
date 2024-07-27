@@ -83,7 +83,7 @@ class solidTractionFvPatchVectorField
 
         //- Extrapolate values to the patch using the patch internal gradient
         //  field. Alternatively, if false, use the gradient at the patch
-        const Switch extrapolateValue_;
+        Switch extrapolateValue_;
 
         //- Switch so that the effective traction is enforced rather than the
         //  total traction. This only applies to porous flow based solids
@@ -191,6 +191,12 @@ public:
             virtual scalarField& pressure()
             {
                 return pressure_;
+            }
+
+            // Non-const access to the extrapolateValue flag
+            Switch& extrapolateValue()
+            {
+                return extrapolateValue_;
             }
 
 

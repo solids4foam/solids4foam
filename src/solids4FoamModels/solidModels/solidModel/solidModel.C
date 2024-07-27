@@ -40,6 +40,26 @@ namespace Foam
     defineRunTimeSelectionTable(solidModel, dictionary);
     addToRunTimeSelectionTable(physicsModel, solidModel, physicsModel);
 
+const Enum<solidModel::solutionAlgorithm> solidModel::solutionAlgorithmNames_
+({
+    {
+        solidModel::solutionAlgorithm::PETSC_SNES,
+        "PETScSNES"
+    },
+    {
+        solidModel::solutionAlgorithm::IMPLICIT_COUPLED,
+        "implicitCoupled"
+    },
+    {
+        solidModel::solutionAlgorithm::IMPLICIT_SEGREGATED,
+        "implicitSegregated"
+    },
+    {
+        solidModel::solutionAlgorithm::EXPLICIT,
+        "explicit"
+    },
+});
+
 #ifdef OPENFOAM_ORG
     typedef meshFaceZones faceZoneMesh;
 #endif
@@ -579,6 +599,12 @@ Foam::solidModel::solidModel
         )
     ),
     type_(type),
+    solutionAlgorithm_
+    (
+        solidModelDict().found("solutionAlgorithm")
+      ? solutionAlgorithmNames_.get("solutionAlgorithm", solidModelDict())
+      : solutionAlgorithm::IMPLICIT_SEGREGATED
+    ),
     thermalPtr_(),
     mechanicalPtr_(),
     Dheader_("D", runTime.timeName(), mesh(), IOobject::MUST_READ),
@@ -808,7 +834,8 @@ Foam::solidModel::solidModel
     (
         solidModelDict().lookupOrAddDefault<Switch>("restart", false)
     ),
-    rhoD2dt2DPtr_()
+    rhoD2dt2DPtr_(),
+    twoD_(mesh().nGeometricD() == 2)
 {
     // Force old time fields to be stored
     D_.oldTime().oldTime();

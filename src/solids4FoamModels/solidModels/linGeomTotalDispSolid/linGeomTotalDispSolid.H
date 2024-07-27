@@ -41,6 +41,45 @@ SourceFiles
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
+#include "sparseMatrix.H"
+#include "globalIndex.H"
+#ifdef USE_PETSC
+    #include <petscksp.h>
+    #include <petscsnes.h>
+#endif
+
+
+// * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
+
+#ifdef USE_PETSC
+
+// Forward declaration of the Foam::solidModels::linGeomTotalDispSolid class
+namespace Foam
+{
+    namespace solidModels
+    {
+        class linGeomTotalDispSolid;
+    }
+}
+
+// User data "context" for PETSc functions
+typedef struct appCtx
+{
+    // Reference to the solid model object
+    Foam::solidModels::linGeomTotalDispSolid& solMod_;
+
+    // Constructor
+    appCtx
+    (
+        Foam::solidModels::linGeomTotalDispSolid& solMod
+    )
+    :
+        solMod_(solMod)
+    {}
+} appCtx;
+
+#endif // ifdef USE_PETSC
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -78,12 +117,41 @@ class linGeomTotalDispSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //- Helper object for converting between local (on processor) and global
+        //  cell indices
+        globalIndex globalCells_;
+
+        //- Flag to set whether the solver stops when PETSs SNES returns an
+        //  error
+        const Switch stopOnPetscError_;
+
+        //- Pointer to the PETSc SNES object
+        autoPtr<SNES> snesPtr_;
+
+        //- Pointer to the PETSc solution vector
+        autoPtr<Vec> xPtr_;
+
+        //- Pointer to the PETSc matrix
+        autoPtr<Mat> APtr_;
+
+        //- PETSc user context
+        autoPtr<appCtx> snesUserPtr_;
+
 
     // Private Member Functions
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
         void predict();
+
+        //- Evolve the solid solver using the segregated implicit approach
+        bool evolveImplicitSegregated();
+
+        //- Evolve the solid solver using the PETSc nonlinear solver (SNES)
+        //  A compact approximate Jacobian (same one as used by the segregated
+        //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
+        //  works well with this approach
+        bool evolveSnes();
 
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);
@@ -135,7 +203,35 @@ public:
                 return D();
             }
 
+            //- Const access to the global index object
+            const globalIndex& globalCells() const
+            {
+                return globalCells_;
+            }
+
+
         // Edit
+
+            //- Calculate the momentum equation residual
+            //  This should be const but is not because of the mechanical law
+            //  The can be fixed when the mechanical models are refactored
+            tmp<vectorField> residualMomentum
+            (
+                const volVectorField& D
+            );
+
+            //- Calculate the Jacobian for the momentum equation
+            //  This Jacobian is the derivative of residualMomentum with respect
+            //  to the solution vector (D)
+            //  This should be const but is not because of the mechanical law
+            //  The can be fixed when the mechanical models are refactored
+            //  This can also be an approximation of the true Jacobian, e.g. a
+            //  compact molecule Laplacian
+            //  We initially adopt this approach for testin
+            tmp<sparseMatrix> JacobianMomentum
+            (
+                const volVectorField& D
+            );
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
@@ -147,6 +243,9 @@ public:
                 const scalarField& pressure,
                 const fvPatch& patch
             ) const;
+
+            //- This function is called at the end of the simulation
+            virtual void end();
 };
 
 

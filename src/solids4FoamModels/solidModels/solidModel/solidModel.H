@@ -51,6 +51,8 @@ SourceFiles
 #include "fvMatricesFwd.H"
 #include "PackedBoolList.H"
 #include "meshDual.H"
+#include "Enum.H"
+#include "twoDPointCorrector.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -66,6 +68,23 @@ class solidModel
     public physicsModel,
     public regIOobject
 {
+public:
+
+        //- Solution algorithms
+        enum solutionAlgorithm
+        {
+            PETSC_SNES,
+            IMPLICIT_COUPLED,
+            IMPLICIT_SEGREGATED,
+            EXPLICIT
+        };
+
+        //- Solution algorithm names
+        static const Enum<solutionAlgorithm> solutionAlgorithmNames_;
+
+
+private:
+
     // Private data
 
         //- Mesh
@@ -79,6 +98,10 @@ class solidModel
 
         //- Derived solidModel type
         const word type_;
+
+        //- Solution algorithm, e.g. coupled, segregated, explicit, SNES
+        //  This enum is used by some of the solid models but not all
+        const solutionAlgorithm solutionAlgorithm_;
 
         //- Thermal model
         mutable autoPtr<thermalModel> thermalPtr_;
@@ -217,6 +240,9 @@ class solidModel
 
         //- Store rho*d2d2t(D) for efficiency
         mutable autoPtr<volVectorField> rhoD2dt2DPtr_;
+
+        //- Flag indicating if the case is 2-D or 3-D
+        const bool twoD_;
 
 
     // Private Member Functions
@@ -436,6 +462,12 @@ public:
                 return solidProperties_;
             }
 
+            //- Const access to the solution algorithm enum
+            const solutionAlgorithm& solutionAlg() const
+            {
+                return solutionAlgorithm_;
+            }
+
             //- Is it a new time step? This function return true the first time
             //  it is called in a time step
             bool newTimeStep() const;
@@ -569,6 +601,12 @@ public:
             //- Each solidModel must indicate whether D or DD is the primary
             //  solution variable
             virtual volVectorField& solutionD() = 0;
+
+            //- Is the model two-dimensional
+            const bool& twoD() const
+            {
+                return twoD_;
+            }
 
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement

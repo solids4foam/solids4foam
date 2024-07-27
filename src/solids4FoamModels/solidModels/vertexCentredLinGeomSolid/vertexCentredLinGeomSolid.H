@@ -54,7 +54,6 @@ SourceFiles
 #include "GeometricField.H"
 #include "dualMechanicalModel.H"
 #include "globalPointIndices.H"
-#include "Enum.H"
 #include "twoDPointCorrector.H"
 #include "pointVolInterpolation.H"
 
@@ -76,30 +75,10 @@ class vertexCentredLinGeomSolid
 :
     public solidModel
 {
-public:
-
-        //- Solution algorithms
-        enum solutionAlgorithm
-        {
-            PETSC_SNES,
-            IMPLICIT_COUPLED,
-            IMPLICIT_SEGREGATED,
-            EXPLICIT
-        };
-
-        //- Solution algorithm names
-        static const Enum<solutionAlgorithm> solutionAlgorithmNames_;
-
-
-private:
-
     // Private Data
 
         //- Mechanical model for dual mesh
         autoPtr<dualMechanicalModel> dualMechanicalPtr_;
-
-        //- Solution algorithm, e.g. coupled, segregated, explicit, SNES
-        const solutionAlgorithm solutionAlgorithm_;
 
         //- Implicit stiffness used by segregated algorithm
         //  Coefficient of the Laplacian term. Defined at the dual mesh faces.
