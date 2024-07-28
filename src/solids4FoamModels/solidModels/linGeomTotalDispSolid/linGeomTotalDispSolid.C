@@ -32,23 +32,6 @@ License
 
 #ifdef USE_PETSC
 
-// // User data "context" for PETSc functions
-// typedef struct appCtx
-// {
-//     // Reference to the solid model object
-//     Foam::solidModels::linGeomTotalDispSolid& solMod_;
-
-//     // Constructor
-//     appCtx
-//     (
-//         Foam::solidModels::linGeomTotalDispSolid& solMod
-//     )
-//     :
-//         solMod_(solMod)
-//     {}
-// } appCtx;
-
-
 PetscErrorCode formResidualLinGeomTotalDispSolid
 (
     SNES snes,    // snes object
@@ -165,9 +148,12 @@ PetscErrorCode formJacobianLinGeomTotalDispSolid
     // entries
     MatInfo info;
     MatGetInfo(B, MAT_LOCAL, &info);
+    // PetscInt rstart, rend;
+    // MatGetOwnershipRange(B, &rstart, &rend);
+    // Foam::Pout<< "rstart = " << rstart
+    //     << ", rend = " << rend << Foam::endl;
     if (info.nz_used)
     {
-        // Foam::Info<< "Zeroing the Jacobian" << Foam::endl;
         // Zero the matrix but do not reallocate the space
         // The "-snes_lag_jacobian -2" PETSc option can be used to avoid
         // re-building the matrix
@@ -574,7 +560,7 @@ bool linGeomTotalDispSolid::evolveSnes()
         if (stopOnPetscError_)
         {
             FatalErrorIn("bool linGeomTotalDispSolid::evolveSnes()")
-                << "Stopping because of the PETSc SNES error"
+                << "Stopping because of the PETSc SNES error" << nl
                 << "Set `stopOnPetscError` to `false` to continue on PETSc "
                 << "SNES errors"
                 << abort(FatalError);
@@ -1216,11 +1202,12 @@ tmp<sparseMatrix> linGeomTotalDispSolid::JacobianMomentum
 
                 // Off-proc off-diagonal coefficient
                 {
+                    // Take care: we need to flip the sign
                     const tensor coeff
                     (
-                        neiCoeffs[faceI][vector::X], 0, 0,
-                        0, neiCoeffs[faceI][vector::Y], 0,
-                        0, 0, neiCoeffs[faceI][vector::Z]
+                        -neiCoeffs[faceI][vector::X], 0, 0,
+                        0, -neiCoeffs[faceI][vector::Y], 0,
+                        0, 0, -neiCoeffs[faceI][vector::Z]
                     );
 
                     const label globalBlockColI = neiGlobalFaceCells[faceI];
