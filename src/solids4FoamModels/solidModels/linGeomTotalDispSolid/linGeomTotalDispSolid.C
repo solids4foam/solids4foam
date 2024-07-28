@@ -24,10 +24,8 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "momentumStabilisation.H"
 #include "solidTractionFvPatchVectorField.H"
-// #ifdef USE_PETSC
-//     #include <petscksp.h>
-//     #include <petscsnes.h>
-// #endif
+#include "fixedDisplacementZeroShearFvPatchVectorField.H"
+#include "symmetryFvPatchFields.H"
 
 
 // * * * * * * * * * * * * * * External Functions  * * * * * * * * * * * * * //
@@ -177,46 +175,27 @@ PetscErrorCode formJacobianLinGeomTotalDispSolid
     }
     else
     {
-        Foam::Info<< "Initialising the matrix" << Foam::endl;
-        // Foam::labelList nonZerosPerBlockRow(user->solMod_.mesh().nCells(), 1);
-        // forAll(user->solMod_.mesh().owner(), faceI)
-        // {
-        //     nonZerosPerBlockRow[user->solMod_.mesh().owner()[faceI]]++;
-        //     nonZerosPerBlockRow[user->solMod_.mesh().neighbour()[faceI]]++;
-        // }
-        // const int d_nz = blockSize*Foam::max(nonZerosPerBlockRow);
-        // Foam::Info<< "    d_nz = " << d_nz << Foam::endl;
-
-        // MatSetOption(B, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
-
-        // // Allocate parallel matrix
-        // // To-do: count exact number of non-zeros rather than conservatively
-        // // estimating
-        // //CHKERRQ(MatMPIAIJSetPreallocation(A, 0, d_nnz, 0, o_nnz));
-        // // Allocate parallel matrix with the same conservative stencil per node
-        // CHKERRQ(MatMPIAIJSetPreallocation(B, d_nz, NULL, 0, NULL));
+        Foam::Info<< "    Initialising the matrix" << Foam::endl;
 
         // Set the block size
         CHKERRQ(MatSetBlockSize(B, blockSize));
 
+        // Number of vector unknowns on this processor
         const int blockn = user->solMod_.globalCells().localSize();
-        //const int n = blockSize*blockn;
-        // const int blockN = user->solMod_.globalCells().size();
-        // const int N = blockSize*blockN;
+
+        // Count the number of non-zeros in the matrix
 
         // Number of on-processor non-zeros per row
-        // int* d_nnz = (int*)malloc(n*sizeof(int));
-        int* D_nnz = (int*)malloc(blockn*sizeof(int));
+        int* d_nnz = (int*)malloc(blockn*sizeof(int));
 
         // Number of off-processor non-zeros per row
-        // int* o_nnz = (int*)malloc(n*sizeof(int));
-        int* O_nnz = (int*)malloc(blockn*sizeof(int));
+        int* o_nnz = (int*)malloc(blockn*sizeof(int));
 
-        // Initialise D_nnz and O_nnz to zero
+        // Initialise d_nnz and o_nnz to zero
         for (int i = 0; i < blockn; ++i)
         {
-            D_nnz[i] = 1; // count diagonal cell
-            O_nnz[i] = 0;
+            d_nnz[i] = 1; // count diagonal cell
+            o_nnz[i] = 0;
         }
 
         // Count neighbours sharing an internal face
@@ -226,8 +205,8 @@ PetscErrorCode formJacobianLinGeomTotalDispSolid
         {
             const Foam::label ownCellID = own[faceI];
             const Foam::label neiCellID = nei[faceI];
-            D_nnz[ownCellID]++;
-            D_nnz[neiCellID]++;
+            d_nnz[ownCellID]++;
+            d_nnz[neiCellID]++;
         }
 
         // Count off-processor neighbour cells
@@ -241,7 +220,7 @@ PetscErrorCode formJacobianLinGeomTotalDispSolid
                 forAll(faceCells, fcI)
                 {
                     const Foam::label cellID = faceCells[fcI];
-                    O_nnz[cellID]++;
+                    o_nnz[cellID]++;
                 }
             }
             else if (user->solMod_.mesh().boundary()[patchI].coupled())
@@ -254,18 +233,18 @@ PetscErrorCode formJacobianLinGeomTotalDispSolid
         }
 
         // Allocate parallel matrix
-        //CHKERRQ(MatMPIAIJSetPreallocation(B, 0, D_nnz, 0, O_nnz));
+        //CHKERRQ(MatMPIAIJSetPreallocation(B, 0, d_nnz, 0, o_nnz));
         // Allocate parallel matrix with the same conservative stencil per node
         //CHKERRQ(MatMPIAIJSetPreallocation(B, d_nz, NULL, 0, NULL));
-        CHKERRQ(MatMPIBAIJSetPreallocation(B, blockSize, 0, D_nnz, 0, O_nnz));
+        CHKERRQ(MatMPIBAIJSetPreallocation(B, blockSize, 0, d_nnz, 0, o_nnz));
 
-        // Raise error if mallocs are required during matrix assembly
+        // Raise an error if mallocs are required during matrix assembly
         MatSetOption(B, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE);
     }
 
     // Insert OpenFOAM matrix into PETSc matrix
-    // Note: the matrix contains global indices, which we use when inserting
-    // coefficients
+    // Note: the sparseMatrix object contains global indices, which we use when
+    // inserting coefficients
     const Foam::sparseMatrixData& data = matrix.data();
     PetscScalar values2d[4];
     PetscScalar values3d[9];
@@ -364,6 +343,58 @@ void linGeomTotalDispSolid::predict()
 
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
+}
+
+
+void linGeomTotalDispSolid::enforceTractionBoundaries
+(
+    surfaceVectorField& traction,
+    const volVectorField& D,
+    const surfaceVectorField& n
+) const
+{
+    // Enforce traction conditions
+    forAll(D.boundaryField(), patchI)
+    {
+        if
+        (
+            isA<solidTractionFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const solidTractionFvPatchVectorField& tracPatch =
+                refCast<const solidTractionFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+            traction.boundaryFieldRef()[patchI] =
+                tracPatch.traction() - nPatch*tracPatch.pressure();
+        }
+        else if
+        (
+            isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+         || isA<symmetryFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            // Unit normals
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+            // Set shear traction to zero
+            traction.boundaryFieldRef()[patchI] =
+                sqr(nPatch) & traction.boundaryField()[patchI];
+        }
+    }
 }
 
 
@@ -484,6 +515,502 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 }
 
 
+bool linGeomTotalDispSolid::evolveSnes()
+{
+    Info<< "Solving the momentum equation for D using PETSc SNES" << endl;
+
+    // Update D boundary conditions
+    D().correctBoundaryConditions();
+
+    // Solution predictor
+    if (predictor_ && newTimeStep())
+    {
+        predict();
+
+        // Map the D field to the SNES solution vector
+        Vec& x = xPtr_();
+        PetscScalar *xx;
+        VecGetArray(x, &xx);
+        const Foam::vectorField& DI = D();
+        {
+            int index = 0;
+            forAll(DI, i)
+            {
+                xx[index++] = DI[i][vector::X];
+                xx[index++] = DI[i][vector::Y];
+
+                if (!solidModel::twoD())
+                {
+                    xx[index++] = DI[i][vector::Z];
+                }
+            }
+        }
+
+        // Restore solution vector
+        CHKERRQ(VecRestoreArray(x, &xx));
+    }
+
+    // Take a reference to the SNES solver object
+    SNES& snes = snesPtr_();
+
+    // Take a reference to the solution vector
+    Vec& x = xPtr_();
+
+    // Solve the nonlinear system
+    CHKERRQ(SNESSolve(snes, NULL, x));
+
+    // Check if SNES converged
+    SNESConvergedReason reason;
+    CHKERRQ(SNESGetConvergedReason(snes, &reason));
+    if (reason < 0)
+    {
+        WarningIn("bool linGeomTotalDispSolid::evolveSnes()")
+            << "PETSc SNES solver return error check disabled" << endl
+            << "The SNES nonlinear solver did not converge." << nl
+            << " PETSc SNES convergence error code: " << reason << nl
+            << " PETSc SNES convergence reason: "
+            << SNESConvergedReasons[reason] << endl;
+
+        if (stopOnPetscError_)
+        {
+            FatalErrorIn("bool linGeomTotalDispSolid::evolveSnes()")
+                << "Stopping because of the PETSc SNES error"
+                << "Set `stopOnPetscError` to `false` to continue on PETSc "
+                << "SNES errors"
+                << abort(FatalError);
+        }
+    }
+
+    // Retrieve the solution
+    {
+        const PetscScalar *xx;
+        VecGetArrayRead(x, &xx);
+        Foam::vectorField& DI = D();
+        {
+            int index = 0;
+            forAll(DI, i)
+            {
+                DI[i].x() = xx[index++];
+                DI[i].y() = xx[index++];
+
+                if (!solidModel::twoD())
+                {
+                    DI[i].z() = xx[index++];
+                }
+            }
+        }
+        D().correctBoundaryConditions();
+
+        // Restore solution vector
+        CHKERRQ(VecRestoreArrayRead(x, &xx));
+    }
+
+    // Interpolate cell displacements to vertices
+    mechanical().interpolate(D(), gradD(), pointD());
+
+    // Increment of displacement
+    DD() = D() - D().oldTime();
+
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
+
+    // Velocity
+    U() = fvc::ddt(D());
+
+    return true;
+}
+
+
+bool linGeomTotalDispSolid::evolveExplicit()
+{
+    if (time().timeIndex() == 1)
+    {
+        Info<< "Solving the solid momentum equation for D using an explicit "
+            << "approach" << nl
+            << "Simulation Time, Clock Time, Max Stress" << endl;
+    }
+
+    physicsModel::printInfo() = bool
+    (
+        time().timeIndex() % infoFrequency() == 0
+     || mag(time().value() - time().endTime().value()) < SMALL
+    );
+
+    if (physicsModel::printInfo())
+    {
+        Info<< time().value() << " " << time().elapsedClockTime()
+            << " " << max(mag(sigma())).value() << endl;
+
+        physicsModel::printInfo() = false;
+    }
+
+    // Take references for brevity and efficiency
+    const fvMesh& mesh = solidModel::mesh();
+    volVectorField& D = solidModel::D();
+    volTensorField& gradD = solidModel::gradD();
+    volVectorField& U = solidModel::U();
+    volSymmTensorField& sigma = solidModel::sigma();
+    const volScalarField& rho = solidModel::rho();
+
+    // Central difference scheme
+
+    // Take a reference to the current and previous time-step
+    const dimensionedScalar& deltaT = time().deltaT();
+    //const dimensionedScalar& deltaT0 = time().deltaT0();
+
+    // Compute the velocity
+    // Note: this is the velocity at the middle of the time-step
+    //pointU_ = pointU_.oldTime() + 0.5*(deltaT + deltaT0)*pointA_.oldTime();
+    U = U.oldTime() + deltaT*A_.oldTime();
+
+    // Compute displacement
+    D = D.oldTime() + deltaT*U;
+
+    // Enforce boundary conditions on the displacement field
+    D.correctBoundaryConditions();
+
+    if (solidModel::twoD())
+    {
+        // Remove displacement in the empty directions
+        forAll(mesh.geometricD(), dirI)
+        {
+            if (mesh.geometricD()[dirI] < 0)
+            {
+                D.primitiveFieldRef().replace(dirI, 0.0);
+            }
+        }
+    }
+
+    // Update gradient of displacement
+    mechanical().grad(D, gradD);
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma);
+
+    // Unit normal vectors at the faces
+    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+
+    // Calculate the traction vectors at the faces
+    surfaceVectorField traction(n & fvc::interpolate(sigma));
+
+    // Add stabilisation to the traction
+    // We add this before enforcing the traction condition as the stabilisation
+    // is set to zero on traction boundaries
+    // To-do: add a stabilisation traction function to momentumStabilisation
+    const scalar scaleFactor =
+        readScalar(stabilisation().dict().lookup("scaleFactor"));
+    const surfaceTensorField gradDf(fvc::interpolate(gradD));
+    traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
+
+    // Enforce traction boundary conditions
+    enforceTractionBoundaries(traction, D, n);
+
+    // Solve the momentum equation for acceleration
+    A_ = fvc::div(mesh.magSf()*traction)/rho
+       + g()
+       - dampingCoeff()*fvc::ddt(D);
+
+    return true;
+}
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+linGeomTotalDispSolid::linGeomTotalDispSolid
+(
+    Time& runTime,
+    const word& region
+)
+:
+    solidModel(typeName, runTime, region),
+    impK_(mechanical().impK()),
+    impKf_(mechanical().impKf()),
+    rImpK_(1.0/impK_),
+    A_
+    (
+        IOobject
+        (
+            "A",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedVector("zero", dimLength/pow(dimTime, 2), vector::zero)
+    ),
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    globalCells_(mesh().nCells()),
+    stopOnPetscError_
+    (
+        solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true)
+    ),
+    snesPtr_(),
+    xPtr_(),
+    APtr_(),
+    snesUserPtr_()
+{
+    DisRequired();
+
+    // Force all required old-time fields to be created
+    fvm::d2dt2(D());
+
+    // For consistent restarts, we will calculate the gradient field
+    D().correctBoundaryConditions();
+    D().storePrevIter();
+    mechanical().grad(D(), gradD());
+
+    if (predictor_)
+    {
+        // Check ddt scheme for D is not steadyState
+        const word ddtDScheme
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh().ddtScheme("ddt(" + D().name() +')')
+#else
+            mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
+#endif
+        );
+
+        if (ddtDScheme == "steadyState")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "If predictor is turned on, then the ddt(" << D().name()
+                << ") scheme should not be 'steadyState'!" << abort(FatalError);
+        }
+    }
+
+    // Check the gradScheme
+    const word gradDScheme
+    (
+        mesh().gradScheme("grad(" + D().name() +')')
+    );
+
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    {
+        if (gradDScheme != "leastSquaresS4f")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "The `leastSquaresS4f` gradScheme should be used for "
+                << "`grad(D)` when using the "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << " solution algorithm" << abort(FatalError);
+        }
+
+        // Set extrapolateValue to true for solidTraction boundaries
+        forAll(D().boundaryField(), patchI)
+        {
+            if
+            (
+                isA<solidTractionFvPatchVectorField>
+                (
+                    D().boundaryField()[patchI]
+                )
+            )
+            {
+                Info<< "    Setting `extrapolateValue` to `true` on the "
+                    << mesh().boundary()[patchI].name() << " patch of the D "
+                    << "field" << endl;
+
+                solidTractionFvPatchVectorField& tracPatch =
+                    refCast<solidTractionFvPatchVectorField>
+                    (
+                        D().boundaryFieldRef()[patchI]
+                    );
+
+                tracPatch.extrapolateValue() = true;
+            }
+        }
+
+        // Lookup the PETSc options file
+        fileName optionsFile(solidModelDict().lookup("optionsFile"));
+        optionsFile.expand();
+
+        // Initialise PETSc with an options file
+        PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
+
+        // Create the PETSc SNES object
+        snesPtr_.set(new SNES());
+        SNES& snes = snesPtr_();
+        SNESCreate(PETSC_COMM_WORLD, &snes);
+
+        // Create user data context
+        snesUserPtr_.set(new appCtx(*this));
+        appCtx& user = snesUserPtr_();
+
+        // Set the user context
+        SNESSetApplicationContext(snes, &user);
+
+        // Set the residual function
+        SNESSetFunction(snes, NULL, formResidualLinGeomTotalDispSolid, &user);
+
+        // Coefficient block size, e.g. 2x2 in 2-D, 3x3 in 3-D
+        const int blockSize = solidModel::twoD() ? 2 : 3;
+
+        // Global system size
+        const int blockN = globalCells_.size();
+        const int N = blockSize*blockN;
+
+        // Local (this processor) system size
+        const int blockn = globalCells_.localSize();
+        const int n = blockSize*blockn;
+
+        // Create the Jacobian matrix
+        APtr_.set(new Mat());
+        Mat& A = APtr_();
+        MatCreate(PETSC_COMM_WORLD, &A);
+        MatSetSizes(A, n, n, N, N);
+        MatSetFromOptions(A);
+        MatSetType(A, MATMPIAIJ);
+        //MatSetType(A, MATMPIBAIJ);
+
+        // Set the Jacobian function
+        SNESSetJacobian(snes, A, A, formJacobianLinGeomTotalDispSolid, &user);
+
+        // Set solver options
+        // Uses default options, can be overridden by command line options
+        SNESSetFromOptions(snes);
+
+        // Create the solution vector
+        xPtr_.set(new Vec());
+        Vec& x = xPtr_();
+        VecCreate(PETSC_COMM_WORLD, &x);
+        VecSetSizes(x, n, N);
+        VecSetBlockSize(x, blockSize);
+        VecSetType(x, VECMPI);
+        PetscObjectSetName((PetscObject) x, "Solution");
+        VecSetFromOptions(x);
+        VecZeroEntries(x);
+    }
+    else if (solutionAlg() != solutionAlgorithm::EXPLICIT)
+    {
+        if (gradDScheme == "leastSquaresS4f")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "The `leastSquaresS4f` gradScheme should only be used for "
+                << "`grad(D)` when using the "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << " and "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << " solution algorithms" << abort(FatalError);
+        }
+
+    }
+}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+void linGeomTotalDispSolid::setDeltaT(Time& runTime)
+{
+    if (solutionAlg() == solutionAlgorithm::EXPLICIT)
+    {
+        // Max wave speed in the domain
+        const scalar waveSpeed = max
+        (
+            Foam::sqrt(mechanical().impK()/mechanical().rho())
+        ).value();
+
+        // deltaT = cellWidth/waveVelocity == (1.0/deltaCoeff)/waveSpeed
+        // In the current discretisation, information can move two cells per
+        // time-step. This means that we use 1/(2*d) == 0.5*deltaCoeff when
+        // calculating the required stable time-step
+        // i.e. deltaT = (1.0/(0.5*deltaCoeff)/waveSpeed
+        // For safety, we should use a time-step smaller than this e.g. Abaqus uses
+        // stableTimeStep/sqrt(2): we will default to this value
+        const scalar requiredDeltaT =
+            1.0/
+            gMax
+            (
+                DimensionedField<scalar, Foam::surfaceMesh>
+                (
+                    mesh().surfaceInterpolation::
+                    deltaCoeffs().internalField()
+                   *waveSpeed
+                )
+            );
+
+        // Lookup the desired Courant number
+        const scalar maxCo =
+            runTime.controlDict().lookupOrDefault<scalar>("maxCo", 0.1);
+
+        const scalar newDeltaT = maxCo*requiredDeltaT;
+
+        // Update print info
+        physicsModel::printInfo() = bool
+        (
+            runTime.timeIndex() % infoFrequency() == 0
+         || mag(runTime.value() - runTime.endTime().value()) < SMALL
+        );
+
+        physicsModel::printInfo() = false;
+
+        if (time().timeIndex() == 1)
+        {
+            Info<< nl << "Setting deltaT = " << newDeltaT
+                << ", maxCo = " << maxCo << endl;
+        }
+
+        runTime.setDeltaT(newDeltaT);
+    }
+}
+
+
+bool linGeomTotalDispSolid::evolve()
+{
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    {
+        return evolveSnes();
+    }
+    // else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
+    // {
+    //     // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
+    //     // could be combined with PETSc to achieve this.. todo!
+    //     return evolveImplicitCoupled();
+    // }
+    else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
+    {
+        return evolveImplicitSegregated();
+    }
+    else if (solutionAlg() == solutionAlgorithm::EXPLICIT)
+    {
+        return evolveExplicit();
+    }
+    else
+    {
+        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+            << "Unrecognised solution algorithm. Available options are "
+            // << solutionAlgorithmNames_.names() << endl;
+            << solidModel::solutionAlgorithmNames_
+               [
+                   solidModel::solutionAlgorithm::PETSC_SNES
+               ]
+            << solidModel::solutionAlgorithmNames_
+               [
+                   solidModel::solutionAlgorithm::IMPLICIT_SEGREGATED
+               ]
+            << solidModel::solutionAlgorithmNames_
+               [
+                   solidModel::solutionAlgorithm::EXPLICIT
+               ]
+            << endl;
+    }
+
+    // Keep compiler happy
+    return true;
+}
+
+
 tmp<vectorField> linGeomTotalDispSolid::residualMomentum
 (
     const volVectorField& D
@@ -517,30 +1044,8 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     const surfaceTensorField gradDf(fvc::interpolate(gradD()));
     traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
 
-    // Enforce traction conditions
-    // To-do: add zero-shear boundaries
-    forAll(D.boundaryField(), patchI)
-    {
-        if
-        (
-            isA<solidTractionFvPatchVectorField>
-            (
-                D.boundaryField()[patchI]
-            )
-        )
-        {
-            const solidTractionFvPatchVectorField& tracPatch =
-                refCast<const solidTractionFvPatchVectorField>
-                (
-                    D.boundaryField()[patchI]
-                );
-
-            const vectorField& nPatch = n.boundaryField()[patchI];
-
-            traction.boundaryFieldRef()[patchI] =
-                tracPatch.traction() - nPatch*tracPatch.pressure();
-        }
-    }
+    // Enforce traction boundary conditions
+    enforceTractionBoundaries(traction, D, n);
 
     // The residual vector is defined as
     // F = div(sigma) + rho*g
@@ -737,336 +1242,6 @@ tmp<sparseMatrix> linGeomTotalDispSolid::JacobianMomentum
     }
 
     return tmatrix;
-}
-
-
-bool linGeomTotalDispSolid::evolveSnes()
-{
-    Info<< "Solving the momentum equation for D using PETSc SNES" << endl;
-
-    // Update D boundary conditions
-    D().correctBoundaryConditions();
-
-    // Solution predictor
-    if (predictor_ && newTimeStep())
-    {
-        predict();
-
-        // Map the D field to the SNES solution vector
-        Vec& x = xPtr_();
-        PetscScalar *xx;
-        VecGetArray(x, &xx);
-        const Foam::vectorField& DI = D();
-        {
-            int index = 0;
-            forAll(DI, i)
-            {
-                xx[index++] = DI[i][vector::X];
-                xx[index++] = DI[i][vector::Y];
-
-                if (!solidModel::twoD())
-                {
-                    xx[index++] = DI[i][vector::Z];
-                }
-            }
-        }
-
-        // Restore solution vector
-        CHKERRQ(VecRestoreArray(x, &xx));
-    }
-
-    // Take a reference to the SNES solver object
-    SNES& snes = snesPtr_();
-
-    // Take a reference to the solution vector
-    Vec& x = xPtr_();
-
-    // Solve the nonlinear system
-    CHKERRQ(SNESSolve(snes, NULL, x));
-
-    // Check if SNES converged
-    SNESConvergedReason reason;
-    CHKERRQ(SNESGetConvergedReason(snes, &reason));
-    if (reason < 0)
-    {
-        WarningIn("bool linGeomTotalDispSolid::evolveSnes()")
-            << "PETSc SNES solver return error check disabled" << endl
-            << "The SNES nonlinear solver did not converge." << nl
-            << " PETSc SNES convergence error code: " << reason << nl
-            << " PETSc SNES convergence reason: "
-            << SNESConvergedReasons[reason] << endl;
-
-        if (stopOnPetscError_)
-        {
-            FatalErrorIn("bool linGeomTotalDispSolid::evolveSnes()")
-                << "Stopping because of the PETSc SNES error"
-                << "Set `stopOnPetscError` to `false` to continue on PETSc "
-                << "SNES errors"
-                << abort(FatalError);
-        }
-    }
-
-    // Retrieve the solution
-    {
-        const PetscScalar *xx;
-        VecGetArrayRead(x, &xx);
-        Foam::vectorField& DI = D();
-        {
-            int index = 0;
-            forAll(DI, i)
-            {
-                DI[i].x() = xx[index++];
-                DI[i].y() = xx[index++];
-
-                if (!solidModel::twoD())
-                {
-                    DI[i].z() = xx[index++];
-                }
-            }
-        }
-        D().correctBoundaryConditions();
-
-        // Restore solution vector
-        CHKERRQ(VecRestoreArrayRead(x, &xx));
-    }
-
-    // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), gradD(), pointD());
-
-    // Increment of displacement
-    DD() = D() - D().oldTime();
-
-    // Increment of point displacement
-    pointDD() = pointD() - pointD().oldTime();
-
-    // Velocity
-    U() = fvc::ddt(D());
-
-    return true;
-}
-
-
-// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
-
-linGeomTotalDispSolid::linGeomTotalDispSolid
-(
-    Time& runTime,
-    const word& region
-)
-:
-    solidModel(typeName, runTime, region),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_),
-    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
-    globalCells_(mesh().nCells()),
-    stopOnPetscError_
-    (
-        solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true)
-    ),
-    snesPtr_(),
-    xPtr_(),
-    APtr_(),
-    snesUserPtr_()
-{
-    DisRequired();
-
-    // Force all required old-time fields to be created
-    fvm::d2dt2(D());
-
-    // For consistent restarts, we will calculate the gradient field
-    D().correctBoundaryConditions();
-    D().storePrevIter();
-    mechanical().grad(D(), gradD());
-
-    if (predictor_)
-    {
-        // Check ddt scheme for D is not steadyState
-        const word ddtDScheme
-        (
-#ifdef OPENFOAM_NOT_EXTEND
-            mesh().ddtScheme("ddt(" + D().name() +')')
-#else
-            mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
-#endif
-        );
-
-        if (ddtDScheme == "steadyState")
-        {
-            FatalErrorIn(type() + "::" + type())
-                << "If predictor is turned on, then the ddt(" << D().name()
-                << ") scheme should not be 'steadyState'!" << abort(FatalError);
-        }
-    }
-
-    // Check the gradScheme
-    const word gradDScheme
-    (
-        mesh().gradScheme("grad(" + D().name() +')')
-    );
-
-    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
-    {
-        if (gradDScheme != "leastSquaresS4f")
-        {
-            FatalErrorIn(type() + "::" + type())
-                << "The `leastSquaresS4f` gradScheme should be used for "
-                << "`grad(D)` when using the "
-                << solidModel::solutionAlgorithmNames_
-                   [
-                       solidModel::solutionAlgorithm::PETSC_SNES
-                   ]
-                << " solution algorithm" << abort(FatalError);
-        }
-
-        // Set extrapolateValue to true for solidTraction boundaries
-        forAll(D().boundaryField(), patchI)
-        {
-            if
-            (
-                isA<solidTractionFvPatchVectorField>
-                (
-                    D().boundaryField()[patchI]
-                )
-            )
-            {
-                Info<< "    Setting `extrapolateValue` to `true` on the "
-                    << mesh().boundary()[patchI].name() << " patch of the D "
-                    << "field" << endl;
-
-                solidTractionFvPatchVectorField& tracPatch =
-                    refCast<solidTractionFvPatchVectorField>
-                    (
-                        D().boundaryFieldRef()[patchI]
-                    );
-
-                tracPatch.extrapolateValue() = true;
-            }
-        }
-
-        // Lookup the PETSc options file
-        fileName optionsFile(solidModelDict().lookup("optionsFile"));
-        optionsFile.expand();
-
-        // Initialise PETSc with an options file
-        PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
-
-        // Create the PETSc SNES object
-        snesPtr_.set(new SNES());
-        SNES& snes = snesPtr_();
-        SNESCreate(PETSC_COMM_WORLD, &snes);
-
-        // Create user data context
-        snesUserPtr_.set(new appCtx(*this));
-        appCtx& user = snesUserPtr_();
-
-        // Set the user context
-        SNESSetApplicationContext(snes, &user);
-
-        // Set the residual function
-        SNESSetFunction(snes, NULL, formResidualLinGeomTotalDispSolid, &user);
-
-        // Coefficient block size, e.g. 2x2 in 2-D, 3x3 in 3-D
-        const int blockSize = solidModel::twoD() ? 2 : 3;
-
-        // Global system size
-        const int blockN = globalCells_.size();
-        const int N = blockSize*blockN;
-
-        // Local (this processor) system size
-        const int blockn = globalCells_.localSize();
-        const int n = blockSize*blockn;
-
-        // Create the Jacobian matrix
-        APtr_.set(new Mat());
-        Mat& A = APtr_();
-        MatCreate(PETSC_COMM_WORLD, &A);
-        MatSetSizes(A, n, n, N, N);
-        MatSetFromOptions(A);
-        MatSetType(A, MATMPIAIJ);
-        //MatSetType(A, MATMPIBAIJ);
-
-        // Set the Jacobian function
-        SNESSetJacobian(snes, A, A, formJacobianLinGeomTotalDispSolid, &user);
-
-        // Set solver options
-        // Uses default options, can be overridden by command line options
-        SNESSetFromOptions(snes);
-
-        // Create the solution vector
-        xPtr_.set(new Vec());
-        Vec& x = xPtr_();
-        VecCreate(PETSC_COMM_WORLD, &x);
-        VecSetSizes(x, n, N);
-        VecSetBlockSize(x, blockSize);
-        VecSetType(x, VECMPI);
-        PetscObjectSetName((PetscObject) x, "Solution");
-        VecSetFromOptions(x);
-        VecZeroEntries(x);
-    }
-    else
-    {
-        if (gradDScheme == "leastSquaresS4f")
-        {
-            FatalErrorIn(type() + "::" + type())
-                << "The `leastSquaresS4f` gradScheme should only be used for "
-                << "`grad(D)` when using the "
-                << solidModel::solutionAlgorithmNames_
-                   [
-                       solidModel::solutionAlgorithm::PETSC_SNES
-                   ]
-                << " solution algorithm" << abort(FatalError);
-        }
-
-    }
-}
-
-
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-bool linGeomTotalDispSolid::evolve()
-{
-    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
-    {
-        return evolveSnes();
-    }
-    // else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
-    // {
-    //     // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
-    //     // could be combined with PETSc to achieve this.. todo!
-    //     return evolveImplicitCoupled();
-    // }
-    else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
-    {
-        return evolveImplicitSegregated();
-    }
-    // else if (solutionAlg() == solutionAlgorithm::EXPLICIT)
-    // {
-    //     return evolveExplicit();
-    // }
-    else
-    {
-        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
-            << "Unrecognised solution algorithm. Available options are "
-            // << solutionAlgorithmNames_.names() << endl;
-            << solidModel::solutionAlgorithmNames_
-               [
-                   solidModel::solutionAlgorithm::PETSC_SNES
-               ]
-            << solidModel::solutionAlgorithmNames_
-               [
-                   solidModel::solutionAlgorithm::IMPLICIT_SEGREGATED
-               ]
-            // << solidModel::solutionAlgorithmNames_
-            //    [
-            //        solidModel::solutionAlgorithm::EXPLICIT
-            //    ]
-            << endl;
-    }
-
-    // Keep compiler happy
-    return true;
 }
 
 

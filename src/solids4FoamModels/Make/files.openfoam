@@ -6,7 +6,6 @@ solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
 
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
-solidModels/explicitLinGeomTotalDispSolid/explicitLinGeomTotalDispSolid.C
 solidModels/explicitUnsLinGeomTotalDispSolid/explicitUnsLinGeomTotalDispSolid.C
 solidModels/linGeomSolid/linGeomSolid.C
 solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C

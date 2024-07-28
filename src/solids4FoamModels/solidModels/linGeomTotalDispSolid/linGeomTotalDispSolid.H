@@ -114,6 +114,10 @@ class linGeomTotalDispSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Acceleration field
+        //  Only used by the explicit solution scheme
+        volVectorField A_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
@@ -144,6 +148,14 @@ class linGeomTotalDispSolid
         //  previous time-steps
         void predict();
 
+        //- Enforce traction boundary conditions on the provided traction field
+        void enforceTractionBoundaries
+        (
+            surfaceVectorField& traction,
+            const volVectorField& D,      // displacement field
+            const surfaceVectorField& n   // unit normals field
+        ) const;
+
         //- Evolve the solid solver using the segregated implicit approach
         bool evolveImplicitSegregated();
 
@@ -152,6 +164,9 @@ class linGeomTotalDispSolid
         //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
         //  works well with this approach
         bool evolveSnes();
+
+        //- Evolve the solid solver using the explicit approach
+        bool evolveExplicit();
 
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);
@@ -212,6 +227,12 @@ public:
 
         // Edit
 
+            //- Update the size of the time-step
+            virtual void setDeltaT(Time& runTime);
+
+            //- Evolve the solid solver and solve the mathematical model
+            virtual bool evolve();
+
             //- Calculate the momentum equation residual
             //  This should be const but is not because of the mechanical law
             //  The can be fixed when the mechanical models are refactored
@@ -232,9 +253,6 @@ public:
             (
                 const volVectorField& D
             );
-
-            //- Evolve the solid solver and solve the mathematical model
-            virtual bool evolve();
 
             //- Traction boundary surface normal gradient
             virtual tmp<vectorField> tractionBoundarySnGrad

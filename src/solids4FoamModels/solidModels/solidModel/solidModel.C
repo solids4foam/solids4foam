@@ -835,6 +835,7 @@ Foam::solidModel::solidModel
         solidModelDict().lookupOrAddDefault<Switch>("restart", false)
     ),
     rhoD2dt2DPtr_(),
+    twoDCorrector_(mesh()),
     twoD_(mesh().nGeometricD() == 2)
 {
     // Force old time fields to be stored
@@ -1712,9 +1713,8 @@ void Foam::solidModel::moveMesh
     // Not need anymore as globalFaceZones are not used
     //updateGlobalFaceZoneNewPoints(pointDDI, newPoints);
 
-    twoDPointCorrector twoDCorrector(mesh());
-    twoDCorrector.correctPoints(newPoints);
-    twoDCorrector.correctPoints(pointDDI);
+    twoDCorrector_.correctPoints(newPoints);
+    twoDCorrector_.correctPoints(pointDDI);
     mesh().movePoints(newPoints);
     mesh().V00();
     mesh().moving(false);

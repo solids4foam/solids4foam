@@ -241,6 +241,9 @@ private:
         //- Store rho*d2d2t(D) for efficiency
         mutable autoPtr<volVectorField> rhoD2dt2DPtr_;
 
+        //- TwoD point corrector object
+        twoDPointCorrector twoDCorrector_;
+
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
 
@@ -601,6 +604,12 @@ public:
             //- Each solidModel must indicate whether D or DD is the primary
             //  solution variable
             virtual volVectorField& solutionD() = 0;
+
+            //- Const-reference to the twoD point corrector object
+            const twoDPointCorrector& twoDCorrector() const
+            {
+                return twoDCorrector_;
+            }
 
             //- Is the model two-dimensional
             const bool& twoD() const
