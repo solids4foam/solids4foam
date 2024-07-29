@@ -24,7 +24,7 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         10;
+endTime         1;
 
 deltaT          1;
 
@@ -58,6 +58,15 @@ functions
     {
         type          solidPointDisplacement;
         point         (0 0.5 0);
+    }
+
+    plateHoleAnalyticalSolution1
+    {
+        type          plateHoleAnalyticalSolution;
+        farFieldTractionX 1e6;
+        holeRadius    0.5;
+        E             200e+9;
+        nu            0.3;
     }
 }
 
