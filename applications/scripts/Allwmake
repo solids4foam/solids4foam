@@ -1,5 +1,10 @@
 #!/bin/bash
 cd "${0%/*}" || exit  # Run from this directory
 
+# Update address of solid model dicts
+CWD=$(pwd)
+\sed -i "s|SOLID_MODEL_DICTS|${CWD}|g" solids4FoamScripts.sh
+
+# Install scripts
 echo; echo "Copying solids4FoamScripts.sh to ${FOAM_USER_APPBIN}"; echo
 \cp solids4FoamScripts.sh ${FOAM_USER_APPBIN}/
