@@ -1,0 +1,77 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    loading
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform -1e6;
+        value           uniform (0 0 0);
+    }
+
+    tractionFree
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+
+    hole
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+
+    front
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+
+    fixed
+    {
+        type            fixedDisplacement;
+        value           uniform ( 0 0 0 );
+    }
+
+    symmx
+    {
+        type            fixedDisplacementZeroShear;
+        value           uniform ( 0 0 0 );
+    }
+
+    symmz
+    {
+        type            fixedDisplacementZeroShear;
+        value           uniform ( 0 0 0 );
+    }
+}
+
+// ************************************************************************* //
