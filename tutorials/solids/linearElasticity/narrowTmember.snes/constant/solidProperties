@@ -35,7 +35,8 @@ solidModel     linearGeometryTotalDisplacement;
     //dampingCoeff    [ 0 0 -1 0 0 0 0 ] 1e4;
 
     // PETSc options file used by PETScSNES
-    optionsFile petscOptions.snes;
+    optionsFile petscOptions.snes.hypre;
+    //optionsFile petscOptions.snes.lu;
 
     // Optional: continue on PETSc SNES error
     // Useful for debugging
