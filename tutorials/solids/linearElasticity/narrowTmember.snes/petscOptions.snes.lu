@@ -1,0 +1,46 @@
+# Use matrix-free approach for matrix-vector products
+-snes_mf
+-snes_mf_operator
+
+# Use Newton-Raphon with line search
+-snes_type newtonls
+
+# Newton-Raphson settings
+-snes_max_it 1000
+#-snes_rtol 1e-6
+#-snes_atol 1e-12
+#-snes_stol 1e-12
+#-snes_max_it 1
+
+# Print Newton-Raphson iterations
+-snes_monitor
+
+# Linear solver
+#-ksp_type gmres
+#-ksp_type fgmres
+-ksp_type lgmres
+#-ksp_type fcg
+-ksp_gmres_restart 100
+-ksp_rtol 1e-3
+#-ksp_atol 1e-14
+#-ksp_max_it 100
+#-ksp_monitor
+#-ksp_view
+#-ksp_converged_reason
+
+# Preconditioner
+
+-pc_type bjacobi
+#-pc_type asm
+#-pc_type sor
+#-pc_type ilu
+#-pc_factor_levels 1
+-sub_pc_type lu
+#-sub_pc_type cholesky
+#-sub_pc_type ilu
+#-sub_pc_type icc
+#-sub_pc_factor_levels 1
+
+# Only create the precondintioner once as the matrix does not change
+-snes_lag_preconditioner_persists true
+-snes_lag_preconditioner -2

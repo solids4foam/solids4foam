@@ -1,0 +1,61 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// linearGeometry: assumes small strains and rotations
+//solidModel       coupledUnsLinearGeometryLinearElastic;
+//solidModel       coupledUnsLinGeometry;
+solidModel     linearGeometryTotalDisplacement;
+//solidModel     unsLinearGeometry;
+
+"linearGeometryTotalDisplacementCoeffs|unsLinearGeometryCoeffs"
+{
+    // Solution algorithm
+    //solutionAlgorithm implicitSegregated;
+    solutionAlgorithm PETScSNES;
+    //solutionAlgorithm explicit;
+
+    // Damping is useful (and often required) for stabilising explicit
+    // simulations
+    //dampingCoeff    [ 0 0 -1 0 0 0 0 ] 1e4;
+
+    // PETSc options file used by PETScSNES
+    optionsFile petscOptions.snes.hypre;
+    //optionsFile petscOptions.snes.lu;
+
+    // Optional: continue on PETSc SNES error
+    // Useful for debugging
+    //stopOnPetscError no;
+
+    // Maximum number of momentum correctors
+    nCorrectors     1000;
+
+    // Solution tolerance for displacement
+    solutionTolerance 1e-06;
+
+    // Alternative solution tolerance for displacement
+    alternativeTolerance 1e-07;
+
+    // Material law solution tolerance
+    materialTolerance 1e-05;
+
+    // Write frequency for the residuals
+    infoFrequency   100;
+}
+
+// ************************************************************************* //
