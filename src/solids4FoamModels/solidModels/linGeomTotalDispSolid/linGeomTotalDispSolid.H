@@ -41,8 +41,6 @@ SourceFiles
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
-#include "sparseMatrix.H"
-#include "globalIndex.H"
 #include "foamPetscSnesHelper.H"
 
 

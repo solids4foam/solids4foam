@@ -22,6 +22,9 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
+#include "solidTractionFvPatchVectorField.H"
+#include "fixedDisplacementZeroShearFvPatchVectorField.H"
+#include "symmetryFvPatchFields.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -72,107 +75,62 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
 }
 
 
-// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
-
-nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
+void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
 (
-    Time& runTime,
-    const word& region
-)
-:
-    solidModel(typeName, runTime, region),
-    F_
-    (
-        IOobject
-        (
-            "F",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::AUTO_WRITE
-        ),
-        mesh(),
-        dimensionedTensor("I", dimless, I)
-    ),
-    Finv_
-    (
-        IOobject
-        (
-            "Finv",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        inv(F_)
-    ),
-    J_
-    (
-        IOobject
-        (
-            "J",
-            runTime.timeName(),
-            mesh(),
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        det(F_)
-    ),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_),
-    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
+    surfaceVectorField& traction,
+    const volVectorField& D,
+    const surfaceVectorField& n
+) const
 {
-    DisRequired();
-
-    // Force all required old-time fields to be created
-    fvm::d2dt2(D());
-
-    if (predictor_)
+    // Enforce traction conditions
+    forAll(D.boundaryField(), patchI)
     {
-        // Check ddt scheme for D is not steadyState
-        const word ddtDScheme
+        if
         (
-#ifdef OPENFOAM_NOT_EXTEND
-            mesh().ddtScheme("ddt(" + D().name() +')')
-#else
-            mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
-#endif
-        );
-
-        if (ddtDScheme == "steadyState")
+            isA<solidTractionFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
         {
-            FatalErrorIn(type() + "::" + type())
-                << "If predictor is turned on, then the ddt(" << D().name()
-                << ") scheme should not be 'steadyState'!" << abort(FatalError);
+            const solidTractionFvPatchVectorField& tracPatch =
+                refCast<const solidTractionFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+            traction.boundaryFieldRef()[patchI] =
+                tracPatch.traction() - nPatch*tracPatch.pressure();
         }
-    }
+        else if
+        (
+            isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+         || isA<symmetryFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            // Unit normals
+            const vectorField& nPatch = n.boundaryField()[patchI];
 
-    // For consistent restarts, we will update the relative kinematic fields
-    D().correctBoundaryConditions();
-    if (restart())
-    {
-        DD() = D() - D().oldTime();
-        mechanical().grad(D(), gradD());
-        gradDD() = gradD() - gradD().oldTime();
-        F_ = I + gradD().T();
-        Finv_ = inv(F_);
-        J_ = det(F_);
-
-        gradD().storeOldTime();
-
-        // Let the mechanical law know
-        mechanical().setRestart();
+            // Set shear traction to zero
+            traction.boundaryFieldRef()[patchI] =
+                sqr(nPatch) & traction.boundaryField()[patchI];
+        }
     }
 }
 
 
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-bool nonLinGeomTotalLagTotalDispSolid::evolve()
+bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
 {
-    Info<< "Evolving solid solver" << endl;
+    Info<< "Evolving solid solver using an implicit segregated approach"
+        << endl;
 
     if (predictor_)
     {
@@ -278,6 +236,505 @@ bool nonLinGeomTotalLagTotalDispSolid::evolve()
 #endif
 
     return true;
+}
+
+
+bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
+{
+    Info<< "Solving the momentum equation for D using PETSc SNES" << endl;
+
+    // Update D boundary conditions
+    D().correctBoundaryConditions();
+
+    // Solution predictor
+    if (predictor_ && newTimeStep())
+    {
+        predict();
+
+        // Map the D field to the SNES solution vector
+        foamPetscSnesHelper::mapSolutionFoamToPetsc();
+    }
+
+    // Solve the nonlinear system and check the convergence
+    foamPetscSnesHelper::solve();
+
+    // Retrieve the solution
+    // Map the PETSc solution to the D field
+    foamPetscSnesHelper::mapSolutionPetscToFoam();
+
+    // Interpolate cell displacements to vertices
+    mechanical().interpolate(D(), gradD(), pointD());
+
+    // Increment of displacement
+    DD() = D() - D().oldTime();
+
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
+
+    // Velocity
+    U() = fvc::ddt(D());
+
+    return true;
+}
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
+(
+    Time& runTime,
+    const word& region
+)
+:
+    solidModel(typeName, runTime, region),
+    foamPetscSnesHelper
+    (
+        fileName(solidModelDict().lookup("optionsFile")),
+        D(),
+        solidModel::twoD(),
+        solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true)
+    ),
+    F_
+    (
+        IOobject
+        (
+            "F",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::AUTO_WRITE
+        ),
+        mesh(),
+        dimensionedTensor("I", dimless, I)
+    ),
+    Finv_
+    (
+        IOobject
+        (
+            "Finv",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        inv(F_)
+    ),
+    J_
+    (
+        IOobject
+        (
+            "J",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        det(F_)
+    ),
+    impK_(mechanical().impK()),
+    impKf_(mechanical().impKf()),
+    rImpK_(1.0/impK_),
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
+{
+    DisRequired();
+
+    // Force all required old-time fields to be created
+    fvm::d2dt2(D());
+
+    if (predictor_)
+    {
+        // Check ddt scheme for D is not steadyState
+        const word ddtDScheme
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh().ddtScheme("ddt(" + D().name() +')')
+#else
+            mesh().schemesDict().ddtScheme("ddt(" + D().name() +')')
+#endif
+        );
+
+        if (ddtDScheme == "steadyState")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "If predictor is turned on, then the ddt(" << D().name()
+                << ") scheme should not be 'steadyState'!" << abort(FatalError);
+        }
+    }
+
+    // For consistent restarts, we will update the relative kinematic fields
+    D().correctBoundaryConditions();
+    if (restart())
+    {
+        DD() = D() - D().oldTime();
+        mechanical().grad(D(), gradD());
+        gradDD() = gradD() - gradD().oldTime();
+        F_ = I + gradD().T();
+        Finv_ = inv(F_);
+        J_ = det(F_);
+
+        gradD().storeOldTime();
+
+        // Let the mechanical law know
+        mechanical().setRestart();
+    }
+
+    // Check the gradScheme
+    const word gradDScheme
+    (
+        mesh().gradScheme("grad(" + D().name() +')')
+    );
+
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    {
+        if (gradDScheme != "leastSquaresS4f")
+        {
+            FatalErrorIn(type() + "::" + type())
+                << "The `leastSquaresS4f` gradScheme should be used for "
+                << "`grad(D)` when using the "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << " solution algorithm" << abort(FatalError);
+        }
+
+        // Set extrapolateValue to true for solidTraction boundaries
+        forAll(D().boundaryField(), patchI)
+        {
+            if
+            (
+                isA<solidTractionFvPatchVectorField>
+                (
+                    D().boundaryField()[patchI]
+                )
+            )
+            {
+                Info<< "    Setting `extrapolateValue` to `true` on the "
+                    << mesh().boundary()[patchI].name() << " patch of the D "
+                    << "field" << endl;
+
+                solidTractionFvPatchVectorField& tracPatch =
+                    refCast<solidTractionFvPatchVectorField>
+                    (
+                        D().boundaryFieldRef()[patchI]
+                    );
+
+                tracPatch.extrapolateValue() = true;
+            }
+        }
+    }
+}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+bool nonLinGeomTotalLagTotalDispSolid::evolve()
+{
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    {
+        return evolveSnes();
+    }
+    // else if (solutionAlg() == solutionAlgorithm::IMPLICIT_COUPLED)
+    // {
+    //     // Not yet implmented, although coupledUnsLinGeomLinearElasticSolid
+    //     // could be combined with PETSc to achieve this.. todo!
+    //     return evolveImplicitCoupled();
+    // }
+    else if (solutionAlg() == solutionAlgorithm::IMPLICIT_SEGREGATED)
+    {
+        return evolveImplicitSegregated();
+    }
+    // else if (solutionAlg() == solutionAlgorithm::EXPLICIT)
+    // {
+    //     return evolveExplicit();
+    // }
+    else
+    {
+        FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")
+            << "Unrecognised solution algorithm. Available options are "
+            // << solutionAlgorithmNames_.names() << endl;
+            << solidModel::solutionAlgorithmNames_
+               [
+                   solidModel::solutionAlgorithm::PETSC_SNES
+               ]
+            << solidModel::solutionAlgorithmNames_
+               [
+                   solidModel::solutionAlgorithm::IMPLICIT_SEGREGATED
+               ]
+            // << solidModel::solutionAlgorithmNames_
+            //    [
+            //        solidModel::solutionAlgorithm::EXPLICIT
+            //    ]
+            << endl;
+    }
+
+    // Keep compiler happy
+    return true;
+}
+
+
+tmp<vectorField> nonLinGeomTotalLagTotalDispSolid::residualMomentum
+(
+    const volVectorField& D
+)
+{
+    // Prepare result
+    tmp<vectorField> tresidual(new vectorField(D.size(), vector::zero));
+    vectorField& residual = tresidual.ref();
+
+    // Enforce the boundary conditions
+    const_cast<volVectorField&>(D).correctBoundaryConditions();
+
+    // Increment of displacement
+    DD() = D - D.oldTime();
+
+    // Update gradient of displacement
+    mechanical().grad(D, gradD());
+
+    // Update gradient of displacement increment
+    gradDD() = gradD() - gradD().oldTime();
+
+    // Total deformation gradient
+    F_ = I + gradD().T();
+
+    // Inverse of the deformation gradient
+    Finv_ = inv(F_);
+
+    // Jacobian of the deformation gradient
+    J_ = det(F_);
+
+    // Calculate the stress using run-time selectable mechanical law
+    mechanical().correct(sigma());
+
+    // Unit normal vectors at the faces
+    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+    const surfaceVectorField SfCurrent
+    (
+        fvc::interpolate(J_*Finv_.T()) & mesh().Sf()
+    );
+    const surfaceScalarField magSfCurrent(mag(SfCurrent));
+    const surfaceVectorField nCurrent(SfCurrent/magSfCurrent);
+
+    // Traction vectors at the faces
+    //surfaceVectorField traction(n & fvc::interpolate(sigma()));
+    surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
+
+    //fvc::div(J_*Finv_ & sigma(), "div(sigma)");
+
+    // Add stabilisation to the traction
+    // We add this before enforcing the traction condition as the stabilisation
+    // is set to zero on traction boundaries
+    // To-do: add a stabilisation traction function to momentumStabilisation
+    const scalar scaleFactor =
+        readScalar(stabilisation().dict().lookup("scaleFactor"));
+    const surfaceTensorField gradDf(fvc::interpolate(gradD()));
+    traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
+
+    // Enforce traction boundary conditions
+    enforceTractionBoundaries(traction, D, nCurrent);
+
+    // The residual vector is defined as
+    // F = div(sigma) + rho*g
+    //     - rho*d2dt2(D) - dampingCoeff*rho*ddt(D) + stabilisationTerm
+    // where, here, we roll the stabilisationTerm into the div(sigma)
+    residual =
+        fvc::div(magSfCurrent*traction)
+      + rho()
+       *(
+            g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)
+        );
+
+    // Make residual extensive as fvc operators are intensive (per unit volume)
+    residual *= mesh().V();
+
+    return tresidual;
+}
+
+
+tmp<sparseMatrix> nonLinGeomTotalLagTotalDispSolid::JacobianMomentum
+(
+    const volVectorField& D
+)
+{
+    // Count the number of non-zeros for a Laplacian discretisation
+    // This equals the sum of one plus the number of internal faces for each,
+    // which can be calculated as nCells + 2*nInternalFaces
+    // Multiply by the blockSize since we will form the block matrix
+    const int blockSize = solidModel::twoD() ? 2 : 3;
+    const label numNonZeros =
+        blockSize*returnReduce
+        (
+            mesh().nCells() + 2.0*mesh().nInternalFaces(), sumOp<label>()
+        );
+
+    // Calculate a segregated approximation of the Jacobian
+    fvVectorMatrix approxJ
+    (
+        fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+      - rho()*fvm::d2dt2(D)
+    );
+
+    if (dampingCoeff().value() > SMALL)
+    {
+        approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
+    }
+
+    // Optional: under-relaxation of the linear system
+    approxJ.relax();
+
+    // Convert fvMatrix matrix to sparseMatrix
+
+    // Initialise matrix
+    tmp<sparseMatrix> tmatrix(new sparseMatrix(numNonZeros));
+    sparseMatrix& matrix = tmatrix.ref();
+
+    // Insert the diagonal
+    {
+        const vectorField diag(approxJ.DD());
+        forAll(diag, blockRowI)
+        {
+            const tensor coeff
+            (
+                diag[blockRowI][vector::X], 0, 0,
+                0, diag[blockRowI][vector::Y], 0,
+                0,  0, diag[blockRowI][vector::Z]
+            );
+
+            const label globalBlockRowI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
+
+            matrix(globalBlockRowI, globalBlockRowI) = coeff;
+        }
+    }
+
+    // Insert the off-diagonal
+    {
+        const labelUList& own = mesh().owner();
+        const labelUList& nei = mesh().neighbour();
+        const scalarField& upper = approxJ.upper();
+        forAll(own, faceI)
+        {
+            const tensor coeff(upper[faceI]*I);
+
+            const label blockRowI = own[faceI];
+            const label blockColI = nei[faceI];
+
+            const label globalBlockRowI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
+            const label globalBlockColI =
+                foamPetscSnesHelper::globalCells().toGlobal(blockColI);
+
+            matrix(globalBlockRowI, globalBlockColI) = coeff;
+            matrix(globalBlockColI, globalBlockRowI) = coeff;
+        }
+    }
+
+    // Collect the global cell indices from neighbours at processor boundaries
+    // These are used to insert the off-processor coefficients
+    // First, send the data
+    forAll(D.boundaryField(), patchI)
+    {
+        const fvPatchField<vector>& pD = D.boundaryField()[patchI];
+        if (pD.type() == "processor")
+        {
+            // Take a copy of the faceCells (local IDs) and convert them to
+            // global IDs
+            labelList globalFaceCells(mesh().boundary()[patchI].faceCells());
+            foamPetscSnesHelper::globalCells().inplaceToGlobal(globalFaceCells);
+
+            // Send global IDs to the neighbour proc
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(mesh().boundary()[patchI]);
+            procPatch.send
+            (
+                Pstream::commsTypes::blocking, globalFaceCells
+            );
+        }
+    }
+    // Next, receive the data
+    PtrList<labelList> neiProcGlobalIDs(D.boundaryField().size());
+    forAll(D.boundaryField(), patchI)
+    {
+        const fvPatchField<vector>& pD = D.boundaryField()[patchI];
+        if (pD.type() == "processor")
+        {
+            neiProcGlobalIDs.set(patchI, new labelList(pD.size()));
+            labelList& globalFaceCells = neiProcGlobalIDs[patchI];
+
+            // Receive global IDs from the neighbour proc
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(mesh().boundary()[patchI]);
+            procPatch.receive
+            (
+                Pstream::commsTypes::blocking, globalFaceCells
+            );
+        }
+    }
+
+    // Insert the off-processor coefficients
+    forAll(D.boundaryField(), patchI)
+    {
+        const fvPatchField<vector>& pD = D.boundaryField()[patchI];
+
+        if (pD.type() == "processor")
+        {
+            const vectorField& intCoeffs = approxJ.internalCoeffs()[patchI];
+            const vectorField& neiCoeffs = approxJ.boundaryCoeffs()[patchI];
+            const unallocLabelList& faceCells =
+                mesh().boundary()[patchI].faceCells();
+            const labelList& neiGlobalFaceCells = neiProcGlobalIDs[patchI];
+
+            forAll(pD, faceI)
+            {
+                const label globalBlockRowI =
+                    foamPetscSnesHelper::globalCells().toGlobal
+                    (
+                        faceCells[faceI]
+                    );
+
+                // On-proc diagonal coefficient
+                {
+                    const tensor coeff
+                    (
+                        intCoeffs[faceI][vector::X], 0, 0,
+                        0, intCoeffs[faceI][vector::Y], 0,
+                        0, 0, intCoeffs[faceI][vector::Z]
+                    );
+
+                    matrix(globalBlockRowI, globalBlockRowI) += coeff;
+                }
+
+                // Off-proc off-diagonal coefficient
+                {
+                    // Take care: we need to flip the sign
+                    const tensor coeff
+                    (
+                        -neiCoeffs[faceI][vector::X], 0, 0,
+                        0, -neiCoeffs[faceI][vector::Y], 0,
+                        0, 0, -neiCoeffs[faceI][vector::Z]
+                    );
+
+                    const label globalBlockColI = neiGlobalFaceCells[faceI];
+
+                    matrix(globalBlockRowI, globalBlockColI) += coeff;
+                }
+            }
+        }
+        else if (pD.coupled()) // coupled but not a processor boundary
+        {
+            FatalErrorIn
+            (
+                "tmp<sparseMatrix> "
+                "nonLinGeomTotalLagTotalDispSolid::JacobianMomentum"
+            )   << "Coupled boundaries (except processors) not implemented"
+                << abort(FatalError);
+        }
+        // else non-coupled boundary contributions have already been added to
+        // the diagonal
+    }
+
+    return tmatrix;
 }
 
 
