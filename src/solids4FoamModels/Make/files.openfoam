@@ -4,6 +4,7 @@ solidModels/solidModel/solidModel.C
 solidModels/solidModel/lookupSolidModel.C
 solidModels/solidModel/momentumStabilisation/momentumStabilisation.C
 solidModels/solidModel/setCellDisplacements/setCellDisplacements.C
+solidModels/solidModel/foamPetscSnesHelper/foamPetscSnesHelper.C
 
 solidModels/coupledUnsLinGeomLinearElasticSolid/coupledUnsLinGeomLinearElasticSolid.C
 solidModels/explicitUnsLinGeomTotalDispSolid/explicitUnsLinGeomTotalDispSolid.C
