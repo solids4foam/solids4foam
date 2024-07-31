@@ -93,6 +93,9 @@ class foamPetscSnesHelper
 {
     // Private data
 
+        //- Was PETSc initialised?
+        const Switch initialised_;
+
         //- Reference to the solution field
         volVectorField& solution_;
 
@@ -143,7 +146,8 @@ public:
             fileName optionsFile,       // PETSc options file address
             volVectorField& solution,   // The solution field
             const Switch twoD,          // Is this a 2-D model?  
-            const Switch stopOnPetscError = true
+            const Switch stopOnPetscError = true,
+            const Switch initialise = true // Will PETSc be used?
         );
 
     // Destructor

@@ -289,10 +289,17 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     solidModel(typeName, runTime, region),
     foamPetscSnesHelper
     (
-        fileName(solidModelDict().lookup("optionsFile")),
+        fileName
+        (
+            solidModelDict().lookupOrDefault<fileName>
+            (
+                "optionsFile", "petscOptions"
+            )
+        ),
         D(),
         solidModel::twoD(),
-        solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true)
+        solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
+        bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
     F_
     (

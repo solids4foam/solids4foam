@@ -313,9 +313,11 @@ foamPetscSnesHelper::foamPetscSnesHelper
     fileName optionsFile,
     volVectorField& solution,
     const Switch twoD,
-    const Switch stopOnPetscError
+    const Switch stopOnPetscError,
+    const Switch initialise
 )
 :
+    initialised_(initialise),
     solution_(solution),
     globalCells_(solution.mesh().nCells()),
     twoD_(twoD),
@@ -325,64 +327,67 @@ foamPetscSnesHelper::foamPetscSnesHelper
     APtr_(),
     snesUserPtr_()
 {
-    // Expand the options file name
-    optionsFile.expand();
+    if (initialise)
+    {
+        // Expand the options file name
+        optionsFile.expand();
 
-    // Initialise PETSc with an options file
-    PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
+        // Initialise PETSc with an options file
+        PetscInitialize(NULL, NULL, optionsFile.c_str(), NULL);
 
-    // Create the PETSc SNES object
-    snesPtr_.set(new SNES());
-    SNES& snes = snesPtr_();
-    SNESCreate(PETSC_COMM_WORLD, &snes);
+        // Create the PETSc SNES object
+        snesPtr_.set(new SNES());
+        SNES& snes = snesPtr_();
+        SNESCreate(PETSC_COMM_WORLD, &snes);
 
-    // Create user data context
-    snesUserPtr_.set(new appCtxfoamPetscSnesHelper(*this));
-    appCtxfoamPetscSnesHelper& user = snesUserPtr_();
+        // Create user data context
+        snesUserPtr_.set(new appCtxfoamPetscSnesHelper(*this));
+        appCtxfoamPetscSnesHelper& user = snesUserPtr_();
 
-    // Set the user context
-    SNESSetApplicationContext(snes, &user);
+        // Set the user context
+        SNESSetApplicationContext(snes, &user);
 
-    // Set the residual function
-    SNESSetFunction(snes, NULL, formResidualFoamPetscSnesHelper, &user);
+        // Set the residual function
+        SNESSetFunction(snes, NULL, formResidualFoamPetscSnesHelper, &user);
 
-    // Coefficient block size, e.g. 2x2 in 2-D, 3x3 in 3-D
-    const int blockSize = twoD_ ? 2 : 3;
+        // Coefficient block size, e.g. 2x2 in 2-D, 3x3 in 3-D
+        const int blockSize = twoD_ ? 2 : 3;
 
-    // Global system size
-    const int blockN = globalCells_.size();
-    const int N = blockSize*blockN;
+        // Global system size
+        const int blockN = globalCells_.size();
+        const int N = blockSize*blockN;
 
-    // Local (this processor) system size
-    const int blockn = globalCells_.localSize();
-    const int n = blockSize*blockn;
+        // Local (this processor) system size
+        const int blockn = globalCells_.localSize();
+        const int n = blockSize*blockn;
 
-    // Create the Jacobian matrix
-    APtr_.set(new Mat());
-    Mat& A = APtr_();
-    MatCreate(PETSC_COMM_WORLD, &A);
-    MatSetSizes(A, n, n, N, N);
-    MatSetFromOptions(A);
-    MatSetType(A, MATMPIAIJ);
-    //MatSetType(A, MATMPIBAIJ);
+        // Create the Jacobian matrix
+        APtr_.set(new Mat());
+        Mat& A = APtr_();
+        MatCreate(PETSC_COMM_WORLD, &A);
+        MatSetSizes(A, n, n, N, N);
+        MatSetFromOptions(A);
+        MatSetType(A, MATMPIAIJ);
+        //MatSetType(A, MATMPIBAIJ);
 
-    // Set the Jacobian function
-    SNESSetJacobian(snes, A, A, formJacobianFoamPetscSnesHelper, &user);
+        // Set the Jacobian function
+        SNESSetJacobian(snes, A, A, formJacobianFoamPetscSnesHelper, &user);
 
-    // Set solver options
-    // Uses default options, can be overridden by command line options
-    SNESSetFromOptions(snes);
+        // Set solver options
+        // Uses default options, can be overridden by command line options
+        SNESSetFromOptions(snes);
 
-    // Create the solution vector
-    xPtr_.set(new Vec());
-    Vec& x = xPtr_();
-    VecCreate(PETSC_COMM_WORLD, &x);
-    VecSetSizes(x, n, N);
-    VecSetBlockSize(x, blockSize);
-    VecSetType(x, VECMPI);
-    PetscObjectSetName((PetscObject) x, "Solution");
-    VecSetFromOptions(x);
-    VecZeroEntries(x);
+        // Create the solution vector
+        xPtr_.set(new Vec());
+        Vec& x = xPtr_();
+        VecCreate(PETSC_COMM_WORLD, &x);
+        VecSetSizes(x, n, N);
+        VecSetBlockSize(x, blockSize);
+        VecSetType(x, VECMPI);
+        PetscObjectSetName((PetscObject) x, "Solution");
+        VecSetFromOptions(x);
+        VecZeroEntries(x);
+    }
 }
 
 
@@ -390,18 +395,21 @@ foamPetscSnesHelper::foamPetscSnesHelper
 
 foamPetscSnesHelper::~foamPetscSnesHelper()
 {
-    SNESDestroy(&snesPtr_());
-    snesPtr_.clear();
+    if (initialised_)
+    {
+        SNESDestroy(&snesPtr_());
+        snesPtr_.clear();
 
-    VecDestroy(&xPtr_());
-    xPtr_.clear();
+        VecDestroy(&xPtr_());
+        xPtr_.clear();
 
-    MatDestroy(&APtr_());
-    APtr_.clear();
+        MatDestroy(&APtr_());
+        APtr_.clear();
 
-    snesUserPtr_.clear();
+        snesUserPtr_.clear();
 
-    PetscFinalize();
+        PetscFinalize();
+    }
 }    
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
@@ -409,6 +417,14 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 
 void foamPetscSnesHelper::mapSolutionFoamToPetsc()
 {
+    if (!initialised_)
+    {
+        FatalErrorIn("void foamPetscSnesHelper::mapSolutionFoamToPetsc()")
+            << "This function cannot be called because the foamPetscSnesHelper "
+            << "object was not initialised during construction"
+            << abort(FatalError);
+    }
+
     // Take a reference to the PETSc solution vector
     Vec& x = xPtr_();
 
@@ -439,6 +455,14 @@ void foamPetscSnesHelper::mapSolutionFoamToPetsc()
 
 void foamPetscSnesHelper::mapSolutionPetscToFoam()
 {
+    if (!initialised_)
+    {
+        FatalErrorIn("void foamPetscSnesHelper::mapSolutionPetscToFoam()")
+            << "This function cannot be called because the foamPetscSnesHelper "
+            << "object was not initialised during construction"
+            << abort(FatalError);
+    }
+
     // Take a reference to the PETSc solution vector
     const Vec& x = xPtr_();
 
@@ -471,6 +495,14 @@ void foamPetscSnesHelper::mapSolutionPetscToFoam()
 
 void foamPetscSnesHelper::solve()
 {
+    if (!initialised_)
+    {
+        FatalErrorIn("void foamPetscSnesHelper::solve()")
+            << "This function cannot be called because the foamPetscSnesHelper "
+            << "object was not initialised during construction"
+            << abort(FatalError);
+    }
+
     // Take a reference to the SNES solver object
     SNES& snes = snesPtr_();
 
