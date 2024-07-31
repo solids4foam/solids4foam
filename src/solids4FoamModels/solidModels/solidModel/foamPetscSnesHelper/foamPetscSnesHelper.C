@@ -410,7 +410,7 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 
         PetscFinalize();
     }
-}    
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 

@@ -145,7 +145,7 @@ public:
         (
             fileName optionsFile,       // PETSc options file address
             volVectorField& solution,   // The solution field
-            const Switch twoD,          // Is this a 2-D model?  
+            const Switch twoD,          // Is this a 2-D model?
             const Switch stopOnPetscError = true,
             const Switch initialise = true // Will PETSc be used?
         );
@@ -206,7 +206,7 @@ public:
             //  2*f.size() for 2-D
             void mapSolutionFoamToPetsc();
 
-            //- Map the PETSc solution Vec to the Foam solution volVectorField 
+            //- Map the PETSc solution Vec to the Foam solution volVectorField
             //  Note that PETSc defines a Vec as a pointer to a struct type
             //  It is assumed that the size of x is 3*f.size() for 3-D and
             //  2*f.size() for 2-D
