@@ -1,0 +1,44 @@
+-snes_view_pre
+-snes_type composite
+#-snes_composite_type additiveoptimal
+#-snes_composite_type additive
+#-snes_composite_type multiplicative
+#-snes_composite_sneses newtonls,newtonls
+-snes_composite_sneses newtonls
+ 
+#-snes_mf
+#-snes_mf_operator
+-sub_0_snes_mf
+-sub_0_snes_mf_operator
+-sub_1_snes_mf
+-sub_1_snes_mf_operator
+
+#-snes_type newtonls
+#-sub_0_snes_type newtonls
+#-sub_1_snes_type newtonls
+
+#-snes_monitor
+-sub_0_snes_monitor
+-sub_1_snes_monitor
+
+#-ksp_type lgmres
+-sub_0_ksp_type lgmres
+-sub_0_ksp_monitor
+-sub_0_ksp_view
+-sub_1_ksp_type lgmres
+-sub_0_mat_view
+
+#-snes_lag_preconditioner_persists true
+#-snes_lag_preconditioner -2
+#-pc_type bjacobi
+#-sub_pc_type lu
+
+#-sub_0_snes_lag_preconditioner_persists true
+#-sub_0_snes_lag_preconditioner -2
+-sub_0_pc_type bjacobi
+-sub_0_sub_pc_type lu
+
+#-sub_1_snes_lag_preconditioner_persists true
+#-sub_1_snes_lag_preconditioner -2
+-sub_1_pc_type bjacobi
+-sub_1_sub_pc_type lu

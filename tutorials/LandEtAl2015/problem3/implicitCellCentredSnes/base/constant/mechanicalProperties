@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.0                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+planeStress     no;
+
+mechanical
+(
+    heartTissue
+    {
+        // type            neoHookeanElastic;
+        // type            StVenantKirchhoffElastic;
+        // rho             rho [1 -3 0 0 0 0 0] 3000;
+        // mu              mu [1 -1 -2 0 0 0 0] 10e3;
+        // K               K [1 -1 -2 0 0 0 0] 20e3;
+
+        type            electroMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 3000;
+        activeTension   activeTension [1 -1 -2 0 0 0 0] 60e3;
+        rampTime        1.0;
+        passiveMechanicalLaw
+        {
+            type            GuccioneElastic;
+            k               k [1 -1 -2 0 0 0 0] 2e3;
+            cf              8.0;
+            ct              2.0;
+            cfs             4.0;
+
+            // The bulk modulus acts as a penalty factor to enforce
+            // incompressiblity
+            // bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 1000e3;
+            bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 100e3;
+
+            // To solve pressure Poisson equation
+            solvePressureEqn no;
+
+            // Pressure smoothing scale factor
+            pressureSmoothingScaleFactor 100;
+        }
+    }
+);
+
+// ************************************************************************* //

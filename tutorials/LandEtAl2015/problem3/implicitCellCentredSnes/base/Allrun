@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# If you want to run the solver in parallel, pass the argument "parallel" to
+# this script, e.g. > ./Allrun parallel
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Create mesh in steps:
+#     1. Create slice of a circle
+#     2. Rotationally extrude the slice
+#     3. Remove empty patches
+runApplication blockMesh
+runApplication extrudeMesh
+runApplication createPatch -overwrite
+
+# Create the fibre field
+runApplication setFibreField
+
+if [[ "$1" == "parallel" ]]
+then
+    # Decompose the mesh
+    runApplication decomposePar
+
+    # Run the solver in parallel
+    runParallel solids4Foam
+
+    # Reconstruct the results
+    runApplication reconstructPar
+else
+    # Run the solver in serial
+    echo "Running solids4Foam"
+    mpirun -np 1 solids4Foam &> log.solids4Foam
+fi
