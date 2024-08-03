@@ -30,15 +30,17 @@ Author
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
-
+#include "transform.H"
+#include "unitConversion.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
 {
+    #include "addRegionOption.H"
     #include "setRootCase.H"
     #include "createTime.H"
-    #include "createMesh.H"
+    #include "createNamedMesh.H"
 
     // Read the transmural distance field
     // This will be calculated using the given boundary conditions
@@ -65,167 +67,124 @@ int main(int argc, char *argv[])
     Info<< "Writing t" << endl;
     t.write();
 
-    const dimensionedScalar dimL("1", dimLength, 1.0);
+    // Base direction as per Rossi-Lassila et al. approach
+    const vector k(0, 0, 1);
 
-    const volScalarField rs("rs", 0.001*(7.0*dimL + 3.0*t));
-    Info<< "Writing rs" << endl;
-    rs.write();
+    // Transmural direction
+    volVectorField et("et", fvc::grad(t));
+    et /= mag(et);
 
-    const volScalarField rl("rl", 0.001*(17.0*dimL + 3.0*t));
-    Info<< "Writing rl" << endl;
-    rl.write();
+    // Normal direction
+    volVectorField en("en", k - (k & et)*et);
+    en /= mag(en);
 
-    const volScalarField alpha("alpha", 90.0*dimL - 180.0*t);
-    Info<< "Writing alpha" << endl;
-    alpha.write();
+    // Longitudinal direction
+    volVectorField el("el", en ^ et);
+    el /= mag(el);
 
-    // Convert alpha to radians
+    Info<< "Writing et, en, el" << endl;
+    et.write();
+    en.write();
+    el.write();
+
+
+    // alpha at the endocardium: SHOULD BE INPUT PARAMETER
+    const scalar alphaEndo = degToRad(60.0);
+
+    // alpha at the epicardium: SHOULD BE INPUT PARAMETER
+    const scalar alphaEpi = degToRad(-60.0);
+
+    // Calculate alphaRadians
     const volScalarField alphaRadians
     (
-        "alphaRadians", alpha*constant::mathematical::pi/180.0
+        "alphaRadians",
+        alphaEndo*(1.0 - t) + alphaEpi*t
     );
     Info<< "Writing alphaRadians" << endl;
     alphaRadians.write();
 
-    // Unit Cartesian vectors
-    const vector iHat(1, 0, 0);
-    const vector jHat(0, 1, 0);
-    const vector kHat(0, 0, 1);
+    // Rotate el about et by alphaRadians to get f
+    volVectorField f0("f0", el);
+    forAll(et, cellI)
+    {
+        const tensor rotT = Ra(et[cellI], alphaRadians[cellI]);
+        f0[cellI] = transform(-rotT, f0[cellI]);
+    }
+    forAll(et.boundaryField(), patchI)
+    {
+        forAll(et.boundaryField()[patchI], faceI)
+        {
+            const tensor rotT = Ra
+            (
+                et.boundaryField()[patchI][faceI],
+                alphaRadians.boundaryField()[patchI][faceI]
+            );
+            f0.boundaryFieldRef()[patchI][faceI] = transform
+            (
+                -rotT,
+                f0.boundaryField()[patchI][faceI]
+            );
+        }
+    }
 
-    // Coordinate fields
-    const volScalarField x("x", mesh.C().component(vector::X));
-    const volScalarField y("y", mesh.C().component(vector::Y));
-    const volScalarField z("z", mesh.C().component(vector::Z));
+    f0.write();
 
-    //const volScalarField posX(pos(x));
-    const volScalarField posY(pos(y));
-    const volScalarField negY(1.0 - posY);
-    const volScalarField posZ(pos(z));
-    const volScalarField negZ(1.0 - posZ);
 
-    // Ellipsoid parameters
-    const volScalarField u
+    // Calculate surface fields
+    const surfaceScalarField tf(fvc::interpolate(t));
+
+    // Transmural direction
+    surfaceVectorField etf("etf", fvc::interpolate(fvc::grad(t)));
+    //surfaceVectorField n(mesh.Sf()/mesh.magSf());
+    // etf += fvc::snGrad(t)*n - ((I - sqr(n)) & etf);
+    etf /= mag(etf);
+
+    // Normal direction
+    surfaceVectorField enf("enf", k - (k & etf)*etf);
+    enf /= mag(enf);
+
+    // Longitudinal direction
+    surfaceVectorField elf("elf", enf ^ etf);
+    elf /= mag(elf);
+
+    etf.write();
+    enf.write();
+    elf.write();
+
+    // Calculate alphaRadians
+    const surfaceScalarField alphaRadiansf
     (
-        IOobject
-        (
-            "u",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        -acos(z/rl)
+        "alphaRadiansf",
+        alphaEndo*(1.0 - tf) + alphaEpi*tf
     );
-    // Info<< "Writing u" << endl;
-    // u.write();
+    Info<< "Writing alphaRadiansf" << endl;
+    alphaRadiansf.write();
 
-    const volScalarField v
-    (
-        IOobject
-        (
-            "v",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        (negY - posY)*acos(x/(rs*sin(u)))
-        //asin(y/(rs*sin(u)))
-    );
-    // Info<< "Writing v" << endl;
-    // v.write();
+    // Rotate el about et by alphaRadians to get f
+    surfaceVectorField f0f("f0f", elf);
+    forAll(etf, faceI)
+    {
+        const tensor rotT = Ra(etf[faceI], alphaRadiansf[faceI]);
+        f0f[faceI] = transform(-rotT, f0f[faceI]);
+    }
+    forAll(etf.boundaryField(), patchI)
+    {
+        forAll(etf.boundaryField()[patchI], faceI)
+        {
+            const tensor rotT = Ra
+            (
+                etf.boundaryField()[patchI][faceI],
+                alphaRadiansf.boundaryField()[patchI][faceI]
+            );
+            f0f.boundaryFieldRef()[patchI][faceI] = transform
+            (
+                -rotT,
+                f0f.boundaryField()[patchI][faceI]
+            );
+        }
+    }
 
-    const volVectorField dxdu
-    (
-        IOobject
-        (
-            "dxdu",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-      //   (1.0 - posY)*rs*cos(u)*cos(v)*iHat
-      // - posY*rs*cos(u)*cos(v)*iHat
-      // + (1.0 - posY)*rs*cos(u)*sin(v)*jHat
-      // - posY*rs*cos(u)*sin(v)*jHat
-        rs*cos(u)*cos(v)*iHat
-      + rs*cos(u)*sin(v)*jHat
-      - rl*sin(u)*kHat
-    );
-    // Info<< "Writing dxdu" << endl;
-    // dxdu.write();
-
-    const volVectorField dxduHat
-    (
-        IOobject
-        (
-            "dxduHat",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        dxdu/mag(dxdu)
-    );
-    // Info<< "Writing dxduHat" << endl;
-    // dxduHat.write();
-
-    const volVectorField dxdv
-    (
-        IOobject
-        (
-            "dxdv",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-       - rs*sin(u)*sin(v)*iHat
-       + rs*sin(u)*cos(v)*jHat
-       //  - (1.0 - posY)*rs*sin(u)*sin(v)*iHat
-       // + posY*rs*sin(u)*sin(v)*iHat
-       // + (1.0 - posY)*rs*sin(u)*cos(v)*jHat
-       // - posY*rs*sin(u)*cos(v)*jHat
-       // + (1.0 - posY)*rs*sin(u)*cos(v)*jHat
-       // - posY*rs*sin(u)*cos(v)*jHat
-    );
-    // Info<< "Writing dxdv" << endl;
-    // dxdv.write();
-
-    const volVectorField dxdvHat
-    (
-        IOobject
-        (
-            "dxdvHat",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        dxdv/mag(dxdv)
-    );
-    // Info<< "Writing dxdvHat" << endl;
-    // dxdvHat.write();
-
-    // Initialise the fibre field
-    const word fibreFieldName("f0");
-    volVectorField fibres
-    (
-        IOobject
-        (
-            fibreFieldName,
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::AUTO_WRITE
-        ),
-        dxduHat*sin(alphaRadians/dimL) + dxdvHat*cos(alphaRadians/dimL)
-    );
-    fibres /= mag(fibres);
-
-    Info<< "Writing " << fibres.name() << endl;
-    fibres.write();
+    f0f.write();
 
     Info<< "\nEnd\n" << endl;
 
