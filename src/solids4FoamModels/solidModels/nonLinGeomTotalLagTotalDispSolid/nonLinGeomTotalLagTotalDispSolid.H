@@ -73,6 +73,9 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Jacobian of total deformation gradient
         volScalarField J_;
 
+        //- Acceleration
+        volVectorField A_;
+
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum

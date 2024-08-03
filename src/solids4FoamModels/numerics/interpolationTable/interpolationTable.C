@@ -225,7 +225,12 @@ void Foam::interpolationTable<Type>::write(Ostream& os) const
 #ifdef OPENFOAM_ORG
     writeEntry(os, "file", fileName_);
     writeEntry(os, "outOfBounds", boundsHandlingToWord(boundsHandling_));
-#else
+#elif OPENFOAM_COM
+    os.writeKeyword("file")
+        << fileName_ << token::END_STATEMENT << nl;
+    os.writeKeyword("outOfBounds")
+        << boundsHandlingToWord(boundsHandling_) << token::END_STATEMENT << nl;
+#elif
     os.writeKeyword("fileName")
         << fileName_ << token::END_STATEMENT << nl;
     os.writeKeyword("outOfBounds")

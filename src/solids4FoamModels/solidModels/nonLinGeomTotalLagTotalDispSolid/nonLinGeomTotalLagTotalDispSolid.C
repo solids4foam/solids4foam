@@ -56,7 +56,9 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
     // Predict D using the velocity field
     // Note: the case may be steady-state but U can still be calculated using a
     // transient method
-    D() = D().oldTime() + U()*runTime().deltaT();
+    // D() = D().oldTime() + U()*runTime().deltaT();
+    D() = D().oldTime() + U()*runTime().deltaT()
+        + 0.5*sqr(runTime().deltaT())*A_;
 
     // Update gradient of displacement
     mechanical().grad(D(), gradD());
@@ -132,7 +134,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     Info<< "Evolving solid solver using an implicit segregated approach"
         << endl;
 
-    if (predictor_)
+    if (predictor_ && newTimeStep())
     {
         predict();
     }
@@ -182,7 +184,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         DD() = D() - D().oldTime();
 
         // Update gradient of displacement
-        mechanical().grad(D(), gradD());
+        mechanical().grad(D(), gradD(), "grad(D).segregated");
 
         // Update gradient of displacement increment
         gradDD() = gradD() - gradD().oldTime();
@@ -229,6 +231,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     // Velocity
     U() = fvc::ddt(D());
 
+    // Acceleration
+    A_ = fvc::d2dt2(D());
+
 #ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
 #else
@@ -251,6 +256,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
     {
         predict();
 
+        // Use the segregated solver as a predictor
+        //evolveImplicitSegregated();
+
         // Map the D field to the SNES solution vector
         foamPetscSnesHelper::mapSolutionFoamToPetsc();
     }
@@ -264,6 +272,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), gradD(), pointD());
+    pointD().correctBoundaryConditions();
 
     // Increment of displacement
     DD() = D() - D().oldTime();
@@ -273,6 +282,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
     // Velocity
     U() = fvc::ddt(D());
+
+    // Acceleration
+    A_ = fvc::d2dt2(D());
 
     return true;
 }
@@ -337,6 +349,18 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
             IOobject::NO_WRITE
         ),
         det(F_)
+    ),
+    A_
+    (
+        IOobject
+        (
+            "A",
+            runTime.timeName(),
+            mesh(),
+            IOobject::READ_IF_PRESENT,
+            IOobject::NO_WRITE
+        ),
+        fvc::d2dt2(D())
     ),
     impK_(mechanical().impK()),
     impKf_(mechanical().impKf()),
