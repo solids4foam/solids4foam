@@ -7,7 +7,7 @@ then
     echo "Please source the OpenFOAM/FOAM bashrc first!"
     exit 1
 else
-    allowed_ver=("4.1" "9" "v2012")
+    allowed_ver=("4.1" "9" "v2012" "v2106" "v2112" "v2206" "v2212" "v2306" "v2312")
     if ! [[ " ${allowed_ver[*]} " == *" $WM_PROJECT_VERSION "* ]]; then
         echo "Unsupported OpenFOAM version sourced!"
     fi

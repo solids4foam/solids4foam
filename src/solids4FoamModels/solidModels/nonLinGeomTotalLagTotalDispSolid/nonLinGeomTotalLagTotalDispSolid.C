@@ -184,7 +184,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         DD() = D() - D().oldTime();
 
         // Update gradient of displacement
-        mechanical().grad(D(), gradD(), "grad(D).segregated");
+        mechanical().grad(D(), gradD());
 
         // Update gradient of displacement increment
         gradDD() = gradD() - gradD().oldTime();

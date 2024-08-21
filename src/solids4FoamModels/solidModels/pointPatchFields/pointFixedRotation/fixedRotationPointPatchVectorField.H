@@ -44,6 +44,7 @@ Author
     #include "PointPatchFieldMapper.H"
 #endif
 #include "interpolationTable.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
