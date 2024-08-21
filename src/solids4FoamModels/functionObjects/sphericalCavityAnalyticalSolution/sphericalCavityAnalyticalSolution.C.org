@@ -1,0 +1,715 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+\*----------------------------------------------------------------------------*/
+
+#include "sphericalCavityAnalyticalSolution.H"
+#include "addToRunTimeSelectionTable.H"
+#include "volFields.H"
+#include "pointFields.H"
+#include "coordinateSystem.H"
+#include "cylindricalCS.H"
+
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+namespace Foam
+{
+    defineTypeNameAndDebug(sphericalCavityAnalyticalSolution, 0);
+
+    addToRunTimeSelectionTable
+    (
+        functionObject,
+        sphericalCavityAnalyticalSolution,
+        dictionary
+    );
+}
+
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::scalar Foam::sphericalCavityAnalyticalSolution::Q
+(
+    const int sub, const int sup, const scalar q
+) const
+{
+    scalar result = 0;
+
+    if (sub == 1 && sup == 1)
+    {
+        result =
+            0.5*Foam::sqrt(sqr(q) - 1)*Foam::log((q + 1)/(q - 1))
+          - q/Foam::sqrt(sqr(q) - 1);
+    }
+    else
+    {
+        FatalErrorIn("Q(const int sub, const int sup, q)")
+            << "Not implemented for sub == " << sub << " and sup == " << sup
+            << abort(FatalError);
+    }
+
+    return result;
+}
+
+
+Foam::scalar Foam::sphericalCavityAnalyticalSolution::Qsub
+(
+    const int sub, const scalar q
+) const
+{
+    scalar result = 0;
+
+    if (sub == 1)
+    {
+        result = 0.5*q*Foam::log((q + 1)/(q - 1)) - 1;
+    }
+    else
+    {
+        FatalErrorIn("Q(const int sub, const int sup, q)")
+            << "Not implemented for sub == " << sub
+            << abort(FatalError);
+    }
+
+    return result;
+}
+
+
+Foam::scalar Foam::sphericalCavityAnalyticalSolution::calculateQj
+(
+    const scalar aj, const scalar zj, const scalar r
+) const
+{
+    // Calculate the coefficients of the quadratic equation
+    const scalar A = sqr(aj);
+    const scalar B = -(sqr(zj) + sqr(aj) + sqr(r));
+    const scalar C = sqr(zj);
+
+    // Calculate the discriminant
+    const scalar discriminant = sqr(B) - 4*A*C;
+
+    if (discriminant < 0)
+    {
+        FatalErrorIn("calculateQj(...)")
+            << "Imaginary roots" << abort(FatalError);
+    }
+
+    // Calculate the positive root of the quadratic equation
+    const scalar qjSquared = (-B + std::sqrt(discriminant))/(2*A);
+
+    // Return the positive square root of qj_squared
+    return std::sqrt(qjSquared);
+}
+
+Foam::symmTensor
+Foam::sphericalCavityAnalyticalSolution::sphericalCavityStress
+(
+    const vector& C
+)
+{
+    //tensor sigma = tensor::zero;
+    symmTensor sigma = symmTensor::zero;
+
+    // Cartesian coordinates
+    const scalar x = C.x();
+    const scalar y = C.y();
+    // const scalar z = C.z();
+
+    // Calculate the cylindrical radial coordinate
+    const scalar r = sqrt(x*x + y*y);
+
+    // Break if we are inside the cavity
+    // Allow some tolerance for geometric discretisation error
+    if (r < 0.99*cavityR_)
+    {
+        return sigma;
+        // return symmTensor::zero;
+    }
+
+    // Calculate the polar angle
+    // This is the angle from the Z axis
+    //const scalar theta = Foam::atan2(r, C.z());
+    //const scalar theta = Foam::acos(z/r);
+
+    // Calculate phi angle
+    //const scalar phi = Foam::atan2(C.y(), C.x());
+    //const scalar phi = Foam::atan2(y, x);
+
+    // Calculate stress in polar coordinates
+    // sigma.rr
+    //sigma.zz() =
+
+
+    // // Radius in xy plane
+    // const scalar xy_magnitude = sqrt(x*x + y*y);
+
+    // // Theta direction
+    // const scalar e_theta_x = x*z/(r*xy_magnitude);
+    // const scalar e_theta_y = y*z/(r*xy_magnitude);
+    // const scalar e_theta_z = -xy_magnitude/r;
+    // const vector thetaDir(e_theta_x, e_theta_y, e_theta_z);
+
+    // // Phi direction
+    // const scalar e_phi_x = -y/xy_magnitude;
+    // const scalar e_phi_y = x/xy_magnitude;
+    // const scalar e_phi_z = 0;
+    // const vector phiDir(e_phi_x, e_phi_y, e_phi_z);
+
+    // Transformation to Cartesian coordinate system
+    const coordinateSystem cs("polarCS", C, vector(0, 0, 1), C/mag(C));
+    sigma = transform(cs.R(), sigma);
+
+    return sigma;
+}
+
+
+Foam::vector
+Foam::sphericalCavityAnalyticalSolution::sphericalCavityDisplacement
+(
+    const vector& C, const symmTensor& sigma
+)
+{
+    // // Shear modulus
+    // const scalar mu = E_/(2*(1 + nu_));
+
+    // // Kappa parameter
+    // const scalar kappa = 3 - 4*nu_;
+
+    // Cartesian coordinates
+    const scalar x = C.x();
+    const scalar y = C.y();
+    const scalar z = C.z();
+
+    // Calculate the cylindrical radial coordinate
+    const scalar r = Foam::sqrt(sqr(x) + sqr(y));
+
+    // Calculate Lame parameters
+    const scalar mu = E_/(2*(1 + nu_));
+    const scalar lambda = (E_*nu_)/((1 + nu_)*(1 - 2*nu_));
+
+    // Material constants from Eq 2.3.6
+    const scalar c11 = 2*mu + lambda;
+    const scalar c33 = 2*mu + lambda;
+    const scalar c12 = lambda;
+    const scalar c13 = lambda;
+    const scalar c44 = mu;
+    const scalar c66 = mu;
+
+    // Calculate constants k1 and k2 from Eq 3.2.5
+    // For isotropy, Eq 3.2.5 becomes
+    //     mu*(lambda + mu)*k^2
+    //         + ((lambda + mu)^2 + mu^2 - (2*mu + lambda)^2)*k
+    //         + mu*(mu + lambda) = 0
+    //     mu*(lambda + mu)*k^2
+    //         + (lambda^2 + 2*lambda*mu + mu^2 + mu^2 - 4*mu^2 - 4*mu*lambda - lambda^2)*k
+    //         + mu*(mu + lambda) = 0
+    //     mu*(mu + lambda)*k^2 - 2*mu*(mu + lambda)*k + mu*(mu + lambda) = 0
+    //     k^2 - 2*k + 1 = 0
+    //     (k - 1)^2 = 0
+    // So
+    //     k1 = k2 = 1
+    const scalar k1 = 1;
+    const scalar k2 = 1;
+
+    // Calculate constants v1^2 and v2^2 from Eq 3.2.9
+    // For isotropy, Eq 3.2.9 becomes
+    //     sqrVj = (kj*(lambda + mu) + mu)/(2*mu + lambda)
+    //           = (1*(lambda + mu) + mu)/(2*mu + lambda)
+    //           = (2*mu + lambda)/(2*mu + lambda)
+    //           = 1
+    // const scalar sqrV1 = 1;
+    // const scalar sqrV2 = 1;
+
+    // Hence
+    const scalar v1 = 1;
+    const scalar v2 = 1;
+
+    // Strangely, if we calculate v1 and v2 directly from Eq 3.2.6, we can
+    // imaginary values. See here:
+    // For isotropic, Eq 3.2.6 can be simplified
+    //     (2*mu + lambda)*mu*v^4 + (lambda*(2*mu + lambda)
+    //         - (2*mu + lambda)*lambda)*v^2 + (2*mu + lambda)*mu = 0
+    //     (2*mu + lambda)*mu*v^4 + (2*mu + lambda)*mu = 0
+    //     v^4 + 1 = 0
+    //     v^4 = -1
+    // Solving for v gives 4 imaginary roots
+    //     v1 =   0.5*(sqrt(2) + i*sqrt(2))
+    //     v2 =   0.5*(sqrt(2) - i*sqrt(2))
+    //     v3 = - 0.5*(sqrt(2) + i*sqrt(2))
+    //     v4 = - 0.5*(sqrt(2) - i*sqrt(2))
+    // By definition, v1 and v2 are the roots with positive real parts
+    // Maybe there is an error in Eq 3.2.6, e.g. an error in the sign of the
+    // constant term of Eq 3.2.6 would result in v1 = v2 = 1
+    // We will continue with v1 = v2 = k1 = k2 = 1
+    // But we now have a problem, aj will be 0 and rhoj will be infinity!
+
+    // Calculate material constants v3 from Eq 3.2.7 
+    const scalar v3 = Foam::sqrt(c44/c66);
+
+    // Calculate zj (z1, z2, z3) according to Eq 3.2.11
+    const scalar z1 = z/v1;
+    const scalar z2 = z/v2;
+    // const scalar z3 = z/v3;
+
+    // a and b are the semi-axes of the ellipsoid according to Eq 4.1.1
+    // In our case (sphere), a == b == cavityRadius
+    // The assumed formulae seem to have problems in the limit that a == b
+    // It might be the case that the analyses is only valid when a > b
+    // Let's assume a = 2*b
+    const scalar b = cavityR_;
+    const scalar a = 2*b;
+
+    // Calculate alpha variables from Eq 4.2.4
+    const scalar alpha1 = Foam::sqrt(sqr(a)/sqr(v1) - sqr(b));
+    const scalar alpha2 = Foam::sqrt(sqr(a)/sqr(v2) - sqr(b));
+    // const scalar alpha3 = Foam::sqrt(sqr(a)/sqr(v3) - sqr(b));
+
+    // Calculate rho variables from Eq 4.2.5
+    const scalar rho1 = Foam::sqrt(sqr(a)/(sqr(a) - sqr(b)*sqr(v1))); // This is division by 0!
+    const scalar rho2 = Foam::sqrt(sqr(a)/(sqr(a) - sqr(b)*sqr(v2))); // This is division by 0!
+    // const scalar rho3 = Foam::sqrt(sqr(a)/(sqr(a) - sqr(b)*sqr(v3)));
+
+    // Calculate p and qj position variables according to Eq 4.2.2
+    const scalar q1 = calculateQj(alpha1, z1, r);
+    const scalar q2 = calculateQj(alpha2, z2, r);
+    //const scalar q3 = calculateQj(alpha3, z3, r);
+    //const scalar p1 = z1/(alpha1*q1);
+    //const scalar p2 = z2/(alpha2*q2);
+    //const scalar p3 = z3/(alpha3*q3);
+
+    // Eqs 6.7.8 and 6.7.9
+    {
+        complex t(1, 1);
+        complex myI(-1, 0);
+        complex sqrtI = sqrt(myI);
+        complex sqrSqrtI = sqr(sqrtI);
+        Info<< "myI " << myI << nl
+            << "sqrtI " << sqrtI << nl
+            << "sqrSqrtI " << sqrSqrtI << endl;
+    }
+    Info<< __LINE__ << endl;
+    Info<< "b " << b << nl
+        << "v3 " << v3 << nl
+        << "k1 " << k1 << nl
+        << "k2 " << k2 << nl
+        << "a " << a << endl;
+    const scalar F1 =
+        1 + (b*pow3(v3)*(1 + k1)*(1 + k2)/(a*(k2 - k1)))
+           *(
+               Qsub(1, rho2)/(v2*Q(1, 1, rho2))
+             - Qsub(1, rho1)/(v1*Q(1, 1, rho1))
+            );
+    Info<< __LINE__ << endl;
+    const scalar Delta = c44*(a/b)*Q(1, 1, rho1)*Q(1, 1, rho2)*F1;
+    Info<< __LINE__ << endl;
+    const scalar A110 =
+        (T0_*b/(2*(k2 - k1)*Delta))
+       *(
+         - sqr(v3)*((1 + k2)/v2)*Qsub(1, rho2)
+         + (a/b)*Q(1, 1, rho2)
+        );
+    const scalar A210 =
+        (T0_*b/(2*(k2 - k1)*Delta))
+       *(
+         - sqr(v3)*((1 + k1)/v1)*Qsub(1, rho1)
+         + (a/b)*Q(1, 1, rho1)
+        );
+
+    // Radial displacement
+    const scalar ur =
+      - r
+       *(
+           (c13/(c33*(c11 + c12) - 2*sqr(c13)))*T0_
+         + A110*Q(1, 1, q1)/(alpha1*Foam::sqrt(sqr(q1) - 1))
+         + A210*Q(1, 1, q2)/(alpha2*Foam::sqrt(sqr(q2) - 1))
+        );
+
+    // Axial displacement
+    const scalar uz =
+        z
+       *(
+           ((c11 + c12)/(c33*(c11 + c12) - 2*sqr(c13)))*T0_
+         + 2*k1*A110*Q(1, 1, q1)/(alpha1*sqr(v1)*Foam::sqrt(sqr(q1) - 1))
+         + 2*k2*A210*Q(1, 1, q2)/(alpha2*sqr(v2)*Foam::sqrt(sqr(q2) - 1))
+        );
+
+    // Initialise displacement vector
+    // x: radial
+    // y: circumferential
+    // z: axial
+    vector disp(ur, 0, uz);
+
+    // Transformation to Cartesian coordinate system
+    const coordinateSystem cs("polarCS", C, vector(0, 0, 1), C/mag(C));
+    disp = transform(cs.R(), disp);
+
+    return disp;
+}
+
+bool Foam::sphericalCavityAnalyticalSolution::writeData()
+{
+    // Lookup the solid mesh
+    const fvMesh* meshPtr = NULL;
+    if (time_.foundObject<fvMesh>("solid"))
+    {
+        meshPtr = &(time_.lookupObject<fvMesh>("solid"));
+    }
+    else
+    {
+        meshPtr = &(time_.lookupObject<fvMesh>("region0"));
+    }
+    const fvMesh& mesh = *meshPtr;
+
+    // Lookup the point mesh
+    const pointMesh& pMesh = mesh.lookupObject<pointMesh>("pointMesh");
+
+    // Cell-centres coordinates
+    const volVectorField& C = mesh.C();
+    const vectorField& CI = C;
+
+    // Point coordinates
+    const pointField& points = mesh.points();
+
+    if (gMin(mag(points)) < -SMALL)
+    {
+        FatalErrorIn("bool Foam::sphericalCavityAnalyticalSolution::writeData()")
+            << "The cavity should be centred on the origin!" << endl
+            << "gMin(mag(points)) = " << gMin(mag(points))
+            << abort(FatalError);
+    }
+
+    // Cell analytical fields
+    if (cellDisplacement_ || cellStress_)
+    {
+        // Analytical stress field
+        volSymmTensorField analyticalStress
+        (
+            IOobject
+            (
+                "analyticalCellStress",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero),
+            "calculated"
+        );
+
+        // Analytical displacement field
+        volVectorField analyticalD
+        (
+            IOobject
+            (
+                "analyticalD",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedVector("zero", dimLength, vector::zero),
+            "calculated"
+        );
+
+        symmTensorField& sI = analyticalStress;
+        vectorField& aDI = analyticalD;
+
+        forAll(sI, cellI)
+        {
+            if (cellStress_)
+            {
+                sI[cellI] = sphericalCavityStress(CI[cellI]);
+            }
+
+            if (cellDisplacement_)
+            {
+                aDI[cellI] = sphericalCavityDisplacement(CI[cellI], sI[cellI]);
+            }
+        }
+
+        forAll(analyticalStress.boundaryField(), patchI)
+        {
+            if (mesh.boundary()[patchI].type() != "empty")
+            {
+#ifdef OPENFOAM_NOT_EXTEND
+                symmTensorField& sP = analyticalStress.boundaryFieldRef()[patchI];
+                vectorField& aDP = analyticalD.boundaryFieldRef()[patchI];
+#else
+                symmTensorField& sP = analyticalStress.boundaryField()[patchI];
+                vectorField& aDP = analyticalD.boundaryField()[patchI];
+#endif
+                const vectorField& CP = C.boundaryField()[patchI];
+
+                forAll(sP, faceI)
+                {
+                    if (cellStress_)
+                    {
+                        sP[faceI] = sphericalCavityStress(CP[faceI]);
+                    }
+
+                    if (cellDisplacement_)
+                    {
+                        aDP[faceI] =
+                            sphericalCavityDisplacement(CP[faceI], sP[faceI]);
+                    }
+                }
+            }
+        }
+
+        // Write out the cell analytical field
+        if (cellStress_)
+        {
+            Info<< "Writing analyticalCellStress field"
+                << nl << endl;
+            analyticalStress.write();
+        }
+
+        if (cellDisplacement_)
+        {
+            Info<< "Writing analyticalD field"
+                << nl << endl;
+            analyticalD.write();
+        }
+
+
+        if (cellStress_ && mesh.foundObject<volSymmTensorField>("sigma"))
+        {
+            const volSymmTensorField& sigma =
+                mesh.lookupObject<volSymmTensorField>("sigma");
+
+            const volSymmTensorField diff
+            (
+                "cellStressDifference", analyticalStress - sigma
+            );
+            Info<< "Writing cellStressDifference field" << endl;
+            diff.write();
+
+            for (int cmpt = 0; cmpt < pTraits<symmTensor>::nComponents; cmpt++)
+            {
+                // Only calculate for XX, XY and ZZ
+                if (cmpt != 0 && cmpt != 1 && cmpt != 3)
+                {
+                    continue;
+                }
+
+                const symmTensorField& diffI = diff;
+                const scalarField diffIcmptI(diffI.component(cmpt));
+
+                Info<< "    Component: " << cmpt << endl;
+                Info<< "    Norms: mean L1, mean L2, LInf: " << nl
+                    << "    " << gAverage(mag(diffIcmptI))
+                    << " " << Foam::sqrt(gAverage(magSqr(diffIcmptI)))
+                    << " " << gMax(mag(diffIcmptI))
+                    << nl << endl;
+            }
+        }
+
+        if (cellDisplacement_ && mesh.foundObject<volVectorField>("D"))
+        {
+            const volVectorField& D =
+                mesh.lookupObject<volVectorField>("D");
+
+            const volVectorField diff
+            (
+                "DDifference", analyticalD - D
+            );
+            Info<< "Writing DDifference field" << endl;
+            diff.write();
+
+            const vectorField& diffI = diff;
+            Info<< "    Norms: mean L1, mean L2, LInf: " << nl
+                << "    " << gAverage(mag(diffI))
+                << " " << Foam::sqrt(gAverage(magSqr(diffI)))
+                << " " << gMax(mag(diffI))
+                << nl << endl;
+        }
+    }
+
+    // Point analytical fields
+    if (pointDisplacement_ || pointStress_)
+    {
+        pointSymmTensorField analyticalStress
+        (
+            IOobject
+            (
+                "analyticalPointStress",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            pMesh,
+            dimensionedSymmTensor("zero", dimPressure, symmTensor::zero)
+        );
+
+        pointVectorField analyticalD
+        (
+            IOobject
+            (
+                "analyticalPointD",
+                time_.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            pMesh,
+            dimensionedVector("zero", dimLength, vector::zero)
+        );
+
+        symmTensorField& sI = analyticalStress;
+        vectorField& aDI = analyticalD;
+
+        forAll(sI, pointI)
+        {
+            if (pointStress_)
+            {
+                sI[pointI] = sphericalCavityStress(points[pointI]);
+            }
+
+            if (pointDisplacement_)
+            {
+                aDI[pointI] =
+                    sphericalCavityDisplacement(points[pointI], sI[pointI]);
+            }
+        }
+
+        // Write point analytical fields
+        if (pointStress_)
+        {
+            Info<< "Writing analyticalPointStress"
+                << nl << endl;
+            analyticalStress.write();
+        }
+
+        if (pointDisplacement_)
+        {
+            Info<< "Writing analyticalPointDisplacement"
+                << nl << endl;
+            analyticalD.write();
+        }
+
+        if
+        (
+            pointDisplacement_
+         && mesh.foundObject<pointVectorField>("pointD")
+        )
+        {
+            const pointVectorField& pointD =
+                mesh.lookupObject<pointVectorField>("pointD");
+
+            const pointVectorField diff
+            (
+                "pointDDifference", analyticalD - pointD
+            );
+            Info<< "Writing pointDDifference field" << endl;
+            diff.write();
+
+            const vectorField& diffI = diff;
+            Info<< "    Norms: mean L1, mean L2, LInf: " << nl
+                << "    " << gAverage(mag(diffI))
+                << " " << Foam::sqrt(gAverage(magSqr(diffI)))
+                << " " << gMax(mag(diffI))
+                << nl << endl;
+        }
+    }
+
+    return true;
+}
+
+//** * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+Foam::sphericalCavityAnalyticalSolution::sphericalCavityAnalyticalSolution
+(
+    const word& name,
+    const Time& t,
+    const dictionary& dict
+)
+:
+    functionObject(name),
+    name_(name),
+    time_(t),
+    cellDisplacement_
+    (
+        dict.lookupOrDefault<Switch>("cellDisplacement", true)
+    ),
+    pointDisplacement_
+    (
+        dict.lookupOrDefault<Switch>("pointDisplacement", true)
+    ),
+    cellStress_
+    (
+        dict.lookupOrDefault<Switch>("cellStress", true)
+    ),
+    pointStress_
+    (
+        dict.lookupOrDefault<Switch>("pointStress", true)
+    ),
+    T0_(readScalar(dict.lookup("farFieldTractionZ"))),
+    cavityR_(readScalar(dict.lookup("cavityRadius"))),
+    E_(readScalar(dict.lookup("E"))),
+    nu_(readScalar(dict.lookup("nu")))
+{
+    Info<< "Creating " << this->name() << " function object" << endl;
+
+    if (cavityR_ < SMALL)
+    {
+        FatalErrorIn(this->name() + " function object constructor")
+            << "cavityRadius should be greater than 0!"
+            << abort(FatalError);
+    }
+
+    if (E_ < SMALL || nu_ < SMALL)
+    {
+        FatalErrorIn(this->name() + " function object constructor")
+            << "E and nu should be positive!"
+            << abort(FatalError);
+    }
+}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+bool Foam::sphericalCavityAnalyticalSolution::start()
+{
+    return true;
+}
+
+
+#if FOAMEXTEND
+    bool Foam::sphericalCavityAnalyticalSolution::execute(const bool forceWrite)
+#else
+    bool Foam::sphericalCavityAnalyticalSolution::execute()
+#endif
+{
+    return writeData();
+}
+
+
+bool Foam::sphericalCavityAnalyticalSolution::read(const dictionary& dict)
+{
+    return true;
+}
+
+
+#ifdef OPENFOAM_NOT_EXTEND
+bool Foam::sphericalCavityAnalyticalSolution::write()
+{
+    return false;
+}
+#endif
+
+// ************************************************************************* //

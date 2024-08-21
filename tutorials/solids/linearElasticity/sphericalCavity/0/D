@@ -1,0 +1,72 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    negX
+    {
+        type            symmetry;
+    }
+    negY
+    {
+        type            symmetry;
+    }
+    posZ
+    {
+        type            analyticalSphericalCavityTraction;
+        farFieldTractionZ 1e6;
+        cavityRadius    0.2;
+        nu              0.3;
+        value           uniform (0 0 0);
+    }
+    posY
+    {
+        type            analyticalSphericalCavityTraction;
+        farFieldTractionZ 1e6;
+        cavityRadius    0.2;
+        nu              0.3;
+        value           uniform (0 0 0);
+    }
+    negZ
+    {
+        type            symmetry;
+    }
+    cavity
+    {
+        type            solidTraction;
+        traction        uniform ( 0 0 0 );
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    posX
+    {
+        type            solidTraction;
+        type            analyticalSphericalCavityTraction;
+        farFieldTractionZ 1e6;
+        cavityRadius    0.2;
+        nu              0.3;
+        value           uniform (0 0 0);
+    }
+}
+
+
+// ************************************************************************* //

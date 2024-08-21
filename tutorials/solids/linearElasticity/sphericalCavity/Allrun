@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# Create the mesh
+if command -v gmsh &> /dev/null
+then
+    # Remporarily rename 0 to avoid issues
+    mv 0 0.tmp
+
+    # Create mesh with gmsh
+    MAX_CELL_SIZE=0.02
+    solids4Foam::runApplication gmsh -3 -clmax ${MAX_CELL_SIZE} -format msh2 sphericalCavity.geo
+    solids4Foam::runApplication gmshToFoam sphericalCavity.msh
+    solids4Foam::runApplication polyDualMesh 30 -overwrite
+    solids4Foam::runApplication combinePatchFaces 45 -overwrite
+    solids4Foam::runApplication changeDictionary
+
+    # Move 0 back
+    mv 0.tmp 0
+else
+    # Fail silently
+    echo; echo "Gmsh is required to run this case: please install it"
+    exit 0        
+fi
+
+# Run solver
+#solids4Foam::runApplication solids4Foam
+echo "Running solids4Foam"
+mpirun -np 1 solids4Foam &> log.solids4Foam
