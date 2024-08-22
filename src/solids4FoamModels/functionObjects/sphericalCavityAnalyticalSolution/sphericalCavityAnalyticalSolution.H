@@ -96,6 +96,9 @@ class sphericalCavityAnalyticalSolution
         //- Calculate point stress fields
         const Switch pointStress_;
 
+        //- Optional history file for writing the errors
+        autoPtr<OFstream> historyFilePtr_;
+
         //- Far field traction
         //  It is assumed that it acts in the positive Z direction
         const scalar T0_;

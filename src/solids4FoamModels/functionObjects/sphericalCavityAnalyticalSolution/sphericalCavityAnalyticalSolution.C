@@ -212,17 +212,38 @@ bool Foam::sphericalCavityAnalyticalSolution::writeData()
             Info<< "Writing cellStressDifference field" << endl;
             diff.write();
 
+            if (Pstream::master())
+            {
+                historyFilePtr_()
+                    << time_.time().value();
+            }
+
             for (int cmpt = 0; cmpt < pTraits<symmTensor>::nComponents; cmpt++)
             {
                 const symmTensorField& diffI = diff;
                 const scalarField diffIcmptI(diffI.component(cmpt));
+                const scalar l1 = gAverage(mag(diffIcmptI));
+                const scalar l2 = Foam::sqrt(gAverage(magSqr(diffIcmptI)));
+                const scalar lInf = gMax(mag(diffIcmptI));
 
                 Info<< "    Component: " << cmpt << endl;
                 Info<< "    Norms: mean L1, mean L2, LInf: " << nl
-                    << "    " << gAverage(mag(diffIcmptI))
-                    << " " << Foam::sqrt(gAverage(magSqr(diffIcmptI)))
-                    << " " << gMax(mag(diffIcmptI))
+                    << "    " << l1
+                    << " " << l2
+                    << " " << lInf
                     << nl << endl;
+
+                if (Pstream::master())
+                {
+                    historyFilePtr_()
+                        << " " << l1 << " " << l2 << " " << lInf;
+                }
+            }
+
+            if (Pstream::master())
+            {
+                historyFilePtr_()
+                    << endl;
             }
         }
 
@@ -370,6 +391,7 @@ Foam::sphericalCavityAnalyticalSolution::sphericalCavityAnalyticalSolution
     (
         dict.lookupOrDefault<Switch>("pointStress", true)
     ),
+    historyFilePtr_(),
     T0_(readScalar(dict.lookup("farFieldTractionZ"))),
     cavityR_(readScalar(dict.lookup("cavityRadius"))),
     E_(readScalar(dict.lookup("E"))),
@@ -389,6 +411,52 @@ Foam::sphericalCavityAnalyticalSolution::sphericalCavityAnalyticalSolution
         FatalErrorIn(this->name() + " function object constructor")
             << "E and nu should be positive!"
             << abort(FatalError);
+    }
+
+    // Create history file if not already created
+    if (historyFilePtr_.empty())
+    {
+        // File update
+        if (Pstream::master())
+        {
+            fileName historyDir;
+
+            word startTimeName =
+                time_.timeName(time_.startTime().value());
+
+            if (Pstream::parRun())
+            {
+                // Put in undecomposed case (Note: gives problems for
+                // distributed data running)
+                historyDir = time_.path()/".."/"postProcessing"/startTimeName;
+            }
+            else
+            {
+                historyDir = time_.path()/"postProcessing"/startTimeName;
+            }
+
+            // Create directory if does not exist.
+            mkDir(historyDir);
+
+            // Open new file at start up
+            OStringStream FileName;
+            FileName()
+                << "sphericalCavityStressErrors.dat";
+
+            historyFilePtr_.reset
+            (
+                new OFstream(historyDir/word(FileName.str()))
+            );
+
+            // Add headers to output data
+            if (historyFilePtr_.valid())
+            {
+                historyFilePtr_()
+                    << "# Time" << "    "
+                    << "Stress Errors (l1, l2, lInfinity) for each component "
+                    << "(XX XY XZ YY YZ ZZ)" << endl;
+            }
+        }
     }
 }
 
