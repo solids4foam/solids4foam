@@ -48,6 +48,11 @@ class leastSquaresS4fVectors
 {
     // Private data
 
+        //- Use boundary face values for patches which do not "fix the value"
+        //  i.e., Neumann type boundaries like traction conditions
+        //  Defaults to true
+        Switch useNeumannBoundaryFaceValues_;
+
         //- Least-squares gradient vectors
         surfaceVectorField pVectors_;
         surfaceVectorField nVectors_;
@@ -67,8 +72,12 @@ public:
 
     // Constructors
 
-        //- Construct given an fvMesh
-        explicit leastSquaresS4fVectors(const fvMesh&);
+        //- Construct given an fvMesh and the useNeumannBoundaryFaceValues flag
+        explicit leastSquaresS4fVectors
+        (
+            const fvMesh&,
+            const Switch& useNeumannBoundaryFaceValues = true
+        );
 
 
     //- Destructor

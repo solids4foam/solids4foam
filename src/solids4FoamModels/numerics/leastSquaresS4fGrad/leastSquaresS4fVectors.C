@@ -19,6 +19,8 @@ License
 
 #include "leastSquaresS4fVectors.H"
 #include "volFields.H"
+#include "symmetryPolyPatch.H"
+#include "symmetryPlanePolyPatch.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -30,9 +32,14 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * Constructors * * * * * * * * * * * * * * //
 
-Foam::leastSquaresS4fVectors::leastSquaresS4fVectors(const fvMesh& mesh)
+Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
+(
+    const fvMesh& mesh,
+    const Switch& useNeumannBoundaryFaceValues
+)
 :
     MeshObject<fvMesh, Foam::MoveableMeshObject, leastSquaresS4fVectors>(mesh),
+    useNeumannBoundaryFaceValues_(useNeumannBoundaryFaceValues),
     pVectors_
     (
         IOobject
@@ -76,7 +83,8 @@ Foam::leastSquaresS4fVectors::~leastSquaresS4fVectors()
 
 void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
 {
-    DebugInFunction << "Calculating least square gradient vectors" << nl;
+    DebugInFunction
+        << "Calculating least square gradient vectors" << nl;
 
     const fvMesh& mesh = mesh_;
 
@@ -129,17 +137,44 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
                     ((1 - pw[patchFacei])*pMagSf[patchFacei]/magSqr(d))*sqr(d);
             }
         }
-        // PC: do not include boundary faces
-        // else
-        // {
-        //     forAll(pd, patchFacei)
-        //     {
-        //         const vector& d = pd[patchFacei];
+        else if
+        (
+            isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchi])
+         || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchi])
+        )
+        {
+            // Treat symmetry planes consistently with internal faces
+            // Use the mirrored face-cell values rather than the patch face
+            // values
+            // See https://doi.org/10.1080/10407790.2022.2105073
+            const vectorField nHat(p.nf());
+            forAll(pd, patchFacei)
+            {
+                // Vector from the face-cell centre to the mirrored face-cell
+                // centred
+                //const vector& d = pd[patchFacei];
+                const vector d =
+                    transform
+                    (
+                        I - 2.0*sqr(nHat[patchFacei]),
+                        C[faceCells[patchFacei]]
+                    )
+                  - C[faceCells[patchFacei]];
 
-        //         dd[faceCells[patchFacei]] +=
-        //             (pMagSf[patchFacei]/magSqr(d))*sqr(d);
-        //     }
-        // }
+                dd[faceCells[patchFacei]] +=
+                    (pMagSf[patchFacei]/magSqr(d))*sqr(d);
+            }
+        }
+        else if (useNeumannBoundaryFaceValues_)
+        {
+            forAll(pd, patchFacei)
+            {
+                const vector& d = pd[patchFacei];
+
+                dd[faceCells[patchFacei]] +=
+                    (pMagSf[patchFacei]/magSqr(d))*sqr(d);
+            }
+        }
     }
 
     // Invert the dd tensor
@@ -183,21 +218,49 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
                    *(invDd[faceCells[patchFacei]] & d);
             }
         }
-        // PC: do not include boundary faces
-        // else
-        // {
-        //     forAll(pd, patchFacei)
-        //     {
-        //         const vector& d = pd[patchFacei];
+        else if
+        (
+            isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchi])
+         || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchi])
+        )
+        {
+            // Treat symmetry planes consistently with internal faces
+            // Use the mirrored face-cell values rather than the patch face
+            // values
+            // See https://doi.org/10.1080/10407790.2022.2105073
+            const vectorField nHat(p.nf());
+            forAll(pd, patchFacei)
+            {
+                // Vector from the face-cell centre to the mirrored face-cell
+                // centred
+                const vector d =
+                    transform
+                    (
+                        I - 2.0*sqr(nHat[patchFacei]),
+                        C[faceCells[patchFacei]]
+                    )
+                  - C[faceCells[patchFacei]];
 
-        //         patchLsP[patchFacei] =
-        //             pMagSf[patchFacei]*(1.0/magSqr(d))
-        //            *(invDd[faceCells[patchFacei]] & d);
-        //     }
-        // }
+                patchLsP[patchFacei] =
+                    pMagSf[patchFacei]*(1.0/magSqr(d))
+                   *(invDd[faceCells[patchFacei]] & d);
+            }
+        }
+        else if (useNeumannBoundaryFaceValues_)
+        {
+            forAll(pd, patchFacei)
+            {
+                const vector& d = pd[patchFacei];
+
+                patchLsP[patchFacei] =
+                    pMagSf[patchFacei]*(1.0/magSqr(d))
+                   *(invDd[faceCells[patchFacei]] & d);
+            }
+        }
     }
 
-    DebugInfo << "Finished calculating least square gradient vectors" << nl;
+    DebugInfo
+        << "Finished calculating least square gradient vectors" << nl;
 }
 
 

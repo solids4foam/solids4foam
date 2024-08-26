@@ -53,6 +53,13 @@ class leastSquaresS4fGrad
 :
     public fv::gradScheme<Type>
 {
+    // Private Member Data
+
+        //- Use boundary face values for patches which do not "fix the value"
+        //  i.e., Neumann type boundaries like traction conditions
+        //  Defaults to false
+        Switch useNeumannBoundaryFaceValues_;
+
     // Private Member Functions
 
         //- No copy construct
@@ -70,17 +77,31 @@ public:
 
     // Constructors
 
-        //- Construct from mesh
-        leastSquaresS4fGrad(const fvMesh& mesh)
-        :
-            gradScheme<Type>(mesh)
-        {}
-
         //- Construct from Istream
-        leastSquaresS4fGrad(const fvMesh& mesh, Istream&)
+        leastSquaresS4fGrad(const fvMesh& mesh, Istream& schemeData)
         :
-            gradScheme<Type>(mesh)
-        {}
+            gradScheme<Type>(mesh),
+            useNeumannBoundaryFaceValues_(false)
+        {
+            if (!schemeData.eof())
+            {
+                useNeumannBoundaryFaceValues_ = Switch(schemeData);
+
+                if (!schemeData.eof())
+                {
+                    FatalErrorIn
+                    (
+                        "leastSquaresS4fGrad::leastSquaresS4fGrad(...)"
+                    )   << "Unknown extra option: " << word(schemeData) << nl << nl
+                        << "Example usage:" << nl
+                        << "    grad(D)    leastSquaresS4f; // defaults to false" << nl
+                        << "    grad(D)    leastSquaresS4f true;" << nl
+                        << "    grad(D)    leastSquaresS4f false;" << nl
+                        << abort(FatalError);
+                }
+
+            }
+        }
 
 
     // Member Functions

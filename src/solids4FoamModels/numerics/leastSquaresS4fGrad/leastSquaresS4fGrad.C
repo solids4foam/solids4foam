@@ -25,6 +25,8 @@ License
 #include "surfaceMesh.H"
 #include "GeometricField.H"
 #include "extrapolatedCalculatedFvPatchField.H"
+#include "symmetryPolyPatch.H"
+#include "symmetryPlanePolyPatch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -68,7 +70,8 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
     GeometricField<GradType, fvPatchField, volMesh>& lsGrad = tlsGrad.ref();
 
     // Get reference to least square vectors
-    const leastSquaresS4fVectors& lsv = leastSquaresS4fVectors::New(mesh);
+    const leastSquaresS4fVectors& lsv =
+        leastSquaresS4fVectors::New(mesh, useNeumannBoundaryFaceValues_);
 
     const surfaceVectorField& ownLs = lsv.pVectors();
     const surfaceVectorField& neiLs = lsv.nVectors();
@@ -109,24 +112,57 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
                    *(neiVsf[patchFacei] - vsf[faceCells[patchFacei]]);
             }
         }
-        // PC: do not include boundary faces
-        // else
-        // {
-        //     const fvPatchField<Type>& patchVsf = vsf.boundaryField()[patchi];
+        else if
+        (
+            isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchi])
+         || isA<symmetryPlanePolyPatch>(mesh.boundaryMesh()[patchi])
+        )
+        {
+            // Treat symmetry planes consistently with internal faces
+            // Use the mirrored face-cell values rather than the patch face
+            // values
+            // See https://doi.org/10.1080/10407790.2022.2105073
+            const fvPatchField<Type>& patchVsf = vsf.boundaryField()[patchi];
+            const vectorField nHat(patchVsf.patch().nf());
+            forAll(patchVsf, patchFacei)
+            {
+                lsGrad[faceCells[patchFacei]] +=
+                     patchOwnLs[patchFacei]
+                    *(
+                        transform
+                        (
+                            I - 2.0*sqr(nHat[patchFacei]),
+                            vsf[faceCells[patchFacei]]
+                        )
+                      - vsf[faceCells[patchFacei]]
+                    );
+            }
+        }
+        else
+        {
+            const fvPatchField<Type>& patchVsf = vsf.boundaryField()[patchi];
 
-        //     forAll(patchVsf, patchFacei)
-        //     {
-        //         lsGrad[faceCells[patchFacei]] +=
-        //              patchOwnLs[patchFacei]
-        //             *(patchVsf[patchFacei] - vsf[faceCells[patchFacei]]);
-        //     }
-        // }
+            // const typename GeometricField<Type, fvPatchField, volMesh>::Boundary& x = vsf.boundaryField();
+            if (useNeumannBoundaryFaceValues_ || patchVsf.fixesValue())
+            {
+                forAll(patchVsf, patchFacei)
+                {
+                    lsGrad[faceCells[patchFacei]] +=
+                         patchOwnLs[patchFacei]
+                        *(patchVsf[patchFacei] - vsf[faceCells[patchFacei]]);
+                }
+            }
+        }
     }
 
 
     lsGrad.correctBoundaryConditions();
-    // PC: do not replace the normal gradient on boundary faces
-    // gaussGrad<Type>::correctBoundaryConditions(vsf, lsGrad);
+
+    if (useNeumannBoundaryFaceValues_)
+    {
+        // Replace the normal gradient on boundary faces
+        gaussGrad<Type>::correctBoundaryConditions(vsf, lsGrad);
+    }
 
     return tlsGrad;
 }
