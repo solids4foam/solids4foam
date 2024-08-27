@@ -62,21 +62,69 @@ Foam::scalar Foam::sphericalCavityDisplacementComponent
 Foam::vector Foam::sphericalCavityDisplacement
 (
     const scalar nu,
-    const scalar T0,
+    const scalar T,
     const scalar E,
     const scalar a,
     const vector& x
 )
 {
-    // Calculate displacement
-    vector disp = vector::zero;
-    for (int i = 0; i < 3; ++i)
-    {
-        disp[i] =
-            sphericalCavityDisplacementComponent(i, nu, T0, E, a, x);
-    }
+    // Bower 2009 approach - not correct
+    // vector disp = vector::zero;
+    // for (int i = 0; i < 3; ++i)
+    // {
+    //     disp[i] =
+    //         sphericalCavityDisplacementComponent(i, nu, T, E, a, x);
+    // }
 
-    return disp;
+    // Goodier 1933
+
+    // Shear modulus
+    const scalar mu = E/(2*(1 + nu));
+
+    // Constants for a spherical cavity
+    const scalar A = -pow3(a)*(T/(8*mu))*(13 - 10*nu)/(7 - 5*nu);
+    const scalar B = pow5(a)*(T/(8*mu))*(1/(7 - 5*nu));
+    const scalar C = pow3(a)*(T/(8*mu))*((5*(1 - 2*nu))/(7 - 5*nu));
+
+    // Calculate the spherical polar coordinates
+    const scalar r = mag(x);
+    if (r < SMALL)
+    {
+        FatalError
+            << "r is less than SMALL. "
+            << "Are you sure the cavity is centred on the origin?"
+            << abort(FatalError);
+    }
+    const scalar theta = Foam::acos(x.z()/r);
+    const scalar phi = Foam::atan2(x.y(), x.x());
+
+    // Radial displacement
+    const scalar ur =
+       - A/sqr(r) - 3*B/pow4(r)
+       + (
+             ((5 - 4*nu)/(1 - 2*nu))*C/sqr(r) - 9*B/pow4(r)
+         )*cos(2*theta);
+
+    // Theta displacement
+    const scalar utheta = -(2*C/sqr(r) + 6*B/pow4(r))*sin(2*theta);
+
+    // Spherical polar displacement vector (r, theta, phi)
+    const vector dispPolar(ur, utheta, 0);
+
+    // Calculate the Cartesian displacement vector
+    const vector dispCart
+    (
+        ur*sin(theta)*cos(phi) + utheta*cos(theta)*cos(phi),
+        ur*sin(theta)*sin(phi) + utheta*cos(theta)*sin(phi),
+        ur*cos(theta) - utheta*sin(theta)
+    );
+
+    // Calculate the displacement field called by a uniform uniaxial T when
+    // there is no cavity
+    const vector dispUni(-nu*T*x.x()/E, -nu*T*x.y()/E, T*x.z()/E);
+
+    // Return the total Cartesian displacement vector
+    return dispCart + dispUni;
 }
 
 
