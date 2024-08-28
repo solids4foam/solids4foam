@@ -143,7 +143,7 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
             const fvPatchField<Type>& patchVsf = vsf.boundaryField()[patchi];
 
             // const typename GeometricField<Type, fvPatchField, volMesh>::Boundary& x = vsf.boundaryField();
-            if (useNeumannBoundaryFaceValues_ || patchVsf.fixesValue())
+            if (useNeumannBoundaryFaceValues_) // || patchVsf.fixesValue())
             {
                 forAll(patchVsf, patchFacei)
                 {
