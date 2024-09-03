@@ -85,6 +85,9 @@ class linGeomTotalDispSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //- Field to provide fvOptions with the correct dimensions
+        volScalarField ds_;
+
 
     // Private Member Functions
 

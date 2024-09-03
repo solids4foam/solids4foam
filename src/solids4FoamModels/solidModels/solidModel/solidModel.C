@@ -837,6 +837,10 @@ Foam::solidModel::solidModel
     rhoD2dt2DPtr_(),
     twoDCorrector_(mesh()),
     twoD_(mesh().nGeometricD() == 2)
+#ifdef OPENFOAM_COM
+    ,
+    fvOptions_(fv::options::New(meshPtr_()))
+#endif
 {
     // Force old time fields to be stored
     D_.oldTime().oldTime();
@@ -916,6 +920,13 @@ Foam::solidModel::solidModel
             solidModelDict().subDict("stabilisation")
         )
     );
+
+#ifdef OPENFOAM_COM
+    if (!fvOptions_.optionList::size())
+    {
+        Info<< "No finite volume options present" << endl;
+    }
+#endif
 
     // If the case is axisymmetric, we will disable solving in the out-of-plane
     // direction

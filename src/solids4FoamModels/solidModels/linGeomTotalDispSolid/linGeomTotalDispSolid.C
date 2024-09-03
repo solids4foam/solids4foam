@@ -152,6 +152,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
               + fvc::div(sigma(), "div(sigma)")
               + rho()*g()
               + stabilisation().stabilisation(D(), gradD(), impK_)
+              + fvOptions()(ds_, D())
             );
 
             // Add damping
@@ -401,7 +402,20 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         mesh(),
         dimensionedVector("zero", dimLength/pow(dimTime, 2), vector::zero)
     ),
-    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false))
+    predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    ds_
+    (
+        IOobject
+        (
+            "ds",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
+    )
 {
     DisRequired();
 
@@ -653,6 +667,10 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh().V();
+
+    // Add optional fvOptions, e.g. MMS body force
+    // Note that "source()" is already multiplied by the volumes
+    residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
 
     return tresidual;
 }

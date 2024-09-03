@@ -53,6 +53,7 @@ SourceFiles
 #include "meshDual.H"
 #include "Enum.H"
 #include "twoDPointCorrector.H"
+#include "fvOptions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -247,6 +248,10 @@ private:
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
 
+#ifdef OPENFOAM_COM
+        //- fvOptions
+        fv::options& fvOptions_;
+#endif
 
     // Private Member Functions
 
@@ -381,6 +386,11 @@ protected:
         //- Return non-const access to rhoD2dt2D
         volVectorField& rhoD2dt2D() const;
 
+        //- Return non-const access to fvOptions
+        fv::options& fvOptions()
+        {
+            return fvOptions_;
+        }
 
 public:
 
