@@ -129,14 +129,12 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
         // In OF.com/OF.org, p.delta are the orthogonal components of the real d
         // vectors, so we need to build them ourselves
         //vectorField pd(p.delta());
-        vectorField pd(p.size(), vector::zero);
-        forAll(pd, faceI)
-        {
-            pd[faceI] = Cf[faceI] - C[faceCells[faceI]];
-        }
 
         if (pw.coupled())
         {
+            // Coupled d vectors
+            const vectorField pd(p.delta());
+
             forAll(pd, patchFacei)
             {
                 const vector& d = pd[patchFacei];
@@ -156,7 +154,7 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
             // values
             // See https://doi.org/10.1080/10407790.2022.2105073
             const vectorField nHat(p.nf());
-            forAll(pd, patchFacei)
+            forAll(nHat, patchFacei)
             {
                 // Vector from the face-cell centre to the mirrored face-cell
                 // centred
@@ -175,6 +173,12 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
         }
         else if (useBoundaryFaceValues_[patchi])
         {
+            vectorField pd(p.size(), vector::zero);
+            forAll(pd, faceI)
+            {
+                pd[faceI] = Cf[faceI] - C[faceCells[faceI]];
+            }
+
             forAll(pd, patchFacei)
             {
                 const vector& d = pd[patchFacei];
@@ -216,14 +220,12 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
         // In OF.com/OF.org, p.delta are the orthogonal components of the real d
         // vectors, so we need to build them ourselves
         //vectorField pd(p.delta());
-        vectorField pd(p.size(), vector::zero);
-        forAll(pd, faceI)
-        {
-            pd[faceI] = Cf[faceI] - C[faceCells[faceI]];
-        }
 
         if (pw.coupled())
         {
+            // Coupled d vectors
+            const vectorField pd(p.delta());
+
             forAll(pd, patchFacei)
             {
                 const vector& d = pd[patchFacei];
@@ -244,7 +246,7 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
             // values
             // See https://doi.org/10.1080/10407790.2022.2105073
             const vectorField nHat(p.nf());
-            forAll(pd, patchFacei)
+            forAll(nHat, patchFacei)
             {
                 // Vector from the face-cell centre to the mirrored face-cell
                 // centred
@@ -263,6 +265,12 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
         }
         else if (useBoundaryFaceValues_[patchi])
         {
+            vectorField pd(p.size(), vector::zero);
+            forAll(pd, faceI)
+            {
+                pd[faceI] = Cf[faceI] - C[faceCells[faceI]];
+            }
+
             forAll(pd, patchFacei)
             {
                 const vector& d = pd[patchFacei];

@@ -23,6 +23,8 @@ License
 #include "surfaceFields.H"
 #include "volFields.H"
 #include "demandDrivenData.H"
+#include "symmetryPolyPatch.H"
+#include "symmetryPlanePolyPatch.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -116,6 +118,8 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
     const unallocLabelList& neighbour = mesh().neighbour();
 #endif
     const volVectorField& C = mesh().C();
+    const surfaceScalarField& w = mesh().weights();
+    const surfaceScalarField& magSf = mesh().magSf();
 
     // Set up temporary storage for the dd tensor (before inversion)
     symmTensorField dd(mesh().nCells(), symmTensor::zero);
@@ -138,19 +142,78 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
     // in the construction of d vectors.
     forAll(lsP.boundaryField(), patchI)
     {
+        const fvsPatchScalarField& pw = w.boundaryField()[patchI];
+        const fvsPatchScalarField& pMagSf = magSf.boundaryField()[patchI];
+
         const fvPatch& p = mesh().boundary()[patchI];
 #ifdef OPENFOAM_COM
         const labelList& faceCells = p.faceCells();
 #else
         const unallocLabelList& faceCells = p.faceCells();
 #endif
-        // Better version of d-vectors: Zeljko Tukovic, 25/Apr/2010
-        vectorField pd(p.delta());
+        const vectorField& Cf = p.Cf();
 
-        forAll(pd, patchFaceI)
+        // Build the d-vectors
+        // In OF.com/OF.org, p.delta are the orthogonal components of the real d
+        // vectors, so we need to build them ourselves
+        //vectorField pd(p.delta());
+
+        if (pw.coupled())
         {
-            dd[faceCells[patchFaceI]] +=
-                (1.0/magSqr(pd[patchFaceI]))*sqr(pd[patchFaceI]);
+            // Coupled d vectors
+            const vectorField pd(p.delta());
+
+            forAll(pd, patchFacei)
+            {
+                const vector& d = pd[patchFacei];
+
+                dd[faceCells[patchFacei]] +=
+                    ((1 - pw[patchFacei])*pMagSf[patchFacei]/magSqr(d))*sqr(d);
+            }
+        }
+        else if
+        (
+            isA<symmetryPolyPatch>(mesh().boundaryMesh()[patchI])
+         || isA<symmetryPlanePolyPatch>(mesh().boundaryMesh()[patchI])
+        )
+        {
+            // Treat symmetry planes consistently with internal faces
+            // Use the mirrored face-cell values rather than the patch face
+            // values
+            // See https://doi.org/10.1080/10407790.2022.2105073
+            const vectorField nHat(p.nf());
+            forAll(nHat, patchFacei)
+            {
+                // Vector from the face-cell centre to the mirrored face-cell
+                // centred
+                //const vector& d = pd[patchFacei];
+                const vector d =
+                    transform
+                    (
+                        I - 2.0*sqr(nHat[patchFacei]),
+                        C[faceCells[patchFacei]]
+                    )
+                  - C[faceCells[patchFacei]];
+
+                dd[faceCells[patchFacei]] +=
+                    (pMagSf[patchFacei]/magSqr(d))*sqr(d);
+            }
+        }
+        else
+        {
+            vectorField pd(p.size(), vector::zero);
+            forAll(pd, faceI)
+            {
+                pd[faceI] = Cf[faceI] - C[faceCells[faceI]];
+            }
+
+            forAll(pd, patchFacei)
+            {
+                const vector& d = pd[patchFacei];
+
+                dd[faceCells[patchFacei]] +=
+                    (pMagSf[patchFacei]/magSqr(d))*sqr(d);
+            }
         }
     }
 
@@ -247,18 +310,80 @@ void Foam::extendedLeastSquaresVectors::makeLeastSquaresVectors() const
 
         fvsPatchVectorField& patchLsP = lsP.boundaryFieldRef()[patchI];
 
+        const fvsPatchScalarField& pw = w.boundaryField()[patchI];
+        const fvsPatchScalarField& pMagSf = magSf.boundaryField()[patchI];
+
         const fvPatch& p = patchLsP.patch();
 #ifdef OPENFOAM_COM
         const labelList& faceCells = p.faceCells();
 #else
         const unallocLabelList& faceCells = p.faceCells();
 #endif
+        const vectorField& Cf = p.Cf();
 
-        forAll(p, patchFaceI)
+        // Build the d-vectors
+        // In OF.com/OF.org, p.delta are the orthogonal components of the real d
+        // vectors, so we need to build them ourselves
+        //vectorField pd(p.delta());
+
+        if (pw.coupled())
         {
-            patchLsP[patchFaceI] =
-                (1.0/magSqr(pd[patchFaceI]))
-               *(invDd[faceCells[patchFaceI]] & pd[patchFaceI]);
+            // Coupled d vectors
+            const vectorField pd(p.delta());
+
+            forAll(pd, patchFacei)
+            {
+                const vector& d = pd[patchFacei];
+
+                patchLsP[patchFacei] =
+                    ((1 - pw[patchFacei])*pMagSf[patchFacei]/magSqr(d))
+                   *(invDd[faceCells[patchFacei]] & d);
+            }
+        }
+        else if
+        (
+            isA<symmetryPolyPatch>(mesh().boundaryMesh()[patchI])
+         || isA<symmetryPlanePolyPatch>(mesh().boundaryMesh()[patchI])
+        )
+        {
+            // Treat symmetry planes consistently with internal faces
+            // Use the mirrored face-cell values rather than the patch face
+            // values
+            // See https://doi.org/10.1080/10407790.2022.2105073
+            const vectorField nHat(p.nf());
+            forAll(pd, patchFacei)
+            {
+                // Vector from the face-cell centre to the mirrored face-cell
+                // centred
+                const vector d =
+                    transform
+                    (
+                        I - 2.0*sqr(nHat[patchFacei]),
+                        C[faceCells[patchFacei]]
+                    )
+                  - C[faceCells[patchFacei]];
+
+                patchLsP[patchFacei] =
+                    pMagSf[patchFacei]*(1.0/magSqr(d))
+                   *(invDd[faceCells[patchFacei]] & d);
+            }
+        }
+        else
+        {
+            vectorField pd(p.size(), vector::zero);
+            forAll(pd, faceI)
+            {
+                pd[faceI] = Cf[faceI] - C[faceCells[faceI]];
+            }
+
+            forAll(pd, patchFacei)
+            {
+                const vector& d = pd[patchFacei];
+
+                patchLsP[patchFacei] =
+                    pMagSf[patchFacei]*(1.0/magSqr(d))
+                   *(invDd[faceCells[patchFacei]] & d);
+            }
         }
     }
 
