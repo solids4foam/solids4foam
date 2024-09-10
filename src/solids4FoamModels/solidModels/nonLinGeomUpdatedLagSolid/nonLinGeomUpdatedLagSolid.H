@@ -41,6 +41,7 @@ SourceFiles
 #define nonLinGeomUpdatedLagSolid_H
 
 #include "solidModel.H"
+#include "foamPetscSnesHelper.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -58,7 +59,8 @@ namespace solidModels
 
 class nonLinGeomUpdatedLagSolid
 :
-    public solidModel
+    public solidModel,
+    public foamPetscSnesHelper
 {
     // Private data
 
@@ -80,6 +82,9 @@ class nonLinGeomUpdatedLagSolid
         //- Density (updated configuration)
         volScalarField rho_;
 
+        //- Acceleration
+        volVectorField A_;
+
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
@@ -93,7 +98,31 @@ class nonLinGeomUpdatedLagSolid
         //  will store the reciprocal for effficiency
         const volScalarField rImpK_;
 
+        //- Predict new time-step fields using the velocity field
+        const Switch predictor_;
+
     // Private Member Functions
+
+        //- Predict the fields for the next time-step based on the
+        //  previous time-steps
+        void predict();
+
+        //- Enforce traction boundary conditions on the provided traction field
+        void enforceTractionBoundaries
+        (
+            surfaceVectorField& traction,
+            const volVectorField& DD,     // displacement increment field
+            const surfaceVectorField& n   // unit normals field
+        ) const;
+
+        //- Evolve the solid solver using the segregated implicit approach
+        bool evolveImplicitSegregated();
+
+        //- Evolve the solid solver using the PETSc nonlinear solver (SNES)
+        //  A compact approximate Jacobian (same one as used by the segregated
+        //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
+        //  works well with this approach
+        bool evolveSnes();
 
         //- Disallow default bitwise copy construct
         nonLinGeomUpdatedLagSolid(const nonLinGeomUpdatedLagSolid&);
@@ -162,6 +191,27 @@ public:
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
+
+            //- Calculate the momentum equation residual
+            //  This should be const but is not because of the mechanical law
+            //  The can be fixed when the mechanical models are refactored
+            virtual tmp<vectorField> residualMomentum
+            (
+                const volVectorField& DD
+            );
+
+            //- Calculate the Jacobian for the momentum equation
+            //  This Jacobian is the derivative of residualMomentum with respect
+            //  to the solution vector (D)
+            //  This should be const but is not because of the mechanical law
+            //  The can be fixed when the mechanical models are refactored
+            //  This can also be an approximation of the true Jacobian, e.g. a
+            //  compact molecule Laplacian
+            //  We initially adopt this approach for testin
+            virtual tmp<sparseMatrix> JacobianMomentum
+            (
+                const volVectorField& DD
+            );
 
             //- Traction boundary surface normal gradient
             virtual tmp<vectorField> tractionBoundarySnGrad
