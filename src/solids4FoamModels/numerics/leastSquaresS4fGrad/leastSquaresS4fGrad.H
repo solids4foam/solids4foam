@@ -58,7 +58,7 @@ class leastSquaresS4fGrad
         //- Use boundary face values for patches which do not "fix the value"
         //  i.e., Neumann type boundaries like traction conditions
         //  Defaults to false
-        Switch useNeumannBoundaryFaceValues_;
+        // Switch useNeumannBoundaryFaceValues_;
 
     // Private Member Functions
 
@@ -80,27 +80,27 @@ public:
         //- Construct from Istream
         leastSquaresS4fGrad(const fvMesh& mesh, Istream& schemeData)
         :
-            gradScheme<Type>(mesh),
-            useNeumannBoundaryFaceValues_(false)
+            gradScheme<Type>(mesh) //,
+            //useNeumannBoundaryFaceValues_(false)
         {
-            if (!schemeData.eof())
-            {
-                useNeumannBoundaryFaceValues_ = Switch(schemeData);
+            // if (!schemeData.eof())
+            // {
+            //     useNeumannBoundaryFaceValues_ = Switch(schemeData);
 
-                if (!schemeData.eof())
-                {
-                    FatalErrorIn
-                    (
-                        "leastSquaresS4fGrad::leastSquaresS4fGrad(...)"
-                    )   << "Unknown extra option: " << word(schemeData) << nl << nl
-                        << "Example usage:" << nl
-                        << "    grad(D)    leastSquaresS4f; // defaults to false" << nl
-                        << "    grad(D)    leastSquaresS4f true;" << nl
-                        << "    grad(D)    leastSquaresS4f false;" << nl
-                        << abort(FatalError);
-                }
+            //     if (!schemeData.eof())
+            //     {
+            //         FatalErrorIn
+            //         (
+            //             "leastSquaresS4fGrad::leastSquaresS4fGrad(...)"
+            //         )   << "Unknown extra option: " << word(schemeData) << nl << nl
+            //             << "Example usage:" << nl
+            //             << "    grad(D)    leastSquaresS4f; // defaults to false" << nl
+            //             << "    grad(D)    leastSquaresS4f true;" << nl
+            //             << "    grad(D)    leastSquaresS4f false;" << nl
+            //             << abort(FatalError);
+            //     }
 
-            }
+            // }
         }
 
 

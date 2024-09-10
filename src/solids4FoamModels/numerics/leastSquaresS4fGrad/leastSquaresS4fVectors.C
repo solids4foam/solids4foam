@@ -35,11 +35,11 @@ namespace Foam
 Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
 (
     const fvMesh& mesh,
-    const Switch& useNeumannBoundaryFaceValues
+    const boolList& useBoundaryFaceValues_
 )
 :
     MeshObject<fvMesh, Foam::MoveableMeshObject, leastSquaresS4fVectors>(mesh),
-    useNeumannBoundaryFaceValues_(useNeumannBoundaryFaceValues),
+    useBoundaryFaceValues_(useBoundaryFaceValues_),
     pVectors_
     (
         IOobject
@@ -123,9 +123,17 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
 
         const fvPatch& p = pw.patch();
         const labelUList& faceCells = p.patch().faceCells();
+        const vectorField& Cf = p.Cf();
 
         // Build the d-vectors
-        vectorField pd(p.delta());
+        // In OF.com/OF.org, p.delta are the orthogonal components of the real d
+        // vectors, so we need to build them ourselves
+        //vectorField pd(p.delta());
+        vectorField pd(p.size(), vector::zero);
+        forAll(pd, faceI)
+        {
+            pd[faceI] = Cf[faceI] - C[faceCells[faceI]];
+        }
 
         if (pw.coupled())
         {
@@ -165,7 +173,7 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
                     (pMagSf[patchFacei]/magSqr(d))*sqr(d);
             }
         }
-        else if (useNeumannBoundaryFaceValues_)
+        else if (useBoundaryFaceValues_[patchi])
         {
             forAll(pd, patchFacei)
             {
@@ -179,7 +187,6 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
 
     // Invert the dd tensor
     const symmTensorField invDd(inv(dd));
-
 
     // Revisit all faces and calculate the pVectors_ and nVectors_ vectors
     forAll(owner, facei)
@@ -203,9 +210,17 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
 
         const fvPatch& p = pw.patch();
         const labelUList& faceCells = p.faceCells();
+        const vectorField& Cf = p.Cf();
 
         // Build the d-vectors
-        vectorField pd(p.delta());
+        // In OF.com/OF.org, p.delta are the orthogonal components of the real d
+        // vectors, so we need to build them ourselves
+        //vectorField pd(p.delta());
+        vectorField pd(p.size(), vector::zero);
+        forAll(pd, faceI)
+        {
+            pd[faceI] = Cf[faceI] - C[faceCells[faceI]];
+        }
 
         if (pw.coupled())
         {
@@ -246,7 +261,7 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors()
                    *(invDd[faceCells[patchFacei]] & d);
             }
         }
-        else if (useNeumannBoundaryFaceValues_)
+        else if (useBoundaryFaceValues_[patchi])
         {
             forAll(pd, patchFacei)
             {

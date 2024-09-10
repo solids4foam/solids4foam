@@ -27,6 +27,7 @@ License
 #include "extrapolatedCalculatedFvPatchField.H"
 #include "symmetryPolyPatch.H"
 #include "symmetryPlanePolyPatch.H"
+#include "solidTractionFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -69,9 +70,20 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
     );
     GeometricField<GradType, fvPatchField, volMesh>& lsGrad = tlsGrad.ref();
 
+    // Prepare the useBoundaryFaceValues list for the least squares vector
+    // We will set traction patches to false and displacement patches to true
+    boolList useBoundaryFaceValues(mesh.boundary().size(), true);
+    forAll(mesh.boundary(), patchI)
+    {
+        if (isA<solidTractionFvPatchVectorField>(vsf.boundaryField()[patchI]))
+        {
+            useBoundaryFaceValues = false;
+        }
+    }
+
     // Get reference to least square vectors
     const leastSquaresS4fVectors& lsv =
-        leastSquaresS4fVectors::New(mesh, useNeumannBoundaryFaceValues_);
+        leastSquaresS4fVectors::New(mesh, useBoundaryFaceValues);
 
     const surfaceVectorField& ownLs = lsv.pVectors();
     const surfaceVectorField& neiLs = lsv.nVectors();
@@ -140,11 +152,10 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
         }
         else
         {
-            const fvPatchField<Type>& patchVsf = vsf.boundaryField()[patchi];
-
-            // const typename GeometricField<Type, fvPatchField, volMesh>::Boundary& x = vsf.boundaryField();
-            if (useNeumannBoundaryFaceValues_) // || patchVsf.fixesValue())
+            if (useBoundaryFaceValues[patchi])
             {
+                const fvPatchField<Type>& patchVsf =
+                    vsf.boundaryField()[patchi];
                 forAll(patchVsf, patchFacei)
                 {
                     lsGrad[faceCells[patchFacei]] +=
@@ -158,11 +169,13 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
 
     lsGrad.correctBoundaryConditions();
 
-    if (useNeumannBoundaryFaceValues_)
-    {
-        // Replace the normal gradient on boundary faces
-        gaussGrad<Type>::correctBoundaryConditions(vsf, lsGrad);
-    }
+    // This causes convergence problems on non-orthogonal grids for the SNES
+    // solver. This may be related to Rhie-Chow stabilisation
+    // if (useNeumannBoundaryFaceValues_)
+    // {
+    //     // Replace the normal gradient on boundary faces
+    //     //gaussGrad<Type>::correctBoundaryConditions(vsf, lsGrad);
+    // }
 
     return tlsGrad;
 }

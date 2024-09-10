@@ -48,10 +48,8 @@ class leastSquaresS4fVectors
 {
     // Private data
 
-        //- Use boundary face values for patches which do not "fix the value"
-        //  i.e., Neumann type boundaries like traction conditions
-        //  Defaults to true
-        Switch useNeumannBoundaryFaceValues_;
+        //- Use boundary face values for patches
+        const boolList useBoundaryFaceValues_;
 
         //- Least-squares gradient vectors
         surfaceVectorField pVectors_;
@@ -76,7 +74,7 @@ public:
         explicit leastSquaresS4fVectors
         (
             const fvMesh&,
-            const Switch& useNeumannBoundaryFaceValues = true
+            const boolList& useBoundaryFaceValues
         );
 
 
