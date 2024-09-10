@@ -227,6 +227,12 @@ public:
                 const bool useVolFieldSigma = true
             );
 
+            //- Correct pointD on symmetry planes
+            void correctSymmPlanes
+            (
+                pointVectorField& pointD
+            ) const;
+
             //- Update total accumulated fields
             void updateTotalFields();
 

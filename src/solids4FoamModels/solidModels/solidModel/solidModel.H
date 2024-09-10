@@ -821,12 +821,11 @@ public:
             //- Return the desired new time-step size
             virtual scalar newDeltaT();
 
-            //- Move the mesh to the deformed configuration
+            //- Move the mesh by the provided point displacement field
             virtual void moveMesh
             (
                 const pointField& oldPoints,
-                const volVectorField& DD,
-                pointVectorField& pointDD
+                const pointVectorField& pointDD
             );
 
             //- End of the program

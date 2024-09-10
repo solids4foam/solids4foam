@@ -368,7 +368,7 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
 #else
     const vectorField oldPoints = mesh().allPoints();
 #endif
-    moveMesh(oldPoints, DD(), pointDD());
+    moveMesh(oldPoints, pointDD());
 
     solidModel::updateTotalFields();
 }

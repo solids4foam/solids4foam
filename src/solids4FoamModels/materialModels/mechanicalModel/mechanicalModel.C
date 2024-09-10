@@ -30,6 +30,8 @@ License
     #include "ZoneID.H"
     #include "crackerFvMesh.H"
 #endif
+#include "lookupSolidModel.H"
+
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -823,6 +825,8 @@ void Foam::mechanicalModel::interpolate
             solSubMeshes().subMeshPointD(), pointD
         );
     }
+
+    correctSymmPlanes(pointD);
 }
 
 
@@ -874,6 +878,94 @@ void Foam::mechanicalModel::interpolate
 #else
     this->interpolate(D, pointD, useVolFieldSigma);
 #endif
+
+    correctSymmPlanes(pointD);
+}
+
+
+void Foam::mechanicalModel::correctSymmPlanes
+(
+    pointVectorField& pointD
+) const
+{
+    const polyMesh& mesh = pointD.mesh().mesh();
+    vectorField& pointDI = pointD;
+
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (isA<symmetryPolyPatch>(mesh.boundaryMesh()[patchI]))
+        {
+            const labelList& meshPoints =
+                mesh.boundaryMesh()[patchI].meshPoints();
+
+            if
+            (
+                returnReduce(mesh.boundaryMesh()[patchI].size(), sumOp<int>())
+             == 0
+            )
+            {
+                continue;
+            }
+
+            const vector avgN =
+                gAverage(mesh.boundaryMesh()[patchI].pointNormals());
+
+            const vector i(1, 0, 0);
+            const vector j(0, 1, 0);
+            const vector k(0, 0, 1);
+
+            if (mag(avgN & i) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDI[meshPoints[pI]].x() = 0;
+                }
+            }
+            else if (mag(avgN & j) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDI[meshPoints[pI]].y() = 0;
+                }
+            }
+            else if (mag(avgN & k) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDI[meshPoints[pI]].z() = 0;
+                }
+            }
+        }
+        else if (isA<emptyPolyPatch>(mesh.boundaryMesh()[patchI]))
+        {
+            const labelList& meshPoints =
+                mesh.boundaryMesh()[patchI].meshPoints();
+
+            if
+            (
+                returnReduce(mesh.boundaryMesh()[patchI].size(), sumOp<int>())
+            )
+            {
+                continue;
+            }
+
+            const vector avgN =
+                gAverage(mesh.boundaryMesh()[patchI].pointNormals());
+            const vector k(0, 0, 1);
+
+            if (mag(avgN & k) > 0.95)
+            {
+                forAll(meshPoints, pI)
+                {
+                    pointDI[meshPoints[pI]].z() = 0;
+                }
+            }
+        }
+    }
+
+    // Apply 2-D corrections
+    const solidModel& solMod = lookupSolidModel(mesh);
+    solMod.twoDCorrector().correctPoints(pointDI);
 }
 
 

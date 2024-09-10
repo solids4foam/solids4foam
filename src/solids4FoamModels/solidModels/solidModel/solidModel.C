@@ -1614,118 +1614,18 @@ Foam::scalar Foam::solidModel::newDeltaT()
 void Foam::solidModel::moveMesh
 (
     const pointField& oldPoints,
-    const volVectorField& DD,
-    pointVectorField& pointDD
+    const pointVectorField& pointDD
 )
 {
     Info<< "Moving the mesh to the deformed configuration" << nl << endl;
 
-    //- Move mesh by interpolating displacement field to vertices
+    const vectorField& pointDDI = pointDD;
 
-    // Interpolate cell displacements to vertices
-    mechanical().interpolate(DD, pointDD);
-
-    // Fix, AW/PC, 22-Dec-20,
-    // correctBoundaryConditions should not be called as it causes (global?)
-    // points to become out of sync. This results in the error "face area does
-    // not match neighbour..."
-    //pointDD.correctBoundaryConditions();
-
-#ifdef OPENFOAM_NOT_EXTEND
-    vectorField& pointDDI = pointDD.primitiveFieldRef();
-#else
-    vectorField& pointDDI = pointDD.internalField();
-#endif
-
-    vectorField newPoints = oldPoints;
-
-    // Correct symmetryPlane points
-
-    forAll(mesh().boundaryMesh(), patchI)
-    {
-        if (isA<symmetryPolyPatch>(mesh().boundaryMesh()[patchI]))
-        {
-            const labelList& meshPoints =
-                mesh().boundaryMesh()[patchI].meshPoints();
-
-            if
-            (
-                returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
-             == 0
-            )
-            {
-                continue;
-            }
-
-            const vector avgN =
-                gAverage(mesh().boundaryMesh()[patchI].pointNormals());
-
-            const vector i(1, 0, 0);
-            const vector j(0, 1, 0);
-            const vector k(0, 0, 1);
-
-            if (mag(avgN & i) > 0.95)
-            {
-                forAll(meshPoints, pI)
-                {
-                    pointDDI[meshPoints[pI]].x() = 0;
-                }
-            }
-            else if (mag(avgN & j) > 0.95)
-            {
-                forAll(meshPoints, pI)
-                {
-                    pointDDI[meshPoints[pI]].y() = 0;
-                }
-            }
-            else if (mag(avgN & k) > 0.95)
-            {
-                forAll(meshPoints, pI)
-                {
-                    pointDDI[meshPoints[pI]].z() = 0;
-                }
-            }
-        }
-        else if (isA<emptyPolyPatch>(mesh().boundaryMesh()[patchI]))
-        {
-            const labelList& meshPoints =
-                mesh().boundaryMesh()[patchI].meshPoints();
-
-            if
-            (
-                returnReduce(mesh().boundaryMesh()[patchI].size(), sumOp<int>())
-            )
-            {
-                continue;
-            }
-
-            const vector avgN =
-                gAverage(mesh().boundaryMesh()[patchI].pointNormals());
-            const vector k(0, 0, 1);
-
-            if (mag(avgN & k) > 0.95)
-            {
-                forAll(meshPoints, pI)
-                {
-                    pointDDI[meshPoints[pI]].z() = 0;
-                }
-            }
-        }
-    }
-
-    // Note: allPoints will have more points than pointDD if there are
-    // globalFaceZones
-    forAll(pointDDI, pointI)
-    {
-        newPoints[pointI] += pointDDI[pointI];
-    }
-
-    // Move unused globalFaceZone points
-    // Not need anymore as globalFaceZones are not used
-    //updateGlobalFaceZoneNewPoints(pointDDI, newPoints);
-
+    // Calculate the new points and apply 2-D corrections
+    vectorField newPoints(oldPoints + pointDDI);
     twoDCorrector_.correctPoints(newPoints);
-    twoDCorrector_.correctPoints(pointDDI);
+
+    // Move the mesh
     mesh().movePoints(newPoints);
     mesh().V00();
     mesh().moving(false);
