@@ -300,7 +300,7 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
     {
         updateSigmaHyd
         (
-            0.5*K()*(J - 1.0),
+            K()*(J - 1.0),
             (4.0/3.0)*mu_ + K_
         );
     }
