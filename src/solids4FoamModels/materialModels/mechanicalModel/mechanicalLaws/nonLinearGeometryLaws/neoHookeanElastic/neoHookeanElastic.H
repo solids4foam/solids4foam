@@ -72,11 +72,16 @@ class neoHookeanElastic
 {
     // Private data
 
-        // Shear modulus
+        //- Shear modulus
         dimensionedScalar mu_;
 
-        // Bulk modulus
+        //- Bulk modulus
         dimensionedScalar K_;
+
+        //- Alternative definition of the Kirchhoff pressure
+        //  default: -0.5*K*(pow(J, 2.0) - 1.0)
+        //  alternate: -0.5*K*(J - 1.0)
+        const Switch alternatePressureDefinition_;
 
     // Private Member Functions
 

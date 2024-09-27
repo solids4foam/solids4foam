@@ -79,9 +79,10 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
 
 void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
 (
-    surfaceVectorField& traction,
+    surfaceVectorField& force,
     const volVectorField& D,
-    const surfaceVectorField& n
+    const surfaceVectorField& nCurrent,
+    const surfaceScalarField& magSfCurrent
 ) const
 {
     // Enforce traction conditions
@@ -101,10 +102,30 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                     D.boundaryField()[patchI]
                 );
 
-            const vectorField& nPatch = n.boundaryField()[patchI];
+            const vectorField& nPatch = nCurrent.boundaryField()[patchI];
 
-            traction.boundaryFieldRef()[patchI] =
-                tracPatch.traction() - nPatch*tracPatch.pressure();
+            // traction.boundaryFieldRef()[patchI] =
+            //     tracPatch.traction() - nPatch*tracPatch.pressure();
+            if (tracPatch.useUndeformedArea())
+            {
+                const scalarField& magSfPatch =
+                    D.mesh().boundary()[patchI].magSf();
+
+                force.boundaryFieldRef()[patchI] =
+                (
+                    tracPatch.traction() - nPatch*tracPatch.pressure()
+                )*magSfPatch;
+            }
+            else
+            {
+                const scalarField& magSfCurrentPatch =
+                    magSfCurrent.boundaryField()[patchI];
+
+                force.boundaryFieldRef()[patchI] =
+                (
+                    tracPatch.traction() - nPatch*tracPatch.pressure()
+                )*magSfCurrentPatch;
+            }
         }
         else if
         (
@@ -118,12 +139,13 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
             )
         )
         {
-            // Unit normals
-            const vectorField& nPatch = n.boundaryField()[patchI];
+            const vectorField& nPatch = nCurrent.boundaryField()[patchI];
 
             // Set shear traction to zero
-            traction.boundaryFieldRef()[patchI] =
-                sqr(nPatch) & traction.boundaryField()[patchI];
+            // traction.boundaryFieldRef()[patchI] =
+                // sqr(nPatch) & traction.boundaryField()[patchI];
+            force.boundaryFieldRef()[patchI] =
+                sqr(nPatch) & force.boundaryField()[patchI];
         }
     }
 }
@@ -562,15 +584,20 @@ tmp<vectorField> nonLinGeomTotalLagTotalDispSolid::residualMomentum
     const surfaceTensorField gradDf(fvc::interpolate(gradD()));
     traction += scaleFactor*impKf_*(fvc::snGrad(D) - (n & gradDf));
 
+    // Calculate the force at the faces
+    surfaceVectorField force(magSfCurrent*traction);
+
     // Enforce traction boundary conditions
-    enforceTractionBoundaries(traction, D, nCurrent);
+    // enforceTractionBoundaries(traction, D, nCurrent);
+    enforceTractionBoundaries(force, D, nCurrent, magSfCurrent);
 
     // The residual vector is defined as
     // F = div(sigma) + rho*g
     //     - rho*d2dt2(D) - dampingCoeff*rho*ddt(D) + stabilisationTerm
     // where, here, we roll the stabilisationTerm into the div(sigma)
     residual =
-        fvc::div(magSfCurrent*traction)
+        // fvc::div(magSfCurrent*traction)
+        fvc::div(force)
       + rho()
        *(
             g() - fvc::d2dt2(D) - dampingCoeff()*fvc::ddt(D)

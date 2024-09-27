@@ -45,7 +45,11 @@ Foam::neoHookeanElastic::neoHookeanElastic
 :
     mechanicalLaw(name, mesh, dict, nonLinGeom),
     mu_("mu", dimPressure, 0.0),
-    K_("K", dimPressure, 0.0)
+    K_("K", dimPressure, 0.0),
+    alternatePressureDefinition_
+    (
+        dict.lookupOrDefault<Switch>("alternatePressureDefinition", false)
+    )
 {
     // Read mechanical properties
     if
@@ -292,11 +296,22 @@ void Foam::neoHookeanElastic::correct(volSymmTensorField& sigma)
     const volSymmTensorField s(mu_*dev(bEbar));
 
     // Update the hydrostatic stress
-    updateSigmaHyd
-    (
-        0.5*K()*(pow(J, 2.0) - 1.0),
-        (4.0/3.0)*mu_ + K_
-    );
+    if (alternatePressureDefinition_)
+    {
+        updateSigmaHyd
+        (
+            0.5*K()*(J - 1.0),
+            (4.0/3.0)*mu_ + K_
+        );
+    }
+    else
+    {
+        updateSigmaHyd
+        (
+            0.5*K()*(pow(J, 2.0) - 1.0),
+            (4.0/3.0)*mu_ + K_
+        );
+    }
 
     // Calculate the Cauchy stress
     sigma = (1.0/J)*(sigmaHyd()*I + s);

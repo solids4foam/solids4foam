@@ -60,6 +60,11 @@ class solidTractionFvPatchVectorField
         //- Enable non-orthogonal corrections
         const Switch nonOrthogonalCorrections_;
 
+        //- Use undeformed areas flag
+        //  Note that this flag is simply stored here and it is the
+        //  responsibility of the solid model to lookup and use this
+        const Switch useUndeformedArea_;
+
         //- Traction
         vectorField traction_;
 
@@ -197,6 +202,12 @@ public:
             Switch& extrapolateValue()
             {
                 return extrapolateValue_;
+            }
+
+            //- Const access to the useUndeformedArea_ flag
+            const Switch& useUndeformedArea() const
+            {
+                return useUndeformedArea_;
             }
 
 
