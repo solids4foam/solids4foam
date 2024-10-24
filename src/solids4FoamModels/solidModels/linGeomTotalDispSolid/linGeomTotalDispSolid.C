@@ -26,6 +26,7 @@ License
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 
+#include <Eigen/Dense>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -178,6 +179,232 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
             // Update gradient of displacement
             mechanical().grad(D(), gradD());
+
+            // Testing new grad scheme start
+
+            // Here we will calculate cell-centred gradient using
+            // high-order disretisation approach
+            // STEPS:
+            // 1. Loop over all cells
+            //   1.1 For each cell construct stencil
+            //
+            // 2. Loop over all cells
+            //   2.1 For each cell make interpolation coefficients
+            //
+            // 3. Explicitly calculate gradient at cell centres unsing cell
+            //    stencil and corresponting interpolation coeffs for each cell
+            //    in stencil
+
+            //
+            // 1. Step - make stencils
+            //
+            //          I'm using layer approach as it has the best condition
+            //          number for LS matrix. Some authors use sphere and put
+            //          in stencil all cells inside the sphere but that produces
+            //          higher values of condition number at structured mesh
+
+            const label maxStencilSize = 70;
+            const label nLayers = 2;
+            const labelListList& cellCells = mesh().cellCells();
+
+            List<DynamicList<label>> lsStencil(mesh().nCells());
+            forAll(lsStencil, cellI)
+            {
+                lsStencil[cellI].setCapacity(maxStencilSize);
+
+                DynamicList<label>& curStencil = lsStencil[cellI];
+                const labelList& curCellCells = cellCells[cellI];
+
+                labelHashSet stencilCells;
+                labelHashSet prevLayer;
+
+                //Info<<"First layer for cell: " << cellI << endl;
+                // Add first layer of cells
+                forAll(curCellCells, cI)
+                {
+                    stencilCells.insert(curCellCells[cI]);
+                    prevLayer.insert(curCellCells[cI]);
+                }
+
+                // Remaining layers of cells
+                for (int layerI = 0; layerI < nLayers; layerI++)
+                {
+                    labelList prevLayerCells(prevLayer.toc());
+                    labelHashSet curLayer;
+
+                    // Loop over previous layer and add one level of
+                    // layer neighbours
+                    for (const label cellI : prevLayerCells)
+                    {
+                        const labelList& cellINei= mesh().cellCells()[cellI];
+                        forAll (cellINei, nei)
+                        {
+                            if (!stencilCells.found(cellINei[nei]))
+                            {
+                                curLayer.insert(cellINei[nei]);
+                            }
+                        }
+                    }
+                    // Now we have curent layer which we need to add to stencil
+                    // and current layer will now be previous layer for next
+                    // loop
+                    stencilCells.merge(curLayer);
+                    prevLayer.clear();
+                    prevLayer = curLayer;
+                }
+
+                if (Pstream::parRun())
+                {
+                    notImplemented("not implemented for parallel run");
+                }
+
+                curStencil.append(stencilCells.toc());
+            }
+
+            forAll(lsStencil, cellI)
+            {
+                // Note: lsStencil is sorted but I do not see problem in that
+                lsStencil[cellI].shrink();
+            }
+
+            //
+            // 2. Step - calculate interpolation coefficients
+            //
+
+            // Order of interpolation
+            const label N = 1;
+
+            // Number of terms in Taylor expression
+            const label Np = 4;
+
+            // Kernel shape parameter
+            const label k = 6;
+
+            // List of condition numbers
+            scalarList stencilCondNumbers(mesh().nCells(), 0.0);
+
+            List<DynamicList<scalar>> c(mesh().nCells());
+            List<DynamicList<scalar>> cx(mesh().nCells());
+            List<DynamicList<scalar>> cy(mesh().nCells());
+            List<DynamicList<scalar>> cz(mesh().nCells());
+
+            forAll(lsStencil, cellI)
+            {
+                DynamicList<label>& curStencil = lsStencil[cellI];
+
+                // Find max distance in this stencil
+                scalar maxDist = 0.0;
+                forAll(curStencil, cellI)
+                {
+                    const label neiCellID = curStencil[cellI];
+                    const scalar d =mag(mesh().C()[neiCellID]-mesh().C()[cellI]);
+                    if ( d > maxDist)
+                    {
+                        maxDist = d;
+                    }
+                }
+
+                // Loop over neighbours and construct matrix Q
+                const label Nn = curStencil.size();
+
+                // For now I will use matrix format from Eigen/Dense library
+                Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(Np, Nn);
+
+                // Loop over cells in stencil, each cell have its corresponding
+                // row in Q matrix
+                forAll(curStencil, cI)
+                {
+                    const label neiCellID = curStencil[cI];
+                    const vector neiC = mesh().C()[neiCellID];
+                    const vector C = mesh().C()[cI];
+
+                    // Hardcoded for linear interpolation
+                    Q(0, cI) = 1;
+                    Q(1, cI) = neiC.x() - C.x();
+                    Q(2, cI) = neiC.y() - C.y();
+                    Q(3, cI) = neiC.z() - C.z();
+                }
+
+                Eigen::MatrixXd W = Eigen::MatrixXd::Zero(Nn, Nn);
+                forAll(curStencil, cI)
+                {
+                    const label neiCellID = curStencil[cI];
+                    const vector neiC = mesh().C()[neiCellID];
+                    const vector C = mesh().C()[cI];
+
+                    const scalar d = mag(neiC-C);
+
+                    // Smoothing length
+                    const scalar dm = 2 * maxDist;
+
+                    // Weight using radially symmetric exponential function
+                    const scalar w =  (exp(-pow(d/dm, 2) * pow(k, 2)) - exp(-pow(k, 2))) / (1 - exp(-pow(k, 2)));
+
+                    W(cellI, cellI) = w;
+                }
+
+                // Now when we have W and Q, next step is QR decomposition and
+                // calculation of matrix A
+
+                Eigen::MatrixXd Qhat = Q * W.diagonal().asDiagonal().sqrt();
+                Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
+
+                Eigen::MatrixXd O = qr.householderQ() * qr.matrixQR().triangularView<Eigen::Upper>();
+                Eigen::MatrixXd R = qr.matrixQR().triangularView<Eigen::Upper>();
+
+                Eigen::MatrixXd Bhat = W.diagonal().asDiagonal().sqrt() * Eigen::MatrixXd::Identity(w_diag.size(), w_diag.size());
+
+                // Slice Rbar and Qbar, as we do not need full matrix
+                Eigen::MatrixXd Rbar = R.topLeftCorner(Np, Np);
+                Eigen::MatrixXd Qbar = O.leftCols(Np);
+
+                // Solve to get A
+                Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(Qbar.transpose() * Bhat);
+
+                // To be sure that interpolation is accurate we will check cond
+                // number of matrix Rbar
+                Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
+                Eigen::VectorXd singularValues = svd.singularValues();
+                stencilCondNumbers[cellI] = singularValues(0) / singularValues(singularValues.size() - 1);
+
+                c[cellI].setCapacity(A.cols());
+                cx[cellI].setCapacity(A.cols());
+                cy[cellI].setCapacity(A.cols());
+                cz[cellI].setCapacity(A.cols());
+
+                for (int j = 0; j < A.cols(); ++j)
+                {
+                    c[cellI].append(A(0,j));
+                    cx[cellI[.append(A(1,j));
+                    cy[cellI[.append(A(2,j));
+                    cz[cellI[.append(A(3,j));
+                }
+
+                c[cellI].shirnk();
+                cx[cellI].shrink();
+                cy[cellI].shrink();
+                cz[cellI].shrink();
+            }
+/*
+            List<DynamicList<vector>> interpCoeffs(mesh().nCells());
+            List<DynamicList<vector>> interpGradCoeffs(mesh().nCells() );
+
+            forAll(interpCoeffs, cellI)
+            {
+                DynamicList<label>& curStencil = lsStencil[cellI];
+
+                forAll(curStencil, nei)
+                {
+                    interpCoeffs[cellI].append(vector(cx[cellI][nei], cy[cellI][nei], cz[cellI][nei]));
+                    interpGradCoeffs[cellI].append(vector());
+                }
+            }
+*/
+            //
+            // Step 3: Interpolate
+            //
+
+            // Testing new grad schene end
 
             // Update gradient of displacement increment
             gradDD() = gradD() - gradD().oldTime();
