@@ -30,6 +30,20 @@ License
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+using namespace std;
+using namespace Eigen;
+
+void QR()
+{
+
+    Eigen::MatrixXf A(2,2), B(3,2);
+    B << 2, 0,  0, 3, 1, 1;
+    A << 2, 0, 0, -2;
+    A = B * A;
+    std::cout << A;
+}
+
+
 namespace Foam
 {
 
@@ -272,7 +286,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             //
 
             // Order of interpolation
-            const label N = 1;
+            //const label N = 1;
 
             // Number of terms in Taylor expression
             const label Np = 4;
@@ -338,21 +352,23 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                     const scalar dm = 2 * maxDist;
 
                     // Weight using radially symmetric exponential function
-                    const scalar w =  (exp(-pow(d/dm, 2) * pow(k, 2)) - exp(-pow(k, 2))) / (1 - exp(-pow(k, 2)));
+                    const scalar sqrK = -pow(k,2);
+                    const scalar w =  (Foam::exp(pow(d/dm, 2) * sqrK) - Foam::exp(sqrK)) / (1 - exp(sqrK));
 
-                    W(cellI, cellI) = w;
+                    W(cI, cI) = w;
                 }
 
-                // Now when we have W and Q, next step is QR decomposition and
-                // calculation of matrix A
-
-                Eigen::MatrixXd Qhat = Q * W.diagonal().asDiagonal().sqrt();
+                // Now when we have W and Q, next step is QR decomposition
+                Eigen::MatrixXd sqrtW = W.cwiseSqrt();
+                Eigen::MatrixXd Qhat = Q * sqrtW;
                 Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
 
-                Eigen::MatrixXd O = qr.householderQ() * qr.matrixQR().triangularView<Eigen::Upper>();
+                // Q and R matrices
+                Eigen::MatrixXd O = qr.householderQ();
                 Eigen::MatrixXd R = qr.matrixQR().triangularView<Eigen::Upper>();
 
-                Eigen::MatrixXd Bhat = W.diagonal().asDiagonal().sqrt() * Eigen::MatrixXd::Identity(w_diag.size(), w_diag.size());
+                // B hat
+                Eigen::MatrixXd Bhat = sqrtW * Eigen::MatrixXd::Identity(W.rows(), W.cols());
 
                 // Slice Rbar and Qbar, as we do not need full matrix
                 Eigen::MatrixXd Rbar = R.topLeftCorner(Np, Np);
@@ -361,32 +377,39 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 // Solve to get A
                 Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(Qbar.transpose() * Bhat);
 
+                // TO-DO
                 // To be sure that interpolation is accurate we will check cond
                 // number of matrix Rbar
-                Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
-                Eigen::VectorXd singularValues = svd.singularValues();
-                stencilCondNumbers[cellI] = singularValues(0) / singularValues(singularValues.size() - 1);
+                //Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
+                //Eigen::VectorXd singularValues = svd.singularValues();
+                //stencilCondNumbers[cellI] = singularValues(0) / singularValues(singularValues.size() - 1);
 
                 c[cellI].setCapacity(A.cols());
                 cx[cellI].setCapacity(A.cols());
                 cy[cellI].setCapacity(A.cols());
                 cz[cellI].setCapacity(A.cols());
 
-                for (int j = 0; j < A.cols(); ++j)
+
+                Eigen::RowVectorXd cRow = A.row(0);
+                Eigen::RowVectorXd cxRow = A.row(1);
+                Eigen::RowVectorXd cyRow = A.row(2);
+                Eigen::RowVectorXd czRow = A.row(3);
+
+                for (label i=0; i < A.cols(); ++i)
                 {
-                    c[cellI].append(A(0,j));
-                    cx[cellI[.append(A(1,j));
-                    cy[cellI[.append(A(2,j));
-                    cz[cellI[.append(A(3,j));
+                    c[cellI].append(cRow(i));
+                    cx[cellI].append(cxRow(i));
+                    cy[cellI].append(cyRow(i));
+                    cz[cellI].append(czRow(i));
                 }
 
-                c[cellI].shirnk();
+                c[cellI].shrink();
                 cx[cellI].shrink();
                 cy[cellI].shrink();
                 cz[cellI].shrink();
             }
-/*
-            List<DynamicList<vector>> interpCoeffs(mesh().nCells());
+
+            List<DynamicList<scalar>> interpCoeffs(mesh().nCells());
             List<DynamicList<vector>> interpGradCoeffs(mesh().nCells() );
 
             forAll(interpCoeffs, cellI)
@@ -395,14 +418,42 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
                 forAll(curStencil, nei)
                 {
-                    interpCoeffs[cellI].append(vector(cx[cellI][nei], cy[cellI][nei], cz[cellI][nei]));
-                    interpGradCoeffs[cellI].append(vector());
+                    interpCoeffs[cellI].append(c[cellI][nei]);
+                    interpGradCoeffs[cellI].append(vector(cx[cellI][nei], cy[cellI][nei], cz[cellI][nei]));
                 }
             }
-*/
+
             //
-            // Step 3: Interpolate
+            // Step 3: Interpolate D() to get gradient of D
             //
+
+            volTensorField hoGradD
+            (
+                IOobject
+                (
+                    "hoGrad(D)",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedTensor("0", dimless, Zero)
+            );
+
+            forAll(lsStencil, cellI)
+            {
+                DynamicList<label>& curStencil = lsStencil[cellI];
+
+                // Loop over stencil and multiply stencil cell values with
+                // corresponding interpolation coefficient
+                forAll(curStencil, cI)
+                {
+                    hoGradD[cellI] += D()[curStencil[cI]] * interpGradCoeffs[cellI][cI];
+                }
+            }
+
+            hoGradD.write();
 
             // Testing new grad schene end
 
