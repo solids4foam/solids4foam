@@ -232,7 +232,6 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 labelHashSet stencilCells;
                 labelHashSet prevLayer;
 
-                //Info<<"First layer for cell: " << cellI << endl;
                 // Add first layer of cells
                 forAll(curCellCells, cI)
                 {
@@ -241,16 +240,16 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 }
 
                 // Remaining layers of cells
-                for (int layerI = 0; layerI < nLayers; layerI++)
+                for (int layerI = 1; layerI < nLayers; layerI++)
                 {
                     labelList prevLayerCells(prevLayer.toc());
                     labelHashSet curLayer;
 
                     // Loop over previous layer and add one level of
                     // layer neighbours
-                    for (const label cellI : prevLayerCells)
+                    for (const label cI : prevLayerCells)
                     {
-                        const labelList& cellINei= mesh().cellCells()[cellI];
+                        const labelList& cellINei= mesh().cellCells()[cI];
                         forAll (cellINei, nei)
                         {
                             if (!stencilCells.found(cellINei[nei]))
@@ -259,18 +258,23 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                             }
                         }
                     }
+
                     // Now we have curent layer which we need to add to stencil
                     // and current layer will now be previous layer for next
                     // loop
-                    stencilCells.merge(curLayer);
                     prevLayer.clear();
                     prevLayer = curLayer;
+                    stencilCells.merge(curLayer);
                 }
 
                 if (Pstream::parRun())
                 {
                     notImplemented("not implemented for parallel run");
                 }
+
+                // Neighbours of first layer will store cellI in stencil so we
+                // need to remove it
+                stencilCells.erase(cellI);
 
                 curStencil.append(stencilCells.toc());
             }
@@ -294,8 +298,20 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             // Kernel shape parameter
             const label k = 6;
 
-            // List of condition numbers
-            scalarList stencilCondNumbers(mesh().nCells(), 0.0);
+            // Cells condition numbers
+            volScalarField condNumber
+            (
+                IOobject
+                (
+                    "condNumber",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("0", dimless, Zero)
+            );
 
             List<DynamicList<scalar>> c(mesh().nCells());
             List<DynamicList<scalar>> cx(mesh().nCells());
@@ -308,9 +324,9 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
                 // Find max distance in this stencil
                 scalar maxDist = 0.0;
-                forAll(curStencil, cellI)
+                forAll(curStencil, cI)
                 {
-                    const label neiCellID = curStencil[cellI];
+                    const label neiCellID = curStencil[cI];
                     const scalar d =mag(mesh().C()[neiCellID]-mesh().C()[cellI]);
                     if ( d > maxDist)
                     {
@@ -330,7 +346,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 {
                     const label neiCellID = curStencil[cI];
                     const vector neiC = mesh().C()[neiCellID];
-                    const vector C = mesh().C()[cI];
+                    const vector C = mesh().C()[cellI];
 
                     // Hardcoded for linear interpolation
                     Q(0, cI) = 1;
@@ -344,7 +360,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 {
                     const label neiCellID = curStencil[cI];
                     const vector neiC = mesh().C()[neiCellID];
-                    const vector C = mesh().C()[cI];
+                    const vector C = mesh().C()[cellI];
 
                     const scalar d = mag(neiC-C);
 
@@ -377,12 +393,11 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 // Solve to get A
                 Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(Qbar.transpose() * Bhat);
 
-                // TO-DO
-                // To be sure that interpolation is accurate we will check cond
-                // number of matrix Rbar
-                //Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
-                //Eigen::VectorXd singularValues = svd.singularValues();
-                //stencilCondNumbers[cellI] = singularValues(0) / singularValues(singularValues.size() - 1);
+                // To be aware of interpolation accuracy we need to control the
+                // condition number
+                Eigen::JacobiSVD<Eigen::MatrixXd> svd(Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV);
+                Eigen::VectorXd singularValues = svd.singularValues();
+                condNumber[cellI] = singularValues(0) / (singularValues(singularValues.size() - 1) + VSMALL);
 
                 c[cellI].setCapacity(A.cols());
                 cx[cellI].setCapacity(A.cols());
@@ -421,11 +436,14 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                     interpCoeffs[cellI].append(c[cellI][nei]);
                     interpGradCoeffs[cellI].append(vector(cx[cellI][nei], cy[cellI][nei], cz[cellI][nei]));
                 }
+
+                interpCoeffs[cellI].shrink();
+                interpGradCoeffs[cellI].shrink();
             }
 
-            //
-            // Step 3: Interpolate D() to get gradient of D
-            //
+            // //
+            // // Step 3: Interpolate D() to get gradient of D
+            // //
 
             volTensorField hoGradD
             (
@@ -454,7 +472,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             }
 
             hoGradD.write();
-
+            condNumber.write();
             // Testing new grad schene end
 
             // Update gradient of displacement increment
