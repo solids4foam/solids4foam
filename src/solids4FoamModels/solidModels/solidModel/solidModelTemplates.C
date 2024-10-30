@@ -188,4 +188,147 @@ bool Foam::solidModel::converged
 }
 
 
+
+
+
+template<class Type>
+bool Foam::solidModel::fieldConverged
+(
+    const int iCorr,
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    const bool writeResiduals
+)
+{
+    // We will check three residuals:
+    // - relative displacement residual
+    // - linear equation residual
+    // - material model residual
+    bool fieldConverged = false;
+
+    // Calculate displacement residual based on the relative change of vf
+    scalar denom = 0.0;
+
+    // Denom is displacement increment
+    if (incremental())
+    {
+        // Incremental approach
+        denom = gMax
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            DimensionedField<scalar, volMesh>
+#else
+            Field<scalar>
+#endif
+            (
+                mag(vf.internalField())
+            )
+        );
+    }
+    else
+    {
+        // Total appraoch
+        denom = gMax
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            DimensionedField<scalar, volMesh>
+#else
+            Field<scalar>
+#endif
+            (
+                mag(vf.internalField() - vf.oldTime().internalField())
+            )
+        );
+    }
+    Info << " denom" <<denom <<endl;
+
+    if (denom < SMALL)
+    {
+        denom = max
+        (
+            gMax
+            (
+#ifdef OPENFOAM_NOT_EXTEND
+                DimensionedField<scalar, volMesh>(mag(vf.internalField()))
+#else
+                mag(vf.internalField())
+#endif
+            ),
+            SMALL
+        );
+    }
+    const scalar residualvf =
+        gMax
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            DimensionedField<scalar, volMesh>
+            (
+                mag(vf.internalField() - vf.oldTime().internalField())
+            )
+#else
+            mag(vf.internalField() - vf.oldTime().internalField())
+#endif
+        )/denom;
+
+    Info << " residualvf = " <<residualvf <<endl;
+
+
+    // If one of the residuals has converged to an order of magnitude
+    // less than the tolerance then consider the solution converged
+    // force at least 1 outer iteration and the material law must be converged
+    if (iCorr > 1)
+    {
+        if (residualvf < alternativeTol_)
+        {
+            if (writeResiduals)
+            {
+                Info<< "    The relative residual has converged" << endl;
+            }
+            fieldConverged = true;
+        }
+
+        else
+        {
+            fieldConverged = false;
+        }
+    }
+
+    if (!writeResiduals)
+    {
+        return fieldConverged;
+    }
+
+    // Print residual information
+    if (iCorr == 0)
+    {
+        Info<< "    Corr, res, relRes, matRes, iters" << endl;
+    }
+    else if (iCorr % infoFrequency_ == 0 || fieldConverged)
+    {
+        Info<< "    " << iCorr
+            << ", " << residualvf << endl;
+
+        if (residualFilePtr_.valid())
+        {
+            residualFilePtr_()
+                << residualvf << " "
+                << endl;
+        }
+
+        if (fieldConverged)
+        {
+            Info<< endl;
+        }
+    }
+
+    if (iCorr == nCorr_ - 1 && !fieldConverged)
+    {
+        maxIterReached_++;
+        Warning
+            << "Max iterations reached within momentum loop" << endl;
+    }
+
+    return fieldConverged;
+}
+
+
 // ************************************************************************* //

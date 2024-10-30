@@ -53,13 +53,16 @@ void explicitGodunovCCSolid::updateStress()
     gradDD() = gradD() - gradD().oldTime();
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
-
+    // mechanical().correct(sigma());
+    sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
     // Interpolate cell displacements to vertices
     mechanical().interpolate(D(), pointD());
 
     // Increment of displacement
     DD() = D() - D().oldTime();
+    
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
 }
 
 
@@ -408,11 +411,19 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     mech_.printCentroid();
     #include "updateVariables.H"   
     #include "riemannSolver.H"
+    D().oldTime();
+    DD().oldTime();
+    gradD().oldTime();
+
+
+    lm_.oldTime();
+    F_.oldTime();
+    x_.oldTime();
+    xF_.oldTime();
+    xN_.oldTime();
 
     DisRequired();
 
-    // Update stress
-    updateStress();
     // Set the printInfo
     physicsModel::printInfo() = bool
     (
@@ -423,60 +434,80 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     Info<< "Frequency at which info is printed: every " << infoFrequency()
         << " time-steps" << endl;
 
-}
+    }
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+void explicitGodunovCCSolid::setDeltaT(Time& runTime)
+{
+     mech_.time(runTime_, deltaT_, max(Up_time_));
+
+}
 
 
 bool explicitGodunovCCSolid::evolve()
 {
-    
-
+    Info<< "starting of evolve function" << endl;
     // Mesh update loop
     do
     {
+        int iCorr = 0;
+
+
         if (physicsModel::printInfo())
         {
             Info<< "Evolving solid solver form explicitGodunovCCSolid" << endl;
         }
 
-        lm_.oldTime();
-        F_.oldTime();
-        x_.oldTime();
-        xF_.oldTime();
-        xN_.oldTime();
+            forAll(RKstages_, stage)
+            {
+                #include "gEqns.H"
 
-        mech_.time(runTime_, deltaT_, max(Up_time_));
+                if (RKstages_[stage] == 0)
+                {
+                    #include "updateVariables.H"
+                }
+            }
 
-        // Info <<"deltaT_" << deltaT_<<endl;
-        forAll(RKstages_, stage)
+            lm_ = 0.5*(lm_.oldTime() + lm_);
+            F_ = 0.5*(F_.oldTime() + F_);
+            x_ = 0.5*(x_.oldTime() + x_);
+            xF_ = 0.5*(xF_.oldTime() + xF_);
+            xN_ = 0.5*(xN_.oldTime() + xN_);
+
+            #include "updateVariables.H"
+
+
+                if (runTime_.outputTime())
+                {
+                    uN_ = xN_ - XN_;
+                    uN_.write();
+
+                    p_ = model_.pressure();
+                    p_.write();
+                    P_.write();
+                }
+
+       // Compute and check residuals
+        // Define tolerance for residuals
+        scalar tolerance = 1e-5;
+        scalar sumResP = 0.0;
+
+        forAll(lm_, i)
         {
-            #include "gEqns.H"
-
-            if (RKstages_[stage] == 0)
-            {
-                #include "updateVariables.H"
-            }
+            sumResP += magSqr(lm_[i] - lm_.oldTime()[i]);
         }
+         Info << "reseduals sumResP = "<< sumResP <<endl;
 
-        lm_ = 0.5*(lm_.oldTime() + lm_);
-        F_ = 0.5*(F_.oldTime() + F_);
-        x_ = 0.5*(x_.oldTime() + x_);
-        xF_ = 0.5*(xF_.oldTime() + xF_);
-        xN_ = 0.5*(xN_.oldTime() + xN_);
+        scalar resP = std::sqrt((sumResP) / lm_.size());
+        Info << "reseduals p = "<< resP <<endl;
 
-        #include "updateVariables.H"
-
-
-            if (runTime_.outputTime())
-            {
-                uN_ = xN_ - XN_;
-                uN_.write();
-
-                p_ = model_.pressure();
-                p_.write();
-                P_.write();
-            }
-            
+        if ( resP < tolerance)
+        {
+            Info << "Converged after " << runTime().timeName() << " iterations." << endl;
+            break;  // Exit the time loop
+        }
+                
             U() = lm_/rho_;
             
             // Compute displacement
@@ -487,6 +518,21 @@ bool explicitGodunovCCSolid::evolve()
 
             // Update the stress field based on the latest D field
             updateStress();
+
+            if(fieldConverged
+                (
+                    iCorr,
+                    lm_
+                )
+                && ++iCorr < nCorr()
+            )
+            {
+                Info<<" solution converged"<<endl;
+            }
+
+
+            
+
     }
     while (mesh().update());
 

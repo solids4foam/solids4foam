@@ -22,6 +22,8 @@ License
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "explicitSolidTractionTractionFvPatchVectorField.H"
+#include "explicitSolidTractionLinearMomentumFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
     #include "polyTopoChange.H"
@@ -1762,6 +1764,19 @@ void Foam::solidModel::setTraction
 
         patchD.traction() = traction;
     }
+    else if (tractionPatch.type() == explicitSolidTractionTractionFvPatchVectorField::typeName)
+    {
+        explicitSolidTractionTractionFvPatchVectorField& patchTraction =
+            refCast<explicitSolidTractionTractionFvPatchVectorField>(tractionPatch);
+
+        patchTraction.traction() = traction;
+
+        explicitSolidTractionLinearMomentumFvPatchVectorField& patchLinearMomentum =
+            refCast<explicitSolidTractionLinearMomentumFvPatchVectorField>(tractionPatch);
+
+        patchLinearMomentum.traction() = traction;
+    }
+
 #ifdef FOAMEXTEND
     else if
     (

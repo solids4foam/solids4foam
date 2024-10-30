@@ -118,6 +118,8 @@ $(solidFvPatchFields)/solidForce/solidForceFvPatchVectorField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchScalarField.C
 $(solidFvPatchFields)/solidSymmetry/solidSymmetryFvPatchVectorField.C
 $(solidFvPatchFields)/solidTraction/solidTractionFvPatchVectorField.C
+$(solidFvPatchFields)/explicitSolidTractionTraction/explicitSolidTractionTractionFvPatchVectorField.C
+$(solidFvPatchFields)/explicitSolidTractionLinearMomentum/explicitSolidTractionLinearMomentumFvPatchVectorField.C
 $(solidFvPatchFields)/solidVelocity/solidVelocityFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchVectorField.C
 $(solidFvPatchFields)/solidWedge/solidWedgeFvPatchScalarField.C
