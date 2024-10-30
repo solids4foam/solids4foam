@@ -31,6 +31,10 @@ Description
 
     The distance calculations and interpolations are performed by the GGI class.
 
+    Two normal force calculation methods are available:
+        - Point-to-segment. Enabled with "integralNormalGap false;"
+        - Segment-to-segment. Enabled with "integralNormalGap true;"
+
     More details in:
 
     P. Cardiff, A. Karać, A. Ivanković: Development of a Finite Volume contact
@@ -44,14 +48,25 @@ Description
     P. Cardiff, Development of the Finite Volume Method for Hip Joint Stress
     Analysis, PhD thesis, University College Dublin, 2012.
 
+    I. Batistić, P. Cardiff, A. Ivanković, and Ž. Tuković. A finite volume
+    penalty‐based implicit procedure for the treatment of the frictionless
+    contact boundaries. International Journal for Numerical Methods in
+    Engineering, vol. 124, no. 18, pp. 4171-4191, Sep. 2023.
+
+    I. Batistić, P. Cardiff, and Ž. Tuković. A finite volume penalty based
+    segment-to-segment method for frictional contact problems. Applied
+    Mathematical Modelling, vol. 101, pp. 673-693, Jan. 2022.
+
 
 SourceFiles
     solidContactFvPatchVectorField.C
     solidContactFvPatchVectorFieldCalcContact.C
 
 Author
-    Philip Cardiff, UCD. All rights reserved.
-    Rewrite by Hrvoje Jasak.
+    Philip Cardiff
+    Ivan Batistic
+    Zeljko Tukovic
+    Hrvoje Jasak
 
 \*---------------------------------------------------------------------------*/
 

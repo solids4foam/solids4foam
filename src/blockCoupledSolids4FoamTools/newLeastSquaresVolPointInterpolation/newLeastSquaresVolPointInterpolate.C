@@ -26,10 +26,12 @@ License
 #include "processorPolyPatch.H"
 #include "transform.H"
 #include "fixedValuePointPatchFields.H"
+#include "symmetryPointPatchFields.H"
 
 #ifdef FOAMEXTEND
     #include "cyclicGgiPolyPatch.H"
     #include "cyclicGgiFvPatchFields.H"
+    // #include "SymmetryPointPatchField.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -623,7 +625,7 @@ void newLeastSquaresVolPointInterpolation::interpolate
           + coeffs[2]*dr.z();
     }
 
-    // ZT: Correct only fixedValue patches
+    // ZT: Correct only fixedValue and symmetry patches
     // (for example, processor patches should already be sinchronized)
     // pf.correctBoundaryConditions();
     forAll(pf.boundaryField(), patchI)
@@ -652,7 +654,33 @@ void newLeastSquaresVolPointInterpolation::interpolate
         {
             pf.boundaryField()[patchI].initEvaluate();
         }
+        else if
+        (
+            isA
+            <
+#ifdef OPENFOAM_NOT_EXTEND
+                symmetryPointPatchField<Type>
+#else
+                SymmetryPointPatchField
+                <
+                    pointPatchField,
+                    pointMesh,
+                    pointPatch,
+                    pointPatch,
+                    DummyMatrix,
+                    Type
+                >
+#endif
+            >
+            (
+                pf.boundaryField()[patchI]
+            )
+        )
+        {
+            pf.boundaryField()[patchI].initEvaluate();
+        }
     }
+
     forAll(pf.boundaryField(), patchI)
     {
         if
@@ -666,6 +694,31 @@ void newLeastSquaresVolPointInterpolation::interpolate
                 <
                     pointPatchField,
                     pointMesh,
+                    pointPatch,
+                    DummyMatrix,
+                    Type
+                >
+#endif
+            >
+            (
+                pf.boundaryField()[patchI]
+            )
+        )
+        {
+            pf.boundaryField()[patchI].evaluate();
+        }
+        else if
+        (
+            isA
+            <
+#ifdef OPENFOAM_NOT_EXTEND
+                symmetryPointPatchField<Type>
+#else
+                SymmetryPointPatchField
+                <
+                    pointPatchField,
+                    pointMesh,
+                    pointPatch,
                     pointPatch,
                     DummyMatrix,
                     Type
