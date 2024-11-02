@@ -147,6 +147,13 @@ public:
                 Time&,
                 dimensionedScalar&,
                 dimensionedScalar
+            );            
+            
+            void pesudoTime
+            (
+                Time&,
+                dimensionedScalar&,
+                dimensionedScalar
             );
 
         // Output

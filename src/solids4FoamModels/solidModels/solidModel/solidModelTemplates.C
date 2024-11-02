@@ -205,12 +205,22 @@ bool Foam::solidModel::fieldConverged
     // - material model residual
     bool fieldConverged = false;
 
+    scalar sumResP = 0.0;
+         scalar resP = 0.0;
+    
+            forAll(vf, i)
+            {
+                sumResP += magSqr(vf[i] - vf.prevIter()[i]);
+            }
+            resP = std::sqrt((sumResP) / vf.size());
+
+
     // Calculate displacement residual based on the relative change of vf
     scalar denom = 0.0;
 
     // Denom is displacement increment
     if (incremental())
-    {
+     {
         // Incremental approach
         denom = gMax
         (
@@ -226,6 +236,7 @@ bool Foam::solidModel::fieldConverged
     }
     else
     {
+        
         // Total appraoch
         denom = gMax
         (
@@ -239,11 +250,12 @@ bool Foam::solidModel::fieldConverged
             )
         );
     }
-    Info << " denom" <<denom <<endl;
 
     if (denom < SMALL)
     {
-        denom = max
+
+        denom = 
+        max
         (
             gMax
             (
@@ -256,7 +268,7 @@ bool Foam::solidModel::fieldConverged
             SMALL
         );
     }
-    const scalar residualvf =
+     scalar residualvf =
         gMax
         (
 #ifdef OPENFOAM_NOT_EXTEND
@@ -268,7 +280,7 @@ bool Foam::solidModel::fieldConverged
             mag(vf.internalField() - vf.oldTime().internalField())
 #endif
         )/denom;
-
+    residualvf = resP;
     Info << " residualvf = " <<residualvf <<endl;
 
 

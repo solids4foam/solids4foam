@@ -197,6 +197,29 @@ void mechanics::time
         << "Time = " << runTime.timeName() << " s" << endl;
 }
 
+void mechanics::pesudoTime
+(
+    Time& runTime,
+    dimensionedScalar& deltaT,
+    dimensionedScalar Up_time
+)
+{
+    const dimensionedScalar& h = op.minimumEdgeLength();
+
+    if (timeStepping_ == "variable")
+    {
+        deltaT = (cfl_*h)/Up_time;
+        runTime.setDeltaT(deltaT);
+    }
+
+    // runTime++;
+    tStep_++;
+
+    Info<< "\nTime step =" << tStep_ << nl
+        << "Time increment = " << runTime.deltaTValue() << " s" << nl
+        << "Time = " << runTime.timeName() << " s" << endl;
+}
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

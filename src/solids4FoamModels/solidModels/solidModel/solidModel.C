@@ -1771,6 +1771,9 @@ void Foam::solidModel::setTraction
 
         patchTraction.traction() = traction;
 
+    }
+    else if (tractionPatch.type() == explicitSolidTractionLinearMomentumFvPatchVectorField::typeName)
+    {
         explicitSolidTractionLinearMomentumFvPatchVectorField& patchLinearMomentum =
             refCast<explicitSolidTractionLinearMomentumFvPatchVectorField>(tractionPatch);
 
@@ -1823,6 +1826,21 @@ void Foam::solidModel::setTraction
     (
         globalPatches()[interfaceI].globalFaceToPatch(faceZoneTraction)
     );
+
+    if(type_ == "explicitGodunovCC")
+    {
+        // Info << "interfaceI: "<< interfaceI << nl
+        // << "patchID: "<< patchID << nl
+        // << "patchTraction: "<< patchTraction << endl;
+
+            volVectorField& lm_b = mesh().lookupObjectRef<volVectorField>("lm_b");
+            volVectorField& t_b = mesh().lookupObjectRef<volVectorField>("t_b");
+
+            setTraction(lm_b.boundaryFieldRef()[patchID], patchTraction);
+            setTraction(t_b.boundaryFieldRef()[patchID], patchTraction);
+    }
+
+
 
 #ifdef OPENFOAM_NOT_EXTEND
     setTraction(solutionD().boundaryFieldRef()[patchID], patchTraction);

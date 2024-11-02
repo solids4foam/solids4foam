@@ -55,13 +55,15 @@ void explicitGodunovCCSolid::updateStress()
     // Calculate the stress using run-time selectable mechanical law
     // mechanical().correct(sigma());
     sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
-    // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
+    // // Interpolate cell displacements to vertices
+    // mechanical().interpolate(D(), pointD());
+
+    mechanical().interpolate(D(), gradD(), pointD());
 
     // Increment of displacement
     DD() = D() - D().oldTime();
     
-    // Increment of point displacement
+    // // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();
 }
 
@@ -140,11 +142,11 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     magSf_(mesh().magSf()),
     Sf_(mesh().Sf()),
     h_(op_.minimumEdgeLength()),
-    bm_(mesh().boundaryMesh()),
-    symmetricPatchID_(bm_.findPatchID("symmetric")),
-    symmetricXpatchID_(bm_.findPatchID("symmetricX")),
-    symmetricYpatchID_(bm_.findPatchID("symmetricY")),
-    symmetricZpatchID_(bm_.findPatchID("symmetricZ")),
+    // bm_(mesh().boundaryMesh()),
+    // symmetricPatchID_(bm_.findPatchID("symmetric")),
+    // symmetricXpatchID_(bm_.findPatchID("symmetricX")),
+    // symmetricYpatchID_(bm_.findPatchID("symmetricY")),
+    // symmetricZpatchID_(bm_.findPatchID("symmetricZ")),
 
     // Creating mesh coordinate fields 
     C_(mesh().C()),
@@ -203,6 +205,19 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
         mesh(),
         tensor::I
     ),
+    lm_k_
+    (
+        IOobject("lm_k", mesh()),
+        mesh(),
+        vector::zero
+    ),
+    F_k_
+    (
+        IOobject("F_k", mesh()),
+        mesh(),
+        tensor::I
+    ),
+
     H_
     (
         IOobject("H", mesh()),
@@ -399,6 +414,12 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     RKstages_[0] = 0;
     RKstages_[1] = 1;
 
+    // symmetricPatchID_ = bm_.findPatchID("symmetric");
+    // symmetricXpatchID_ = bm_.findPatchID("symmetricX");
+    // symmetricYpatchID_ = bm_.findPatchID("symmetricY");
+    // symmetricZpatchID_ = bm_.findPatchID("symmetricZ");
+   
+
     Info << "Printing data ..." << endl;
 
     // Print material properties
@@ -414,6 +435,7 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     D().oldTime();
     DD().oldTime();
     gradD().oldTime();
+    pointD().oldTime();
 
 
     lm_.oldTime();
@@ -502,33 +524,33 @@ bool explicitGodunovCCSolid::evolve()
         scalar resP = std::sqrt((sumResP) / lm_.size());
         Info << "reseduals p = "<< resP <<endl;
 
-        if ( resP < tolerance)
-        {
-            Info << "Converged after " << runTime().timeName() << " iterations." << endl;
-            break;  // Exit the time loop
-        }
+        // if ( resP < tolerance)
+        // {
+        //     Info << "Converged after " << runTime().timeName() << " iterations." << endl;
+        //     break;  // Exit the time loop
+        // }
                 
             U() = lm_/rho_;
             
-            // Compute displacement
+            // // Compute displacement
             D() = D().oldTime() + deltaT_*U();
 
-            // Enforce boundary conditions on the displacement field
+            // // Enforce boundary conditions on the displacement field
             D().correctBoundaryConditions();
 
-            // Update the stress field based on the latest D field
+            // // Update the stress field based on the latest D field
             updateStress();
 
-            if(fieldConverged
-                (
-                    iCorr,
-                    lm_
-                )
-                && ++iCorr < nCorr()
-            )
-            {
-                Info<<" solution converged"<<endl;
-            }
+            // if(fieldConverged
+            //     (
+            //         iCorr,
+            //         lm_
+            //     )
+            //     && ++iCorr < nCorr()
+            // )
+            // {
+            //     Info<<" solution converged"<<endl;
+            // }
 
 
             

@@ -1,5 +1,13 @@
 // Strong boundary conditions for nodal linear momentum
 
+
+// Boundary patches
+const polyBoundaryMesh& bm = mesh().boundaryMesh();
+const label& symmetricPatchID_ = bm.findPatchID("symmetric");
+const label& symmetricXpatchID_ = bm.findPatchID("symmetricX");
+const label& symmetricYpatchID_ = bm.findPatchID("symmetricY");
+const label& symmetricZpatchID_ = bm.findPatchID("symmetricZ");
+
 // Symmetric boundary patch
 if (symmetricPatchID_ != -1)
 {

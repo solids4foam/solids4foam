@@ -125,11 +125,11 @@ class explicitGodunovCCSolid
     const dimensionedScalar h_;
 
     // Boundary patches
-    const polyBoundaryMesh& bm_;
-    const label& symmetricPatchID_;
-    const label& symmetricXpatchID_;
-    const label& symmetricYpatchID_;
-    const label& symmetricZpatchID_;
+    // const polyBoundaryMesh& bm_;
+    // const label& symmetricPatchID_;
+    // const label& symmetricXpatchID_;
+    // const label& symmetricYpatchID_;
+    // const label& symmetricZpatchID_;
    
     //Creating mesh coordinate fields
 
@@ -167,6 +167,11 @@ class explicitGodunovCCSolid
 
     // Deformation gradient tensor
     volTensorField F_;
+
+    // Cell linear momentum (pesudo)
+    volVectorField lm_k_;
+    // Deformation gradient tensor  (pesudo)
+    volTensorField F_k_;
 
     // Cofactor of deformation
     volTensorField H_;
@@ -300,7 +305,8 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            return nonLinearGeometry::LINEAR_GEOMETRY;
+            return nonLinearGeometry::TOTAL_LAGRANGIAN;
+            // return nonLinearGeometry::LINEAR_GEOMETRY;
         }
 
 
