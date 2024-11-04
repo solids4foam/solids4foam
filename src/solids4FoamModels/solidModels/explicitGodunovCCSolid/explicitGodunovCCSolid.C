@@ -156,6 +156,11 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
         IOobject("x", mesh()),
         C_
     ),
+    X_
+    (
+        IOobject("X", mesh()),
+        C_
+    ),
 
     xN_
     (
@@ -209,7 +214,7 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     (
         IOobject("lm_k", mesh()),
         mesh(),
-        vector::zero
+         dimensionedVector("lm_k", dimensionSet(1,-2,-1,0,0,0,0), vector::zero)
     ),
     F_k_
     (
@@ -217,6 +222,21 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
         mesh(),
         tensor::I
     ),
+
+    x_k_
+    (
+        IOobject("x_k", mesh()),
+        C_
+    ),
+
+    xN_k_
+    (
+        IOobject("xN_k", mesh()),
+        pMesh(),
+        dimensionedVector("xN_k", dimensionSet(0,1,0,0,0,0,0), vector::zero)
+    ),
+       
+    xF_k_(mesh().Cf()),
 
     H_
     (
@@ -385,6 +405,12 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
         dimTime, 
         runTime.deltaTValue()
     ),
+    // Time increment 
+    pDeltaT_(
+        "pDeltaT", 
+        dimTime, 
+        runTime.deltaTValue()
+    ),
 
     // Runge-Kutta stage
     RKstages_(2)
@@ -438,13 +464,24 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     pointD().oldTime();
 
 
-    lm_.oldTime();
-    F_.oldTime();
+    lm_.oldTime().oldTime();
+    F_.oldTime().oldTime();
     x_.oldTime();
     xF_.oldTime();
     xN_.oldTime();
 
     DisRequired();
+
+    // Force all required old-time fields to be created
+    fvm::d2dt2(D());
+
+    // For consistent restarts, we will calculate the gradient field
+    D().correctBoundaryConditions();
+    D().storePrevIter();
+    mechanical().grad(D(), gradD());
+
+
+
 
     // Set the printInfo
     physicsModel::printInfo() = bool
@@ -475,12 +512,11 @@ bool explicitGodunovCCSolid::evolve()
     {
         int iCorr = 0;
 
-
         if (physicsModel::printInfo())
         {
             Info<< "Evolving solid solver form explicitGodunovCCSolid" << endl;
         }
-
+        
             forAll(RKstages_, stage)
             {
                 #include "gEqns.H"
@@ -496,19 +532,27 @@ bool explicitGodunovCCSolid::evolve()
             x_ = 0.5*(x_.oldTime() + x_);
             xF_ = 0.5*(xF_.oldTime() + xF_);
             xN_ = 0.5*(xN_.oldTime() + xN_);
+            D() = 0.5*( D().oldTime() +  D());
+            
 
             #include "updateVariables.H"
 
+            // D() = x_ - X_;
+            
+            // D().correctBoundaryConditions(); 
+            
+            uN_ = xN_ - XN_;    
+            pointD() = uN_;  
 
-                if (runTime_.outputTime())
-                {
-                    uN_ = xN_ - XN_;
-                    uN_.write();
+        
+            if (runTime_.outputTime())
+            {
+                uN_.write();
 
-                    p_ = model_.pressure();
-                    p_.write();
-                    P_.write();
-                }
+                p_ = model_.pressure();
+                p_.write();
+                P_.write();
+            }
 
        // Compute and check residuals
         // Define tolerance for residuals
@@ -519,40 +563,17 @@ bool explicitGodunovCCSolid::evolve()
         {
             sumResP += magSqr(lm_[i] - lm_.oldTime()[i]);
         }
-         Info << "reseduals sumResP = "<< sumResP <<endl;
 
         scalar resP = std::sqrt((sumResP) / lm_.size());
         Info << "reseduals p = "<< resP <<endl;
 
-        // if ( resP < tolerance)
-        // {
-        //     Info << "Converged after " << runTime().timeName() << " iterations." << endl;
-        //     break;  // Exit the time loop
-        // }
-                
-            U() = lm_/rho_;
-            
-            // // Compute displacement
-            D() = D().oldTime() + deltaT_*U();
+    // Update the stress field based on the latest D field
+    DD() = D() - D().oldTime();
 
-            // // Enforce boundary conditions on the displacement field
-            D().correctBoundaryConditions();
+    sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
 
-            // // Update the stress field based on the latest D field
-            updateStress();
-
-            // if(fieldConverged
-            //     (
-            //         iCorr,
-            //         lm_
-            //     )
-            //     && ++iCorr < nCorr()
-            // )
-            // {
-            //     Info<<" solution converged"<<endl;
-            // }
-
-
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
             
 
     }

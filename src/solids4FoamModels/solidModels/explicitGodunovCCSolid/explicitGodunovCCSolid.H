@@ -138,6 +138,8 @@ class explicitGodunovCCSolid
 
     // Spatial cell center coordinates
     volVectorField x_;
+    // material cell center coordinates
+    const volVectorField X_;
 
     // Spatial nodal coordinates
     pointVectorField xN_;
@@ -172,6 +174,16 @@ class explicitGodunovCCSolid
     volVectorField lm_k_;
     // Deformation gradient tensor  (pesudo)
     volTensorField F_k_;
+
+        // Spatial cell center coordinates
+    volVectorField x_k_;
+
+    // Spatial nodal coordinates
+    pointVectorField xN_k_;
+
+    // Spatial face center coordinates
+    surfaceVectorField xF_k_;
+
 
     // Cofactor of deformation
     volTensorField H_;
@@ -280,6 +292,8 @@ class explicitGodunovCCSolid
     //Creating variables for time 
     // Time increment
     dimensionedScalar deltaT_;
+    // Time increment (pesudo)
+    dimensionedScalar pDeltaT_;
 
     // Runge-Kutta stage
     scalarList RKstages_;
@@ -305,8 +319,8 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            return nonLinearGeometry::TOTAL_LAGRANGIAN;
-            // return nonLinearGeometry::LINEAR_GEOMETRY;
+            // return nonLinearGeometry::TOTAL_LAGRANGIAN;
+            return nonLinearGeometry::LINEAR_GEOMETRY;
         }
 
 

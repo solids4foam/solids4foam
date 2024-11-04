@@ -89,6 +89,13 @@ mechanics::mechanics
     cfl_(readScalar(dict.lookup("cfl"))),
 
     tStep_(0),
+   
+    tpdeltaT_
+    (
+        "tpdeltaT_", 
+        dimTime, 
+        1e-5
+    ),
 
     stretch_
     (
@@ -206,18 +213,20 @@ void mechanics::pesudoTime
 {
     const dimensionedScalar& h = op.minimumEdgeLength();
 
+
     if (timeStepping_ == "variable")
     {
         deltaT = (cfl_*h)/Up_time;
-        runTime.setDeltaT(deltaT);
+        // runTime.setDeltaT(deltaT);
     }
-
+    // deltaT =tpdeltaT_;
     // runTime++;
-    tStep_++;
+    pesudoTimeStep_++;
 
-    Info<< "\nTime step =" << tStep_ << nl
-        << "Time increment = " << runTime.deltaTValue() << " s" << nl
-        << "Time = " << runTime.timeName() << " s" << endl;
+
+    Info<< "\nPesudo Time step =" << pesudoTimeStep_ << nl
+        << "Pesudo Time increment = " << deltaT.value()<< " s" << endl;
+
 }
 
 

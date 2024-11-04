@@ -12,6 +12,10 @@ x_ += deltaT_*(lm_/rho_);
 xF_ += deltaT_*(lmC_/rho_);
 xN_ += deltaT_*(lmN_/rho_);
 
+D() += deltaT_ *(lm_/rho_);// -  pDeltaT_* ( (D().prevIter() - D().oldTime())/(deltaT_));
+D().correctBoundaryConditions();
+
+
 lm_ += deltaT_*rhsLm_ - deltaT_*dampingCoeff_*lm_;
 
 // Update deformation gradient tensor

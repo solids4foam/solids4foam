@@ -73,7 +73,10 @@ class mechanics
 
         //- Time step
         scalar tStep_;
-
+        
+        //- Pesudo Time step 
+        scalar pesudoTimeStep_;
+        dimensionedScalar  tpdeltaT_;
         //- Stretch
         volScalarField stretch_;
 
@@ -126,6 +129,11 @@ public:
             const volScalarField stretch() const
             {
                 return stretch_;
+            }
+           
+            scalar& pesudoTimeStep() 
+            {
+                return pesudoTimeStep_;
             }
 
         // Edit
