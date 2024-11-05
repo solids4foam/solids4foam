@@ -281,7 +281,6 @@ bool Foam::solidModel::fieldConverged
 #endif
         )/denom;
     residualvf = resP;
-    Info << " residualvf = " <<residualvf <<endl;
 
 
     // If one of the residuals has converged to an order of magnitude

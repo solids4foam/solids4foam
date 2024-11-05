@@ -499,7 +499,8 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
 
 void explicitGodunovCCSolid::setDeltaT(Time& runTime)
 {
-     mech_.time(runTime_, deltaT_, max(Up_time_));
+    //  mech_.time(runTime_, deltaT_, max(Up_time_));
+    Info<< " setDeltaT solid "<<endl;
 
 }
 
@@ -511,12 +512,26 @@ bool explicitGodunovCCSolid::evolve()
     do
     {
         int iCorr = 0;
+        mech_.pesudoTimeStep() = 0;
+        
 
         if (physicsModel::printInfo())
         {
             Info<< "Evolving solid solver form explicitGodunovCCSolid" << endl;
         }
         
+        // Momentum equation loop
+        do
+        {
+            F_.storePrevIter();
+            lm_.storePrevIter();
+            x_.storePrevIter();
+            xN_.storePrevIter();
+            xF_.storePrevIter();
+            D().storePrevIter();
+
+            mech_.pesudoTime(runTime_, pDeltaT_, max(Up_time_));
+
             forAll(RKstages_, stage)
             {
                 #include "gEqns.H"
@@ -527,20 +542,17 @@ bool explicitGodunovCCSolid::evolve()
                 }
             }
 
-            lm_ = 0.5*(lm_.oldTime() + lm_);
-            F_ = 0.5*(F_.oldTime() + F_);
-            x_ = 0.5*(x_.oldTime() + x_);
-            xF_ = 0.5*(xF_.oldTime() + xF_);
-            xN_ = 0.5*(xN_.oldTime() + xN_);
-            D() = 0.5*( D().oldTime() +  D());
+            lm_ = 0.5*(lm_.prevIter() + lm_);
+            F_ = 0.5*(F_.prevIter() + F_);
+            x_ = 0.5*(x_.prevIter() + x_);
+            xF_ = 0.5*(xF_.prevIter() + xF_);
+            xN_ = 0.5*(xN_.prevIter() + xN_);
+            D() = 0.5*( D().prevIter() +  D());
             
 
             #include "updateVariables.H"
 
-            // D() = x_ - X_;
-            
-            // D().correctBoundaryConditions(); 
-            
+
             uN_ = xN_ - XN_;    
             pointD() = uN_;  
 
@@ -556,25 +568,37 @@ bool explicitGodunovCCSolid::evolve()
 
        // Compute and check residuals
         // Define tolerance for residuals
-        scalar tolerance = 1e-5;
-        scalar sumResP = 0.0;
+        // scalar tolerance = 1e-5;
+        // scalar sumResP = 0.0;
 
-        forAll(lm_, i)
-        {
-            sumResP += magSqr(lm_[i] - lm_.oldTime()[i]);
+        // forAll(lm_, i)
+        // {
+        //     sumResP += magSqr(lm_[i] - lm_.prevIter()[i]);
+        // }
+
+        // scalar resP = std::sqrt((sumResP) / lm_.size());
+        // Info << "reseduals p = "<< resP <<endl;
+
         }
+        while
+        (
+            !fieldConverged
+                (
+                    iCorr,
+                    lm_
+                )
+         && ++iCorr < nCorr()
+        );
 
-        scalar resP = std::sqrt((sumResP) / lm_.size());
-        Info << "reseduals p = "<< resP <<endl;
 
-    // Update the stress field based on the latest D field
-    DD() = D() - D().oldTime();
+        // Update the stress field based on the latest D field
+        DD() = D() - D().oldTime();
 
-    sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
+        sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
 
-    // Increment of point displacement
-    pointDD() = pointD() - pointD().oldTime();
-            
+        // Increment of point displacement
+        pointDD() = pointD() - pointD().oldTime();
+                
 
     }
     while (mesh().update());

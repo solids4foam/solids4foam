@@ -199,9 +199,9 @@ void mechanics::time
     // runTime++;
     tStep_++;
 
-    Info<< "\nTime step =" << tStep_ << nl
-        << "Time increment = " << runTime.deltaTValue() << " s" << nl
-        << "Time = " << runTime.timeName() << " s" << endl;
+    // Info<< "\nTime step =" << tStep_ << nl
+    //     << "Time increment = " << runTime.deltaTValue() << " s" << nl
+    //     << "Time = " << runTime.timeName() << " s" << endl;
 }
 
 void mechanics::pesudoTime
@@ -224,8 +224,8 @@ void mechanics::pesudoTime
     pesudoTimeStep_++;
 
 
-    Info<< "\nPesudo Time step =" << pesudoTimeStep_ << nl
-        << "Pesudo Time increment = " << deltaT.value()<< " s" << endl;
+    // Info<< "\nPesudo Time step =" << pesudoTimeStep_ << nl
+    //     << "Pesudo Time increment = " << deltaT.value()<< " s" << endl;
 
 }
 

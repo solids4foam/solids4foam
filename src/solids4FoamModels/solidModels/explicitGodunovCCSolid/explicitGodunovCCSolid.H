@@ -123,14 +123,7 @@ class explicitGodunovCCSolid
     
     // Minimum edge length
     const dimensionedScalar h_;
-
-    // Boundary patches
-    // const polyBoundaryMesh& bm_;
-    // const label& symmetricPatchID_;
-    // const label& symmetricXpatchID_;
-    // const label& symmetricYpatchID_;
-    // const label& symmetricZpatchID_;
-   
+  
     //Creating mesh coordinate fields
 
     // Material cell center coordinates
