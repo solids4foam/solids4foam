@@ -195,6 +195,10 @@ void mechanics::time
         deltaT = (cfl_*h)/Up_time;
         runTime.setDeltaT(deltaT);
     }
+    else
+    {
+        deltaT = runTime.deltaT();
+    }
 
     // runTime++;
     tStep_++;

@@ -210,33 +210,6 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
         mesh(),
         tensor::I
     ),
-    lm_k_
-    (
-        IOobject("lm_k", mesh()),
-        mesh(),
-         dimensionedVector("lm_k", dimensionSet(1,-2,-1,0,0,0,0), vector::zero)
-    ),
-    F_k_
-    (
-        IOobject("F_k", mesh()),
-        mesh(),
-        tensor::I
-    ),
-
-    x_k_
-    (
-        IOobject("x_k", mesh()),
-        C_
-    ),
-
-    xN_k_
-    (
-        IOobject("xN_k", mesh()),
-        pMesh(),
-        dimensionedVector("xN_k", dimensionSet(0,1,0,0,0,0,0), vector::zero)
-    ),
-       
-    xF_k_(mesh().Cf()),
 
     H_
     (
@@ -440,11 +413,6 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     RKstages_[0] = 0;
     RKstages_[1] = 1;
 
-    // symmetricPatchID_ = bm_.findPatchID("symmetric");
-    // symmetricXpatchID_ = bm_.findPatchID("symmetricX");
-    // symmetricYpatchID_ = bm_.findPatchID("symmetricY");
-    // symmetricZpatchID_ = bm_.findPatchID("symmetricZ");
-   
 
     Info << "Printing data ..." << endl;
 
@@ -458,28 +426,17 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     mech_.printCentroid();
     #include "updateVariables.H"   
     #include "riemannSolver.H"
-    D().oldTime();
-    DD().oldTime();
-    gradD().oldTime();
+
     pointD().oldTime();
 
 
     lm_.oldTime().oldTime();
     F_.oldTime().oldTime();
-    x_.oldTime();
-    xF_.oldTime();
+    // x_.oldTime();
+    // xF_.oldTime();
     xN_.oldTime();
 
     DisRequired();
-
-    // Force all required old-time fields to be created
-    fvm::d2dt2(D());
-
-    // For consistent restarts, we will calculate the gradient field
-    D().correctBoundaryConditions();
-    D().storePrevIter();
-    mechanical().grad(D(), gradD());
-
 
 
 
@@ -499,8 +456,7 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
 
 void explicitGodunovCCSolid::setDeltaT(Time& runTime)
 {
-    //  mech_.time(runTime_, deltaT_, max(Up_time_));
-    Info<< " setDeltaT solid "<<endl;
+     mech_.time(runTime_, deltaT_, max(Up_time_));
 
 }
 
@@ -525,10 +481,9 @@ bool explicitGodunovCCSolid::evolve()
         {
             F_.storePrevIter();
             lm_.storePrevIter();
-            x_.storePrevIter();
+            // x_.storePrevIter();
             xN_.storePrevIter();
-            xF_.storePrevIter();
-            D().storePrevIter();
+            // xF_.storePrevIter();
 
             mech_.pesudoTime(runTime_, pDeltaT_, max(Up_time_));
 
@@ -544,40 +499,13 @@ bool explicitGodunovCCSolid::evolve()
 
             lm_ = 0.5*(lm_.prevIter() + lm_);
             F_ = 0.5*(F_.prevIter() + F_);
-            x_ = 0.5*(x_.prevIter() + x_);
-            xF_ = 0.5*(xF_.prevIter() + xF_);
-            xN_ = 0.5*(xN_.prevIter() + xN_);
-            D() = 0.5*( D().prevIter() +  D());
-            
+            // x_ = 0.5*(x_.prevIter() + x_);
+            // xF_ = 0.5*(xF_.prevIter() + xF_);
+            xN_ = 0.5*(xN_.prevIter() + xN_);            
 
             #include "updateVariables.H"
 
-
-            uN_ = xN_ - XN_;    
-            pointD() = uN_;  
-
-        
-            if (runTime_.outputTime())
-            {
-                uN_.write();
-
-                p_ = model_.pressure();
-                p_.write();
-                P_.write();
-            }
-
-       // Compute and check residuals
-        // Define tolerance for residuals
-        // scalar tolerance = 1e-5;
-        // scalar sumResP = 0.0;
-
-        // forAll(lm_, i)
-        // {
-        //     sumResP += magSqr(lm_[i] - lm_.prevIter()[i]);
-        // }
-
-        // scalar resP = std::sqrt((sumResP) / lm_.size());
-        // Info << "reseduals p = "<< resP <<endl;
+            pointD() = xN_ - XN_;
 
         }
         while
@@ -592,7 +520,7 @@ bool explicitGodunovCCSolid::evolve()
 
 
         // Update the stress field based on the latest D field
-        DD() = D() - D().oldTime();
+        // DD() = D() - D().oldTime();
 
         sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
 

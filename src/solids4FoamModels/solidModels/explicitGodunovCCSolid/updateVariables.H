@@ -29,7 +29,7 @@ S_t_ = mech_.Smatrix_t();
 lmR_ = interpolate_.surfaceToVol(lmC_);
 lmRgrad_ = grad_.localGradient(lmR_, lmC_);
 interpolate_.volToPoint(lmR_, lmRgrad_, lmN_);
-#include "strongBCs.H" //! some problem with the deffention here
+#include "strongBCs.H" 
 lmN_.correctBoundaryConditions();
 
 // Constrained fluxes

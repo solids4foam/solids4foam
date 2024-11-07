@@ -163,21 +163,6 @@ class explicitGodunovCCSolid
     // Deformation gradient tensor
     volTensorField F_;
 
-    // Cell linear momentum (pesudo)
-    volVectorField lm_k_;
-    // Deformation gradient tensor  (pesudo)
-    volTensorField F_k_;
-
-        // Spatial cell center coordinates
-    volVectorField x_k_;
-
-    // Spatial nodal coordinates
-    pointVectorField xN_k_;
-
-    // Spatial face center coordinates
-    surfaceVectorField xF_k_;
-
-
     // Cofactor of deformation
     volTensorField H_;
 
@@ -312,8 +297,8 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            // return nonLinearGeometry::TOTAL_LAGRANGIAN;
-            return nonLinearGeometry::LINEAR_GEOMETRY;
+            return nonLinearGeometry::TOTAL_LAGRANGIAN;
+            // return nonLinearGeometry::LINEAR_GEOMETRY;
         }
 
 

@@ -168,28 +168,29 @@ void gradientSchemes::distanceMatrixLocal
             vector d = XF_.boundaryField()[patchID][facei] - X_[bCellID];
             dCd[bCellID] += d*d;
 
-            if (lmN_.boundaryField().types()[patchID] == "fixedValue")
-            {
-                const label& faceID =
-                    mesh_.boundary()[patchID].start() + facei;
+            //! requiers to ignor when an empty BCs is specifide.
+            // if (lmN_.boundaryField().types()[patchID] == "fixedValue")
+            // {
+            //     const label& faceID =
+            //         mesh_.boundary()[patchID].start() + facei;
 
-                forAll(mesh_.faces()[faceID], nodei)
-                {
-                    const label& nodeID = mesh_.faces()[faceID][nodei];
+            //     forAll(mesh_.faces()[faceID], nodei)
+            //     {
+            //         const label& nodeID = mesh_.faces()[faceID][nodei];
 
-                    d = XN_[nodeID] - X_[bCellID];
-                    dCd[bCellID] += d * d;
+            //         d = XN_[nodeID] - X_[bCellID];
+            //         dCd[bCellID] += d * d;
 
-                    for (int i=0; i<7; i++)
-                    {
-                        d =
-                            ((((i+1)*XN_[nodeID])
-                          + ((7 - i)*XF_.boundaryField()[patchID][facei]))/8.0)
-                          - X_[bCellID];
-                        dCd[bCellID] += d * d;
-                    }
-                }
-            }
+            //         for (int i=0; i<7; i++)
+            //         {
+            //             d =
+            //                 ((((i+1)*XN_[nodeID])
+            //               + ((7 - i)*XF_.boundaryField()[patchID][facei]))/8.0)
+            //               - X_[bCellID];
+            //             dCd[bCellID] += d * d;
+            //         }
+            //     }
+            // }
         }
     }
 
@@ -462,6 +463,12 @@ volTensorField gradientSchemes::localGradient
 
     forAll(mesh_.boundary(), patchID)
     {
+        // Check if the boundary patch is of type "empty"
+        if (mesh_.boundary()[patchID].type() == "empty")
+        {
+            continue;
+        }
+
         forAll(mesh_.boundary()[patchID], facei)
         {
             const label& bCellID =
@@ -560,6 +567,12 @@ void gradientSchemes::reconstruct
 
     forAll(mesh_.boundary(), patchID)
     {
+        // Check if the boundary patch is of type "empty"
+        if (mesh_.boundary()[patchID].type() == "empty")
+        {
+            continue;
+        }
+
         forAll(mesh_.boundaryMesh()[patchID],facei)
         {
             const label& bCellID =
@@ -598,6 +611,12 @@ void gradientSchemes::reconstruct
 
     forAll(mesh_.boundary(), patchID)
     {
+        // Check if the boundary patch is of type "empty"
+        if (mesh_.boundary()[patchID].type() == "empty")
+        {
+            continue;
+        }
+
         forAll(mesh_.boundaryMesh()[patchID], facei)
         {
             const label& bCellID =
@@ -684,6 +703,12 @@ void gradientSchemes::reconstruct
 
     forAll(mesh_.boundary(), patchID)
     {
+        // Check if the boundary patch is of type "empty"
+        if (mesh_.boundary()[patchID].type() == "empty")
+        {
+            continue;
+        }
+
         forAll(mesh_.boundaryMesh()[patchID], facei)
         {
             const label& bCellID =
