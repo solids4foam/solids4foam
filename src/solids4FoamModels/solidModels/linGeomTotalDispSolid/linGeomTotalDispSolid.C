@@ -204,7 +204,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             //          higher values of condition number at structured mesh
 
             const label maxStencilSize = 70;
-            const label nLayers = 4;
+            const label nLayers = 2;
             const labelListList& cellCells = mesh().cellCells();
 
             List<DynamicList<label>> lsStencil(mesh().nCells());
@@ -276,7 +276,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             //
 
             // Order of interpolation
-            const label N = 2;
+            const label N = 1;
 
             // Number of terms in Taylor expression
             // 1 for zero order, 4 for 1 order, 10 for second order
@@ -305,6 +305,32 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             List<DynamicList<scalar>> cy(mesh().nCells());
             List<DynamicList<scalar>> cz(mesh().nCells());
 
+            // Cell boundary faces global index
+            List<DynamicList<label>> cellBoundaryFaces(mesh().nCells());
+
+            const polyBoundaryMesh& boundaryMesh = mesh().boundaryMesh();
+
+            forAll(boundaryMesh, patchI)
+            {
+                if (boundaryMesh[patchI].type() != emptyPolyPatch::typeName)
+                {
+                    const labelUList& faceCells = boundaryMesh[patchI].faceCells();
+
+                    forAll(faceCells, faceI)
+                    {
+                        const label cellID = faceCells[faceI];
+                        const label gI = faceI+boundaryMesh[patchI].start();
+                        cellBoundaryFaces[cellID].append(gI);
+                    }
+                }
+            }
+
+            forAll(cellBoundaryFaces, cellI)
+            {
+                cellBoundaryFaces[cellI].shrink();
+            }
+
+
             forAll(lsStencil, cellI)
             {
                 DynamicList<label>& curStencil = lsStencil[cellI];
@@ -322,7 +348,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 }
 
                 // Loop over neighbours and construct matrix Q
-                const label Nn = curStencil.size();
+                const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
 
                 // For now I will use matrix format from Eigen/Dense library
                 Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(Np, Nn);
@@ -338,13 +364,28 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 
                 // Loop over cells in stencil, each cell have its corresponding
                 // row in Q matrix
-                forAll(curStencil, cI)
+                for(label cI=0; cI<Nn; cI++)
+                //forAll(curStencil, cI)
                 {
-                    const label neiCellID = curStencil[cI];
-                    const vector neiC = mesh().C()[neiCellID];
+                    vector neiC = vector::zero;
+
+                    if (cI < curStencil.size())
+                    {
+                        const label neiCellID = curStencil[cI];
+                        neiC = mesh().C()[neiCellID];
+                    }
+                    else
+                    {
+                        // For boundary cells we need to add boundary face as
+                        // neigbour
+                        const label i = cI-curStencil.size();
+                        const label globalFaceID = cellBoundaryFaces[cellI][i];
+                        neiC = mesh().Cf()[globalFaceID];
+                    }
+
                     const vector C = mesh().C()[cellI];
 
-                    // Add linear interpolation part
+                    // Add linear interpolation part N=1
                     if ( N > 0 )
                     {
                         Q(0, cI) = 1;
@@ -352,7 +393,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                         Q(2, cI) = neiC.y() - C.y();
                         Q(3, cI) = neiC.z() - C.z();
                     }
-                    // Add quadratic interpolation part
+                    // Add quadratic interpolation part N=2
                     if ( N > 1 )
                     {
                         Q(4, cI) = (1.0/2.0)*pow(neiC.x() - C.x(), 2);
@@ -362,7 +403,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                         Q(8, cI) = (neiC.x() - C.x())*(neiC.z() - C.z());
                         Q(9, cI) = (neiC.y() - C.y())*(neiC.z() - C.z());
                     }
-                    // Add cubic interpolation part
+                    // Add cubic interpolation part N=3
                     if ( N > 2)
                     {
                         // This have 20 terms
@@ -371,10 +412,29 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 }
 
                 Eigen::MatrixXd W = Eigen::MatrixXd::Zero(Nn, Nn);
-                forAll(curStencil, cI)
+
+                //forAll(curStencil, cI)
+                for(label cI=0; cI<Nn; cI++)
                 {
-                    const label neiCellID = curStencil[cI];
-                    const vector neiC = mesh().C()[neiCellID];
+                    vector neiC = vector::zero;
+
+                    if (cI < curStencil.size())
+                    {
+                        const label neiCellID = curStencil[cI];
+                        neiC = mesh().C()[neiCellID];
+                    }
+                    else
+                    {
+                        // For boundary cells we need to add boundary face as
+                        // neigbour
+                        const label i = cI-curStencil.size();
+                        const label globalFaceID = cellBoundaryFaces[cellI][i];
+                        neiC = mesh().Cf()[globalFaceID];
+                    }
+
+                    //const label neiCellID = curStencil[cI];
+                    //const vector neiC = mesh().C()[neiCellID];
+
                     const vector C = mesh().C()[cellI];
 
                     const scalar d = mag(neiC-C);
@@ -419,7 +479,6 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 cy[cellI].setCapacity(A.cols());
                 cz[cellI].setCapacity(A.cols());
 
-
                 Eigen::RowVectorXd cRow = A.row(0);
                 Eigen::RowVectorXd cxRow = A.row(1);
                 Eigen::RowVectorXd cyRow = A.row(2);
@@ -445,11 +504,13 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             forAll(interpCoeffs, cellI)
             {
                 DynamicList<label>& curStencil = lsStencil[cellI];
+                const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
 
-                forAll(curStencil, nei)
+                for(label I=0; I<Nn; I++)
+                //forAll(curStencil, nei)
                 {
-                    interpCoeffs[cellI].append(c[cellI][nei]);
-                    interpGradCoeffs[cellI].append(vector(cx[cellI][nei], cy[cellI][nei], cz[cellI][nei]));
+                    interpCoeffs[cellI].append(c[cellI][I]);
+                    interpGradCoeffs[cellI].append(vector(cx[cellI][I], cy[cellI][I], cz[cellI][I]));
                 }
 
                 interpCoeffs[cellI].shrink();
@@ -477,17 +538,76 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             forAll(lsStencil, cellI)
             {
                 DynamicList<label>& curStencil = lsStencil[cellI];
+                const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
 
                 // Loop over stencil and multiply stencil cell values with
                 // corresponding interpolation coefficient
-                forAll(curStencil, cI)
+                for(label cI=0; cI<Nn; cI++)
+                //forAll(curStencil, cI)
                 {
-                    hoGradD[cellI] += D()[curStencil[cI]] * interpGradCoeffs[cellI][cI];
+                    if (cI < curStencil.size())
+                    {
+                        hoGradD[cellI] += D()[curStencil[cI]] * interpGradCoeffs[cellI][cI];
+                    }
+                    else
+                    {
+                        const label i = cI-curStencil.size();
+                        const label globalFaceID = cellBoundaryFaces[cellI][i];
+
+
+                        vector boundaryD = vector::zero;
+
+                        forAll(boundaryMesh, patchI)
+                        {
+                            const label start = boundaryMesh[patchI].start();
+                            const label nFaces = boundaryMesh[patchI].nFaces();
+
+
+                            if (globalFaceID >= start && globalFaceID < start+nFaces)
+                            {
+                                const label k = globalFaceID-start;
+                                boundaryD = D().boundaryField()[patchI][k];
+                            }
+                        }
+
+                        hoGradD[cellI] += boundaryD * interpGradCoeffs[cellI][cI];
+                    }
                 }
             }
 
             hoGradD.write();
             condNumber.write();
+
+            scalar cellRelErrorXX = 0.0;
+            scalar cellRelErrorXY = 0.0;
+            scalar cellRelErrorYY = 0.0;
+            scalar cellRelErrorXZ = 0.0;
+            scalar cellRelErrorYZ = 0.0;
+            scalar cellRelErrorZZ = 0.0;
+
+            forAll(hoGradD, cellI)
+            {
+                cellRelErrorXX = abs((hoGradD[cellI].xx()-gradD()[cellI].xx())/(gradD()[cellI].xx()+SMALL))*100;
+                cellRelErrorYY = abs((hoGradD[cellI].yy()-gradD()[cellI].yy())/(gradD()[cellI].yy()+SMALL))*100;
+                cellRelErrorXY = abs((hoGradD[cellI].xy()-gradD()[cellI].xy())/(gradD()[cellI].xy()+SMALL))*100;
+                cellRelErrorXZ = abs((hoGradD[cellI].xz()-gradD()[cellI].xz())/(gradD()[cellI].xz()+SMALL))*100;
+                cellRelErrorYZ = abs((hoGradD[cellI].yz()-gradD()[cellI].yz())/(gradD()[cellI].yz()+SMALL))*100;
+                cellRelErrorZZ = abs((hoGradD[cellI].zz()-gradD()[cellI].zz())/(gradD()[cellI].zz()+SMALL))*100;
+            }
+            cellRelErrorXX /= mesh().nCells();
+            cellRelErrorYY /= mesh().nCells();
+            cellRelErrorXZ /= mesh().nCells();
+            cellRelErrorXY /= mesh().nCells();
+            cellRelErrorYZ /= mesh().nCells();
+            cellRelErrorZZ /= mesh().nCells();
+
+            Info << "Average error for XX component" << cellRelErrorXX << endl;
+            Info << "Average error for YY component" << cellRelErrorYY << endl;
+            Info << "Average error for ZZ component" << cellRelErrorZZ << endl;
+            Info << "Average error for XY component" << cellRelErrorXY << endl;
+            Info << "Average error for XZ component" << cellRelErrorXZ << endl;
+            Info << "Average error for YZ component" << cellRelErrorYZ << endl;
+            Info<<endl;
             // Testing new grad schene end
 
             // Update gradient of displacement increment
