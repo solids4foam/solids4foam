@@ -30,20 +30,6 @@ License
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-using namespace std;
-using namespace Eigen;
-
-void QR()
-{
-
-    Eigen::MatrixXf A(2,2), B(3,2);
-    B << 2, 0,  0, 3, 1, 1;
-    A << 2, 0, 0, -2;
-    A = B * A;
-    std::cout << A;
-}
-
-
 namespace Foam
 {
 
@@ -218,7 +204,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             //          higher values of condition number at structured mesh
 
             const label maxStencilSize = 70;
-            const label nLayers = 2;
+            const label nLayers = 4;
             const labelListList& cellCells = mesh().cellCells();
 
             List<DynamicList<label>> lsStencil(mesh().nCells());
@@ -290,10 +276,11 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             //
 
             // Order of interpolation
-            //const label N = 1;
+            const label N = 2;
 
             // Number of terms in Taylor expression
-            const label Np = 4;
+            // 1 for zero order, 4 for 1 order, 10 for second order
+            label Np = factorial(N+3)/(factorial(N)*factorial(3));
 
             // Kernel shape parameter
             const label k = 6;
@@ -340,6 +327,15 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                 // For now I will use matrix format from Eigen/Dense library
                 Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(Np, Nn);
 
+                // Check to avoid Eigen error
+                if (Nn < Np)
+                {
+                    FatalErrorInFunction
+                        << "Interpolation stencil needs to be bigger than the "
+                       "number of elements in Taylor order!"
+                        << exit(FatalError);
+                }
+
                 // Loop over cells in stencil, each cell have its corresponding
                 // row in Q matrix
                 forAll(curStencil, cI)
@@ -348,11 +344,30 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
                     const vector neiC = mesh().C()[neiCellID];
                     const vector C = mesh().C()[cellI];
 
-                    // Hardcoded for linear interpolation
-                    Q(0, cI) = 1;
-                    Q(1, cI) = neiC.x() - C.x();
-                    Q(2, cI) = neiC.y() - C.y();
-                    Q(3, cI) = neiC.z() - C.z();
+                    // Add linear interpolation part
+                    if ( N > 0 )
+                    {
+                        Q(0, cI) = 1;
+                        Q(1, cI) = neiC.x() - C.x();
+                        Q(2, cI) = neiC.y() - C.y();
+                        Q(3, cI) = neiC.z() - C.z();
+                    }
+                    // Add quadratic interpolation part
+                    if ( N > 1 )
+                    {
+                        Q(4, cI) = (1.0/2.0)*pow(neiC.x() - C.x(), 2);
+                        Q(5, cI) = (1.0/2.0)*pow(neiC.y() - C.y(), 2);
+                        Q(6, cI) = (1.0/2.0)*pow(neiC.z() - C.z(), 2);
+                        Q(7, cI) = (neiC.x() - C.x())*(neiC.y() - C.y());
+                        Q(8, cI) = (neiC.x() - C.x())*(neiC.z() - C.z());
+                        Q(9, cI) = (neiC.y() - C.y())*(neiC.z() - C.z());
+                    }
+                    // Add cubic interpolation part
+                    if ( N > 2)
+                    {
+                        // This have 20 terms
+                        notImplemented("Orders higher that quadratic not implemented");
+                    }
                 }
 
                 Eigen::MatrixXd W = Eigen::MatrixXd::Zero(Nn, Nn);
@@ -425,7 +440,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             }
 
             List<DynamicList<scalar>> interpCoeffs(mesh().nCells());
-            List<DynamicList<vector>> interpGradCoeffs(mesh().nCells() );
+            List<DynamicList<vector>> interpGradCoeffs(mesh().nCells());
 
             forAll(interpCoeffs, cellI)
             {
