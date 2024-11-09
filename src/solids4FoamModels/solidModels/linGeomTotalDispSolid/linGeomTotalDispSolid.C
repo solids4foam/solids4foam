@@ -204,7 +204,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             //          higher values of condition number at structured mesh
 
             const label maxStencilSize = 70;
-            const label nLayers = 2;
+            const label nLayers = 4;
             const labelListList& cellCells = mesh().cellCells();
 
             List<DynamicList<label>> lsStencil(mesh().nCells());
@@ -276,7 +276,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             //
 
             // Order of interpolation
-            const label N = 1;
+            const label N = 2;
 
             // Number of terms in Taylor expression
             // 1 for zero order, 4 for 1 order, 10 for second order
@@ -578,6 +578,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             hoGradD.write();
             condNumber.write();
 
+            // Calculation of average difference between leastSquares and HO
             scalar cellRelErrorXX = 0.0;
             scalar cellRelErrorXY = 0.0;
             scalar cellRelErrorYY = 0.0;
@@ -601,13 +602,17 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             cellRelErrorYZ /= mesh().nCells();
             cellRelErrorZZ /= mesh().nCells();
 
-            Info << "Average error for XX component" << cellRelErrorXX << endl;
-            Info << "Average error for YY component" << cellRelErrorYY << endl;
-            Info << "Average error for ZZ component" << cellRelErrorZZ << endl;
-            Info << "Average error for XY component" << cellRelErrorXY << endl;
-            Info << "Average error for XZ component" << cellRelErrorXZ << endl;
-            Info << "Average error for YZ component" << cellRelErrorYZ << endl;
-            Info<<endl;
+            if (true)
+            {
+                Info << "Average difference with leastSquares in %" << endl;
+                Info << "\tXX component: " << cellRelErrorXX << "%" << endl;
+                Info << "\tYY component: " << cellRelErrorYY << "%" << endl;
+                Info << "\tZZ component: " << cellRelErrorZZ << "%" << endl;
+                Info << "\tXY component: " << cellRelErrorXY << "%" << endl;
+                Info << "\tXZ component: " << cellRelErrorXZ << "%" << endl;
+                Info << "\tYZ component: " << cellRelErrorYZ << "%" << endl;
+                Info<<endl;
+            }
             // Testing new grad schene end
 
             // Update gradient of displacement increment
