@@ -419,7 +419,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         mesh(),
         dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
     ),
-    hoGrad_(mesh()), 1, 1, 6, 70, false)
+    hoGrad_(mesh()) //, 1, 1, 6, 70, false)
 {
     DisRequired();
 

@@ -187,202 +187,202 @@ void higherOrderGrad::calcCoeffs() const
 
     forAll(boundaryMesh, patchI)
     {
-       if (boundaryMesh[patchI].type() != emptyPolyPatch::typeName)
-       {
-           const labelUList& faceCells = boundaryMesh[patchI].faceCells();
+        if (boundaryMesh[patchI].type() != emptyPolyPatch::typeName)
+        {
+            const labelUList& faceCells = boundaryMesh[patchI].faceCells();
 
-           forAll(faceCells, faceI)
-           {
-               const label cellID = faceCells[faceI];
-               const label gI = faceI + boundaryMesh[patchI].start();
-               cellBoundaryFaces[cellID].append(gI);
-           }
-       }
+            forAll(faceCells, faceI)
+            {
+                const label cellID = faceCells[faceI];
+                const label gI = faceI + boundaryMesh[patchI].start();
+                cellBoundaryFaces[cellID].append(gI);
+            }
+        }
     }
 
     forAll(cellBoundaryFaces, cellI)
     {
-       cellBoundaryFaces[cellI].shrink();
+        cellBoundaryFaces[cellI].shrink();
     }
 
     const List<DynamicList<label>> stencils = this->stencils();
 
     forAll(stencils, cellI)
     {
-       const DynamicList<label>& curStencil = stencils[cellI];
+        const DynamicList<label>& curStencil = stencils[cellI];
 
-       // Find max distance in this stencil
-       scalar maxDist = 0.0;
-       forAll(curStencil, cI)
-       {
-           const label neiCellID = curStencil[cI];
-           const scalar d = mag(CI[neiCellID] - CI[cellI]);
-           if ( d > maxDist)
-           {
-               maxDist = d;
-           }
-       }
+        // Find max distance in this stencil
+        scalar maxDist = 0.0;
+        forAll(curStencil, cI)
+        {
+            const label neiCellID = curStencil[cI];
+            const scalar d = mag(CI[neiCellID] - CI[cellI]);
+            if (d > maxDist)
+            {
+                maxDist = d;
+            }
+        }
 
-       // Loop over neighbours and construct matrix Q
-       const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
+        // Loop over neighbours and construct matrix Q
+        const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
 
-       // For now I will use matrix format from Eigen/Dense library
-       Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(Np, Nn);
+        // For now I will use matrix format from Eigen/Dense library
+        Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(Np, Nn);
 
-       // Check to avoid Eigen error
-       if (Nn < Np)
-       {
-           FatalErrorInFunction
-               << "Interpolation stencil needs to be bigger than the "
-              "number of elements in Taylor order!"
-               << exit(FatalError);
-       }
+        // Check to avoid Eigen error
+        if (Nn < Np)
+        {
+            FatalErrorInFunction
+                << "Interpolation stencil needs to be bigger than the "
+               "number of elements in Taylor order!"
+                << exit(FatalError);
+        }
 
-       // Loop over cells in stencil, each cell have its corresponding
-       // row in Q matrix
-       for (label cI = 0; cI < Nn; cI++)
-       {
-           vector neiC = vector::zero;
+        // Loop over cells in stencil, each cell have its corresponding
+        // row in Q matrix
+        for (label cI = 0; cI < Nn; cI++)
+        {
+            vector neiC = vector::zero;
 
-           if (cI < curStencil.size())
-           {
-               const label neiCellID = curStencil[cI];
-               neiC = CI[neiCellID];
-           }
-           else
-           {
-               // For boundary cells we need to add boundary face as
-               // neigbour
-               const label i = cI - curStencil.size();
-               const label globalFaceID = cellBoundaryFaces[cellI][i];
-               neiC = CfI[globalFaceID];
-           }
+            if (cI < curStencil.size())
+            {
+                const label neiCellID = curStencil[cI];
+                neiC = CI[neiCellID];
+            }
+            else
+            {
+                // For boundary cells we need to add boundary face as
+                // neigbour
+                const label i = cI - curStencil.size();
+                const label globalFaceID = cellBoundaryFaces[cellI][i];
+                neiC = CfI[globalFaceID];
+            }
 
-           const vector C = CI[cellI];
+            const vector& C = CI[cellI];
 
-           // Add linear interpolation part N = 1
-           if (N_ > 0)
-           {
-               Q(0, cI) = 1;
-               Q(1, cI) = neiC.x() - C.x();
-               Q(2, cI) = neiC.y() - C.y();
-               Q(3, cI) = neiC.z() - C.z();
-           }
+            // Add linear interpolation part N = 1
+            if (N_ > 0)
+            {
+                Q(0, cI) = 1;
+                Q(1, cI) = neiC.x() - C.x();
+                Q(2, cI) = neiC.y() - C.y();
+                Q(3, cI) = neiC.z() - C.z();
+            }
 
-           // Add quadratic interpolation part N = 2
-           if (N_ > 1)
-           {
-               Q(4, cI) = (1.0/2.0)*pow(neiC.x() - C.x(), 2);
-               Q(5, cI) = (1.0/2.0)*pow(neiC.y() - C.y(), 2);
-               Q(6, cI) = (1.0/2.0)*pow(neiC.z() - C.z(), 2);
-               Q(7, cI) = (neiC.x() - C.x())*(neiC.y() - C.y());
-               Q(8, cI) = (neiC.x() - C.x())*(neiC.z() - C.z());
-               Q(9, cI) = (neiC.y() - C.y())*(neiC.z() - C.z());
-           }
+            // Add quadratic interpolation part N = 2
+            if (N_ > 1)
+            {
+                Q(4, cI) = (1.0/2.0)*pow(neiC.x() - C.x(), 2);
+                Q(5, cI) = (1.0/2.0)*pow(neiC.y() - C.y(), 2);
+                Q(6, cI) = (1.0/2.0)*pow(neiC.z() - C.z(), 2);
+                Q(7, cI) = (neiC.x() - C.x())*(neiC.y() - C.y());
+                Q(8, cI) = (neiC.x() - C.x())*(neiC.z() - C.z());
+                Q(9, cI) = (neiC.y() - C.y())*(neiC.z() - C.z());
+            }
 
-           // Todo: generalise to higher orders
-           if ( N_ > 2)
-           {
-               // This has 20 terms
-               notImplemented("Orders higher that quadratic not implemented");
-           }
-       }
+            // Todo: generalise to higher orders
+            if ( N_ > 2)
+            {
+                // This has 20 terms
+                notImplemented("Orders higher that quadratic not implemented");
+            }
+        }
 
-       Eigen::MatrixXd W = Eigen::MatrixXd::Zero(Nn, Nn);
+        Eigen::MatrixXd W = Eigen::MatrixXd::Zero(Nn, Nn);
 
-       for (label cI = 0; cI < Nn; cI++)
-       {
-           vector neiC = vector::zero;
+        for (label cI = 0; cI < Nn; cI++)
+        {
+            vector neiC = vector::zero;
 
-           if (cI < curStencil.size())
-           {
-               const label neiCellID = curStencil[cI];
-               neiC = CI[neiCellID];
-           }
-           else
-           {
-               // For boundary cells we need to add boundary face as
-               // neigbour
-               const label i = cI - curStencil.size();
-               const label globalFaceID = cellBoundaryFaces[cellI][i];
-               neiC = CfI[globalFaceID];
-           }
+            if (cI < curStencil.size())
+            {
+                const label neiCellID = curStencil[cI];
+                neiC = CI[neiCellID];
+            }
+            else
+            {
+                // For boundary cells we need to add boundary face as
+                // neigbour
+                const label i = cI - curStencil.size();
+                const label globalFaceID = cellBoundaryFaces[cellI][i];
+                neiC = CfI[globalFaceID];
+            }
 
-           const vector C = CI[cellI];
-           const scalar d = mag(neiC - C);
+            const vector& C = CI[cellI];
+            const scalar d = mag(neiC - C);
 
-           // Smoothing length
-           const scalar dm = 2*maxDist;
+            // Smoothing length
+            const scalar dm = 2*maxDist;
 
-           // Weight using radially symmetric exponential function
-           const scalar sqrK = -pow(k_,2);
-           const scalar w =
-               (
-                   Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
-               )/(1 - exp(sqrK));
+            // Weight using radially symmetric exponential function
+            const scalar sqrK = -pow(k_,2);
+            const scalar w =
+                (
+                    Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
+                )/(1 - exp(sqrK));
 
-           W(cI, cI) = w;
-       }
+            W(cI, cI) = w;
+        }
 
-       // Now when we have W and Q, next step is QR decomposition
-       const Eigen::MatrixXd sqrtW = W.cwiseSqrt();
-       const Eigen::MatrixXd Qhat = Q*sqrtW;
-       Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
+        // Now when we have W and Q, next step is QR decomposition
+        const Eigen::MatrixXd sqrtW = W.cwiseSqrt();
+        const Eigen::MatrixXd Qhat = Q*sqrtW;
+        Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
 
-       // Q and R matrices
-       const Eigen::MatrixXd O = qr.householderQ();
-       const Eigen::MatrixXd R = qr.matrixQR().triangularView<Eigen::Upper>();
+        // Q and R matrices
+        const Eigen::MatrixXd O = qr.householderQ();
+        const Eigen::MatrixXd R = qr.matrixQR().triangularView<Eigen::Upper>();
 
-       // B hat
-       const Eigen::MatrixXd Bhat =
-           sqrtW*Eigen::MatrixXd::Identity(W.rows(), W.cols());
+        // B hat
+        const Eigen::MatrixXd Bhat =
+            sqrtW*Eigen::MatrixXd::Identity(W.rows(), W.cols());
 
-       // Slice Rbar and Qbar, as we do not need full matrix
-       const Eigen::MatrixXd Rbar = R.topLeftCorner(Np, Np);
-       const Eigen::MatrixXd Qbar = O.leftCols(Np);
+        // Slice Rbar and Qbar, as we do not need full matrix
+        const Eigen::MatrixXd Rbar = R.topLeftCorner(Np, Np);
+        const Eigen::MatrixXd Qbar = O.leftCols(Np);
 
-       // Solve to get A
-       const Eigen::MatrixXd A =
-           Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
+        // Solve to get A
+        const Eigen::MatrixXd A =
+            Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
 
-       // To be aware of interpolation accuracy we need to control the
-       // condition number
-       if (calcConditionNumber_)
-       {
-           Eigen::JacobiSVD<Eigen::MatrixXd> svd
-           (
-               Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
-           );
-           Eigen::VectorXd singularValues = svd.singularValues();
+        // To be aware of interpolation accuracy we need to control the
+        // condition number
+        if (calcConditionNumber_)
+        {
+            Eigen::JacobiSVD<Eigen::MatrixXd> svd
+            (
+                Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
+            );
+            Eigen::VectorXd singularValues = svd.singularValues();
 
-           volScalarField& condNumber = *condNumberPtr_;
-           condNumber[cellI] =
-               singularValues(0)
-              /(singularValues(singularValues.size() - 1) + VSMALL);
-       }
+            volScalarField& condNumber = *condNumberPtr_;
+            condNumber[cellI] =
+                singularValues(0)
+               /(singularValues(singularValues.size() - 1) + VSMALL);
+        }
 
-       c[cellI].setCapacity(A.cols());
-       cx[cellI].setCapacity(A.cols());
-       cy[cellI].setCapacity(A.cols());
-       cz[cellI].setCapacity(A.cols());
+        c[cellI].setCapacity(A.cols());
+        cx[cellI].setCapacity(A.cols());
+        cy[cellI].setCapacity(A.cols());
+        cz[cellI].setCapacity(A.cols());
 
-       Eigen::RowVectorXd cRow = A.row(0);
-       Eigen::RowVectorXd cxRow = A.row(1);
-       Eigen::RowVectorXd cyRow = A.row(2);
-       Eigen::RowVectorXd czRow = A.row(3);
+        Eigen::RowVectorXd cRow = A.row(0);
+        Eigen::RowVectorXd cxRow = A.row(1);
+        Eigen::RowVectorXd cyRow = A.row(2);
+        Eigen::RowVectorXd czRow = A.row(3);
 
-       for (label i = 0; i < A.cols(); ++i)
-       {
-           c[cellI].append(cRow(i));
-           cx[cellI].append(cxRow(i));
-           cy[cellI].append(cyRow(i));
-           cz[cellI].append(czRow(i));
-       }
+        for (label i = 0; i < A.cols(); ++i)
+        {
+            c[cellI].append(cRow(i));
+            cx[cellI].append(cxRow(i));
+            cy[cellI].append(cyRow(i));
+            cz[cellI].append(czRow(i));
+        }
 
-       c[cellI].shrink();
-       cx[cellI].shrink();
-       cy[cellI].shrink();
-       cz[cellI].shrink();
+        c[cellI].shrink();
+        cx[cellI].shrink();
+        cy[cellI].shrink();
+        cz[cellI].shrink();
     }
 
     forAll(interpCoeffs, cellI)
@@ -523,7 +523,7 @@ tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D)
        {
            if (cI < curStencil.size())
            {
-               gradD[cellI] += D[curStencil[cI]]*interpGradCoeffs[cellI][cI];
+               gradD[cellI] += interpGradCoeffs[cellI][cI]*D[curStencil[cI]];
            }
            else
            {
@@ -544,7 +544,7 @@ tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D)
                    }
                }
 
-               gradD[cellI] += boundaryD*interpGradCoeffs[cellI][cI];
+               gradD[cellI] += interpGradCoeffs[cellI][cI]*boundaryD;
            }
        }
     }
