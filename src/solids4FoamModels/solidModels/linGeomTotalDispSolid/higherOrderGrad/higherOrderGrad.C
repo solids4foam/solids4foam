@@ -23,6 +23,7 @@ License
 #include "emptyPolyPatch.H"
 #include <Eigen/Dense>
 
+#include <ctime>
 
 namespace Foam
 {
@@ -214,6 +215,17 @@ void higherOrderGrad::calcCoeffs() const
     const List<DynamicList<label>>& cellBoundaryFaces = this->cellBoundaryFaces();
     const List<DynamicList<label>> stencils = this->stencils();
 
+    if (N_ < 1)
+    {
+        FatalErrorInFunction
+            << "N must be at least 1!" << exit(FatalError);
+    }
+
+    if (N_ > 2)
+    {
+        notImplemented("Orders higher that quadratic not implemented");
+    }
+
     forAll(stencils, cellI)
     {
         const DynamicList<label>& curStencil = stencils[cellI];
@@ -234,68 +246,91 @@ void higherOrderGrad::calcCoeffs() const
         const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
 
         // For now I will use matrix format from Eigen/Dense library
-        Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(Np, Nn);
+        //Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(Np, Nn);
+        // Avoid initialisation to zero as we will set every entry below
+        Eigen::MatrixXd Q(Np, Nn);
 
         // Check to avoid Eigen error
         if (Nn < Np)
         {
             FatalErrorInFunction
                 << "Interpolation stencil needs to be bigger than the "
-               "number of elements in Taylor order!"
+                << "number of elements in Taylor order!"
                 << exit(FatalError);
         }
 
         // Loop over cells in stencil, each cell have its corresponding
         // row in Q matrix
-        for (label cI = 0; cI < Nn; cI++)
-        {
-            vector neiC = vector::zero;
 
-            if (cI < curStencil.size())
+        // Add linear interpolation part N = 1
+        for (label cI = 0; cI < curStencil.size(); cI++)
+        {
+            const label neiCellID = curStencil[cI];
+            const vector& neiC = CI[neiCellID];
+            const vector& C = CI[cellI];
+            const vector dx = neiC - C;
+            Q(0, cI) = 1;
+            Q(1, cI) = dx.x();
+            Q(2, cI) = dx.y();
+            Q(3, cI) = dx.z();
+        }
+
+        // Add quadratic interpolation part N = 2
+        if (N_ > 1)
+        {
+            for (label cI = 0; cI < curStencil.size(); cI++)
             {
                 const label neiCellID = curStencil[cI];
-                neiC = CI[neiCellID];
-            }
-            else
-            {
-                // For boundary cells we need to add boundary face as
-                // neigbour
-                const label i = cI - curStencil.size();
-                const label globalFaceID = cellBoundaryFaces[cellI][i];
-                neiC = CfI[globalFaceID];
-            }
-
-            const vector& C = CI[cellI];
-
-            // Add linear interpolation part N = 1
-            if (N_ > 0)
-            {
-                Q(0, cI) = 1;
-                Q(1, cI) = neiC.x() - C.x();
-                Q(2, cI) = neiC.y() - C.y();
-                Q(3, cI) = neiC.z() - C.z();
-            }
-
-            // Add quadratic interpolation part N = 2
-            if (N_ > 1)
-            {
-                Q(4, cI) = (1.0/2.0)*pow(neiC.x() - C.x(), 2);
-                Q(5, cI) = (1.0/2.0)*pow(neiC.y() - C.y(), 2);
-                Q(6, cI) = (1.0/2.0)*pow(neiC.z() - C.z(), 2);
-                Q(7, cI) = (neiC.x() - C.x())*(neiC.y() - C.y());
-                Q(8, cI) = (neiC.x() - C.x())*(neiC.z() - C.z());
-                Q(9, cI) = (neiC.y() - C.y())*(neiC.z() - C.z());
-            }
-
-            // Todo: generalise to higher orders
-            if ( N_ > 2)
-            {
-                // This has 20 terms
-                notImplemented("Orders higher that quadratic not implemented");
+                const vector& neiC = CI[neiCellID];
+                const vector& C = CI[cellI];
+                const vector dx = neiC - C;
+                Q(4, cI) = 0.5*dx.x()*dx.x();
+                Q(5, cI) = 0.5*dx.y()*dx.y();
+                Q(6, cI) = 0.5*dx.z()*dx.z();
+                Q(7, cI) = dx.x()*dx.y();
+                Q(8, cI) = dx.x()*dx.z();
+                Q(9, cI) = dx.y()*dx.z();
             }
         }
 
-        Eigen::MatrixXd W = Eigen::MatrixXd::Zero(Nn, Nn);
+        // Boundary faces
+        // For boundary cells we need to add boundary face as
+        // neigbour
+        for (label cI = curStencil.size(); cI < Nn; cI++)
+        {
+            const label i = cI - curStencil.size();
+            const label globalFaceID = cellBoundaryFaces[cellI][i];
+            const vector& neiC = CfI[globalFaceID];
+            const vector& C = CI[cellI];
+            const vector dx = neiC - C;
+            Q(0, cI) = 1;
+            Q(1, cI) = dx.x();
+            Q(2, cI) = dx.y();
+            Q(3, cI) = dx.z();
+        }
+
+        // Add quadratic interpolation part N = 2
+        if (N_ > 1)
+        {
+            for (label cI = curStencil.size(); cI < Nn; cI++)
+            {
+                const label i = cI - curStencil.size();
+                const label globalFaceID = cellBoundaryFaces[cellI][i];
+                const vector& neiC = CfI[globalFaceID];
+                const vector& C = CI[cellI];
+                const vector dx = neiC - C;
+                Q(4, cI) = 0.5*dx.x()*dx.x();
+                Q(5, cI) = 0.5*dx.y()*dx.y();
+                Q(6, cI) = 0.5*dx.z()*dx.z();
+                Q(7, cI) = dx.x()*dx.y();
+                Q(8, cI) = dx.x()*dx.z();
+                Q(9, cI) = dx.y()*dx.z();
+            }
+        }
+
+        //Eigen::MatrixXd W = Eigen::MatrixXd::Zero(Nn, Nn);
+        Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn);
+        //W.setZero(); // no need to waste time initialising
 
         for (label cI = 0; cI < Nn; cI++)
         {
@@ -328,29 +363,50 @@ void higherOrderGrad::calcCoeffs() const
                     Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
                 )/(1 - exp(sqrK));
 
-            W(cI, cI) = w;
+            //W(cI, cI) = w;
+            W.diagonal()[cI] = w;
         }
 
         // Now when we have W and Q, next step is QR decomposition
-        const Eigen::MatrixXd sqrtW = W.cwiseSqrt();
-        const Eigen::MatrixXd Qhat = Q*sqrtW;
+        //const Eigen::MatrixXd sqrtW = W.cwiseSqrt();
+        const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
+            W.diagonal().cwiseSqrt().asDiagonal();
+        //const Eigen::MatrixXd Qhat = Q*sqrtW;
+        //const Eigen::MatrixXd Qhat = Q*sqrtW.diagonal().asDiagonal();
+        const Eigen::MatrixXd Qhat =
+            Q.array().rowwise()*sqrtW.diagonal().transpose().array();
         Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
+        //Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
 
         // Q and R matrices
         const Eigen::MatrixXd O = qr.householderQ();
-        const Eigen::MatrixXd R = qr.matrixQR().triangularView<Eigen::Upper>();
+        const Eigen::MatrixXd& R = qr.matrixQR().triangularView<Eigen::Upper>();
 
         // B hat
-        const Eigen::MatrixXd Bhat =
-            sqrtW*Eigen::MatrixXd::Identity(W.rows(), W.cols());
+        // const Eigen::MatrixXd Bhat =
+        //     sqrtW*Eigen::MatrixXd::Identity(W.rows(), W.cols());
+        //const Eigen::MatrixXd Bhat = sqrtW.diagonal().asDiagonal();
+        const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
+            sqrtW.diagonal().asDiagonal();
 
         // Slice Rbar and Qbar, as we do not need full matrix
-        const Eigen::MatrixXd Rbar = R.topLeftCorner(Np, Np);
-        const Eigen::MatrixXd Qbar = O.leftCols(Np);
+        // const Eigen::MatrixXd Rbar = R.topLeftCorner(Np, Np);
+        // const Eigen::MatrixXd Qbar = O.leftCols(Np);
+        const auto Rbar = R.topLeftCorner(Np, Np);
+        const auto Qbar = O.leftCols(Np);
+
+        // Perform element-wise multiplication and convert to MatrixXd
+        const Eigen::MatrixXd QbarBhat =
+            (
+                Qbar.transpose().array().rowwise()
+               *Bhat.diagonal().transpose().array()
+            ).matrix();
 
         // Solve to get A
-        const Eigen::MatrixXd A =
-            Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
+        // const Eigen::MatrixXd A =
+        //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
+        // Solve using the modified QbarBhat
+        const Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(QbarBhat);
 
         // To be aware of interpolation accuracy we need to control the
         // condition number
