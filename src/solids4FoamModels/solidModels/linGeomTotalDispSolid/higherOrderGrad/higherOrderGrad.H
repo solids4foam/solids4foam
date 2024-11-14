@@ -57,6 +57,9 @@ class higherOrderGrad
         //- Const reference to the mesh
         const fvMesh& mesh_;
 
+        //- Include patch in the stencils
+        const boolList includePatchInStencils_;
+
         //- Order of interpolation
         const label N_;
 
@@ -64,7 +67,7 @@ class higherOrderGrad
         const label nLayers_;
 
         //- Kernel shape parameter
-        const label k_;
+        const scalar k_;
 
         //- Maxium stencil size: used for initialising dynamic lists
         const label maxStencilSize_;
@@ -126,11 +129,8 @@ public:
         higherOrderGrad
         (
             const fvMesh& mesh,
-            const label N = 2,
-            const label nLayers = 4,
-            const label k = 6,
-            const label maxStencilSize = 70,
-            const bool calcConditionNumber = false
+            const boolList& includePatchInStencils,
+            const dictionary& dict
         );
 
     // Destructor

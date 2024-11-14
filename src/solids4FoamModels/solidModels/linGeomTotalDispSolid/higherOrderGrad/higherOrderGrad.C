@@ -39,7 +39,7 @@ void higherOrderGrad::makeStencils() const
 {
     Info<< "higherOrderGrad::makeStencils()" << endl;
 
-    if (stencilsPtr_)
+    if (stencilsPtr_ || cellBoundaryFacesPtr_)
     {
         FatalErrorInFunction
             << "Pointer already set!" << abort(FatalError);
@@ -50,6 +50,9 @@ void higherOrderGrad::makeStencils() const
 
     stencilsPtr_.set(new List<DynamicList<label>>(mesh.nCells()));
     List<DynamicList<label>>& stencils = *stencilsPtr_;
+
+    cellBoundaryFacesPtr_.set(new List<DynamicList<label>>(mesh.nCells()));
+    List<DynamicList<label>>& cellBoundaryFaces = *cellBoundaryFacesPtr_;
 
     forAll(stencils, cellI)
     {
@@ -113,6 +116,34 @@ void higherOrderGrad::makeStencils() const
        stencils[cellI].shrink();
     }
 
+
+    // Make cell boundary face stencils
+    const polyBoundaryMesh& boundaryMesh = mesh.boundaryMesh();
+    forAll(boundaryMesh, patchI)
+    {
+        if
+        (
+            includePatchInStencils_[patchI]
+         && boundaryMesh[patchI].type() != emptyPolyPatch::typeName
+         && !boundaryMesh[patchI].coupled()
+        )
+        {
+            const labelUList& faceCells = boundaryMesh[patchI].faceCells();
+
+            forAll(faceCells, faceI)
+            {
+                const label cellID = faceCells[faceI];
+                const label gI = faceI + boundaryMesh[patchI].start();
+                cellBoundaryFaces[cellID].append(gI);
+            }
+        }
+    }
+
+    forAll(cellBoundaryFaces, cellI)
+    {
+        cellBoundaryFaces[cellI].shrink();
+    }
+
     Info<< "higherOrderGrad::makeStencils(): end" << endl;
 }
 
@@ -132,7 +163,7 @@ void higherOrderGrad::calcCoeffs() const
 {
     Info<< "higherOrderGrad::calcCoeffs()" << endl;
 
-    if (interpCoeffsPtr_ || interpGradCoeffsPtr_ || cellBoundaryFacesPtr_)
+    if (interpCoeffsPtr_ || interpGradCoeffsPtr_)
     {
         FatalErrorInFunction
             << "Pointers already set!" << abort(FatalError);
@@ -145,9 +176,6 @@ void higherOrderGrad::calcCoeffs() const
 
     interpGradCoeffsPtr_.set(new List<DynamicList<vector>>(mesh.nCells()));
     List<DynamicList<vector>>& interpGradCoeffs = *interpGradCoeffsPtr_;
-
-    cellBoundaryFacesPtr_.set(new List<DynamicList<label>>(mesh.nCells()));
-    List<DynamicList<label>>& cellBoundaryFaces = *cellBoundaryFacesPtr_;
 
     // Refernces for brevity and efficiency
     const vectorField& CI = mesh.C();
@@ -183,28 +211,7 @@ void higherOrderGrad::calcCoeffs() const
     List<DynamicList<scalar>> cy(mesh.nCells());
     List<DynamicList<scalar>> cz(mesh.nCells());
 
-    const polyBoundaryMesh& boundaryMesh = mesh.boundaryMesh();
-
-    forAll(boundaryMesh, patchI)
-    {
-        if (boundaryMesh[patchI].type() != emptyPolyPatch::typeName)
-        {
-            const labelUList& faceCells = boundaryMesh[patchI].faceCells();
-
-            forAll(faceCells, faceI)
-            {
-                const label cellID = faceCells[faceI];
-                const label gI = faceI + boundaryMesh[patchI].start();
-                cellBoundaryFaces[cellID].append(gI);
-            }
-        }
-    }
-
-    forAll(cellBoundaryFaces, cellI)
-    {
-        cellBoundaryFaces[cellI].shrink();
-    }
-
+    const List<DynamicList<label>>& cellBoundaryFaces = this->cellBoundaryFaces();
     const List<DynamicList<label>> stencils = this->stencils();
 
     forAll(stencils, cellI)
@@ -436,7 +443,7 @@ const List<DynamicList<label>>& higherOrderGrad::cellBoundaryFaces() const
 {
     if (!cellBoundaryFacesPtr_)
     {
-        calcCoeffs();
+        makeStencils();
     }
 
     return *cellBoundaryFacesPtr_;
@@ -448,19 +455,17 @@ const List<DynamicList<label>>& higherOrderGrad::cellBoundaryFaces() const
 higherOrderGrad::higherOrderGrad
 (
     const fvMesh& mesh,
-    const label N,
-    const label nLayers,
-    const label k,
-    const label maxStencilSize,
-    const bool calcConditionNumber
+    const boolList& includePatchInStencils,
+    const dictionary& dict
 )
 :
     mesh_(mesh),
-    N_(N),
-    nLayers_(nLayers),
-    k_(k),
-    maxStencilSize_(maxStencilSize),
-    calcConditionNumber_(calcConditionNumber),
+    includePatchInStencils_(includePatchInStencils),
+    N_(readInt(dict.lookup("N"))),
+    nLayers_(readInt(dict.lookup("nLayers"))),
+    k_(readScalar(dict.lookup("k"))),
+    maxStencilSize_(readInt(dict.lookup("maxStencilSize"))),
+    calcConditionNumber_(dict.lookup("calcConditionNumber")),
     condNumberPtr_(),
     stencilsPtr_(),
     interpCoeffsPtr_(),
@@ -534,13 +539,21 @@ tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D)
 
                forAll(boundaryMesh, patchI)
                {
-                   const label start = boundaryMesh[patchI].start();
-                   const label nFaces = boundaryMesh[patchI].nFaces();
-
-                   if (globalFaceID >= start && globalFaceID < start + nFaces)
+                   if
+                   (
+                       includePatchInStencils_[patchI]
+                    && boundaryMesh[patchI].type() != emptyPolyPatch::typeName
+                    && !boundaryMesh[patchI].coupled()
+                   )
                    {
-                       const label k = globalFaceID-start;
-                       boundaryD = D.boundaryField()[patchI][k];
+                       const label start = boundaryMesh[patchI].start();
+                       const label nFaces = boundaryMesh[patchI].nFaces();
+
+                       if (globalFaceID >= start && globalFaceID < start + nFaces)
+                       {
+                           const label k = globalFaceID - start;
+                           boundaryD = D.boundaryField()[patchI][k];
+                       }
                    }
                }
 

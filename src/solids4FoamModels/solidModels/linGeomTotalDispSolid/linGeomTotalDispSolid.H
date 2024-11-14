@@ -90,7 +90,7 @@ class linGeomTotalDispSolid
         volScalarField ds_;
 
         //- Higher order gradient calculator
-        higherOrderGrad hoGrad_;
+        autoPtr<higherOrderGrad> hoGradPtr_;
 
 
     // Private Member Functions

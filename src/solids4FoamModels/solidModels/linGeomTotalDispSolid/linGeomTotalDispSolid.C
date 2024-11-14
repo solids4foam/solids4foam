@@ -24,6 +24,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
+#include "fixedDisplacementFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 
 
@@ -177,8 +178,14 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             DD() = D() - D().oldTime();
 
             // Update gradient of displacement
-            //mechanical().grad(D(), gradD());
-            gradD() = hoGrad_.grad(D()); // Test new grad scheme
+            if (hoGradPtr_)
+            {
+                gradD() = hoGradPtr_->grad(D());
+            }
+            else
+            {
+                mechanical().grad(D(), gradD());
+            }
 
             // Update gradient of displacement increment
             gradDD() = gradD() - gradD().oldTime();
@@ -419,7 +426,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         mesh(),
         dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
     ),
-    hoGrad_(mesh()) //, 1, 1, 6, 70, false)
+    hoGradPtr_()
 {
     DisRequired();
 
@@ -430,6 +437,35 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     D().correctBoundaryConditions();
     D().storePrevIter();
     mechanical().grad(D(), gradD());
+
+    if (solidModelDict().lookupOrDefault<Switch>("higherOrderGrad", false))
+    {
+        // Include fixedValue patches should in the least squares stencils
+        boolList includePatchInStencils(mesh().boundaryMesh().size(), false);
+        forAll(includePatchInStencils, patchI)
+        {
+            if
+            (
+                isA<fixedDisplacementFvPatchVectorField>
+                (
+                    D().boundaryField()[patchI]
+                )
+            )
+            {
+                includePatchInStencils[patchI] = true;
+            }
+        }
+
+        hoGradPtr_.set
+        (
+            new higherOrderGrad
+            (
+                mesh(),
+                includePatchInStencils,
+                solidModelDict().subDict("higherOrderGradCoeffs")
+            )
+        );
+    }
 
     if (predictor_)
     {
@@ -635,8 +671,14 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     const_cast<volVectorField&>(D).correctBoundaryConditions();
 
     // Update gradient of displacement
-    //mechanical().grad(D, gradD());
-    gradD() = hoGrad_.grad(D);
+    if (hoGradPtr_)
+    {
+        gradD() = hoGradPtr_->grad(D);
+    }
+    else
+    {
+        mechanical().grad(D, gradD());
+    }
 
     // Calculate the stress using run-time selectable mechanical law
     mechanical().correct(sigma());
