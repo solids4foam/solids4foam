@@ -21,9 +21,6 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "emptyPolyPatch.H"
-#include <Eigen/Dense>
-
-#include <ctime>
 
 namespace Foam
 {
@@ -177,6 +174,17 @@ void higherOrderGrad::calcCoeffs() const
 
     interpGradCoeffsPtr_.set(new List<DynamicList<vector>>(mesh.nCells()));
     List<DynamicList<vector>>& interpGradCoeffs = *interpGradCoeffsPtr_;
+
+    if (!useQRDecomposition_)
+    {
+        choleskyPtr_.set(new List<Eigen::LLT<Eigen::MatrixXd>>(mesh.nCells()));
+        QhatPtr_.set(new List<Eigen::MatrixXd>(mesh.nCells()));
+    }
+
+    sqrtWPtr_.set
+    (
+        new List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>(mesh.nCells())
+    );
 
     // Refernces for brevity and efficiency
     const vectorField& CI = mesh.C();
@@ -368,105 +376,164 @@ void higherOrderGrad::calcCoeffs() const
         }
 
         // Now when we have W and Q, next step is QR decomposition
-        //const Eigen::MatrixXd sqrtW = W.cwiseSqrt();
-        const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
-            W.diagonal().cwiseSqrt().asDiagonal();
-        //const Eigen::MatrixXd Qhat = Q*sqrtW;
-        //const Eigen::MatrixXd Qhat = Q*sqrtW.diagonal().asDiagonal();
+        Eigen::DiagonalMatrix<double, Eigen::Dynamic>& sqrtW =
+            sqrtWPtr_()[cellI];
+        sqrtW = W.diagonal().cwiseSqrt().asDiagonal();
         const Eigen::MatrixXd Qhat =
             Q.array().rowwise()*sqrtW.diagonal().transpose().array();
-        Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
-        //Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
-
-        // Q and R matrices
-        const Eigen::MatrixXd O = qr.householderQ();
-        const Eigen::MatrixXd& R = qr.matrixQR().triangularView<Eigen::Upper>();
 
         // B hat
-        // const Eigen::MatrixXd Bhat =
-        //     sqrtW*Eigen::MatrixXd::Identity(W.rows(), W.cols());
-        //const Eigen::MatrixXd Bhat = sqrtW.diagonal().asDiagonal();
         const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
             sqrtW.diagonal().asDiagonal();
 
-        // Slice Rbar and Qbar, as we do not need full matrix
-        // const Eigen::MatrixXd Rbar = R.topLeftCorner(Np, Np);
-        // const Eigen::MatrixXd Qbar = O.leftCols(Np);
-        const auto Rbar = R.topLeftCorner(Np, Np);
-        const auto Qbar = O.leftCols(Np);
+        // Declare A outside the if-else scope, but do not initialise
+        Eigen::MatrixXd A;
 
-        // Perform element-wise multiplication and convert to MatrixXd
-        const Eigen::MatrixXd QbarBhat =
-            (
-                Qbar.transpose().array().rowwise()
-               *Bhat.diagonal().transpose().array()
-            ).matrix();
-
-        // Solve to get A
-        // const Eigen::MatrixXd A =
-        //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
-        // Solve using the modified QbarBhat
-        const Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(QbarBhat);
-
-        // To be aware of interpolation accuracy we need to control the
-        // condition number
-        if (calcConditionNumber_)
+        if (useQRDecomposition_)
         {
-            Eigen::JacobiSVD<Eigen::MatrixXd> svd
-            (
-                Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
-            );
-            Eigen::VectorXd singularValues = svd.singularValues();
+            Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
 
-            volScalarField& condNumber = *condNumberPtr_;
-            condNumber[cellI] =
-                singularValues(0)
-               /(singularValues(singularValues.size() - 1) + VSMALL);
+            // Q and R matrices
+            const Eigen::MatrixXd O = qr.householderQ();
+            const Eigen::MatrixXd& R = qr.matrixQR().triangularView<Eigen::Upper>();
+
+            // Slice Rbar and Qbar, as we do not need full matrix
+            // Note: auto is a reference type here (Rbar, Qbar are not copied)
+            const auto Rbar = R.topLeftCorner(Np, Np);
+            const auto Qbar = O.leftCols(Np);
+
+            // Perform element-wise multiplication and convert to MatrixXd
+            const Eigen::MatrixXd QbarBhat =
+                (
+                    Qbar.transpose().array().rowwise()
+                   *Bhat.diagonal().transpose().array()
+                ).matrix();
+
+            // Solve to get A
+            // const Eigen::MatrixXd A =
+            //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
+            // Solve using the modified QbarBhat
+            A = Rbar.colPivHouseholderQr().solve(QbarBhat);
+
+            // To be aware of interpolation accuracy we need to control the
+            // condition number
+            if (calcConditionNumber_)
+            {
+                Eigen::JacobiSVD<Eigen::MatrixXd> svd
+                (
+                    Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
+                );
+                Eigen::VectorXd singularValues = svd.singularValues();
+
+                volScalarField& condNumber = condNumberPtr_();
+                condNumber[cellI] =
+                    singularValues(0)
+                   /(singularValues(singularValues.size() - 1) + VSMALL);
+            }
+
+            c[cellI].setCapacity(A.cols());
+            cx[cellI].setCapacity(A.cols());
+            cy[cellI].setCapacity(A.cols());
+            cz[cellI].setCapacity(A.cols());
+
+            Eigen::RowVectorXd cRow = A.row(0);
+            Eigen::RowVectorXd cxRow = A.row(1);
+            Eigen::RowVectorXd cyRow = A.row(2);
+            Eigen::RowVectorXd czRow = A.row(3);
+
+            for (label i = 0; i < A.cols(); ++i)
+            {
+                c[cellI].append(cRow(i));
+                cx[cellI].append(cxRow(i));
+                cy[cellI].append(cyRow(i));
+                cz[cellI].append(czRow(i));
+            }
+
+            c[cellI].shrink();
+            cx[cellI].shrink();
+            cy[cellI].shrink();
+            cz[cellI].shrink();
         }
-
-        c[cellI].setCapacity(A.cols());
-        cx[cellI].setCapacity(A.cols());
-        cy[cellI].setCapacity(A.cols());
-        cz[cellI].setCapacity(A.cols());
-
-        Eigen::RowVectorXd cRow = A.row(0);
-        Eigen::RowVectorXd cxRow = A.row(1);
-        Eigen::RowVectorXd cyRow = A.row(2);
-        Eigen::RowVectorXd czRow = A.row(3);
-
-        for (label i = 0; i < A.cols(); ++i)
+        else // Cholesky decomposition of the "normal equations"
         {
-            c[cellI].append(cRow(i));
-            cx[cellI].append(cxRow(i));
-            cy[cellI].append(cyRow(i));
-            cz[cellI].append(czRow(i));
-        }
+            // Transpose Q to follow the standard convention
+            // TODO: avoid this by assigning Q correctly from the start!
+            // It may be clear to seperate QR and Cholesky into their own
+            // functions
+            Q = Q.transpose().eval();
 
-        c[cellI].shrink();
-        cx[cellI].shrink();
-        cy[cellI].shrink();
-        cz[cellI].shrink();
+            // Compute Q_hat = Q * W^{1/2}
+            Eigen::MatrixXd& Qhat = QhatPtr_()[cellI];
+            Qhat = Q.array().colwise()*sqrtW.diagonal().array();
+
+            // Compute N = Q_hat^T * Q_hat = Q^T W Q
+            Eigen::MatrixXd N = Qhat.transpose()*Qhat;
+
+            if (debug)
+            {
+                Eigen::FullPivLU<Eigen::MatrixXd> lu(Q);
+                int rank = lu.rank();
+                Info<< "Rank of Q: " << rank << nl
+                    << "Q rows: " << Q.rows() << nl
+                    << "Q cols: " << Q.cols() << endl;
+
+                if (rank < Q.cols())
+                {
+                    Warning
+                        << "Design matrix Q is rank-deficient!" << endl;
+                }
+
+                Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(N);
+                if (eigensolver.info() != Eigen::Success)
+                {
+                    Warning
+                        << "Eigenvalue computation failed!" << endl;
+                    Eigen::VectorXd eigenvalues = eigensolver.eigenvalues();
+                    std::cout
+                        << "Eigenvalues of N: " << eigenvalues.transpose()
+                        << std::endl;
+                }
+            }
+
+            // Perform Cholesky decomposition
+            Eigen::LLT<Eigen::MatrixXd>& cholesky = choleskyPtr_()[cellI];
+            cholesky.compute(N);
+            if (cholesky.info() != Eigen::Success)
+            {
+                FatalErrorInFunction
+                    << "Cholesky decomposition failed; "
+                    << "matrix is not positive definite."
+                    << exit(FatalError);
+            }
+        }
     }
 
-    forAll(interpCoeffs, cellI)
+    if (useQRDecomposition_)
     {
-       const DynamicList<label>& curStencil = stencils[cellI];
-       const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
+        forAll(interpCoeffs, cellI)
+        {
+           const DynamicList<label>& curStencil = stencils[cellI];
+           const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
 
-       interpCoeffs[cellI].setCapacity(Nn);
-       interpGradCoeffs[cellI].setCapacity(Nn);
+           interpCoeffs[cellI].setCapacity(Nn);
+           interpGradCoeffs[cellI].setCapacity(Nn);
 
-       for (label I = 0; I < Nn; I++)
-       {
-           interpCoeffs[cellI].append(c[cellI][I]);
-           interpGradCoeffs[cellI].append
-           (
-               vector(cx[cellI][I], cy[cellI][I], cz[cellI][I])
-           );
-       }
+           for (label I = 0; I < Nn; I++)
+           {
+               interpCoeffs[cellI].append(c[cellI][I]);
+               interpGradCoeffs[cellI].append
+               (
+                   vector(cx[cellI][I], cy[cellI][I], cz[cellI][I])
+               );
+           }
 
-       interpCoeffs[cellI].shrink();
-       interpGradCoeffs[cellI].shrink();
+           interpCoeffs[cellI].shrink();
+           interpGradCoeffs[cellI].shrink();
+        }
+
+        // We can clear sqrtW since it is no longer needed for the QR
+        // decomposition approach
+        sqrtWPtr_.clear();
     }
 
     Info<< "higherOrderGrad::calcCoeffs(): end" << endl;
@@ -521,13 +588,27 @@ higherOrderGrad::higherOrderGrad
     nLayers_(readInt(dict.lookup("nLayers"))),
     k_(readScalar(dict.lookup("k"))),
     maxStencilSize_(readInt(dict.lookup("maxStencilSize"))),
+    useQRDecomposition_(dict.lookup("useQRDecomposition")),
     calcConditionNumber_(dict.lookup("calcConditionNumber")),
     condNumberPtr_(),
     stencilsPtr_(),
+    cellBoundaryFacesPtr_(),
     interpCoeffsPtr_(),
     interpGradCoeffsPtr_(),
-    cellBoundaryFacesPtr_()
-{}
+    choleskyPtr_(),
+    QhatPtr_(),
+    sqrtWPtr_()
+{
+    if (calcConditionNumber_)
+    {
+        if (!useQRDecomposition_)
+        {
+            FatalErrorInFunction
+                << "useQRDecomposition must be 'on' when `calcConditionNumber` is 'on'"
+                << exit(FatalError);
+        }
+    }
+}
 
 
 // * * * * * * * * * * * * * * * * Destructors * * * * * * * * * * * * * * * //
@@ -575,47 +656,111 @@ tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D)
 
     forAll(stencils, cellI)
     {
-       const DynamicList<label>& curStencil = stencils[cellI];
-       const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
+        const DynamicList<label>& curStencil = stencils[cellI];
+        const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
 
-       // Loop over stencil and multiply stencil cell values with
-       // corresponding interpolation coefficient
-       for(label cI = 0; cI < Nn; cI++)
-       {
-           if (cI < curStencil.size())
-           {
-               gradD[cellI] += interpGradCoeffs[cellI][cI]*D[curStencil[cI]];
-           }
-           else
-           {
-               const label i = cI - curStencil.size();
-               const label globalFaceID = cellBoundaryFaces[cellI][i];
+        if (useQRDecomposition_)
+        {
+            // Loop over stencil and multiply stencil cell values with
+            // corresponding interpolation coefficient
+            for(label cI = 0; cI < Nn; cI++)
+            {
+                if (cI < curStencil.size())
+                {
+                    gradD[cellI] += interpGradCoeffs[cellI][cI]*D[curStencil[cI]];
+                }
+                else
+                {
+                    const label i = cI - curStencil.size();
+                    const label globalFaceID = cellBoundaryFaces[cellI][i];
 
-               vector boundaryD = vector::zero;
+                    vector boundaryD = vector::zero;
 
-               forAll(boundaryMesh, patchI)
-               {
-                   if
-                   (
-                       includePatchInStencils_[patchI]
-                    && boundaryMesh[patchI].type() != emptyPolyPatch::typeName
-                    && !boundaryMesh[patchI].coupled()
-                   )
-                   {
-                       const label start = boundaryMesh[patchI].start();
-                       const label nFaces = boundaryMesh[patchI].nFaces();
+                    forAll(boundaryMesh, patchI)
+                    {
+                        if
+                        (
+                            includePatchInStencils_[patchI]
+                         && boundaryMesh[patchI].type() != emptyPolyPatch::typeName
+                         && !boundaryMesh[patchI].coupled()
+                        )
+                        {
+                            const label start = boundaryMesh[patchI].start();
+                            const label nFaces = boundaryMesh[patchI].nFaces();
 
-                       if (globalFaceID >= start && globalFaceID < start + nFaces)
-                       {
-                           const label k = globalFaceID - start;
-                           boundaryD = D.boundaryField()[patchI][k];
-                       }
-                   }
-               }
+                            if (globalFaceID >= start && globalFaceID < start + nFaces)
+                            {
+                                const label k = globalFaceID - start;
+                                boundaryD = D.boundaryField()[patchI][k];
+                            }
+                        }
+                    }
 
-               gradD[cellI] += interpGradCoeffs[cellI][cI]*boundaryD;
-           }
-       }
+                    gradD[cellI] += interpGradCoeffs[cellI][cI]*boundaryD;
+                }
+            }
+        }
+        else // Cholesky decomposition
+        {
+            for (label cmptI = 0; cmptI < vector::nComponents; ++cmptI)
+            {
+                // Prepare right-hand side vector (y) for Cholesky decomposition
+                Eigen::VectorXd y(Nn);
+
+                for (label cI = 0; cI < Nn; cI++)
+                {
+                    if (cI < curStencil.size())
+                    {
+                        y[cI] = D[curStencil[cI]][cmptI];
+                    }
+                    else
+                    {
+                        const label i = cI - curStencil.size();
+                        const label globalFaceID = cellBoundaryFaces[cellI][i];
+
+                        forAll(boundaryMesh, patchI)
+                        {
+                            if
+                            (
+                                includePatchInStencils_[patchI]
+                                && boundaryMesh[patchI].type() != emptyPolyPatch::typeName
+                                && !boundaryMesh[patchI].coupled()
+                            )
+                            {
+                                const label start = boundaryMesh[patchI].start();
+                                const label nFaces = boundaryMesh[patchI].nFaces();
+
+                                if (globalFaceID >= start && globalFaceID < start + nFaces)
+                                {
+                                    const label k = globalFaceID - start;
+                                    y[cI] = D.boundaryField()[patchI][k][cmptI];
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Compute y_hat = W^{1/2} * y
+                const Eigen::VectorXd yhat =
+                    sqrtWPtr_()[cellI].diagonal().array()*y.array();
+
+                // Compute Q^T W y = Q_hat^T * y_hat
+                const Eigen::VectorXd QTWy = QhatPtr_()[cellI].transpose()*yhat;
+
+                // Solve for A
+                const Eigen::VectorXd z = choleskyPtr_()[cellI].matrixL().solve(QTWy);
+                const Eigen::VectorXd A = choleskyPtr_()[cellI].matrixU().solve(z);
+
+                // Extract gradient components from A and assign the gradient field
+                // Careful: they are column-wise
+                // gradD[cellI][3*cmptI] = A[1];
+                // gradD[cellI][3*cmptI + 1] = A[2];
+                // gradD[cellI][3*cmptI + 2] = A[3];
+                gradD[cellI][3*0 + cmptI] = A[1];
+                gradD[cellI][3*1 + cmptI] = A[2];
+                gradD[cellI][3*2 + cmptI] = A[3];
+            }
+        }
     }
 
     gradD.correctBoundaryConditions();

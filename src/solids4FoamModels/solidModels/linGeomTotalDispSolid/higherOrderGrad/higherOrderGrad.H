@@ -39,6 +39,7 @@ SourceFiles
 #define higherOrderGrad_H
 
 #include "fvMesh.H"
+#include <Eigen/Dense>
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -72,8 +73,13 @@ class higherOrderGrad
         //- Maxium stencil size: used for initialising dynamic lists
         const label maxStencilSize_;
 
+        //- Use QR decomposition to solve the least squares problem; if false,
+        //  use Cholesky decomposition to solve the normal equations
+        //  QR is more stable (to round-off error) but more expensive
+        const Switch useQRDecomposition_;
+
         //- Calculate the condition number field
-        const bool calcConditionNumber_;
+        const Switch calcConditionNumber_;
 
         //- Condition number field
         mutable autoPtr<volScalarField> condNumberPtr_;
@@ -81,14 +87,26 @@ class higherOrderGrad
         //- Least squares cell stencils
         mutable autoPtr<List<DynamicList<label>>> stencilsPtr_;
 
-        //- Interpolation coefficients
-        mutable autoPtr<List<DynamicList<scalar>>> interpCoeffsPtr_;
-
-        //- Gradient coefficients
-        mutable autoPtr<List<DynamicList<vector>>> interpGradCoeffsPtr_;
-
         //- Cell boundary face indices
         mutable autoPtr<List<DynamicList<label>>> cellBoundaryFacesPtr_;
+
+        //- QR Interpolation coefficients
+        mutable autoPtr<List<DynamicList<scalar>>> interpCoeffsPtr_;
+
+        //- QR Gradient coefficients
+        mutable autoPtr<List<DynamicList<vector>>> interpGradCoeffsPtr_;
+
+        //- Cholesky decomposition
+        mutable autoPtr<List<Eigen::LLT<Eigen::MatrixXd>>> choleskyPtr_;
+
+        //- Qhat matrix needed for Cholesky decomposition
+        mutable autoPtr<List<Eigen::MatrixXd>> QhatPtr_;
+
+        //- sqrtW matrix needed for Cholesky decomposition
+        mutable autoPtr
+        <
+            List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>
+        > sqrtWPtr_;
 
 
     // Private Member Functions
