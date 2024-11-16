@@ -117,6 +117,13 @@ class higherOrderGrad
         //- Return the least squares cell stencils
         const List<DynamicList<label>> stencils() const;
 
+        //- Calculate exponents for the Tayler series expansion terms
+        void generateExponents
+        (
+            const label N,
+            DynamicList<FixedList<label, 3>>& exponents
+        ) const;
+
         //- Calculate interpolation and gradient coefficients
         void calcCoeffs() const;
 

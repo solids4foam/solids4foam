@@ -157,6 +157,42 @@ const List<DynamicList<label>> higherOrderGrad::stencils() const
 }
 
 
+void higherOrderGrad::generateExponents
+(
+    const label N,
+    DynamicList<FixedList<label, 3>>& exponents
+) const
+{
+    // Estimate the number of terms to set the capacity
+    const label estimatedSize = (N + 1)*(N + 2)*(N + 3)/6;
+    exponents.setCapacity(estimatedSize);
+
+    // Add the constant term first
+    exponents.append(FixedList<label, 3>{0, 0, 0});
+
+    for (label n = 1; n <= N; ++n)
+    {
+        for (label i = n; i >= 0; --i)
+        {
+            for (label j = n - i; j >= 0; --j)
+            {
+                label k = n - i - j;
+                if (i == 0 && j == 0 && k == 0)
+                {
+                    // Skip the constant term as it's already added
+                    continue;
+                }
+                FixedList<label, 3> exponent = {i, j, k};
+                exponents.append(exponent);
+            }
+        }
+    }
+
+    // Adjust capacity to actual size
+    exponents.shrink();
+}
+
+
 void higherOrderGrad::calcCoeffs() const
 {
     Info<< "higherOrderGrad::calcCoeffs()" << endl;
@@ -190,9 +226,22 @@ void higherOrderGrad::calcCoeffs() const
     const vectorField& CI = mesh.C();
     const vectorField& CfI = mesh.Cf();
 
-    // Number of terms in Taylor expression
-    // 1 for zero order, 4 for 1 order, 10 for second order
-    const label Np = factorial(N_ + 3)/(factorial(N_)*factorial(3));
+    // Calculate Taylor series exponents
+    // 1 for zero order, 4 for 1 order, 10 for second order, etc.
+    DynamicList<FixedList<label, 3>> exponents;
+    generateExponents(N_, exponents);
+    const label Np = exponents.size();
+    if (debug)
+    {
+        Info<< "Np = " << Np << endl;
+    }
+
+    // Precompute factorials up to N
+    List<scalar> factorials(N_ + 1, 1.0);
+    for (label n = 1; n <= N_; ++n)
+    {
+        factorials[n] = factorials[n - 1]*n;
+    }
 
     if (calcConditionNumber_)
     {
@@ -229,11 +278,6 @@ void higherOrderGrad::calcCoeffs() const
             << "N must be at least 1!" << exit(FatalError);
     }
 
-    if (N_ > 2)
-    {
-        notImplemented("Orders higher that quadratic not implemented");
-    }
-
     forAll(stencils, cellI)
     {
         const DynamicList<label>& curStencil = stencils[cellI];
@@ -253,8 +297,7 @@ void higherOrderGrad::calcCoeffs() const
         // Loop over neighbours and construct matrix Q
         const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
 
-        // For now I will use matrix format from Eigen/Dense library
-        //Eigen::MatrixXd Q = Eigen::MatrixXd::Zero(Np, Nn);
+        // Use matrix format from Eigen/Dense library
         // Avoid initialisation to zero as we will set every entry below
         Eigen::MatrixXd Q(Np, Nn);
 
@@ -267,99 +310,69 @@ void higherOrderGrad::calcCoeffs() const
                 << exit(FatalError);
         }
 
-        // Loop over cells in stencil, each cell have its corresponding
-        // row in Q matrix
-
-        // Add linear interpolation part N = 1
-        for (label cI = 0; cI < curStencil.size(); cI++)
+        // Loop over stencil points
+        for (label cI = 0; cI < Nn; ++cI)
         {
-            const label neiCellID = curStencil[cI];
-            const vector& neiC = CI[neiCellID];
-            const vector& C = CI[cellI];
-            const vector dx = neiC - C;
-            Q(0, cI) = 1;
-            Q(1, cI) = dx.x();
-            Q(2, cI) = dx.y();
-            Q(3, cI) = dx.z();
-        }
-
-        // Add quadratic interpolation part N = 2
-        if (N_ > 1)
-        {
-            for (label cI = 0; cI < curStencil.size(); cI++)
+            vector dx;
+            if (cI < curStencil.size())
             {
                 const label neiCellID = curStencil[cI];
                 const vector& neiC = CI[neiCellID];
-                const vector& C = CI[cellI];
-                const vector dx = neiC - C;
-                Q(4, cI) = 0.5*dx.x()*dx.x();
-                Q(5, cI) = 0.5*dx.y()*dx.y();
-                Q(6, cI) = 0.5*dx.z()*dx.z();
-                Q(7, cI) = dx.x()*dx.y();
-                Q(8, cI) = dx.x()*dx.z();
-                Q(9, cI) = dx.y()*dx.z();
+                dx = neiC - CI[cellI];
             }
-        }
-
-        // Boundary faces
-        // For boundary cells we need to add boundary face as
-        // neigbour
-        for (label cI = curStencil.size(); cI < Nn; cI++)
-        {
-            const label i = cI - curStencil.size();
-            const label globalFaceID = cellBoundaryFaces[cellI][i];
-            const vector& neiC = CfI[globalFaceID];
-            const vector& C = CI[cellI];
-            const vector dx = neiC - C;
-            Q(0, cI) = 1;
-            Q(1, cI) = dx.x();
-            Q(2, cI) = dx.y();
-            Q(3, cI) = dx.z();
-        }
-
-        // Add quadratic interpolation part N = 2
-        if (N_ > 1)
-        {
-            for (label cI = curStencil.size(); cI < Nn; cI++)
+            else
             {
                 const label i = cI - curStencil.size();
                 const label globalFaceID = cellBoundaryFaces[cellI][i];
                 const vector& neiC = CfI[globalFaceID];
-                const vector& C = CI[cellI];
-                const vector dx = neiC - C;
-                Q(4, cI) = 0.5*dx.x()*dx.x();
-                Q(5, cI) = 0.5*dx.y()*dx.y();
-                Q(6, cI) = 0.5*dx.z()*dx.z();
-                Q(7, cI) = dx.x()*dx.y();
-                Q(8, cI) = dx.x()*dx.z();
-                Q(9, cI) = dx.y()*dx.z();
+                dx = neiC - CI[cellI];
+            }
+
+            // Compute monomial values for each exponent
+            for (label p = 0; p < Np; ++p)
+            {
+                const FixedList<label, 3>& exponent = exponents[p];
+                const label i = exponent[0];
+                const label j = exponent[1];
+                const label k = exponent[2];
+
+               // Compute factorial denominator
+               const scalar factorialDenominator =
+                   factorials[i]*factorials[j]*factorials[k];
+
+               // Compute and assign monomial value with factorials
+               // Note: the order of the quadratic and higher terms may not be
+               // the same as the previous manual approach
+               Q(p, cI) =
+                   pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
+                  /factorialDenominator;
             }
         }
 
-        //Eigen::MatrixXd W = Eigen::MatrixXd::Zero(Nn, Nn);
         Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn);
         //W.setZero(); // no need to waste time initialising
 
         for (label cI = 0; cI < Nn; cI++)
         {
-            vector neiC = vector::zero;
+            scalar d;
 
             if (cI < curStencil.size())
             {
+                const vector& C = CI[cellI];
                 const label neiCellID = curStencil[cI];
-                neiC = CI[neiCellID];
+                const vector& neiC = CI[neiCellID];
+                d = mag(neiC - C);
             }
             else
             {
                 // For boundary cells we need to add boundary face as
                 // neigbour
+                const vector& C = CI[cellI];
                 const label i = cI - curStencil.size();
                 const label globalFaceID = cellBoundaryFaces[cellI][i];
-                neiC = CfI[globalFaceID];
+                const vector& neiC = CfI[globalFaceID];
+                d = mag(neiC - C);
             }
-
-            const vector& C = CI[cellI];
-            const scalar d = mag(neiC - C);
 
             // Smoothing length
             const scalar dm = 2*maxDist;
@@ -371,7 +384,6 @@ void higherOrderGrad::calcCoeffs() const
                     Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
                 )/(1 - exp(sqrK));
 
-            //W(cI, cI) = w;
             W.diagonal()[cI] = w;
         }
 
