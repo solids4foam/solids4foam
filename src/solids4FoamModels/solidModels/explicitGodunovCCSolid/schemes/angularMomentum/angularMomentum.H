@@ -92,7 +92,8 @@ public:
                 GeometricField<vector, fvPatchField, volMesh>&,
                 GeometricField<vector, fvPatchField, volMesh>&,
                 const GeometricField<vector, fvPatchField, volMesh>&,
-                const scalar&
+                const scalar&,
+                const dimensionedScalar&
             ) const;
 
         // Print

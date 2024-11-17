@@ -216,15 +216,9 @@ void mechanics::pesudoTime
 )
 {
     const dimensionedScalar& h = op.minimumEdgeLength();
-
-
-    if (timeStepping_ == "variable")
-    {
-        deltaT = (cfl_*h)/Up_time;
-        // runTime.setDeltaT(deltaT);
-    }
-    // deltaT =tpdeltaT_;
-    // runTime++;
+    
+    deltaT = (cfl_*h)/Up_time;
+    
     pesudoTimeStep_++;
 
 

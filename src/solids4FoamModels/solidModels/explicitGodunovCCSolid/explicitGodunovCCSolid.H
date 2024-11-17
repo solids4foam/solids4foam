@@ -71,21 +71,6 @@ class explicitGodunovCCSolid
     public solidModel
 {
     // Private data
-        //- Implicit stiffness; coefficient of the Laplacian term
-        //  The value of this term only affects convergence and not the answer
-        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        const volScalarField impK_;
-
-        //- Implicit stiffness surface field
-        surfaceScalarField impKf_;
-
-        //- Reciprocal of impK
-        //  We divide by impK every time tractionBoundarySnGrad is called so we
-        //  will store the reciprocal for effficiency
-        const volScalarField rImpK_;
-
-    //-----------------------------------
-
     Time& runTime_;
 
     // Reading dictionaries 
@@ -95,17 +80,11 @@ class explicitGodunovCCSolid
     // Control dictionary
     IOdictionary controlDict_;
 
-    // Finite volume solution dictionary
-    IOdictionary fvSolution_;
-
     // Stabilisation parameter for near incompressibility
     const scalar& beta_;
 
     // Angular momentum conservation
     const word angularMomentumConservation_;
-
-    // Optional linear momentum damping coefficient
-    const dimensionedScalar dampingCoeff_;
 
     //Creating mesh parameters 
 
@@ -279,9 +258,6 @@ class explicitGodunovCCSolid
 
 
     // Private Member Functions
-    
-        //- Update the stress field
-        void updateStress();
 
         //- Disallow default bitwise copy construct
         explicitGodunovCCSolid(const explicitGodunovCCSolid&);
@@ -297,8 +273,7 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-            return nonLinearGeometry::TOTAL_LAGRANGIAN;
-            // return nonLinearGeometry::LINEAR_GEOMETRY;
+                return nonLinearGeometry::TOTAL_LAGRANGIAN;
         }
 
 

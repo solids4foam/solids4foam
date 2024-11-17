@@ -39,35 +39,6 @@ defineTypeNameAndDebug(explicitGodunovCCSolid, 0);
 addToRunTimeSelectionTable(solidModel, explicitGodunovCCSolid, dictionary);
 
 
-// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
-
-void explicitGodunovCCSolid::updateStress()
-{
-    // Update increment of displacement
-    DD() = D() - D().oldTime();
-
-    // Update gradient of displacement
-    mechanical().grad(D(), gradD());
-
-    // Update gradient of displacement increment
-    gradDD() = gradD() - gradD().oldTime();
-
-    // Calculate the stress using run-time selectable mechanical law
-    // mechanical().correct(sigma());
-    sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
-    // // Interpolate cell displacements to vertices
-    // mechanical().interpolate(D(), pointD());
-
-    mechanical().interpolate(D(), gradD(), pointD());
-
-    // Increment of displacement
-    DD() = D() - D().oldTime();
-    
-    // // Increment of point displacement
-    pointDD() = pointD() - pointD().oldTime();
-}
-
-
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 explicitGodunovCCSolid::explicitGodunovCCSolid
@@ -77,10 +48,6 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
 )
 :
     solidModel(typeName, runTime, region),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
-    rImpK_(1.0/impK_),
-    //----------------------------------------------
     runTime_(runTime),
     //reading dicts
     mechanicalProperties_//! to be changed
@@ -106,47 +73,23 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
             IOobject::NO_WRITE
         )
     ),
-
-    fvSolution_
-    (
-        IOobject
-        (
-            "fvSolution",
-            runTime.system(),
-            mesh(),
-            IOobject::MUST_READ_IF_MODIFIED,
-            IOobject::NO_WRITE
-        )
-    ),
     
     beta_
     (
-        readScalar(fvSolution_.lookup("incompressiblilityCoefficient"))
+        solidModelDict().lookupOrAddDefault<scalar>("incompressiblilityCoefficient", 1)
     ),
    
     angularMomentumConservation_
     (
-        fvSolution_.lookup("angularMomentumConservation")
+        solidModelDict().lookupOrAddDefault<word>("angularMomentumConservation", "no")
     ),
     
-    dampingCoeff_
-    (
-        "dampingCoeff",
-        dimensionSet(0,0,-1, 0, 0, 0, 0),
-        fvSolution_
-    ),
-
 //-----------------------------------------------------------------
 
     op_(mesh()),
     magSf_(mesh().magSf()),
     Sf_(mesh().Sf()),
     h_(op_.minimumEdgeLength()),
-    // bm_(mesh().boundaryMesh()),
-    // symmetricPatchID_(bm_.findPatchID("symmetric")),
-    // symmetricXpatchID_(bm_.findPatchID("symmetricX")),
-    // symmetricYpatchID_(bm_.findPatchID("symmetricY")),
-    // symmetricZpatchID_(bm_.findPatchID("symmetricZ")),
 
     // Creating mesh coordinate fields 
     C_(mesh().C()),
@@ -396,13 +339,14 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
         angularMomentumConservation_ != "yes" && angularMomentumConservation_ != "no"
     )
     {
-        FatalErrorIn("readControls.H")
+        FatalErrorIn("angularMomentumConservation_")
             << "Valid type entries are 'yes' or 'no' "
             << "for angularMomentumConservation"
             << abort(FatalError);
     }
+    Info << "Angular Momentum Conservation: " << angularMomentumConservation_ << endl;
+    Info << "dampingCoeff: " << dampingCoeff().value() << endl;
 
-    Info << "dampingCoeff: " << dampingCoeff_.value() << endl;
 
 
     // Assign mesh points to the primitive field of xN_
@@ -430,11 +374,16 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     pointD().oldTime();
 
 
+    lm_.oldTime();
     lm_.oldTime().oldTime();
+    F_.oldTime();
     F_.oldTime().oldTime();
-    // x_.oldTime();
-    // xF_.oldTime();
+    x_.oldTime();
+    x_.oldTime().oldTime();
+    xF_.oldTime();
+    xF_.oldTime().oldTime();
     xN_.oldTime();
+    xN_.oldTime().oldTime();
 
     DisRequired();
 
@@ -469,7 +418,6 @@ bool explicitGodunovCCSolid::evolve()
     {
         int iCorr = 0;
         mech_.pesudoTimeStep() = 0;
-        
 
         if (physicsModel::printInfo())
         {
@@ -479,11 +427,16 @@ bool explicitGodunovCCSolid::evolve()
         // Momentum equation loop
         do
         {
+            if (angularMomentumConservation_ == "yes")
+            {
+                x_.storePrevIter();
+                xF_.storePrevIter();
+            }
+
             F_.storePrevIter();
             lm_.storePrevIter();
-            // x_.storePrevIter();
             xN_.storePrevIter();
-            // xF_.storePrevIter();
+            
 
             mech_.pesudoTime(runTime_, pDeltaT_, max(Up_time_));
 
@@ -497,10 +450,14 @@ bool explicitGodunovCCSolid::evolve()
                 }
             }
 
+            if (angularMomentumConservation_ == "yes")
+            {
+                x_ = 0.5*(x_.prevIter() + x_);
+                xF_ = 0.5*(xF_.prevIter() + xF_);
+            }
+
             lm_ = 0.5*(lm_.prevIter() + lm_);
             F_ = 0.5*(F_.prevIter() + F_);
-            // x_ = 0.5*(x_.prevIter() + x_);
-            // xF_ = 0.5*(xF_.prevIter() + xF_);
             xN_ = 0.5*(xN_.prevIter() + xN_);            
 
             #include "updateVariables.H"
@@ -518,10 +475,7 @@ bool explicitGodunovCCSolid::evolve()
          && ++iCorr < nCorr()
         );
 
-
         // Update the stress field based on the latest D field
-        // DD() = D() - D().oldTime();
-
         sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
 
         // Increment of point displacement
@@ -534,6 +488,7 @@ bool explicitGodunovCCSolid::evolve()
     return true;
 }
 
+//! unnecessary function but requiered by the main solver
 tmp<vectorField> explicitGodunovCCSolid::tractionBoundarySnGrad
 (
     const vectorField& traction,
@@ -541,35 +496,7 @@ tmp<vectorField> explicitGodunovCCSolid::tractionBoundarySnGrad
     const fvPatch& patch
 ) const
 {
-    // Patch index
-    const label patchID = patch.index();
-
-    // Patch mechanical property
-    const scalarField& impK = impK_.boundaryField()[patchID];
-
-    // Patch reciprocal implicit stiffness field
-    const scalarField& rImpK = rImpK_.boundaryField()[patchID];
-
-    // Patch gradient
-    const tensorField& pGradD = gradD().boundaryField()[patchID];
-
-    // Patch stress
-    const symmTensorField& pSigma = sigma().boundaryField()[patchID];
-
-    // Patch unit normals
-    const vectorField n(patch.nf());
-
-    // Return patch snGrad
-    return tmp<vectorField>
-    (
-        new vectorField
-        (
-            (
-                (traction - n*pressure)
-              - (n & (pSigma - impK*pGradD))
-            )*rImpK
-        )
-    );
+    Info << "tractionBoundarySnGrad() not implemented" << endl;
 }
 
 

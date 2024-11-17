@@ -213,7 +213,7 @@ bool Foam::solidModel::fieldConverged
                 sumResP += magSqr(vf[i] - vf.prevIter()[i]);
             }
             resP = std::sqrt((sumResP) / vf.size());
-
+     reduce(resP, sumOp<scalar>());
 
     // Calculate displacement residual based on the relative change of vf
     scalar denom = 0.0;

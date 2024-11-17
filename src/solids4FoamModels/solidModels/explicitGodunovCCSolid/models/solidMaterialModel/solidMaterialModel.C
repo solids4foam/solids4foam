@@ -90,20 +90,96 @@ solidMaterialModel::solidMaterialModel
         )
     ),
 
-    model_(dict.lookup("solidMaterialModel")),
+    rho_
+    (
+        "rho",
+        dimensionSet(1 , -3,  0, 0, 0, 0, 0),
+        0.0  
+    ),
 
-    rho_(dict.lookup("rho")),
-    E_(dict.lookup("E")),
-    nu_(dict.lookup("nu")),
-    mu_(E_/(2.0*(1.0 + nu_))),
-    lambda_(nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_))),
-    kappa_(lambda_ + (2.0/3.0)*mu_),
+    E_
+    (
+        "rho",
+        dimensionSet(1, -1, -2, 0, 0, 0, 0),
+        0.0  
+    ),
 
-    Up_(sqrt((lambda_+2.0*mu_)/rho_)),
-    Us_(sqrt(mu_/rho_))
+    nu_
+    (
+        "nu",
+        dimensionSet(0, 0, 0, 0, 0, 0, 0),
+        0.0  
+    ),
+
+    mu_
+    (
+        "lambda",
+        dimensionSet(1, -1, -2, 0, 0, 0, 0),
+        0.0  
+    ),
+
+    lambda_
+    (
+        "lambda",
+        dimensionSet(1, -1, -2, 0, 0, 0, 0),    
+        0.0  
+    ),
+
+    kappa_
+    (
+        "kappa",
+        dimensionSet(1, -1, -2, 0, 0, 0, 0),
+        0.0  
+    ),
+
+
+    Up_
+    (
+        "Up",
+        dimensionSet(0, 1, -1, 0, 0, 0, 0),
+        0.0  
+    ),
+
+    Us_
+    (
+        "Us",
+        dimensionSet(0, 1, -1, 0, 0, 0, 0),
+        0.0  
+    )
+
 {
+    Info << "lambda: " << lambda_ << nl;
+
+    // Read the mechanical laws
+    const PtrList<entry> lawEntries(dict.lookup("mechanical"));
+
+    const dictionary& materialDict = lawEntries[0].dict();
+
+    // Read rho, E, and nu from the material dictionary
+
+    const word model
+    (
+        materialDict.lookup("type")
+    );
+    model_ = model;
+
+
+    rho_ = dimensionedScalar(materialDict.lookup("rho"));
+    E_ = dimensionedScalar(materialDict.lookup("E"));
+    nu_ = dimensionedScalar(materialDict.lookup("nu"));
+    mu_ =(E_/(2.0*(1.0 + nu_)));
+
+    lambda_ = (nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_)));
+
+    kappa_ =lambda_ + (2.0/3.0)*mu_;
+
+    Up_ = sqrt((lambda_+2.0*mu_)/rho_);
+    Us_ = sqrt(mu_/rho_);
+
+
     correct();// add here form creatField.H in original solver to make sure variables are apdated like rho_ ...
     p_.write();
+
 }
 
 
@@ -133,7 +209,7 @@ void solidMaterialModel::correct()
         P_ = mu_*(F_ + F_.T() - ((2.0/3.0)*tr(F_)*tensor::I)) + p_*tensor::I;
     }
 
-    else if (model_ == "neoHookean")
+    else if (model_ == "neoHookeanElastic")
     {
         p_ = kappa_*(J_-1.0);
         P_ =
@@ -146,7 +222,7 @@ void solidMaterialModel::correct()
         FatalErrorIn
         (
             "solidMaterialModel.C"
-        )   << "Valid type entries are 'linearElastic' or 'neoHookean' for"
+        )   << "Valid type entries are 'linearElastic' or 'neoHookeanElastic' for"
             << "solidMaterialModel"
             << abort(FatalError);
     }

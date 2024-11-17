@@ -44,8 +44,18 @@ angularMomentum::angularMomentum
 )
 :
     mesh_(vm),
-    rho_(dict.lookup("rho"))
-{}
+    rho_
+    (
+        "rho",
+        dimensionSet(1 , -3,  0, 0, 0, 0, 0),
+        0.0  
+    )
+{
+    const PtrList<entry> lawEntries(dict.lookup("mechanical"));
+    const dictionary& materialDict = lawEntries[0].dict();
+
+    rho_ = dimensionedScalar(materialDict.lookup("rho"));
+}
 
 
 // * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * * //
@@ -60,7 +70,8 @@ void angularMomentum::AMconservation
     GeometricField<vector, fvPatchField, volMesh>& rhsLm,
     GeometricField<vector, fvPatchField, volMesh>& rhsLm1,
     const GeometricField<vector, fvPatchField, volMesh>& rhsAm,
-    const scalar& RKstage
+    const scalar& RKstage,
+    const dimensionedScalar& deltaT
 ) const
 {
     const scalarField& V_ = mesh_.V();
@@ -68,12 +79,12 @@ void angularMomentum::AMconservation
     const volVectorField& x_ = db.lookupObject<volVectorField>("x");
     const volVectorField& lm_ = db.lookupObject<volVectorField>("lm");
 
-    const dimensionedScalar deltaT
-    (
-        "deltaT",
-        dimensionSet(0,0,1,0,0,0,0),
-        db.time().deltaTValue()
-    );
+    // const dimensionedScalar deltaT
+    // (
+    //     "deltaT",
+    //     dimensionSet(0,0,1,0,0,0,0),
+    //     db.time().deltaTValue()
+    // );
 
     tmp<GeometricField<vector, fvPatchField, volMesh> > tvf_x
     (
@@ -113,13 +124,13 @@ void angularMomentum::AMconservation
 
     if (RKstage == 0)
     {
-        xAM = x_.oldTime();
+        xAM = x_.prevIter();
     }
 
     else if (RKstage == 1)
     {
-        xAM = x_.oldTime() + (deltaT/2.0)*(lm_.oldTime()/rho_);
-        lmAM = lm_.oldTime() + (deltaT*rhsLm1);
+        xAM = x_.prevIter() + (deltaT/2.0)*(lm_.prevIter()/rho_);
+        lmAM = lm_.prevIter() + (deltaT*rhsLm1);
         xAM = xAM + ((deltaT*(lmAM/rho_))/2.0);
     }
 
