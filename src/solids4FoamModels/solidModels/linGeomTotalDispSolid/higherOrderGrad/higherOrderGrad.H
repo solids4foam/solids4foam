@@ -81,8 +81,8 @@ class higherOrderGrad
         //- Calculate the condition number field
         const Switch calcConditionNumber_;
 
-        //- Condition number field
-        mutable autoPtr<volScalarField> condNumberPtr_;
+        //- Condition number field of the least squares system
+        mutable autoPtr<volScalarField> conditionNumberPtr_;
 
         //- Least squares cell stencils
         mutable autoPtr<List<DynamicList<label>>> stencilsPtr_;
@@ -91,10 +91,10 @@ class higherOrderGrad
         mutable autoPtr<List<DynamicList<label>>> cellBoundaryFacesPtr_;
 
         //- QR Interpolation coefficients
-        mutable autoPtr<List<DynamicList<scalar>>> interpCoeffsPtr_;
+        mutable autoPtr<List<DynamicList<scalar>>> QRInterpCoeffsPtr_;
 
         //- QR Gradient coefficients
-        mutable autoPtr<List<DynamicList<vector>>> interpGradCoeffsPtr_;
+        mutable autoPtr<List<DynamicList<vector>>> QRGradCoeffsPtr_;
 
         //- Cholesky decomposition
         mutable autoPtr<List<Eigen::LLT<Eigen::MatrixXd>>> choleskyPtr_;
@@ -124,17 +124,37 @@ class higherOrderGrad
             DynamicList<FixedList<label, 3>>& exponents
         ) const;
 
-        //- Calculate interpolation and gradient coefficients
-        void calcCoeffs() const;
+        //- Calculate coefficients for the QR decomposition approach
+        void calcQRCoeffs() const;
+
+        //- Calculate coefficients for the Cholesky decomposition approach
+        void calcCholeskyCoeffs() const;
 
         //- Return the interpolation coefficients
-        const List<DynamicList<scalar>>& interpCoeffs() const;
+        const List<DynamicList<scalar>>& QRInterpCoeffs() const;
 
         //- Return the gradient coefficients
-        const List<DynamicList<vector>>& interpGradCoeffs() const;
+        const List<DynamicList<vector>>& QRGradCoeffs() const;
 
         //- Return the cell boundary face indices
         const List<DynamicList<label>>& cellBoundaryFaces() const;
+
+        //- Return Cholesky matrices
+        const List<Eigen::LLT<Eigen::MatrixXd>>& cholesky() const;
+
+        //- Return Qhat matirces used by the Cholesky decomposition approach
+        const List<Eigen::MatrixXd>& Qhat() const;
+
+        //- Return sqrtW weight matirces used by the Cholesky decomposition
+        //  approach
+        const List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>&
+            sqrtW() const;
+
+        //- Return the condition number field
+        volScalarField& conditionNumber() const;
+
+        //- Make the condition number field
+        void makeConditionNumber() const;
 
         //- Disallow default bitwise copy construct
         higherOrderGrad(const higherOrderGrad&);
@@ -164,25 +184,19 @@ public:
 
 
     // Member Functions
-
-        // Access
-
-            //- Condition number field
-            const volScalarField& condNumber() const
-            {
-                if (calcConditionNumber_)
-                {
-                    FatalErrorInFunction
-                        << "Field not calculated!" << abort(FatalError);
-                }
-
-                return *condNumberPtr_;
-            }
-
+    
         // Edit
 
             //- Calculate the gradient of a volVectorField
             tmp<volTensorField> grad(const volVectorField& D);
+
+            //- Calculate the gradient of a volVectorField using QR
+            //  decomposition
+            tmp<volTensorField> gradQR(const volVectorField& D);
+
+            //- Calculate the gradient of a volVectorField using Cholesky
+            //  decomposition
+            tmp<volTensorField> gradCholesky(const volVectorField& D);
 };
 
 
