@@ -39,6 +39,7 @@ SourceFiles
 #define higherOrderGrad_H
 
 #include "fvMesh.H"
+#include "globalIndex.H"
 #include <Eigen/Dense>
 
 
@@ -73,6 +74,10 @@ class higherOrderGrad
         //- Maxium stencil size: used for initialising dynamic lists
         const label maxStencilSize_;
 
+        //- Global cell addressing object for converting between local and
+        //  global indices
+        const globalIndex globalCells_;
+
         //- Use QR decomposition to solve the least squares problem; if false,
         //  use Cholesky decomposition to solve the normal equations
         //  QR is more stable (to round-off error) but more expensive
@@ -88,7 +93,15 @@ class higherOrderGrad
         mutable autoPtr<List<DynamicList<label>>> stencilsPtr_;
 
         //- Cell boundary face indices
-        mutable autoPtr<List<DynamicList<label>>> cellBoundaryFacesPtr_;
+        mutable autoPtr<List<DynamicList<label>>> stencilsBoundaryFacesPtr_;
+
+        //- Least squares global cell stencils
+        //  This is a labelList for each cell on this processor, containing the
+        //  global cell indices of all cells in its stencil, including those on
+        //  other processors
+        //  The globalCells object can be used to check if a cell is local or
+        //  not and to convert between global and local indices
+        mutable autoPtr<labelListList> globalCellStencilsPtr_;
 
         //- QR Interpolation coefficients
         mutable autoPtr<List<DynamicList<scalar>>> QRInterpCoeffsPtr_;
@@ -111,11 +124,17 @@ class higherOrderGrad
 
     // Private Member Functions
 
+        //- Make the least squares cell stencils
+        void makeGlobalCellStencils() const;
+
         //- Least squares cell stencils
         void makeStencils() const;
 
         //- Return the least squares cell stencils
-        const List<DynamicList<label>> stencils() const;
+        const List<DynamicList<label>>& stencils() const;
+
+        //- Return the least squares global cell stencils
+        const labelListList& globalCellStencils() const;
 
         //- Calculate exponents for the Tayler series expansion terms
         void generateExponents
@@ -137,7 +156,7 @@ class higherOrderGrad
         const List<DynamicList<vector>>& QRGradCoeffs() const;
 
         //- Return the cell boundary face indices
-        const List<DynamicList<label>>& cellBoundaryFaces() const;
+        const List<DynamicList<label>>& stencilsBoundaryFaces() const;
 
         //- Return Cholesky matrices
         const List<Eigen::LLT<Eigen::MatrixXd>>& cholesky() const;

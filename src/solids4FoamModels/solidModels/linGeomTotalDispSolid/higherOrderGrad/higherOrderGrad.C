@@ -21,6 +21,8 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "emptyPolyPatch.H"
+#include "processorPolyPatch.H"
+
 
 namespace Foam
 {
@@ -33,11 +35,433 @@ defineTypeNameAndDebug(higherOrderGrad, 0);
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 
+void higherOrderGrad::makeGlobalCellStencils() const
+{
+    InfoInFunction
+        << "start" << endl;
+
+    if (globalCellStencilsPtr_)
+    {
+        FatalErrorInFunction
+            << "Pointer already set" << exit(FatalError);
+    }
+
+    // References from brevity and efficiency
+    const fvMesh& mesh = mesh_;
+    const label nCells = mesh.nCells();
+    const labelUList& owner = mesh.owner();
+    const labelUList& neighbour = mesh.neighbour();
+    const cellList& cells = mesh.cells();
+
+    // Prepare and store processor neighbour face global cells, i.e. global cell
+    // indices of the cells across the processor patches
+    labelListList procPatchNeiGlobalCellIDs(mesh.boundaryMesh().size());
+    if (Pstream::parRun())
+    {
+        PstreamBuffers pBufs(UPstream::commsTypes::nonBlocking);
+
+        // Send global cell IDs for each processor patch
+        forAll(mesh.boundaryMesh(), patchI)
+        {
+            const polyPatch& pp = mesh.boundaryMesh()[patchI];
+            if (isA<processorPolyPatch>(pp))
+            {
+                const processorPolyPatch& procPatch =
+                    refCast<const processorPolyPatch>(pp);
+
+                UOPstream toNeighbProc(procPatch.neighbProcNo(), pBufs);
+
+                toNeighbProc
+                    << globalCells_.toGlobal(pp.faceCells());
+            }
+        }
+
+        pBufs.finishedSends(); // no-op for blocking
+
+        // Receive data
+        forAll(mesh.boundaryMesh(), patchI)
+        {
+            const polyPatch& pp = mesh.boundaryMesh()[patchI];
+            if (isA<processorPolyPatch>(pp))
+            {
+                const processorPolyPatch& procPatch =
+                    refCast<const processorPolyPatch>(pp);
+
+                UIPstream fromNeighbProc(procPatch.neighbProcNo(), pBufs);
+
+                procPatchNeiGlobalCellIDs[patchI].setSize(pp.size());
+
+                fromNeighbProc
+                    >> procPatchNeiGlobalCellIDs[patchI];
+            }
+        }
+    }
+
+    // Initialize visited sets and frontiers for all cells
+    // For each local cell, we will find and store all cells in the stecil as
+    // global cell indices
+    List<labelHashSet> cellVisitedSets(nCells);
+    List<labelList> cellFrontiers(nCells);
+
+    // Initialize the visited sets and current frontiers
+    for (label localCellI = 0; localCellI < nCells; ++localCellI)
+    {
+        // Get global cell ID
+        const label globalCellI = globalCells_.toGlobal(localCellI);
+
+        // Initialize the visited set with the cell itself
+        cellVisitedSets[localCellI].insert(globalCellI);
+
+        // Initialize current frontier with immediate neighbors
+        DynamicList<label> neighborCellIDs;
+
+        const labelList& cellFaces = cells[localCellI];
+
+        forAll(cellFaces, faceI)
+        {
+            const label curFaceID = cellFaces[faceI];
+
+            if (mesh.isInternalFace(curFaceID))
+            {
+                // Internal face
+                const label own = owner[curFaceID];
+                const label nei = neighbour[curFaceID];
+                const label neiLocalCellI = (own == localCellI) ? nei : own;
+                const label neiGlobalCellI =
+                    globalCells_.toGlobal(neiLocalCellI);
+
+                // Check if neiCellID is already in neighbors
+                if (findIndex(neighborCellIDs, neiGlobalCellI) == -1)
+                {
+                    neighborCellIDs.append(neiGlobalCellI);
+                }
+            }
+            else
+            {
+                // Boundary face
+                const label patchID =
+                    mesh.boundaryMesh().whichPatch(curFaceID);
+                const polyPatch& pp = mesh.boundaryMesh()[patchID];
+
+                if (isA<processorPolyPatch>(pp))
+                {
+                    // Lookup the global cell ID across the processor patch
+                    const label localFaceI = curFaceID - pp.start();
+                    const label neiGlobalCellI =
+                        procPatchNeiGlobalCellIDs[patchID][localFaceI];
+
+                    // Check if neiCellID is already in neighbors
+                    if (findIndex(neighborCellIDs, neiGlobalCellI) == -1)
+                    {
+                        neighborCellIDs.append(neiGlobalCellI);
+                    }
+                }
+                // else {} // Physical boundary, no action needed
+            }
+        }
+
+        // Add immediate neighbors to the visited set and current frontier
+        cellVisitedSets[localCellI].insert(neighborCellIDs);
+        cellFrontiers[localCellI] = neighborCellIDs;
+    }
+
+    // Now perform N-1 iterations (we already have the first layer)
+    for (label layer = 2; layer <= nLayers_; ++layer)
+    {
+        // Prepare the next layer's frontiers
+        List<labelList> nextFrontiers(nCells);
+
+        // Maps for inter-processor communication
+        // Map from processor ID to Pair(originGlobalCellI, frontGlobalCellI)
+        // What we want from other procs?
+        //    cell-cells of a given cell on their proc
+        // What to send?
+        //     originGlobalCellID => cell whose stencil we are making
+        //     frontGlobalCellID => whose cell-cells we want (as global IDs)
+        //     myProcNo => so the other proc knows who to send the info back to
+        //             may not be explicitly needed, as implicitly known
+        Map<List<labelPair>> sendMap;
+
+        for (label localCellI = 0; localCellI < nCells; ++localCellI)
+        {
+            const labelList& currentFrontier = cellFrontiers[localCellI];
+            labelHashSet& visitedSet = cellVisitedSets[localCellI];
+            labelList& nextFrontier = nextFrontiers[localCellI];
+
+            forAll(currentFrontier, idx)
+            {
+                const label frontGlobalCellI = currentFrontier[idx];
+
+                if (globalCells_.isLocal(frontGlobalCellI))
+                {
+                    const label frontLocalCellI =
+                        globalCells_.toLocal(frontGlobalCellI);
+                    const labelList& frontCellFaces = cells[frontLocalCellI];
+
+                    forAll(frontCellFaces, fI)
+                    {
+                        const label curFaceID = frontCellFaces[fI];
+
+                        if (mesh.isInternalFace(curFaceID))
+                        {
+                            // Internal face
+                            const label own = owner[curFaceID];
+                            const label nei = neighbour[curFaceID];
+                            const label neiLocalCellID =
+                                (own == frontLocalCellI) ? nei : own;
+                            const label neiGlobalCellID =
+                                globalCells_.toGlobal(neiLocalCellID);
+
+                            if (!visitedSet.found(neiGlobalCellID))
+                            {
+                                visitedSet.insert(neiGlobalCellID);
+                                nextFrontier.append(neiGlobalCellID);
+                            }
+                        }
+                        else // Boundary face
+                        {
+                            const label patchID =
+                                mesh.boundaryMesh().whichPatch(curFaceID);
+                            if (patchID == -1)
+                            {
+                                FatalErrorInFunction
+                                    << "patchID == -1 for face " << curFaceID
+                                    << abort(FatalError);
+                            }
+                            const polyPatch& pp = mesh.boundaryMesh()[patchID];
+
+                            if (isA<processorPolyPatch>(pp))
+                            {
+                                // Processor boundary face
+                                //const processorPolyPatch& procPatch =
+                                //    refCast<const processorPolyPatch>(pp);
+                                //const label procNo = procPatch.neighbProcNo();
+
+                               // Lookup the global cell ID across the processor patch
+                               const label localFaceI = curFaceID - pp.start();
+                               const label neiGlobalCellI =
+                                   procPatchNeiGlobalCellIDs[patchID][localFaceI];
+
+                               if (!visitedSet.found(neiGlobalCellI))
+                               {
+                                   visitedSet.insert(neiGlobalCellI);
+                                   nextFrontier.append(neiGlobalCellI);
+                               }
+                            }
+                            // else {} // Physical boundary, no action needed
+                        }
+                    }
+                }
+                else // frontGlobalCellI is on another proc
+                {
+                    // We need to request the cell-cells from the processor who
+                    // owns this front cell
+
+                    // Determine which processor owns this cell
+                    const label procID =
+                        globalCells_.whichProcID(frontGlobalCellI);
+
+                    // Origin cell
+                    const label globalCellI = globalCells_.toGlobal(localCellI);
+
+                    // Record the origin cell and front cell for communication
+                    sendMap(procID).append
+                    (
+                        labelPair(globalCellI, frontGlobalCellI)
+                    );
+                }
+            }
+        }
+
+        // Handle inter-processor communication
+        // Prepare data to send to neighboring processors
+        Map<List<labelPair>> toSend(Pstream::nProcs());
+        Map<List<labelPair>> toReceive(Pstream::nProcs());
+
+        // Create toSend lists
+        forAllIter(Map<List<labelPair>>, sendMap, iter)
+        {
+            const label procNo = iter.key();
+            List<labelPair>& sendData = iter();
+
+            toSend(procNo).transfer(sendData);
+        }
+
+        // Exchange data with neighboring processors
+        Pstream::exchange<List<labelPair>, labelPair>
+        (
+            toSend, toReceive
+        );
+
+        // Clear send map for next communication
+        sendMap.clear();
+
+        // Process received data
+        forAllConstIter(Map<List<labelPair>>, toReceive, iter)
+        {
+            const label procI = iter.key();
+            const List<labelPair>& receivedData = iter();
+
+            forAll(receivedData, idx)
+            {
+                const label globalCellI = receivedData[idx].first();
+                const label frontGlobalCellI = receivedData[idx].second();
+
+                if (!globalCells_.isLocal(frontGlobalCellI))
+                {
+                    FatalErrorInFunction
+                        << "Global cell " << frontGlobalCellI
+                        << " is not on this proc!" << abort(FatalError);
+                }
+
+                // Get local ID
+                const label frontLocalCellI =
+                    globalCells_.toLocal(frontGlobalCellI);
+
+                // Prepare list of cell-cells for the frontGlobalCellI as
+                // global IDs
+
+                const labelList& cellFaces = cells[frontLocalCellI];
+
+                forAll(cellFaces, fI)
+                {
+                    const label curFaceID = cellFaces[fI];
+
+                    if (mesh.isInternalFace(curFaceID))
+                    {
+                        // Internal face
+                        const label own = owner[curFaceID];
+                        const label nei = neighbour[curFaceID];
+                        const label neiLocalCellI =
+                            (own == frontLocalCellI) ? nei : own;
+                        const label neiGlobalCellI =
+                            globalCells_.toGlobal(neiLocalCellI);
+
+                        sendMap(procI).append
+                        (
+                            labelPair(globalCellI, neiGlobalCellI)
+                        );
+                    }
+                    else
+                    {
+                        // Boundary face
+                        const label patchID =
+                            mesh.boundaryMesh().whichPatch(curFaceID);
+                        const polyPatch& pp = mesh.boundaryMesh()[patchID];
+
+                        if (isA<processorPolyPatch>(pp))
+                        {
+                            // Lookup the global cell ID across the processor patch
+                            const label localFaceI = curFaceID - pp.start();
+                            const label neiGlobalCellI =
+                                procPatchNeiGlobalCellIDs[patchID][localFaceI];
+
+                            sendMap(procI).append
+                            (
+                                labelPair(globalCellI, neiGlobalCellI)
+                            );
+                        }
+                        // else {} // Physical boundary, no action needed
+                    }
+                }
+
+                // const label globalCellI = receivedData[idx].first();
+            }
+        }
+
+        // Handle inter-processor communication
+
+        // Clear communication maps
+        toSend.clear();
+        toReceive.clear();
+
+        // Populate toSend lists
+        forAllIter(Map<List<labelPair>>, sendMap, iter)
+        {
+            const label procNo = iter.key();
+            List<labelPair>& sendData = iter();
+
+            toSend(procNo).transfer(sendData);
+        }
+
+        // Exchange data with neighboring processors
+        Pstream::exchange<List<labelPair>, labelPair>
+        (
+            toSend, toReceive
+        );
+
+        // Finally, retreive data and add to local visited cells and next
+        // frontier
+
+        // Process received data
+        // Here, we are receiving the cell-cells from other procs, which we had
+        // requested. We will add these to our stencils.
+        forAllConstIter(Map<List<labelPair>>, toReceive, iter)
+        {
+            //const label procI = iter.key();
+            const List<labelPair>& receivedData = iter();
+
+            forAll(receivedData, idx)
+            {
+                // Cell whose stencil we are creating
+                const label globalCellI = receivedData[idx].first();
+
+                if (!globalCells_.isLocal(globalCellI))
+                {
+                    FatalErrorInFunction
+                        << "Global cell " << globalCellI
+                        << " is not on this proc!" << abort(FatalError);
+                }
+
+                // Get local ID
+                const label localCellI = globalCells_.toLocal(globalCellI);
+
+                // Local visited cells and next front
+                labelHashSet& visitedSet = cellVisitedSets[localCellI];
+                labelList& nextFrontier = nextFrontiers[localCellI];
+
+                // Cell to be added to the stencil of globallCellI
+                const label neiGlobalCellI = receivedData[idx].second();
+
+                // Add neiGlobalCellI to the visited cells and next front
+                if (!visitedSet.found(neiGlobalCellI))
+                {
+                    visitedSet.insert(neiGlobalCellI);
+                    nextFrontier.append(neiGlobalCellI);
+                }
+            }
+        }
+
+        // Update the frontiers for the next iteration
+        cellFrontiers = nextFrontiers;
+    }
+
+    // At this point, cellVisitedSets contains the N-layer neighborhoods for
+    // all cells
+    globalCellStencilsPtr_.set(new labelListList(nCells));
+    forAll(cellVisitedSets, localCellI)
+    {
+        globalCellStencilsPtr_()[localCellI] =
+            cellVisitedSets[localCellI].toc();
+    }
+
+    InfoInFunction
+        << "end" << endl;
+}
+
+
 void higherOrderGrad::makeStencils() const
 {
     Info<< "higherOrderGrad::makeStencils()" << endl;
 
-    if (stencilsPtr_ || cellBoundaryFacesPtr_)
+    if (Pstream::parRun())
+    {
+        notImplemented("not implemented for parallel run");
+        // makeGlobalCellStencils works in parallel: next build coefficients
+        // using these global stencils
+    }
+
+    if (stencilsPtr_ || stencilsBoundaryFacesPtr_)
     {
         FatalErrorInFunction
             << "Pointer already set!" << abort(FatalError);
@@ -49,8 +473,8 @@ void higherOrderGrad::makeStencils() const
     stencilsPtr_.set(new List<DynamicList<label>>(mesh.nCells()));
     List<DynamicList<label>>& stencils = *stencilsPtr_;
 
-    cellBoundaryFacesPtr_.set(new List<DynamicList<label>>(mesh.nCells()));
-    List<DynamicList<label>>& cellBoundaryFaces = *cellBoundaryFacesPtr_;
+    stencilsBoundaryFacesPtr_.set(new List<DynamicList<label>>(mesh.nCells()));
+    List<DynamicList<label>>& stencilsBoundaryFaces = *stencilsBoundaryFacesPtr_;
 
     forAll(stencils, cellI)
     {
@@ -96,11 +520,6 @@ void higherOrderGrad::makeStencils() const
            stencilCells.merge(curLayer);
        }
 
-       if (Pstream::parRun())
-       {
-           notImplemented("not implemented for parallel run");
-       }
-
        // Neighbours of first layer will store cellI in stencil so we
        // need to remove it
        stencilCells.erase(cellI);
@@ -132,21 +551,21 @@ void higherOrderGrad::makeStencils() const
             {
                 const label cellID = faceCells[faceI];
                 const label gI = faceI + boundaryMesh[patchI].start();
-                cellBoundaryFaces[cellID].append(gI);
+                stencilsBoundaryFaces[cellID].append(gI);
             }
         }
     }
 
-    forAll(cellBoundaryFaces, cellI)
+    forAll(stencilsBoundaryFaces, cellI)
     {
-        cellBoundaryFaces[cellI].shrink();
+        stencilsBoundaryFaces[cellI].shrink();
     }
 
     Info<< "higherOrderGrad::makeStencils(): end" << endl;
 }
 
 
-const List<DynamicList<label>> higherOrderGrad::stencils() const
+const List<DynamicList<label>>& higherOrderGrad::stencils() const
 {
     if (!stencilsPtr_)
     {
@@ -154,6 +573,17 @@ const List<DynamicList<label>> higherOrderGrad::stencils() const
     }
 
     return *stencilsPtr_;
+}
+
+
+const labelListList& higherOrderGrad::globalCellStencils() const
+{
+    if (!globalCellStencilsPtr_)
+    {
+        makeGlobalCellStencils();
+    }
+
+    return globalCellStencilsPtr_();
 }
 
 
@@ -243,7 +673,8 @@ void higherOrderGrad::calcQRCoeffs() const
     List<DynamicList<scalar>> cy(mesh.nCells());
     List<DynamicList<scalar>> cz(mesh.nCells());
 
-    const List<DynamicList<label>>& cellBoundaryFaces = this->cellBoundaryFaces();
+    const List<DynamicList<label>>& stencilsBoundaryFaces =
+        this->stencilsBoundaryFaces();
     const List<DynamicList<label>> stencils = this->stencils();
 
     forAll(stencils, cellI)
@@ -263,7 +694,8 @@ void higherOrderGrad::calcQRCoeffs() const
         }
 
         // Loop over neighbours and construct matrix Q
-        const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
+        const label Nn =
+            curStencil.size() + stencilsBoundaryFaces[cellI].size();
 
         // Use matrix format from Eigen/Dense library
         // Avoid initialisation to zero as we will set every entry below
@@ -291,7 +723,7 @@ void higherOrderGrad::calcQRCoeffs() const
             else
             {
                 const label i = cI - curStencil.size();
-                const label globalFaceID = cellBoundaryFaces[cellI][i];
+                const label globalFaceID = stencilsBoundaryFaces[cellI][i];
                 const vector& neiC = CfI[globalFaceID];
                 dx = neiC - CI[cellI];
             }
@@ -337,7 +769,7 @@ void higherOrderGrad::calcQRCoeffs() const
                 // neigbour
                 const vector& C = CI[cellI];
                 const label i = cI - curStencil.size();
-                const label globalFaceID = cellBoundaryFaces[cellI][i];
+                const label globalFaceID = stencilsBoundaryFaces[cellI][i];
                 const vector& neiC = CfI[globalFaceID];
                 d = mag(neiC - C);
             }
@@ -432,7 +864,7 @@ void higherOrderGrad::calcQRCoeffs() const
     forAll(QRInterpCoeffs, cellI)
     {
        const DynamicList<label>& curStencil = stencils[cellI];
-       const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
+       const label Nn = curStencil.size() + stencilsBoundaryFaces[cellI].size();
 
        QRInterpCoeffs[cellI].setCapacity(Nn);
        QRGradCoeffs[cellI].setCapacity(Nn);
@@ -504,7 +936,8 @@ void higherOrderGrad::calcCholeskyCoeffs() const
     List<DynamicList<scalar>> cy(mesh.nCells());
     List<DynamicList<scalar>> cz(mesh.nCells());
 
-    const List<DynamicList<label>>& cellBoundaryFaces = this->cellBoundaryFaces();
+    const List<DynamicList<label>>& stencilsBoundaryFaces =
+        this->stencilsBoundaryFaces();
     const List<DynamicList<label>> stencils = this->stencils();
 
     forAll(stencils, cellI)
@@ -524,7 +957,7 @@ void higherOrderGrad::calcCholeskyCoeffs() const
         }
 
         // Loop over neighbours and construct matrix Q
-        const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
+        const label Nn = curStencil.size() + stencilsBoundaryFaces[cellI].size();
 
         // Use matrix format from Eigen/Dense library
         // Avoid initialisation to zero as we will set every entry below
@@ -552,7 +985,7 @@ void higherOrderGrad::calcCholeskyCoeffs() const
             else
             {
                 const label i = cI - curStencil.size();
-                const label globalFaceID = cellBoundaryFaces[cellI][i];
+                const label globalFaceID = stencilsBoundaryFaces[cellI][i];
                 const vector& neiC = CfI[globalFaceID];
                 dx = neiC - CI[cellI];
             }
@@ -598,7 +1031,7 @@ void higherOrderGrad::calcCholeskyCoeffs() const
                 // neigbour
                 const vector& C = CI[cellI];
                 const label i = cI - curStencil.size();
-                const label globalFaceID = cellBoundaryFaces[cellI][i];
+                const label globalFaceID = stencilsBoundaryFaces[cellI][i];
                 const vector& neiC = CfI[globalFaceID];
                 d = mag(neiC - C);
             }
@@ -704,14 +1137,14 @@ const List<DynamicList<vector>>& higherOrderGrad::QRGradCoeffs() const
 }
 
 
-const List<DynamicList<label>>& higherOrderGrad::cellBoundaryFaces() const
+const List<DynamicList<label>>& higherOrderGrad::stencilsBoundaryFaces() const
 {
-    if (!cellBoundaryFacesPtr_)
+    if (!stencilsBoundaryFacesPtr_)
     {
         makeStencils();
     }
 
-    return cellBoundaryFacesPtr_();
+    return stencilsBoundaryFacesPtr_();
 }
 
 
@@ -802,24 +1235,30 @@ higherOrderGrad::higherOrderGrad
     nLayers_(readInt(dict.lookup("nLayers"))),
     k_(readScalar(dict.lookup("k"))),
     maxStencilSize_(readInt(dict.lookup("maxStencilSize"))),
+    globalCells_(mesh.nCells()),
     useQRDecomposition_(dict.lookup("useQRDecomposition")),
     calcConditionNumber_(dict.lookup("calcConditionNumber")),
     conditionNumberPtr_(),
     stencilsPtr_(),
-    cellBoundaryFacesPtr_(),
+    stencilsBoundaryFacesPtr_(),
+    globalCellStencilsPtr_(),
     QRInterpCoeffsPtr_(),
     QRGradCoeffsPtr_(),
     choleskyPtr_(),
     QhatPtr_(),
     sqrtWPtr_()
 {
+    WarningInFunction
+        << "Testing makeGlobalCellsStencils()" << endl;
+    makeGlobalCellStencils(); // testing
+
     if (calcConditionNumber_)
     {
         if (!useQRDecomposition_)
         {
             FatalErrorInFunction
-                << "useQRDecomposition must be 'on' when `calcConditionNumber` is 'on'"
-                << exit(FatalError);
+                << "useQRDecomposition must be 'on' when "
+                << "`calcConditionNumber` is 'on'" << exit(FatalError);
         }
     }
 }
@@ -878,14 +1317,14 @@ tmp<volTensorField> higherOrderGrad::gradQR(const volVectorField& D)
 
     const polyBoundaryMesh& boundaryMesh = mesh.boundaryMesh();
     const List<DynamicList<label>> stencils = this->stencils();
-    const List<DynamicList<label>> cellBoundaryFaces =
-        this->cellBoundaryFaces();
+    const List<DynamicList<label>> stencilsBoundaryFaces =
+        this->stencilsBoundaryFaces();
     const List<DynamicList<vector>>& QRGradCoeffs = this->QRGradCoeffs();
 
     forAll(stencils, cellI)
     {
         const DynamicList<label>& curStencil = stencils[cellI];
-        const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
+        const label Nn = curStencil.size() + stencilsBoundaryFaces[cellI].size();
 
         // Loop over stencil and multiply stencil cell values with
         // corresponding interpolation coefficient
@@ -898,7 +1337,7 @@ tmp<volTensorField> higherOrderGrad::gradQR(const volVectorField& D)
             else
             {
                 const label i = cI - curStencil.size();
-                const label globalFaceID = cellBoundaryFaces[cellI][i];
+                const label globalFaceID = stencilsBoundaryFaces[cellI][i];
 
                 vector boundaryD = vector::zero;
 
@@ -969,8 +1408,8 @@ tmp<volTensorField> higherOrderGrad::gradCholesky(const volVectorField& D)
 
     const polyBoundaryMesh& boundaryMesh = mesh.boundaryMesh();
     const List<DynamicList<label>> stencils = this->stencils();
-    const List<DynamicList<label>> cellBoundaryFaces =
-        this->cellBoundaryFaces();
+    const List<DynamicList<label>> stencilsBoundaryFaces =
+        this->stencilsBoundaryFaces();
     const List<Eigen::LLT<Eigen::MatrixXd>>& cholesky = this->cholesky();
     const List<Eigen::MatrixXd>& Qhat = this->Qhat();
     const List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>& sqrtW =
@@ -979,7 +1418,7 @@ tmp<volTensorField> higherOrderGrad::gradCholesky(const volVectorField& D)
     forAll(stencils, cellI)
     {
         const DynamicList<label>& curStencil = stencils[cellI];
-        const label Nn = curStencil.size() + cellBoundaryFaces[cellI].size();
+        const label Nn = curStencil.size() + stencilsBoundaryFaces[cellI].size();
 
         for (label cmptI = 0; cmptI < vector::nComponents; ++cmptI)
         {
@@ -995,7 +1434,7 @@ tmp<volTensorField> higherOrderGrad::gradCholesky(const volVectorField& D)
                 else
                 {
                     const label i = cI - curStencil.size();
-                    const label globalFaceID = cellBoundaryFaces[cellI][i];
+                    const label globalFaceID = stencilsBoundaryFaces[cellI][i];
 
                     forAll(boundaryMesh, patchI)
                     {
