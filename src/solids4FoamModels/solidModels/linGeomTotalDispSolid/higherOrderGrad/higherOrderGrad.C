@@ -675,7 +675,7 @@ void higherOrderGrad::calcQRCoeffs() const
 
     const List<DynamicList<label>>& stencilsBoundaryFaces =
         this->stencilsBoundaryFaces();
-    const List<DynamicList<label>> stencils = this->stencils();
+    const List<DynamicList<label>>& stencils = this->stencils();
 
     forAll(stencils, cellI)
     {
@@ -938,7 +938,7 @@ void higherOrderGrad::calcCholeskyCoeffs() const
 
     const List<DynamicList<label>>& stencilsBoundaryFaces =
         this->stencilsBoundaryFaces();
-    const List<DynamicList<label>> stencils = this->stencils();
+    const List<DynamicList<label>>& stencils = this->stencils();
 
     forAll(stencils, cellI)
     {
@@ -1115,6 +1115,238 @@ void higherOrderGrad::calcCholeskyCoeffs() const
 }
 
 
+void higherOrderGrad::calcGlobalCholeskyCoeffs() const
+{
+    InfoInFunction
+        << "start" << endl;
+
+    if (choleskyPtr_ || QhatPtr_ || sqrtWPtr_)
+    {
+        FatalErrorInFunction
+            << "Pointers already set!" << abort(FatalError);
+    }
+
+    const fvMesh& mesh = mesh_;
+
+    choleskyPtr_.set(new List<Eigen::LLT<Eigen::MatrixXd>>(mesh.nCells()));
+    List<Eigen::LLT<Eigen::MatrixXd>>& cholesky = choleskyPtr_();
+
+    QhatPtr_.set(new List<Eigen::MatrixXd>(mesh.nCells()));
+    List<Eigen::MatrixXd>& Qhat = QhatPtr_();
+
+    sqrtWPtr_.set
+    (
+        new List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>(mesh.nCells())
+    );
+    List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>& sqrtW = sqrtWPtr_();
+
+    // Refernces for brevity and efficiency
+    const vectorField& CI = mesh.C();
+
+    // Collect CI for off-processor cells in the stencils
+    Map<vector> globalCI;
+    requestGlobalStencilData(CI, globalCI);
+
+    // Calculate Taylor series exponents
+    // 1 for zero order, 4 for 1 order, 10 for second order, etc.
+    DynamicList<FixedList<label, 3>> exponents;
+    generateExponents(N_, exponents);
+    const label Np = exponents.size();
+    if (debug)
+    {
+        Info<< "Np = " << Np << endl;
+    }
+
+    // Precompute factorials up to N
+    List<scalar> factorials(N_ + 1, 1.0);
+    for (label n = 1; n <= N_; ++n)
+    {
+        factorials[n] = factorials[n - 1]*n;
+    }
+
+    List<DynamicList<scalar>> c(mesh.nCells());
+    List<DynamicList<scalar>> cx(mesh.nCells());
+    List<DynamicList<scalar>> cy(mesh.nCells());
+    List<DynamicList<scalar>> cz(mesh.nCells());
+
+    const labelListList& stencils = this->globalCellStencils();
+
+    forAll(stencils, localCellI)
+    {
+        const labelList& curStencil = stencils[localCellI];
+
+        // Find max distance in this stencil
+        scalar maxDist = 0.0;
+        forAll(curStencil, cI)
+        {
+            const label neiGlobalCellID = curStencil[cI];
+
+            scalar d;
+            if (globalCells_.isLocal(neiGlobalCellID))
+            {
+                const label neiLocalCellID =
+                    globalCells_.toLocal(neiGlobalCellID);
+                d = mag(CI[neiLocalCellID] - CI[localCellI]);
+            }
+            else
+            {
+                d = mag(globalCI[neiGlobalCellID] - CI[localCellI]);
+            }
+
+            maxDist = max(maxDist, d);
+        }
+
+        // Loop over neighbours and construct matrix Q
+        const label Nn = curStencil.size();
+
+        // Use matrix format from Eigen/Dense library
+        // Avoid initialisation to zero as we will set every entry below
+        Eigen::MatrixXd Q(Np, Nn);
+
+        // Check to avoid Eigen error
+        if (Nn < Np)
+        {
+            FatalErrorInFunction
+                << "Interpolation stencil needs to be bigger than the "
+                << "number of elements in Taylor order!"
+                << exit(FatalError);
+        }
+
+        // Loop over stencil points
+        for (label cI = 0; cI < Nn; ++cI)
+        {
+            const label neiGlobalCellID = curStencil[cI];
+            vector dx;
+            if (globalCells_.isLocal(neiGlobalCellID))
+            {
+                const label neiLocalCellID =
+                    globalCells_.toLocal(neiGlobalCellID);
+                dx = CI[neiLocalCellID] - CI[localCellI];
+            }
+            else
+            {
+                dx = globalCI[neiGlobalCellID] - CI[localCellI];
+            }
+
+            // Compute monomial values for each exponent
+            for (label p = 0; p < Np; ++p)
+            {
+                const FixedList<label, 3>& exponent = exponents[p];
+                const label i = exponent[0];
+                const label j = exponent[1];
+                const label k = exponent[2];
+
+               // Compute factorial denominator
+               const scalar factorialDenominator =
+                   factorials[i]*factorials[j]*factorials[k];
+
+               // Compute and assign monomial value with factorials
+               // Note: the order of the quadratic and higher terms may not be
+               // the same as the previous manual approach
+               Q(p, cI) =
+                   pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
+                  /factorialDenominator;
+            }
+        }
+
+        Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn);
+        //W.setZero(); // no need to waste time initialising
+
+        for (label cI = 0; cI < Nn; cI++)
+        {
+            const label neiGlobalCellID = curStencil[cI];
+            scalar d;
+            if (globalCells_.isLocal(neiGlobalCellID))
+            {
+                const label neiLocalCellID =
+                    globalCells_.toLocal(neiGlobalCellID);
+
+                d = mag(CI[neiLocalCellID] - CI[localCellI]);
+            }
+            else
+            {
+                d = mag(globalCI[neiGlobalCellID] - CI[localCellI]);
+            }
+
+            // Smoothing length
+            const scalar dm = 2*maxDist;
+
+            // Weight using radially symmetric exponential function
+            const scalar sqrK = -pow(k_,2);
+            const scalar w =
+                (
+                    Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
+                )/(1 - exp(sqrK));
+
+            W.diagonal()[cI] = w;
+        }
+
+        // Now when we have W and Q, next step is QR decomposition
+        sqrtW[localCellI] = W.diagonal().cwiseSqrt().asDiagonal();
+
+        // B hat
+        const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
+            sqrtW[localCellI].diagonal().asDiagonal();
+
+        // Cholesky decomposition of the "normal equations"
+
+        // Transpose Q to follow the standard convention
+        // TODO: avoid this by assigning Q correctly from the start!
+        Q = Q.transpose().eval();
+
+        // Compute Q_hat = Q * W^{1/2}
+        Qhat[localCellI] =
+            Q.array().colwise()*sqrtW[localCellI].diagonal().array();
+
+        // Compute N = Q_hat^T * Q_hat = Q^T W Q
+        const Eigen::MatrixXd N = Qhat[localCellI].transpose()*Qhat[localCellI];
+
+        if (debug)
+        {
+            Eigen::FullPivLU<Eigen::MatrixXd> lu(Q);
+            int rank = lu.rank();
+            Info<< "Rank of Q: " << rank << nl
+                << "Q rows: " << Q.rows() << nl
+                << "Q cols: " << Q.cols() << endl;
+
+            if (rank < Q.cols())
+            {
+                WarningInFunction
+                    << "Design matrix Q is rank-deficient!" << endl;
+            }
+
+            Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(N);
+
+            if (eigensolver.info() != Eigen::Success)
+            {
+                WarningInFunction
+                    << "Eigenvalue computation failed!" << endl;
+
+                Eigen::VectorXd eigenvalues = eigensolver.eigenvalues();
+
+                std::cout
+                    << "Eigenvalues of N: " << eigenvalues.transpose()
+                    << std::endl;
+            }
+        }
+
+        // Perform Cholesky decomposition
+        cholesky[localCellI].compute(N);
+
+        if (cholesky[localCellI].info() != Eigen::Success)
+        {
+            FatalErrorInFunction
+                << "Cholesky decomposition failed; "
+                << "matrix is not positive definite."
+                << exit(FatalError);
+        }
+    }
+
+    InfoInFunction
+        << "end" << endl;
+}
+
+
 const List<DynamicList<scalar>>& higherOrderGrad::QRInterpCoeffs() const
 {
     if (!QRInterpCoeffsPtr_)
@@ -1152,7 +1384,14 @@ const List<Eigen::LLT<Eigen::MatrixXd>>& higherOrderGrad::cholesky() const
 {
     if (!choleskyPtr_)
     {
-        calcCholeskyCoeffs();
+        if (useGlobalStencils_)
+        {
+            calcGlobalCholeskyCoeffs();
+        }
+        else
+        {
+            calcCholeskyCoeffs();
+        }
     }
 
     return choleskyPtr_();
@@ -1163,7 +1402,14 @@ const List<Eigen::MatrixXd>& higherOrderGrad::Qhat() const
 {
     if (!QhatPtr_)
     {
-        calcCholeskyCoeffs();
+        if (useGlobalStencils_)
+        {
+            calcGlobalCholeskyCoeffs();
+        }
+        else
+        {
+            calcCholeskyCoeffs();
+        }
     }
 
     return QhatPtr_();
@@ -1175,7 +1421,14 @@ higherOrderGrad::sqrtW() const
 {
     if (!sqrtWPtr_)
     {
-        calcCholeskyCoeffs();
+        if (useGlobalStencils_)
+        {
+            calcGlobalCholeskyCoeffs();
+        }
+        else
+        {
+            calcCholeskyCoeffs();
+        }
     }
 
     return sqrtWPtr_();
@@ -1237,6 +1490,7 @@ higherOrderGrad::higherOrderGrad
     maxStencilSize_(readInt(dict.lookup("maxStencilSize"))),
     globalCells_(mesh.nCells()),
     useQRDecomposition_(dict.lookup("useQRDecomposition")),
+    useGlobalStencils_(dict.lookup("useGlobalStencils")),
     calcConditionNumber_(dict.lookup("calcConditionNumber")),
     conditionNumberPtr_(),
     stencilsPtr_(),
@@ -1248,10 +1502,6 @@ higherOrderGrad::higherOrderGrad
     QhatPtr_(),
     sqrtWPtr_()
 {
-    WarningInFunction
-        << "Testing makeGlobalCellsStencils()" << endl;
-    makeGlobalCellStencils(); // testing
-
     if (calcConditionNumber_)
     {
         if (!useQRDecomposition_)
@@ -1281,7 +1531,14 @@ tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D)
     }
     else
     {
-        return gradCholesky(D);
+        if (useGlobalStencils_)
+        {
+            return gradGlobalCholesky(D);
+        }
+        else
+        {
+            return gradCholesky(D);
+        }
     }
 }
 
@@ -1316,8 +1573,8 @@ tmp<volTensorField> higherOrderGrad::gradQR(const volVectorField& D)
     volTensorField& gradD = tgradD.ref();
 
     const polyBoundaryMesh& boundaryMesh = mesh.boundaryMesh();
-    const List<DynamicList<label>> stencils = this->stencils();
-    const List<DynamicList<label>> stencilsBoundaryFaces =
+    const List<DynamicList<label>>& stencils = this->stencils();
+    const List<DynamicList<label>>& stencilsBoundaryFaces =
         this->stencilsBoundaryFaces();
     const List<DynamicList<vector>>& QRGradCoeffs = this->QRGradCoeffs();
 
@@ -1407,8 +1664,8 @@ tmp<volTensorField> higherOrderGrad::gradCholesky(const volVectorField& D)
     volTensorField& gradD = tgradD.ref();
 
     const polyBoundaryMesh& boundaryMesh = mesh.boundaryMesh();
-    const List<DynamicList<label>> stencils = this->stencils();
-    const List<DynamicList<label>> stencilsBoundaryFaces =
+    const List<DynamicList<label>>& stencils = this->stencils();
+    const List<DynamicList<label>>& stencilsBoundaryFaces =
         this->stencilsBoundaryFaces();
     const List<Eigen::LLT<Eigen::MatrixXd>>& cholesky = this->cholesky();
     const List<Eigen::MatrixXd>& Qhat = this->Qhat();
@@ -1487,6 +1744,105 @@ tmp<volTensorField> higherOrderGrad::gradCholesky(const volVectorField& D)
     if (debug)
     {
         Info<< "higherOrderGrad::gradCholesky(...): end" << endl;
+    }
+
+    return tgradD;
+}
+
+
+tmp<volTensorField> higherOrderGrad::gradGlobalCholesky(const volVectorField& D)
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    const fvMesh& mesh = mesh_;
+
+    // Prepare the return field
+    tmp<volTensorField> tgradD
+    (
+        new volTensorField
+        (
+           IOobject
+           (
+               "grad(" + D.name() + ")",
+               mesh.time().timeName(),
+               mesh,
+               IOobject::NO_READ,
+               IOobject::AUTO_WRITE
+           ),
+           mesh,
+           dimensionedTensor("0", dimless, Zero),
+           "zeroGradient"
+        )
+    );
+    volTensorField& gradD = tgradD.ref();
+
+    const List<labelList>& stencils = globalCellStencils();
+    const List<Eigen::LLT<Eigen::MatrixXd>>& cholesky = this->cholesky();
+    const List<Eigen::MatrixXd>& Qhat = this->Qhat();
+    const List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>& sqrtW =
+        this->sqrtW();
+    const vectorField& DI = D;
+
+    // Collect DI for off-processor cells in the stencils
+    Map<vector> globalDI;
+    requestGlobalStencilData(DI, globalDI);
+
+    forAll(stencils, localCellI)
+    {
+        const labelList& curStencil = stencils[localCellI];
+        const label Nn = curStencil.size();
+
+        for (label cmptI = 0; cmptI < vector::nComponents; ++cmptI)
+        {
+            // Prepare right-hand side vector (y) for Cholesky decomposition
+            Eigen::VectorXd y(Nn);
+
+            for (label cI = 0; cI < Nn; cI++)
+            {
+                const label globalCellID = curStencil[cI];
+
+                if (globalCells_.isLocal(globalCellID))
+                {
+                    const label localCellID =
+                        globalCells_.toLocal(globalCellID);
+
+                    y[cI] = DI[localCellID][cmptI];
+                }
+                else
+                {
+                    y[cI] = globalDI[globalCellID][cmptI];
+                }
+            }
+
+            // Compute y_hat = W^{1/2}*y
+            const Eigen::VectorXd yhat =
+                sqrtW[localCellI].diagonal().array()*y.array();
+
+            // Compute Q^T W y = Q_hat^T * y_hat
+            const Eigen::VectorXd QTWy = Qhat[localCellI].transpose()*yhat;
+
+            // Solve for A
+            const Eigen::VectorXd z = cholesky[localCellI].matrixL().solve(QTWy);
+            const Eigen::VectorXd A = cholesky[localCellI].matrixU().solve(z);
+
+            // Extract gradient components from A and assign the gradient field
+            // Careful: they are column-wise
+            gradD[localCellI][3*0 + cmptI] = A[1];
+            gradD[localCellI][3*1 + cmptI] = A[2];
+            gradD[localCellI][3*2 + cmptI] = A[3];
+        }
+    }
+
+    gradD.correctBoundaryConditions();
+
+    if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
     }
 
     return tgradD;

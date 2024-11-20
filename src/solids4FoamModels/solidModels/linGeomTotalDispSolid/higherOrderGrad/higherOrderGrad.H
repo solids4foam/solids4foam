@@ -83,6 +83,11 @@ class higherOrderGrad
         //  QR is more stable (to round-off error) but more expensive
         const Switch useQRDecomposition_;
 
+        //- Use new parallelised global cell stencils approach
+        //  Once this has been verified, we can remove this flag and make this
+        //  the default method
+        const Switch useGlobalStencils_;
+
         //- Calculate the condition number field
         const Switch calcConditionNumber_;
 
@@ -149,6 +154,10 @@ class higherOrderGrad
         //- Calculate coefficients for the Cholesky decomposition approach
         void calcCholeskyCoeffs() const;
 
+        //- Calculate coefficients for the Cholesky decomposition approach using
+        //  the global cell stencils
+        void calcGlobalCholeskyCoeffs() const;
+
         //- Return the interpolation coefficients
         const List<DynamicList<scalar>>& QRInterpCoeffs() const;
 
@@ -176,10 +185,9 @@ class higherOrderGrad
         void makeConditionNumber() const;
 
         //- Request data for off-processor cells in the stencils
-        //  Input
-        //     - local proc field: Field<Type>
-        //  Output
-        //     - container of off-proc data required by the stencils
+        //  Given the local processor field data, return a map containing
+        //  the field data from other processors that is required for the local
+        //  processor cell stencils
         template<class Type>
         void requestGlobalStencilData
         (
@@ -216,7 +224,7 @@ public:
 
 
     // Member Functions
-    
+
         // Edit
 
             //- Calculate the gradient of a volVectorField
@@ -229,6 +237,10 @@ public:
             //- Calculate the gradient of a volVectorField using Cholesky
             //  decomposition
             tmp<volTensorField> gradCholesky(const volVectorField& D);
+
+            //- Calculate the gradient of a volVectorField using Cholesky
+            //  decomposition using the global cell stencils
+            tmp<volTensorField> gradGlobalCholesky(const volVectorField& D);
 };
 
 

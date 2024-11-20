@@ -20,7 +20,6 @@ License
 #include "higherOrderGrad.H"
 
 
-
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 
@@ -96,8 +95,10 @@ void Foam::higherOrderGrad::requestGlobalStencilData
 
         // Create map to hold to requested field data
         // We will record Tuple2(globalCellI, fieldValue)
-        typedef Map<List<Tuple2<label, Type>>> FieldDataMapType;
-        FieldDataMapType requestedFieldData;
+        // typedef Map<List<Tuple2<label, Type>>> FieldDataMapType;
+        // FieldDataMapType requestedFieldData;
+        Map<labelList> requestedCellIDs;
+        Map<List<Type>> requestedCellFieldValues;
 
         forAllConstIter(Map<labelList>, toReceive, iter)
         {
@@ -118,48 +119,65 @@ void Foam::higherOrderGrad::requestGlobalStencilData
                 // Get local ID
                 const label localCellI = globalCells_.toLocal(globalCellI);
 
+                // Record the cell ID
+                requestedCellIDs(procI).append(globalCellI);
+
                 // Record local field value
-                requestedFieldData(procI).append
-                (
-                    Tuple2<label, Type>(globalCellI, localField[localCellI])
-                );
+                requestedCellFieldValues(procI).append(localField[localCellI]);
             }
         }
 
         // Send the request field data back to the processors who requested it
 
         // Prepare data to send to neighboring processors
-        FieldDataMapType toSendField(Pstream::nProcs());
-        FieldDataMapType toReceiveField(Pstream::nProcs());
+        // We must send the labels and the values seperately as the exchange
+        // function only works with contigious data types
+        Map<labelList> toSendLabels(Pstream::nProcs());
+        Map<List<Type>> toSendField(Pstream::nProcs());
+        Map<labelList> toReceiveLabels(Pstream::nProcs());
+        Map<List<Type>> toReceiveField(Pstream::nProcs());
 
         // Populate toSend lists
-        forAllIter(typename FieldDataMapType, requestedFieldData, iter)
+        forAllIter(Map<labelList>, requestedCellIDs, iter)
         {
             const label procNo = iter.key();
-            List<Tuple2<label, Type>>& sendData = iter();
+            labelList& sendData = iter();
+
+            toSendLabels(procNo).transfer(sendData);
+        }
+        forAllIter(typename Map<List<Type>>, requestedCellFieldValues, iter)
+        {
+            const label procNo = iter.key();
+            List<Type>& sendData = iter();
 
             toSendField(procNo).transfer(sendData);
         }
 
         // Exchange data with neighboring processors
-        Pstream::exchange<List<Tuple2<label, Type>>, Tuple2<label, Type>>
+        Pstream::exchange<labelList, label>
+        (
+            toSendLabels, toReceiveLabels
+        );
+        Pstream::exchange<List<Type>, Type>
         (
             toSendField, toReceiveField
         );
 
-        // Clear requestedFieldData as it is no longer needed
-        requestedFieldData.clear();
+        // Clear requested data as it is no longer needed
+        requestedCellIDs.clear();
+        requestedCellFieldValues.clear();
 
         // Populate the globalField map with the toReceiveField data
-        forAllConstIter(typename FieldDataMapType, toReceiveField, iter)
+        forAllConstIter(Map<labelList>, toReceiveLabels, iter)
         {
-            //const label procI = iter.key();
-            const List<Tuple2<label, Type>>& receivedData = iter();
+            const label procI = iter.key();
+            const labelList& receivedLabels = iter();
+            const List<Type>& receivedField = toReceiveField[procI];
 
-            forAll(receivedData, cI)
+            forAll(receivedLabels, cI)
             {
-                const label globalCellI = receivedData[cI].first();
-                const Type& fieldValue = receivedData[cI].second();
+                const label globalCellI = receivedLabels[cI];
+                const Type& fieldValue = receivedField[cI];
 
                 // Record data in the global field map
                 globalField(globalCellI) = fieldValue;
