@@ -175,6 +175,19 @@ class higherOrderGrad
         //- Make the condition number field
         void makeConditionNumber() const;
 
+        //- Request data for off-processor cells in the stencils
+        //  Input
+        //     - local proc field: Field<Type>
+        //  Output
+        //     - container of off-proc data required by the stencils
+        template<class Type>
+        void requestGlobalStencilData
+        (
+            const Field<Type>& localField,
+            Map<Type>& globalField
+        ) const;
+
+
         //- Disallow default bitwise copy construct
         higherOrderGrad(const higherOrderGrad&);
 
@@ -223,6 +236,11 @@ public:
 
 } // End namespace Foam
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#ifdef NoRepository
+    #include "higherOrderGradTemplates.C"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
