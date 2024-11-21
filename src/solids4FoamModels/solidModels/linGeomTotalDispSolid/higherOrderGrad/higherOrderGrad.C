@@ -450,6 +450,121 @@ void higherOrderGrad::makeGlobalCellStencils() const
 }
 
 
+void higherOrderGrad::makeGlobalFaceStencils() const
+{
+    if (globalFaceStencilsPtr_)
+    {
+        FatalErrorInFunction
+            << "Pointer already set" << exit(FatalError);
+    }
+
+    const fvMesh& mesh = mesh_;
+    const labelList& faceOwner = mesh.faceOwner();
+    const labelList& faceNeighbour = mesh.faceNeighbour();
+
+    globalFaceStencilsPtr_.set(new labelListList(mesh.nFaces()));
+    labelListList& faceStencils = globalFaceStencilsPtr_();
+
+    // Create the cell stencils
+    const labelListList& cellStencils = globalCellStencils();
+
+    // The stencil for each face consists of the cell stencils of the cell(s)
+    // containing that face
+    // We will only keep unique entries
+    forAll(faceStencils, faceI)
+    {
+        // We will use a set to check avoid adding duplicates
+        labelHashSet curStencil;
+
+        // Add owner stencil
+        const label ownLocalCellI = faceOwner[faceI];
+        curStencil.insert(cellStencils[ownLocalCellI]);
+
+        // Add neighbour stencil
+        // Note: we deal with processor patch faces afterwards
+        if (mesh.isInternalFace(faceI))
+        {
+            const label neiLocalCellI = faceNeighbour[faceI];
+            curStencil.merge(labelHashSet(cellStencils[neiLocalCellI]));
+        }
+
+        // Convert set to labelList
+        faceStencils[faceI] = curStencil.toc();
+    }
+
+    // If the face is on a processor patch, we need to get the cell
+    // stencils from the face cells on the neighbouring processor
+
+    if (Pstream::parRun())
+    {
+        PstreamBuffers pBufs(UPstream::commsTypes::nonBlocking);
+
+        // Prepare and send stencils
+        forAll(mesh.boundaryMesh(), patchI)
+        {
+            const polyPatch& pp = mesh.boundaryMesh()[patchI];
+            if (isA<processorPolyPatch>(pp))
+            {
+                const processorPolyPatch& procPatch =
+                    refCast<const processorPolyPatch>(pp);
+
+                // Prepare cell stencils for sending
+                const labelUList& faceCells = pp.faceCells();
+                labelListList patchCellStencils(faceCells.size());
+                forAll(patchCellStencils, fI)
+                {
+                    const label localCellI = faceCells[fI];
+                    patchCellStencils[fI] = cellStencils[localCellI];
+                }
+
+                // Send to neighbour processor
+                UOPstream toNeighbProc(procPatch.neighbProcNo(), pBufs);
+                toNeighbProc
+                    << patchCellStencils;
+            }
+        }
+
+        pBufs.finishedSends(); // no-op for blocking
+
+        // Receive data
+        forAll(mesh.boundaryMesh(), patchI)
+        {
+            const polyPatch& pp = mesh.boundaryMesh()[patchI];
+            if (isA<processorPolyPatch>(pp))
+            {
+                const processorPolyPatch& procPatch =
+                    refCast<const processorPolyPatch>(pp);
+
+                UIPstream fromNeighbProc(procPatch.neighbProcNo(), pBufs);
+
+                labelListList receiveData(pp.size());
+
+                fromNeighbProc
+                    >> receiveData;
+
+                // Merge stencils with local face cells
+                const labelUList& faceCells = pp.faceCells();
+                forAll(faceCells, fI)
+                {
+                    // Convert data to a set
+                    labelHashSet receiveDataSet(receiveData[fI]);
+
+                    // Convert local stencit to a set
+                    const label faceID = pp.start() + fI;
+                    labelHashSet curStencil(faceStencils[faceID]);
+
+                    // Merge sets
+                    curStencil.merge(receiveDataSet);
+
+                    // Update local stencil
+                    faceStencils[faceID] = curStencil.toc();
+                }
+            }
+        }
+    }
+}
+
+
 void higherOrderGrad::makeStencils() const
 {
     //if (debug)
@@ -592,6 +707,17 @@ const labelListList& higherOrderGrad::globalCellStencils() const
     }
 
     return globalCellStencilsPtr_();
+}
+
+
+const labelListList& higherOrderGrad::globalFaceStencils() const
+{
+    if (!globalFaceStencilsPtr_)
+    {
+        makeGlobalFaceStencils();
+    }
+
+    return globalFaceStencilsPtr_();
 }
 
 
@@ -1169,6 +1295,274 @@ void higherOrderGrad::calcGlobalQRCoeffs() const
 }
 
 
+void higherOrderGrad::calcGlobalQRFaceCoeffs() const
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    if (QRGradFaceCoeffsPtr_)
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    const fvMesh& mesh = mesh_;
+
+    QRGradFaceCoeffsPtr_.set(new List<DynamicList<vector>>(mesh.nFaces()));
+    List<DynamicList<vector>>& QRGradCoeffs = *QRGradFaceCoeffsPtr_;
+
+    // Refernces for brevity and efficiency
+    const vectorField& CI = mesh.C();
+    const vectorField& CfI = mesh.Cf();
+
+    // Collect CI for off-processor cells in the stencils
+    Map<vector> globalCI;
+    requestGlobalStencilData(CI, globalCI);
+
+    // Calculate Taylor series exponents
+    // 1 for zero order, 4 for 1 order, 10 for second order, etc.
+    DynamicList<FixedList<label, 3>> exponents;
+    generateExponents(N_, exponents);
+    const label Np = exponents.size();
+    if (debug)
+    {
+        Info<< "Np = " << Np << endl;
+    }
+
+    // Precompute factorials up to N
+    List<scalar> factorials(N_ + 1, 1.0);
+    for (label n = 1; n <= N_; ++n)
+    {
+        factorials[n] = factorials[n - 1]*n;
+    }
+
+    // Coefficients
+    List<DynamicList<scalar>> c(mesh.nFaces());
+    List<DynamicList<scalar>> cx(mesh.nFaces());
+    List<DynamicList<scalar>> cy(mesh.nFaces());
+    List<DynamicList<scalar>> cz(mesh.nFaces());
+
+    const List<labelList>& stencils = globalFaceStencils();
+
+    forAll(stencils, faceI)
+    {
+        const labelList& curStencil = stencils[faceI];
+
+        // Centre of current face
+        const vector& curCf = CfI[faceI];
+
+        // Find max distance in this stencil
+        scalar maxDist = 0.0;
+        forAll(curStencil, cI)
+        {
+            const label neiGlobalCellID = curStencil[cI];
+
+            scalar d;
+            if (globalCells_.isLocal(neiGlobalCellID))
+            {
+                const label neiLocalCellID =
+                    globalCells_.toLocal(neiGlobalCellID);
+                d = mag(CI[neiLocalCellID] - curCf);
+            }
+            else
+            {
+                d = mag(globalCI[neiGlobalCellID] - curCf);
+            }
+
+            maxDist = max(maxDist, d);
+        }
+
+        // Loop over neighbours and construct matrix Q
+        const label Nn = curStencil.size();
+
+        // Use matrix format from Eigen/Dense library
+        // Avoid initialisation to zero as we will set every entry below
+        Eigen::MatrixXd Q(Np, Nn);
+
+        // Check to avoid Eigen error
+        if (Nn < Np)
+        {
+            FatalErrorInFunction
+                << "Interpolation stencil needs to be bigger than the "
+                << "number of elements in Taylor order!"
+                << exit(FatalError);
+        }
+
+        // Loop over stencil points
+        for (label cI = 0; cI < Nn; ++cI)
+        {
+            const label neiGlobalCellID = curStencil[cI];
+            vector dx;
+            if (globalCells_.isLocal(neiGlobalCellID))
+            {
+                const label neiLocalCellID =
+                    globalCells_.toLocal(neiGlobalCellID);
+
+                dx = CI[neiLocalCellID] - curCf;
+            }
+            else
+            {
+                dx = globalCI[neiGlobalCellID] - curCf;
+            }
+
+            // Compute monomial values for each exponent
+            for (label p = 0; p < Np; ++p)
+            {
+                const FixedList<label, 3>& exponent = exponents[p];
+                const label i = exponent[0];
+                const label j = exponent[1];
+                const label k = exponent[2];
+
+               // Compute factorial denominator
+               const scalar factorialDenominator =
+                   factorials[i]*factorials[j]*factorials[k];
+
+               // Compute and assign monomial value with factorials
+               // Note: the order of the quadratic and higher terms may not be
+               // the same as the previous manual approach
+               Q(p, cI) =
+                   pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
+                  /factorialDenominator;
+            }
+        }
+
+        Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn);
+        //W.setZero(); // no need to waste time initialising
+
+        for (label cI = 0; cI < Nn; cI++)
+        {
+            const label neiGlobalCellID = curStencil[cI];
+            scalar d;
+            if (globalCells_.isLocal(neiGlobalCellID))
+            {
+                const label neiLocalCellID =
+                    globalCells_.toLocal(neiGlobalCellID);
+
+                d = mag(CI[neiLocalCellID] - curCf);
+            }
+            else
+            {
+                d = mag(globalCI[neiGlobalCellID] - curCf);
+            }
+
+            // Smoothing length
+            const scalar dm = 2*maxDist;
+
+            // Weight using radially symmetric exponential function
+            const scalar sqrK = -pow(k_,2);
+            const scalar w =
+                (
+                    Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
+                )/(1 - exp(sqrK));
+
+            W.diagonal()[cI] = w;
+        }
+
+        // Now when we have W and Q, next step is QR decomposition
+        const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
+            W.diagonal().cwiseSqrt().asDiagonal();
+        const Eigen::MatrixXd Qhat =
+            Q.array().rowwise()*sqrtW.diagonal().transpose().array();
+
+        // B hat
+        const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
+            sqrtW.diagonal().asDiagonal();
+
+        // QR decomposition
+        Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
+
+        // Q and R matrices
+        const Eigen::MatrixXd O = qr.householderQ();
+        const Eigen::MatrixXd& R = qr.matrixQR().triangularView<Eigen::Upper>();
+
+        // Slice Rbar and Qbar, as we do not need full matrix
+        // Note: auto is a reference type here (Rbar, Qbar are not copied)
+        const auto Rbar = R.topLeftCorner(Np, Np);
+        const auto Qbar = O.leftCols(Np);
+
+        // Perform element-wise multiplication and convert to MatrixXd
+        const Eigen::MatrixXd QbarBhat =
+            (
+                Qbar.transpose().array().rowwise()
+               *Bhat.diagonal().transpose().array()
+            ).matrix();
+
+        // Solve to get A
+        // const Eigen::MatrixXd A =
+        //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
+        // Solve using the modified QbarBhat
+        const Eigen::MatrixXd A = Rbar.colPivHouseholderQr().solve(QbarBhat);
+
+        // TODO: how best to display a surface field? Maybe use fvc::average to
+        // create a vol field
+        // // To be aware of interpolation accuracy we need to control the
+        // // condition number
+        // if (calcConditionNumber_)
+        // {
+        //     Eigen::JacobiSVD<Eigen::MatrixXd> svd
+        //     (
+        //         Rbar, Eigen::ComputeFullU | Eigen::ComputeFullV
+        //     );
+        //     Eigen::VectorXd singularValues = svd.singularValues();
+
+        //     conditionNumber()[localCellI] =
+        //         singularValues(0)
+        //        /(singularValues(singularValues.size() - 1) + VSMALL);
+        // }
+
+        c[faceI].setCapacity(A.cols());
+        cx[faceI].setCapacity(A.cols());
+        cy[faceI].setCapacity(A.cols());
+        cz[faceI].setCapacity(A.cols());
+
+        Eigen::RowVectorXd cRow = A.row(0);
+        Eigen::RowVectorXd cxRow = A.row(1);
+        Eigen::RowVectorXd cyRow = A.row(2);
+        Eigen::RowVectorXd czRow = A.row(3);
+
+        for (label i = 0; i < A.cols(); ++i)
+        {
+            c[faceI].append(cRow(i));
+            cx[faceI].append(cxRow(i));
+            cy[faceI].append(cyRow(i));
+            cz[faceI].append(czRow(i));
+        }
+
+        c[faceI].shrink();
+        cx[faceI].shrink();
+        cy[faceI].shrink();
+        cz[faceI].shrink();
+    }
+
+    forAll(QRGradCoeffs, faceI)
+    {
+       const labelList& curStencil = stencils[faceI];
+       const label Nn = curStencil.size();
+
+       QRGradCoeffs[faceI].setCapacity(Nn);
+
+       for (label I = 0; I < Nn; I++)
+       {
+           QRGradCoeffs[faceI].append
+           (
+               vector(cx[faceI][I], cy[faceI][I], cz[faceI][I])
+           );
+       }
+
+       QRGradCoeffs[faceI].shrink();
+    }
+
+    if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
+    }
+}
+
+
 void higherOrderGrad::calcCholeskyCoeffs() const
 {
     Info<< "higherOrderGrad::calcCholeskyCoeffs()" << endl;
@@ -1666,6 +2060,17 @@ const List<DynamicList<vector>>& higherOrderGrad::QRGradCoeffs() const
 }
 
 
+const List<DynamicList<vector>>& higherOrderGrad::QRGradFaceCoeffs() const
+{
+    if (!QRGradFaceCoeffsPtr_)
+    {
+        calcGlobalQRFaceCoeffs();
+    }
+
+    return QRGradFaceCoeffsPtr_();
+}
+
+
 const List<DynamicList<label>>& higherOrderGrad::stencilsBoundaryFaces() const
 {
     if (!stencilsBoundaryFacesPtr_)
@@ -1795,6 +2200,7 @@ higherOrderGrad::higherOrderGrad
     globalCellStencilsPtr_(),
     QRInterpCoeffsPtr_(),
     QRGradCoeffsPtr_(),
+    QRGradFaceCoeffsPtr_(),
     choleskyPtr_(),
     QhatPtr_(),
     sqrtWPtr_()
@@ -1820,7 +2226,7 @@ higherOrderGrad::~higherOrderGrad()
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D)
+tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D) const
 {
     if (useQRDecomposition_)
     {
@@ -1847,7 +2253,112 @@ tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D)
 }
 
 
-tmp<volTensorField> higherOrderGrad::gradQR(const volVectorField& D)
+tmp<surfaceTensorField> higherOrderGrad::fGrad(const volVectorField& D) const
+{
+    const fvMesh& mesh = mesh_;
+
+    // Prepare the return field
+    tmp<surfaceTensorField> tgradD
+    (
+        new surfaceTensorField
+        (
+           IOobject
+           (
+               "grad(" + D.name() + ")",
+               mesh.time().timeName(),
+               mesh,
+               IOobject::NO_READ,
+               IOobject::AUTO_WRITE
+           ),
+           mesh,
+           dimensionedTensor("0", dimless, Zero)
+        )
+    );
+    surfaceTensorField& gradD = tgradD.ref();
+    tensorField& gradDI = gradD;
+
+    const List<labelList>& stencils = globalFaceStencils();
+    const List<DynamicList<vector>>& QRGradCoeffs = QRGradFaceCoeffs();
+    const vectorField& DI = D;
+
+    // Collect DI for off-processor cells in the stencils
+    Map<vector> globalDI;
+    requestGlobalStencilData(DI, globalDI);
+
+    forAll(stencils, faceI)
+    {
+        const labelList& curStencil = stencils[faceI];
+        const label Nn = curStencil.size();
+
+        // Loop over stencil and multiply stencil cell values with
+        // corresponding interpolation coefficient
+        for (label cI = 0; cI < Nn; cI++)
+        {
+            const label neiGlobalCellI = curStencil[cI];
+
+            if (globalCells_.isLocal(neiGlobalCellI))
+            {
+                const label neiLocalCellI =
+                    globalCells_.toLocal(neiGlobalCellI);
+
+                if (mesh.isInternalFace(faceI))
+                {
+                    gradDI[faceI] +=
+                        QRGradCoeffs[faceI][cI]*DI[neiLocalCellI];
+                }
+                else
+                {
+                    // Boundary face
+                    const label patchID =
+                        mesh.boundaryMesh().whichPatch(faceI);
+                    const polyPatch& pp = mesh.boundaryMesh()[patchID];
+
+                    // Note: there is no special treatment for processor patches
+                    // as all patches may use global data depending on their
+                    // stencils
+                    if (!isA<emptyPolyPatch>(pp))
+                    {
+                        const label localFaceI = faceI - pp.start();
+                        gradD.boundaryFieldRef()[patchID][localFaceI] +=
+                            QRGradCoeffs[faceI][cI]*DI[neiLocalCellI];
+                    }
+                }
+            }
+            else // global cell in the stencil
+            {
+                if (mesh.isInternalFace(faceI))
+                {
+                    gradD[faceI] +=
+                        QRGradCoeffs[faceI][cI]*globalDI[neiGlobalCellI];
+                }
+                else
+                {
+                    // Boundary face
+                    const label patchID =
+                        mesh.boundaryMesh().whichPatch(faceI);
+                    const polyPatch& pp = mesh.boundaryMesh()[patchID];
+
+                    // Note: there is no special treatment for processor patches
+                    // as all patches may use global data depending on their
+                    // stencils
+                    if (!isA<emptyPolyPatch>(pp))
+                    {
+                        const label localFaceI = faceI - pp.start();
+                        gradD.boundaryFieldRef()[patchID][localFaceI] +=
+                            QRGradCoeffs[faceI][cI]*globalDI[neiGlobalCellI];
+                    }
+                }
+            }
+        }
+    }
+
+    gradD.correctBoundaryConditions();
+
+    return tgradD;
+}
+
+
+tmp<volTensorField> higherOrderGrad::gradQR(const volVectorField& D) const
 {
     if (debug)
     {
@@ -1940,7 +2451,7 @@ tmp<volTensorField> higherOrderGrad::gradQR(const volVectorField& D)
 }
 
 
-tmp<volTensorField> higherOrderGrad::gradGlobalQR(const volVectorField& D)
+tmp<volTensorField> higherOrderGrad::gradGlobalQR(const volVectorField& D) const
 {
     if (debug)
     {
@@ -2017,7 +2528,7 @@ tmp<volTensorField> higherOrderGrad::gradGlobalQR(const volVectorField& D)
 }
 
 
-tmp<volTensorField> higherOrderGrad::gradCholesky(const volVectorField& D)
+tmp<volTensorField> higherOrderGrad::gradCholesky(const volVectorField& D) const
 {
     if (debug)
     {
@@ -2133,7 +2644,10 @@ tmp<volTensorField> higherOrderGrad::gradCholesky(const volVectorField& D)
 }
 
 
-tmp<volTensorField> higherOrderGrad::gradGlobalCholesky(const volVectorField& D)
+tmp<volTensorField> higherOrderGrad::gradGlobalCholesky
+(
+    const volVectorField& D
+) const
 {
     if (debug)
     {

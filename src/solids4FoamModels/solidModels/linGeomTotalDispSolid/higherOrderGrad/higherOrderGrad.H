@@ -108,11 +108,22 @@ class higherOrderGrad
         //  not and to convert between global and local indices
         mutable autoPtr<labelListList> globalCellStencilsPtr_;
 
+        //- Least squares global face stencils
+        //  This is a labelList for each face (internal and boundary) on this
+        //  processor, containing the global cell indices of all cells in its
+        //  stencil, including those on other processors
+        //  The globalCells object can be used to check if a cell is local or
+        //  not and to convert between global and local indices
+        mutable autoPtr<labelListList> globalFaceStencilsPtr_;
+
         //- QR Interpolation coefficients
         mutable autoPtr<List<DynamicList<scalar>>> QRInterpCoeffsPtr_;
 
-        //- QR Gradient coefficients
+        //- QR Gradient cell coefficients
         mutable autoPtr<List<DynamicList<vector>>> QRGradCoeffsPtr_;
+
+        //- QR Gradient face coefficients
+        mutable autoPtr<List<DynamicList<vector>>> QRGradFaceCoeffsPtr_;
 
         //- Cholesky decomposition
         mutable autoPtr<List<Eigen::LLT<Eigen::MatrixXd>>> choleskyPtr_;
@@ -132,6 +143,9 @@ class higherOrderGrad
         //- Make the least squares cell stencils
         void makeGlobalCellStencils() const;
 
+        //- Make the least squares face stencils
+        void makeGlobalFaceStencils() const;
+
         //- Least squares cell stencils
         void makeStencils() const;
 
@@ -140,6 +154,9 @@ class higherOrderGrad
 
         //- Return the least squares global cell stencils
         const labelListList& globalCellStencils() const;
+
+        //- Return the least squares face cell stencils
+        const labelListList& globalFaceStencils() const;
 
         //- Calculate exponents for the Tayler series expansion terms
         void generateExponents
@@ -155,6 +172,10 @@ class higherOrderGrad
         //  the global cell stencils
         void calcGlobalQRCoeffs() const;
 
+        //- Calculate coefficients for the QR decomposition approach using the
+        //  the global cell stencils for the faces
+        void calcGlobalQRFaceCoeffs() const;
+
         //- Calculate coefficients for the Cholesky decomposition approach
         void calcCholeskyCoeffs() const;
 
@@ -167,6 +188,9 @@ class higherOrderGrad
 
         //- Return the gradient coefficients
         const List<DynamicList<vector>>& QRGradCoeffs() const;
+
+        //- Return the gradient face coefficients
+        const List<DynamicList<vector>>& QRGradFaceCoeffs() const;
 
         //- Return the cell boundary face indices
         const List<DynamicList<label>>& stencilsBoundaryFaces() const;
@@ -232,23 +256,26 @@ public:
         // Edit
 
             //- Calculate the gradient of a volVectorField
-            tmp<volTensorField> grad(const volVectorField& D);
+            tmp<volTensorField> grad(const volVectorField& D) const;
+
+            //- Calculate the face gradient of a volVectorField
+            tmp<surfaceTensorField> fGrad(const volVectorField& D) const;
 
             //- Calculate the gradient of a volVectorField using QR
             //  decomposition
-            tmp<volTensorField> gradQR(const volVectorField& D);
+            tmp<volTensorField> gradQR(const volVectorField& D) const;
 
             //- Calculate the gradient of a volVectorField using QR
             //  decomposition using the global cell stencils
-            tmp<volTensorField> gradGlobalQR(const volVectorField& D);
+            tmp<volTensorField> gradGlobalQR(const volVectorField& D) const;
 
             //- Calculate the gradient of a volVectorField using Cholesky
             //  decomposition
-            tmp<volTensorField> gradCholesky(const volVectorField& D);
+            tmp<volTensorField> gradCholesky(const volVectorField& D) const;
 
             //- Calculate the gradient of a volVectorField using Cholesky
             //  decomposition using the global cell stencils
-            tmp<volTensorField> gradGlobalCholesky(const volVectorField& D);
+            tmp<volTensorField> gradGlobalCholesky(const volVectorField& D) const;
 };
 
 

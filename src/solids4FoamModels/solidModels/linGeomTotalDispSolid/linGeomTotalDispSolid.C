@@ -674,6 +674,7 @@ tmp<vectorField> linGeomTotalDispSolid::residualMomentum
     if (hoGradPtr_)
     {
         gradD() = hoGradPtr_->grad(D);
+        //const surfaceTensorField gradDf(hoGradPtr_->fGrad(D));
     }
     else
     {
