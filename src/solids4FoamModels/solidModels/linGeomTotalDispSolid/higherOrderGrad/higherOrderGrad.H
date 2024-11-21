@@ -151,6 +151,10 @@ class higherOrderGrad
         //- Calculate coefficients for the QR decomposition approach
         void calcQRCoeffs() const;
 
+        //- Calculate coefficients for the QR decomposition approach using the
+        //  the global cell stencils
+        void calcGlobalQRCoeffs() const;
+
         //- Calculate coefficients for the Cholesky decomposition approach
         void calcCholeskyCoeffs() const;
 
@@ -233,6 +237,10 @@ public:
             //- Calculate the gradient of a volVectorField using QR
             //  decomposition
             tmp<volTensorField> gradQR(const volVectorField& D);
+
+            //- Calculate the gradient of a volVectorField using QR
+            //  decomposition using the global cell stencils
+            tmp<volTensorField> gradGlobalQR(const volVectorField& D);
 
             //- Calculate the gradient of a volVectorField using Cholesky
             //  decomposition
