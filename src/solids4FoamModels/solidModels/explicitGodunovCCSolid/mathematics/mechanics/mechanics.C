@@ -84,18 +84,10 @@ mechanics::mechanics
         dimensionedTensor("S_t", dimensionSet(0,-1,1,0,0,0,0), tensor::zero)
     ),
 
-    timeStepping_(dict.lookup("timeStepping")),
 
     cfl_(readScalar(dict.lookup("cfl"))),
 
     tStep_(0),
-   
-    tpdeltaT_
-    (
-        "tpdeltaT_", 
-        dimTime, 
-        1e-5
-    ),
 
     stretch_
     (
@@ -111,12 +103,7 @@ mechanics::mechanics
 
 {
 
-    if (timeStepping_ != "constant" && timeStepping_ != "variable")
-    {
-        FatalErrorIn("readControls.H")
-            << "Valid type entries are 'constant' or 'variable' for timeStepping"
-            << abort(FatalError);
-    }
+
 
     if (cfl_ <= 0.0 || cfl_ > 1.0)
     {
@@ -190,41 +177,7 @@ void mechanics::time
 {
     const dimensionedScalar& h = op.minimumEdgeLength();
 
-    if (timeStepping_ == "variable")
-    {
-        deltaT = (cfl_*h)/Up_time;
-        runTime.setDeltaT(deltaT);
-    }
-    else
-    {
-        deltaT = runTime.deltaT();
-    }
-
-    // runTime++;
-    tStep_++;
-
-    // Info<< "\nTime step =" << tStep_ << nl
-    //     << "Time increment = " << runTime.deltaTValue() << " s" << nl
-    //     << "Time = " << runTime.timeName() << " s" << endl;
-}
-
-void mechanics::pesudoTime
-(
-    Time& runTime,
-    dimensionedScalar& deltaT,
-    dimensionedScalar Up_time
-)
-{
-    const dimensionedScalar& h = op.minimumEdgeLength();
-    
-    deltaT = (cfl_*h)/Up_time;
-    
-    pesudoTimeStep_++;
-
-
-    // Info<< "\nPesudo Time step =" << pesudoTimeStep_ << nl
-    //     << "Pesudo Time increment = " << deltaT.value()<< " s" << endl;
-
+    deltaT = min((cfl_*h)/Up_time, 0.666*runTime.deltaT());
 }
 
 

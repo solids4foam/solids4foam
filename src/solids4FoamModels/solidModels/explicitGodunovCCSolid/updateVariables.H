@@ -14,9 +14,11 @@ P_ = model_.piola();
 lmGrad_ = grad_.gradient(lm_);
 grad_.gradient(P_, PxGrad_, PyGrad_, PzGrad_);
 
+
 // Reconstruction
 grad_.reconstruct(lm_, lmGrad_, lm_M_, lm_P_);
 grad_.reconstruct(P_, PxGrad_, PyGrad_, PzGrad_, P_M_, P_P_);
+
 t_M_ = P_M_ & N_;
 t_P_ = P_P_ & N_;
 

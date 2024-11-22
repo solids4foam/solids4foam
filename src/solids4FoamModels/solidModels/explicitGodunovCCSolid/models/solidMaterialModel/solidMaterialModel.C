@@ -90,79 +90,27 @@ solidMaterialModel::solidMaterialModel
         )
     ),
 
-    rho_
-    (
-        "rho",
-        dimensionSet(1 , -3,  0, 0, 0, 0, 0),
-        0.0  
-    ),
-
-    E_
-    (
-        "rho",
-        dimensionSet(1, -1, -2, 0, 0, 0, 0),
-        0.0  
-    ),
-
-    nu_
-    (
-        "nu",
-        dimensionSet(0, 0, 0, 0, 0, 0, 0),
-        0.0  
-    ),
-
-    mu_
-    (
-        "lambda",
-        dimensionSet(1, -1, -2, 0, 0, 0, 0),
-        0.0  
-    ),
-
-    lambda_
-    (
-        "lambda",
-        dimensionSet(1, -1, -2, 0, 0, 0, 0),    
-        0.0  
-    ),
-
-    kappa_
-    (
-        "kappa",
-        dimensionSet(1, -1, -2, 0, 0, 0, 0),
-        0.0  
-    ),
-
-
-    Up_
-    (
-        "Up",
-        dimensionSet(0, 1, -1, 0, 0, 0, 0),
-        0.0  
-    ),
-
-    Us_
-    (
-        "Us",
-        dimensionSet(0, 1, -1, 0, 0, 0, 0),
-        0.0  
-    )
-
+    rho_("rho",dimDensity , 0.0),
+    E_("E", dimPressure, 0.0),
+    nu_("nu", dimless, 0.0),
+    mu_("mu", dimPressure, 0.0),
+    lambda_("lambda", dimPressure, 0.0),
+    kappa_("kappa_", dimPressure, 0.0),
+    Up_("Up_", dimVelocity, 0.0),
+    Us_("Us_", dimVelocity, 0.0)
 {
-    Info << "lambda: " << lambda_ << nl;
-
     // Read the mechanical laws
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
 
     const dictionary& materialDict = lawEntries[0].dict();
 
-    // Read rho, E, and nu from the material dictionary
+    // Read model rho, E, and nu from the material dictionary
 
     const word model
     (
         materialDict.lookup("type")
     );
     model_ = model;
-
 
     rho_ = dimensionedScalar(materialDict.lookup("rho"));
     E_ = dimensionedScalar(materialDict.lookup("E"));
@@ -179,7 +127,6 @@ solidMaterialModel::solidMaterialModel
 
     correct();// add here form creatField.H in original solver to make sure variables are apdated like rho_ ...
     p_.write();
-
 }
 
 

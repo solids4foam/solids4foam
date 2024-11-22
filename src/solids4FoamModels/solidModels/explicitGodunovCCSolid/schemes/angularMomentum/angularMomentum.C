@@ -44,12 +44,8 @@ angularMomentum::angularMomentum
 )
 :
     mesh_(vm),
-    rho_
-    (
-        "rho",
-        dimensionSet(1 , -3,  0, 0, 0, 0, 0),
-        0.0  
-    )
+    rho_("rho",dimDensity , 0.0)
+
 {
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
     const dictionary& materialDict = lawEntries[0].dict();
@@ -71,7 +67,7 @@ void angularMomentum::AMconservation
     GeometricField<vector, fvPatchField, volMesh>& rhsLm1,
     const GeometricField<vector, fvPatchField, volMesh>& rhsAm,
     const scalar& RKstage,
-    const dimensionedScalar& deltaT
+    const dimensionedScalar& pDeltaT 
 ) const
 {
     const scalarField& V_ = mesh_.V();
@@ -124,14 +120,14 @@ void angularMomentum::AMconservation
 
     if (RKstage == 0)
     {
-        xAM = x_.prevIter();
+        xAM = x_.oldTime();
     }
 
     else if (RKstage == 1)
     {
-        xAM = x_.prevIter() + (deltaT/2.0)*(lm_.prevIter()/rho_);
-        lmAM = lm_.prevIter() + (deltaT*rhsLm1);
-        xAM = xAM + ((deltaT*(lmAM/rho_))/2.0);
+        xAM = x_.oldTime() + (pDeltaT/2.0)*(lm_.oldTime()/rho_);
+        lmAM = lm_.oldTime() + (pDeltaT*rhsLm1);
+        xAM = xAM + ((pDeltaT*(lmAM/rho_))/2.0);
     }
 
     tensor K_LL = tensor::zero;

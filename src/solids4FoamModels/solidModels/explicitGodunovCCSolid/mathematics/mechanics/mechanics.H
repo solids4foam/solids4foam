@@ -65,18 +65,13 @@ class mechanics
         //- Stabilisation matrix for traction
         surfaceTensorField S_t_;
 
-        //- Time stepping
-        word timeStepping_;
 
         //- CFl number
         scalar cfl_;
 
         //- Time step
         scalar tStep_;
-        
-        //- Pesudo Time step 
-        scalar pesudoTimeStep_;
-        dimensionedScalar  tpdeltaT_;
+
         //- Stretch
         volScalarField stretch_;
 
@@ -130,11 +125,6 @@ public:
             {
                 return stretch_;
             }
-           
-            scalar& pesudoTimeStep() 
-            {
-                return pesudoTimeStep_;
-            }
 
         // Edit
 
@@ -151,13 +141,6 @@ public:
 
             //-
             void time
-            (
-                Time&,
-                dimensionedScalar&,
-                dimensionedScalar
-            );            
-            
-            void pesudoTime
             (
                 Time&,
                 dimensionedScalar&,

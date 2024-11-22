@@ -55,8 +55,6 @@ class solidMaterialModel
         //- Energy of algorithm
         volScalarField energyAlgorithm_;
 
-        // const dictionary& mechanicalPropertiesDict_; 
-
        //- Constitutive model
         word model_;
 
@@ -118,10 +116,6 @@ public:
 
         // Access
 
-           const  word& model() const
-            {
-                return model_;
-            }
             const volTensorField& piola() const
             {
                 return P_;

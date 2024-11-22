@@ -18,10 +18,8 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "explicitGodunovCCSolid.H"
-#include "fvm.H"
-#include "fvc.H"
-#include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -39,6 +37,99 @@ defineTypeNameAndDebug(explicitGodunovCCSolid, 0);
 addToRunTimeSelectionTable(solidModel, explicitGodunovCCSolid, dictionary);
 
 
+// * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
+
+bool explicitGodunovCCSolid::converged
+(
+    const int iCorr,
+    const dimensionedScalar pDeltaT,
+    const GeometricField<vector, fvPatchField, volMesh>& vf
+)  
+{
+    // We will check three residuals:
+    // - relative linear momentum residual
+
+    bool converged = false;
+
+    // Calculate residual based on the relative change of vf
+    scalar denom = 0.0;
+
+    // Denom is linear momentum increment
+        denom = gMax
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            DimensionedField<scalar, volMesh>
+#else
+            Field<scalar>
+#endif
+            (
+                mag(vf.internalField() - vf.oldTime().internalField())
+            )
+        );
+
+    if (denom < SMALL)
+    {
+        denom = 
+        max
+        (
+            gMax
+            (
+#ifdef OPENFOAM_NOT_EXTEND
+                DimensionedField<scalar, volMesh>(mag(vf.internalField()))
+#else
+                mag(vf.internalField())
+#endif
+            ),
+            SMALL
+        );
+    }
+    
+    const scalar residualvf =
+        gMax
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            DimensionedField<scalar, volMesh>
+            (
+                mag(vf.internalField() - vf.prevIter().internalField())
+            )
+#else
+            mag(vf.internalField() - vf.prevIter().internalField())
+#endif
+        )/denom;
+
+    // If one of the residuals has converged to an order of magnitude
+    // less than the tolerance then consider the solution converged
+    // force at least 1 outer iteration
+   if (residualvf < solutionTol())
+    {
+        Info<< "    Converged" << endl;
+        converged = true;
+    }
+
+    // Print residual information
+    if (iCorr == 0)
+    {
+        Info<< "    Corr, res, pDeltaT" << endl;
+    }
+    else if (iCorr % infoFrequency() == 0 || converged || iCorr >= nCorr() - 1)
+    {
+        Info<< "    " << iCorr
+            << ", " << residualvf
+            << ", " << pDeltaT.value() << endl;
+
+        if (iCorr >= nCorr())
+        {
+            Warning
+                << "Max iterations reached within the momentum loop"
+                << endl;
+            converged = true;
+        }
+    }
+
+    return converged;
+ }
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 explicitGodunovCCSolid::explicitGodunovCCSolid
@@ -50,7 +141,7 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     solidModel(typeName, runTime, region),
     runTime_(runTime),
     //reading dicts
-    mechanicalProperties_//! to be changed
+    mechanicalProperties_
     (
         IOobject
         (
@@ -73,11 +164,13 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
             IOobject::NO_WRITE
         )
     ),
-    
-    beta_
+ 
+    incompressibilityCoefficient_
     (
         solidModelDict().lookupOrAddDefault<scalar>("incompressiblilityCoefficient", 1)
     ),
+
+    beta_(incompressibilityCoefficient_),
    
     angularMomentumConservation_
     (
@@ -329,7 +422,21 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     ),
 
     // Runge-Kutta stage
-    RKstages_(2)
+    RKstages_(2),
+
+    phi_lm_
+    (
+        IOobject("phi_lm", mesh()),
+        mesh(),
+        dimensionedVector("phi_lm", dimensionSet(0,0,0,0,0,0,0), vector::zero)
+    ),
+    phi_P_
+    (
+        IOobject("phi_P", mesh()),
+        mesh(),
+        dimensionedTensor("phi_P", dimensionSet(0,0,0,0,0,0,0), tensor::zero)
+    )
+
 
 {
 
@@ -371,23 +478,17 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     #include "updateVariables.H"   
     #include "riemannSolver.H"
 
-    pointD().oldTime();
-
-
-    lm_.oldTime();
-    lm_.oldTime().oldTime();
-    F_.oldTime();
-    F_.oldTime().oldTime();
     x_.oldTime();
-    x_.oldTime().oldTime();
     xF_.oldTime();
-    xF_.oldTime().oldTime();
+    lm_.oldTime();
+    F_.oldTime();
     xN_.oldTime();
+
+    lm_.oldTime().oldTime();
+    F_.oldTime().oldTime();
+    x_.oldTime().oldTime();
+    xF_.oldTime().oldTime();
     xN_.oldTime().oldTime();
-
-    DisRequired();
-
-
 
     // Set the printInfo
     physicsModel::printInfo() = bool
@@ -399,15 +500,11 @@ explicitGodunovCCSolid::explicitGodunovCCSolid
     Info<< "Frequency at which info is printed: every " << infoFrequency()
         << " time-steps" << endl;
 
-    }
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-void explicitGodunovCCSolid::setDeltaT(Time& runTime)
-{
-     mech_.time(runTime_, deltaT_, max(Up_time_));
-
 }
+
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
 bool explicitGodunovCCSolid::evolve()
@@ -417,14 +514,13 @@ bool explicitGodunovCCSolid::evolve()
     do
     {
         int iCorr = 0;
-        mech_.pesudoTimeStep() = 0;
 
         if (physicsModel::printInfo())
         {
             Info<< "Evolving solid solver form explicitGodunovCCSolid" << endl;
         }
         
-        // Momentum equation loop
+        // Pseudo time loop (Correction loop)
         do
         {
             if (angularMomentumConservation_ == "yes")
@@ -435,10 +531,9 @@ bool explicitGodunovCCSolid::evolve()
 
             F_.storePrevIter();
             lm_.storePrevIter();
-            xN_.storePrevIter();
-            
+            xN_.storePrevIter();            
 
-            mech_.pesudoTime(runTime_, pDeltaT_, max(Up_time_));
+            mech_.time(runTime_, pDeltaT_, max(Up_time_));
 
             forAll(RKstages_, stage)
             {
@@ -467,28 +562,28 @@ bool explicitGodunovCCSolid::evolve()
         }
         while
         (
-            !fieldConverged
+            !converged
                 (
                     iCorr,
+                    pDeltaT_,
                     lm_
                 )
          && ++iCorr < nCorr()
         );
-
+        
         // Update the stress field based on the latest D field
         sigma() =  symm( (1.0 / J_) * (P_ & F_.T()));
 
         // Increment of point displacement
         pointDD() = pointD() - pointD().oldTime();
-                
-
+ 
     }
     while (mesh().update());
-
+  
     return true;
 }
 
-//! unnecessary function but requiered by the main solver
+
 tmp<vectorField> explicitGodunovCCSolid::tractionBoundarySnGrad
 (
     const vectorField& traction,
@@ -496,7 +591,7 @@ tmp<vectorField> explicitGodunovCCSolid::tractionBoundarySnGrad
     const fvPatch& patch
 ) const
 {
-    Info << "tractionBoundarySnGrad() not implemented" << endl;
+        Info << "tractionBoundarySnGrad is not implimented";
 }
 
 

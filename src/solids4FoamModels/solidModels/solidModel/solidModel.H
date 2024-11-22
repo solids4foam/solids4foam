@@ -321,7 +321,18 @@ protected:
         bool fieldConverged
         (
             const int iCorr,
+            const dimensionedScalar pDeltaT,
             const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const bool writeResiduals = true
+        );
+
+        //- Check if a vol field  has converged
+        template<class Type>
+        bool fieldConverged
+        (
+            const int iCorr,
+            const dimensionedScalar pDeltaT,
+            const GeometricField<Type, pointPatchField, pointMesh>& vf,
             const bool writeResiduals = true
         );
 

@@ -401,21 +401,6 @@ void explicitSolidTractionLinearMomentumFvPatchVectorField::updateCoeffs()
 
     this->operator==(lm_C);
     fixedValueFvPatchVectorField::updateCoeffs();
-
-
-    // // Lookup the solidModel object
-    // const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
-
-    // // Set surface-normal gradient on the patch corresponding to the desired
-    // // traction
-    // gradient() =
-    //     relaxFac_*solMod.tractionBoundarySnGrad
-    //     (
-    //         traction_, press, patch()
-    //     )
-    //   + (1.0 - relaxFac_)*gradient();
-
-    // fixedValueFvPatchVectorField::updateCoeffs();
 }
 
 
@@ -429,59 +414,6 @@ void explicitSolidTractionLinearMomentumFvPatchVectorField::evaluate
         this->updateCoeffs();
     }
 
-    // if (nonOrthogonalCorrections_)
-    // {
-    //     // Lookup the gradient field
-    //     const fvPatchField<tensor>& gradField =
-    //         patch().lookupPatchField<volTensorField, tensor>
-    //         (
-    //         #ifdef OPENFOAM_NOT_EXTEND
-    //             "grad(" + internalField().name() + ")"
-    //         #else
-    //             "grad(" + dimensionedInternalField().name() + ")"
-    //         #endif
-    //         );
-
-    //     // Non-orthogonal correction vectors
-    //     const vectorField k(patchCorrectionVectors(patch()));
-
-    //     if (secondOrder_)
-    //     {
-    //         // Face unit normals
-    //         const vectorField n(patch().nf());
-
-    //         // Correction to internal field cells
-    //         const vectorField dUP(k & gradField.patchInternalField());
-
-    //         // Normal gradient at internal field cells
-    //         const vectorField nGradUP(n & gradField.patchInternalField());
-
-    //         Field<vector>::operator=
-    //         (
-    //             patchInternalField()
-    //           + dUP
-    //           + 0.5*(gradient() + nGradUP)/patch().deltaCoeffs()
-    //         );
-    //     }
-    //     else
-    //     {
-
-    //         Field<vector>::operator=
-    //         (
-    //             patchInternalField()
-    //           + (k & gradField.patchInternalField())
-    //           + gradient()/patch().deltaCoeffs()
-    //         );
-    //     }
-    // }
-    // else
-    // {
-    //     // No non-orthogonal correction
-    //     Field<vector>::operator=
-    //     (
-    //         patchInternalField() + gradient()/patch().deltaCoeffs()
-    //     );
-    // }
 
     fvPatchField<vector>::evaluate();
 }

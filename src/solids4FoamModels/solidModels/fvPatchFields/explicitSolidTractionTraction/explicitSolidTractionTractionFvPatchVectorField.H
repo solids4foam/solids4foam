@@ -24,6 +24,7 @@ Description
 Author
     Philip Cardiff, UCD.
     Zeljko Tukovic, FSB Zagreb.
+    Khoder Alhamwi Alshaar, IITB.
 
 SourceFiles
     explicitSolidTractionTractionFvPatchVectorField.C

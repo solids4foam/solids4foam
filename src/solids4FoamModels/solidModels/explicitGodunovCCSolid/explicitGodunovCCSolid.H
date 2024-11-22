@@ -19,38 +19,32 @@ Class
     explicitGodunovCCSolid
 
 Description
-    A solid mechanics solver based on a Total Lagrangian mixed formulation
+    A solid model based on the  explicitSolidDynamics toolkit.
+    Solve a first order system of total Lagrangian mixed formulation
     comprising of conservation laws for linear momentum and deformation
-    gradient of the system.
+    gradient.
 
-Original Author
+Author
+    Khoder Alhamwi Alshaar, IITB. All rights reserved.
 
-
-Integrated with solids4Foam
-    Khoder Alhamwi Alshaar 
+Original Author of explicitSolidDynamics toolkit
+    Jibran Haider
 
 SourceFiles
     explicitGodunovCCSolid.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef explicitGodunovCC_H
-#define explicitGodunovCC_H
+#ifndef explicitGodunovCCSolid_H
+#define explicitGodunovCCSolid_H
 
 #include "solidModel.H"
-// #include "volFields.H"
-// #include "surfaceFields.H"
-// #include "pointFields.H"
-// #include "uniformDimensionedFields.H"
-// #include "mechanicalEnergies.H"
-
 #include "operations.H"
 #include "solidMaterialModel.H"
 #include "mechanics.H"
 #include "gradientSchemes.H"
 #include "interpolationSchemes.H"
 #include "angularMomentum.H"
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -63,7 +57,7 @@ namespace solidModels
 {
 
 /*---------------------------------------------------------------------------*\
-                        Class linGeomSolid Declaration
+                        Class explicitGodunovCCSolid Declaration
 \*---------------------------------------------------------------------------*/
 
 class explicitGodunovCCSolid
@@ -71,7 +65,7 @@ class explicitGodunovCCSolid
     public solidModel
 {
     // Private data
-    Time& runTime_;
+        Time& runTime_;
 
     // Reading dictionaries 
     // Mechanical properties
@@ -80,6 +74,7 @@ class explicitGodunovCCSolid
     // Control dictionary
     IOdictionary controlDict_;
 
+    scalar incompressibilityCoefficient_; 
     // Stabilisation parameter for near incompressibility
     const scalar& beta_;
 
@@ -255,9 +250,18 @@ class explicitGodunovCCSolid
     // Runge-Kutta stage
     scalarList RKstages_;
 
-
+    //limiter fields
+    volVectorField phi_lm_;
+    volTensorField phi_P_;
 
     // Private Member Functions
+    //- Check for solution convergence
+    bool converged
+    (
+        const int iCorr,
+        const dimensionedScalar pDeltaT,
+        const GeometricField<vector, fvPatchField, volMesh>& vf
+    );
 
         //- Disallow default bitwise copy construct
         explicitGodunovCCSolid(const explicitGodunovCCSolid&);
@@ -273,7 +277,7 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
-                return nonLinearGeometry::TOTAL_LAGRANGIAN;
+            return nonLinearGeometry::LINEAR_GEOMETRY;
         }
 
 
@@ -290,7 +294,6 @@ public:
             Time& runTime,
             const word& region = dynamicFvMesh::defaultRegion
         );
-
 
     // Destructor
 
@@ -311,9 +314,7 @@ public:
             }
 
         // Edit
-            //- Update the size of the time-step
-            virtual void setDeltaT(Time& runTime);
-            
+
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
 
@@ -324,11 +325,6 @@ public:
                 const scalarField& pressure,
                 const fvPatch& patch
             ) const;
-
-            //- End of the program
-            virtual void end()
-            {}
-
 };
 
 

@@ -1,7 +1,7 @@
 // Compute right hand sides
 rhsLm_ = fvc::surfaceIntegrate(tC_*magSf_);
 
-//! angula momentum required to be updated to consider  dual time step 
+//! angula momentum required to be updated to consider  dual time step?
 if (angularMomentumConservation_ == "yes")
 {
     rhsAm_ = fvc::surfaceIntegrate((xF_ ^ tC_)*magSf_);
