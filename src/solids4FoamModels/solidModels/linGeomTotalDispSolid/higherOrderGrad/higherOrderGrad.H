@@ -41,6 +41,7 @@ SourceFiles
 #include "fvMesh.H"
 #include "globalIndex.H"
 #include <Eigen/Dense>
+#include "tensorList.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -260,6 +261,9 @@ public:
 
             //- Calculate the face gradient of a volVectorField
             tmp<surfaceTensorField> fGrad(const volVectorField& D) const;
+
+            //- Calculate the face Gauss points gradient of a volVectorField
+            refPtr<List<List<tensor>>> fGradGaussPoints(const volVectorField& D) const;
 
             //- Calculate the gradient of a volVectorField using QR
             //  decomposition

@@ -22,7 +22,8 @@ License
 #include "surfaceFields.H"
 #include "emptyPolyPatch.H"
 #include "processorPolyPatch.H"
-
+#include "triangle.H"
+#include "triFace.H"
 
 namespace Foam
 {
@@ -2228,6 +2229,8 @@ higherOrderGrad::~higherOrderGrad()
 
 tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D) const
 {
+    auto test =  fGradGaussPoints(D);
+
     if (useQRDecomposition_)
     {
         if (useGlobalStencils_)
@@ -2355,6 +2358,111 @@ tmp<surfaceTensorField> higherOrderGrad::fGrad(const volVectorField& D) const
     gradD.correctBoundaryConditions();
 
     return tgradD;
+}
+
+
+refPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints(const volVectorField& D) const
+{
+    // Number of quadrature points per triangle.
+    const label triQuadraturePtsNb = 3;
+
+    const fvMesh& mesh = mesh_;
+
+    const pointField& pts = mesh.points();
+
+    // Prepare the return field
+    // Philip: I'm using refPtr, tmp is more appropriate but I had a compilation
+    // problems, when it is used for List<List<tensor>
+    refPtr<List<List<tensor>>> tgradDGP(new List<List<tensor>>(mesh.nFaces()));
+    List<List<tensor>>& gradDGP = tgradDGP.ref();
+
+    forAll(gradDGP, i)
+    {
+        List<tensor>& faceGradGP = gradDGP[i];
+
+        const label nbOfTriangles = mesh.faces()[i].size();
+        const label nbOfGaussPoints = nbOfTriangles * triQuadraturePtsNb;
+
+        faceGradGP.setSize(nbOfGaussPoints);
+    }
+
+    // 1. Stage - decompose faces into triangles. Store triangle points
+
+    // Triangulate each face and store points of each triangle
+    List<List<triPoints>> faceTri(mesh.nFaces());
+    forAll(faceTri, i)
+    {
+        List<triPoints>& fT = faceTri[i];
+
+        fT.setSize(mesh.faces()[i].size());
+    }
+
+    // Loop over faces and decompose each face, store triangles of each face
+    for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
+    {
+        const face& f = mesh.faces()[faceI];
+
+        const point fc = f.centre(pts);
+
+        const label nPoints = f.size();
+
+        label nextpI;
+        for (label pI = 0; pI<nPoints; ++pI)
+        {
+            if (pI < f.size() - 1)
+            {
+                nextpI = pI + 1;
+            }
+            else
+            {
+                nextpI = 0;
+            }
+
+            const triPoints tri
+            (
+                pts[f[pI]],
+                pts[f[nextpI]],
+                fc
+            );
+
+            faceTri[faceI][pI] = tri;
+        }
+    }
+
+    // 2. Stage - for each triangle calculate Gauss point locations and store
+    //            corresponding weights
+
+    // Gauss point locations on each face
+    List<List<point>> faceGP(mesh.nFaces());
+    forAll(faceGP, i)
+    {
+        List<point>& fGP = faceGP[i];
+        fGP.setSize(mesh.faces()[i].size() * triQuadraturePtsNb);
+    }
+
+    // Gauss point weights
+    List<List<scalar>> faceGPW(mesh.nFaces());
+    forAll(faceGPW, i)
+    {
+        List<scalar>& fGPW = faceGPW[i];
+        fGPW.setSize(mesh.faces()[i].size() * triQuadraturePtsNb);
+    }
+
+    // Loop over faces; loop over triangles. Store Gauss point locations and
+    // weight
+    forAll(faceTri, faceI)
+    {
+        List<triPoints>& fT = faceTri[faceI];
+
+        forAll(fT, tI)
+        {
+            const triPoints& tp = fT[tI];
+
+            // Sad bi tu isla funkcija koja mi vraca Gaussove tocke i tezine
+        }
+    }
+
+    return tgradDGP;
 }
 
 

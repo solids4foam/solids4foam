@@ -236,5 +236,6 @@ numerics/pointPointLeastSquaresVectors/pointPointLeastSquaresVectors.C
 numerics/sparseMatrix/sparseMatrix.C
 numerics/sparseMatrix/SparseMatrixTemplates.C
 numerics/sparseMatrix/sparseMatrixTools.C
+numerics/triangleQuadrature/triangleQuadrature.C
 
 LIB = $(FOAM_MODULE_LIBBIN)/libsolids4FoamModels
