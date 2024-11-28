@@ -22,6 +22,6 @@ set mxtic 4
 set mytic 4
 
 # Plotting the data
-plot 'postProcessing/0/solidPointDisplacement_displacement.dat' u ($1):($2) w l ls 1  title 'Dx Displacement'\
+plot 'postProcessing/0/solidPointDisplacement_displacement.dat' u ($1):($2) w l ls 1  title 'explicitGodunovCC'\
     ,"referenceSolution/refSol.dat" u ($1):($2) w l ls 2 title "preCICE. [2]" \
 
