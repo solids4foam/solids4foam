@@ -22,8 +22,10 @@ License
 #include "surfaceFields.H"
 #include "emptyPolyPatch.H"
 #include "processorPolyPatch.H"
+
 #include "triangle.H"
 #include "triFace.H"
+#include "triangleQuadrature.H"
 
 namespace Foam
 {
@@ -2458,9 +2460,19 @@ refPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints(const volVectorFiel
         {
             const triPoints& tp = fT[tI];
 
-            // Sad bi tu isla funkcija koja mi vraca Gaussove tocke i tezine
+            // Get triangle Gauss points and weights
+            const triangleQuadrature tq(tp, triQuadraturePtsNb);
+
+            List<point> triangleGP = tq.gaussPoints();
+            List<scalar> triangleGPweights = tq.weights();
+
+            faceGP[faceI].push_back(triangleGP);
+            faceGPW[faceI].push_back(triangleGPweights);
         }
     }
+
+
+
 
     return tgradDGP;
 }

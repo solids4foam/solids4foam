@@ -151,14 +151,20 @@ void triangleQuadrature::constructRules()
 
 // * * * * * * * * * * * * * Private Member Functions * * * * * * * * * * * * //
 
-List<point> triangleQuadrature::mapGaussPoints(const List<vector>& pts)
+List<point> triangleQuadrature::barycentricToPoint(const List<point>& localGP)
 {
-    List<point> gp;
-    gp.setSize(pts.size());
+    List<point> globalGP;
+    globalGP.setSize(localGP.size());
 
-    NotImplemented;
+    forAll(globalGP, pointI)
+    {
+        globalGP[pointI] =
+                localGP[pointI].x() * this->a()
+              + localGP[pointI].y() * this->b()
+              + localGP[pointI].z() * this->c();
+    }
 
-    return gp;
+    return globalGP;
 }
 
 // * * * * * * * * * * * * * Static Member Functions * * * * * * * * * * * * //
@@ -193,7 +199,7 @@ triangleQuadrature::triangleQuadrature(const triPoints& pts, const label& n)
 
     const quadratureRule& r = rules()[n_];
     weights_ = r.weights;
-    gaussPoints_ = mapGaussPoints(r.gaussPoints);
+    gaussPoints_ = barycentricToPoint(r.gaussPoints);
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

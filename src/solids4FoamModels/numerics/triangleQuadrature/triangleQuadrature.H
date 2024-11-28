@@ -80,8 +80,8 @@ class triangleQuadrature
 
     // Private Member Functions
 
-        //- Map integration points from local natural to cartesian coordinates
-        List<point> mapGaussPoints(const List<point>& pts);
+        //- Map integration points from barycentric to cartesian coordinates
+        List<point> barycentricToPoint(const List<point>& localGP);
 
 public:
 
