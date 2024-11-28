@@ -19,7 +19,7 @@ Function
     triangleQuadrature
 
 Description
-    Gaussian quadrature integration for triangle
+    Gauss quadrature for triangle
 
     Source:
     D. A. Dunavant,
@@ -43,7 +43,7 @@ Author
 #include "Tuple2.H"
 #include "vectorList.H"
 #include "scalarList.H"
-
+#include "Map.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -56,16 +56,32 @@ class triangleQuadrature
 {
     // Private data
 
+        //- Quadrature rules storage
+        struct quadratureRule
+        {
+            List<vector> gaussPoints;
+            List<scalar> weights;
+        };
+
+        //- Static storage for quadrature rules
+        static Map<quadratureRule> rules_;
+
+        //- Construct rules
+        static void constructRules();
+
         //- Number of Gauss points
         const label n_;
 
-        //- Mapped Gauss points and corresponding weights
-        List<Tuple2<point, scalar>> gaussPointsWeights_;
+        //- Gaussian quadrature points in Cartesian coordinates
+        List<point> gaussPoints_;
+
+        //- Gaussian quadrature points weights
+        List<scalar> weights_;
 
     // Private Member Functions
 
         //- Map integration points from local natural to cartesian coordinates
-        void mapGaussPoints();
+        List<point> mapGaussPoints(const List<point>& pts);
 
 public:
 
@@ -74,15 +90,23 @@ public:
 
     // Member Functions
 
-    // Properties
+    // Access
 
-        //- Triangle quadrature points and weights in local natural coordinates
-        static const List<Tuple2
-            <
-                label,
-                Tuple2<vectorList, scalarList>
-            >> TRI_QUADRATURE;
+        //- Predefined integration rules
+        static const Map<quadratureRule>& rules();
 
+        //- Get reference to Gaussian quadrature points in global Cartesian
+        //  coordinates
+        const List<point>& gaussPoints() const;
+
+        //- Get reference to Gaussian quadrature points weights
+        const List<scalar>& weights() const;
+
+        //- Get Gaussian quadrature points in global Cartesian coordinates
+        const List<point> gaussPoints();
+
+        //- Get Gaussian quadrature points weights
+        const List<scalar> weights();
 };
 
 } // End namespace Foam
