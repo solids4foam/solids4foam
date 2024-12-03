@@ -22,8 +22,6 @@ Description
     Class for calculating higher order cell-centre gradients using the least
     squares method.
 
-    Currently, linear and quadratic polynomials are implemented.
-
     Cells are added to the stencil in layers.
 
 Author
@@ -71,6 +69,9 @@ class higherOrderGrad
 
         //- Kernel shape parameter
         const scalar k_;
+
+        //- Number of quadrature points per face triangle
+        const label triQuadraturePtsNb_;
 
         //- Maxium stencil size: used for initialising dynamic lists
         const label maxStencilSize_;
@@ -126,6 +127,9 @@ class higherOrderGrad
         //- QR Gradient face coefficients
         mutable autoPtr<List<DynamicList<vector>>> QRGradFaceCoeffsPtr_;
 
+        //- QR Gradient face Gauss points coefficients
+        mutable autoPtr<List<List<DynamicList<vector>>>> QRGradFaceGPCoeffsPtr_;
+
         //- Cholesky decomposition
         mutable autoPtr<List<Eigen::LLT<Eigen::MatrixXd>>> choleskyPtr_;
 
@@ -138,6 +142,11 @@ class higherOrderGrad
             List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>
         > sqrtWPtr_;
 
+        //- Face Gauss points
+        mutable autoPtr<List<List<point>>> faceGaussPointsPtr_;
+
+        //- Face Gauss points weights
+        mutable autoPtr<List<List<scalar>>> faceGaussPointsWeightPtr_;
 
     // Private Member Functions
 
@@ -174,8 +183,12 @@ class higherOrderGrad
         void calcGlobalQRCoeffs() const;
 
         //- Calculate coefficients for the QR decomposition approach using the
-        //  the global cell stencils for the faces
+        //  global cell stencils for the faces
         void calcGlobalQRFaceCoeffs() const;
+
+        //- Calculate coefficients for the QR decomposition approach at face
+        //  Gauss points using the global cell stencils for the faces
+        void calcGlobalQRFaceGPCoeffs() const;
 
         //- Calculate coefficients for the Cholesky decomposition approach
         void calcCholeskyCoeffs() const;
@@ -183,6 +196,9 @@ class higherOrderGrad
         //- Calculate coefficients for the Cholesky decomposition approach using
         //  the global cell stencils
         void calcGlobalCholeskyCoeffs() const;
+
+        //- Calculate Gauss points and corresponding weights
+        void calcGaussPointsAndWeights() const;
 
         //- Return the interpolation coefficients
         const List<DynamicList<scalar>>& QRInterpCoeffs() const;
@@ -192,6 +208,9 @@ class higherOrderGrad
 
         //- Return the gradient face coefficients
         const List<DynamicList<vector>>& QRGradFaceCoeffs() const;
+
+        //- Return the gradient face Gauss points coefficients
+        const List<List<DynamicList<vector>>>& QRGradFaceGPCoeffs() const;
 
         //- Return the cell boundary face indices
         const List<DynamicList<label>>& stencilsBoundaryFaces() const;
@@ -206,6 +225,12 @@ class higherOrderGrad
         //  approach
         const List<Eigen::DiagonalMatrix<double, Eigen::Dynamic>>&
             sqrtW() const;
+
+        //- Return the face Gauss points
+        const List<List<point>>& faceGaussPoints() const;
+
+        //- Return the face Gauss points weights
+        const List<List<scalar>>& faceGaussPointsWeight() const;
 
         //- Return the condition number field
         volScalarField& conditionNumber() const;
@@ -263,7 +288,7 @@ public:
             tmp<surfaceTensorField> fGrad(const volVectorField& D) const;
 
             //- Calculate the face Gauss points gradient of a volVectorField
-            refPtr<List<List<tensor>>> fGradGaussPoints(const volVectorField& D) const;
+            autoPtr<List<List<tensor>>> fGradGaussPoints(const volVectorField& D) const;
 
             //- Calculate the gradient of a volVectorField using QR
             //  decomposition

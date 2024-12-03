@@ -31,7 +31,7 @@ Map<triangleQuadrature::quadratureRule> triangleQuadrature::rules_;
 // Initialize and return quadrature rules
 void triangleQuadrature::constructRules()
 {
-    if (!rules_.empty())
+    if (rules_.size() != 0)
     {
         FatalErrorInFunction
             << "attempt to re-construct rules when they already exist"
@@ -171,12 +171,12 @@ List<point> triangleQuadrature::barycentricToPoint(const List<point>& localGP)
 
 const Map<triangleQuadrature::quadratureRule>& triangleQuadrature::rules()
 {
-   if (rules_.empty())
-   {
-       constructRules();
-   }
+    if (rules_.size() == 0)
+    {
+        constructRules();
+    }
 
-   return rules_;
+    return rules_;
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -187,8 +187,6 @@ triangleQuadrature::triangleQuadrature(const triPoints& pts, const label& n)
     triPoints(pts),
     n_(n)
 {
-    constructRules();
-
     // Check if the requested number of points exists in the rules
     if (!rules().found(n_))
     {
