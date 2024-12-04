@@ -193,7 +193,7 @@ Foam::symmTensor Foam::sphericalCavityStress
           + 15*(sqr(r)/sqr(R))*(5 - 7*(sqr(a)/sqr(R)))
         );
 
-    // Rotate the cylindrical stress to Cartesian coordinates 
+    // Rotate the cylindrical stress to Cartesian coordinates
     const coordinateSystem cs("cylindrical", x, vector(0, 0, 1), x/mag(x));
     const symmTensor sigmaCartesian = transform(cs.R(), sigmaCylindrical);
 
