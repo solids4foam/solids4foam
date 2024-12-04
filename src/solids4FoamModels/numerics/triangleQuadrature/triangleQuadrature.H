@@ -59,7 +59,7 @@ class triangleQuadrature
         //- Quadrature rules storage
         struct quadratureRule
         {
-            List<vector> gaussPoints;
+            List<point> gaussPoints;
             List<scalar> weights;
         };
 
@@ -81,7 +81,7 @@ class triangleQuadrature
     // Private Member Functions
 
         //- Map integration points from barycentric to cartesian coordinates
-        List<point> barycentricToPoint(const List<point>& localGP);
+        tmp<Field<point>> barycentricToPoint(const List<point>& localGP) const;
 
 public:
 

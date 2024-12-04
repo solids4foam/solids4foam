@@ -151,10 +151,13 @@ void triangleQuadrature::constructRules()
 
 // * * * * * * * * * * * * * Private Member Functions * * * * * * * * * * * * //
 
-List<point> triangleQuadrature::barycentricToPoint(const List<point>& localGP)
+tmp<Field<point>> triangleQuadrature::barycentricToPoint
+(
+    const List<point>& localGP
+) const
 {
-    List<point> globalGP;
-    globalGP.setSize(localGP.size());
+    tmp<Field<point>> tglobalGP(new Field<point>(localGP.size()));
+    Field<point>& globalGP = tglobalGP.ref();
 
     forAll(globalGP, pointI)
     {
@@ -164,7 +167,7 @@ List<point> triangleQuadrature::barycentricToPoint(const List<point>& localGP)
               + localGP[pointI].z() * this->c();
     }
 
-    return globalGP;
+    return tglobalGP;
 }
 
 // * * * * * * * * * * * * * Static Member Functions * * * * * * * * * * * * //
