@@ -91,6 +91,111 @@ void Foam::solidSubMeshes::mapSubMeshVolFields
     baseMeshField.correctBoundaryConditions();
 }
 
+template<class Type>
+Foam::tmp< Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh> >
+Foam::solidSubMeshes::mapPartialSubMeshVolFields
+(
+   const word fieldName
+) const
+{
+    // Initialize the subMeshField pointer list (container)
+    PtrList< GeometricField<Type, fvPatchField, volMesh> > subMeshFields
+    (
+        subMeshes().size()
+    );
+
+    // Prepare an default IOobject for efficiency and readability
+    IOobject defaultIO
+    (
+        "subMeshField",
+        baseMesh().time().timeName(),
+        baseMesh(),
+        IOobject::NO_READ,
+        IOobject::NO_WRITE,
+        false
+    );
+
+    // Prepare an default zero valued type for efficiency and readability
+    dimensioned<Type> zero( "", dimless, pTraits<Type>::zero);
+
+    // Loop over all submeshes
+    forAll(subMeshes(),meshI)
+    {
+        // Reference to subMesh number i
+        const fvMesh& lawMesh(subMeshes()[meshI].subMesh());
+
+        // If the field is found in the subMesh...
+        if
+        (
+            lawMesh.foundObject<GeometricField<Type, fvPatchField, volMesh>>
+            (
+                fieldName
+            )
+        )
+        {
+            // .. get it from the subMesh and add it to the container
+            subMeshFields.set
+            (
+                meshI,
+                tmp<GeometricField<Type, fvPatchField, volMesh>>
+                (
+                    lawMesh.lookupObject<GeometricField<Type, fvPatchField, volMesh>>
+                    (
+                        fieldName
+                    )
+                )
+            );
+        }
+        else
+        {
+            // This subMesh / law does not have the field, initialize to zero
+            // and add to container
+            subMeshFields.set
+            (
+                meshI,
+                tmp< GeometricField<Type, fvPatchField, volMesh> >
+                (
+                    new GeometricField<Type, fvPatchField, volMesh>
+                    (
+                        defaultIO,lawMesh,zero
+                    )
+                )
+            );
+        }
+    }
+
+    // Initialize baseMesh field
+    tmp< GeometricField<Type, fvPatchField, volMesh> > tbaseMeshField
+    (
+        new GeometricField<Type, fvPatchField, volMesh>
+        (
+            IOobject(
+                fieldName,
+                baseMesh().time().timeName(),
+                baseMesh(),
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE,
+                false
+            ),
+            baseMesh(),
+            zero
+        )
+    );
+
+    #ifdef OPENFOAM_NOT_EXTEND
+        GeometricField<Type, fvPatchField, volMesh>& baseMeshField = tbaseMeshField.ref();
+    #else
+        GeometricField<Type, fvPatchField, volMesh>& baseMeshField = tbaseMeshField();
+    #endif
+
+    // Map the subMesh fields onto the baseMesh field
+    mapSubMeshVolFields<Type>(subMeshFields, baseMeshField);
+
+    return tbaseMeshField;
+}
+
+
+
 
 template<class Type>
 void Foam::solidSubMeshes::mapSubMeshSurfaceFields

@@ -25,11 +25,37 @@ License
 #include "fixedGradientFvPatchFields.H"
 #include "wedgePolyPatch.H"
 #ifdef OPENFOAM_NOT_EXTEND
-    #include "ZoneIDs.H"
+#include "ZoneIDs.H"
 #else
-    #include "ZoneID.H"
-    #include "crackerFvMesh.H"
+#include "ZoneID.H"
+#include "crackerFvMesh.H"
 #endif
+
+#ifdef OPENFOAM_NOT_EXTEND
+    std::initializer_list<Foam::word> dtypes
+#else
+    const char* dtypes[] =
+#endif
+    {
+        "volScalarField",
+        "volVectorField",
+        "volSphericalTensorField",
+        "volSymmTensorField",
+        "volTensorField"
+    };
+
+const Foam::hashedWordList Foam::mechanicalModel::internalVariableTypes
+(
+    #ifdef OPENFOAM_NOT_EXTEND
+        dtypes
+    #else
+        label(5),
+        static_cast<const char**>
+        (
+            dtypes
+        )
+    #endif
+);
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -85,6 +111,51 @@ Foam::solidSubMeshes& Foam::mechanicalModel::solSubMeshes()
     return solSubMeshes_();
 }
 
+bool Foam::mechanicalModel::getInternalVariables()
+{
+    const PtrList<mechanicalLaw> &laws = *this;
+
+    // make a list of internal variables for each type of field
+    // (scalar, vector etc)
+    forAllConstIter(wordUList, internalVariableTypes, iter)
+    {
+        internalVariables_.insert(*iter,hashedWordList());
+    }
+
+    forAll(laws, lawI)
+    {
+        const fvMesh& subMesh = solSubMeshes().subMeshes()[lawI].subMesh();
+
+        // Go through all the fields in subMesh
+        forAllConstIter(HashTable<regIOobject*>, subMesh.thisDb(), iterLocal)
+        {
+            const regIOobject* obj = iterLocal();
+            // Find the type of field in the internalVariables object
+            // and add it there. If its not a standard volField skip it.
+            HashTable<hashedWordList>::iterator iterGlobal
+                        = internalVariables_.find(obj->type());
+
+            if (iterGlobal != internalVariables_.end())
+            {
+                // Only add if not already present and if object is not NO_WRITE
+                if
+                (
+                #ifdef OPENFOAM_NOT_EXTEND
+                    !iterGlobal().found(obj->name())
+                #else
+                    !iterGlobal().contains(obj->name())
+                #endif
+                    && (obj->writeOpt() != IOobject::NO_WRITE)
+                )
+                {
+                    iterGlobal().append(obj->name());
+                }
+            }
+        }
+    }
+
+    return true;
+}
 
 void Foam::mechanicalModel::clearOut()
 {
@@ -113,10 +184,10 @@ Foam::mechanicalModel::mechanicalModel
     (
         IOobject
         (
-            "mechanicalProperties",
-            mesh.time().constant(),
-            mesh,
-            IOobject::MUST_READ,
+              "mechanicalProperties",
+              mesh.time().constant(),
+              mesh,
+              IOobject::MUST_READ,
             IOobject::NO_WRITE
         )
     ),
@@ -125,7 +196,9 @@ Foam::mechanicalModel::mechanicalModel
     planeStress_(lookup("planeStress")),
     incremental_(incremental),
     cellZoneNames_(),
-    solSubMeshes_()
+    solSubMeshes_(),
+    internalVariables_(),
+    gotInternalVariables_(false)
 {
     Info<< "Creating the mechanicalModel" << endl;
 
@@ -937,6 +1010,68 @@ void Foam::mechanicalModel::setRestart()
     forAll(laws, lawI)
     {
         laws[lawI].setRestart();
+    }
+}
+
+void Foam::mechanicalModel::writeFields(const Time &runTime)
+{
+    PtrList<mechanicalLaw> &laws = *this;
+
+    // Execute the code only for multi material cases,
+    // since writing out fields in single material is trivial
+    if (laws.size() > 1)
+    {
+        // Get list of internal variables if not already happened
+        if (!gotInternalVariables_)
+        {
+            gotInternalVariables_ = getInternalVariables();
+        }
+
+        Info << internalVariables_ << endl;
+
+        // For each type of field, find out what field it is
+        // Then cummulate the fields from the subMeshes and write out
+
+        // "volScalarField"
+        forAllConstIter(hashedWordList, internalVariables_["volScalarField"], fieldIter)
+        {
+            solSubMeshes().mapPartialSubMeshVolFields<scalar>
+            (
+                *fieldIter
+            )().write();
+        }
+        // "volVectorField"
+        forAllConstIter(hashedWordList, internalVariables_["volVectorField"], fieldIter)
+        {
+            solSubMeshes().mapPartialSubMeshVolFields<vector>
+            (
+                *fieldIter
+            )().write();
+        }
+        // "volSphericalTensorField"
+        forAllConstIter(hashedWordList, internalVariables_["volSphericalTensorField"], fieldIter)
+        {
+            solSubMeshes().mapPartialSubMeshVolFields<sphericalTensor>
+            (
+                *fieldIter
+            )().write();
+        }
+        // "volSymmTensorField"
+        forAllConstIter(hashedWordList, internalVariables_["volSymmTensorField"], fieldIter)
+        {
+            solSubMeshes().mapPartialSubMeshVolFields<symmTensor>
+            (
+                *fieldIter
+            )().write();
+        }
+        // "volTensorField"
+        forAllConstIter(hashedWordList, internalVariables_["volTensorField"], fieldIter)
+        {
+            solSubMeshes().mapPartialSubMeshVolFields<tensor>
+            (
+                *fieldIter
+            )().write();
+        }
     }
 }
 
