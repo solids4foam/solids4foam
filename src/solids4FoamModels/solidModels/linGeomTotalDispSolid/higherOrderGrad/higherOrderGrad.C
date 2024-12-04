@@ -1582,7 +1582,10 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
 
     const fvMesh& mesh = mesh_;
 
-    QRGradFaceGPCoeffsPtr_.set(new List<List<DynamicList<vector>>>(mesh.nFaces()));
+    QRGradFaceGPCoeffsPtr_.set
+    (
+        new List<List<DynamicList<vector>>>(mesh.nFaces())
+    );
     List<List<DynamicList<vector>>>& QRGradCoeffs = *QRGradFaceGPCoeffsPtr_;
 
     forAll(QRGradCoeffs, faceI)
@@ -1625,10 +1628,10 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
     // Set size for second list
     forAll(c, faceI)
     {
-        c[faceI].setSize(mesh.faces()[faceI].size() * triQuadraturePtsNb_);
-        cx[faceI].setSize(mesh.faces()[faceI].size() * triQuadraturePtsNb_);
-        cy[faceI].setSize(mesh.faces()[faceI].size() * triQuadraturePtsNb_);
-        cz[faceI].setSize(mesh.faces()[faceI].size() * triQuadraturePtsNb_);
+        c[faceI].setSize(mesh.faces()[faceI].size()*triQuadraturePtsNb_);
+        cx[faceI].setSize(mesh.faces()[faceI].size()*triQuadraturePtsNb_);
+        cy[faceI].setSize(mesh.faces()[faceI].size()*triQuadraturePtsNb_);
+        cz[faceI].setSize(mesh.faces()[faceI].size()*triQuadraturePtsNb_);
     }
 
     const List<labelList>& stencils = globalFaceStencils();
@@ -1637,7 +1640,7 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
     const List<List<point>>& faceGP = faceGaussPoints();
 
     // Gauss point weights
-    const List<List<scalar>>& faceGPW = faceGaussPointsWeight();
+    //const List<List<scalar>>& faceGPW = faceGaussPointsWeight();
 
     forAll(stencils, faceI)
     {
@@ -1721,8 +1724,8 @@ void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
                        factorials[i]*factorials[j]*factorials[k];
 
                    // Compute and assign monomial value with factorials
-                   // Note: the order of the quadratic and higher terms may not be
-                   // the same as the previous manual approach
+                   // Note: the order of the quadratic and higher terms may not
+                   // be the same as the previous manual approach
                    Q(p, cI) =
                        pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
                       /factorialDenominator;
@@ -2405,7 +2408,7 @@ void higherOrderGrad::calcGaussPointsAndWeights() const
 
     forAll(faceTri, faceI)
     {
-        List<triPoints>& fT = faceTri[faceI];
+        const List<triPoints>& fT = faceTri[faceI];
 
         forAll(fT, tI)
         {
@@ -2414,12 +2417,12 @@ void higherOrderGrad::calcGaussPointsAndWeights() const
             // Get triangle Gauss points and weights
             const triangleQuadrature tq(tp, triQuadraturePtsNb_);
 
-            List<point> triangleGP = tq.gaussPoints();
-            List<scalar> triangleGPweights = tq.weights();
+            const List<point>& triangleGP = tq.gaussPoints();
+            const List<scalar>& triangleGPweights = tq.weights();
 
             forAll(tp ,i)
             {
-                const label pos = tI * triQuadraturePtsNb_ + i;
+                const label pos = tI*triQuadraturePtsNb_ + i;
                 faceGP[faceI][pos] = triangleGP[i];
                 faceGPW[faceI][pos] = triangleGPweights[i];
             }
@@ -2810,7 +2813,7 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
 {
     const fvMesh& mesh = mesh_;
 
-    const pointField& pts = mesh.points();
+    //const pointField& pts = mesh.points();
 
     // Prepare the return field
     autoPtr<List<List<tensor>>> tgradDGP(new List<List<tensor>>(mesh.nFaces()));
@@ -2830,7 +2833,7 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
     const List<List<point>>& faceGP = faceGaussPoints();
 
     // Gauss point weights
-    const List<List<scalar>>& faceGPW = faceGaussPointsWeight();
+    //const List<List<scalar>>& faceGPW = faceGaussPointsWeight();
 
     // Loop over Gauss points, calculate interpolation coefficients.
     // Gauss points on face share the same interpolation stencil
@@ -2897,7 +2900,7 @@ autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
                     if (mesh.isInternalFace(faceI))
                     {
                         gradDGP[faceI][pointI] +=
-               	            pointQRGradCoeffs[faceI][pointI][cI]*globalDI[neiGlobalCellI];
+                            pointQRGradCoeffs[faceI][pointI][cI]*globalDI[neiGlobalCellI];
                     }
                     else
                     {
