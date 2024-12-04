@@ -23,6 +23,9 @@ License
 #include "emptyPolyPatch.H"
 #include "processorPolyPatch.H"
 
+#include "triangle.H"
+#include "triFace.H"
+#include "triangleQuadrature.H"
 
 namespace Foam
 {
@@ -1563,6 +1566,305 @@ void higherOrderGrad::calcGlobalQRFaceCoeffs() const
 }
 
 
+void higherOrderGrad::calcGlobalQRFaceGPCoeffs() const
+{
+    //if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    if (QRGradFaceGPCoeffsPtr_)
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    const fvMesh& mesh = mesh_;
+
+    QRGradFaceGPCoeffsPtr_.set
+    (
+        new List<List<DynamicList<vector>>>(mesh.nFaces())
+    );
+    List<List<DynamicList<vector>>>& QRGradCoeffs = *QRGradFaceGPCoeffsPtr_;
+
+    forAll(QRGradCoeffs, faceI)
+    {
+        List<DynamicList<vector>>& facePointsGC = QRGradCoeffs[faceI];
+        facePointsGC.setSize(mesh.faces()[faceI].size() * triQuadraturePtsNb_);
+    }
+
+    // Refernces for brevity and efficiency
+    const vectorField& CI = mesh.C();
+    const vectorField& CfI = mesh.Cf();
+
+    // Collect CI for off-processor cells in the stencils
+    Map<vector> globalCI;
+    requestGlobalStencilData(CI, globalCI);
+
+    // Calculate Taylor series exponents
+    // 1 for zero order, 4 for 1 order, 10 for second order, etc.
+    DynamicList<FixedList<label, 3>> exponents;
+    generateExponents(N_, exponents);
+    const label Np = exponents.size();
+    if (debug)
+    {
+        Info<< "Np = " << Np << endl;
+    }
+
+    // Precompute factorials up to N
+    List<scalar> factorials(N_ + 1, 1.0);
+    for (label n = 1; n <= N_; ++n)
+    {
+        factorials[n] = factorials[n - 1]*n;
+    }
+
+    // Coefficients
+    List<List<DynamicList<scalar>>> c(mesh.nFaces());
+    List<List<DynamicList<scalar>>> cx(mesh.nFaces());
+    List<List<DynamicList<scalar>>> cy(mesh.nFaces());
+    List<List<DynamicList<scalar>>> cz(mesh.nFaces());
+
+    // Set size for second list
+    forAll(c, faceI)
+    {
+        c[faceI].setSize(mesh.faces()[faceI].size()*triQuadraturePtsNb_);
+        cx[faceI].setSize(mesh.faces()[faceI].size()*triQuadraturePtsNb_);
+        cy[faceI].setSize(mesh.faces()[faceI].size()*triQuadraturePtsNb_);
+        cz[faceI].setSize(mesh.faces()[faceI].size()*triQuadraturePtsNb_);
+    }
+
+    const List<labelList>& stencils = globalFaceStencils();
+
+    // Gauss point locations on each face
+    const List<List<point>>& faceGP = faceGaussPoints();
+
+    // Gauss point weights
+    //const List<List<scalar>>& faceGPW = faceGaussPointsWeight();
+
+    forAll(stencils, faceI)
+    {
+        const labelList& curStencil = stencils[faceI];
+
+        // Centre of current face
+        const vector& curCf = CfI[faceI];
+
+        // Find max distance in this stencil
+        scalar maxDist = 0.0;
+        forAll(curStencil, cI)
+        {
+            const label neiGlobalCellID = curStencil[cI];
+
+            scalar d;
+            if (globalCells_.isLocal(neiGlobalCellID))
+            {
+                const label neiLocalCellID =
+                    globalCells_.toLocal(neiGlobalCellID);
+                d = mag(CI[neiLocalCellID] - curCf);
+            }
+            else
+            {
+                d = mag(globalCI[neiGlobalCellID] - curCf);
+            }
+
+            maxDist = max(maxDist, d);
+        }
+
+        // Number of neighbours in stencil
+        const label Nn = curStencil.size();
+
+        // Check to avoid Eigen error
+        if (Nn < Np)
+        {
+            FatalErrorInFunction
+                << "Interpolation stencil needs to be bigger than the "
+                << "number of elements in Taylor order!"
+                << exit(FatalError);
+        }
+
+        // Face Gauss points
+        const List<point>& fGP = faceGP[faceI];
+
+        // Loop over face Gauss points
+        forAll(fGP, gaussPointI)
+        {
+            const vector& curGP = fGP[gaussPointI];
+
+            // Use matrix format from Eigen/Dense library
+            // Avoid initialisation to zero as we will set every entry below
+            Eigen::MatrixXd Q(Np, Nn);
+
+            // Loop over stencil points and compute Q
+            for (label cI = 0; cI < Nn; ++cI)
+            {
+                const label neiGlobalCellID = curStencil[cI];
+                vector dx;
+                if (globalCells_.isLocal(neiGlobalCellID))
+                {
+                    const label neiLocalCellID =
+                        globalCells_.toLocal(neiGlobalCellID);
+
+                    dx = CI[neiLocalCellID] - curGP;
+                }
+                else
+                {
+                    dx = globalCI[neiGlobalCellID] - curGP;
+                }
+
+                // Compute monomial values for each exponent
+                for (label p = 0; p < Np; ++p)
+                {
+                    const FixedList<label, 3>& exponent = exponents[p];
+                    const label i = exponent[0];
+                    const label j = exponent[1];
+                    const label k = exponent[2];
+
+                   // Compute factorial denominator
+                   const scalar factorialDenominator =
+                       factorials[i]*factorials[j]*factorials[k];
+
+                   // Compute and assign monomial value with factorials
+                   // Note: the order of the quadratic and higher terms may not
+                   // be the same as the previous manual approach
+                   Q(p, cI) =
+                       pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
+                      /factorialDenominator;
+                }
+            }
+
+            Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn);
+            //W.setZero(); // no need to waste time initialising
+
+            // Loop over stencil points and compute W
+            for (label cI = 0; cI < Nn; cI++)
+            {
+                const label neiGlobalCellID = curStencil[cI];
+                scalar d;
+                if (globalCells_.isLocal(neiGlobalCellID))
+                {
+                    const label neiLocalCellID =
+                        globalCells_.toLocal(neiGlobalCellID);
+
+                    d = mag(CI[neiLocalCellID] - curGP);
+                }
+                else
+                {
+                    d = mag(globalCI[neiGlobalCellID] - curGP);
+                }
+
+                // Smoothing length
+                const scalar dm = 2*maxDist;
+
+                // Weight using radially symmetric exponential function
+                const scalar sqrK = -pow(k_,2);
+                const scalar w =
+                    (
+                        Foam::exp(pow(d/dm, 2)*sqrK) - Foam::exp(sqrK)
+                    )/(1 - exp(sqrK));
+
+                W.diagonal()[cI] = w;
+            }
+
+            // Now when we have W and Q, next step is QR decomposition
+            const Eigen::DiagonalMatrix<double, Eigen::Dynamic> sqrtW =
+                W.diagonal().cwiseSqrt().asDiagonal();
+            const Eigen::MatrixXd Qhat =
+                Q.array().rowwise()*sqrtW.diagonal().transpose().array();
+
+            // B hat
+            const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& Bhat =
+                sqrtW.diagonal().asDiagonal();
+
+            // QR decomposition
+            Eigen::HouseholderQR<Eigen::MatrixXd> qr(Qhat.transpose());
+
+            // Q and R matrices
+            const Eigen::MatrixXd O = qr.householderQ();
+            const Eigen::MatrixXd& R =
+                qr.matrixQR().triangularView<Eigen::Upper>();
+
+            // Slice Rbar and Qbar, as we do not need full matrix
+            // Note: auto is a reference type here (Rbar, Qbar are not copied)
+            const auto Rbar = R.topLeftCorner(Np, Np);
+            const auto Qbar = O.leftCols(Np);
+
+            // Perform element-wise multiplication and convert to MatrixXd
+            const Eigen::MatrixXd QbarBhat =
+                (
+                    Qbar.transpose().array().rowwise()
+                   *Bhat.diagonal().transpose().array()
+                ).matrix();
+
+            // Solve to get A
+            // const Eigen::MatrixXd A =
+            //     Rbar.colPivHouseholderQr().solve(Qbar.transpose()*Bhat);
+            // Solve using the modified QbarBhat
+            const Eigen::MatrixXd A =
+                Rbar.colPivHouseholderQr().solve(QbarBhat);
+
+            c[faceI][gaussPointI].setCapacity(A.cols());
+            cx[faceI][gaussPointI].setCapacity(A.cols());
+            cy[faceI][gaussPointI].setCapacity(A.cols());
+            cz[faceI][gaussPointI].setCapacity(A.cols());
+
+            Eigen::RowVectorXd cRow = A.row(0);
+            Eigen::RowVectorXd cxRow = A.row(1);
+            Eigen::RowVectorXd cyRow = A.row(2);
+            Eigen::RowVectorXd czRow = A.row(3);
+
+            for (label i = 0; i < A.cols(); ++i)
+            {
+                c[faceI][gaussPointI].append(cRow(i));
+                cx[faceI][gaussPointI].append(cxRow(i));
+                cy[faceI][gaussPointI].append(cyRow(i));
+                cz[faceI][gaussPointI].append(czRow(i));
+            }
+
+            c[faceI][gaussPointI].shrink();
+            cx[faceI][gaussPointI].shrink();
+            cy[faceI][gaussPointI].shrink();
+            cz[faceI][gaussPointI].shrink();
+        }
+
+    }
+
+    forAll(QRGradCoeffs, faceI)
+    {
+       const labelList& curStencil = stencils[faceI];
+       const label Nn = curStencil.size();
+
+       const List<point>& fGP = faceGP[faceI];
+
+       // Loop over face Gauss points
+       forAll(fGP, gaussPointI)
+       {
+           QRGradCoeffs[faceI][gaussPointI].setCapacity(Nn);
+
+           for (label I = 0; I < Nn; I++)
+           {
+               QRGradCoeffs[faceI][gaussPointI].append
+               (
+                   vector
+                   (
+                       cx[faceI][gaussPointI][I],
+                       cy[faceI][gaussPointI][I],
+                       cz[faceI][gaussPointI][I]
+                   )
+               );
+           }
+
+           QRGradCoeffs[faceI][gaussPointI].shrink();
+       }
+    }
+
+    //if (debug)
+    {
+        InfoInFunction
+            << "end" << endl;
+    }
+}
+
+
 void higherOrderGrad::calcCholeskyCoeffs() const
 {
     Info<< "higherOrderGrad::calcCholeskyCoeffs()" << endl;
@@ -2024,6 +2326,133 @@ void higherOrderGrad::calcGlobalCholeskyCoeffs() const
 }
 
 
+void higherOrderGrad::calcGaussPointsAndWeights() const
+{
+    if (debug)
+    {
+        InfoInFunction
+            << "start" << endl;
+    }
+
+    if (faceGaussPointsPtr_ || faceGaussPointsWeightPtr_)
+    {
+        FatalErrorInFunction
+            << "Pointers already set!" << abort(FatalError);
+    }
+
+    const fvMesh& mesh = mesh_;
+    const pointField& pts = mesh.points();
+
+    // Gauss point locations on each face
+    faceGaussPointsPtr_.set(new List<List<point>>(mesh.nFaces()));
+    List<List<point>>& faceGP = *faceGaussPointsPtr_;
+
+    // Gauss point weights
+    faceGaussPointsWeightPtr_.set(new List<List<scalar>>(mesh.nFaces()));
+    List<List<scalar>>& faceGPW = *faceGaussPointsWeightPtr_;
+
+    forAll(faceGP, i)
+    {
+        List<point>& fGP = faceGP[i];
+        List<scalar>& fGPW = faceGPW[i];
+
+        fGP.setSize(mesh.faces()[i].size() * triQuadraturePtsNb_);
+        fGPW.setSize(mesh.faces()[i].size() * triQuadraturePtsNb_);
+    }
+
+    // 1. Stage - decompose faces into triangles. Store triangle points
+
+    // Triangulate each face and store points of each triangle
+    List<List<triPoints>> faceTri(mesh.nFaces());
+    forAll(faceTri, i)
+    {
+        List<triPoints>& fT = faceTri[i];
+
+        fT.setSize(mesh.faces()[i].size());
+    }
+
+    // Loop over faces and decompose each face, store triangles of each face
+    for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
+    {
+        const face& f = mesh.faces()[faceI];
+
+        const point fc = f.centre(pts);
+
+        const label nPoints = f.size();
+
+        label nextpI;
+        for (label pI = 0; pI<nPoints; ++pI)
+        {
+            if (pI < f.size() - 1)
+            {
+                nextpI = pI + 1;
+            }
+            else
+            {
+                nextpI = 0;
+            }
+
+            const triPoints tri
+            (
+                pts[f[pI]],
+                pts[f[nextpI]],
+                fc
+            );
+
+            faceTri[faceI][pI] = tri;
+        }
+    }
+
+    // 2. Stage - for each triangle calculate Gauss point locations and store
+    //            corresponding weights
+
+    forAll(faceTri, faceI)
+    {
+        const List<triPoints>& fT = faceTri[faceI];
+
+        forAll(fT, tI)
+        {
+            const triPoints& tp = fT[tI];
+
+            // Get triangle Gauss points and weights
+            const triangleQuadrature tq(tp, triQuadraturePtsNb_);
+
+            const List<point>& triangleGP = tq.gaussPoints();
+            const List<scalar>& triangleGPweights = tq.weights();
+
+            forAll(tp ,i)
+            {
+                const label pos = tI*triQuadraturePtsNb_ + i;
+                faceGP[faceI][pos] = triangleGP[i];
+                faceGPW[faceI][pos] = triangleGPweights[i];
+            }
+        }
+    }
+}
+
+
+const List<List<point>>& higherOrderGrad::faceGaussPoints() const
+{
+    if (!faceGaussPointsPtr_)
+    {
+        calcGaussPointsAndWeights();
+    }
+
+    return faceGaussPointsPtr_();
+}
+
+
+const List<List<scalar>>& higherOrderGrad::faceGaussPointsWeight() const
+{
+    if (!faceGaussPointsWeightPtr_)
+    {
+        calcGaussPointsAndWeights();
+    }
+
+    return faceGaussPointsWeightPtr_();
+}
+
+
 const List<DynamicList<scalar>>& higherOrderGrad::QRInterpCoeffs() const
 {
     if (!QRInterpCoeffsPtr_)
@@ -2068,6 +2497,18 @@ const List<DynamicList<vector>>& higherOrderGrad::QRGradFaceCoeffs() const
     }
 
     return QRGradFaceCoeffsPtr_();
+}
+
+
+const List<List<DynamicList<vector>>>&
+higherOrderGrad::QRGradFaceGPCoeffs()const
+{
+    if (!QRGradFaceGPCoeffsPtr_)
+    {
+        calcGlobalQRFaceGPCoeffs();
+    }
+
+    return QRGradFaceGPCoeffsPtr_();
 }
 
 
@@ -2189,6 +2630,7 @@ higherOrderGrad::higherOrderGrad
     N_(readInt(dict.lookup("N"))),
     nLayers_(readInt(dict.lookup("nLayers"))),
     k_(readScalar(dict.lookup("k"))),
+    triQuadraturePtsNb_(readInt(dict.lookup("triGaussPointsNb"))),
     maxStencilSize_(readInt(dict.lookup("maxStencilSize"))),
     globalCells_(mesh.nCells()),
     useQRDecomposition_(dict.lookup("useQRDecomposition")),
@@ -2201,9 +2643,12 @@ higherOrderGrad::higherOrderGrad
     QRInterpCoeffsPtr_(),
     QRGradCoeffsPtr_(),
     QRGradFaceCoeffsPtr_(),
+    QRGradFaceGPCoeffsPtr_(),
     choleskyPtr_(),
     QhatPtr_(),
-    sqrtWPtr_()
+    sqrtWPtr_(),
+    faceGaussPointsPtr_(),
+    faceGaussPointsWeightPtr_()
 {
     if (calcConditionNumber_)
     {
@@ -2228,6 +2673,9 @@ higherOrderGrad::~higherOrderGrad()
 
 tmp<volTensorField> higherOrderGrad::grad(const volVectorField& D) const
 {
+    // For testing
+    auto test =  fGradGaussPoints(D);
+
     if (useQRDecomposition_)
     {
         if (useGlobalStencils_)
@@ -2355,6 +2803,130 @@ tmp<surfaceTensorField> higherOrderGrad::fGrad(const volVectorField& D) const
     gradD.correctBoundaryConditions();
 
     return tgradD;
+}
+
+
+autoPtr<List<List<tensor>>> higherOrderGrad::fGradGaussPoints
+(
+    const volVectorField& D
+) const
+{
+    const fvMesh& mesh = mesh_;
+
+    //const pointField& pts = mesh.points();
+
+    // Prepare the return field
+    autoPtr<List<List<tensor>>> tgradDGP(new List<List<tensor>>(mesh.nFaces()));
+    List<List<tensor>>& gradDGP = tgradDGP.ref();
+
+    forAll(gradDGP, i)
+    {
+        List<tensor>& faceGradGP = gradDGP[i];
+
+        const label nbOfTriangles = mesh.faces()[i].size();
+        const label nbOfGaussPoints = nbOfTriangles * triQuadraturePtsNb_;
+
+        faceGradGP.setSize(nbOfGaussPoints);
+    }
+
+    // Gauss point locations on each face
+    const List<List<point>>& faceGP = faceGaussPoints();
+
+    // Gauss point weights
+    //const List<List<scalar>>& faceGPW = faceGaussPointsWeight();
+
+    // Loop over Gauss points, calculate interpolation coefficients.
+    // Gauss points on face share the same interpolation stencil
+
+    const vectorField& DI = D;
+    const List<labelList>& stencils = globalFaceStencils();
+
+    const List<List<DynamicList<vector>>>& pointQRGradCoeffs = QRGradFaceGPCoeffs();
+
+    // Collect DI for off-processor cells in the stencils
+    Map<vector> globalDI;
+    requestGlobalStencilData(DI, globalDI);
+
+    forAll(stencils, faceI)
+    {
+        const labelList& curStencil = stencils[faceI];
+        const label Nn = curStencil.size();
+
+        const List<point>& fGP = faceGP[faceI];
+
+        // Loop over face Gauss point
+        forAll(fGP, pointI)
+        {
+            // For current face Gauss point, loop over stencil and multiply cell
+            // values with corresponding interpolation coefficients
+            for(label cI = 0; cI < Nn; cI++)
+            {
+                const label neiGlobalCellI = curStencil[cI];
+
+                if (globalCells_.isLocal(neiGlobalCellI))
+                {
+                    const label neiLocalCellI =
+                        globalCells_.toLocal(neiGlobalCellI);
+
+                    if (mesh.isInternalFace(faceI))
+                    {
+                        gradDGP[faceI][pointI] +=
+                           pointQRGradCoeffs[faceI][pointI][cI]*DI[neiLocalCellI];
+
+                    }
+                    else
+                    {
+                        // Boundary face
+                        const label patchID =
+                            mesh.boundaryMesh().whichPatch(faceI);
+                        const polyPatch& pp = mesh.boundaryMesh()[patchID];
+
+                        // Note: there is no special treatment for processor patches
+                        // as all patches may use global data depending on their
+                        // stencils
+                        if (!isA<emptyPolyPatch>(pp))
+                        {
+                            // I'm doing same as for internal face. I do not
+                            // have field, so i do not have boundaryField
+                            //const label localFaceI = faceI - pp.start();
+                            gradDGP[faceI][pointI] +=
+                                pointQRGradCoeffs[faceI][pointI][cI]*DI[neiLocalCellI];
+                        }
+                    }
+                }
+                else // global cell in the stencil
+                {
+
+                    if (mesh.isInternalFace(faceI))
+                    {
+                        gradDGP[faceI][pointI] +=
+                            pointQRGradCoeffs[faceI][pointI][cI]*globalDI[neiGlobalCellI];
+                    }
+                    else
+                    {
+                        // Boundary face
+                        const label patchID =
+                            mesh.boundaryMesh().whichPatch(faceI);
+                        const polyPatch& pp = mesh.boundaryMesh()[patchID];
+
+                        // Note: there is no special treatment for processor patches
+                        // as all patches may use global data depending on their
+                        // stencils
+                        if (!isA<emptyPolyPatch>(pp))
+                        {
+                            // I'm doing same as for internal face. I do not
+                            // have field, so i do not have boundaryField
+                            //const label localFaceI = faceI - pp.start();
+                            gradDGP[faceI][pointI] +=
+                               pointQRGradCoeffs[faceI][pointI][cI]*globalDI[neiGlobalCellI];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return tgradDGP;
 }
 
 
