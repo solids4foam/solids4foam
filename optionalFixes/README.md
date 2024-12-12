@@ -6,7 +6,7 @@ sort: 1
 
 As described below, there are different optional fixes depending on whether you are using OpenFOAM.org, OpenFOAM.com, or foam-extend.
 
-## OpenFOAM.com
+## OpenFOAM.org
 
   * `GeometricField.C`: this fix is required for consistent time discretisation. Some FSI cases may crash without this fix.
 
