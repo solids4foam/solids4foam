@@ -4,6 +4,8 @@ sort: 3
 
 # My third tutorial: `beamInCrossFlow`
 
+You can find the files for this tutorial under [`tutorials/fluidSolidInteraction/beamInCrossFlow`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluidSolidInteraction/beamInCrossFlow).
+
 ---
 
 ## Tutorial Aims

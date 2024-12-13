@@ -4,6 +4,8 @@ sort: 4
 
 # My fourth tutorial: `3dTube`
 
+You can find the files for this tutorial under [`tutorials/fluidSolidInteraction/3dTube`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluidSolidInteraction/3dTube).
+
 ---
 
 ## Tutorial Aims
