@@ -4,6 +4,8 @@ sort: 1
 
 # My first tutorial: `hotSphere`
 
+You can find the files for this tutorial under [`tutorials/solids/thermoelasticity/hotSphere`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/solids/thermoelasticity/hotSphere).
+
 ---
 
 ## Tutorial Aims
