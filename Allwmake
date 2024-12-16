@@ -25,8 +25,9 @@ N_FIXES=$(grep "PLEASE FIX THIS" optionalFixes/log.Allcheck | wc -l)
 if [[ $N_FIXES -gt 0 ]]
 then
     echo "** ERROR with optionalFixes **"
-    echo "Please make the file replacements described above, or skip these "
-    echo "checks by setting 'export S4F_NO_FILE_FIXES=1'"; echo
+    echo "Please make the file replacements described above and rebuild OpenFOAM,"
+    echo "or skip these checks by setting 'export S4F_NO_FILE_FIXES=1'."
+    echo "Read more details on https://www.solids4foam.com/installation/optionalFixes/"; echo
     exit 1
 fi
 
