@@ -269,6 +269,8 @@ then
         grep "ERROR" testLoopReport
         echo
     fi
+    echo "The tests were executed in $TEST_RUN_DIR. You can find logs there."
+    echo
     exit 1
 else
     echo "All tests passed: enjoy solids4foam."
