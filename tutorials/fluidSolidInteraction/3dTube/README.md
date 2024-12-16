@@ -51,7 +51,7 @@ In this tutorial, we will compare six variants of the approaches above:
 3. **Dirichlet-Neumann formulation with Aitken's acceleration and a weakly compressible fluid model**: We use the `sonicLiquidFluid` fluid model.
 4. **Dirichlet-Neumann formulation with IQNILS acceleration and a weakly compressible fluid model**: We use the `sonicLiquidFluid` fluid model.
 5. **Robin-Neumann formulation with an incompressible fluid**: Support for this approach is implemented in the `pimpleFluid` model, where we apply special interface boundary conditions: `elasticWallPressure` for the fluid pressure field; and `elasticWallVelocity` for the fluid velocity field. 
-6. **Dirichlet-Neumann formulation with Aitken's acceleration and an incompressible fluid model using preCICE**: This approach is the same as approach 1, except the [preCICE](http://precice.org) coupling implementation is used. preCICE is an open-source coupling library for partitioned multi-physics simulations. In this case, `solids4Foam` is used as the solid solver, and standard `pimpleFoam` is used as the fluid solver (as opposed to solids4foam's `pimpleFluid` fluid model). Due to implementation differences, this preCICE IQNILS approach may perform differently than the built-in solids4foam approach.
+6. **Dirichlet-Neumann formulation with IQNILS acceleration and an incompressible fluid model using preCICE**: This approach is the same as approach 1, except the [preCICE](http://precice.org) coupling implementation is used. preCICE is an open-source coupling library for partitioned multi-physics simulations. In this case, `solids4Foam` is used as the solid solver, and standard `pimpleFoam` is used as the fluid solver (as opposed to solids4foam's `pimpleFluid` fluid model). Due to implementation differences, this preCICE IQNILS approach may perform differently than the built-in solids4foam approach.
 
 In all approaches, the solid domain setup is exactly the same, where an incremental small strain formulation is used (the `linearGeometry` solid model). One-quarter of the tube's cross-section is considered, although the case could actually be modelled as 2-D axisymmetric. The test is run for 0.02 s. A relatively tight FSI loop tolerance of 1e-6 is used for all approaches based on the interface motion. For approach 6 (preCICE), the relative displacement tolerance was set to 1e-6, and the relative force tolerance was set to 1e-3.
 
@@ -86,7 +86,7 @@ Initially, we compare the solutions using a relatively large time step size of 1
 - WC-DNF-Aitken: Dirichlet-Neumann formulation with Aitken's acceleration and a weakly compressible fluid model;
 - WC-DNF-IQNILS: Dirichlet-Neumann formulation with IQNILS acceleration and a weakly compressible fluid model;
 - RNF: Robin-Neumann formulation with an incompressible fluid;
-- preCICE-DN-IQNILS: Dirichlet-Neumann formulation with Aitken's acceleration and an incompressible fluid model using preCICE.
+- preCICE-DN-IQNILS: Dirichlet-Neumann formulation with IQNILS acceleration and an incompressible fluid model using preCICE.
 
 ![](./images/axial-displacement-deltaT1e-4.png)
 
