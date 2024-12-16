@@ -4,6 +4,8 @@ sort: 2
 
 # My second tutorial: `cylinderInChannel`
 
+You can find the files for this tutorial under [`tutorials/fluids/cylinderInChannel`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluids/cylinderInChannel).
+
 ---
 
 ## Tutorial Aims

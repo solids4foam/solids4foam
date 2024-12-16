@@ -16,9 +16,10 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
+// solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
+solidModel    nonLinearGeometryUpdatedLagrangian;
 
-nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+"nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs|nonLinearGeometryUpdatedLagrangianCoeffs"
 {}
 
 // ************************************************************************* //

@@ -10,7 +10,7 @@ then
     echo "Please source the OpenFOAM/FOAM bashrc first!"
     exit 1
 else
-    allowed_ver=("4.1" "9" "v2012" "v2106" "v2112" "v2206" "v2212" "v2306" "v2312")
+    allowed_ver=("4.1" "9" "v2012" "v2106" "v2112" "v2206" "v2212" "v2306" "v2312" "v2406")
     if ! [[ " ${allowed_ver[*]} " == *" $WM_PROJECT_VERSION "* ]]; then
         echo "Unsupported OpenFOAM version sourced!"
     fi
@@ -25,8 +25,9 @@ N_FIXES=$(grep "PLEASE FIX THIS" optionalFixes/log.Allcheck | wc -l)
 if [[ $N_FIXES -gt 0 ]]
 then
     echo "** ERROR with optionalFixes **"
-    echo "Please make the file replacements described above, or skip these "
-    echo "checks by setting 'export S4F_NO_FILE_FIXES=1'"; echo
+    echo "Please make the file replacements described above and rebuild OpenFOAM,"
+    echo "or skip these checks by setting 'export S4F_NO_FILE_FIXES=1'."
+    echo "Read more details on https://www.solids4foam.com/installation/optionalFixes/"; echo
     exit 1
 fi
 
