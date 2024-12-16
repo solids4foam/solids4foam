@@ -19,7 +19,7 @@ A finite-strain elastoplastic version of this tutorial is also available in soli
 
 ## Case Overview
 
-Cook's membrane is a well-known bending-dominated benchmark case. The tapered panel (trapezoid) is fixed on one side and subjected to uniform shear traction on the opposite side. The prescribed shear traction is 6250 Pa. The vertices of the trapezoid (in mm) are (0, 0), (48, 44), (48, 60), and (0, 44), as shown in Figure 1. The Young's modulus is 70 Pa, and the Poisson's ratio is 1/3. Gravitation effects are neglected, and there are no body forces. The problem is solved as static, using one loading increment.
+Cook's membrane is a well-known bending-dominated benchmark case. The tapered panel (trapezoid) is fixed on one side and subjected to uniform shear traction on the opposite side. The prescribed shear traction is 6.25 MPa. The vertices of the trapezoid (in mm) are (0, 0), (48, 44), (48, 60), and (0, 44), as shown in Figure 1. The Young's modulus is 70 MPa, and the Poisson's ratio is 1/3. Gravitation effects are neglected, and there are no body forces. The problem is solved as static, using one loading increment.
 
 <div style="text-align: center;">
   <img src="./images/cooksMembrane-geometry.png" alt="Image" width="400">
