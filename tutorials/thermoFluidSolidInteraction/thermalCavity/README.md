@@ -49,7 +49,7 @@ size $$\Delta t = 0.01$$ s.
 
 The assumed fluid and solid physical parameters are given in Table 1.
 
-**Table 1: Physical Parameters**
+### Table 1: Physical Parameters
 
 |          Parameter           |       Symbol       |          Value           |
 | :--------------------------: | :----------------: | :----------------------: |
