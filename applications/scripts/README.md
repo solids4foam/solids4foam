@@ -62,7 +62,9 @@ Changes are performed in different ways:
   by renaming it (see points 4 or 7).
 
 ```note
-The following description refers to the function `solids4foam::convertCaseFormat()`. The description of `solids4foam::convertCaseFormatFoamExtend()` is not provided because it performs the same changes only in reverse order.
+The following description refers to the function `solids4foam::convertCaseFormat()`.
+The description of `solids4foam::convertCaseFormatFoamExtend()` is not provided
+because it performs the same changes only in reverse order.
 ```
 
 **1.** `symmetryPlane` in `foam-extend` becomes `symmetry` in `OpenFOAM`.
@@ -121,7 +123,7 @@ left
 For solid and fluid simulations, `blockMeshDict` is found in
 `constant/polyMesh/`:
 
-```bash
+```plaintext
 ├── 0
 ├── constant
 │   └── polyMesh
@@ -131,7 +133,7 @@ For solid and fluid simulations, `blockMeshDict` is found in
 
 and it is moved to the `system` directory:
 
-```
+```plaintext
 ├── 0
 ├── constant
 │   └── polyMesh
@@ -142,7 +144,7 @@ and it is moved to the `system` directory:
 For fluid-solid interaction simulations, there may be two `blockMeshDict` files,
 each located in the corresponding `solid/` and `fluid/` subdirectories:
 
-```
+```plaintext
 ├── 0
 ├── constant
 │   └── fluid
@@ -156,7 +158,7 @@ each located in the corresponding `solid/` and `fluid/` subdirectories:
 
 These are also relocated to the `system` directory:
 
-```
+```plaintext
 ├── 0
 ├── constant
 │   └── fluid
@@ -175,14 +177,14 @@ These are also relocated to the `system` directory:
 The function file is used to specify the list of function objects and is loaded
 at the bottom of the `controlDict`:
 
-```
+```c++
 #include "./system/functions"
 ```
 
 In the `foam-extend` case structure, the `functions` file is renamed to
 `functions.foam-extend` whereas `functions.openfoam` is renamed to functions:
 
-```
+```plaintext
 └── system
     ├── controlDict
     ├── fvSchemes
@@ -193,7 +195,7 @@ In the `foam-extend` case structure, the `functions` file is renamed to
 
 is transformed into:
 
-```
+```plaintext
 └── system
     ├── controlDict
     ├── fvSchemes
@@ -221,7 +223,7 @@ in the `constant/`.
 
 **4.** If found,`boundaryData` directory is renamed:
 
-```bash
+```plaintext
 ├── 0
 ├── constant
 │   ├── boundaryData
@@ -232,7 +234,7 @@ in the `constant/`.
 
 is transformed into:
 
-```bash
+```plaintext
 ├── 0
 ├── constant
 │   ├── boundaryData.foamextend
@@ -245,7 +247,7 @@ is transformed into:
 [OpenFOAM.org](OpenFOAM.org) version is used, `uniform` is replaced with
 `lineUniform`:
 
-```
+```c++
 sets
 (
     lineXX
@@ -261,7 +263,7 @@ sets
 
 is transformed into:
 
-```
+```c++
 sets
 (
     lineXX
@@ -309,7 +311,7 @@ inlet
 
 **7.** If found, the version of the`changeDictionaryDict` file is updated:
 
-```
+```plaintext
 ├── 0
 ├── constant
 └── system
@@ -322,7 +324,7 @@ inlet
 
 is transformed into:
 
-```bash
+```plaintext
 ├── 0
 ├── constant
 └── system
@@ -335,7 +337,7 @@ is transformed into:
 
 **8.** If found, the version of the`createPatchDict` file is updated:
 
-```bash
+```plaintext
 ├── 0
 ├── constant
 └── system
@@ -348,7 +350,7 @@ is transformed into:
 
 is transformed into:
 
-```bash
+```plaintext
 ├── 0
 ├── constant
 └── system
@@ -395,7 +397,8 @@ plot [0.1:] "< sed s/[\\(\\)]//g forces/0/forces.dat" u 1:2 w l
 is transformed into:
 
 ```bash
-plot [0.1:] "< sed s/[\\(\\)]//g ./postProcessing/fluid/forces/0/force.dat" u 1:2 w l
+plot [0.1:] "< sed s/[\\(\\)]//g ./postProcessing/fluid/forces/0/force.dat" \
+    u 1:2 w l
 ```
 
 **11.** In case the `plot.gnuplot` script is found, the path to the
@@ -527,7 +530,7 @@ written to `errorCommandLog.txt` file.
   In the above example, the error message is stored in the `error.txt` file and
   printed in the console as:
 
-  ```
+  ```plaintext
   ERROR: see error.txt
   [2023-09-05T10:19:18+0200]: The postProcessing directory already exists: run Allclean
   ```
@@ -549,9 +552,10 @@ written to `errorCommandLog.txt` file.
 
   The console output of this will be :
 
-  ```ERROR: see error.txt
+  ```plaintext
   ERROR: see error.txt
-  [2023-09-05T10:19:18+0200]: The postProcessing directory already exists: run Allclean to delete postProcessing/data.dat
+  [2023-09-05T10:19:18+0200]: The postProcessing directory already exists: run
+  Allclean to delete postProcessing/data.dat
          see errorCommandLog.txt
   ```
 
@@ -609,7 +613,6 @@ solids4Foam::runApplication setsToZones
 
 # Run the solver
 solids4Foam::runApplication solids4Foam
-
 ```
 
 In this example, options are not used. `setSet` is executable with

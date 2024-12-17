@@ -27,12 +27,9 @@ Prepared by Ivan Batistić, with additions by Philip Cardiff
 - **Utility purpose** Mesh converter: converts
   [Abaqus](https://www.3ds.com/products-services/simulia/products/abaqus/) mesh
   (in `*.inp` format) into the FOAM mesh format.  
-  Currently, this utility only supports 3-D hexahedral cells/elements. Details
-  regarding the FOAM mesh format can be found, for example,
-  [here](https://www.openfoam.com/documentation/user-guide/4-mesh-generation-and-conversion/4.1-mesh-description#:~:text=By%20default%20OpenFOAM%20defines%20a,any%20restriction%20on%20its%20alignment.).  
-  Note
-  that each distribution of `OpenFOAM` comes with a set of mesh converters (but
-  not for Abaqus), see the available one
+  Currently, this utility only supports 3-D hexahedral cells/elements.
+  Note that each distribution of `OpenFOAM` comes with a set of mesh converters
+  (but not for Abaqus), see the available one
   [here](https://www.openfoam.com/documentation/user-guide/4-mesh-generation-and-conversion/4.5-mesh-conversion).
 - **Arguments**
 
@@ -79,12 +76,8 @@ Prepared by Ivan Batistić, with additions by Philip Cardiff
   addTinyPatch Top TopNew "(30 30 0)"
   ```
 
-<div style="text-align: center;">
-<img src="./images/addTinyPatch.png" alt="Image" width="800">
-    <figcaption>
-     <strong>addTinyPatch: top patch before and after adding one-face patch</strong>
-    </figcaption>
-</div>
+![addTinyPatch: top patch before and after adding one-face patch](./images/addTinyPatch.png)
+**`addTinyPatch`: top patch before and after adding one-face patch**
 
 ```note
 When using `addTinyPatch` the original mesh is overwritten!
@@ -191,15 +184,12 @@ When using `addTinyPatch` the original mesh is overwritten!
   The figure below shows mesh before and after using `perturbMeshPoints`
   utility.
 
-<div style="text-align: center;">
-  <img src="./images/perturbMeshPoints.png" alt="Image" width="800">
-    <figcaption>
-     <strong>perturbMeshPoints: mesh before and after point perturbation</strong>
-    </figcaption>
-</div>
+![perturbMeshPoints: mesh before and after point perturbation](./images/perturbMeshPoints.png)
+**`perturbMeshPoints`: mesh before and after point perturbation**
 
 ```note
-Perturbed mesh (`polyMesh`) is stored in the `0` directory and needs to be moved to `constant` before running the simulation!
+Perturbed mesh (`polyMesh`) is stored in the `0` directory and needs to be moved
+to `constant` before running the simulation!
 ```
 
 ---
@@ -243,15 +233,14 @@ Perturbed mesh (`polyMesh`) is stored in the `0` directory and needs to be moved
   splitPatch
   ```
 
-  <div style="text-align: center;">
-    <img src="./images/splitPatch.png" alt="Image" width="800">
-      <figcaption>
-       <strong>splitPatch: top patch before and after split</strong>
-      </figcaption>
-  </div>
+![splitPatch: top patch before and after split](./images/splitPatch.png")
+**splitPatch: top patch before and after split**
 
   ```note
-  The mesh with the new patch is stored in a new time-step directory (`1` for example) and should be moved to the `constant` before running the simulation. Alternatively, the `-overwrite` option can be used to overwrite the original mesh.
+  The mesh with the new patch is stored in a new time-step directory (`1` for
+  example) and should be moved to the `constant` before running the simulation.
+  Alternatively, the `-overwrite` option can be used to overwrite the original
+  mesh.
   ```
 
 ---
