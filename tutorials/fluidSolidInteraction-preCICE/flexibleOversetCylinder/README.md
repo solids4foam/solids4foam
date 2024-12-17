@@ -29,8 +29,7 @@ the problem using the standard `overPimpleDyMFoam` solver coupled to a
 solids4foam solid solver using [preCICE](https://precice.org), which is an
 open-source coupling library for partitioned multi-physics simulations.
 
-![](images/flexibleOversetCylinderMesh.png)
-
+![Diagram showing the fluid and solid meshes](images/flexibleOversetCylinderMesh.png)
 **Figure 1: `flexibleOversetCylinder` case mesh showing the fluid domain
 (yellow) and the solid domain (cyan)**
 
@@ -76,10 +75,6 @@ requires the following modifications:
           libs ("libpreciceAdapterFunctionObject.so");
       }
       ```
-
-    ```
-
-    ```
 
   - Add the `preciceDict` to the `system` directory; for example, see the
     preCICE
@@ -137,7 +132,6 @@ early stages of the simulation, where the acceleration on the solid is greatest
 **Video 1: Velocity field within the fluid domain and hydrostatic stress field
 within the solid domain in the `flexibleOversetCylinder` tutorial**
 
-![](./images/flexibleOversetCylinderDeformedRing.png)
-
+![Diagram of the mesh](./images/flexibleOversetCylinderDeformedRing.png)
 **Figure 2: Snapshot of the solid deformation in the early stages of the
 `flexibleOversetCylinder` tutorial**

@@ -1,3 +1,5 @@
+# Overview
+
 The preCICE coupling library (<http://precice.org/>) can provide FSI coupling
 between the solids4foam solid solvers and the OpenFOAM fluid solvers (or any
 other fluid solvers supported by preCICE).
