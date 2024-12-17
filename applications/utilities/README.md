@@ -6,7 +6,7 @@ sort: 4
 
 ---
 
-Prepared by Ivan Batistić
+Prepared by Ivan Batistić, with additions by Philip Cardiff
 
 ---
 
@@ -115,9 +115,17 @@ When using `addTinyPatch` the original mesh is overwritten!
 ## `perturbMeshPoints`
 
 - __Utility purpose__  
-  Add a random perturbation to each interior mesh point. Boundary points are not perturbed, except for in-plane motion on `empty` and `wedge` patches.   
-  The utility can be used to create a distorted mesh to test the behavior (accuracy, order of accuracy, stability, etc.) of a discretisation procedure.
+    Add a random perturbation to each mesh points. The perturbation of a point is calculated as a scale factor times the local minimum edge length.
+    
+    By default, boundary points are slide along the patch. Patches which should not move can be defined via the fixedPatches entry.
+    
+    Points on feature edges are not moved, where feature edges are defined by the minimum cosine angle (`minCos`).
 
+    The inputs are defined in `$FOAM_CASE/system/perturbMeshPointsDict`, and consist of a seed (for the random number generator) and a scaling factor to scale the perturbations relative to the local minimum edge length. The scaling factor is a vector to allow different scalings in different directions; for example, for 2-D, the Z
+    component should be set to 0.0.
+
+    This utility is useful for creating distorted grids for testing discretisations.
+    
 - __Arguments__  
   None
 
@@ -129,16 +137,27 @@ When using `addTinyPatch` the original mesh is overwritten!
   Inputs are defined in dictionary named `perturbMeshPointsDict` and located in `system` directory:
 
   ```c++
+  // Perturn by 30% of the local minimum edge length in the X, Y and Z directions
+  scaleFactor (0.3 0.3 0.3);
+  
+  // Gaussian or uniform random distribution
+  Gaussian    no;
+  
+  // Seed for random number generator
   seed        1;
   
-  scaleFactor (5e-3 5e-3 5e-3);
+  // Minimum cosine to find feature edges
+  // Points on feature edges are not moved
+  minCos      0.7;
   
-  Gaussian    no;
+  // Names of patches which should not be perturbed
+  fixedPatches
+  (
+      // Add patch names here
+  );
   ```
 
-  - `seed` is a scalar value used for the random number generator;
-  - `scaleFactor` is a scaling vector which scales the point perturbation in each direction separately;
-  - `Gaussian` enforces Gaussian distribution when perturbing points, otherwise uniform distribution is expected. Only used in combination with [OpenFOAM.com](https://www.openfoam.com/). 
+  The `Gaussian` distribution can only be used in combination with [OpenFOAM.com](https://www.openfoam.com/). 
 
 - __Example of usage__
 
@@ -157,11 +176,6 @@ When using `addTinyPatch` the original mesh is overwritten!
 
 ```note
 Perturbed mesh (`polyMesh`) is stored in the `0` directory and needs to be moved to `constant` before running the simulation!
-```
-
-```tip
-For 2-D simulations, there is no need to perturb points in the `empty` direction. For an empty direction, zero scaling should be used, e.g.:  
-`scaleFactor (5e-3 5e-3 0);`
 ```
 
 ---
