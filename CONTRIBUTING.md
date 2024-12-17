@@ -78,9 +78,6 @@ Go to the original solids4foam repository on GitHub and open a pull request (tar
 
 ## Questions?
 
-Feel free to open a [discussion thread](https://github.com/solids4foam/solids4foam/discussions) if you have any questions or need assistance, 
-## Questions?
-
 If you have any questions or need assistance, we encourage you to use the appropriate discussion platform based on your query:
 
 - **User Support**: For general usage questions, user support, or troubleshooting, please post on the **CFD Online Forum**: [https://www.cfd-online.com/Forums/openfoam-cc-toolkits-fluid-structure-interaction/](https://www.cfd-online.com/Forums/openfoam-cc-toolkits-fluid-structure-interaction/)
