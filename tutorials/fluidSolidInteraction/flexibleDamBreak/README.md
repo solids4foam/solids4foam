@@ -33,14 +33,11 @@ neo-Hookean large strain constitutive law. The total Lagrangian solid model
 solver, and the volume-of-fluid incompressible multiphase fluid model
 (interFluid) is used as the fluid solver.
 
-<div style="text-align: center;">
-  <img src="./images/flexibleDamBreak-geometry.png" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 1: Problem geometry and initial conditions </strong>
-    </figcaption>
-</div>
+![Figure 1: Problem geometry and initial conditions](./images/flexibleDamBreak-geometry.png)
 
-**Table 1: Problem Physical Parameters**
+### Figure 1: Problem geometry and initial conditions
+
+### Table 1: Problem Physical Parameters
 
 |           Parameter           |       Value        |
 | :---------------------------: | :----------------: |
@@ -64,16 +61,12 @@ are compared with numerical solutions from the literature in Figure 2, showing
 reasonable agreement. For better agreement, a mesh and time-step independence
 study should be performed.
 
-<div style="text-align: center;">
-  <img src="./images/flexibleDamBreak-plot.pdf" alt="Image" width="500">
-    <figcaption>
-     <strong>Figure 2: Displacement over time for the top-left corner of flexible obstacle (the "dam")  </strong>
-    </figcaption>
-</div>
+![Figure 2: Displacement over time for the top-left corner of flexible obstacle (the "dam")](./images/flexibleDamBreak-plot.pdf)
 
-<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; height: auto;">
-  <iframe src="https://www.youtube.com/embed/Ttmvg7r9MJg?si=Y4mabkGgYqbgJdYV" frameborder="0" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" allowfullscreen></iframe>
-</div>
+ **Figure 2: Displacement over time for the top-left corner of flexible obstacle
+ (the "dam")**
+
+{% include youtube.html id="Ttmvg7r9MJg" %}
 
 **Video 1: Evolution of the volume-of-fluid field in the fluid domain and the
 displacement field in the solid domain**

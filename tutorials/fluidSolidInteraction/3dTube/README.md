@@ -23,8 +23,7 @@ You can find the files for this tutorial under
 This case consists of a pressure pulse applied in a thick-walled elastic tube
 (Figure 1).
 
-![](images/3dTube.png)
-
+![Figure 1: Wave propagation in an elastic pipe](images/3dTube.png)
 **Figure 1: Wave propagation in an elastic pipe**
 
 The fluid is assumed incompressible, Newtonian and isothermal, with a density of
@@ -49,14 +48,19 @@ FSI coupling:
   fluid velocity and Neumann conditions to the fluid pressure and solid
   displacement. This approach **does not** require modification of the
   underlying fluid solver; see
-  [Tuković Ž, Karač A, Cardiff P, Jasak H, Ivanković A, 2018, OpenFOAM finite volume solver for fluid–solid interaction. Trans FAMENA, 42(3):1–31.10.21278/TOF.42301](https://hrcak.srce.hr/206941);
+  [Tuković Ž, Karač A, Cardiff P, Jasak H, Ivanković A, 2018, OpenFOAM finite
+  volume solver for fluid–solid interaction. Trans FAMENA,
+  42(3):1–31.10.21278/TOF.42301](https://hrcak.srce.hr/206941);
 
 - **Robin-Neumann coupling**, where a Dirichlet condition is applied to the
   fluid velocity, a Robin condition to the fluid pressure, and a Neumann
   condition to the solid displacement. This approach **does** require
   modification of the underlying fluid solver, and hence it cannot be considered
   a _black-box_ coupling approach; see
-  [Tuković Ž, Bukač M, Cardiff P, Jasak H, Ivanković A, 2018, Added mass partitioned fluid–structure interaction solver based on a robin boundary condition for pressure. In: OpenFOAM selected papers of the 11th workshop. Springer, Berlin, pp 1–23](https://doi.org/10.1007/978-3-319-60846-4_1).
+  [Tuković Ž, Bukač M, Cardiff P, Jasak H, Ivanković A, 2018, Added mass
+  partitioned fluid–structure interaction solver based on a robin boundary
+  condition for pressure. In: OpenFOAM selected papers of the 11th workshop.
+  Springer, Berlin, pp 1–23](https://doi.org/10.1007/978-3-319-60846-4_1).
 
 For each of these two classes of approach, we can employ different methods to
 accelerate the FSI iteration loop convergence; within solids4foam, we can use:
@@ -64,13 +68,18 @@ accelerate the FSI iteration loop convergence; within solids4foam, we can use:
 - Aitken's dynamic relaxation;
 
 - the IQN-ILS algorithm of
-  [Joris Degroote, Robby Haelterman, Sebastiaan Annerel, Peter Bruggeman, Jan Vierendeels, Performance of partitioned procedures in fluid–structure interaction, Computers & Structures, 88, 7–8, 2010, 10.1016/j.compstruc.2009.12.006](https://www.sciencedirect.com/science/article/abs/pii/S0045794909003022).
+  [Joris Degroote, Robby Haelterman, Sebastiaan Annerel, Peter Bruggeman, Jan
+  Vierendeels, Performance of partitioned procedures in fluid–structure
+  interaction, Computers & Structures, 88, 7–8, 2010,
+  10.1016/j.compstruc.2009.12.006](https://www.sciencedirect.com/science/article/abs/pii/S0045794909003022).
 
 As well as using these acceleration algorithms, we can also use a **weakly
 compressible** fluid model rather than the standard **fully incompressible**
 model; for FSI, weakly compressible fluid models how been shown to improve
 convergence, for example, see
-[E. Tandis and A. Ashrafizadeh, “A numerical study on the fluid compressibility effects in strongly coupled fluid–solid interaction problems,” Engineering with Computers, 2019, doi: 10.1007/s00366-019-00880-4.](https://doi.org/10.1007/s00366-019-00880-4).
+[E. Tandis and A. Ashrafizadeh, “A numerical study on the fluid compressibility
+effects in strongly coupled fluid–solid interaction problems,” Engineering with
+Computers, 2019, doi: 10.1007/s00366-019-00880-4.](https://doi.org/10.1007/s00366-019-00880-4).
 
 In this tutorial, we will compare six variants of the approaches above:
 
@@ -127,7 +136,8 @@ The tutorial case for approach 6, which uses preCICE, is located at
 `Allrun` script runs the case.
 
 ```tip
-Remember that a tutorial case can be cleaned and reset using the included `Allrun` script, i.e. `./Allclean`.
+Remember that a tutorial case can be cleaned and reset using the included
+`Allrun` script, i.e. `./Allclean`.
 ```
 
 ---
@@ -157,16 +167,13 @@ iterations per time step. In the figures, the approaches are designated as:
 - preCICE-DN-IQNILS: Dirichlet-Neumann formulation with IQNILS acceleration and
   an incompressible fluid model using preCICE.
 
-![](./images/axial-displacement-deltaT1e-4.png)
-
+![Figure 2: Axial displacement at point A vs time with deltaT = 1e-4 s](./images/axial-displacement-deltaT1e-4.png)
 **Figure 2: Axial displacement at point A vs time with deltaT = 1e-4 s**
 
-![](./images/radial-displacement-deltaT1e-4.png)
-
+![Figure 3: Radial displacement at point A vs time with deltaT = 1e-4 s](./images/radial-displacement-deltaT1e-4.png)
 **Figure 3: Radial displacement at point A vs time with deltaT = 1e-4 s**
 
-![](./images/coupling-iterations-deltaT1e-4.png)
-
+![Figure 4: Number of FSI iterations per time-step with deltaT = 1e-4 s](./images/coupling-iterations-deltaT1e-4.png)
 **Figure 4: Number of FSI iterations per time-step with deltaT = 1e-4 s**
 
 The predictions from all approaches agree closely. Examining the number of FSI
@@ -181,16 +188,14 @@ Dirichlet-Neumann and Robin-Neumann approaches are seen to perform the poorest.
 To observe the effect of the time step size, the cases were re-run with a
 smaller time step of 2.5e-5 s, where Figures 5, 6 and 7 show the radial
 displacement, axial displacement and the number of iterations.
-![](./images/axial-displacement-deltaT2.5e-5.png)
 
+!Figure 5: Axial displacement at point A vs time with deltaT = 2.5e-5 s[](./images/axial-displacement-deltaT2.5e-5.png)
 **Figure 5: Axial displacement at point A vs time with deltaT = 2.5e-5 s**
 
-![](./images/radial-displacement-deltaT2.5e-5.png)
-
+![Figure 6: Radial displacement at point A vs time with deltaT = 2.5e-5 s](./images/radial-displacement-deltaT2.5e-5.png)
 **Figure 6: Radial displacement at point A vs time with deltaT = 2.5e-5 s**
 
-![](./images/coupling-iterations-deltaT2.5e-5.png)
-
+![Figure 7: Number of FSI iterations per time-step with deltaT = 2.5e-5 s](./images/coupling-iterations-deltaT2.5e-5.png)
 **Figure 7: Number of FSI iterations per time-step with deltaT = 2.5e-5 s**
 
 Unlike the larger time step, the Robin-Neumann approach now requires the least
@@ -220,18 +225,18 @@ generated using the weakly compressible fluid model and Aitken's coupling;
 however, the same behaviour is expected with the other modelling and coupling
 approaches.
 
-![](./images/radial-displacement-euler.png)
-
+![Figure 8: The effect of the time step size when using the first-order `Euler`
+time scheme](./images/radial-displacement-euler.png)
 **Figure 8: The effect of the time step size when using the first-order `Euler`
 time scheme**
 
-![](./images/radial-displacement-backward.png)
-
+![Figure 9: The effect of the time step size when using the second-order
+`backward` time scheme](./images/radial-displacement-backward.png)
 **Figure 9: The effect of the time step size when using the second-order
 `backward` time scheme**
 
-![](./images/radial-displacement-time-schemes.png)
-
+![Figure 10: Comparing the first-order `Euler` and second-order `backward`
+schemes as the time step size is reduced](./images/radial-displacement-time-schemes.png)
 **Figure 10: Comparing the first-order `Euler` and second-order `backward`
 schemes as the time step size is reduced**
 

@@ -2,7 +2,7 @@
 sort: 3
 ---
 
-# Fluid-solid interaction benchmark between an elastic object and laminar incompressible flow: `HronTurekFsi3`
+# Hron_Turek fluid-solid interaction benchmark: `HronTurekFsi3`
 
 ---
 
@@ -39,14 +39,13 @@ reach the periodic motion of the plate, the inlet velocity profile is applied
 without a gradual increase in the mean velocity and the coupling between the
 fluid and the solid is activated after 2 s.
 
-<div style="text-align: center;">
-  <img src="./images/HronTurekFsi3-geometry.pdf" alt="Image" width="600">
-    <figcaption>
-     <strong>Figure 1: Computational domain with a structural detail for the elastic plate case. All dimensions are in m. </strong>
-    </figcaption>
-</div>
+![Figure 1: Computational domain with a structural detail for the elas\
+tic plate case. All dimensions are in m.](./images/HronTurekFsi3-geometry.pdf)
 
-**Table 1: Problem Physical Parameters**
+**Figure 1: Computational domain with a structural detail for the elastic plate
+case. All dimensions are in m.**
+
+### Table 1: Problem Physical Parameters
 
 |            Parameter             | Value (FSI3) |   Units    |
 | :------------------------------: | :----------: | :--------: |
@@ -76,34 +75,32 @@ y-component goes up to 40%, which can be attributed to the difficulty in
 calculating the mean value in the case when it is close to zero.
 
 ```note
-The results in Figures 3 and 4 and Table 2 were generated with the mesh and time settings used in Tuković et al. [2], whereas Figure 2 and Video 1 were generated using the default settings in the tutorial case.
+The results in Figures 3 and 4 and Table 2 were generated with the mesh and time
+settings used in Tuković et al. [2], whereas Figure 2 and Video 1 were generated
+using the default settings in the tutorial case.
 ```
 
-<div style="text-align: center;">
-  <img src="./images/HronTurekFsi3-results.png" alt="Image" width="500">
-    <figcaption>
-     <strong>Figure 2: Snapshot of the pressure field in the fluid and the equivalent (von Mises) stress field in the solid.</strong>
-    </figcaption>
-</div>
+![Figure 2: Snapshot of the pressure field in the fluid and the equivalent (von Mises) stress field in the solid](./images/HronTurekFsi3-results.png)
+
+**Figure 2: Snapshot of the pressure field in the fluid and the equivalent (von
+Mises) stress field in the solid**
 
 {% include youtube.html id="GCwZ3tC-Iig" %}
 
 **Video 1: Time evolution of the pressure field in the fluid and the
 displacement magnitude field in the solid.**
 
-<div style="text-align: center;">
-  <img src="./images/HronTurekFsi3-displacement.pdf" alt="Image" width="500">
-    <figcaption>
-     <strong>Figure 3: Displacement of the plate tip point A for the elastic plate behind a rigid cylinder case.</strong>
-    </figcaption>
-</div>
+![Figure 3: Displacement of the plate tip point A for the elastic plat\
+e behind a rigid cylinder case](./images/HronTurekFsi3-displacement.pdf")
 
-<div style="text-align: center;">
-  <img src="./images/HronTurekFsi3-force.pdf" alt="Image" width="500">
-    <figcaption>
-     <strong>Figure 4: Force on the plate and the cylinder for the elastic plate behind a rigid cylinder case.</strong>
-    </figcaption>
-</div>
+**Figure 3: Displacement of the plate tip point A for the elastic plate behind a
+rigid cylinder case**
+
+![Figure 4: Force on the plate and the cylinder for the elastic plate behind a
+rigid cylinder case](./images/HronTurekFsi3-force.pdf")
+
+**Figure 4: Force on the plate and the cylinder for the elastic plate behind a
+rigid cylinder case**
 
 **Table 2: Displacement on point A and the force on the elastic plate. The
 values are given in the same format as in the benchmark paper [1] (mean ±
